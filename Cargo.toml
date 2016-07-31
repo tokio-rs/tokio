@@ -1,0 +1,18 @@
+[package]
+name = "futures-mio"
+version = "0.1.0"
+authors = ["Alex Crichton <alex@alexcrichton.com>"]
+
+[dependencies]
+futures = { path = ".." }
+futures-io = { path = "../futures-io" }
+log = "0.3"
+mio = { git = "https://github.com/alexcrichton/mio", branch = "write-then-drop" }
+scoped-tls = "0.1.0"
+slab = "0.2.0"
+
+[dev-dependencies]
+env_logger = "0.3"
+
+[lib]
+test = false
