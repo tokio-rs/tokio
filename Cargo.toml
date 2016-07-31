@@ -2,10 +2,19 @@
 name = "futures-mio"
 version = "0.1.0"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/alexcrichton/futures-rs"
+homepage = "https://github.com/alexcrichton/futures-rs"
+documentation = "http://alexcrichton.com/futures-rs/futures_mio/"
+description = """
+Bindings from the `futures` crate to the `mio` crate to get I/O in the form of
+futures and streams.
+"""
 
 [dependencies]
-futures = { path = ".." }
-futures-io = { path = "../futures-io" }
+futures = { path = "..", version = "0.1.0" }
+futures-io = { path = "../futures-io", version = "0.1.0" }
 log = "0.3"
 mio = { git = "https://github.com/alexcrichton/mio", branch = "write-then-drop" }
 scoped-tls = "0.1.0"
