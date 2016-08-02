@@ -33,12 +33,6 @@ mod slot;
 #[path = "../../src/lock.rs"]
 mod lock;
 
-/// A convenience typedef around a `Future` whose error component is `io::Error`
-pub type IoFuture<T> = Future<Item=T, Error=io::Error>;
-
-/// A convenience typedef around a `Stream` whose error component is `io::Error`
-pub type IoStream<T> = Stream<Item=T, Error=io::Error>;
-
 pub use event_loop::{Loop, LoopHandle};
 pub use readiness_stream::ReadinessStream;
 pub use tcp::{TcpListener, TcpStream};
