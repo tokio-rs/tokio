@@ -232,6 +232,7 @@ impl Loop {
     fn deschedule(&self, token: usize) {
         let mut dispatch = self.dispatch.borrow_mut();
         dispatch.get_mut(token).unwrap();
+        // TODO: was... this supposed to do something?
     }
 
     fn consume_queue(&self) {
