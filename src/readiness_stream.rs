@@ -1,13 +1,10 @@
-#![allow(missing_docs)] // TODO: document this module
-
 use std::io;
 use std::sync::Arc;
 
 use futures::stream::Stream;
 use futures::{Future, Task, Poll};
-use futures_io::Ready;
+use futures_io::{Ready, IoFuture};
 
-use IoFuture;
 use event_loop::{IoSource, LoopHandle};
 use readiness_stream::drop_source::DropSource;
 
@@ -40,6 +37,19 @@ mod drop_source {
     }
 }
 
+/// A concrete implementation of a stream of readiness notifications for I/O
+/// objects that originates from an event loop.
+///
+/// Created by the `ReadinessStream::new` method, each `ReadinessStream` is
+/// associated with a specific event loop and source of events that will be
+/// registered with an event loop.
+///
+/// Currently readiness streams have "edge" semantics. That is, if a stream
+/// receives a readable notification it will not receive another readable
+/// notification until all bytes have been read from the stream.
+///
+/// Note that the precise semantics of when notifications are received will
+/// likely be configurable in the future.
 pub struct ReadinessStream {
     io_token: usize,
     loop_handle: LoopHandle,
@@ -48,6 +58,11 @@ pub struct ReadinessStream {
 }
 
 impl ReadinessStream {
+    /// Creates a new readiness stream associated with the provided
+    /// `loop_handle` and for the given `source`.
+    ///
+    /// This method returns a future which will resolve to the readiness stream
+    /// when it's ready.
     pub fn new(loop_handle: LoopHandle, source: IoSource)
                -> Box<IoFuture<ReadinessStream>> {
         loop_handle.add_source(source.clone()).map(|token| {

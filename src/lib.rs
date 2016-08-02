@@ -19,15 +19,9 @@ extern crate scoped_tls;
 #[macro_use]
 extern crate log;
 
-use std::io;
-use futures::Future;
-use futures::stream::Stream;
-
 mod readiness_stream;
 mod event_loop;
 mod tcp;
-mod buf_reader;
-mod buf_writer;
 #[path = "../../src/slot.rs"]
 mod slot;
 #[path = "../../src/lock.rs"]
@@ -36,5 +30,3 @@ mod lock;
 pub use event_loop::{Loop, LoopHandle};
 pub use readiness_stream::ReadinessStream;
 pub use tcp::{TcpListener, TcpStream};
-pub use buf_reader::{BufReader, InputBuf};
-pub use buf_writer::{BufWriter, Flush, Reserve};

@@ -5,6 +5,7 @@
 
 #[macro_use]
 extern crate futures;
+extern crate futures_io;
 extern crate futures_mio;
 
 use std::env;
@@ -32,7 +33,7 @@ fn main() {
     l.run(server).unwrap();
 }
 
-fn write(socket: futures_mio::TcpStream) -> Box<futures_mio::IoFuture<()>> {
+fn write(socket: futures_mio::TcpStream) -> Box<futures_io::IoFuture<()>> {
     static BUF: &'static [u8] = &[0; 64 * 1024];
     socket.into_future().map_err(|e| e.0).and_then(move |(ready, mut socket)| {
         let ready = match ready {

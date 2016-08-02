@@ -111,7 +111,10 @@ impl Loop {
         }
     }
 
-    #[allow(missing_docs)]
+    /// Runs a future until completion, driving the event loop while we're
+    /// otherwise waiting for the future to complete.
+    ///
+    /// Returns the value that the future resolves to.
     pub fn run<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
         let (tx_res, rx_res) = mpsc::channel();
         let handle = self.handle();

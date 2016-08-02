@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use futures::stream::{self, Stream};
 use futures::{Future, IntoFuture, failed, Task, Poll};
-use futures_io::Ready;
+use futures_io::{Ready, IoFuture, IoStream};
 use mio;
 
-use {IoFuture, IoStream, ReadinessStream, LoopHandle};
+use {ReadinessStream, LoopHandle};
 use event_loop::Source;
 
 /// An I/O object representing a TCP socket listening for incoming connections.
