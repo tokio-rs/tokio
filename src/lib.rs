@@ -22,6 +22,7 @@ extern crate log;
 mod readiness_stream;
 mod event_loop;
 mod tcp;
+mod udp;
 #[path = "../../src/slot.rs"]
 mod slot;
 #[path = "../../src/lock.rs"]
@@ -30,3 +31,4 @@ mod lock;
 pub use event_loop::{Loop, LoopHandle};
 pub use readiness_stream::ReadinessStream;
 pub use tcp::{TcpListener, TcpStream};
+pub use udp::UdpSocket;
