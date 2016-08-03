@@ -1,6 +1,6 @@
 use std::io::{self, ErrorKind, Read, Write};
 use std::mem;
-use std::net::{self, SocketAddr};
+use std::net::{self, SocketAddr, Shutdown};
 use std::sync::Arc;
 
 use futures::stream::{self, Stream};
@@ -238,6 +238,31 @@ impl TcpStream {
     /// Returns the remote address that this stream is connected to.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.source.io().peer_addr()
+    }
+
+    /// Shuts down the read, write, or both halves of this connection.
+    ///
+    /// This function will cause all pending and future I/O on the specified
+    /// portions to return immediately with an appropriate value (see the
+    /// documentation of `Shutdown`).
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        self.source.io().shutdown(how)
+    }
+
+    /// Sets the value of the `TCP_NODELAY` option on this socket.
+    ///
+    /// If set, this option disables the Nagle algorithm. This means that
+    /// segments are always sent as soon as possible, even if there is only a
+    /// small amount of data. When not set, data is buffered until there is a
+    /// sufficient amount to send out, thereby avoiding the frequent sending of
+    /// small packets.
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        self.source.io().set_nodelay(nodelay)
+    }
+
+    /// Sets the keepalive time in seconds for this socket.
+    pub fn set_keepalive_s(&self, seconds: Option<u32>) -> io::Result<()> {
+        self.source.io().set_keepalive(seconds)
     }
 }
 
