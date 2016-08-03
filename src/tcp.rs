@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{self, ErrorKind, Read, Write};
 use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
@@ -124,6 +125,12 @@ impl Iterator for NonblockingIter {
             }
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl fmt::Debug for TcpListener {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.listener.io().fmt(f)
     }
 }
 
@@ -332,6 +339,12 @@ impl<'a> Write for &'a TcpStream {
     }
     fn flush(&mut self) -> io::Result<()> {
         self.source.io().flush()
+    }
+}
+
+impl fmt::Debug for TcpStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.source.io().fmt(f)
     }
 }
 

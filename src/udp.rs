@@ -1,6 +1,7 @@
 use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
+use std::fmt;
 
 use futures::stream::Stream;
 use futures::{Future, failed, Task, Poll};
@@ -71,16 +72,22 @@ impl UdpSocket {
     ///
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
-                   -> io::Result<Option<usize>> {
-        self.source.io().send_to(buf, target)
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+        match self.source.io().send_to(buf, target) {
+            Ok(Some(n)) => Ok(n),
+            Ok(None) => Err(io::Error::new(io::ErrorKind::WouldBlock, "would block")),
+            Err(e) => Err(e),
+        }
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
-    pub fn recv_from(&self, buf: &mut [u8])
-                     -> io::Result<Option<(usize, SocketAddr)>> {
-        self.source.io().recv_from(buf)
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        match self.source.io().recv_from(buf) {
+            Ok(Some(n)) => Ok(n),
+            Ok(None) => Err(io::Error::new(io::ErrorKind::WouldBlock, "would block")),
+            Err(e) => Err(e),
+        }
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
@@ -221,6 +228,12 @@ impl UdpSocket {
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
         self.source.io().leave_multicast_v6(multiaddr, interface)
+    }
+}
+
+impl fmt::Debug for UdpSocket {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.source.io().fmt(f)
     }
 }
 
