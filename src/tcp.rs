@@ -360,3 +360,41 @@ impl Stream for TcpStream {
         self.ready.schedule(task)
     }
 }
+
+#[cfg(unix)]
+mod sys {
+    use std::os::unix::prelude::*;
+    use super::{TcpStream, TcpListener};
+
+    impl AsRawFd for TcpStream {
+        fn as_raw_fd(&self) -> RawFd {
+            self.source.io().as_raw_fd()
+        }
+    }
+
+    impl AsRawFd for TcpListener {
+        fn as_raw_fd(&self) -> RawFd {
+            self.listener.io().as_raw_fd()
+        }
+    }
+}
+
+#[cfg(windows)]
+mod sys {
+    // TODO: let's land these upstream with mio and then we can add them here.
+    //
+    // use std::os::windows::prelude::*;
+    // use super::{TcpStream, TcpListener};
+    //
+    // impl AsRawHandle for TcpStream {
+    //     fn as_raw_handle(&self) -> RawHandle {
+    //         self.source.io().as_raw_handle()
+    //     }
+    // }
+    //
+    // impl AsRawHandle for TcpListener {
+    //     fn as_raw_handle(&self) -> RawHandle {
+    //         self.listener.io().as_raw_handle()
+    //     }
+    // }
+}

@@ -249,3 +249,29 @@ impl Stream for UdpSocket {
         self.ready.schedule(task)
     }
 }
+
+#[cfg(unix)]
+mod sys {
+    use std::os::unix::prelude::*;
+    use super::UdpSocket;
+
+    impl AsRawFd for UdpSocket {
+        fn as_raw_fd(&self) -> RawFd {
+            self.source.io().as_raw_fd()
+        }
+    }
+}
+
+#[cfg(windows)]
+mod sys {
+    // TODO: let's land these upstream with mio and then we can add them here.
+    //
+    // use std::os::windows::prelude::*;
+    // use super::UdpSocket;
+    //
+    // impl AsRawHandle for UdpSocket {
+    //     fn as_raw_handle(&self) -> RawHandle {
+    //         self.source.io().as_raw_handle()
+    //     }
+    // }
+}
