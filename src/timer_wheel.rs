@@ -230,12 +230,11 @@ impl<T> TimerWheel<T> {
                 (Some(a), Some(b)) => Some(cmp::min(a, b)),
             }
         });
-        let time = min.map(|min| min + Duration::from_millis(TICK_MS / 2));
-        if let Some(time) = time {
-            debug!("next timeout {:?}", time);
+        if let Some(min) = min {
+            debug!("next timeout {:?}", min);
             debug!("now          {:?}", Instant::now());
         }
-        return time
+        return min
     }
 
     /// Cancels the specified timeout.
