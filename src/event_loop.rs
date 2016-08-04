@@ -1,5 +1,7 @@
+use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::io::{self, ErrorKind};
+use std::marker;
 use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
@@ -7,11 +9,13 @@ use std::sync::mpsc;
 use std::time::{Instant, Duration};
 
 use futures::{Future, Task, TaskHandle, Poll};
+use futures::executor::{ExecuteCallback, Executor};
 use futures_io::Ready;
-use mio::channel::SendError;
 use mio;
 use slab::Slab;
 
+use channel::{Sender, Receiver, channel};
+use event_loop::dropbox::DropBox;
 use slot::{self, Slot};
 use timer_wheel::{TimerWheel, Timeout};
 
@@ -31,8 +35,8 @@ pub struct Loop {
     id: usize,
     active: Cell<bool>,
     io: mio::Poll,
-    tx: mio::channel::Sender<Message>,
-    rx: mio::channel::Receiver<Message>,
+    tx: Arc<MioSender>,
+    rx: Receiver<Message>,
     dispatch: RefCell<Slab<Scheduled, usize>>,
 
     // Timer wheel keeping track of all timeouts. The `usize` stored in the
@@ -45,6 +49,10 @@ pub struct Loop {
     timeouts: RefCell<Slab<(Timeout, TimeoutState), usize>>,
 }
 
+struct MioSender {
+    inner: Sender<Message>,
+}
+
 /// Handle to an event loop, used to construct I/O objects, send messages, and
 /// otherwise interact indirectly with the event loop itself.
 ///
@@ -53,7 +61,7 @@ pub struct Loop {
 #[derive(Clone)]
 pub struct LoopHandle {
     id: usize,
-    tx: mio::channel::Sender<Message>,
+    tx: Arc<MioSender>,
 }
 
 struct Scheduled {
@@ -75,6 +83,8 @@ enum Message {
     AddTimeout(Instant, Arc<Slot<io::Result<TimeoutToken>>>),
     UpdateTimeout(TimeoutToken, TaskHandle),
     CancelTimeout(TimeoutToken),
+    Run(Box<ExecuteCallback>),
+    Drop(DropBox<Any>),
     Shutdown,
 }
 
@@ -103,7 +113,7 @@ impl Loop {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Loop> {
-        let (tx, rx) = mio::channel::from_std_channel(mpsc::channel());
+        let (tx, rx) = channel();
         let io = try!(mio::Poll::new());
         try!(io.register(&rx,
                          mio::Token(0),
@@ -113,7 +123,7 @@ impl Loop {
             id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
             active: Cell::new(true),
             io: io,
-            tx: tx,
+            tx: Arc::new(MioSender { inner: tx }),
             rx: rx,
             dispatch: RefCell::new(Slab::new_starting_at(1, SLAB_CAPACITY)),
             timeouts: RefCell::new(Slab::new_starting_at(0, SLAB_CAPACITY)),
@@ -314,7 +324,8 @@ impl Loop {
     }
 
     fn consume_queue(&self) {
-        while let Ok(msg) = self.rx.try_recv() {
+        // TODO: can we do better than `.unwrap()` here?
+        while let Some(msg) = self.rx.recv().unwrap() {
             self.notify(msg);
         }
     }
@@ -337,6 +348,8 @@ impl Loop {
             }
             Message::UpdateTimeout(t, handle) => self.update_timeout(&t, handle),
             Message::CancelTimeout(t) => self.cancel_timeout(&t),
+            Message::Run(f) => f.call(),
+            Message::Drop(data) => drop(data),
         }
     }
 }
@@ -352,20 +365,14 @@ impl LoopHandle {
                     lp.notify(msg);
                 }
                 None => {
-                    match self.tx.send(msg) {
+                    match self.tx.inner.send(msg) {
                         Ok(()) => {}
 
                         // This should only happen when there was an error
                         // writing to the pipe to wake up the event loop,
                         // hopefully that never happens
-                        Err(SendError::Io(e)) => {
+                        Err(e) => {
                             panic!("error sending message to event loop: {}", e)
-                        }
-
-                        // If we're still sending a message to the event loop
-                        // after it's closed, then that's bad!
-                        Err(SendError::Disconnected(_)) => {
-                            panic!("event loop is no longer available")
                         }
                     }
                 }
@@ -511,6 +518,38 @@ impl LoopHandle {
         self.send(Message::CancelTimeout(timeout))
     }
 
+    /// Schedules a closure to add some data to event loop thread itself.
+    ///
+    /// This function is useful for when storing non-`Send` data inside of a
+    /// future. This returns a future which will resolve to a `LoopData<A>`
+    /// handle, which is itself `Send + 'static` regardless of the underlying
+    /// `A`. That is, for example, you can create a handle to some data that
+    /// contains an `Rc`, for example.
+    ///
+    /// This function takes a closure which may be sent to the event loop to
+    /// generate an instance of type `A`. The closure itself is required to be
+    /// `Send + 'static`, but the data it produces is only required to adhere to
+    /// `Any`.
+    ///
+    /// If the returned future is polled on the event loop thread itself it will
+    /// very cheaply resolve to a handle to the data, but if it's not polled on
+    /// the event loop then it will send a message to the event loop to run the
+    /// closure `f`, generate a handle, and then the future will yield it back.
+    // TODO: more with examples
+    pub fn add_loop_data<F, A>(&self, f: F) -> AddLoopData<F, A>
+        where F: FnOnce() -> A + Send + 'static,
+              A: Any,
+    {
+        AddLoopData {
+            _marker: marker::PhantomData,
+            inner: LoopFuture {
+                loop_handle: self.clone(),
+                data: Some(f),
+                result: None,
+            },
+        }
+    }
+
     /// Send a message to the associated event loop that it should shut down, or
     /// otherwise break out of its current loop of iteration.
     ///
@@ -571,6 +610,271 @@ impl Future for AddTimeout {
 
     fn schedule(&mut self, task: &mut Task) {
         self.inner.schedule(task, Message::AddTimeout)
+    }
+}
+
+/// A handle to data that is owned by an event loop thread, and is only
+/// accessible on that thread itself.
+///
+/// This structure is created by the `LoopHandle::add_loop_data` method which
+/// will return a future resolving to one of these references. A `LoopData<A>`
+/// handle is `Send` regardless of what `A` is, but the internal data can only
+/// be accessed on the event loop thread itself.
+///
+/// Internally this reference also stores a handle to the event loop that the
+/// data originated on, so it knows how to go back to the event loop to access
+/// the data itself.
+// TODO: write more once it's implemented
+pub struct LoopData<A: Any> {
+    data: DropBox<A>,
+    handle: LoopHandle,
+}
+
+/// Future returned from the `LoopHandle::add_loop_data` method.
+///
+/// This future will resolve to a `LoopData<A>` reference when completed, which
+/// represents a handle to data that is "owned" by the event loop thread but can
+/// migrate among threads temporarily so travel with a future itself.
+pub struct AddLoopData<F, A> {
+    inner: LoopFuture<DropBox<Any>, F>,
+    _marker: marker::PhantomData<fn() -> A>,
+}
+
+fn _assert() {
+    fn _assert_send<T: Send>() {}
+    _assert_send::<LoopData<()>>();
+}
+
+impl<F, A> Future for AddLoopData<F, A>
+    where F: FnOnce() -> A + Send + 'static,
+          A: Any,
+{
+    type Item = LoopData<A>;
+    type Error = io::Error;
+
+    fn poll(&mut self, _task: &mut Task) -> Poll<LoopData<A>, io::Error> {
+        let ret = self.inner.poll(|_lp, f| {
+            Ok(DropBox::new(f()))
+        });
+
+        ret.map(|mut data| {
+            match data.downcast::<A>() {
+                Some(data) => {
+                    LoopData {
+                        data: data,
+                        handle: self.inner.loop_handle.clone(),
+                    }
+                }
+                None => panic!("data mixed up?"),
+            }
+        })
+    }
+
+    fn schedule(&mut self, task: &mut Task) {
+        self.inner.schedule(task, |f, slot| {
+            Message::Run(Box::new(move || {
+                slot.try_produce(Ok(DropBox::new(f()))).ok()
+                    .expect("add loop data try_produce intereference");
+            }))
+        })
+    }
+}
+
+impl<A: Any> LoopData<A> {
+    /// Gets a shared reference to the underlying data in this handle.
+    ///
+    /// Returns `None` if it is not called from the event loop thread that this
+    /// `LoopData<A>` is associated with, or `Some` with a reference to the data
+    /// if we are indeed on the event loop thread.
+    pub fn get(&self) -> Option<&A> {
+        self.data.get()
+    }
+
+    /// Gets a mutable reference to the underlying data in this handle.
+    ///
+    /// Returns `None` if it is not called from the event loop thread that this
+    /// `LoopData<A>` is associated with, or `Some` with a reference to the data
+    /// if we are indeed on the event loop thread.
+    pub fn get_mut(&mut self) -> Option<&mut A> {
+        self.data.get_mut()
+    }
+
+    /// Acquire the executor associated with the thread that owns this
+    /// `LoopData<A>`'s data.
+    ///
+    /// If the `get` and `get_mut` functions above return `None`, then this data
+    /// is being polled on the wrong thread to access the data, and to make
+    /// progress a future may need to migrate to the actual thread which owns
+    /// the relevant data.
+    ///
+    /// This executor can in turn be passed to `Task::poll_on`, which will then
+    /// move the entire future to be polled on the right thread.
+    pub fn executor(&self) -> Arc<Executor> {
+        self.handle.tx.clone()
+    }
+}
+
+impl<A: Any> Drop for LoopData<A> {
+    fn drop(&mut self) {
+        // The `DropBox` we store internally will cause a memory leak if it's
+        // dropped on the wrong thread. While necessary for safety, we don't
+        // actually want a memory leak, so for all normal circumstances we take
+        // out the `DropBox<A>` as a `DropBox<Any>` and then we send it off to
+        // the event loop.
+        //
+        // TODO: possible optimization is to do none of this if we're on the
+        //       event loop thread itself
+        if let Some(data) = self.data.take_any() {
+            self.handle.send(Message::Drop(data));
+        }
+    }
+}
+
+/// A curious inner module with one `unsafe` keyword, yet quite an important
+/// one!
+///
+/// The purpose of this module is to define a type, `DropBox<A>`, which is able
+/// to be sent across thread event when the underlying data `A` is itself not
+/// sendable across threads. This is then in turn used to build up the
+/// `LoopData` abstraction above.
+///
+/// A `DropBox` currently contains two major components, an identification of
+/// the thread that it originated from as well as the data itself. Right now the
+/// data is stored in a `Box` as we'll transition between it and `Box<Any>`, but
+/// this is perhaps optimizable.
+///
+/// The `DropBox<A>` itself only provides a few safe methods, all of which are
+/// safe to call from any thread. Access to the underlying data is only granted
+/// if we're on the right thread, and otherwise the methods don't access the
+/// data itself.
+///
+/// Finally, one crucial piece, if the data is dropped it may run code that
+/// assumes it's on the original thread. For this reason we have to be sure that
+/// the data is only dropped on the originating thread itself. It's currently
+/// the job of the outer `LoopData` to ensure that a `DropBox` is dropped on the
+/// right thread, so we don't attempt to perform any communication in this
+/// `Drop` implementation. Instead, if a `DropBox` is dropped on the wrong
+/// thread, it simply leaks its contents.
+///
+/// All that's really just a lot of words in an attempt to justify the `unsafe`
+/// impl of `Send` below. The idea is that the data is only ever accessed on the
+/// originating thread, even during `Drop`.
+///
+/// Note that this is a private module to have a visibility boundary around the
+/// unsafe internals. Although there's not any unsafe blocks here, the code
+/// itself is quite unsafe as it has to make sure that the data is dropped in
+/// the right place, if ever.
+mod dropbox {
+    use std::any::Any;
+    use std::mem;
+    use super::CURRENT_LOOP;
+
+    pub struct DropBox<A: ?Sized> {
+        id: usize,
+        inner: Option<Box<A>>,
+    }
+
+    unsafe impl<A: ?Sized> Send for DropBox<A> {}
+
+    impl DropBox<Any> {
+        /// Creates a new `DropBox` pinned to the current threads.
+        ///
+        /// Will panic if `CURRENT_LOOP` isn't set.
+        pub fn new<A: Any>(a: A) -> DropBox<Any> {
+            DropBox {
+                id: CURRENT_LOOP.with(|lp| lp.id),
+                inner: Some(Box::new(a) as Box<Any>),
+            }
+        }
+
+        /// Downcasts this `DropBox` to the type specified.
+        ///
+        /// Normally this always succeeds as it's a static assertion that we
+        /// already have all the types matched up, but an `Option` is returned
+        /// here regardless.
+        pub fn downcast<A: Any>(&mut self) -> Option<DropBox<A>> {
+            self.inner.take().and_then(|data| {
+                match data.downcast::<A>() {
+                    Ok(a) => Some(DropBox { id: self.id, inner: Some(a) }),
+
+                    // Note that we're careful that when a downcast fails we put
+                    // the data back into ourselves, because we may be
+                    // downcasting on any thread. This will ensure that if we
+                    // drop accidentally we'll forget the data correctly.
+                    Err(obj) => {
+                        self.inner = Some(obj);
+                        None
+                    }
+                }
+            })
+        }
+    }
+
+    impl<A: Any> DropBox<A> {
+        /// Consumes the contents of this `DropBox<A>`, returning a new
+        /// `DropBox<Any>`.
+        ///
+        /// This is just intended to be a simple and cheap conversion, should
+        /// almost always return `Some`.
+        pub fn take_any(&mut self) -> Option<DropBox<Any>> {
+            self.inner.take().map(|d| {
+                DropBox { id: self.id, inner: Some(d as Box<Any>) }
+            })
+        }
+    }
+
+    impl<A: ?Sized> DropBox<A> {
+        /// Returns a shared reference to the data if we're on the right
+        /// thread.
+        pub fn get(&self) -> Option<&A> {
+            if CURRENT_LOOP.is_set() {
+                CURRENT_LOOP.with(|lp| {
+                    if lp.id == self.id {
+                        self.inner.as_ref().map(|b| &**b)
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            }
+        }
+
+        /// Returns a mutable reference to the data if we're on the right
+        /// thread.
+        pub fn get_mut(&mut self) -> Option<&mut A> {
+            if CURRENT_LOOP.is_set() {
+                CURRENT_LOOP.with(move |lp| {
+                    if lp.id == self.id {
+                        self.inner.as_mut().map(|b| &mut **b)
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            }
+        }
+    }
+
+    impl<A: ?Sized> Drop for DropBox<A> {
+        fn drop(&mut self) {
+            // Try our safe accessor first, and if it works then we know that
+            // we're on the right thread. In that case we can simply drop as
+            // usual.
+            if let Some(a) = self.get_mut().take() {
+                return drop(a)
+            }
+
+            // If we're on the wrong thread but we actually have some data, then
+            // something in theory horrible has gone awry. Prevent memory safety
+            // issues by forgetting the data and then also warn about this odd
+            // event.
+            if let Some(data) = self.inner.take() {
+                mem::forget(data);
+                warn!("forgetting some data on an event loop");
+            }
+        }
     }
 }
 
@@ -669,5 +973,12 @@ impl<E: ?Sized> Source<E> {
 
     pub fn io(&self) -> &E {
         &self.io
+    }
+}
+
+impl Executor for MioSender {
+    fn execute_boxed(&self, callback: Box<ExecuteCallback>) {
+        self.inner.send(Message::Run(callback))
+            .expect("error sending a message to the event loop")
     }
 }
