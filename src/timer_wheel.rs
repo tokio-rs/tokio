@@ -62,6 +62,7 @@ struct Slot {
 struct Entry<T> {
     data: T,
     when: Instant,
+    wheel_idx: usize,
     prev: usize,
     next: usize,
 }
@@ -137,6 +138,7 @@ impl<T> TimerWheel<T> {
             entry.insert(Entry {
                 data: data,
                 when: at,
+                wheel_idx: wheel_idx,
                 prev: EMPTY,
                 next: prev_head,
             });
@@ -189,6 +191,7 @@ impl<T> TimerWheel<T> {
                 self.cur_wheel_tick += 1;
                 let idx = self.ticks_to_wheel_idx(self.cur_wheel_tick);
                 self.cur_slab_idx = self.wheel[idx].head;
+                self.wheel[idx].next_timeout = None;
                 continue
             }
 
@@ -197,9 +200,6 @@ impl<T> TimerWheel<T> {
             // element of this slot we'll restore the `next_timeout` field if
             // necessary.
             let idx = self.ticks_to_wheel_idx(self.cur_wheel_tick);
-            if head == self.wheel[idx].head {
-                self.wheel[idx].next_timeout = None;
-            }
 
             // Otherwise, continue iterating over the linked list in the wheel
             // slot we're on and remove anything which has expired.
@@ -258,6 +258,7 @@ impl<T> TimerWheel<T> {
     }
 
     fn remove_slab(&mut self, slab_idx: usize) -> Option<Entry<T>> {
+        debug!("removing timer slab {}", slab_idx);
         let entry = match self.slab.remove(slab_idx) {
             Some(e) => e,
             None => return None,
@@ -265,13 +266,16 @@ impl<T> TimerWheel<T> {
 
         // Remove the node from the linked list
         if entry.prev == EMPTY {
-            let idx = self.ticks_to_wheel_idx(self.time_to_ticks(entry.when));
-            self.wheel[idx].head = entry.next;
+            self.wheel[entry.wheel_idx].head = entry.next;
         } else {
             self.slab[entry.prev].next = entry.next;
         }
         if entry.next != EMPTY {
             self.slab[entry.next].prev = entry.prev;
+        }
+
+        if self.cur_slab_idx == slab_idx {
+            self.cur_slab_idx = entry.next;
         }
 
         return Some(entry)
@@ -429,5 +433,29 @@ mod tests {
         assert_eq!(timer.next_timeout(), Some(now + ms(100)));
         assert_eq!(timer.poll(now + ms(200)), Some(3));
         assert_eq!(timer.next_timeout(), None);
+    }
+
+    #[test]
+    fn remove_then_poll() {
+        drop(env_logger::init());
+        let mut timer = TimerWheel::<i32>::new();
+        let now = Instant::now();
+
+        let t = timer.insert(now + ms(1), 3);
+        timer.cancel(&t).unwrap();
+        assert_eq!(timer.poll(now + ms(200)), None);
+    }
+
+    #[test]
+    fn add_two_then_remove() {
+        drop(env_logger::init());
+        let mut timer = TimerWheel::<i32>::new();
+        let now = Instant::now();
+
+        let t1 = timer.insert(now + ms(1), 1);
+        timer.insert(now + ms(2), 2);
+        assert_eq!(timer.poll(now + ms(200)), Some(2));
+        timer.cancel(&t1).unwrap();
+        assert_eq!(timer.poll(now + ms(200)), None);
     }
 }
