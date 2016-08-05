@@ -1,10 +1,7 @@
-//! A binding to mio giving it a future/stream interface on top.
+//! Mio bindings with streams and futures
 //!
-//! This library contains the rudimentary bindings to an event loop in mio which
-//! provides future and stream-based abstractions of all the underlying I/O
-//! objects that mio provides internally.
-//!
-//! Currently very much a work in progress, and breakage should be expected!
+//! This crate uses the `futures_io` and `futures` crates to provide a thin
+//! binding on top of mio of TCP and UDP sockets.
 
 #![deny(missing_docs)]
 
