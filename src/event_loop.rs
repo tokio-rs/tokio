@@ -203,7 +203,9 @@ impl Loop {
                 // process the whole queue of messages.
                 if token == 0 {
                     debug!("consuming notification queue");
-                    self.consume_queue();
+                    CURRENT_LOOP.set(&self, || {
+                        self.consume_queue();
+                    });
                     continue
                 }
 
