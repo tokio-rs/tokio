@@ -209,6 +209,8 @@ impl Loop {
                     continue
                 }
 
+                trace!("event {:?} {:?}", event.kind(), event.token());
+
                 // For any other token we look at `dispatch` to see what we're
                 // supposed to do. If there's a waiter we get ready to notify
                 // it, and we also or-in atomically any events that have
@@ -293,6 +295,7 @@ impl Loop {
             }
         };
         if let Some(to_call) = to_call {
+            debug!("schedule immediately done");
             self.notify_handle(to_call);
         }
     }
