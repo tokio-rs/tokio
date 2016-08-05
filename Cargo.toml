@@ -21,6 +21,3 @@ slab = "0.2.0"
 
 [dev-dependencies]
 env_logger = "0.3"
-
-[lib]
-test = false

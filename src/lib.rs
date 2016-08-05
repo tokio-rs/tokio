@@ -24,7 +24,7 @@ mod event_loop;
 mod tcp;
 mod udp;
 mod timeout;
-pub mod timer_wheel;
+mod timer_wheel;
 #[path = "../../src/slot.rs"]
 mod slot;
 #[path = "../../src/lock.rs"]
