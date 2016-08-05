@@ -212,7 +212,7 @@ impl Loop {
                 // it, and we also or-in atomically any events that have
                 // happened (currently read/write events).
                 let mut waiter = None;
-                if let Some(sched) = self.dispatch.get_mut().get_mut(token) {
+                if let Some(sched) = self.dispatch.borrow_mut().get_mut(token) {
                     waiter = sched.waiter.take();
                     if event.kind().is_readable() {
                         sched.source.readiness.fetch_or(1, Ordering::Relaxed);
@@ -237,9 +237,9 @@ impl Loop {
     }
 
     fn consume_timeouts(&mut self, now: Instant) {
-        while let Some(idx) = self.timer_wheel.get_mut().poll(now) {
+        while let Some(idx) = self.timer_wheel.borrow_mut().poll(now) {
             trace!("firing timeout: {}", idx);
-            let handle = self.timeouts.get_mut()[idx].1.fire();
+            let handle = self.timeouts.borrow_mut()[idx].1.fire();
             if let Some(handle) = handle {
                 self.notify_handle(handle);
             }
