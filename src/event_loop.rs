@@ -783,7 +783,12 @@ mod dropbox {
         inner: Option<Box<A>>,
     }
 
+    // We can be sent across threads due to the comment above
     unsafe impl<A: ?Sized> Send for DropBox<A> {}
+
+    // We can also be shared across threads just fine as we'll only ever get a
+    // reference on at most one thread, regardless of `A`.
+    unsafe impl<A: ?Sized> Sync for DropBox<A> {}
 
     impl DropBox<Any> {
         /// Creates a new `DropBox` pinned to the current threads.
