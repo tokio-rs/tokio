@@ -3,6 +3,7 @@ use std::cell::{Cell, RefCell};
 use std::io::{self, ErrorKind};
 use std::marker;
 use std::mem;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::sync::mpsc;
@@ -47,6 +48,12 @@ pub struct Loop {
     // `timeouts` slab.
     timer_wheel: RefCell<TimerWheel<usize>>,
     timeouts: RefCell<Slab<(Timeout, TimeoutState), usize>>,
+
+    // A `Loop` cannot be sent to other threads as it's used as a proxy for data
+    // that belongs to the thread the loop was running on at some point. In
+    // other words, the safety of `DropBox` below relies on loops not crossing
+    // threads.
+    _marker: marker::PhantomData<Rc<u32>>,
 }
 
 struct MioSender {
@@ -128,6 +135,7 @@ impl Loop {
             dispatch: RefCell::new(Slab::new_starting_at(1, SLAB_CAPACITY)),
             timeouts: RefCell::new(Slab::new_starting_at(0, SLAB_CAPACITY)),
             timer_wheel: RefCell::new(TimerWheel::new()),
+            _marker: marker::PhantomData,
         })
     }
 
@@ -140,6 +148,22 @@ impl Loop {
         LoopHandle {
             id: self.id,
             tx: self.tx.clone(),
+        }
+    }
+
+    /// Creates a new `LoopData<A>` handle by associating data to be directly
+    /// stored by this event loop.
+    ///
+    /// This function is useful for when storing non-`Send` data inside of a
+    /// future. The `LoopData<A>` handle is itself `Send + 'static` regardless
+    /// of the underlying `A`. That is, for example, you can create a handle to
+    /// some data that contains an `Rc`, for example.
+    pub fn add_loop_data<A>(&self, a: A) -> LoopData<A>
+        where A: Any,
+    {
+        LoopData {
+            data: DropBox::new_on(a, self),
+            handle: self.handle(),
         }
     }
 
@@ -776,7 +800,7 @@ impl<A: Any> Drop for LoopData<A> {
 mod dropbox {
     use std::any::Any;
     use std::mem;
-    use super::CURRENT_LOOP;
+    use super::{CURRENT_LOOP, Loop};
 
     pub struct DropBox<A: ?Sized> {
         id: usize,
@@ -798,6 +822,16 @@ mod dropbox {
             DropBox {
                 id: CURRENT_LOOP.with(|lp| lp.id),
                 inner: Some(Box::new(a) as Box<Any>),
+            }
+        }
+
+        /// Creates a new `DropBox` pinned to the thread of `Loop`.
+        ///
+        /// Will panic if `CURRENT_LOOP` isn't set.
+        pub fn new_on<A: Any>(a: A, lp: &Loop) -> DropBox<A> {
+            DropBox {
+                id: lp.id,
+                inner: Some(Box::new(a)),
             }
         }
 
