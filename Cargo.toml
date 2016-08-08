@@ -15,7 +15,7 @@ futures and streams.
 futures = { path = "..", version = "0.1.0" }
 futures-io = { path = "../futures-io", version = "0.1.0" }
 log = "0.3"
-mio = { git = "https://github.com/alexcrichton/mio", branch = "write-then-drop" }
+mio = { git = "https://github.com/carllerche/mio" }
 scoped-tls = "0.1.0"
 slab = "0.2.0"
 
