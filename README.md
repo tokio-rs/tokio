@@ -1,9 +1,10 @@
 # futures-mio
 
-Build status, license, and other information can be found in the top-level
-[README.md].
+Bindings to the `mio` crate implementing the `futures-io` and `futures`
+abstractions.
 
-[README.md]: https://github.com/alexcrichton/futures-rs#futures-rs
+[![Build Status](https://travis-ci.org/alexcrichton/futures-rs.svg?branch=master)](https://travis-ci.org/alexcrichton/futures-rs)
+[![Build status](https://ci.appveyor.com/api/projects/status/yl5w3ittk4kggfsh?svg=true)](https://ci.appveyor.com/project/alexcrichton/futures-rs)
 
 [Documentation](http://alexcrichton.com/futures-rs/futures_mio)
 
@@ -61,3 +62,11 @@ combinators to compose working with data on sockets.
 Check out the [documentation] for more information, and more coming here soon!
 
 [documentation]: http://alexcrichton.com/futures-rs/futures_mio
+
+# License
+
+`futures-mio` is primarily distributed under the terms of both the MIT license
+and the Apache License (Version 2.0), with portions covered by various BSD-like
+licenses.
+
+See LICENSE-APACHE, and LICENSE-MIT for details.
