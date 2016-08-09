@@ -30,7 +30,7 @@ There are a few small examples showing off how to use this library:
 * [echo.rs] - a simple TCP echo server
 * [socks5.rs] - an implementation of a SOCKSv5 proxy server
 
-[echo]: https://github.com/alexcrichton/futures-rs/blob/master/futures-mio/src/bin/echo.rs
+[echo.rs]: https://github.com/alexcrichton/futures-rs/blob/master/futures-mio/src/bin/echo.rs
 [socks5.rs]: https://github.com/alexcrichton/futures-rs/blob/master/futures-socks5/src/main.rs
 
 ## What is futures-mio?
