@@ -95,11 +95,13 @@ enum Message {
     Shutdown,
 }
 
+/// Type of I/O objects inserted into the event loop, created by `Source::new`.
 pub struct Source<E: ?Sized> {
     readiness: AtomicUsize,
     io: E,
 }
 
+/// I/O objects inserted into the event loop
 pub type IoSource = Arc<Source<mio::Evented + Sync + Send>>;
 
 fn register(poll: &mio::Poll,
@@ -745,6 +747,11 @@ impl<A: Any> LoopData<A> {
     pub fn executor(&self) -> Arc<Executor> {
         self.handle.tx.clone()
     }
+
+    /// Returns a reference to the handle that this data is bound to.
+    pub fn loop_handle(&self) -> &LoopHandle {
+        &self.handle
+    }
 }
 
 impl<A: Any> Drop for LoopData<A> {
@@ -1000,6 +1007,7 @@ impl TimeoutState {
 }
 
 impl<E> Source<E> {
+    /// Creates a new `Source` wrapping the provided source of events.
     pub fn new(e: E) -> Source<E> {
         Source {
             readiness: AtomicUsize::new(0),
@@ -1009,6 +1017,16 @@ impl<E> Source<E> {
 }
 
 impl<E: ?Sized> Source<E> {
+    /// Consumes the last readiness notification that this source received.
+    ///
+    /// Currently sources receive readiness notifications on an edge-basis. That
+    /// is, once you receive a notification that an object can be read, you
+    /// won't receive any more notifications until all of that data has been
+    /// read.
+    ///
+    /// The event loop will fill in this information and then inform futures
+    /// that they're ready to go with the `schedule` method, and then the `poll`
+    /// method can use this to figure out what happened.
     pub fn take_readiness(&self) -> Option<Ready> {
         match self.readiness.swap(0, Ordering::SeqCst) {
             0 => None,
@@ -1019,6 +1037,7 @@ impl<E: ?Sized> Source<E> {
         }
     }
 
+    /// Gets access to the underlying I/O object.
     pub fn io(&self) -> &E {
         &self.io
     }

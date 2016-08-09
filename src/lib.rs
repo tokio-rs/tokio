@@ -30,7 +30,7 @@ mod mpsc_queue;
 mod channel;
 
 pub use event_loop::{Loop, LoopHandle, AddSource, AddTimeout};
-pub use event_loop::{LoopData, AddLoopData, TimeoutToken};
+pub use event_loop::{LoopData, AddLoopData, TimeoutToken, IoSource, Source};
 pub use readiness_stream::ReadinessStream;
 pub use tcp::{TcpListener, TcpStream};
 pub use timeout::Timeout;
