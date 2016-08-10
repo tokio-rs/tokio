@@ -2,9 +2,9 @@ use std::io;
 
 use futures::stream::Stream;
 use futures::{Future, Task, Poll};
-use futures_io::{Ready, IoFuture};
+use futures_io::{Ready};
 
-use event_loop::{IoSource, LoopHandle};
+use event_loop::{IoSource, LoopHandle, AddSource};
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -25,6 +25,12 @@ pub struct ReadinessStream {
     source: IoSource,
 }
 
+pub struct ReadinessStreamNew {
+    inner: AddSource,
+    handle: Option<LoopHandle>,
+    source: Option<IoSource>,
+}
+
 impl ReadinessStream {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
@@ -32,14 +38,31 @@ impl ReadinessStream {
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
     pub fn new(loop_handle: LoopHandle, source: IoSource)
-               -> Box<IoFuture<ReadinessStream>> {
-        loop_handle.add_source(source.clone()).map(|token| {
+               -> ReadinessStreamNew {
+        ReadinessStreamNew {
+            inner: loop_handle.add_source(source.clone()),
+            source: Some(source),
+            handle: Some(loop_handle),
+        }
+    }
+}
+
+impl Future for ReadinessStreamNew {
+    type Item = ReadinessStream;
+    type Error = io::Error;
+
+    fn poll(&mut self, task: &mut Task) -> Poll<ReadinessStream, io::Error> {
+        self.inner.poll(task).map(|token| {
             ReadinessStream {
                 io_token: token,
-                source: source,
-                loop_handle: loop_handle,
+                source: self.source.take().unwrap(),
+                loop_handle: self.handle.take().unwrap(),
             }
-        }).boxed()
+        })
+    }
+
+    fn schedule(&mut self, task: &mut Task) {
+        self.inner.schedule(task)
     }
 }
 
