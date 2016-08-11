@@ -23,7 +23,7 @@ fn main() {
 
     let done = server.and_then(move |socket| {
         // Once we've got the TCP listener, inform that we have it
-        println!("Listenering on: {}", addr);
+        println!("Listening on: {}", addr);
 
         // Pull out the stream of incoming connections and then for each new
         // one spin up a new task copying data. We put the `socket` into a
