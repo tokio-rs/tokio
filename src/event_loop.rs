@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::io::{self, ErrorKind};
 use std::marker;
@@ -91,7 +90,7 @@ enum Message {
     UpdateTimeout(TimeoutToken, TaskHandle),
     CancelTimeout(TimeoutToken),
     Run(Box<ExecuteCallback>),
-    Drop(DropBox<Any>),
+    Drop(DropBox<dropbox::MyDrop>),
     Shutdown,
 }
 
@@ -161,7 +160,7 @@ impl Loop {
     /// of the underlying `A`. That is, for example, you can create a handle to
     /// some data that contains an `Rc`, for example.
     pub fn add_loop_data<A>(&self, a: A) -> LoopData<A>
-        where A: Any,
+        where A: 'static,
     {
         LoopData {
             data: DropBox::new_on(a, self),
@@ -564,7 +563,7 @@ impl LoopHandle {
     /// This function takes a closure which may be sent to the event loop to
     /// generate an instance of type `A`. The closure itself is required to be
     /// `Send + 'static`, but the data it produces is only required to adhere to
-    /// `Any`.
+    /// `'static`.
     ///
     /// If the returned future is polled on the event loop thread itself it will
     /// very cheaply resolve to a handle to the data, but if it's not polled on
@@ -573,10 +572,9 @@ impl LoopHandle {
     // TODO: more with examples
     pub fn add_loop_data<F, A>(&self, f: F) -> AddLoopData<F, A>
         where F: FnOnce() -> A + Send + 'static,
-              A: Any,
+              A: 'static,
     {
         AddLoopData {
-            _marker: marker::PhantomData,
             inner: LoopFuture {
                 loop_handle: self.clone(),
                 data: Some(f),
@@ -660,7 +658,7 @@ impl Future for AddTimeout {
 /// data originated on, so it knows how to go back to the event loop to access
 /// the data itself.
 // TODO: write more once it's implemented
-pub struct LoopData<A: Any> {
+pub struct LoopData<A: 'static> {
     data: DropBox<A>,
     handle: LoopHandle,
 }
@@ -671,8 +669,7 @@ pub struct LoopData<A: Any> {
 /// represents a handle to data that is "owned" by the event loop thread but can
 /// migrate among threads temporarily so travel with a future itself.
 pub struct AddLoopData<F, A> {
-    inner: LoopFuture<DropBox<Any>, F>,
-    _marker: marker::PhantomData<fn() -> A>,
+    inner: LoopFuture<DropBox<A>, F>,
 }
 
 fn _assert() {
@@ -682,7 +679,7 @@ fn _assert() {
 
 impl<F, A> Future for AddLoopData<F, A>
     where F: FnOnce() -> A + Send + 'static,
-          A: Any,
+          A: 'static,
 {
     type Item = LoopData<A>;
     type Error = io::Error;
@@ -692,15 +689,10 @@ impl<F, A> Future for AddLoopData<F, A>
             Ok(DropBox::new(f()))
         });
 
-        ret.map(|mut data| {
-            match data.downcast::<A>() {
-                Some(data) => {
-                    LoopData {
-                        data: data,
-                        handle: self.inner.loop_handle.clone(),
-                    }
-                }
-                None => panic!("data mixed up?"),
+        ret.map(|data| {
+            LoopData {
+                data: data,
+                handle: self.inner.loop_handle.clone(),
             }
         })
     }
@@ -715,7 +707,7 @@ impl<F, A> Future for AddLoopData<F, A>
     }
 }
 
-impl<A: Any> LoopData<A> {
+impl<A: 'static> LoopData<A> {
     /// Gets a shared reference to the underlying data in this handle.
     ///
     /// Returns `None` if it is not called from the event loop thread that this
@@ -754,17 +746,17 @@ impl<A: Any> LoopData<A> {
     }
 }
 
-impl<A: Any> Drop for LoopData<A> {
+impl<A: 'static> Drop for LoopData<A> {
     fn drop(&mut self) {
         // The `DropBox` we store internally will cause a memory leak if it's
         // dropped on the wrong thread. While necessary for safety, we don't
         // actually want a memory leak, so for all normal circumstances we take
-        // out the `DropBox<A>` as a `DropBox<Any>` and then we send it off to
-        // the event loop.
+        // out the `DropBox<A>` as a `DropBox<MyDrop>` and then we send it off
+        // to the event loop.
         //
         // TODO: possible optimization is to do none of this if we're on the
         //       event loop thread itself
-        if let Some(data) = self.data.take_any() {
+        if let Some(data) = self.data.take() {
             self.handle.send(Message::Drop(data));
         }
     }
@@ -780,8 +772,8 @@ impl<A: Any> Drop for LoopData<A> {
 ///
 /// A `DropBox` currently contains two major components, an identification of
 /// the thread that it originated from as well as the data itself. Right now the
-/// data is stored in a `Box` as we'll transition between it and `Box<Any>`, but
-/// this is perhaps optimizable.
+/// data is stored in a `Box` as we'll transition between it and `Box<MyDrop>`,
+/// but this is perhaps optimizable.
 ///
 /// The `DropBox<A>` itself only provides a few safe methods, all of which are
 /// safe to call from any thread. Access to the underlying data is only granted
@@ -805,7 +797,6 @@ impl<A: Any> Drop for LoopData<A> {
 /// itself is quite unsafe as it has to make sure that the data is dropped in
 /// the right place, if ever.
 mod dropbox {
-    use std::any::Any;
     use std::mem;
     use super::{CURRENT_LOOP, Loop};
 
@@ -821,59 +812,40 @@ mod dropbox {
     // reference on at most one thread, regardless of `A`.
     unsafe impl<A: ?Sized> Sync for DropBox<A> {}
 
-    impl DropBox<Any> {
+    pub trait MyDrop {}
+    impl<T: ?Sized> MyDrop for T {}
+
+    impl<A> DropBox<A> {
         /// Creates a new `DropBox` pinned to the current threads.
         ///
         /// Will panic if `CURRENT_LOOP` isn't set.
-        pub fn new<A: Any>(a: A) -> DropBox<Any> {
+        pub fn new(a: A) -> DropBox<A> {
             DropBox {
                 id: CURRENT_LOOP.with(|lp| lp.id),
-                inner: Some(Box::new(a) as Box<Any>),
+                inner: Some(Box::new(a)),
             }
         }
 
         /// Creates a new `DropBox` pinned to the thread of `Loop`.
         ///
         /// Will panic if `CURRENT_LOOP` isn't set.
-        pub fn new_on<A: Any>(a: A, lp: &Loop) -> DropBox<A> {
+        pub fn new_on(a: A, lp: &Loop) -> DropBox<A> {
             DropBox {
                 id: lp.id,
                 inner: Some(Box::new(a)),
             }
         }
 
-        /// Downcasts this `DropBox` to the type specified.
-        ///
-        /// Normally this always succeeds as it's a static assertion that we
-        /// already have all the types matched up, but an `Option` is returned
-        /// here regardless.
-        pub fn downcast<A: Any>(&mut self) -> Option<DropBox<A>> {
-            self.inner.take().and_then(|data| {
-                match data.downcast::<A>() {
-                    Ok(a) => Some(DropBox { id: self.id, inner: Some(a) }),
-
-                    // Note that we're careful that when a downcast fails we put
-                    // the data back into ourselves, because we may be
-                    // downcasting on any thread. This will ensure that if we
-                    // drop accidentally we'll forget the data correctly.
-                    Err(obj) => {
-                        self.inner = Some(obj);
-                        None
-                    }
-                }
-            })
-        }
-    }
-
-    impl<A: Any> DropBox<A> {
         /// Consumes the contents of this `DropBox<A>`, returning a new
-        /// `DropBox<Any>`.
+        /// `DropBox<MyDrop>`.
         ///
         /// This is just intended to be a simple and cheap conversion, should
         /// almost always return `Some`.
-        pub fn take_any(&mut self) -> Option<DropBox<Any>> {
+        pub fn take<'a>(&mut self) -> Option<DropBox<MyDrop + 'a>>
+            where A: 'a
+        {
             self.inner.take().map(|d| {
-                DropBox { id: self.id, inner: Some(d as Box<Any>) }
+                DropBox { id: self.id, inner: Some(d as Box<MyDrop + 'a>) }
             })
         }
     }
