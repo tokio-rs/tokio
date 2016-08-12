@@ -24,7 +24,7 @@ pub struct TcpListener {
 
 impl TcpListener {
     fn new(listener: mio::tcp::TcpListener,
-           handle: LoopHandle) -> Box<IoFuture<TcpListener>> {
+           handle: LoopHandle) -> IoFuture<TcpListener> {
         let listener = Arc::new(Source::new(listener));
         ReadinessStream::new(handle.clone(), listener.clone()).map(|r| {
             TcpListener {
@@ -64,7 +64,7 @@ impl TcpListener {
     ///   well (same for IPv6).
     pub fn from_listener(listener: net::TcpListener,
                          addr: &SocketAddr,
-                         handle: LoopHandle) -> Box<IoFuture<TcpListener>> {
+                         handle: LoopHandle) -> IoFuture<TcpListener> {
         mio::tcp::TcpListener::from_listener(listener, addr)
             .into_future()
             .and_then(|l| TcpListener::new(l, handle))
@@ -84,7 +84,7 @@ impl TcpListener {
     ///
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
-    pub fn incoming(self) -> Box<IoStream<(TcpStream, SocketAddr)>> {
+    pub fn incoming(self) -> IoStream<(TcpStream, SocketAddr)> {
         let TcpListener { loop_handle, listener, ready } = self;
 
         ready
@@ -169,7 +169,7 @@ impl LoopHandle {
     /// The TCP listener will bind to the provided `addr` address, if available,
     /// and will be returned as a future. The returned future, if resolved
     /// successfully, can then be used to accept incoming connections.
-    pub fn tcp_listen(self, addr: &SocketAddr) -> Box<IoFuture<TcpListener>> {
+    pub fn tcp_listen(self, addr: &SocketAddr) -> IoFuture<TcpListener> {
         match mio::tcp::TcpListener::bind(addr) {
             Ok(l) => TcpListener::new(l, self),
             Err(e) => failed(e).boxed(),
@@ -183,7 +183,7 @@ impl LoopHandle {
     /// stream has successfully connected. If an error happens during the
     /// connection or during the socket creation, that error will be returned to
     /// the future instead.
-    pub fn tcp_connect(self, addr: &SocketAddr) -> Box<IoFuture<TcpStream>> {
+    pub fn tcp_connect(self, addr: &SocketAddr) -> IoFuture<TcpStream> {
         match mio::tcp::TcpStream::connect(addr) {
             Ok(tcp) => TcpStream::new(tcp, self),
             Err(e) => failed(e).boxed(),
@@ -194,7 +194,7 @@ impl LoopHandle {
 impl TcpStream {
     fn new(connected_stream: mio::tcp::TcpStream,
            handle: LoopHandle)
-           -> Box<IoFuture<TcpStream>> {
+           -> IoFuture<TcpStream> {
         // Once we've connected, wait for the stream to be writable as that's
         // when the actual connection has been initiated. Once we're writable we
         // check for `take_socket_error` to see if the connect actually hit an
@@ -230,7 +230,7 @@ impl TcpStream {
     ///   (perhaps to `INADDR_ANY`) before this method is called.
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr,
-                          handle: LoopHandle) -> Box<IoFuture<TcpStream>> {
+                          handle: LoopHandle) -> IoFuture<TcpStream> {
         match mio::tcp::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => failed(e).boxed(),

@@ -193,10 +193,10 @@ impl Loop {
     pub fn run<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
         let (tx_res, rx_res) = mpsc::channel();
         let handle = self.handle();
-        f.then(move |res| {
+        self.add_loop_data(f.then(move |res| {
             handle.shutdown();
             tx_res.send(res)
-        }).forget();
+        })).forget();
 
         self._run();
 
@@ -780,6 +780,30 @@ impl<A: 'static> LoopData<A> {
     }
 }
 
+impl<A: Future> Future for LoopData<A> {
+    type Item = A::Item;
+    type Error = A::Error;
+
+    fn poll(&mut self, task: &mut Task) -> Poll<A::Item, A::Error> {
+        // If we're on the right thread, then we can proceed. Otherwise we need
+        // to go and get polled on the right thread.
+        if let Some(inner) = self.get_mut() {
+            return inner.poll(task)
+        }
+        task.poll_on(self.executor());
+        Poll::NotReady
+    }
+
+    fn schedule(&mut self, task: &mut Task) {
+        // If we're on the right thread, then we're good to go, otherwise we
+        // need to get poll'd to tell the task to move somewhere else.
+        match self.get_mut() {
+            Some(inner) => inner.schedule(task),
+            None => task.notify(),
+        }
+    }
+}
+
 impl<A: 'static> Drop for LoopData<A> {
     fn drop(&mut self) {
         // The `DropBox` we store internally will cause a memory leak if it's
@@ -944,7 +968,7 @@ struct LoopFuture<T, U> {
 }
 
 impl<T, U> LoopFuture<T, U>
-    where T: Send + 'static,
+    where T: 'static,
 {
     fn poll<F>(&mut self, f: F) -> Poll<T, io::Error>
         where F: FnOnce(&Loop, U) -> io::Result<T>,

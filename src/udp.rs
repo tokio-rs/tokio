@@ -25,7 +25,7 @@ impl LoopHandle {
     /// `addr` provided. The returned future will be resolved once the socket
     /// has successfully bound. If an error happens during the binding or during
     /// the socket creation, that error will be returned to the future instead.
-    pub fn udp_bind(self, addr: &SocketAddr) -> Box<IoFuture<UdpSocket>> {
+    pub fn udp_bind(self, addr: &SocketAddr) -> IoFuture<UdpSocket> {
         match mio::udp::UdpSocket::bind(addr) {
             Ok(udp) => UdpSocket::new(udp, self),
             Err(e) => failed(e).boxed(),
@@ -35,7 +35,7 @@ impl LoopHandle {
 
 impl UdpSocket {
     fn new(socket: mio::udp::UdpSocket, handle: LoopHandle)
-           -> Box<IoFuture<UdpSocket>> {
+           -> IoFuture<UdpSocket> {
         let socket = Arc::new(Source::new(socket));
         ReadinessStream::new(handle, socket.clone()).map(|ready| {
             UdpSocket {
@@ -55,7 +55,7 @@ impl UdpSocket {
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_socket(socket: net::UdpSocket,
-                       handle: LoopHandle) -> Box<IoFuture<UdpSocket>> {
+                       handle: LoopHandle) -> IoFuture<UdpSocket> {
         match mio::udp::UdpSocket::from_socket(socket) {
             Ok(tcp) => UdpSocket::new(tcp, handle),
             Err(e) => failed(e).boxed(),

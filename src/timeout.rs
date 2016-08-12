@@ -26,7 +26,7 @@ impl LoopHandle {
     /// This function will return a future that will resolve to the actual
     /// timeout object. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
-    pub fn timeout(self, dur: Duration) -> Box<IoFuture<Timeout>> {
+    pub fn timeout(self, dur: Duration) -> IoFuture<Timeout> {
         self.timeout_at(Instant::now() + dur)
     }
 
@@ -35,7 +35,7 @@ impl LoopHandle {
     /// This function will return a future that will resolve to the actual
     /// timeout object. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
-    pub fn timeout_at(self, at: Instant) -> Box<IoFuture<Timeout>> {
+    pub fn timeout_at(self, at: Instant) -> IoFuture<Timeout> {
         self.add_timeout(at).map(move |token| {
             Timeout {
                 at: at,

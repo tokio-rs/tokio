@@ -14,6 +14,7 @@ use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::Stream;
+use futures_io::IoFuture;
 
 fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
@@ -33,7 +34,7 @@ fn main() {
     l.run(server).unwrap();
 }
 
-fn write(socket: futures_mio::TcpStream) -> Box<futures_io::IoFuture<()>> {
+fn write(socket: futures_mio::TcpStream) -> IoFuture<()> {
     static BUF: &'static [u8] = &[0; 64 * 1024];
     socket.into_future().map_err(|e| e.0).and_then(move |(ready, mut socket)| {
         let ready = match ready {
