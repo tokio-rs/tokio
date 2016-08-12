@@ -70,6 +70,14 @@ pub struct LoopHandle {
     tx: Arc<MioSender>,
 }
 
+/// A non-sendable handle to an event loop, useful for manufacturing instances
+/// of `LoopData`.
+#[derive(Clone)]
+pub struct LoopPin {
+    handle: LoopHandle,
+    _marker: marker::PhantomData<Box<Drop>>,
+}
+
 struct Scheduled {
     source: IoSource,
     waiter: Option<TaskHandle>,
@@ -152,6 +160,19 @@ impl Loop {
         }
     }
 
+    /// Returns a "pin" of this event loop which cannot be sent across threads
+    /// but can be used as a proxy to the event loop itself.
+    ///
+    /// Currently the primary use for this is to use as a handle to add data
+    /// to the event loop directly. The `LoopPin::add_loop_data` method can
+    /// be used to immediately create instances of `LoopData` structures.
+    pub fn pin(&self) -> LoopPin {
+        LoopPin {
+            handle: self.handle(),
+            _marker: marker::PhantomData,
+        }
+    }
+
     /// Creates a new `LoopData<A>` handle by associating data to be directly
     /// stored by this event loop.
     ///
@@ -162,10 +183,7 @@ impl Loop {
     pub fn add_loop_data<A>(&self, a: A) -> LoopData<A>
         where A: 'static,
     {
-        LoopData {
-            data: DropBox::new_on(a, self),
-            handle: self.handle(),
-        }
+        self.pin().add_loop_data(a)
     }
 
     /// Runs a future until completion, driving the event loop while we're
@@ -601,6 +619,22 @@ impl LoopHandle {
     }
 }
 
+impl LoopPin {
+    /// Adds some data to the event loop this pin is associated with.
+    ///
+    /// This method will return a handle to the data, `LoopData`, which can be
+    /// used to access the underlying data whenever it's on the correct event
+    /// loop thread.
+    pub fn add_loop_data<A>(&self, a: A) -> LoopData<A>
+        where A: 'static,
+    {
+        LoopData {
+            data: DropBox::new_on(a, self),
+            handle: self.handle.clone(),
+        }
+    }
+}
+
 /// A future which will resolve a unique `tok` token for an I/O object.
 ///
 /// Created through the `LoopHandle::add_source` method, this future can also
@@ -798,7 +832,7 @@ impl<A: 'static> Drop for LoopData<A> {
 /// the right place, if ever.
 mod dropbox {
     use std::mem;
-    use super::{CURRENT_LOOP, Loop};
+    use super::{CURRENT_LOOP, LoopPin};
 
     pub struct DropBox<A: ?Sized> {
         id: usize,
@@ -826,12 +860,10 @@ mod dropbox {
             }
         }
 
-        /// Creates a new `DropBox` pinned to the thread of `Loop`.
-        ///
-        /// Will panic if `CURRENT_LOOP` isn't set.
-        pub fn new_on(a: A, lp: &Loop) -> DropBox<A> {
+        /// Creates a new `DropBox` pinned to the thread of `LoopPin`.
+        pub fn new_on(a: A, lp: &LoopPin) -> DropBox<A> {
             DropBox {
-                id: lp.id,
+                id: lp.handle.id,
                 inner: Some(Box::new(a)),
             }
         }
