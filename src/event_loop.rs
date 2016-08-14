@@ -633,6 +633,11 @@ impl LoopPin {
             handle: self.handle.clone(),
         }
     }
+
+    /// Returns a reference to the underlying handle to the event loop.
+    pub fn handle(&self) -> &LoopHandle {
+        &self.handle
+    }
 }
 
 /// A future which will resolve a unique `tok` token for an I/O object.
