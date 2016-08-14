@@ -231,21 +231,22 @@ impl<T> TimerWheel<T> {
     /// scheduled in this wheel.
     pub fn next_timeout(&self) -> Option<Instant> {
         // TODO: can this be optimized to not look at the whole array?
-        let timeouts = self.wheel.iter().map(|slot| slot.next_timeout);
-        let min = timeouts.fold(None, |prev, cur| {
-            match (prev, cur) {
-                (None, cur) => cur,
-                (Some(time), None) => Some(time),
-                (Some(a), Some(b)) => Some(cmp::min(a, b)),
+        let mut min = None;
+        for a in self.wheel.iter().filter_map(|s| s.next_timeout.as_ref()) {
+            if let Some(b) = min {
+                if b < a {
+                    continue
+                }
             }
-        });
+            min = Some(a);
+        }
         if let Some(min) = min {
             debug!("next timeout {:?}", min);
             debug!("now          {:?}", Instant::now());
         } else {
             debug!("next timeout never");
         }
-        return min
+        min.map(|t| *t)
     }
 
     /// Cancels the specified timeout.
