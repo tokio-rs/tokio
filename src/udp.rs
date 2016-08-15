@@ -11,7 +11,6 @@ use mio;
 use {ReadinessStream, LoopHandle};
 use event_loop::Source;
 
-
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
     source: Arc<Source<mio::udp::UdpSocket>>,
