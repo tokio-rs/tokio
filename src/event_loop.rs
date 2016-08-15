@@ -195,7 +195,9 @@ impl Loop {
     /// otherwise waiting for the future to complete.
     ///
     /// Returns the value that the future resolves to.
-    pub fn run<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
+    pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
+        where F: Future + 'static,
+    {
         let (tx_res, rx_res) = mpsc::channel();
         let handle = self.handle();
         self.add_loop_data(f.then(move |res| {
