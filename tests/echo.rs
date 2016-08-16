@@ -1,3 +1,4 @@
+extern crate env_logger;
 extern crate futures;
 extern crate futures_io;
 extern crate futures_mio;
@@ -19,6 +20,8 @@ macro_rules! t {
 
 #[test]
 fn echo_server() {
+    drop(env_logger::init());
+
     let mut l = t!(futures_mio::Loop::new());
     let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
     let srv = t!(l.run(srv));

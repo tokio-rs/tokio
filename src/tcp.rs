@@ -141,10 +141,6 @@ impl Stream for TcpListener {
     fn poll(&mut self, task: &mut Task) -> Poll<Option<Ready>, io::Error> {
         self.ready.poll(task)
     }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.ready.schedule(task)
-    }
 }
 
 /// An I/O object representing a TCP stream connected to a remote endpoint.
@@ -297,15 +293,6 @@ impl Future for TcpStreamNew {
         *self = TcpStreamNew::Waiting(stream);
         Poll::NotReady
     }
-
-    fn schedule(&mut self, task: &mut Task) {
-        match *self {
-            TcpStreamNew::Waiting(ref mut s) => {
-                s.ready.schedule(task);
-            }
-            TcpStreamNew::Empty => task.notify(),
-        }
-    }
 }
 
 impl Read for TcpStream {
@@ -354,10 +341,6 @@ impl Stream for TcpStream {
 
     fn poll(&mut self, task: &mut Task) -> Poll<Option<Ready>, io::Error> {
         self.ready.poll(task)
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.ready.schedule(task)
     }
 }
 

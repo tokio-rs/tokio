@@ -652,12 +652,8 @@ impl Future for AddSource {
     type Item = usize;
     type Error = io::Error;
 
-    fn poll(&mut self, _task: &mut Task) -> Poll<usize, io::Error> {
-        self.inner.poll(Loop::add_source)
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.inner.schedule(task, Message::AddSource)
+    fn poll(&mut self, task: &mut Task) -> Poll<usize, io::Error> {
+        self.inner.poll(task, Loop::add_source, Message::AddSource)
     }
 }
 
@@ -676,12 +672,8 @@ impl Future for AddTimeout {
     type Item = TimeoutToken;
     type Error = io::Error;
 
-    fn poll(&mut self, _task: &mut Task) -> Poll<TimeoutToken, io::Error> {
-        self.inner.poll(Loop::add_timeout)
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.inner.schedule(task, Message::AddTimeout)
+    fn poll(&mut self, task: &mut Task) -> Poll<TimeoutToken, io::Error> {
+        self.inner.poll(task, Loop::add_timeout, Message::AddTimeout)
     }
 }
 
@@ -723,9 +715,14 @@ impl<F, A> Future for AddLoopData<F, A>
     type Item = LoopData<A>;
     type Error = io::Error;
 
-    fn poll(&mut self, _task: &mut Task) -> Poll<LoopData<A>, io::Error> {
-        let ret = self.inner.poll(|_lp, f| {
+    fn poll(&mut self, task: &mut Task) -> Poll<LoopData<A>, io::Error> {
+        let ret = self.inner.poll(task, |_lp, f| {
             Ok(DropBox::new(f()))
+        }, |f, slot| {
+            Message::Run(Box::new(move || {
+                slot.try_produce(Ok(DropBox::new(f()))).ok()
+                    .expect("add loop data try_produce intereference");
+            }))
         });
 
         ret.map(|data| {
@@ -733,15 +730,6 @@ impl<F, A> Future for AddLoopData<F, A>
                 data: data,
                 handle: self.inner.loop_handle.clone(),
             }
-        })
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.inner.schedule(task, |f, slot| {
-            Message::Run(Box::new(move || {
-                slot.try_produce(Ok(DropBox::new(f()))).ok()
-                    .expect("add loop data try_produce intereference");
-            }))
         })
     }
 }
@@ -797,15 +785,6 @@ impl<A: Future> Future for LoopData<A> {
         }
         task.poll_on(self.executor());
         Poll::NotReady
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        // If we're on the right thread, then we're good to go, otherwise we
-        // need to get poll'd to tell the task to move somewhere else.
-        match self.get_mut() {
-            Some(inner) => inner.schedule(task),
-            None => task.notify(),
-        }
     }
 }
 
@@ -975,48 +954,42 @@ struct LoopFuture<T, U> {
 impl<T, U> LoopFuture<T, U>
     where T: 'static,
 {
-    fn poll<F>(&mut self, f: F) -> Poll<T, io::Error>
+    fn poll<F, G>(&mut self, task: &mut Task, f: F, g: G) -> Poll<T, io::Error>
         where F: FnOnce(&Loop, U) -> io::Result<T>,
+              G: FnOnce(U, Arc<Slot<io::Result<T>>>) -> Message,
     {
         match self.result {
-            Some((ref result, ref token)) => {
+            Some((ref result, ref mut token)) => {
                 result.cancel(*token);
                 match result.try_consume() {
-                    Ok(t) => t.into(),
-                    Err(_) => Poll::NotReady,
+                    Ok(t) => return t.into(),
+                    Err(_) => {}
                 }
+                let handle = task.handle().clone();
+                *token = result.on_full(move |_| {
+                    handle.notify();
+                });
+                return Poll::NotReady
             }
             None => {
                 let data = &mut self.data;
-                self.loop_handle.with_loop(|lp| {
-                    match lp {
-                        Some(lp) => f(lp, data.take().unwrap()).into(),
-                        None => Poll::NotReady,
-                    }
-                })
+                let ret = self.loop_handle.with_loop(|lp| {
+                    lp.map(|lp| f(lp, data.take().unwrap()))
+                });
+                if let Some(ret) = ret {
+                    return ret.into()
+                }
+
+                let handle = task.handle().clone();
+                let result = Arc::new(Slot::new(None));
+                let token = result.on_full(move |_| {
+                    handle.notify();
+                });
+                self.result = Some((result.clone(), token));
+                self.loop_handle.send(g(data.take().unwrap(), result));
+                Poll::NotReady
             }
         }
-    }
-
-    fn schedule<F>(&mut self, task: &mut Task, f: F)
-        where F: FnOnce(U, Arc<Slot<io::Result<T>>>) -> Message,
-    {
-        if let Some((ref result, ref mut token)) = self.result {
-            result.cancel(*token);
-            let handle = task.handle().clone();
-            *token = result.on_full(move |_| {
-                handle.notify();
-            });
-            return
-        }
-
-        let handle = task.handle().clone();
-        let result = Arc::new(Slot::new(None));
-        let token = result.on_full(move |_| {
-            handle.notify();
-        });
-        self.result = Some((result.clone(), token));
-        self.loop_handle.send(f(self.data.take().unwrap(), result))
     }
 }
 

@@ -50,17 +50,14 @@ impl Future for Timeout {
     type Item = ();
     type Error = io::Error;
 
-    fn poll(&mut self, _task: &mut Task) -> Poll<(), io::Error> {
+    fn poll(&mut self, task: &mut Task) -> Poll<(), io::Error> {
         // TODO: is this fast enough?
         if self.at <= Instant::now() {
             Poll::Ok(())
         } else {
+            self.handle.update_timeout(&self.token, task);
             Poll::NotReady
         }
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.handle.update_timeout(&self.token, task);
     }
 }
 

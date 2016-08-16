@@ -243,10 +243,6 @@ impl Stream for UdpSocket {
     fn poll(&mut self, task: &mut Task) -> Poll<Option<Ready>, io::Error> {
         self.ready.poll(task)
     }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.ready.schedule(task)
-    }
 }
 
 #[cfg(unix)]

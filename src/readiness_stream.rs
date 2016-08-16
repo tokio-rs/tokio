@@ -60,25 +60,25 @@ impl Future for ReadinessStreamNew {
             }
         })
     }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.inner.schedule(task)
-    }
 }
 
 impl Stream for ReadinessStream {
     type Item = Ready;
     type Error = io::Error;
 
-    fn poll(&mut self, _task: &mut Task) -> Poll<Option<Ready>, io::Error> {
+    fn poll(&mut self, task: &mut Task) -> Poll<Option<Ready>, io::Error> {
         match self.source.take_readiness() {
-            None => Poll::NotReady,
-            Some(r) => Poll::Ok(Some(r)),
+            None => {
+                self.loop_handle.schedule(self.io_token, task);
+                Poll::NotReady
+            }
+            Some(r) => {
+                if !r.is_read() || !r.is_write() {
+                    self.loop_handle.schedule(self.io_token, task);
+                }
+                Poll::Ok(Some(r))
+            }
         }
-    }
-
-    fn schedule(&mut self, task: &mut Task) {
-        self.loop_handle.schedule(self.io_token, task)
     }
 }
 
