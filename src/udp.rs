@@ -3,9 +3,8 @@ use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::fmt;
 
-use futures::stream::Stream;
-use futures::{Future, failed, Task, Poll};
-use futures_io::{Ready, IoFuture};
+use futures::{Future, failed, Poll};
+use futures_io::IoFuture;
 use mio;
 
 use {ReadinessStream, LoopHandle};
@@ -66,6 +65,16 @@ impl UdpSocket {
         self.source.io().local_addr()
     }
 
+    /// Test whether this socket is ready to be read or not.
+    pub fn poll_read(&self) -> Poll<(), io::Error> {
+        self.ready.poll_read()
+    }
+
+    /// Test whether this socket is writey to be written to or not.
+    pub fn poll_write(&self) -> Poll<(), io::Error> {
+        self.ready.poll_write()
+    }
+
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
@@ -74,7 +83,10 @@ impl UdpSocket {
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         match self.source.io().send_to(buf, target) {
             Ok(Some(n)) => Ok(n),
-            Ok(None) => Err(io::Error::new(io::ErrorKind::WouldBlock, "would block")),
+            Ok(None) => {
+                self.ready.need_write();
+                Err(io::Error::new(io::ErrorKind::WouldBlock, "would block"))
+            }
             Err(e) => Err(e),
         }
     }
@@ -84,7 +96,10 @@ impl UdpSocket {
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         match self.source.io().recv_from(buf) {
             Ok(Some(n)) => Ok(n),
-            Ok(None) => Err(io::Error::new(io::ErrorKind::WouldBlock, "would block")),
+            Ok(None) => {
+                self.ready.need_read();
+                Err(io::Error::new(io::ErrorKind::WouldBlock, "would block"))
+            }
             Err(e) => Err(e),
         }
     }
@@ -233,15 +248,6 @@ impl UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.source.io().fmt(f)
-    }
-}
-
-impl Stream for UdpSocket {
-    type Item = Ready;
-    type Error = io::Error;
-
-    fn poll(&mut self, task: &mut Task) -> Poll<Option<Ready>, io::Error> {
-        self.ready.poll(task)
     }
 }
 

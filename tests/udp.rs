@@ -1,8 +1,11 @@
 extern crate futures;
 extern crate futures_mio;
 
-use futures::Future;
-use futures::stream::Stream;
+use std::io;
+use std::net::SocketAddr;
+
+use futures::{Future, Poll};
+use futures_mio::UdpSocket;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -20,24 +23,50 @@ fn send_messages() {
     let a_addr = t!(a.local_addr());
     let b_addr = t!(b.local_addr());
 
-    let ((ar, a), (br, b)) = t!(l.run(a.into_future().join(b.into_future())));
-    let ar = ar.unwrap();
-    let br = br.unwrap();
+    let send = SendMessage { socket: a, addr: b_addr };
+    let recv = RecvMessage { socket: b, expected_addr: a_addr };
+    t!(l.run(send.join(recv)));
+}
 
-    assert!(ar.is_write());
-    assert!(!ar.is_read());
-    assert!(br.is_write());
-    assert!(!br.is_read());
+struct SendMessage {
+    socket: UdpSocket,
+    addr: SocketAddr,
+}
 
-    assert_eq!(t!(a.send_to(b"1234", &b_addr)), 4);
-    let (br, b) = t!(l.run(b.into_future()));
-    let br = br.unwrap();
+impl Future for SendMessage {
+    type Item = ();
+    type Error = io::Error;
 
-    assert!(br.is_read());
+    fn poll(&mut self) -> Poll<(), io::Error> {
+        match self.socket.send_to(b"1234", &self.addr) {
+            Ok(4) => Poll::Ok(()),
+            Ok(n) => panic!("didn't send 4 bytes: {}", n),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::NotReady,
+            Err(e) => Poll::Err(e),
+        }
+    }
+}
 
-    let mut buf = [0; 32];
-    let (size, addr) = t!(b.recv_from(&mut buf));
-    assert_eq!(size, 4);
-    assert_eq!(&buf[..4], b"1234");
-    assert_eq!(addr, a_addr);
+struct RecvMessage {
+    socket: UdpSocket,
+    expected_addr: SocketAddr,
+}
+
+impl Future for RecvMessage {
+    type Item = ();
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<(), io::Error> {
+        let mut buf = [0; 32];
+        match self.socket.recv_from(&mut buf) {
+            Ok((4, addr)) => {
+                assert_eq!(&buf[..4], b"1234");
+                assert_eq!(addr, self.expected_addr);
+                Poll::Ok(())
+            }
+            Ok((n, _)) => panic!("didn't read 4 bytes: {}", n),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::NotReady,
+            Err(e) => Poll::Err(e),
+        }
+    }
 }

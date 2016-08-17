@@ -5,11 +5,11 @@ extern crate env_logger;
 
 use std::net::TcpStream;
 use std::thread;
-use std::io::{Read, Write};
+use std::io::{Read, Write, BufReader, BufWriter};
 
 use futures::Future;
 use futures::stream::Stream;
-use futures_io::{BufReader, BufWriter, copy};
+use futures_io::copy;
 
 macro_rules! t {
     ($e:expr) => (match $e {

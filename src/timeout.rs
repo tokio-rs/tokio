@@ -1,7 +1,7 @@
 use std::io;
 use std::time::{Duration, Instant};
 
-use futures::{Future, Task, Poll};
+use futures::{Future, Poll};
 use futures_io::IoFuture;
 
 use LoopHandle;
@@ -50,12 +50,12 @@ impl Future for Timeout {
     type Item = ();
     type Error = io::Error;
 
-    fn poll(&mut self, task: &mut Task) -> Poll<(), io::Error> {
+    fn poll(&mut self) -> Poll<(), io::Error> {
         // TODO: is this fast enough?
         if self.at <= Instant::now() {
             Poll::Ok(())
         } else {
-            self.handle.update_timeout(&self.token, task);
+            self.handle.update_timeout(&self.token);
             Poll::NotReady
         }
     }

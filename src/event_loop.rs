@@ -8,9 +8,9 @@ use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::sync::mpsc;
 use std::time::{Instant, Duration};
 
-use futures::{Future, Task, TaskHandle, Poll};
+use futures::{Future, Poll};
+use futures::task::{self, TaskHandle};
 use futures::executor::{ExecuteCallback, Executor};
-use futures_io::Ready;
 use mio;
 use slab::Slab;
 
@@ -80,7 +80,8 @@ pub struct LoopPin {
 
 struct Scheduled {
     source: IoSource,
-    waiter: Option<TaskHandle>,
+    reader: Option<TaskHandle>,
+    writer: Option<TaskHandle>,
 }
 
 enum TimeoutState {
@@ -89,11 +90,15 @@ enum TimeoutState {
     Waiting(TaskHandle),
 }
 
+enum Direction {
+    Read,
+    Write,
+}
+
 enum Message {
     AddSource(IoSource, Arc<Slot<io::Result<usize>>>),
     DropSource(usize),
-    Schedule(usize, TaskHandle),
-    Deschedule(usize),
+    Schedule(usize, TaskHandle, Direction),
     AddTimeout(Instant, Arc<Slot<io::Result<TimeoutToken>>>),
     UpdateTimeout(TimeoutToken, TaskHandle),
     CancelTimeout(TimeoutToken),
@@ -258,13 +263,15 @@ impl Loop {
                 // supposed to do. If there's a waiter we get ready to notify
                 // it, and we also or-in atomically any events that have
                 // happened (currently read/write events).
-                let mut waiter = None;
+                let mut reader = None;
+                let mut writer = None;
                 if let Some(sched) = self.dispatch.borrow_mut().get_mut(token) {
-                    waiter = sched.waiter.take();
                     if event.kind().is_readable() {
+                        reader = sched.reader.take();
                         sched.source.readiness.fetch_or(1, Ordering::Relaxed);
                     }
                     if event.kind().is_writable() {
+                        writer = sched.writer.take();
                         sched.source.readiness.fetch_or(2, Ordering::Relaxed);
                     }
                 } else {
@@ -272,8 +279,13 @@ impl Loop {
                 }
 
                 // If we actually got a waiter, then notify!
-                if let Some(waiter) = waiter {
-                    self.notify_handle(waiter);
+                //
+                // TODO: don't notify the same task twice
+                if let Some(reader) = reader {
+                    self.notify_handle(reader);
+                }
+                if let Some(writer) = writer {
+                    self.notify_handle(writer);
                 }
             }
 
@@ -299,16 +311,17 @@ impl Loop {
 
     /// Method used to notify a task handle.
     ///
-    /// Note that this should be used instead fo `handle.notify()` to ensure
+    /// Note that this should be used instead fo `handle.unpark()` to ensure
     /// that the `CURRENT_LOOP` variable is set appropriately.
     fn notify_handle(&self, handle: TaskHandle) {
-        CURRENT_LOOP.set(&self, || handle.notify());
+        CURRENT_LOOP.set(&self, || handle.unpark());
     }
 
     fn add_source(&self, source: IoSource) -> io::Result<usize> {
         let sched = Scheduled {
             source: source,
-            waiter: None,
+            reader: None,
+            writer: None,
         };
         let mut dispatch = self.dispatch.borrow_mut();
         if dispatch.vacant_entry().is_none() {
@@ -325,15 +338,21 @@ impl Loop {
         deregister(&self.io, &sched);
     }
 
-    fn schedule(&self, token: usize, wake: TaskHandle) {
+    fn schedule(&self, token: usize, wake: TaskHandle, dir: Direction) {
         let to_call = {
             let mut dispatch = self.dispatch.borrow_mut();
             let sched = dispatch.get_mut(token).unwrap();
-            if sched.source.readiness.load(Ordering::Relaxed) != 0 {
-                sched.waiter = None;
+            let (slot, bit) = match dir {
+                Direction::Read => (&mut sched.reader, 1),
+                Direction::Write => (&mut sched.writer, 2),
+            };
+            let ready = sched.source.readiness.load(Ordering::SeqCst);
+            if ready & bit != 0 {
+                *slot = None;
+                sched.source.readiness.store(ready & !bit, Ordering::SeqCst);
                 Some(wake)
             } else {
-                sched.waiter = Some(wake);
+                *slot = Some(wake);
                 None
             }
         };
@@ -341,12 +360,6 @@ impl Loop {
             debug!("schedule immediately done");
             self.notify_handle(to_call);
         }
-    }
-
-    fn deschedule(&self, token: usize) {
-        let mut dispatch = self.dispatch.borrow_mut();
-        let sched = dispatch.get_mut(token).unwrap();
-        sched.waiter = None;
     }
 
     fn add_timeout(&self, at: Instant) -> io::Result<TimeoutToken> {
@@ -390,8 +403,7 @@ impl Loop {
                     .ok().expect("interference with try_produce");
             }
             Message::DropSource(tok) => self.drop_source(tok),
-            Message::Schedule(tok, wake) => self.schedule(tok, wake),
-            Message::Deschedule(tok) => self.deschedule(tok),
+            Message::Schedule(tok, wake, dir) => self.schedule(tok, wake, dir),
             Message::Shutdown => self.active.set(false),
 
             Message::AddTimeout(at, slot) => {
@@ -475,42 +487,48 @@ impl LoopHandle {
         }
     }
 
-    /// Begin listening for events on an event loop.
+    /// Begin listening for read events on an event loop.
     ///
     /// Once an I/O object has been registered with the event loop through the
     /// `add_source` method, this method can be used with the assigned token to
-    /// begin awaiting notifications.
+    /// begin awaiting read notifications.
     ///
-    /// The `dir` argument indicates how the I/O object is expected to be
-    /// awaited on (either readable or writable) and the `wake` callback will be
-    /// invoked. Note that one the `wake` callback is invoked once it will not
-    /// be invoked again, it must be re-`schedule`d to continue receiving
-    /// notifications.
+    /// Currently the current task will be notified with *edge* semantics. This
+    /// means that whenever the underlying I/O object changes state, e.g. it was
+    /// not readable and now it is, then a notification will be sent.
     ///
     /// # Panics
     ///
     /// This function will panic if the event loop this handle is associated
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
-    pub fn schedule(&self, tok: usize, task: &mut Task) {
-        // TODO: plumb through `&mut Task` if we're on the event loop
-        self.send(Message::Schedule(tok, task.handle().clone()));
+    ///
+    /// This function will also panic if there is not a currently running future
+    /// task.
+    pub fn schedule_read(&self, tok: usize) {
+        self.send(Message::Schedule(tok, task::park(), Direction::Read));
     }
 
-    /// Stop listening for events on an event loop.
+    /// Begin listening for write events on an event loop.
     ///
-    /// Once a callback has been scheduled with the `schedule` method, it can be
-    /// unregistered from the event loop with this method. This method does not
-    /// guarantee that the callback will not be invoked if it hasn't already,
-    /// but a best effort will be made to ensure it is not called.
+    /// Once an I/O object has been registered with the event loop through the
+    /// `add_source` method, this method can be used with the assigned token to
+    /// begin awaiting write notifications.
+    ///
+    /// Currently the current task will be notified with *edge* semantics. This
+    /// means that whenever the underlying I/O object changes state, e.g. it was
+    /// not writable and now it is, then a notification will be sent.
     ///
     /// # Panics
     ///
     /// This function will panic if the event loop this handle is associated
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
-    pub fn deschedule(&self, tok: usize) {
-        self.send(Message::Deschedule(tok));
+    ///
+    /// This function will also panic if there is not a currently running future
+    /// task.
+    pub fn schedule_write(&self, tok: usize) {
+        self.send(Message::Schedule(tok, task::park(), Direction::Write));
     }
 
     /// Unregister all information associated with a token on an event loop,
@@ -554,9 +572,9 @@ impl LoopHandle {
     ///
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
-    pub fn update_timeout(&self, timeout: &TimeoutToken, task: &mut Task) {
+    pub fn update_timeout(&self, timeout: &TimeoutToken) {
         let timeout = TimeoutToken { token: timeout.token };
-        self.send(Message::UpdateTimeout(timeout, task.handle().clone()))
+        self.send(Message::UpdateTimeout(timeout, task::park()))
     }
 
     /// Cancel a previously added timeout.
@@ -652,8 +670,8 @@ impl Future for AddSource {
     type Item = usize;
     type Error = io::Error;
 
-    fn poll(&mut self, task: &mut Task) -> Poll<usize, io::Error> {
-        self.inner.poll(task, Loop::add_source, Message::AddSource)
+    fn poll(&mut self) -> Poll<usize, io::Error> {
+        self.inner.poll(Loop::add_source, Message::AddSource)
     }
 }
 
@@ -672,8 +690,8 @@ impl Future for AddTimeout {
     type Item = TimeoutToken;
     type Error = io::Error;
 
-    fn poll(&mut self, task: &mut Task) -> Poll<TimeoutToken, io::Error> {
-        self.inner.poll(task, Loop::add_timeout, Message::AddTimeout)
+    fn poll(&mut self) -> Poll<TimeoutToken, io::Error> {
+        self.inner.poll(Loop::add_timeout, Message::AddTimeout)
     }
 }
 
@@ -715,8 +733,8 @@ impl<F, A> Future for AddLoopData<F, A>
     type Item = LoopData<A>;
     type Error = io::Error;
 
-    fn poll(&mut self, task: &mut Task) -> Poll<LoopData<A>, io::Error> {
-        let ret = self.inner.poll(task, |_lp, f| {
+    fn poll(&mut self) -> Poll<LoopData<A>, io::Error> {
+        let ret = self.inner.poll(|_lp, f| {
             Ok(DropBox::new(f()))
         }, |f, slot| {
             Message::Run(Box::new(move || {
@@ -777,13 +795,13 @@ impl<A: Future> Future for LoopData<A> {
     type Item = A::Item;
     type Error = A::Error;
 
-    fn poll(&mut self, task: &mut Task) -> Poll<A::Item, A::Error> {
+    fn poll(&mut self) -> Poll<A::Item, A::Error> {
         // If we're on the right thread, then we can proceed. Otherwise we need
         // to go and get polled on the right thread.
         if let Some(inner) = self.get_mut() {
-            return inner.poll(task)
+            return inner.poll()
         }
-        task.poll_on(self.executor());
+        task::poll_on(self.executor());
         Poll::NotReady
     }
 }
@@ -954,7 +972,7 @@ struct LoopFuture<T, U> {
 impl<T, U> LoopFuture<T, U>
     where T: 'static,
 {
-    fn poll<F, G>(&mut self, task: &mut Task, f: F, g: G) -> Poll<T, io::Error>
+    fn poll<F, G>(&mut self, f: F, g: G) -> Poll<T, io::Error>
         where F: FnOnce(&Loop, U) -> io::Result<T>,
               G: FnOnce(U, Arc<Slot<io::Result<T>>>) -> Message,
     {
@@ -965,9 +983,9 @@ impl<T, U> LoopFuture<T, U>
                     Ok(t) => return t.into(),
                     Err(_) => {}
                 }
-                let handle = task.handle().clone();
+                let task = task::park();
                 *token = result.on_full(move |_| {
-                    handle.notify();
+                    task.unpark();
                 });
                 return Poll::NotReady
             }
@@ -980,10 +998,10 @@ impl<T, U> LoopFuture<T, U>
                     return ret.into()
                 }
 
-                let handle = task.handle().clone();
+                let task = task::park();
                 let result = Arc::new(Slot::new(None));
                 let token = result.on_full(move |_| {
-                    handle.notify();
+                    task.unpark();
                 });
                 self.result = Some((result.clone(), token));
                 self.loop_handle.send(g(data.take().unwrap(), result));
@@ -1033,14 +1051,8 @@ impl<E: ?Sized> Source<E> {
     /// The event loop will fill in this information and then inform futures
     /// that they're ready to go with the `schedule` method, and then the `poll`
     /// method can use this to figure out what happened.
-    pub fn take_readiness(&self) -> Option<Ready> {
-        match self.readiness.swap(0, Ordering::SeqCst) {
-            0 => None,
-            1 => Some(Ready::Read),
-            2 => Some(Ready::Write),
-            3 => Some(Ready::ReadWrite),
-            _ => panic!(),
-        }
+    pub fn take_readiness(&self) -> usize {
+        self.readiness.swap(0, Ordering::SeqCst)
     }
 
     /// Gets access to the underlying I/O object.

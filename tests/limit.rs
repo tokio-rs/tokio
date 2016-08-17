@@ -4,11 +4,11 @@ extern crate futures_mio;
 
 use std::net::TcpStream;
 use std::thread;
-use std::io::Write;
+use std::io::{Write, Read};
 
 use futures::Future;
 use futures::stream::Stream;
-use futures_io::{read_to_end, take};
+use futures_io::read_to_end;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -34,7 +34,7 @@ fn limit() {
         let mut clients = clients.into_iter();
         let a = clients.next().unwrap();
 
-        read_to_end(take(a, 4), Vec::new())
+        read_to_end(a.take(4), Vec::new())
     });
 
     let data = t!(l.run(copied));
