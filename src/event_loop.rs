@@ -995,8 +995,10 @@ impl<T, U> LoopFuture<T, U>
                     lp.map(|lp| f(lp, data.take().unwrap()))
                 });
                 if let Some(ret) = ret {
+                    debug!("loop future done immediately on event loop");
                     return ret.into()
                 }
+                debug!("loop future needs to send info to event loop");
 
                 let task = task::park();
                 let result = Arc::new(Slot::new(None));

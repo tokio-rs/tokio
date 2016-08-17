@@ -3,14 +3,13 @@ extern crate futures;
 extern crate futures_io;
 extern crate futures_mio;
 
-use std::io::{self, Read, Write};
-use std::sync::Arc;
+use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use futures_io::copy;
-use futures_mio::TcpStream;
+use futures_io::{copy, TaskIo};
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -30,8 +29,6 @@ fn echo_server() {
 
     let msg = "foo bar baz";
     let t = thread::spawn(move || {
-        use std::net::TcpStream;
-
         let mut s = TcpStream::connect(&addr).unwrap();
 
         for _i in 0..1024 {
@@ -44,32 +41,11 @@ fn echo_server() {
 
     let clients = srv.incoming();
     let client = clients.into_future().map(|e| e.0.unwrap()).map_err(|e| e.0);
-    let halves = client.map(|s| {
-        let s = Arc::new(s.0);
-        (SocketIo(s.clone()), SocketIo(s))
-    });
+    let halves = client.map(|s| TaskIo::new(s.0).split());
     let copied = halves.and_then(|(a, b)| copy(a, b));
 
     let amt = t!(l.run(copied));
     t.join().unwrap();
 
     assert_eq!(amt, msg.len() as u64 * 1024);
-}
-
-struct SocketIo(Arc<TcpStream>);
-
-impl Read for SocketIo {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&*self.0).read(buf)
-    }
-}
-
-impl Write for SocketIo {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&*self.0).write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        (&*self.0).flush()
-    }
 }

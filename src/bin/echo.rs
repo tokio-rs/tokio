@@ -5,14 +5,11 @@ extern crate futures_io;
 extern crate futures_mio;
 
 use std::env;
-use std::io::{self, Read, Write};
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use futures::Future;
 use futures::stream::Stream;
-use futures_io::copy;
-use futures_mio::TcpStream;
+use futures_io::{copy, TaskIo};
 
 fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
@@ -36,8 +33,9 @@ fn main() {
         // Finally we use the `io::copy` future to copy all data from the
         // reading half onto the writing half.
         socket.incoming().for_each(|(socket, addr)| {
-            let socket = Arc::new(socket);
-            let amt = copy(SocketIo(socket.clone()), SocketIo(socket));
+            let socket = futures::lazy(|| futures::finished(TaskIo::new(socket)));
+            let pair = socket.map(|s| s.split());
+            let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
 
             // Once all that is done we print out how much we wrote, and then
             // critically we *forget* this future which allows it to run
@@ -50,22 +48,4 @@ fn main() {
         })
     });
     l.run(done).unwrap();
-}
-
-struct SocketIo(Arc<TcpStream>);
-
-impl Read for SocketIo {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&*self.0).read(buf)
-    }
-}
-
-impl Write for SocketIo {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&*self.0).write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        (&*self.0).flush()
-    }
 }

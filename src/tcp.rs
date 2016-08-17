@@ -100,8 +100,12 @@ impl TcpListener {
 
             fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
                 match self.inner.listener.io().accept() {
-                    Ok(Some(pair)) => Poll::Ok(Some(pair)),
+                    Ok(Some(pair)) => {
+                        debug!("accepted a socket");
+                        Poll::Ok(Some(pair))
+                    }
                     Ok(None) => {
+                        debug!("waiting to accept another socket");
                         self.inner.ready.need_read();
                         Poll::NotReady
                     }
