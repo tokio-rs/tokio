@@ -1,15 +1,14 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::io::{self, ErrorKind};
 use std::marker;
 use std::mem;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use std::sync::mpsc;
 use std::time::{Instant, Duration};
 
 use futures::{Future, Poll};
-use futures::task::{self, TaskHandle};
+use futures::task::{self, Task, Notify, TaskHandle};
 use futures::executor::{ExecuteCallback, Executor};
 use mio;
 use slab::Slab;
@@ -33,11 +32,13 @@ const SLAB_CAPACITY: usize = 1024 * 64;
 // TODO: expand this
 pub struct Loop {
     id: usize,
-    active: Cell<bool>,
     io: mio::Poll,
+    events: mio::Events,
     tx: Arc<MioSender>,
     rx: Receiver<Message>,
     dispatch: RefCell<Slab<Scheduled, usize>>,
+    _future_registration: mio::Registration,
+    future_readiness: Arc<mio::SetReadiness>,
 
     // Timer wheel keeping track of all timeouts. The `usize` stored in the
     // timer wheel is an index into the slab below.
@@ -104,7 +105,6 @@ enum Message {
     CancelTimeout(TimeoutToken),
     Run(Box<ExecuteCallback>),
     Drop(DropBox<dropbox::MyDrop>),
-    Shutdown,
 }
 
 /// Type of I/O objects inserted into the event loop, created by `Source::new`.
@@ -140,13 +140,20 @@ impl Loop {
                          mio::Token(0),
                          mio::EventSet::readable(),
                          mio::PollOpt::edge()));
+        let pair = mio::Registration::new(&io,
+                                          mio::Token(1),
+                                          mio::EventSet::readable(),
+                                          mio::PollOpt::level());
+        let (registration, readiness) = pair;
         Ok(Loop {
             id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
-            active: Cell::new(true),
             io: io,
+            events: mio::Events::new(),
             tx: Arc::new(MioSender { inner: tx }),
             rx: rx,
-            dispatch: RefCell::new(Slab::new_starting_at(1, SLAB_CAPACITY)),
+            _future_registration: registration,
+            future_readiness: Arc::new(readiness),
+            dispatch: RefCell::new(Slab::new_starting_at(2, SLAB_CAPACITY)),
             timeouts: RefCell::new(Slab::new_starting_at(0, SLAB_CAPACITY)),
             timer_wheel: RefCell::new(TimerWheel::new()),
             _marker: marker::PhantomData,
@@ -195,25 +202,38 @@ impl Loop {
     /// otherwise waiting for the future to complete.
     ///
     /// Returns the value that the future resolves to.
-    pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
-        where F: Future + 'static,
+    pub fn run<F>(&mut self, mut f: F) -> Result<F::Item, F::Error>
+        where F: Future,
     {
-        let (tx_res, rx_res) = mpsc::channel();
-        let handle = self.handle();
-        self.add_loop_data(f.then(move |res| {
-            handle.shutdown();
-            tx_res.send(res)
-        })).forget();
+        struct MyNotify(Arc<mio::SetReadiness>);
 
-        self._run();
+        impl Notify for MyNotify {
+            fn notify(&self) {
+                self.0.set_readiness(mio::EventSet::readable())
+                      .expect("failed to set readiness");
+            }
+        }
 
-        rx_res.recv().unwrap()
+        let mut task = Task::new_notify(MyNotify(self.future_readiness.clone()));
+        let ready = self.future_readiness.clone();
+
+        let mut res = None;
+        self._run(&mut || {
+            ready.set_readiness(mio::EventSet::none())
+                 .expect("failed to set readiness");
+            assert!(res.is_none());
+            match task.enter(|| f.poll()) {
+                Poll::NotReady => {}
+                Poll::Ok(e) => res = Some(Ok(e)),
+                Poll::Err(e) => res = Some(Err(e)),
+            }
+            res.is_some()
+        });
+        res.expect("run should not return until future is done")
     }
 
-    fn _run(&mut self) {
-        let mut events = mio::Events::new();
-        self.active.set(true);
-        while self.active.get() {
+    fn _run(&mut self, done: &mut FnMut() -> bool) {
+        while CURRENT_LOOP.set(self, || !done()) {
             let amt;
             // On Linux, Poll::poll is epoll_wait, which may return EINTR if a
             // ptracer attaches. This retry loop prevents crashing when
@@ -227,7 +247,7 @@ impl Loop {
                         t - start
                     }
                 });
-                match self.io.poll(&mut events, timeout) {
+                match self.io.poll(&mut self.events, timeout) {
                     Ok(a) => {
                         amt = a;
                         break;
@@ -246,17 +266,23 @@ impl Loop {
             self.consume_timeouts(start);
 
             // Next, process all the events that came in.
-            for i in 0..events.len() {
-                let event = events.get(i).unwrap();
+            for i in 0..self.events.len() {
+                let event = self.events.get(i).unwrap();
                 let token = usize::from(event.token());
 
                 // Token 0 == our incoming message queue, so this means we
                 // process the whole queue of messages.
+                //
+                // Token 1 == we should poll the future, we'll do that right
+                // after we get through the rest of this tick of the event loop.
                 if token == 0 {
                     debug!("consuming notification queue");
                     CURRENT_LOOP.set(&self, || {
                         self.consume_queue();
                     });
+                    continue
+                } else if token == 1 {
+                    debug!("ZOMG IT'S HERE");
                     continue
                 }
 
@@ -418,7 +444,6 @@ impl Loop {
             }
             Message::DropSource(tok) => self.drop_source(tok),
             Message::Schedule(tok, wake, dir) => self.schedule(tok, wake, dir),
-            Message::Shutdown => self.active.set(false),
 
             Message::AddTimeout(at, slot) => {
                 slot.try_produce(self.add_timeout(at))
@@ -604,6 +629,7 @@ impl LoopHandle {
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
     pub fn cancel_timeout(&self, timeout: &TimeoutToken) {
+        debug!("cancel timeout {}", timeout.token);
         let timeout = TimeoutToken { token: timeout.token, when: timeout.when };
         self.send(Message::CancelTimeout(timeout))
     }
@@ -637,23 +663,6 @@ impl LoopHandle {
                 result: None,
             },
         }
-    }
-
-    /// Send a message to the associated event loop that it should shut down, or
-    /// otherwise break out of its current loop of iteration.
-    ///
-    /// This method does not forcibly cause the event loop to shut down or
-    /// perform an interrupt on whatever task is currently running, instead a
-    /// message is simply enqueued to at a later date process the request to
-    /// stop looping ASAP.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the event loop this handle is associated
-    /// with has gone away, or if there is an error communicating with the event
-    /// loop.
-    pub fn shutdown(&self) {
-        self.send(Message::Shutdown);
     }
 }
 
