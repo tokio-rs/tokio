@@ -54,8 +54,6 @@ impl Future for Timeout {
         if *self.token.when() <= now {
             Poll::Ok(())
         } else {
-            trace!("waiting for a timeout at {:?}", self.token.when());
-            trace!("current time is          {:?}", now);
             self.handle.update_timeout(&self.token);
             Poll::NotReady
         }

@@ -201,7 +201,26 @@ impl Loop {
     /// Runs a future until completion, driving the event loop while we're
     /// otherwise waiting for the future to complete.
     ///
-    /// Returns the value that the future resolves to.
+    /// This function will begin executing the event loop and will finish once
+    /// the provided future is resolve. Note that the future argument here
+    /// crucially does not require the `'static` nor `Send` bounds. As a result
+    /// the future will be "pinned" to not only this thread but also this stack
+    /// frame.
+    ///
+    /// This function will returns the value that the future resolves to once
+    /// the future has finished. If the future never resolves then this function
+    /// will never return.
+    ///
+    /// # Panics
+    ///
+    /// This method will **not** catch panics from polling the future `f`. If
+    /// the future panics then it's the responsibility of the caller to catch
+    /// that panic and handle it as appropriate.
+    ///
+    /// Similarly, becuase the provided future will be pinned not only to this
+    /// thread but also to this task, any attempt to poll the future on a
+    /// separate thread will result in a panic. That is, calls to
+    /// `task::poll_on` must be avoided.
     pub fn run<F>(&mut self, mut f: F) -> Result<F::Item, F::Error>
         where F: Future,
     {
@@ -214,9 +233,19 @@ impl Loop {
             }
         }
 
+        // First up, create the task that will drive this future. The task here
+        // isn't a "normal task" but rather one where we define what to do when
+        // a readiness notification comes in.
+        //
+        // We translate readiness notifications to a `set_readiness` of our
+        // `future_readiness` structure we have stored internally.
         let mut task = Task::new_notify(MyNotify(self.future_readiness.clone()));
         let ready = self.future_readiness.clone();
 
+        // Next, move all that data into a dynamically dispatched closure to cut
+        // down on monomorphization costs. Inside this closure we unset the
+        // readiness of the future (as we're about to poll it) and then we check
+        // to see if it's done. If it's not then the event loop will turn again.
         let mut res = None;
         self._run(&mut || {
             ready.set_readiness(mio::EventSet::none())
@@ -233,7 +262,13 @@ impl Loop {
     }
 
     fn _run(&mut self, done: &mut FnMut() -> bool) {
-        while CURRENT_LOOP.set(self, || !done()) {
+        // Check to see if we're done immediately, if so we shouldn't do any
+        // work.
+        if CURRENT_LOOP.set(self, || done()) {
+            return
+        }
+
+        loop {
             let amt;
             // On Linux, Poll::poll is epoll_wait, which may return EINTR if a
             // ptracer attaches. This retry loop prevents crashing when
@@ -282,7 +317,9 @@ impl Loop {
                     });
                     continue
                 } else if token == 1 {
-                    debug!("ZOMG IT'S HERE");
+                    if CURRENT_LOOP.set(self, || done()) {
+                        return
+                    }
                     continue
                 }
 
@@ -320,8 +357,6 @@ impl Loop {
 
             debug!("loop process - {} events, {:?}", amt, start.elapsed());
         }
-
-        debug!("loop is done!");
     }
 
     fn consume_timeouts(&mut self, now: Instant) {
@@ -1100,6 +1135,7 @@ impl<E: ?Sized> Source<E> {
     /// The event loop will fill in this information and then inform futures
     /// that they're ready to go with the `schedule` method, and then the `poll`
     /// method can use this to figure out what happened.
+    // TODO: shouldn't return a usize here, but rather some kind of newtype
     pub fn take_readiness(&self) -> usize {
         self.readiness.swap(0, Ordering::SeqCst)
     }

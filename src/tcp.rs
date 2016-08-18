@@ -227,11 +227,21 @@ impl TcpStream {
     }
 
     /// Test whether this socket is ready to be read or not.
+    ///
+    /// If the socket is *not* readable then the current task is scheduled to
+    /// get a notification when the socket does become readable. That is, this
+    /// is only suitable for calling in a `Future::poll` method and will
+    /// automatically handle ensuring a retry once the socket is readable again.
     pub fn poll_read(&self) -> Poll<(), io::Error> {
         self.ready.poll_read()
     }
 
     /// Test whether this socket is writey to be written to or not.
+    ///
+    /// If the socket is *not* writable then the current task is scheduled to
+    /// get a notification when the socket does become writable. That is, this
+    /// is only suitable for calling in a `Future::poll` method and will
+    /// automatically handle ensuring a retry once the socket is writable again.
     pub fn poll_write(&self) -> Poll<(), io::Error> {
         self.ready.poll_write()
     }
@@ -303,7 +313,6 @@ impl Read for TcpStream {
         if is_wouldblock(&r) {
             self.ready.need_read();
         }
-        trace!("read[{:p}] {:?} on {:?}", self, r, self.source.io());
         return r
     }
 }
@@ -314,7 +323,6 @@ impl Write for TcpStream {
         if is_wouldblock(&r) {
             self.ready.need_write();
         }
-        trace!("write[{:p}] {:?} on {:?}", self, r, self.source.io());
         return r
     }
     fn flush(&mut self) -> io::Result<()> {
