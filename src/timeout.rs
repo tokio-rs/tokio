@@ -15,7 +15,6 @@ use event_loop::TimeoutToken;
 /// they will likely fire some granularity after the exact instant that they're
 /// otherwise indicated to fire at.
 pub struct Timeout {
-    at: Instant,
     token: TimeoutToken,
     handle: LoopHandle,
 }
@@ -38,7 +37,6 @@ impl LoopHandle {
     pub fn timeout_at(self, at: Instant) -> IoFuture<Timeout> {
         self.add_timeout(at).map(move |token| {
             Timeout {
-                at: at,
                 token: token,
                 handle: self,
             }
@@ -52,9 +50,12 @@ impl Future for Timeout {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
         // TODO: is this fast enough?
-        if self.at <= Instant::now() {
+        let now = Instant::now();
+        if *self.token.when() <= now {
             Poll::Ok(())
         } else {
+            trace!("waiting for a timeout at {:?}", self.token.when());
+            trace!("current time is          {:?}", now);
             self.handle.update_timeout(&self.token);
             Poll::NotReady
         }

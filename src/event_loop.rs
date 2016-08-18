@@ -237,6 +237,7 @@ impl Loop {
                 }
             }
             debug!("loop poll - {:?}", start.elapsed());
+            debug!("loop time - {:?}", Instant::now());
 
             // First up, process all timeouts that may have just occurred.
             let start = Instant::now();
@@ -314,10 +315,12 @@ impl Loop {
     /// Note that this should be used instead fo `handle.unpark()` to ensure
     /// that the `CURRENT_LOOP` variable is set appropriately.
     fn notify_handle(&self, handle: TaskHandle) {
+        debug!("notifying a task handle");
         CURRENT_LOOP.set(&self, || handle.unpark());
     }
 
     fn add_source(&self, source: IoSource) -> io::Result<usize> {
+        debug!("adding a new I/O source");
         let sched = Scheduled {
             source: source,
             reader: None,
@@ -334,11 +337,13 @@ impl Loop {
     }
 
     fn drop_source(&self, token: usize) {
+        debug!("dropping I/O source: {}", token);
         let sched = self.dispatch.borrow_mut().remove(token).unwrap();
         deregister(&self.io, &sched);
     }
 
     fn schedule(&self, token: usize, wake: TaskHandle, dir: Direction) {
+        debug!("scheduling direction for: {}", token);
         let to_call = {
             let mut dispatch = self.dispatch.borrow_mut();
             let sched = dispatch.get_mut(token).unwrap();
@@ -370,11 +375,17 @@ impl Loop {
         }
         let entry = timeouts.vacant_entry().unwrap();
         let timeout = self.timer_wheel.borrow_mut().insert(at, entry.index());
+        let when = *timeout.when();
         let entry = entry.insert((timeout, TimeoutState::NotFired));
-        Ok(TimeoutToken { token: entry.index() })
+        debug!("added a timeout: {}", entry.index());
+        Ok(TimeoutToken {
+            token: entry.index(),
+            when: when,
+        })
     }
 
     fn update_timeout(&self, token: &TimeoutToken, handle: TaskHandle) {
+        debug!("updating a timeout: {}", token.token);
         let to_wake = self.timeouts.borrow_mut()[token.token].1.block(handle);
         if let Some(to_wake) = to_wake {
             self.notify_handle(to_wake);
@@ -382,6 +393,7 @@ impl Loop {
     }
 
     fn cancel_timeout(&self, token: &TimeoutToken) {
+        debug!("cancel a timeout: {}", token.token);
         let pair = self.timeouts.borrow_mut().remove(token.token);
         if let Some((timeout, _state)) = pair {
             self.timer_wheel.borrow_mut().cancel(&timeout);
@@ -412,8 +424,14 @@ impl Loop {
             }
             Message::UpdateTimeout(t, handle) => self.update_timeout(&t, handle),
             Message::CancelTimeout(t) => self.cancel_timeout(&t),
-            Message::Run(f) => f.call(),
-            Message::Drop(data) => drop(data),
+            Message::Run(f) => {
+                debug!("running a closure");
+                f.call()
+            }
+            Message::Drop(data) => {
+                debug!("dropping some data");
+                drop(data);
+            }
         }
     }
 }
@@ -573,7 +591,7 @@ impl LoopHandle {
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
     pub fn update_timeout(&self, timeout: &TimeoutToken) {
-        let timeout = TimeoutToken { token: timeout.token };
+        let timeout = TimeoutToken { token: timeout.token, when: timeout.when };
         self.send(Message::UpdateTimeout(timeout, task::park()))
     }
 
@@ -584,7 +602,7 @@ impl LoopHandle {
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
     pub fn cancel_timeout(&self, timeout: &TimeoutToken) {
-        let timeout = TimeoutToken { token: timeout.token };
+        let timeout = TimeoutToken { token: timeout.token, when: timeout.when };
         self.send(Message::CancelTimeout(timeout))
     }
 
@@ -656,6 +674,11 @@ impl LoopPin {
     pub fn handle(&self) -> &LoopHandle {
         &self.handle
     }
+
+    /// TODO: dox
+    pub fn executor(&self) -> Arc<Executor> {
+        self.handle.tx.clone()
+    }
 }
 
 /// A future which will resolve a unique `tok` token for an I/O object.
@@ -684,6 +707,7 @@ pub struct AddTimeout {
 /// A token that identifies an active timeout.
 pub struct TimeoutToken {
     token: usize,
+    when: Instant,
 }
 
 impl Future for AddTimeout {
@@ -692,6 +716,18 @@ impl Future for AddTimeout {
 
     fn poll(&mut self) -> Poll<TimeoutToken, io::Error> {
         self.inner.poll(Loop::add_timeout, Message::AddTimeout)
+    }
+}
+
+impl TimeoutToken {
+    /// Returns the instant in time when this timeout token will "fire".
+    ///
+    /// Note that this instant may *not* be the instant that was passed in when
+    /// the timeout was created. The event loop does not support high resolution
+    /// timers, so the exact resolution of when a timeout may fire may be
+    /// slightly fudged.
+    pub fn when(&self) -> &Instant {
+        &self.when
     }
 }
 

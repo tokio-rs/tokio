@@ -1,6 +1,5 @@
 //! A timer wheel implementation
 
-use std::cmp;
 use std::mem;
 use std::time::{Instant, Duration};
 
@@ -110,7 +109,7 @@ impl<T> TimerWheel<T> {
     ///
     /// This method will panic if `at` is before the time that this timer wheel
     /// was created.
-    pub fn insert(&mut self, at: Instant, data: T) -> Timeout {
+    pub fn insert(&mut self, mut at: Instant, data: T) -> Timeout {
         // First up, figure out where we're gonna go in the wheel. Note that if
         // we're being scheduled on or before the current wheel tick we just
         // make sure to defer ourselves to the next tick.
@@ -121,6 +120,12 @@ impl<T> TimerWheel<T> {
         }
         let wheel_idx = self.ticks_to_wheel_idx(tick);
         trace!("inserting timeout at {} for {}", wheel_idx, tick);
+
+        let actual_tick = self.start +
+                          Duration::from_millis(TICK_MS) * (tick as u32);
+        trace!("actual_tick: {:?}", actual_tick);
+        trace!("at:          {:?}", at);
+        at = actual_tick;
 
         // Next, make sure there's enough space in the slab for the timeout.
         if self.slab.vacant_entry().is_none() {
@@ -150,12 +155,8 @@ impl<T> TimerWheel<T> {
 
         // Update the wheel slot's next timeout field.
         if at <= slot.next_timeout.unwrap_or(at) {
-            let tick = tick as u32;
-            let actual_tick = self.start + Duration::from_millis(TICK_MS) * tick;
-            trace!("actual_tick: {:?}", actual_tick);
-            trace!("at:          {:?}", at);
-            let at = cmp::max(actual_tick, at);
             debug!("updating[{}] next timeout: {:?}", wheel_idx, at);
+            debug!("                    start: {:?}", self.start);
             slot.next_timeout = Some(at);
         }
 
@@ -300,11 +301,17 @@ impl<T> TimerWheel<T> {
                     .checked_mul(1_000)
                     .and_then(|m| m.checked_add(ms))
                     .expect("overflow scheduling timeout");
-        (ms + TICK_MS / 2) / TICK_MS
+        ms / TICK_MS
     }
 
     fn ticks_to_wheel_idx(&self, ticks: u64) -> usize {
         (ticks as usize) & MASK
+    }
+}
+
+impl Timeout {
+    pub fn when(&self) -> &Instant {
+        &self.when
     }
 }
 
@@ -401,7 +408,7 @@ mod tests {
     fn next_timeout() {
         drop(env_logger::init());
         let mut timer = TimerWheel::<i32>::new();
-        let now = Instant::now();
+        let now = timer.start;
 
         assert!(timer.next_timeout().is_none());
         timer.insert(now + ms(400), 3);
@@ -423,15 +430,23 @@ mod tests {
         timer.insert(now + ms(200), 4);
         timer.insert(now + ms(201), 5);
         timer.insert(now + ms(251), 6);
+        timer.insert(now + ms(299), 7);
+        timer.insert(now + ms(300), 8);
+        timer.insert(now + ms(301), 9);
 
         let mut found = Vec::new();
         while let Some(i) = timer.poll(now + ms(200)) {
             found.push(i);
         }
         found.sort();
-        assert_eq!(found, [3, 4, 5]);
+        assert_eq!(found, [3, 4, 5, 6, 7]);
 
-        assert_eq!(timer.poll(now + ms(300)), Some(6));
+        let mut found = Vec::new();
+        while let Some(i) = timer.poll(now + ms(300)) {
+            found.push(i);
+        }
+        found.sort();
+        assert_eq!(found, [8, 9]);
         assert_eq!(timer.poll(now + ms(300)), None);
     }
 
@@ -439,10 +454,10 @@ mod tests {
     fn remove_clears_timeout() {
         drop(env_logger::init());
         let mut timer = TimerWheel::<i32>::new();
-        let now = Instant::now();
+        let now = timer.start;
 
         timer.insert(now + ms(100), 3);
-        assert_eq!(timer.next_timeout(), Some(now + ms(100)));
+        assert_eq!(timer.next_timeout(), Some(timer.start + ms(100)));
         assert_eq!(timer.poll(now + ms(200)), Some(3));
         assert_eq!(timer.next_timeout(), None);
     }
@@ -475,7 +490,7 @@ mod tests {
     fn poll_then_next_timeout() {
         drop(env_logger::init());
         let mut timer = TimerWheel::<i32>::new();
-        let now = Instant::now();
+        let now = timer.start;
 
         timer.insert(now + ms(200), 2);
         assert_eq!(timer.poll(now + ms(100)), None);
