@@ -9,10 +9,11 @@ extern crate futures_io;
 extern crate futures_mio;
 
 use std::env;
+use std::iter;
 use std::net::SocketAddr;
 
 use futures::Future;
-use futures::stream::Stream;
+use futures::stream::{self, Stream};
 use futures_io::IoFuture;
 
 fn main() {
@@ -33,10 +34,10 @@ fn main() {
     l.run(server).unwrap();
 }
 
-// TODO: this blows the stack...
 fn write(socket: futures_mio::TcpStream) -> IoFuture<()> {
-    static BUF: &'static [u8] = &[0; 1 * 1024 * 1024];
-    futures_io::write_all(socket, BUF).and_then(|(socket, _)| {
-        write(socket)
-    }).boxed()
+    static BUF: &'static [u8] = &[0; 64 * 1024];
+    let iter = iter::repeat(()).map(|()| Ok(()));
+    stream::iter(iter).fold(socket, |socket, ()| {
+        futures_io::write_all(socket, BUF).map(|(socket, _)| socket)
+    }).map(|_| ()).boxed()
 }
