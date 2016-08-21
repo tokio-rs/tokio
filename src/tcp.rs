@@ -2,7 +2,6 @@ use std::fmt;
 use std::io::{self, ErrorKind, Read, Write};
 use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
-use std::sync::Arc;
 
 use futures::stream::Stream;
 use futures::{Future, IntoFuture, failed, Poll};
@@ -10,27 +9,21 @@ use futures_io::{IoFuture, IoStream};
 use mio;
 
 use {ReadinessStream, LoopHandle};
-use event_loop::Source;
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
 /// This object can be converted into a stream of incoming connections for
 /// various forms of processing.
 pub struct TcpListener {
-    loop_handle: LoopHandle,
-    ready: ReadinessStream,
-    listener: Arc<Source<mio::tcp::TcpListener>>,
+    io: ReadinessStream<mio::tcp::TcpListener>,
 }
 
 impl TcpListener {
     fn new(listener: mio::tcp::TcpListener,
            handle: LoopHandle) -> IoFuture<TcpListener> {
-        let listener = Arc::new(Source::new(listener));
-        ReadinessStream::new(handle.clone(), listener.clone()).map(|r| {
+        ReadinessStream::new(handle, listener).map(|io| {
             TcpListener {
-                loop_handle: handle,
-                ready: r,
-                listener: listener,
+                io: io,
             }
         }).boxed()
     }
@@ -73,7 +66,7 @@ impl TcpListener {
 
     /// Test whether this socket is ready to be read or not.
     pub fn poll_read(&self) -> Poll<(), io::Error> {
-        self.ready.poll_read()
+        self.io.poll_read()
     }
 
     /// Returns the local address that this listener is bound to.
@@ -81,7 +74,7 @@ impl TcpListener {
     /// This can be useful, for example, when binding to port 0 to figure out
     /// which port was actually bound.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.listener.io().local_addr()
+        self.io.get_ref().local_addr()
     }
 
     /// Consumes this listener, returning a stream of the sockets this listener
@@ -99,14 +92,14 @@ impl TcpListener {
             type Error = io::Error;
 
             fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-                match self.inner.listener.io().accept() {
+                match self.inner.io.get_ref().accept() {
                     Ok(Some(pair)) => {
                         debug!("accepted a socket");
                         Poll::Ok(Some(pair))
                     }
                     Ok(None) => {
                         debug!("waiting to accept another socket");
-                        self.inner.ready.need_read();
+                        self.inner.io.need_read();
                         Poll::NotReady
                     }
                     Err(e) => Poll::Err(e),
@@ -114,17 +107,11 @@ impl TcpListener {
             }
         }
 
-        let loop_handle = self.loop_handle.clone();
+        let loop_handle = self.io.loop_handle().clone();
         Incoming { inner: self }
             .and_then(move |(tcp, addr)| {
-                let tcp = Arc::new(Source::new(tcp));
-                ReadinessStream::new(loop_handle.clone(),
-                                     tcp.clone()).map(move |ready| {
-                    let stream = TcpStream {
-                        source: tcp,
-                        ready: ready,
-                    };
-                    (stream, addr)
+                ReadinessStream::new(loop_handle.clone(), tcp).map(move |io| {
+                    (TcpStream { io: io }, addr)
                 })
             }).boxed()
     }
@@ -132,7 +119,7 @@ impl TcpListener {
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.listener.io().fmt(f)
+        self.io.get_ref().fmt(f)
     }
 }
 
@@ -143,8 +130,7 @@ impl fmt::Debug for TcpListener {
 /// raw underlying I/O object as well as streams for the read/write
 /// notifications on the stream itself.
 pub struct TcpStream {
-    source: Arc<Source<mio::tcp::TcpStream>>,
-    ready: ReadinessStream,
+    io: ReadinessStream<mio::tcp::TcpStream>,
 }
 
 enum TcpStreamNew {
@@ -184,18 +170,8 @@ impl TcpStream {
     fn new(connected_stream: mio::tcp::TcpStream,
            handle: LoopHandle)
            -> IoFuture<TcpStream> {
-        // Once we've connected, wait for the stream to be writable as that's
-        // when the actual connection has been initiated. Once we're writable we
-        // check for `take_socket_error` to see if the connect actually hit an
-        // error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        let connected_stream = Arc::new(Source::new(connected_stream));
-        ReadinessStream::new(handle, connected_stream.clone()).and_then(|ready| {
-            TcpStreamNew::Waiting(TcpStream {
-                source: connected_stream,
-                ready: ready,
-            })
+        ReadinessStream::new(handle, connected_stream).and_then(|io| {
+            TcpStreamNew::Waiting(TcpStream { io: io })
         }).boxed()
     }
 
@@ -233,7 +209,7 @@ impl TcpStream {
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is readable again.
     pub fn poll_read(&self) -> Poll<(), io::Error> {
-        self.ready.poll_read()
+        self.io.poll_read()
     }
 
     /// Test whether this socket is writey to be written to or not.
@@ -243,17 +219,17 @@ impl TcpStream {
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is writable again.
     pub fn poll_write(&self) -> Poll<(), io::Error> {
-        self.ready.poll_write()
+        self.io.poll_write()
     }
 
     /// Returns the local address that this stream is bound to.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.source.io().local_addr()
+        self.io.get_ref().local_addr()
     }
 
     /// Returns the remote address that this stream is connected to.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.source.io().peer_addr()
+        self.io.get_ref().peer_addr()
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -262,7 +238,7 @@ impl TcpStream {
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.source.io().shutdown(how)
+        self.io.get_ref().shutdown(how)
     }
 
     /// Sets the value of the `TCP_NODELAY` option on this socket.
@@ -273,12 +249,12 @@ impl TcpStream {
     /// sufficient amount to send out, thereby avoiding the frequent sending of
     /// small packets.
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.source.io().set_nodelay(nodelay)
+        self.io.get_ref().set_nodelay(nodelay)
     }
 
     /// Sets the keepalive time in seconds for this socket.
     pub fn set_keepalive_s(&self, seconds: Option<u32>) -> io::Result<()> {
-        self.source.io().set_keepalive(seconds)
+        self.io.get_ref().set_keepalive(seconds)
     }
 }
 
@@ -291,9 +267,16 @@ impl Future for TcpStreamNew {
             TcpStreamNew::Waiting(s) => s,
             TcpStreamNew::Empty => panic!("can't poll TCP stream twice"),
         };
-        match stream.ready.poll_write() {
+
+        // Once we've connected, wait for the stream to be writable as that's
+        // when the actual connection has been initiated. Once we're writable we
+        // check for `take_socket_error` to see if the connect actually hit an
+        // error or not.
+        //
+        // If all that succeeded then we ship everything on up.
+        match stream.io.poll_write() {
             Poll::Ok(()) => {
-                match stream.source.io().take_socket_error() {
+                match stream.io.get_ref().take_socket_error() {
                     Ok(()) => return Poll::Ok(stream),
                     Err(ref e) if e.kind() == ErrorKind::WouldBlock => {}
                     Err(e) => return Poll::Err(e),
@@ -309,9 +292,9 @@ impl Future for TcpStreamNew {
 
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let r = self.source.io().read(buf);
+        let r = self.io.get_ref().read(buf);
         if is_wouldblock(&r) {
-            self.ready.need_read();
+            self.io.need_read();
         }
         return r
     }
@@ -319,16 +302,16 @@ impl Read for TcpStream {
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let r = self.source.io().write(buf);
+        let r = self.io.get_ref().write(buf);
         if is_wouldblock(&r) {
-            self.ready.need_write();
+            self.io.need_write();
         }
         return r
     }
     fn flush(&mut self) -> io::Result<()> {
-        let r = self.source.io().flush();
+        let r = self.io.get_ref().flush();
         if is_wouldblock(&r) {
-            self.ready.need_write();
+            self.io.need_write();
         }
         return r
     }
@@ -336,9 +319,9 @@ impl Write for TcpStream {
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let r = self.source.io().read(buf);
+        let r = self.io.get_ref().read(buf);
         if is_wouldblock(&r) {
-            self.ready.need_read();
+            self.io.need_read();
         }
         return r
     }
@@ -346,17 +329,17 @@ impl<'a> Read for &'a TcpStream {
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let r = self.source.io().write(buf);
+        let r = self.io.get_ref().write(buf);
         if is_wouldblock(&r) {
-            self.ready.need_write();
+            self.io.need_write();
         }
         return r
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        let r = self.source.io().flush();
+        let r = self.io.get_ref().flush();
         if is_wouldblock(&r) {
-            self.ready.need_write();
+            self.io.need_write();
         }
         return r
     }
@@ -371,7 +354,7 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.source.io().fmt(f)
+        self.io.get_ref().fmt(f)
     }
 }
 
@@ -382,13 +365,13 @@ mod sys {
 
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {
-            self.source.io().as_raw_fd()
+            self.io.get_ref().as_raw_fd()
         }
     }
 
     impl AsRawFd for TcpListener {
         fn as_raw_fd(&self) -> RawFd {
-            self.listener.io().as_raw_fd()
+            self.io.get_ref().as_raw_fd()
         }
     }
 }
@@ -402,7 +385,7 @@ mod sys {
     //
     // impl AsRawHandle for TcpStream {
     //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.source.io().as_raw_handle()
+    //         self.io.get_ref().as_raw_handle()
     //     }
     // }
     //

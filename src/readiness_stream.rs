@@ -2,8 +2,9 @@ use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures::{Future, Poll};
+use mio;
 
-use event_loop::{IoSource, LoopHandle, AddSource};
+use event_loop::{IoToken, LoopHandle, AddSource};
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -21,31 +22,30 @@ use event_loop::{IoSource, LoopHandle, AddSource};
 /// It's the responsibility of the wrapper to inform the readiness stream when a
 /// "would block" I/O event is seen. The readiness stream will then take care of
 /// any scheduling necessary to get notified when the event is ready again.
-pub struct ReadinessStream {
-    io_token: usize,
-    loop_handle: LoopHandle,
-    source: IoSource,
+pub struct ReadinessStream<E> {
+    token: IoToken,
+    handle: LoopHandle,
     readiness: AtomicUsize,
+    io: E,
 }
 
-pub struct ReadinessStreamNew {
-    inner: AddSource,
-    handle: Option<LoopHandle>,
-    source: Option<IoSource>,
+pub struct ReadinessStreamNew<E> {
+    inner: AddSource<E>,
+    handle: LoopHandle,
 }
 
-impl ReadinessStream {
+impl<E> ReadinessStream<E>
+    where E: mio::Evented + Send + 'static,
+{
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
     ///
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
-    pub fn new(loop_handle: LoopHandle, source: IoSource)
-               -> ReadinessStreamNew {
+    pub fn new(loop_handle: LoopHandle, source: E) -> ReadinessStreamNew<E> {
         ReadinessStreamNew {
-            inner: loop_handle.add_source(source.clone()),
-            source: Some(source),
-            handle: Some(loop_handle),
+            inner: loop_handle.add_source(source),
+            handle: loop_handle,
         }
     }
 
@@ -60,11 +60,11 @@ impl ReadinessStream {
         if self.readiness.load(Ordering::SeqCst) & 1 != 0 {
             return Poll::Ok(())
         }
-        self.readiness.fetch_or(self.source.take_readiness(), Ordering::SeqCst);
+        self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
         if self.readiness.load(Ordering::SeqCst) & 1 != 0 {
             Poll::Ok(())
         } else {
-            self.loop_handle.schedule_read(self.io_token);
+            self.handle.schedule_read(&self.token);
             Poll::NotReady
         }
     }
@@ -80,11 +80,11 @@ impl ReadinessStream {
         if self.readiness.load(Ordering::SeqCst) & 2 != 0 {
             return Poll::Ok(())
         }
-        self.readiness.fetch_or(self.source.take_readiness(), Ordering::SeqCst);
+        self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
         if self.readiness.load(Ordering::SeqCst) & 2 != 0 {
             Poll::Ok(())
         } else {
-            self.loop_handle.schedule_write(self.io_token);
+            self.handle.schedule_write(&self.token);
             Poll::NotReady
         }
     }
@@ -102,7 +102,7 @@ impl ReadinessStream {
     /// then again readable.
     pub fn need_read(&self) {
         self.readiness.fetch_and(!1, Ordering::SeqCst);
-        self.loop_handle.schedule_read(self.io_token);
+        self.handle.schedule_read(&self.token);
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -118,28 +118,48 @@ impl ReadinessStream {
     /// then again writable.
     pub fn need_write(&self) {
         self.readiness.fetch_and(!2, Ordering::SeqCst);
-        self.loop_handle.schedule_write(self.io_token);
+        self.handle.schedule_write(&self.token);
+    }
+
+    /// Returns a reference to the event loop handle that this readiness stream
+    /// is associated with.
+    pub fn loop_handle(&self) -> &LoopHandle {
+        &self.handle
+    }
+
+    /// Returns a shared reference to the underlying I/O object this readiness
+    /// stream is wrapping.
+    pub fn get_ref(&self) -> &E {
+        &self.io
+    }
+
+    /// Returns a mutable reference to the underlying I/O object this readiness
+    /// stream is wrapping.
+    pub fn get_mut(&mut self) -> &mut E {
+        &mut self.io
     }
 }
 
-impl Future for ReadinessStreamNew {
-    type Item = ReadinessStream;
+impl<E> Future for ReadinessStreamNew<E>
+    where E: mio::Evented + Send + 'static,
+{
+    type Item = ReadinessStream<E>;
     type Error = io::Error;
 
-    fn poll(&mut self) -> Poll<ReadinessStream, io::Error> {
-        self.inner.poll().map(|token| {
+    fn poll(&mut self) -> Poll<ReadinessStream<E>, io::Error> {
+        self.inner.poll().map(|(io, token)| {
             ReadinessStream {
-                io_token: token,
-                source: self.source.take().unwrap(),
-                loop_handle: self.handle.take().unwrap(),
+                token: token,
+                handle: self.handle.clone(),
+                io: io,
                 readiness: AtomicUsize::new(0),
             }
         })
     }
 }
 
-impl Drop for ReadinessStream {
+impl<E> Drop for ReadinessStream<E> {
     fn drop(&mut self) {
-        self.loop_handle.drop_source(self.io_token)
+        self.handle.drop_source(&self.token)
     }
 }
