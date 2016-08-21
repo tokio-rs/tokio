@@ -48,7 +48,9 @@ impl<E> ReadinessStream<E>
             handle: loop_handle,
         }
     }
+}
 
+impl<E> ReadinessStream<E> {
     /// Tests to see if this source is ready to be read from or not.
     ///
     /// If this stream is not ready for a read then `NotReady` will be returned
