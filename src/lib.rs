@@ -27,7 +27,6 @@ mod slot;
 #[path = "../../src/lock.rs"]
 mod lock;
 mod mpsc_queue;
-mod channel;
 
 pub use event_loop::{Loop, LoopPin, LoopHandle, AddSource, AddTimeout};
 pub use event_loop::{LoopData, AddLoopData, TimeoutToken, IoToken};
