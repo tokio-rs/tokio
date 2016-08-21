@@ -43,7 +43,7 @@ fn chain_clients() {
         read_to_end(a.chain(b).chain(c), Vec::new())
     });
 
-    let data = t!(l.run(copied));
+    let (_, data) = t!(l.run(copied));
     t.join().unwrap();
 
     assert_eq!(data, b"foo bar baz");

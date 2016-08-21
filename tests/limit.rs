@@ -37,7 +37,7 @@ fn limit() {
         read_to_end(a.take(4), Vec::new())
     });
 
-    let data = t!(l.run(copied));
+    let (_, data) = t!(l.run(copied));
     t.join().unwrap();
 
     assert_eq!(data, b"foo ");
