@@ -16,21 +16,23 @@ extern crate scoped_tls;
 #[macro_use]
 extern crate log;
 
-mod readiness_stream;
-mod event_loop;
-mod tcp;
-mod udp;
-mod timeout;
-mod timer_wheel;
 #[path = "../../src/slot.rs"]
 mod slot;
 #[path = "../../src/lock.rs"]
 mod lock;
-mod mpsc_queue;
-mod channel;
 
+mod channel;
+mod event_loop;
+mod mpsc_queue;
+mod readiness_stream;
+mod tcp;
+mod timeout;
+mod timer_wheel;
+mod udp;
+
+pub use channel::{Sender, Receiver};
 pub use event_loop::{Loop, LoopPin, LoopHandle, AddSource, AddTimeout};
-pub use event_loop::{LoopData, AddLoopData, TimeoutToken, IoSource, Source};
+pub use event_loop::{LoopData, AddLoopData, TimeoutToken, IoToken};
 pub use readiness_stream::ReadinessStream;
 pub use tcp::{TcpListener, TcpStream};
 pub use timeout::Timeout;

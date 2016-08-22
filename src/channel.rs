@@ -1,118 +1,107 @@
-//! A thin wrapper around a mpsc queue and mio-based channel information
-//!
-//! Normally the standard library's channels would suffice but we unfortunately
-//! need the `Sender<T>` half to be `Sync`, so to accomplish this for now we
-//! just vendor the same mpsc queue as the one in the standard library and then
-//! we pair that with the `mio::channel` module's Ctl pairs to control the
-//! readiness notifications on the channel.
-
-use std::cell::Cell;
 use std::io;
-use std::marker;
-use std::sync::Arc;
+use std::sync::mpsc::TryRecvError;
 
-use mio;
-use mio::channel::{ctl_pair, SenderCtl, ReceiverCtl};
+use futures::{Future, Poll};
+use futures_io::IoFuture;
+use mio::channel;
 
-use mpsc_queue::{Queue, PopResult};
+use {ReadinessStream, LoopHandle};
 
+/// The transmission half of a channel used for sending messages to a receiver.
+///
+/// A `Sender` can be `clone`d to have multiple threads or instances sending
+/// messages to one receiver.
+///
+/// This type is created by the `LoopHandle::channel` method.
 pub struct Sender<T> {
-    ctl: SenderCtl,
-    inner: Arc<Queue<T>>,
+    tx: channel::Sender<T>,
 }
 
+/// The receiving half of a channel used for processing messages sent by a
+/// `Sender`.
+///
+/// A `Receiver` cannot be cloned and is not `Sync`, so only one thread can
+/// receive messages at a time.
+///
+/// This type is created by the `LoopHandle::channel` method.
 pub struct Receiver<T> {
-    ctl: ReceiverCtl,
-    inner: Arc<Queue<T>>,
-    _marker: marker::PhantomData<Cell<()>>, // this type is not Sync
+    rx: ReadinessStream<channel::Receiver<T>>,
 }
 
-pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    let inner = Arc::new(Queue::new());
-    let (tx, rx) = ctl_pair();
-
-    let tx = Sender {
-        ctl: tx,
-        inner: inner.clone(),
-    };
-    let rx = Receiver {
-        ctl: rx,
-        inner: inner.clone(),
-        _marker: marker::PhantomData,
-    };
-    (tx, rx)
+impl LoopHandle {
+    /// Creates a new in-memory channel used for sending data across `Send +
+    /// 'static` boundaries, frequently threads.
+    ///
+    /// This type can be used to conveniently send messages between futures.
+    /// Unlike the futures crate `channel` method and types, the returned tx/rx
+    /// pair is a multi-producer single-consumer (mpsc) channel *with no
+    /// backpressure*. Currently it's left up to the application to implement a
+    /// mechanism, if necessary, to avoid messages piling up.
+    ///
+    /// The returned `Sender` can be used to send messages that are processed by
+    /// the returned `Receiver`. The `Sender` can be cloned to send messages
+    /// from multiple sources simultaneously.
+    pub fn channel<T>(self) -> (Sender<T>, IoFuture<Receiver<T>>)
+        where T: Send + 'static,
+    {
+        let (tx, rx) = channel::channel();
+        let rx = ReadinessStream::new(self, rx).map(|rx| Receiver { rx: rx });
+        (Sender { tx: tx }, rx.boxed())
+    }
 }
 
 impl<T> Sender<T> {
-    pub fn send(&self, data: T) -> io::Result<()> {
-        self.inner.push(data);
-        self.ctl.inc()
-    }
-}
-
-impl<T> Receiver<T> {
-    pub fn recv(&self) -> io::Result<Option<T>> {
-        // Note that the underlying method is `unsafe` because it's only safe
-        // if one thread accesses it at a time.
-        //
-        // We, however, are the only thread with a `Receiver<T>` because this
-        // type is not `Sync`. and we never handed out another instance.
-        match unsafe { self.inner.pop() } {
-            PopResult::Data(t) => {
-                try!(self.ctl.dec());
-                Ok(Some(t))
+    /// Sends a message to the corresponding receiver of this sender.
+    ///
+    /// The message provided will be enqueued on the channel immediately, and
+    /// this function will return immediately. Keep in mind that the
+    /// underlying channel has infinite capacity, and this may not always be
+    /// desired.
+    ///
+    /// If an I/O error happens while sending the message, or if the receiver
+    /// has gone away, then an error will be returned. Note that I/O errors here
+    /// are generally quite abnormal.
+    pub fn send(&self, t: T) -> io::Result<()> {
+        self.tx.send(t).map_err(|e| {
+            match e {
+                channel::SendError::Io(e) => e,
+                channel::SendError::Disconnected(_) => {
+                    io::Error::new(io::ErrorKind::Other,
+                                   "channel has been disconnected")
+                }
             }
-
-            // If the queue is either in an inconsistent or empty state, then
-            // we return `None` for both instances. Note that the standard
-            // library performs a yield loop in the event of `Inconsistent`,
-            // which means that there's data in the queue but a sender hasn't
-            // finished their operation yet.
-            //
-            // We do this because the queue will continue to be readable as
-            // the thread performing the push will eventually call `inc`, so
-            // if we return `None` and the event loop just loops aruond calling
-            // this method then we'll eventually get back to the same spot
-            // and due the retry.
-            //
-            // Basically, the inconsistent state doesn't mean we need to busy
-            // wait, but instead we can forge ahead and assume by the time we
-            // go to the kernel and come back we'll no longer be in an
-            // inconsistent state.
-            PopResult::Empty |
-            PopResult::Inconsistent => Ok(None),
-        }
-    }
-}
-
-// Just delegate everything to `self.ctl`
-impl<T> mio::Evented for Receiver<T> {
-    fn register(&self,
-                poll: &mio::Poll,
-                token: mio::Token,
-                interest: mio::EventSet,
-                opts: mio::PollOpt) -> io::Result<()> {
-        self.ctl.register(poll, token, interest, opts)
-    }
-
-    fn reregister(&self,
-                  poll: &mio::Poll,
-                  token: mio::Token,
-                  interest: mio::EventSet,
-                  opts: mio::PollOpt) -> io::Result<()> {
-        self.ctl.reregister(poll, token, interest, opts)
-    }
-
-    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
-        self.ctl.deregister(poll)
+        })
     }
 }
 
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Sender<T> {
-        Sender {
-            ctl: self.ctl.clone(),
-            inner: self.inner.clone(),
+        Sender { tx: self.tx.clone() }
+    }
+}
+
+impl<T> Receiver<T> {
+    /// Attempts to receive a message sent on this channel.
+    ///
+    /// This method will attempt to dequeue any messages sent on this channel
+    /// from any corresponding sender. If no message is available, but senders
+    /// are still detected, then `Poll::NotReady` is returned and the current
+    /// future task is scheduled to receive a notification when a message is
+    /// available.
+    ///
+    /// If an I/O error happens or if all senders have gone away (the channel is
+    /// disconnected) then `Poll::Err` will be returned.
+    pub fn recv(&self) -> Poll<T, io::Error> {
+        match self.rx.get_ref().try_recv() {
+            Ok(t) => Poll::Ok(t),
+            Err(TryRecvError::Empty) => {
+                self.rx.need_read();
+                Poll::NotReady
+            }
+            Err(TryRecvError::Disconnected) => {
+                Poll::Err(io::Error::new(io::ErrorKind::Other,
+                                         "channel has been disconnected"))
+            }
         }
     }
 }

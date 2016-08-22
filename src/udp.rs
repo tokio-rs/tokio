@@ -1,6 +1,5 @@
 use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
-use std::sync::Arc;
 use std::fmt;
 
 use futures::{Future, failed, Poll};
@@ -8,12 +7,10 @@ use futures_io::IoFuture;
 use mio;
 
 use {ReadinessStream, LoopHandle};
-use event_loop::Source;
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    source: Arc<Source<mio::udp::UdpSocket>>,
-    ready: ReadinessStream,
+    io: ReadinessStream<mio::udp::UdpSocket>,
 }
 
 impl LoopHandle {
@@ -34,12 +31,8 @@ impl LoopHandle {
 impl UdpSocket {
     fn new(socket: mio::udp::UdpSocket, handle: LoopHandle)
            -> IoFuture<UdpSocket> {
-        let socket = Arc::new(Source::new(socket));
-        ReadinessStream::new(handle, socket.clone()).map(|ready| {
-            UdpSocket {
-                source: socket,
-                ready: ready,
-            }
+        ReadinessStream::new(handle, socket).map(|io| {
+            UdpSocket { io: io }
         }).boxed()
     }
 
@@ -62,7 +55,7 @@ impl UdpSocket {
 
     /// Returns the local address that this stream is bound to.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.source.io().local_addr()
+        self.io.get_ref().local_addr()
     }
 
     /// Test whether this socket is ready to be read or not.
@@ -72,7 +65,7 @@ impl UdpSocket {
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is readable again.
     pub fn poll_read(&self) -> Poll<(), io::Error> {
-        self.ready.poll_read()
+        self.io.poll_read()
     }
 
     /// Test whether this socket is writey to be written to or not.
@@ -82,7 +75,7 @@ impl UdpSocket {
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is writable again.
     pub fn poll_write(&self) -> Poll<(), io::Error> {
-        self.ready.poll_write()
+        self.io.poll_write()
     }
 
     /// Sends data on the socket to the given address. On success, returns the
@@ -91,10 +84,10 @@ impl UdpSocket {
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        match self.source.io().send_to(buf, target) {
+        match self.io.get_ref().send_to(buf, target) {
             Ok(Some(n)) => Ok(n),
             Ok(None) => {
-                self.ready.need_write();
+                self.io.need_write();
                 Err(io::Error::new(io::ErrorKind::WouldBlock, "would block"))
             }
             Err(e) => Err(e),
@@ -104,10 +97,10 @@ impl UdpSocket {
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        match self.source.io().recv_from(buf) {
+        match self.io.get_ref().recv_from(buf) {
             Ok(Some(n)) => Ok(n),
             Ok(None) => {
-                self.ready.need_read();
+                self.io.need_read();
                 Err(io::Error::new(io::ErrorKind::WouldBlock, "would block"))
             }
             Err(e) => Err(e),
@@ -121,7 +114,7 @@ impl UdpSocket {
     ///
     /// [link]: #method.set_broadcast
     pub fn broadcast(&self) -> io::Result<bool> {
-        self.source.io().broadcast()
+        self.io.get_ref().broadcast()
     }
 
     /// Sets the value of the `SO_BROADCAST` option for this socket.
@@ -129,7 +122,7 @@ impl UdpSocket {
     /// When enabled, this socket is allowed to send packets to a broadcast
     /// address.
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        self.source.io().set_broadcast(on)
+        self.io.get_ref().set_broadcast(on)
     }
 
     /// Gets the value of the `IP_MULTICAST_LOOP` option for this socket.
@@ -139,7 +132,7 @@ impl UdpSocket {
     ///
     /// [link]: #method.set_multicast_loop_v4
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
-        self.source.io().multicast_loop_v4()
+        self.io.get_ref().multicast_loop_v4()
     }
 
     /// Sets the value of the `IP_MULTICAST_LOOP` option for this socket.
@@ -147,7 +140,7 @@ impl UdpSocket {
     /// If enabled, multicast packets will be looped back to the local socket.
     /// Note that this may not have any affect on IPv6 sockets.
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
-        self.source.io().set_multicast_loop_v4(on)
+        self.io.get_ref().set_multicast_loop_v4(on)
     }
 
     /// Gets the value of the `IP_MULTICAST_TTL` option for this socket.
@@ -157,7 +150,7 @@ impl UdpSocket {
     ///
     /// [link]: #method.set_multicast_ttl_v4
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        self.source.io().multicast_ttl_v4()
+        self.io.get_ref().multicast_ttl_v4()
     }
 
     /// Sets the value of the `IP_MULTICAST_TTL` option for this socket.
@@ -168,7 +161,7 @@ impl UdpSocket {
     ///
     /// Note that this may not have any affect on IPv6 sockets.
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
-        self.source.io().set_multicast_ttl_v4(ttl)
+        self.io.get_ref().set_multicast_ttl_v4(ttl)
     }
 
     /// Gets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
@@ -178,7 +171,7 @@ impl UdpSocket {
     ///
     /// [link]: #method.set_multicast_loop_v6
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
-        self.source.io().multicast_loop_v6()
+        self.io.get_ref().multicast_loop_v6()
     }
 
     /// Sets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
@@ -186,7 +179,7 @@ impl UdpSocket {
     /// Controls whether this socket sees the multicast packets it sends itself.
     /// Note that this may not have any affect on IPv4 sockets.
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
-        self.source.io().set_multicast_loop_v6(on)
+        self.io.get_ref().set_multicast_loop_v6(on)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -195,7 +188,7 @@ impl UdpSocket {
     ///
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
-        self.source.io().ttl()
+        self.io.get_ref().ttl()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -203,7 +196,7 @@ impl UdpSocket {
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.source.io().set_ttl(ttl)
+        self.io.get_ref().set_ttl(ttl)
     }
 
     /// Executes an operation of the `IP_ADD_MEMBERSHIP` type.
@@ -216,7 +209,7 @@ impl UdpSocket {
     pub fn join_multicast_v4(&self,
                              multiaddr: &Ipv4Addr,
                              interface: &Ipv4Addr) -> io::Result<()> {
-        self.source.io().join_multicast_v4(multiaddr, interface)
+        self.io.get_ref().join_multicast_v4(multiaddr, interface)
     }
 
     /// Executes an operation of the `IPV6_ADD_MEMBERSHIP` type.
@@ -227,7 +220,7 @@ impl UdpSocket {
     pub fn join_multicast_v6(&self,
                              multiaddr: &Ipv6Addr,
                              interface: u32) -> io::Result<()> {
-        self.source.io().join_multicast_v6(multiaddr, interface)
+        self.io.get_ref().join_multicast_v6(multiaddr, interface)
     }
 
     /// Executes an operation of the `IP_DROP_MEMBERSHIP` type.
@@ -239,7 +232,7 @@ impl UdpSocket {
     pub fn leave_multicast_v4(&self,
                               multiaddr: &Ipv4Addr,
                               interface: &Ipv4Addr) -> io::Result<()> {
-        self.source.io().leave_multicast_v4(multiaddr, interface)
+        self.io.get_ref().leave_multicast_v4(multiaddr, interface)
     }
 
     /// Executes an operation of the `IPV6_DROP_MEMBERSHIP` type.
@@ -251,13 +244,13 @@ impl UdpSocket {
     pub fn leave_multicast_v6(&self,
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
-        self.source.io().leave_multicast_v6(multiaddr, interface)
+        self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }
 }
 
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.source.io().fmt(f)
+        self.io.get_ref().fmt(f)
     }
 }
 
@@ -268,7 +261,7 @@ mod sys {
 
     impl AsRawFd for UdpSocket {
         fn as_raw_fd(&self) -> RawFd {
-            self.source.io().as_raw_fd()
+            self.io.get_ref().as_raw_fd()
         }
     }
 }
@@ -282,7 +275,7 @@ mod sys {
     //
     // impl AsRawHandle for UdpSocket {
     //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.source.io().as_raw_handle()
+    //         self.io.get_ref().as_raw_handle()
     //     }
     // }
 }
