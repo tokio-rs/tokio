@@ -95,7 +95,7 @@ impl LoopHandle {
     /// closure `f`, generate a handle, and then the future will yield it back.
     // TODO: more with examples
     pub fn add_loop_data<F, A>(&self, f: F) -> AddLoopData<F, A>
-        where F: FnOnce() -> A + Send + 'static,
+        where F: FnOnce(&LoopPin) -> A + Send + 'static,
               A: 'static,
     {
         AddLoopData {
@@ -109,18 +109,19 @@ impl LoopHandle {
 }
 
 impl<F, A> Future for AddLoopData<F, A>
-    where F: FnOnce() -> A + Send + 'static,
+    where F: FnOnce(&LoopPin) -> A + Send + 'static,
           A: 'static,
 {
     type Item = LoopData<A>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<LoopData<A>, io::Error> {
-        let ret = self.inner.poll(|_lp, f| {
-            Ok(DropBox::new(f()))
+        let ret = self.inner.poll(|lp, f| {
+            Ok(DropBox::new(f(&lp.pin())))
         }, |f, slot| {
             Message::Run(Box::new(move || {
-                slot.try_produce(Ok(DropBox::new(f()))).ok()
+                let pin = super::CURRENT_LOOP.with(|lp| lp.pin());
+                slot.try_produce(Ok(DropBox::new(f(&pin)))).ok()
                     .expect("add loop data try_produce intereference");
             }))
         });
