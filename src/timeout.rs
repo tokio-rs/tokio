@@ -2,9 +2,9 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use futures::{Future, Poll};
-use futures_io::IoFuture;
 
 use LoopHandle;
+use io::IoFuture;
 use event_loop::TimeoutToken;
 
 /// A future representing the notification that a timeout has occurred.

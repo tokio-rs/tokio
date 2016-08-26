@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate futures;
-extern crate futures_mio;
+extern crate tokio_core;
 
 use std::time::{Instant, Duration};
 
@@ -16,7 +16,7 @@ macro_rules! t {
 #[test]
 fn smoke() {
     drop(env_logger::init());
-    let mut l = t!(futures_mio::Loop::new());
+    let mut l = t!(tokio_core::Loop::new());
     let dur = Duration::from_millis(10);
     let timeout = l.handle().timeout(dur).and_then(|t| t);
     let start = Instant::now();

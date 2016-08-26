@@ -5,10 +5,10 @@ use std::net::{self, SocketAddr, Shutdown};
 
 use futures::stream::Stream;
 use futures::{Future, IntoFuture, failed, Poll};
-use futures_io::{IoFuture, IoStream};
 use mio;
 
 use {ReadinessStream, LoopHandle};
+use io::{IoFuture, IoStream};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///

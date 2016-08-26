@@ -1,12 +1,12 @@
-# futures-mio
+# tokio-core
 
-Bindings to the `mio` crate implementing the `futures-io` and `futures`
-abstractions.
+Core I/O and event loop abstraction for asynchronous I/O in Rust built on
+`futures` and `mio`.
 
-[![Build Status](https://travis-ci.org/alexcrichton/futures-rs.svg?branch=master)](https://travis-ci.org/alexcrichton/futures-rs)
+[![Build Status](https://travis-ci.org/tokio-rs/tokio-core.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-core)
 [![Build status](https://ci.appveyor.com/api/projects/status/yl5w3ittk4kggfsh?svg=true)](https://ci.appveyor.com/project/alexcrichton/futures-rs)
 
-[Documentation](http://alexcrichton.com/futures-rs/futures_mio)
+[Documentation](https://tokio-rs.github.io/tokio-core)
 
 ## Usage
 
@@ -14,13 +14,13 @@ First, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-futures-mio = { git = "https://github.com/alexcrichton/futures-rs" }
+tokio-core = { git = "https://github.com/tokio-rs/tokio-core" }
 ```
 
 Next, add this to your crate:
 
 ```rust
-extern crate futures_mio;
+extern crate tokio_core;
 ```
 
 ## Examples
@@ -30,18 +30,17 @@ There are a few small examples showing off how to use this library:
 * [echo.rs] - a simple TCP echo server
 * [socks5.rs] - an implementation of a SOCKSv5 proxy server
 
-[echo.rs]: https://github.com/alexcrichton/futures-rs/blob/master/futures-mio/src/bin/echo.rs
-[socks5.rs]: https://github.com/alexcrichton/futures-rs/blob/master/futures-socks5/src/main.rs
+[echo.rs]: https://github.com/tokio-rs/tokio-core/blob/master/src/bin/echo.rs
+[socks5.rs]: https://github.com/tokio-rs/tokio-socks5/blob/master/src/main.rs
 
-## What is futures-mio?
+## What is tokio-core?
 
 This crate is a connection `futures`, a zero-cost implementation of futures in
-Rust, and `mio`, a crate for zero-cost asynchronous I/O, and `futures-io`,
-abstractions for I/O on top of the `futures` crate. The types and structures
-implemented in `futures-mio` implement `Future` and `Stream` traits as
-appropriate. For example connecting a TCP stream returns a `Future` resolving
-to a TCP stream, and a TCP listener implements a stream of TCP streams
-(accepted connections).
+Rust, and `mio` and a crate for zero-cost asynchronous I/O. The types and
+structures implemented in `tokio-core` implement `Future` and `Stream` traits
+as appropriate. For example connecting a TCP stream returns a `Future`
+resolving to a TCP stream, and a TCP listener implements a stream of TCP
+streams (accepted connections).
 
 This crate also provides facilities such as:
 
@@ -52,20 +51,20 @@ This crate also provides facilities such as:
 * Data owned and local to the event loop
 * An `Executor` implementation for a futures' `Task`
 
-The intention of `futures-mio` is to provide a concrete implementation for
-crates built on top of `futures-io`. For example you can easily turn a TCP
-stream into a TLS/SSL stream with the [`futures-tls`] crate or use the
-combinators to compose working with data on sockets.
+The intention of `tokio-core` is to provide a concrete implementation for crates
+built on top of asynchronous I/O. For example you can easily turn a TCP stream
+into a TLS/SSL stream with the [`tokio-tls`] crate or use the combinators to
+compose working with data on sockets.
 
-[`futures-tls`]: http://alexcrichton.com/futures-rs/futures_tls
+[`tokio-tls`]: https://tokio-rs.github.io/tokio-tls
 
 Check out the [documentation] for more information, and more coming here soon!
 
-[documentation]: http://alexcrichton.com/futures-rs/futures_mio
+[documentation]: https://tokio-rs.github.io/tokio-core
 
 # License
 
-`futures-mio` is primarily distributed under the terms of both the MIT license
+`tokio-core` is primarily distributed under the terms of both the MIT license
 and the Apache License (Version 2.0), with portions covered by various BSD-like
 licenses.
 

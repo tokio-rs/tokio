@@ -3,10 +3,10 @@ use std::sync::mpsc::TryRecvError;
 
 use futures::{Future, Poll};
 use futures::stream::Stream;
-use futures_io::IoFuture;
 use mio::channel;
 
 use {ReadinessStream, LoopHandle};
+use io::IoFuture;
 
 /// The transmission half of a channel used for sending messages to a receiver.
 ///

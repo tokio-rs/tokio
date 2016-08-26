@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate futures;
-extern crate futures_mio;
+extern crate tokio_core;
 
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::channel;
@@ -19,7 +19,7 @@ macro_rules! t {
 #[test]
 fn connect() {
     drop(env_logger::init());
-    let mut l = t!(futures_mio::Loop::new());
+    let mut l = t!(tokio_core::Loop::new());
     let srv = t!(TcpListener::bind("127.0.0.1:0"));
     let addr = t!(srv.local_addr());
     let t = thread::spawn(move || {
@@ -37,7 +37,7 @@ fn connect() {
 #[test]
 fn accept() {
     drop(env_logger::init());
-    let mut l = t!(futures_mio::Loop::new());
+    let mut l = t!(tokio_core::Loop::new());
     let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());
@@ -63,7 +63,7 @@ fn accept() {
 #[test]
 fn accept2() {
     drop(env_logger::init());
-    let mut l = t!(futures_mio::Loop::new());
+    let mut l = t!(tokio_core::Loop::new());
     let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());

@@ -1,11 +1,11 @@
 extern crate futures;
-extern crate futures_mio;
+extern crate tokio_core;
 
 use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Poll};
-use futures_mio::UdpSocket;
+use tokio_core::UdpSocket;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -16,7 +16,7 @@ macro_rules! t {
 
 #[test]
 fn send_messages() {
-    let mut l = t!(futures_mio::Loop::new());
+    let mut l = t!(tokio_core::Loop::new());
     let a = l.handle().udp_bind(&"127.0.0.1:0".parse().unwrap());
     let b = l.handle().udp_bind(&"127.0.0.1:0".parse().unwrap());
     let (a, b) = t!(l.run(a.join(b)));

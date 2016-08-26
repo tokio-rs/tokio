@@ -6,7 +6,6 @@
 #![deny(missing_docs)]
 
 extern crate futures;
-extern crate futures_io;
 extern crate mio;
 extern crate slab;
 
@@ -16,9 +15,7 @@ extern crate scoped_tls;
 #[macro_use]
 extern crate log;
 
-#[path = "../../src/slot.rs"]
 mod slot;
-#[path = "../../src/lock.rs"]
 mod lock;
 
 mod channel;
@@ -29,6 +26,8 @@ mod tcp;
 mod timeout;
 mod timer_wheel;
 mod udp;
+
+pub mod io;
 
 pub use channel::{Sender, Receiver};
 pub use event_loop::{Loop, LoopPin, LoopHandle, AddSource, AddTimeout};

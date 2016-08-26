@@ -3,10 +3,10 @@ use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
 
 use futures::{Future, failed, Poll};
-use futures_io::IoFuture;
 use mio;
 
 use {ReadinessStream, LoopHandle};
+use io::IoFuture;
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {

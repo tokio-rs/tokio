@@ -1,19 +1,18 @@
 [package]
-name = "futures-mio"
+name = "tokio-core"
 version = "0.1.0"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT/Apache-2.0"
-repository = "https://github.com/alexcrichton/futures-rs"
-homepage = "https://github.com/alexcrichton/futures-rs"
-documentation = "http://alexcrichton.com/futures-rs/futures_mio/"
+repository = "https://github.com/tokio-rs/tokio-core"
+homepage = "https://github.com/tokio-rs/tokio-core"
+documentation = "https://tokio-rs.github.io/tokio-core"
 description = """
-Bindings from the `futures` crate to the `mio` crate to get I/O in the form of
-futures and streams.
+Core I/O and event loop primitives for asynchronous I/O in Rust. Foundation for
+the rest of the tokio crates.
 """
 
 [dependencies]
-futures = { path = "..", version = "0.1.0" }
-futures-io = { path = "../futures-io", version = "0.1.0" }
+futures = { git = "https://github.com/alexcrichton/futures-rs" }
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio" }
 scoped-tls = "0.1.0"

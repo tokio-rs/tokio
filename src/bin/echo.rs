@@ -1,22 +1,21 @@
 //! An echo server that just writes back everything that's written to it.
 
 extern crate futures;
-extern crate futures_io;
-extern crate futures_mio;
+extern crate tokio_core;
 
 use std::env;
 use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::Stream;
-use futures_io::{copy, TaskIo};
+use tokio_core::io::{copy, TaskIo};
 
 fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     // Create the event loop that will drive this server
-    let mut l = futures_mio::Loop::new().unwrap();
+    let mut l = tokio_core::Loop::new().unwrap();
 
     // Create a TCP listener which will listen for incoming connections
     let server = l.handle().tcp_listen(&addr);

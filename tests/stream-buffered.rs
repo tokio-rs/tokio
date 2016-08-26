@@ -1,6 +1,5 @@
 extern crate futures;
-extern crate futures_io;
-extern crate futures_mio;
+extern crate tokio_core;
 extern crate env_logger;
 
 use std::io::{Read, Write};
@@ -9,7 +8,7 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use futures_io::{copy, TaskIo};
+use tokio_core::io::{copy, TaskIo};
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -22,7 +21,7 @@ macro_rules! t {
 fn echo_server() {
     drop(env_logger::init());
 
-    let mut l = t!(futures_mio::Loop::new());
+    let mut l = t!(tokio_core::Loop::new());
     let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());
