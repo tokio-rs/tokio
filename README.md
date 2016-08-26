@@ -4,7 +4,7 @@ Core I/O and event loop abstraction for asynchronous I/O in Rust built on
 `futures` and `mio`.
 
 [![Build Status](https://travis-ci.org/tokio-rs/tokio-core.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-core)
-[![Build status](https://ci.appveyor.com/api/projects/status/caxmxbg8181kk9mq/branch/master?svg=true)](https://ci.appveyor.com/api/projects/status/caxmxbg8181kk9mq/branch/master?svg=true)
+[![Build status](https://ci.appveyor.com/api/projects/status/caxmxbg8181kk9mq/branch/master?svg=true)](https://ci.appveyor.com/project/carllerche/tokio-core)
 
 [Documentation](https://tokio-rs.github.io/tokio-core)
 
