@@ -66,7 +66,7 @@ impl<A, T> Future for ReadExact<A, T>
                     }
                 }
             }
-            State::Empty => panic!("poll a WriteAll after it's done"),
+            State::Empty => panic!("poll a ReadExact after it's done"),
         }
 
         match mem::replace(&mut self.state, State::Empty) {
