@@ -18,6 +18,9 @@ extern crate log;
 mod slot;
 mod lock;
 
+#[macro_use]
+pub mod io;
+
 mod channel;
 mod event_loop;
 mod mpsc_queue;
@@ -26,8 +29,6 @@ mod tcp;
 mod timeout;
 mod timer_wheel;
 mod udp;
-
-pub mod io;
 
 pub use channel::{Sender, Receiver};
 pub use event_loop::{Loop, LoopPin, LoopHandle, AddSource, AddTimeout};

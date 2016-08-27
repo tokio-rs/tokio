@@ -90,7 +90,7 @@ impl<T> mio::Evented for Receiver<T> {
     fn register(&self,
                 poll: &mio::Poll,
                 token: mio::Token,
-                interest: mio::EventSet,
+                interest: mio::Ready,
                 opts: mio::PollOpt) -> io::Result<()> {
         self.ctl.register(poll, token, interest, opts)
     }
@@ -98,7 +98,7 @@ impl<T> mio::Evented for Receiver<T> {
     fn reregister(&self,
                   poll: &mio::Poll,
                   token: mio::Token,
-                  interest: mio::EventSet,
+                  interest: mio::Ready,
                   opts: mio::PollOpt) -> io::Result<()> {
         self.ctl.reregister(poll, token, interest, opts)
     }

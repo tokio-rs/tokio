@@ -93,16 +93,12 @@ impl TcpListener {
 
             fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
                 match self.inner.io.get_ref().accept() {
-                    Ok(Some(pair)) => {
-                        debug!("accepted a socket");
-                        Poll::Ok(Some(pair))
-                    }
-                    Ok(None) => {
-                        debug!("waiting to accept another socket");
+                    Ok(pair) => Poll::Ok(Some(pair)),
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                         self.inner.io.need_read();
                         Poll::NotReady
                     }
-                    Err(e) => Poll::Err(e),
+                    Err(e) => Poll::Err(e)
                 }
             }
         }

@@ -121,11 +121,11 @@ impl Loop {
         let io = try!(mio::Poll::new());
         try!(io.register(&rx,
                          mio::Token(0),
-                         mio::EventSet::readable(),
+                         mio::Ready::readable(),
                          mio::PollOpt::edge()));
         let pair = mio::Registration::new(&io,
                                           mio::Token(1),
-                                          mio::EventSet::readable(),
+                                          mio::Ready::readable(),
                                           mio::PollOpt::level());
         let (registration, readiness) = pair;
         Ok(Loop {
@@ -198,7 +198,7 @@ impl Loop {
 
         impl Notify for MyNotify {
             fn notify(&self) {
-                self.0.set_readiness(mio::EventSet::readable())
+                self.0.set_readiness(mio::Ready::readable())
                       .expect("failed to set readiness");
             }
         }
@@ -218,7 +218,7 @@ impl Loop {
         // to see if it's done. If it's not then the event loop will turn again.
         let mut res = None;
         self._run(&mut || {
-            ready.set_readiness(mio::EventSet::none())
+            ready.set_readiness(mio::Ready::none())
                  .expect("failed to set readiness");
             assert!(res.is_none());
             match task.enter(|| f.poll()) {
@@ -368,8 +368,7 @@ impl Loop {
         let entry = dispatch.vacant_entry().unwrap();
         try!(self.io.register(source,
                               mio::Token(entry.index()),
-                              mio::EventSet::readable() |
-                                mio::EventSet::writable(),
+                              mio::Ready::readable() | mio::Ready::writable(),
                               mio::PollOpt::edge()));
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
