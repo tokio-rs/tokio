@@ -330,8 +330,9 @@ mod dropbox {
             // Try our safe accessor first, and if it works then we know that
             // we're on the right thread. In that case we can simply drop as
             // usual.
-            if let Some(a) = self.get_mut().take() {
-                return drop(a)
+            if self.get().is_some() {
+                drop(self.inner.take().unwrap());
+                return;
             }
 
             // If we're on the wrong thread but we actually have some data, then
@@ -345,4 +346,3 @@ mod dropbox {
         }
     }
 }
-
