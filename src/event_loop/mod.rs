@@ -131,7 +131,7 @@ impl Loop {
         Ok(Loop {
             id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
             io: io,
-            events: mio::Events::new(),
+            events: mio::Events::with_capacity(1024),
             tx: Arc::new(MioSender { inner: tx }),
             rx: rx,
             _future_registration: registration,
