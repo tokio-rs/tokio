@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::Stream;
+use tokio_core::Loop;
 use tokio_core::io::{copy, TaskIo};
 
 fn main() {
@@ -15,7 +16,8 @@ fn main() {
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     // Create the event loop that will drive this server
-    let mut l = tokio_core::Loop::new().unwrap();
+    let mut l = Loop::new().unwrap();
+    let pin = l.pin();
 
     // Create a TCP listener which will listen for incoming connections
     let server = l.handle().tcp_listen(&addr);
@@ -29,17 +31,20 @@ fn main() {
         //
         // We use the `io::copy` future to copy all data from the
         // reading half onto the writing half.
-        socket.incoming().for_each(|(socket, addr)| {
+        socket.incoming().for_each(move |(socket, addr)| {
             let socket = futures::lazy(|| futures::finished(TaskIo::new(socket)));
             let pair = socket.map(|s| s.split());
             let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
 
             // Once all that is done we print out how much we wrote, and then
-            // critically we *forget* this future which allows it to run
+            // critically we *spawn* this future which allows it to run
             // concurrently with other connections.
-            amt.map(move |amt| {
+            let msg = amt.map(move |amt| {
                 println!("wrote {} bytes to {}", amt, addr)
-            }).forget();
+            }).map_err(|e| {
+                panic!("error: {}", e);
+            });
+            pin.spawn(msg);
 
             Ok(())
         })

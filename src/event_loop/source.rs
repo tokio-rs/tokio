@@ -6,7 +6,7 @@ use futures::{Future, Poll};
 use futures::task;
 use mio;
 
-use event_loop::{Message, LoopHandle, LoopFuture, Direction};
+use event_loop::{Message, LoopHandle, LoopFuture, Direction, Loop};
 
 /// A future which will resolve a unique `tok` token for an I/O object.
 ///
@@ -160,17 +160,12 @@ impl<E> Future for AddSource<E>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(E, IoToken), io::Error> {
-        let handle = self.inner.loop_handle.clone();
         let res = self.inner.poll(|lp, io| {
             let pair = try!(lp.add_source(&io));
             Ok((io, pair))
         }, |io, slot| {
-            Message::Run(Box::new(move || {
-                let res = handle.with_loop(|lp| {
-                    let lp = lp.unwrap();
-                    let pair = try!(lp.add_source(&io));
-                    Ok((io, pair))
-                });
+            Message::Run(Box::new(move |lp: &Loop| {
+                let res = lp.add_source(&io).map(|p| (io, p));
                 slot.try_produce(res).ok()
                     .expect("add source try_produce intereference");
             }))

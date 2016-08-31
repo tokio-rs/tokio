@@ -32,7 +32,7 @@ mod udp;
 
 pub use channel::{Sender, Receiver};
 pub use event_loop::{Loop, LoopPin, LoopHandle, AddSource, AddTimeout};
-pub use event_loop::{LoopData, AddLoopData, TimeoutToken, IoToken};
+pub use event_loop::{TimeoutToken, IoToken};
 pub use readiness_stream::ReadinessStream;
 pub use tcp::{TcpListener, TcpStream};
 pub use timeout::Timeout;

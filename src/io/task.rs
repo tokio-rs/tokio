@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::io::{self, Read, Write};
 
-use futures::task::TaskData;
+use futures::task::TaskRc;
 
 /// Abstraction that allows inserting an I/O object into task-local storage,
 /// returning a handle that can be split.
@@ -15,7 +15,7 @@ use futures::task::TaskData;
 /// polled, will pin the yielded `TaskIo<T>` object to that specific task. Any
 /// attempt to read or write the object on other tasks will result in a panic.
 pub struct TaskIo<T> {
-    handle: TaskData<RefCell<T>>,
+    handle: TaskRc<RefCell<T>>,
 }
 
 /// The readable half of a `TaskIo<T>` instance returned from `TaskIo::split`.
@@ -23,7 +23,7 @@ pub struct TaskIo<T> {
 /// This handle implements the `ReadTask` trait and can be used to split up an
 /// I/O object into two distinct halves.
 pub struct TaskIoRead<T> {
-    handle: TaskData<RefCell<T>>,
+    handle: TaskRc<RefCell<T>>,
 }
 
 /// The writable half of a `TaskIo<T>` instance returned from `TaskIo::split`.
@@ -31,7 +31,7 @@ pub struct TaskIoRead<T> {
 /// This handle implements the `WriteTask` trait and can be used to split up an
 /// I/O object into two distinct halves.
 pub struct TaskIoWrite<T> {
-    handle: TaskData<RefCell<T>>,
+    handle: TaskRc<RefCell<T>>,
 }
 
 impl<T> TaskIo<T> {
@@ -41,7 +41,7 @@ impl<T> TaskIo<T> {
     /// The returned future will never resolve to an error.
     pub fn new(t: T) -> TaskIo<T> {
         TaskIo {
-            handle: TaskData::new(RefCell::new(t)),
+            handle: TaskRc::new(RefCell::new(t)),
         }
     }
 }
