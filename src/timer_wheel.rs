@@ -1,6 +1,6 @@
 //! A timer wheel implementation
 
-use std::mem;
+use std::{mem, usize};
 use std::time::{Instant, Duration};
 
 use slab::Slab;
@@ -74,7 +74,7 @@ pub struct Timeout {
     slab_idx: usize,
 }
 
-const EMPTY: usize = 0;
+const EMPTY: usize = usize::MAX;
 const LEN: usize = 256;
 const MASK: usize = LEN - 1;
 const TICK_MS: u64 = 100;
@@ -88,7 +88,7 @@ impl<T> TimerWheel<T> {
     pub fn new() -> TimerWheel<T> {
         TimerWheel {
             wheel: vec![Slot { head: EMPTY, next_timeout: None }; LEN],
-            slab: Slab::new_starting_at(1, 256),
+            slab: Slab::with_capacity(256),
             start: Instant::now(),
             cur_wheel_tick: 0,
             cur_slab_idx: EMPTY,
@@ -129,8 +129,8 @@ impl<T> TimerWheel<T> {
 
         // Next, make sure there's enough space in the slab for the timeout.
         if self.slab.vacant_entry().is_none() {
-            let amt = self.slab.count();
-            self.slab.grow(amt);
+            let amt = self.slab.len();
+            self.slab.reserve_exact(amt);
         }
 
         // Insert ourselves at the head of the linked list in the wheel.

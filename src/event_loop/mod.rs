@@ -147,9 +147,9 @@ impl Loop {
             events: mio::Events::with_capacity(1024),
             tx: Arc::new(tx),
             rx: rx,
-            io_dispatch: RefCell::new(Slab::new_starting_at(0, SLAB_CAPACITY)),
-            task_dispatch: RefCell::new(Slab::new_starting_at(0, SLAB_CAPACITY)),
-            timeouts: RefCell::new(Slab::new_starting_at(0, SLAB_CAPACITY)),
+            io_dispatch: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
+            task_dispatch: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
+            timeouts: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
             timer_wheel: RefCell::new(TimerWheel::new()),
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
@@ -388,8 +388,8 @@ impl Loop {
         };
         let mut dispatch = self.io_dispatch.borrow_mut();
         if dispatch.vacant_entry().is_none() {
-            let amt = dispatch.count();
-            dispatch.grow(amt);
+            let amt = dispatch.len();
+            dispatch.reserve_exact(amt);
         }
         let entry = dispatch.vacant_entry().unwrap();
         try!(self.io.register(source,
@@ -430,8 +430,8 @@ impl Loop {
     fn add_timeout(&self, at: Instant) -> io::Result<(usize, Instant)> {
         let mut timeouts = self.timeouts.borrow_mut();
         if timeouts.vacant_entry().is_none() {
-            let len = timeouts.count();
-            timeouts.grow(len);
+            let len = timeouts.len();
+            timeouts.reserve_exact(len);
         }
         let entry = timeouts.vacant_entry().unwrap();
         let timeout = self.timer_wheel.borrow_mut().insert(at, entry.index());
@@ -461,8 +461,8 @@ impl Loop {
         let unpark = {
             let mut dispatch = self.task_dispatch.borrow_mut();
             if dispatch.vacant_entry().is_none() {
-                let len = dispatch.count();
-                dispatch.grow(len);
+                let len = dispatch.len();
+                dispatch.reserve_exact(len);
             }
             let entry = dispatch.vacant_entry().unwrap();
             let token = TOKEN_START + 2 * entry.index() + 1;

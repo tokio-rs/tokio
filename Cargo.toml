@@ -16,7 +16,7 @@ futures = { git = "https://github.com/alexcrichton/futures-rs" }
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio" }
 scoped-tls = "0.1.0"
-slab = "0.2.0"
+slab = { git = "https://github.com/carllerche/slab" }
 
 [dev-dependencies]
 env_logger = "0.3"
