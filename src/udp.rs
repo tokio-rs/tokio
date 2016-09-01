@@ -2,7 +2,7 @@ use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
 
-use futures::{Future, failed, Poll};
+use futures::{Future, failed, Poll, Async};
 use mio;
 
 use {ReadinessStream, LoopHandle};
@@ -84,9 +84,8 @@ impl UdpSocket {
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        match self.io.poll_write() {
-            Poll::Ok(()) => {}
-            _ => return Err(mio::would_block()),
+        if let Async::NotReady = try!(self.io.poll_write()) {
+            return Err(mio::would_block())
         }
         match self.io.get_ref().send_to(buf, target) {
             Ok(Some(n)) => Ok(n),
@@ -101,9 +100,8 @@ impl UdpSocket {
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        match self.io.poll_read() {
-            Poll::Ok(()) => {}
-            _ => return Err(mio::would_block()),
+        if let Async::NotReady = try!(self.io.poll_read()) {
+            return Err(mio::would_block())
         }
         match self.io.get_ref().recv_from(buf) {
             Ok(Some(n)) => Ok(n),

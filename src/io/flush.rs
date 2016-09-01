@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use futures::{Poll, Future};
+use futures::{Poll, Future, Async};
 
 /// A future used to fully flush an I/O object.
 ///
@@ -33,7 +33,7 @@ impl<A> Future for Flush<A>
 
     fn poll(&mut self) -> Poll<A, io::Error> {
         try_nb!(self.a.as_mut().unwrap().flush());
-        Poll::Ok(self.a.take().unwrap())
+        Ok(Async::Ready(self.a.take().unwrap()))
     }
 }
 

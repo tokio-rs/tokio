@@ -25,9 +25,9 @@ macro_rules! try_nb {
     ($e:expr) => (match $e {
         Ok(t) => t,
         Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => {
-            return ::futures::Poll::NotReady
+            return Ok(::futures::Async::NotReady)
         }
-        Err(e) => return ::futures::Poll::Err(e.into()),
+        Err(e) => return Err(e.into()),
     })
 }
 

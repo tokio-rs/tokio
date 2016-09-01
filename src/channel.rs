@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::mpsc::TryRecvError;
 
-use futures::{Future, Poll};
+use futures::{Future, Poll, Async};
 use futures::stream::Stream;
 use mio::channel;
 
@@ -87,17 +87,14 @@ impl<T> Stream for Receiver<T> {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<T>, io::Error> {
-        match self.rx.poll_read() {
-            Poll::Ok(()) => {}
-            _ => return Poll::NotReady,
-        }
+        try_ready!(self.rx.poll_read());
         match self.rx.get_ref().try_recv() {
-            Ok(t) => Poll::Ok(Some(t)),
+            Ok(t) => Ok(Async::Ready(Some(t))),
             Err(TryRecvError::Empty) => {
                 self.rx.need_read();
-                Poll::NotReady
+                Ok(Async::NotReady)
             }
-            Err(TryRecvError::Disconnected) => Poll::Ok(None),
+            Err(TryRecvError::Disconnected) => Ok(Async::Ready(None)),
         }
     }
 }

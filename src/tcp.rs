@@ -4,7 +4,7 @@ use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
 
 use futures::stream::Stream;
-use futures::{Future, IntoFuture, failed, Poll};
+use futures::{Future, IntoFuture, failed, Poll, Async};
 use mio;
 
 use {ReadinessStream, LoopHandle};
@@ -92,17 +92,14 @@ impl TcpListener {
             type Error = io::Error;
 
             fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-                match self.inner.io.poll_read() {
-                    Poll::Ok(()) => {}
-                    _ => return Poll::NotReady,
-                }
+                try_ready!(self.inner.io.poll_read());
                 match self.inner.io.get_ref().accept() {
-                    Ok(pair) => Poll::Ok(Some(pair)),
+                    Ok(pair) => Ok(Async::Ready(Some(pair))),
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                         self.inner.io.need_read();
-                        Poll::NotReady
+                        Ok(Async::NotReady)
                     }
-                    Err(e) => Poll::Err(e)
+                    Err(e) => Err(e)
                 }
             }
         }
@@ -348,30 +345,27 @@ impl Future for TcpStreamNew {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
-        let stream = match mem::replace(self, TcpStreamNew::Empty) {
-            TcpStreamNew::Waiting(s) => s,
-            TcpStreamNew::Empty => panic!("can't poll TCP stream twice"),
-        };
+        {
+            let stream = match *self {
+                TcpStreamNew::Waiting(ref s) => s,
+                TcpStreamNew::Empty => panic!("can't poll TCP stream twice"),
+            };
 
-        // Once we've connected, wait for the stream to be writable as that's
-        // when the actual connection has been initiated. Once we're writable we
-        // check for `take_socket_error` to see if the connect actually hit an
-        // error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        match stream.io.poll_write() {
-            Poll::Ok(()) => {
-                match stream.io.get_ref().take_error() {
-                    Ok(Some(e)) => return Poll::Err(e),
-                    Ok(None) => return Poll::Ok(stream),
-                    Err(e) => return Poll::Err(e),
-                }
+            // Once we've connected, wait for the stream to be writable as
+            // that's when the actual connection has been initiated. Once we're
+            // writable we check for `take_socket_error` to see if the connect
+            // actually hit an error or not.
+            //
+            // If all that succeeded then we ship everything on up.
+            try_ready!(stream.io.poll_write());
+            if let Some(e) = try!(stream.io.get_ref().take_error()) {
+                return Err(e)
             }
-            Poll::Err(e) => return Poll::Err(e),
-            Poll::NotReady => {}
         }
-        *self = TcpStreamNew::Waiting(stream);
-        Poll::NotReady
+        match mem::replace(self, TcpStreamNew::Empty) {
+            TcpStreamNew::Waiting(stream) => Ok(Async::Ready(stream)),
+            TcpStreamNew::Empty => panic!(),
+        }
     }
 }
 
@@ -392,9 +386,8 @@ impl Write for TcpStream {
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.io.poll_read() {
-            Poll::Ok(()) => {}
-            _ => return Err(mio::would_block()),
+        if let Async::NotReady = try!(self.io.poll_read()) {
+            return Err(mio::would_block())
         }
         let r = self.io.get_ref().read(buf);
         if is_wouldblock(&r) {
@@ -406,9 +399,8 @@ impl<'a> Read for &'a TcpStream {
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.io.poll_write() {
-            Poll::Ok(()) => {}
-            _ => return Err(mio::would_block()),
+        if let Async::NotReady = try!(self.io.poll_write()) {
+            return Err(mio::would_block())
         }
         let r = self.io.get_ref().write(buf);
         if is_wouldblock(&r) {
@@ -418,9 +410,8 @@ impl<'a> Write for &'a TcpStream {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        match self.io.poll_write() {
-            Poll::Ok(()) => {}
-            _ => return Err(mio::would_block()),
+        if let Async::NotReady = try!(self.io.poll_write()) {
+            return Err(mio::would_block())
         }
         let r = self.io.get_ref().flush();
         if is_wouldblock(&r) {

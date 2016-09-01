@@ -75,7 +75,7 @@ impl<R, W> Future for Copy<R, W>
             // done with the entire transfer.
             if self.pos == self.cap && self.read_done {
                 try_nb!(self.writer.flush());
-                return Poll::Ok(self.amt)
+                return Ok(self.amt.into())
             }
         }
     }

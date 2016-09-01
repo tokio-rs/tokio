@@ -3,7 +3,7 @@ extern crate futures;
 extern crate mio;
 extern crate tokio_core;
 
-use futures::{Future, Poll};
+use futures::{Future, Poll, Async};
 use futures::task;
 use tokio_core::{Loop, IoToken, LoopHandle};
 
@@ -17,9 +17,9 @@ impl Future for Next {
         if self.0 == 0 {
             task::park().unpark();
             self.0 += 1;
-            Poll::NotReady
+            Ok(Async::NotReady)
         } else {
-            Poll::Ok(())
+            Ok(().into())
         }
     }
 }
@@ -54,10 +54,10 @@ fn poll_after_ready() {
             if self.n == 0 {
                 self.handle.schedule_read(&self.token);
                 self.n += 1;
-                Poll::NotReady
+                Ok(Async::NotReady)
             } else {
                 assert!(self.token.take_readiness() & 1 != 0);
-                Poll::Ok(())
+                Ok(().into())
             }
         }
     }

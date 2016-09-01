@@ -58,12 +58,12 @@ impl Future for AddTimeout {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<TimeoutToken, io::Error> {
-        self.inner.poll(Loop::add_timeout, Message::AddTimeout).map(|(t, i)| {
-            TimeoutToken {
-                token: t,
-                when: i,
-            }
-        })
+        let (t, i) = try_ready!(self.inner.poll(Loop::add_timeout,
+                                               Message::AddTimeout));
+        Ok(TimeoutToken {
+            token: t,
+            when: i,
+        }.into())
     }
 }
 

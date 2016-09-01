@@ -65,7 +65,7 @@ impl<A, T> Future for WriteAll<A, T>
                     let n = try_nb!(a.write(&buf[*pos..]));
                     *pos += n;
                     if n == 0 {
-                        return Poll::Err(zero_write())
+                        return Err(zero_write())
                     }
                 }
             }
@@ -73,7 +73,7 @@ impl<A, T> Future for WriteAll<A, T>
         }
 
         match mem::replace(&mut self.state, State::Empty) {
-            State::Writing { a, buf, .. } => Poll::Ok((a, buf)),
+            State::Writing { a, buf, .. } => Ok((a, buf).into()),
             State::Empty => panic!(),
         }
     }

@@ -62,7 +62,7 @@ impl<A, T> Future for ReadExact<A, T>
                     let n = try_nb!(a.read(&mut buf[*pos..]));
                     *pos += n;
                     if n == 0 {
-                        return Poll::Err(eof())
+                        return Err(eof())
                     }
                 }
             }
@@ -70,7 +70,7 @@ impl<A, T> Future for ReadExact<A, T>
         }
 
         match mem::replace(&mut self.state, State::Empty) {
-            State::Reading { a, buf, .. } => Poll::Ok((a, buf)),
+            State::Reading { a, buf, .. } => Ok((a, buf).into()),
             State::Empty => panic!(),
         }
     }

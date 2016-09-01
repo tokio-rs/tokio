@@ -5,6 +5,7 @@
 
 #![deny(missing_docs)]
 
+#[macro_use]
 extern crate futures;
 extern crate mio;
 extern crate slab;

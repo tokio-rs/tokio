@@ -1,4 +1,5 @@
 extern crate futures;
+#[macro_use]
 extern crate tokio_core;
 
 use std::io;
@@ -38,12 +39,9 @@ impl Future for SendMessage {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(), io::Error> {
-        match self.socket.send_to(b"1234", &self.addr) {
-            Ok(4) => Poll::Ok(()),
-            Ok(n) => panic!("didn't send 4 bytes: {}", n),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::NotReady,
-            Err(e) => Poll::Err(e),
-        }
+        let n = try_nb!(self.socket.send_to(b"1234", &self.addr));
+        assert_eq!(n, 4);
+        Ok(().into())
     }
 }
 
@@ -58,15 +56,10 @@ impl Future for RecvMessage {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
         let mut buf = [0; 32];
-        match self.socket.recv_from(&mut buf) {
-            Ok((4, addr)) => {
-                assert_eq!(&buf[..4], b"1234");
-                assert_eq!(addr, self.expected_addr);
-                Poll::Ok(())
-            }
-            Ok((n, _)) => panic!("didn't read 4 bytes: {}", n),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::NotReady,
-            Err(e) => Poll::Err(e),
-        }
+        let (n, addr) = try_nb!(self.socket.recv_from(&mut buf));
+        assert_eq!(n, 4);
+        assert_eq!(&buf[..4], b"1234");
+        assert_eq!(addr, self.expected_addr);
+        Ok(().into())
     }
 }

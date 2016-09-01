@@ -160,7 +160,7 @@ impl<E> Future for AddSource<E>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(E, IoToken), io::Error> {
-        let res = self.inner.poll(|lp, io| {
+        let res = try_ready!(self.inner.poll(|lp, io| {
             let pair = try!(lp.add_source(&io));
             Ok((io, pair))
         }, |io, slot| {
@@ -169,10 +169,9 @@ impl<E> Future for AddSource<E>
                 slot.try_produce(res).ok()
                     .expect("add source try_produce intereference");
             }))
-        });
+        }));
 
-        res.map(|(io, (ready, token))| {
-            (io, IoToken { token: token, readiness: ready })
-        })
+        let (io, (ready, token)) = res;
+        Ok((io, IoToken { token: token, readiness: ready }).into())
     }
 }

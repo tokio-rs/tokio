@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
-use futures::{Future, Poll, IntoFuture};
+use futures::{Future, Poll, IntoFuture, Async};
 use futures::task::{self, Unpark, Task, Spawn};
 use mio;
 use slab::Slab;
@@ -223,9 +223,9 @@ impl Loop {
         self._run(&mut || {
             assert!(res.is_none());
             match task.poll_future(ready.clone()) {
-                Poll::NotReady => {}
-                Poll::Ok(e) => res = Some(Ok(e)),
-                Poll::Err(e) => res = Some(Err(e)),
+                Ok(Async::NotReady) => {}
+                Ok(Async::Ready(e)) => res = Some(Ok(e)),
+                Err(e) => res = Some(Err(e)),
             }
             res.is_some()
         });
@@ -344,12 +344,12 @@ impl Loop {
         let res = CURRENT_LOOP.set(self, || task.poll_future(wake));
         let mut dispatch = self.task_dispatch.borrow_mut();
         match res {
-            Poll::NotReady => {
+            Ok(Async::NotReady) => {
                 assert!(dispatch[token].spawn.is_none());
                 dispatch[token].spawn = Some(task);
             }
-            Poll::Ok(()) |
-            Poll::Err(()) => {
+            Ok(Async::Ready(())) |
+            Err(()) => {
                 dispatch.remove(token).unwrap();
             }
         }
@@ -599,14 +599,15 @@ impl<T, U> LoopFuture<T, U>
             Some((ref result, ref mut token)) => {
                 result.cancel(*token);
                 match result.try_consume() {
-                    Ok(t) => return t.into(),
+                    Ok(Ok(t)) => return Ok(t.into()),
+                    Ok(Err(e)) => return Err(e),
                     Err(_) => {}
                 }
                 let task = task::park();
                 *token = result.on_full(move |_| {
                     task.unpark();
                 });
-                return Poll::NotReady
+                Ok(Async::NotReady)
             }
             None => {
                 let data = &mut self.data;
@@ -615,7 +616,7 @@ impl<T, U> LoopFuture<T, U>
                 });
                 if let Some(ret) = ret {
                     debug!("loop future done immediately on event loop");
-                    return ret.into()
+                    return ret.map(|e| e.into())
                 }
                 debug!("loop future needs to send info to event loop");
 
@@ -626,7 +627,7 @@ impl<T, U> LoopFuture<T, U>
                 });
                 self.result = Some((result.clone(), token));
                 self.loop_handle.send(g(data.take().unwrap(), result));
-                Poll::NotReady
+                Ok(Async::NotReady)
             }
         }
     }

@@ -55,7 +55,7 @@ impl<A> Future for ReadToEnd<A>
         }
 
         match mem::replace(&mut self.state, State::Empty) {
-            State::Reading { a, buf } => Poll::Ok((a, buf)),
+            State::Reading { a, buf } => Ok((a, buf).into()),
             State::Empty => unreachable!(),
         }
     }

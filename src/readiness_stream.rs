@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use futures::{Future, Poll};
+use futures::{Future, Poll, Async};
 use mio;
 
 use event_loop::{IoToken, LoopHandle, AddSource};
@@ -60,14 +60,14 @@ impl<E> ReadinessStream<E> {
     /// `Future::poll` method.
     pub fn poll_read(&self) -> Poll<(), io::Error> {
         if self.readiness.load(Ordering::SeqCst) & 1 != 0 {
-            return Poll::Ok(())
+            return Ok(Async::Ready(()))
         }
         self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
         if self.readiness.load(Ordering::SeqCst) & 1 != 0 {
-            Poll::Ok(())
+            Ok(Async::Ready(()))
         } else {
             self.handle.schedule_read(&self.token);
-            Poll::NotReady
+            Ok(Async::NotReady)
         }
     }
 
@@ -80,14 +80,14 @@ impl<E> ReadinessStream<E> {
     /// `Future::poll` method.
     pub fn poll_write(&self) -> Poll<(), io::Error> {
         if self.readiness.load(Ordering::SeqCst) & 2 != 0 {
-            return Poll::Ok(())
+            return Ok(Async::Ready(()))
         }
         self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
         if self.readiness.load(Ordering::SeqCst) & 2 != 0 {
-            Poll::Ok(())
+            Ok(Async::Ready(()))
         } else {
             self.handle.schedule_write(&self.token);
-            Poll::NotReady
+            Ok(Async::NotReady)
         }
     }
 
@@ -149,14 +149,13 @@ impl<E> Future for ReadinessStreamNew<E>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<ReadinessStream<E>, io::Error> {
-        self.inner.poll().map(|(io, token)| {
-            ReadinessStream {
-                token: token,
-                handle: self.handle.clone(),
-                io: io,
-                readiness: AtomicUsize::new(0),
-            }
-        })
+        let (io, token) = try_ready!(self.inner.poll());
+        Ok(ReadinessStream {
+            token: token,
+            handle: self.handle.clone(),
+            io: io,
+            readiness: AtomicUsize::new(0),
+        }.into())
     }
 }
 

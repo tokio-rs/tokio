@@ -1,7 +1,7 @@
 use std::io;
 use std::time::{Duration, Instant};
 
-use futures::{Future, Poll};
+use futures::{Future, Poll, Async};
 
 use LoopHandle;
 use io::IoFuture;
@@ -52,10 +52,10 @@ impl Future for Timeout {
         // TODO: is this fast enough?
         let now = Instant::now();
         if *self.token.when() <= now {
-            Poll::Ok(())
+            Ok(Async::Ready(()))
         } else {
             self.handle.update_timeout(&self.token);
-            Poll::NotReady
+            Ok(Async::NotReady)
         }
     }
 }
