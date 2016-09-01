@@ -205,7 +205,7 @@ impl Loop {
     /// the future panics then it's the responsibility of the caller to catch
     /// that panic and handle it as appropriate.
     ///
-    /// Similarly, becuase the provided future will be pinned not only to this
+    /// Similarly, because the provided future will be pinned not only to this
     /// thread but also to this task, any attempt to poll the future on a
     /// separate thread will result in a panic. That is, calls to
     /// `task::poll_on` must be avoided.
