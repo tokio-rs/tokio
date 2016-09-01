@@ -92,6 +92,10 @@ impl TcpListener {
             type Error = io::Error;
 
             fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
+                match self.inner.io.poll_read() {
+                    Poll::Ok(()) => {}
+                    _ => return Poll::NotReady,
+                }
                 match self.inner.io.get_ref().accept() {
                     Ok(pair) => Poll::Ok(Some(pair)),
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -288,33 +292,25 @@ impl Future for TcpStreamNew {
 
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let r = self.io.get_ref().read(buf);
-        if is_wouldblock(&r) {
-            self.io.need_read();
-        }
-        return r
+        <&TcpStream>::read(&mut &*self, buf)
     }
 }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let r = self.io.get_ref().write(buf);
-        if is_wouldblock(&r) {
-            self.io.need_write();
-        }
-        return r
+        <&TcpStream>::write(&mut &*self, buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        let r = self.io.get_ref().flush();
-        if is_wouldblock(&r) {
-            self.io.need_write();
-        }
-        return r
+        <&TcpStream>::flush(&mut &*self)
     }
 }
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self.io.poll_read() {
+            Poll::Ok(()) => {}
+            _ => return Err(mio::would_block()),
+        }
         let r = self.io.get_ref().read(buf);
         if is_wouldblock(&r) {
             self.io.need_read();
@@ -325,6 +321,10 @@ impl<'a> Read for &'a TcpStream {
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self.io.poll_write() {
+            Poll::Ok(()) => {}
+            _ => return Err(mio::would_block()),
+        }
         let r = self.io.get_ref().write(buf);
         if is_wouldblock(&r) {
             self.io.need_write();
@@ -333,6 +333,10 @@ impl<'a> Write for &'a TcpStream {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        match self.io.poll_write() {
+            Poll::Ok(()) => {}
+            _ => return Err(mio::would_block()),
+        }
         let r = self.io.get_ref().flush();
         if is_wouldblock(&r) {
             self.io.need_write();

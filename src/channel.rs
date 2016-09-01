@@ -87,6 +87,10 @@ impl<T> Stream for Receiver<T> {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<T>, io::Error> {
+        match self.rx.poll_read() {
+            Poll::Ok(()) => {}
+            _ => return Poll::NotReady,
+        }
         match self.rx.get_ref().try_recv() {
             Ok(t) => Poll::Ok(Some(t)),
             Err(TryRecvError::Empty) => {
