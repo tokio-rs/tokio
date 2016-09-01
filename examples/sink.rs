@@ -3,7 +3,7 @@
 //! There is no concurrency in this server, only one connection is written to at
 //! a time.
 
-#[macro_use]
+extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
 
@@ -16,6 +16,7 @@ use futures::stream::{self, Stream};
 use tokio_core::io::IoFuture;
 
 fn main() {
+    env_logger::init().unwrap();
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 

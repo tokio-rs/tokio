@@ -1,5 +1,6 @@
 //! An echo server that just writes back everything that's written to it.
 
+extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
 
@@ -12,6 +13,7 @@ use tokio_core::Loop;
 use tokio_core::io::{copy, TaskIo};
 
 fn main() {
+    env_logger::init().unwrap();
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
