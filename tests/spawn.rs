@@ -3,12 +3,12 @@ extern crate env_logger;
 extern crate futures;
 
 use futures::Future;
-use tokio_core::Loop;
+use tokio_core::reactor::Core;
 
 #[test]
 fn simple() {
     drop(env_logger::init());
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
 
     let (tx1, rx1) = futures::oneshot();
     let (tx2, rx2) = futures::oneshot();
@@ -29,7 +29,7 @@ fn simple() {
 #[test]
 fn spawn_in_poll() {
     drop(env_logger::init());
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
 
     let (tx1, rx1) = futures::oneshot();
     let (tx2, rx2) = futures::oneshot();

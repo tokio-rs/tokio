@@ -1,7 +1,13 @@
+//! The core reactor driving all I/O
+//!
+//! This module contains the `Core` type which is the reactor for all I/O
+//! happening in `tokio-core`. This reactor (or event loop) is used to run
+//! futures, schedule tasks, issue I/O requests, etc.
+
 use std::cell::RefCell;
 use std::io::{self, ErrorKind};
 use std::mem;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
@@ -12,17 +18,20 @@ use mio;
 use slab::Slab;
 
 use slot::{self, Slot};
-use timer_wheel::{TimerWheel, Timeout};
+use timer_wheel::{TimerWheel, Timeout as WheelTimeout};
 
 mod channel;
-mod source;
-mod timeout;
-pub use self::source::{AddSource, IoToken};
-pub use self::timeout::{AddTimeout, TimeoutToken};
+mod io_token;
+mod timeout_token;
 use self::channel::{Sender, Receiver, channel};
 
+mod poll_evented;
+mod timeout;
+pub use self::poll_evented::{PollEvented, PollEventedNew};
+pub use self::timeout::{Timeout, TimeoutNew};
+
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-scoped_thread_local!(static CURRENT_LOOP: Loop);
+scoped_thread_local!(static CURRENT_LOOP: Core);
 
 const SLAB_CAPACITY: usize = 1024 * 64;
 
@@ -33,11 +42,11 @@ const SLAB_CAPACITY: usize = 1024 * 64;
 /// multiple handles pointing to it, each of which can then be used to create
 /// various I/O objects to interact with the event loop in interesting ways.
 // TODO: expand this
-pub struct Loop {
+pub struct Core {
     id: usize,
     io: mio::Poll,
     events: mio::Events,
-    tx: Arc<Sender<Message>>,
+    tx: Sender<Message>,
     rx: Receiver<Message>,
     io_dispatch: RefCell<Slab<ScheduledIo, usize>>,
     task_dispatch: RefCell<Slab<ScheduledTask, usize>>,
@@ -59,7 +68,7 @@ pub struct Loop {
     // state of the timeout itself. The `TimeoutToken` type is an index into the
     // `timeouts` slab.
     timer_wheel: RefCell<TimerWheel<usize>>,
-    timeouts: RefCell<Slab<(Timeout, TimeoutState), usize>>,
+    timeouts: RefCell<Slab<(WheelTimeout, TimeoutState), usize>>,
 }
 
 /// Handle to an event loop, used to construct I/O objects, send messages, and
@@ -68,17 +77,17 @@ pub struct Loop {
 /// Handles can be cloned, and when cloned they will still refer to the
 /// same underlying event loop.
 #[derive(Clone)]
-pub struct LoopHandle {
+pub struct Handle {
     id: usize,
-    tx: Arc<Sender<Message>>,
+    tx: Sender<Message>,
 }
 
 /// A non-sendable handle to an event loop, useful for manufacturing instances
 /// of `LoopData`.
 #[derive(Clone)]
-pub struct LoopPin {
-    handle: LoopHandle,
-    futures: Rc<NewFutures>,
+pub struct Pinned {
+    handle: Handle,
+    futures: Weak<NewFutures>,
 }
 
 struct ScheduledIo {
@@ -123,10 +132,10 @@ const TOKEN_FUTURE: mio::Token = mio::Token(1);
 const TOKEN_NEW_FUTURES: mio::Token = mio::Token(2);
 const TOKEN_START: usize = 3;
 
-impl Loop {
+impl Core {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub fn new() -> io::Result<Loop> {
+    pub fn new() -> io::Result<Core> {
         let (tx, rx) = channel();
         let io = try!(mio::Poll::new());
         try!(io.register(&rx,
@@ -141,11 +150,11 @@ impl Loop {
                                                      TOKEN_NEW_FUTURES,
                                                      mio::Ready::readable(),
                                                      mio::PollOpt::level());
-        Ok(Loop {
+        Ok(Core {
             id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
             io: io,
             events: mio::Events::with_capacity(1024),
-            tx: Arc::new(tx),
+            tx: tx,
             rx: rx,
             io_dispatch: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
             task_dispatch: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
@@ -166,8 +175,8 @@ impl Loop {
     ///
     /// Handles to an event loop are cloneable as well and clones will always
     /// refer to the same event loop.
-    pub fn handle(&self) -> LoopHandle {
-        LoopHandle {
+    pub fn handle(&self) -> Handle {
+        Handle {
             id: self.id,
             tx: self.tx.clone(),
         }
@@ -177,12 +186,12 @@ impl Loop {
     /// but can be used as a proxy to the event loop itself.
     ///
     /// Currently the primary use for this is to use as a handle to add data
-    /// to the event loop directly. The `LoopPin::add_loop_data` method can
+    /// to the event loop directly. The `Pinned::add_loop_data` method can
     /// be used to immediately create instances of `LoopData` structures.
-    pub fn pin(&self) -> LoopPin {
-        LoopPin {
+    pub fn pin(&self) -> Pinned {
+        Pinned {
             handle: self.handle(),
-            futures: self.new_futures.clone(),
+            futures: Rc::downgrade(&self.new_futures),
         }
     }
 
@@ -501,7 +510,7 @@ impl Loop {
     }
 }
 
-impl LoopHandle {
+impl Handle {
     fn send(&self, msg: Message) {
         self.with_loop(|lp| {
             match lp {
@@ -528,7 +537,7 @@ impl LoopHandle {
     }
 
     fn with_loop<F, R>(&self, f: F) -> R
-        where F: FnOnce(Option<&Loop>) -> R
+        where F: FnOnce(Option<&Core>) -> R
     {
         if CURRENT_LOOP.is_set() {
             CURRENT_LOOP.with(|lp| {
@@ -552,20 +561,20 @@ impl LoopHandle {
     /// Note that while the closure, `F`, requires the `Send` bound as it might
     /// cross threads, the future `R` does not.
     pub fn spawn<F, R>(&self, f: F)
-        where F: FnOnce(&LoopPin) -> R + Send + 'static,
+        where F: FnOnce(&Pinned) -> R + Send + 'static,
               R: IntoFuture<Item=(), Error=()>,
               R::Future: 'static,
     {
-        self.send(Message::Run(Box::new(|lp: &Loop| {
+        self.send(Message::Run(Box::new(|lp: &Core| {
             let f = f(&lp.pin());
             lp.spawn(Box::new(f.into_future()));
         })));
     }
 }
 
-impl LoopPin {
+impl Pinned {
     /// Returns a reference to the underlying handle to the event loop.
-    pub fn handle(&self) -> &LoopHandle {
+    pub fn handle(&self) -> &Handle {
         &self.handle
     }
 
@@ -573,22 +582,26 @@ impl LoopPin {
     pub fn spawn<F>(&self, f: F)
         where F: Future<Item=(), Error=()> + 'static,
     {
-        self.futures.queue.borrow_mut().push(Box::new(f));
-        self.futures.ready.set_readiness(mio::Ready::readable()).unwrap();
+        let inner = match self.futures.upgrade() {
+            Some(inner) => inner,
+            None => return,
+        };
+        inner.queue.borrow_mut().push(Box::new(f));
+        inner.ready.set_readiness(mio::Ready::readable()).unwrap();
     }
 }
 
-struct LoopFuture<T, U> {
-    loop_handle: LoopHandle,
+struct CoreFuture<T, U> {
+    handle: Handle,
     data: Option<U>,
     result: Option<(Arc<Slot<io::Result<T>>>, slot::Token)>,
 }
 
-impl<T, U> LoopFuture<T, U>
+impl<T, U> CoreFuture<T, U>
     where T: 'static,
 {
     fn poll<F, G>(&mut self, f: F, g: G) -> Poll<T, io::Error>
-        where F: FnOnce(&Loop, U) -> io::Result<T>,
+        where F: FnOnce(&Core, U) -> io::Result<T>,
               G: FnOnce(U, Arc<Slot<io::Result<T>>>) -> Message,
     {
         match self.result {
@@ -607,7 +620,7 @@ impl<T, U> LoopFuture<T, U>
             }
             None => {
                 let data = &mut self.data;
-                let ret = self.loop_handle.with_loop(|lp| {
+                let ret = self.handle.with_loop(|lp| {
                     lp.map(|lp| f(lp, data.take().unwrap()))
                 });
                 if let Some(ret) = ret {
@@ -622,7 +635,7 @@ impl<T, U> LoopFuture<T, U>
                     task.unpark();
                 });
                 self.result = Some((result.clone(), token));
-                self.loop_handle.send(g(data.take().unwrap(), result));
+                self.handle.send(g(data.take().unwrap(), result));
                 Ok(Async::NotReady)
             }
         }
@@ -658,11 +671,11 @@ impl Unpark for MySetReadiness {
 }
 
 trait FnBox: Send + 'static {
-    fn call_box(self: Box<Self>, lp: &Loop);
+    fn call_box(self: Box<Self>, lp: &Core);
 }
 
-impl<F: FnOnce(&Loop) + Send + 'static> FnBox for F {
-    fn call_box(self: Box<Self>, lp: &Loop) {
+impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
+    fn call_box(self: Box<Self>, lp: &Core) {
         (*self)(lp)
     }
 }

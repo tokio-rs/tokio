@@ -9,6 +9,8 @@ use std::io::{Read, Write, BufReader, BufWriter};
 use futures::Future;
 use futures::stream::Stream;
 use tokio_core::io::copy;
+use tokio_core::net::TcpListener;
+use tokio_core::reactor::Core;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -22,8 +24,8 @@ fn echo_server() {
     const N: usize = 1024;
     drop(env_logger::init());
 
-    let mut l = t!(tokio_core::Loop::new());
-    let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
+    let mut l = t!(Core::new());
+    let srv = TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());
 

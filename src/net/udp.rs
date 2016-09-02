@@ -5,33 +5,36 @@ use std::fmt;
 use futures::{Future, failed, Poll, Async};
 use mio;
 
-use {ReadinessStream, LoopHandle};
 use io::IoFuture;
+use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    io: ReadinessStream<mio::udp::UdpSocket>,
+    io: PollEvented<mio::udp::UdpSocket>,
 }
 
-impl LoopHandle {
+/// Future returned from `UdpSocket::bind` which will resolve to a `UdpSocket`.
+pub struct UdpSocketNew {
+    inner: IoFuture<UdpSocket>,
+}
+
+impl UdpSocket {
     /// Create a new UDP socket bound to the specified address.
     ///
     /// This function will create a new UDP socket and attempt to bind it to the
     /// `addr` provided. The returned future will be resolved once the socket
     /// has successfully bound. If an error happens during the binding or during
     /// the socket creation, that error will be returned to the future instead.
-    pub fn udp_bind(self, addr: &SocketAddr) -> IoFuture<UdpSocket> {
-        match mio::udp::UdpSocket::bind(addr) {
-            Ok(udp) => UdpSocket::new(udp, self),
+    pub fn bind(addr: &SocketAddr, handle: &Handle) -> UdpSocketNew {
+        let future = match mio::udp::UdpSocket::bind(addr) {
+            Ok(udp) => UdpSocket::new(udp, handle),
             Err(e) => failed(e).boxed(),
-        }
+        };
+        UdpSocketNew { inner: future }
     }
-}
 
-impl UdpSocket {
-    fn new(socket: mio::udp::UdpSocket, handle: LoopHandle)
-           -> IoFuture<UdpSocket> {
-        ReadinessStream::new(handle, socket).map(|io| {
+    fn new(socket: mio::udp::UdpSocket, handle: &Handle) -> IoFuture<UdpSocket> {
+        PollEvented::new(socket, handle).map(|io| {
             UdpSocket { io: io }
         }).boxed()
     }
@@ -46,9 +49,9 @@ impl UdpSocket {
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_socket(socket: net::UdpSocket,
-                       handle: LoopHandle) -> IoFuture<UdpSocket> {
+                       handle: &Handle) -> IoFuture<UdpSocket> {
         match mio::udp::UdpSocket::from_socket(socket) {
-            Ok(tcp) => UdpSocket::new(tcp, handle),
+            Ok(udp) => UdpSocket::new(udp, handle),
             Err(e) => failed(e).boxed(),
         }
     }
@@ -64,7 +67,7 @@ impl UdpSocket {
     /// get a notification when the socket does become readable. That is, this
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is readable again.
-    pub fn poll_read(&self) -> Poll<(), io::Error> {
+    pub fn poll_read(&self) -> Async<()> {
         self.io.poll_read()
     }
 
@@ -74,7 +77,7 @@ impl UdpSocket {
     /// get a notification when the socket does become writable. That is, this
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is writable again.
-    pub fn poll_write(&self) -> Poll<(), io::Error> {
+    pub fn poll_write(&self) -> Async<()> {
         self.io.poll_write()
     }
 
@@ -84,14 +87,14 @@ impl UdpSocket {
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        if let Async::NotReady = try!(self.io.poll_write()) {
+        if let Async::NotReady = self.io.poll_write() {
             return Err(mio::would_block())
         }
         match self.io.get_ref().send_to(buf, target) {
             Ok(Some(n)) => Ok(n),
             Ok(None) => {
                 self.io.need_write();
-                Err(io::Error::new(io::ErrorKind::WouldBlock, "would block"))
+                Err(mio::would_block())
             }
             Err(e) => Err(e),
         }
@@ -100,14 +103,14 @@ impl UdpSocket {
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        if let Async::NotReady = try!(self.io.poll_read()) {
+        if let Async::NotReady = self.io.poll_read() {
             return Err(mio::would_block())
         }
         match self.io.get_ref().recv_from(buf) {
             Ok(Some(n)) => Ok(n),
             Ok(None) => {
                 self.io.need_read();
-                Err(io::Error::new(io::ErrorKind::WouldBlock, "would block"))
+                Err(mio::would_block())
             }
             Err(e) => Err(e),
         }
@@ -257,6 +260,15 @@ impl UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
+    }
+}
+
+impl Future for UdpSocketNew {
+    type Item = UdpSocket;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
+        self.inner.poll()
     }
 }
 

@@ -2,12 +2,14 @@ extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
 
-use std::net::{TcpListener, TcpStream};
+use std::net;
 use std::sync::mpsc::channel;
 use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
+use tokio_core::reactor::Core;
+use tokio_core::net::{TcpListener, TcpStream};
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -19,14 +21,14 @@ macro_rules! t {
 #[test]
 fn connect() {
     drop(env_logger::init());
-    let mut l = t!(tokio_core::Loop::new());
-    let srv = t!(TcpListener::bind("127.0.0.1:0"));
+    let mut l = t!(Core::new());
+    let srv = t!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = t!(srv.local_addr());
     let t = thread::spawn(move || {
         t!(srv.accept()).0
     });
 
-    let stream = l.handle().tcp_connect(&addr);
+    let stream = TcpStream::connect(&addr, &l.handle());
     let mine = t!(l.run(stream));
     let theirs = t.join().unwrap();
 
@@ -37,8 +39,8 @@ fn connect() {
 #[test]
 fn accept() {
     drop(env_logger::init());
-    let mut l = t!(tokio_core::Loop::new());
-    let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
+    let mut l = t!(Core::new());
+    let srv = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &l.handle());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());
 
@@ -49,7 +51,7 @@ fn accept() {
     }).into_future().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
     let t = thread::spawn(move || {
-        TcpStream::connect(&addr).unwrap()
+        net::TcpStream::connect(&addr).unwrap()
     });
 
     let (mine, _remaining) = t!(l.run(client));
@@ -63,13 +65,13 @@ fn accept() {
 #[test]
 fn accept2() {
     drop(env_logger::init());
-    let mut l = t!(tokio_core::Loop::new());
-    let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
+    let mut l = t!(Core::new());
+    let srv = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &l.handle());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());
 
     let t = thread::spawn(move || {
-        TcpStream::connect(&addr).unwrap()
+        net::TcpStream::connect(&addr).unwrap()
     });
 
     let (tx, rx) = channel();

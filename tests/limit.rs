@@ -8,6 +8,8 @@ use std::io::{Write, Read};
 use futures::Future;
 use futures::stream::Stream;
 use tokio_core::io::read_to_end;
+use tokio_core::net::TcpListener;
+use tokio_core::reactor::Core;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -18,8 +20,8 @@ macro_rules! t {
 
 #[test]
 fn limit() {
-    let mut l = t!(tokio_core::Loop::new());
-    let srv = l.handle().tcp_listen(&"127.0.0.1:0".parse().unwrap());
+    let mut l = t!(Core::new());
+    let srv = TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle());
     let srv = t!(l.run(srv));
     let addr = t!(srv.local_addr());
 

@@ -3,9 +3,9 @@
 //! Contains various combinators to work with I/O objects and type definitions
 //! as well.
 
-use std::io;
+use std::io::{self, Read, Write};
 
-use futures::BoxFuture;
+use futures::{BoxFuture, Async};
 use futures::stream::BoxStream;
 
 /// A convenience typedef around a `Future` whose error component is `io::Error`
@@ -45,3 +45,74 @@ pub use self::read_to_end::{read_to_end, ReadToEnd};
 pub use self::task::{TaskIo, TaskIoRead, TaskIoWrite};
 pub use self::window::Window;
 pub use self::write_all::{write_all, WriteAll};
+
+/// A trait for read/write I/O objects
+///
+/// This trait represents I/O object which are readable and writable.
+/// Additionally, they're associated with the ability to test whether they're
+/// readable or writable.
+///
+/// Imporantly, the methods of this trait are intended to be used in conjuction
+/// with the current task of a future. Namely whenever any of them return a
+/// value that indicates "would block" the current future's task is arranged to
+/// receive a notification when the method would otherwise not indicate that it
+/// would block.
+pub trait Io: Read + Write {
+    /// Tests to see if this I/O object may be readable.
+    ///
+    /// This method returns an `Async<()>` indicating whether the object
+    /// **might** be readable. It is possible that even if this method returns
+    /// `Async::Ready` that a call to `read` would return a `WouldBlock` error.
+    ///
+    /// There is a default implementation for this function which always
+    /// indicates that an I/O object is readable, but objects which can
+    /// implement a finer grained version of this are recommended to do so.
+    ///
+    /// If this function returns `Async::NotReady` then the current future's
+    /// task is arranged to receive a notification when it might not return
+    /// `NotReady`.
+    ///
+    /// # Panics
+    ///
+    /// This method is likely to panic if called from outside the context of a
+    /// future's task.
+    fn poll_read(&mut self) -> Async<()> {
+        Async::Ready(())
+    }
+
+    /// Tests to see if this I/O object may be writable.
+    ///
+    /// This method returns an `Async<()>` indicating whether the object
+    /// **might** be writable. It is possible that even if this method returns
+    /// `Async::Ready` that a call to `write` would return a `WouldBlock` error.
+    ///
+    /// There is a default implementation for this function which always
+    /// indicates that an I/O object is writable, but objects which can
+    /// implement a finer grained version of this are recommended to do so.
+    ///
+    /// If this function returns `Async::NotReady` then the current future's
+    /// task is arranged to receive a notification when it might not return
+    /// `NotReady`.
+    ///
+    /// # Panics
+    ///
+    /// This method is likely to panic if called from outside the context of a
+    /// future's task.
+    fn poll_write(&mut self) -> Async<()> {
+        Async::Ready(())
+    }
+
+    /// Helper method for splitting this read/write object into two halves.
+    ///
+    /// The two halves returned implement the `Read` and `Write` traits,
+    /// respectively, but are only usable on the current task.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if there is not currently an active future task.
+    fn task_split(self) -> (TaskIoRead<Self>, TaskIoWrite<Self>)
+        where Self: Sized
+    {
+        TaskIo::new(self).split()
+    }
+}

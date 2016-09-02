@@ -6,14 +6,14 @@ use futures::{Future, Poll};
 use futures::task;
 use mio;
 
-use event_loop::{Message, LoopHandle, LoopFuture, Direction, Loop};
+use reactor::{Message, Handle, CoreFuture, Direction, Core};
 
 /// A future which will resolve a unique `tok` token for an I/O object.
 ///
-/// Created through the `LoopHandle::add_source` method, this future can also
+/// Created through the `Handle::add_source` method, this future can also
 /// resolve to an error if there's an issue communicating with the event loop.
-pub struct AddSource<E> {
-    inner: LoopFuture<(E, (Arc<AtomicUsize>, usize)), E>,
+pub struct IoTokenNew<E> {
+    inner: CoreFuture<(E, (Arc<AtomicUsize>, usize)), E>,
 }
 
 /// A token that identifies an active timeout.
@@ -23,7 +23,7 @@ pub struct IoToken {
     readiness: Arc<AtomicUsize>,
 }
 
-impl LoopHandle {
+impl IoToken {
     /// Add a new source to an event loop, returning a future which will resolve
     /// to the token that can be used to identify this source.
     ///
@@ -40,16 +40,35 @@ impl LoopHandle {
     /// The returned future will panic if the event loop this handle is
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
-    pub fn add_source<E>(&self, source: E) -> AddSource<E>
+    pub fn new<E>(source: E, handle: &Handle) -> IoTokenNew<E>
         where E: mio::Evented + Send + 'static,
     {
-        AddSource {
-            inner: LoopFuture {
-                loop_handle: self.clone(),
+        IoTokenNew {
+            inner: CoreFuture {
+                handle: handle.clone(),
                 data: Some(source),
                 result: None,
-            }
+            },
         }
+    }
+
+	/// Consumes the last readiness notification the token this source is for
+    /// registered.
+	///
+	/// Currently sources receive readiness notifications on an edge-basis. That
+	/// is, once you receive a notification that an object can be read, you
+	/// won't receive any more notifications until all of that data has been
+	/// read.
+	///
+	/// The event loop will fill in this information and then inform futures
+	/// that they're ready to go with the `schedule` method, and then the `poll`
+	/// method can use this to figure out what happened.
+    ///
+    /// > **Note**: This method should generally not be used directly, but
+    /// >           rather the `ReadinessStream` type should be used instead.
+    // TODO: this should really return a proper newtype/enum, not a usize
+    pub fn take_readiness(&self) -> usize {
+        self.readiness.swap(0, Ordering::SeqCst)
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -74,8 +93,8 @@ impl LoopHandle {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_read(&self, tok: &IoToken) {
-        self.send(Message::Schedule(tok.token, task::park(), Direction::Read));
+    pub fn schedule_read(&self, handle: &Handle) {
+        handle.send(Message::Schedule(self.token, task::park(), Direction::Read));
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -101,8 +120,8 @@ impl LoopHandle {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_write(&self, tok: &IoToken) {
-        self.send(Message::Schedule(tok.token, task::park(), Direction::Write));
+    pub fn schedule_write(&self, handle: &Handle) {
+        handle.send(Message::Schedule(self.token, task::park(), Direction::Write));
     }
 
     /// Unregister all information associated with a token on an event loop,
@@ -127,33 +146,12 @@ impl LoopHandle {
     /// This function will panic if the event loop this handle is associated
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
-    pub fn drop_source(&self, tok: &IoToken) {
-        self.send(Message::DropSource(tok.token));
+    pub fn drop_source(&self, handle: &Handle) {
+        handle.send(Message::DropSource(self.token));
     }
 }
 
-impl IoToken {
-	/// Consumes the last readiness notification the token this source is for
-    /// registered.
-	///
-	/// Currently sources receive readiness notifications on an edge-basis. That
-	/// is, once you receive a notification that an object can be read, you
-	/// won't receive any more notifications until all of that data has been
-	/// read.
-	///
-	/// The event loop will fill in this information and then inform futures
-	/// that they're ready to go with the `schedule` method, and then the `poll`
-	/// method can use this to figure out what happened.
-    ///
-    /// > **Note**: This method should generally not be used directly, but
-    /// >           rather the `ReadinessStream` type should be used instead.
-    // TODO: this should really return a proper newtype/enum, not a usize
-    pub fn take_readiness(&self) -> usize {
-        self.readiness.swap(0, Ordering::SeqCst)
-    }
-}
-
-impl<E> Future for AddSource<E>
+impl<E> Future for IoTokenNew<E>
     where E: mio::Evented + Send + 'static,
 {
     type Item = (E, IoToken);
@@ -164,7 +162,7 @@ impl<E> Future for AddSource<E>
             let pair = try!(lp.add_source(&io));
             Ok((io, pair))
         }, |io, slot| {
-            Message::Run(Box::new(move |lp: &Loop| {
+            Message::Run(Box::new(move |lp: &Core| {
                 let res = lp.add_source(&io).map(|p| (io, p));
                 slot.try_produce(res).ok()
                     .expect("add source try_produce intereference");

@@ -9,8 +9,9 @@ use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::Loop;
 use tokio_core::io::{copy, TaskIo};
+use tokio_core::net::TcpListener;
+use tokio_core::reactor::Core;
 
 fn main() {
     env_logger::init().unwrap();
@@ -18,11 +19,11 @@ fn main() {
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     // Create the event loop that will drive this server
-    let mut l = Loop::new().unwrap();
+    let mut l = Core::new().unwrap();
     let pin = l.pin();
 
     // Create a TCP listener which will listen for incoming connections
-    let server = l.handle().tcp_listen(&addr);
+    let server = TcpListener::bind(&addr, &l.handle());
 
     let done = server.and_then(move |socket| {
         // Once we've got the TCP listener, inform that we have it

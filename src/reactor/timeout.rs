@@ -1,11 +1,16 @@
+//! Support for creating futures that represent timeouts.
+//!
+//! This module contains the `Timeout` type which is a future that will resolve
+//! at a particular point in the future.
+
 use std::io;
 use std::time::{Duration, Instant};
 
 use futures::{Future, Poll, Async};
 
-use LoopHandle;
+use reactor::Handle;
+use reactor::timeout_token::TimeoutToken;
 use io::IoFuture;
-use event_loop::TimeoutToken;
 
 /// A future representing the notification that a timeout has occurred.
 ///
@@ -16,17 +21,23 @@ use event_loop::TimeoutToken;
 /// otherwise indicated to fire at.
 pub struct Timeout {
     token: TimeoutToken,
-    handle: LoopHandle,
+    handle: Handle,
 }
 
-impl LoopHandle {
+/// Future returned from `Timeout::new` and `Timeout::new_at` which will resolve
+/// to the actual `Timeout` itself.
+pub struct TimeoutNew {
+    inner: IoFuture<Timeout>,
+}
+
+impl Timeout {
     /// Creates a new timeout which will fire at `dur` time into the future.
     ///
     /// This function will return a future that will resolve to the actual
     /// timeout object. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
-    pub fn timeout(self, dur: Duration) -> IoFuture<Timeout> {
-        self.timeout_at(Instant::now() + dur)
+    pub fn new(dur: Duration, handle: &Handle) -> TimeoutNew {
+        Timeout::new_at(Instant::now() + dur, handle)
     }
 
     /// Creates a new timeout which will fire at the time specified by `at`.
@@ -34,13 +45,16 @@ impl LoopHandle {
     /// This function will return a future that will resolve to the actual
     /// timeout object. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
-    pub fn timeout_at(self, at: Instant) -> IoFuture<Timeout> {
-        self.add_timeout(at).map(move |token| {
-            Timeout {
-                token: token,
-                handle: self,
-            }
-        }).boxed()
+    pub fn new_at(at: Instant, handle: &Handle) -> TimeoutNew {
+        let handle = handle.clone();
+        TimeoutNew {
+            inner: TimeoutToken::new(at, &handle).map(move |token| {
+                Timeout {
+                    token: token,
+                    handle: handle,
+                }
+            }).boxed(),
+        }
     }
 }
 
@@ -54,14 +68,23 @@ impl Future for Timeout {
         if *self.token.when() <= now {
             Ok(Async::Ready(()))
         } else {
-            self.handle.update_timeout(&self.token);
+            self.token.update_timeout(&self.handle);
             Ok(Async::NotReady)
         }
     }
 }
 
+impl Future for TimeoutNew {
+    type Item = Timeout;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Timeout, io::Error> {
+        self.inner.poll()
+    }
+}
+
 impl Drop for Timeout {
     fn drop(&mut self) {
-        self.handle.cancel_timeout(&self.token);
+        self.token.cancel_timeout(&self.handle);
     }
 }
