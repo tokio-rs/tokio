@@ -30,7 +30,7 @@ There are a few small examples showing off how to use this library:
 * [echo.rs] - a simple TCP echo server
 * [socks5.rs] - an implementation of a SOCKSv5 proxy server
 
-[echo.rs]: https://github.com/tokio-rs/tokio-core/blob/master/src/bin/echo.rs
+[echo.rs]: https://github.com/tokio-rs/tokio-core/blob/master/examples/echo.rs
 [socks5.rs]: https://github.com/tokio-rs/tokio-socks5/blob/master/src/main.rs
 
 ## What is tokio-core?
