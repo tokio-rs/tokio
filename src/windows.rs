@@ -101,7 +101,7 @@ impl Drop for Waiting {
 
 unsafe extern "system" fn callback(ptr: winapi::PVOID,
                                    _timer_fired: winapi::BOOLEAN) {
-    let mut complete = Box::from_raw(ptr as *mut Option<Complete<()>>);
+    let mut complete = &mut *(ptr as *mut Option<Complete<()>>);
     complete.take().unwrap().complete(());
 }
 
