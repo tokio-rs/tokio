@@ -1,3 +1,8 @@
+//! Unix-specific types for signal handling.
+//!
+//! This module is only defined on Unix platforms and contains the primary
+//! `Signal` type for receiving notifications of signals.
+
 #![cfg(unix)]
 
 extern crate libc;
@@ -20,6 +25,43 @@ use tokio_core::{LoopHandle, Sender, Receiver, ReadinessStream};
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
 
+/// An implementation of `Stream` for receiving a particular type of signal.
+///
+/// This structure implements the `Stream` trait and represents notifications
+/// of the current process receiving a particular signal. The signal being
+/// listened for is passed to `Signal::new`, and the same signal number is then
+/// yielded as each element for the stream.
+///
+/// In general signal handling on Unix is a pretty tricky topic, and this
+/// structure is no exception! There are some important limitations to keep in
+/// mind when using `Signal` streams:
+///
+/// * While multiple event loops are supported, the *first* event loop to
+///   register a signal handler is required to be active to ensure that signals
+///   for other event loops are delivered. In other words, once an event loop
+///   registers a signal, it's best to keep it around and running. This is
+///   normally just a problem for tests, and the "workaround" is to spawn a
+///   thread in the background at the beginning of the test suite which is
+///   running an event loop (and listening for a signal).
+///
+/// * Signals handling in Unix already necessitates coalescing signals
+///   together sometimes. This `Signal` stream is also no exception here in
+///   that it will also coalesce signals. That is, even if the signal handler
+///   for this process runs multiple times, the `Signal` stream may only return
+///   one signal notification. Specifically, before `poll` is called, all
+///   signal notifications are coalesced into one item returned from `poll`.
+///   Once `poll` has been called, however, a further signal is guaranteed to
+///   be yielded as an item.
+///
+/// * Signal handling in general is relatively inefficient. Although some
+///   improvements are possible in this crate, it's recommended to not plan on
+///   having millions of signal channels open.
+///
+/// * Currently the "driver task" to process incoming signals never exits.
+///
+/// If you've got any questions about this feel free to open an issue on the
+/// repo, though, as I'd love to chat about this! In other words, I'd love to
+/// alleviate some of these limitations if possible!
 pub struct Signal {
     signum: c_int,
     reg: ReadinessStream<MyRegistration>,
@@ -54,8 +96,27 @@ struct SignalState {
 }
 
 impl Signal {
-    // TODO: document coalescing (happens everywhere)
-    // TODO: document multiple event loops (first must stay alive)
+    /// Creates a new stream which will receive notifications when the current
+    /// process receives the signal `signum`.
+    ///
+    /// This function will create a new stream which may be based on the
+    /// event loop handle provided. This function returns a future which will
+    /// then resolve to the signal stream, if successful.
+    ///
+    /// The `Signal` stream is an infinite stream which will receive
+    /// notifications whenever a signal is received. More documentation can be
+    /// found on `Signal` itself, but to reiterate:
+    ///
+    /// * Signals may be coalesced beyond what the kernel already does.
+    /// * While multiple event loops are supported, the first event loop to
+    ///   register a signal handler must be active to deliver signal
+    ///   notifications
+    /// * Once a signal handle is registered with the process the underlying
+    ///   libc signal handler is never unregistered.
+    ///
+    /// A `Signal` stream can be created for a particular signal number
+    /// multiple times. When a signal is received then all the associated
+    /// channels will receive the signal notification.
     pub fn new(signum: c_int, handle: &LoopHandle) -> IoFuture<Signal> {
         let mut init = None;
         INIT.call_once(|| {

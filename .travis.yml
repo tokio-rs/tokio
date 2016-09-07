@@ -1,0 +1,24 @@
+language: rust
+
+rust:
+  - stable
+  - beta
+  - nightly
+sudo: false
+before_script:
+  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+script:
+  - cargo build
+  - cargo test
+  - cargo doc --no-deps
+after_success:
+  - travis-cargo --only nightly doc-upload
+env:
+  global:
+    - secure: ZP6mBCD3U75sMAn29TtNCOt/ZS5A2GlyPTvbg0V5Ppjsk4L0S5zXLxGgBSA5d5Bay92uTd54u02uEhplIY8fp9AZ5sbHYVmzbnCK6m8iz2kcTL4QmlhqF3Hpv9QcUcnIzhnAmy2ucpk1QxF19vlwMwg7f1CDdEObDn0OcrhOK+tgRQwzDLwdIklkrrNhfv/WjM2vaht/0pRN2yfmDjNOxC8qESJKD85PnVrMyb5SmFVLY3tDiQstBA2hBZ+Lf2FoBD9JztuvMBAJsC6aTFx94Cv6CdcqtRyQRFNaOw65cj97Z5W/ELpcncNQh+VswDYVgoMi2OqSqpqSj3wdVFztb9UTXXuuEirUjoXxzIu0/rff93O3wAiXQKKzNvdZqLRvHYD9FV2e43m0ZlnzQi0f3LcORjOmbQy0tnQgS8anMjryW+20A1HYFAVsA3/GdGfVJY/YRkIV6rQCZ8J1cg4UDZMpiisYTi5qCHAYPmG/R1QzcVg6lKIF4KIvNNCBW2IDxZNDd7cc1MYXrT8GctVoTqcKREYX24UqrOZITaAutKjSasmp7rOtPkUCBHI8gBTEX5XFNWS39Y9J3Km8hrTvmGQ+1jEOCB6NVimpwo5Yljua1gYYmHCgavFuYgv0fntn7WEC4cfx4+xpJtj+5MOm8uzT4i9RUBU+Hjq8yZGl63Y=
+notifications:
+  email:
+    on_success: never
+os:
+  - linux
+  - osx
