@@ -3,8 +3,8 @@ use std::mem;
 
 use futures::{Poll, Future};
 
-/// A future which can be used to easily read the entire contents of a stream
-/// into a vector.
+/// A future which can be used to easily read exactly enough bytes to fill
+/// a buffer.
 ///
 /// Created by the `read_exact` function.
 pub struct ReadExact<A, T> {
