@@ -1,0 +1,12 @@
+[package]
+name = "tokio-process"
+version = "0.1.0"
+authors = ["Alex Crichton <alex@alexcrichton.com>"]
+
+[dependencies]
+tokio-core = { git = "https://github.com/tokio-rs/tokio-core" }
+futures = { git = "https://github.com/alexcrichton/futures-rs" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+tokio-signal = { git = "https://github.com/alexcrichton/tokio-signal" }
