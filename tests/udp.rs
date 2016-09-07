@@ -19,9 +19,8 @@ macro_rules! t {
 #[test]
 fn send_messages() {
     let mut l = t!(Core::new());
-    let a = UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle());
-    let b = UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle());
-    let (a, b) = t!(l.run(a.join(b)));
+    let a = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let b = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let a_addr = t!(a.local_addr());
     let b_addr = t!(b.local_addr());
 

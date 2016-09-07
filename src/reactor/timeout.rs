@@ -8,9 +8,8 @@ use std::time::{Duration, Instant};
 
 use futures::{Future, Poll, Async};
 
-use reactor::Handle;
+use reactor::{Remote, Handle};
 use reactor::timeout_token::TimeoutToken;
-use io::IoFuture;
 
 /// A future representing the notification that a timeout has occurred.
 ///
@@ -21,13 +20,7 @@ use io::IoFuture;
 /// otherwise indicated to fire at.
 pub struct Timeout {
     token: TimeoutToken,
-    handle: Handle,
-}
-
-/// Future returned from `Timeout::new` and `Timeout::new_at` which will resolve
-/// to the actual `Timeout` itself.
-pub struct TimeoutNew {
-    inner: IoFuture<Timeout>,
+    handle: Remote,
 }
 
 impl Timeout {
@@ -36,7 +29,7 @@ impl Timeout {
     /// This function will return a future that will resolve to the actual
     /// timeout object. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
-    pub fn new(dur: Duration, handle: &Handle) -> TimeoutNew {
+    pub fn new(dur: Duration, handle: &Handle) -> io::Result<Timeout> {
         Timeout::new_at(Instant::now() + dur, handle)
     }
 
@@ -45,16 +38,11 @@ impl Timeout {
     /// This function will return a future that will resolve to the actual
     /// timeout object. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
-    pub fn new_at(at: Instant, handle: &Handle) -> TimeoutNew {
-        let handle = handle.clone();
-        TimeoutNew {
-            inner: TimeoutToken::new(at, &handle).map(move |token| {
-                Timeout {
-                    token: token,
-                    handle: handle,
-                }
-            }).boxed(),
-        }
+    pub fn new_at(at: Instant, handle: &Handle) -> io::Result<Timeout> {
+        Ok(Timeout {
+            token: try!(TimeoutToken::new(at, &handle)),
+            handle: handle.remote().clone(),
+        })
     }
 }
 
@@ -71,15 +59,6 @@ impl Future for Timeout {
             self.token.update_timeout(&self.handle);
             Ok(Async::NotReady)
         }
-    }
-}
-
-impl Future for TimeoutNew {
-    type Item = Timeout;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Timeout, io::Error> {
-        self.inner.poll()
     }
 }
 

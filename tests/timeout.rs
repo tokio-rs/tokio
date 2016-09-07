@@ -4,7 +4,6 @@ extern crate tokio_core;
 
 use std::time::{Instant, Duration};
 
-use futures::Future;
 use tokio_core::reactor::{Core, Timeout};
 
 macro_rules! t {
@@ -19,7 +18,7 @@ fn smoke() {
     drop(env_logger::init());
     let mut l = t!(Core::new());
     let dur = Duration::from_millis(10);
-    let timeout = Timeout::new(dur, &l.handle()).and_then(|t| t);
+    let timeout = t!(Timeout::new(dur, &l.handle()));
     let start = Instant::now();
     t!(l.run(timeout));
     assert!(start.elapsed() >= dur);

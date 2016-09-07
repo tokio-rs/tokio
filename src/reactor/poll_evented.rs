@@ -9,12 +9,12 @@
 use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use futures::{Future, Poll, Async};
+use futures::Async;
 use mio;
 
 use io::Io;
-use reactor::Handle;
-use reactor::io_token::{IoToken, IoTokenNew};
+use reactor::{Handle, Remote};
+use reactor::io_token::IoToken;
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -34,31 +34,24 @@ use reactor::io_token::{IoToken, IoTokenNew};
 /// any scheduling necessary to get notified when the event is ready again.
 pub struct PollEvented<E> {
     token: IoToken,
-    handle: Handle,
+    handle: Remote,
     readiness: AtomicUsize,
     io: E,
 }
 
-/// Future returned from `PollEvented::new` which will resolve to a
-/// `PollEvented`.
-pub struct PollEventedNew<E> {
-    inner: IoTokenNew<E>,
-    handle: Handle,
-}
-
-impl<E> PollEvented<E>
-    where E: mio::Evented + Send + 'static,
-{
+impl<E: mio::Evented> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
     ///
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
-    pub fn new(source: E, handle: &Handle) -> PollEventedNew<E> {
-        PollEventedNew {
-            inner: IoToken::new(source, handle),
-            handle: handle.clone(),
-        }
+    pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
+        Ok(PollEvented {
+            token: try!(IoToken::new(&io, handle)),
+            handle: handle.remote().clone(),
+            readiness: AtomicUsize::new(0),
+            io: io,
+        })
     }
 }
 
@@ -137,7 +130,7 @@ impl<E> PollEvented<E> {
 
     /// Returns a reference to the event loop handle that this readiness stream
     /// is associated with.
-    pub fn handle(&self) -> &Handle {
+    pub fn remote(&self) -> &Remote {
         &self.handle
     }
 
@@ -264,22 +257,5 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 impl<E> Drop for PollEvented<E> {
     fn drop(&mut self) {
         self.token.drop_source(&self.handle);
-    }
-}
-
-impl<E> Future for PollEventedNew<E>
-    where E: mio::Evented + Send + 'static,
-{
-    type Item = PollEvented<E>;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<PollEvented<E>, io::Error> {
-        let (io, token) = try_ready!(self.inner.poll());
-        Ok(PollEvented {
-            token: token,
-            handle: self.handle.clone(),
-            io: io,
-            readiness: AtomicUsize::new(0),
-        }.into())
     }
 }

@@ -20,36 +20,34 @@ fn main() {
 
     // Create the event loop that will drive this server
     let mut l = Core::new().unwrap();
-    let pin = l.pin();
+    let handle = l.handle();
 
     // Create a TCP listener which will listen for incoming connections
-    let server = TcpListener::bind(&addr, &l.handle());
+    let socket = TcpListener::bind(&addr, &l.handle()).unwrap();
 
-    let done = server.and_then(move |socket| {
-        // Once we've got the TCP listener, inform that we have it
-        println!("Listening on: {}", addr);
+    // Once we've got the TCP listener, inform that we have it
+    println!("Listening on: {}", addr);
 
-        // Pull out the stream of incoming connections and then for each new
-        // one spin up a new task copying data.
-        //
-        // We use the `io::copy` future to copy all data from the
-        // reading half onto the writing half.
-        socket.incoming().for_each(move |(socket, addr)| {
-            let pair = futures::lazy(|| futures::finished(socket.split()));
-            let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
+    // Pull out the stream of incoming connections and then for each new
+    // one spin up a new task copying data.
+    //
+    // We use the `io::copy` future to copy all data from the
+    // reading half onto the writing half.
+    let done = socket.incoming().for_each(move |(socket, addr)| {
+        let pair = futures::lazy(|| futures::finished(socket.split()));
+        let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
 
-            // Once all that is done we print out how much we wrote, and then
-            // critically we *spawn* this future which allows it to run
-            // concurrently with other connections.
-            let msg = amt.map(move |amt| {
-                println!("wrote {} bytes to {}", amt, addr)
-            }).map_err(|e| {
-                panic!("error: {}", e);
-            });
-            pin.spawn(msg);
+        // Once all that is done we print out how much we wrote, and then
+        // critically we *spawn* this future which allows it to run
+        // concurrently with other connections.
+        let msg = amt.map(move |amt| {
+            println!("wrote {} bytes to {}", amt, addr)
+        }).map_err(|e| {
+            panic!("error: {}", e);
+        });
+        handle.spawn(msg);
 
-            Ok(())
-        })
+        Ok(())
     });
     l.run(done).unwrap();
 }

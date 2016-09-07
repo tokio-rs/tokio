@@ -23,16 +23,15 @@ fn main() {
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     let mut l = Core::new().unwrap();
-    let server = TcpListener::bind(&addr, &l.handle()).and_then(|socket| {
-        socket.incoming().and_then(|(socket, addr)| {
-            println!("got a socket: {}", addr);
-            write(socket).or_else(|_| Ok(()))
-        }).for_each(|()| {
-            println!("lost the socket");
-            Ok(())
-        })
-    });
+    let socket = TcpListener::bind(&addr, &l.handle()).unwrap();
     println!("Listenering on: {}", addr);
+    let server = socket.incoming().and_then(|(socket, addr)| {
+        println!("got a socket: {}", addr);
+        write(socket).or_else(|_| Ok(()))
+    }).for_each(|()| {
+        println!("lost the socket");
+        Ok(())
+    });
     l.run(server).unwrap();
 }
 

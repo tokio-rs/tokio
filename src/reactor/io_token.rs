@@ -2,19 +2,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::io;
 
-use futures::{Future, Poll};
 use futures::task;
 use mio;
 
-use reactor::{Message, Handle, CoreFuture, Direction, Core};
-
-/// A future which will resolve a unique `tok` token for an I/O object.
-///
-/// Created through the `Handle::add_source` method, this future can also
-/// resolve to an error if there's an issue communicating with the event loop.
-pub struct IoTokenNew<E> {
-    inner: CoreFuture<(E, (Arc<AtomicUsize>, usize)), E>,
-}
+use reactor::{Message, Remote, Handle, Direction};
 
 /// A token that identifies an active timeout.
 pub struct IoToken {
@@ -40,15 +31,13 @@ impl IoToken {
     /// The returned future will panic if the event loop this handle is
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
-    pub fn new<E>(source: E, handle: &Handle) -> IoTokenNew<E>
-        where E: mio::Evented + Send + 'static,
-    {
-        IoTokenNew {
-            inner: CoreFuture {
-                handle: handle.clone(),
-                data: Some(source),
-                result: None,
-            },
+    pub fn new(source: &mio::Evented, handle: &Handle) -> io::Result<IoToken> {
+        match handle.inner.upgrade() {
+            Some(inner) => {
+                let (ready, token) = try!(inner.borrow_mut().add_source(source));
+                Ok(IoToken { token: token, readiness: ready })
+            }
+            None => Err(io::Error::new(io::ErrorKind::Other, "event loop gone")),
         }
     }
 
@@ -93,7 +82,7 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_read(&self, handle: &Handle) {
+    pub fn schedule_read(&self, handle: &Remote) {
         handle.send(Message::Schedule(self.token, task::park(), Direction::Read));
     }
 
@@ -120,7 +109,7 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_write(&self, handle: &Handle) {
+    pub fn schedule_write(&self, handle: &Remote) {
         handle.send(Message::Schedule(self.token, task::park(), Direction::Write));
     }
 
@@ -146,30 +135,7 @@ impl IoToken {
     /// This function will panic if the event loop this handle is associated
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
-    pub fn drop_source(&self, handle: &Handle) {
+    pub fn drop_source(&self, handle: &Remote) {
         handle.send(Message::DropSource(self.token));
-    }
-}
-
-impl<E> Future for IoTokenNew<E>
-    where E: mio::Evented + Send + 'static,
-{
-    type Item = (E, IoToken);
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<(E, IoToken), io::Error> {
-        let res = try_ready!(self.inner.poll(|lp, io| {
-            let pair = try!(lp.add_source(&io));
-            Ok((io, pair))
-        }, |io, slot| {
-            Message::Run(Box::new(move |lp: &Core| {
-                let res = lp.add_source(&io).map(|p| (io, p));
-                slot.try_produce(res).ok()
-                    .expect("add source try_produce intereference");
-            }))
-        }));
-
-        let (io, (ready, token)) = res;
-        Ok((io, IoToken { token: token, readiness: ready }).into())
     }
 }

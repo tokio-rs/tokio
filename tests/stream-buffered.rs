@@ -24,8 +24,7 @@ fn echo_server() {
     drop(env_logger::init());
 
     let mut l = t!(Core::new());
-    let srv = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &l.handle());
-    let srv = t!(l.run(srv));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let addr = t!(srv.local_addr());
 
     let t = thread::spawn(move || {

@@ -6,11 +6,10 @@
 use std::io;
 use std::sync::mpsc::TryRecvError;
 
-use futures::{Future, Poll, Async};
+use futures::{Poll, Async};
 use futures::stream::Stream;
 use mio::channel;
 
-use io::IoFuture;
 use reactor::{Handle, PollEvented};
 
 /// The transmission half of a channel used for sending messages to a receiver.
@@ -35,12 +34,6 @@ pub struct Receiver<T> {
     rx: PollEvented<channel::Receiver<T>>,
 }
 
-/// Future returned by the `channel` function which will resolve to a
-/// `Receiver<T>`.
-pub struct ReceiverNew<T> {
-    inner: IoFuture<Receiver<T>>,
-}
-
 /// Creates a new in-memory channel used for sending data across `Send +
 /// 'static` boundaries, frequently threads.
 ///
@@ -53,12 +46,12 @@ pub struct ReceiverNew<T> {
 /// The returned `Sender` can be used to send messages that are processed by
 /// the returned `Receiver`. The `Sender` can be cloned to send messages
 /// from multiple sources simultaneously.
-pub fn channel<T>(handle: &Handle) -> (Sender<T>, ReceiverNew<T>)
+pub fn channel<T>(handle: &Handle) -> io::Result<(Sender<T>, Receiver<T>)>
     where T: Send + 'static,
 {
     let (tx, rx) = channel::channel();
-    let rx = PollEvented::new(rx, handle).map(|rx| Receiver { rx: rx });
-    (Sender { tx: tx }, ReceiverNew { inner: rx.boxed() })
+    let rx = try!(PollEvented::new(rx, handle));
+    Ok((Sender { tx: tx }, Receiver { rx: rx }))
 }
 
 impl<T> Sender<T> {
@@ -107,14 +100,5 @@ impl<T> Stream for Receiver<T> {
             }
             Err(TryRecvError::Disconnected) => Ok(Async::Ready(None)),
         }
-    }
-}
-
-impl<T> Future for ReceiverNew<T> {
-    type Item = Receiver<T>;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Receiver<T>, io::Error> {
-        self.inner.poll()
     }
 }

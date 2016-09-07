@@ -12,12 +12,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
-use futures::{Future, Poll, IntoFuture, Async};
+use futures::{Future, IntoFuture, Async};
 use futures::task::{self, Unpark, Task, Spawn};
 use mio;
 use slab::Slab;
 
-use slot::{self, Slot};
 use timer_wheel::{TimerWheel, Timeout as WheelTimeout};
 
 mod channel;
@@ -27,8 +26,8 @@ use self::channel::{Sender, Receiver, channel};
 
 mod poll_evented;
 mod timeout;
-pub use self::poll_evented::{PollEvented, PollEventedNew};
-pub use self::timeout::{Timeout, TimeoutNew};
+pub use self::poll_evented::PollEvented;
+pub use self::timeout::Timeout;
 
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 scoped_thread_local!(static CURRENT_LOOP: Core);
@@ -43,23 +42,25 @@ const SLAB_CAPACITY: usize = 1024 * 64;
 /// various I/O objects to interact with the event loop in interesting ways.
 // TODO: expand this
 pub struct Core {
-    id: usize,
-    io: mio::Poll,
     events: mio::Events,
     tx: Sender<Message>,
     rx: Receiver<Message>,
-    io_dispatch: RefCell<Slab<ScheduledIo, usize>>,
-    task_dispatch: RefCell<Slab<ScheduledTask, usize>>,
-
-    // Incoming queue of newly spawned futures
-    new_futures: Rc<NewFutures>,
-    _new_futures_registration: mio::Registration,
+    inner: Rc<RefCell<Inner>>,
 
     // Used for determining when the future passed to `run` is ready. Once the
     // registration is passed to `io` above we never touch it again, just keep
     // it alive.
     _future_registration: mio::Registration,
     future_readiness: Arc<MySetReadiness>,
+}
+
+struct Inner {
+    id: usize,
+    io: mio::Poll,
+
+    // Dispatch slabs for I/O and futures events
+    io_dispatch: Slab<ScheduledIo>,
+    task_dispatch: Slab<ScheduledTask>,
 
     // Timer wheel keeping track of all timeouts. The `usize` stored in the
     // timer wheel is an index into the slab below.
@@ -67,8 +68,8 @@ pub struct Core {
     // The slab below keeps track of the timeouts themselves as well as the
     // state of the timeout itself. The `TimeoutToken` type is an index into the
     // `timeouts` slab.
-    timer_wheel: RefCell<TimerWheel<usize>>,
-    timeouts: RefCell<Slab<(WheelTimeout, TimeoutState), usize>>,
+    timer_wheel: TimerWheel<usize>,
+    timeouts: Slab<(WheelTimeout, TimeoutState)>,
 }
 
 /// Handle to an event loop, used to construct I/O objects, send messages, and
@@ -77,7 +78,7 @@ pub struct Core {
 /// Handles can be cloned, and when cloned they will still refer to the
 /// same underlying event loop.
 #[derive(Clone)]
-pub struct Handle {
+pub struct Remote {
     id: usize,
     tx: Sender<Message>,
 }
@@ -85,9 +86,9 @@ pub struct Handle {
 /// A non-sendable handle to an event loop, useful for manufacturing instances
 /// of `LoopData`.
 #[derive(Clone)]
-pub struct Pinned {
-    handle: Handle,
-    futures: Weak<NewFutures>,
+pub struct Handle {
+    remote: Remote,
+    inner: Weak<RefCell<Inner>>,
 }
 
 struct ScheduledIo {
@@ -100,11 +101,6 @@ struct ScheduledTask {
     _registration: mio::Registration,
     spawn: Option<Spawn<Box<Future<Item=(), Error=()>>>>,
     wake: Arc<MySetReadiness>,
-}
-
-struct NewFutures {
-    queue: RefCell<Vec<Box<Future<Item=(), Error=()>>>>,
-    ready: mio::SetReadiness,
 }
 
 enum TimeoutState {
@@ -121,7 +117,6 @@ enum Direction {
 enum Message {
     DropSource(usize),
     Schedule(usize, Task, Direction),
-    AddTimeout(Instant, Arc<Slot<io::Result<(usize, Instant)>>>),
     UpdateTimeout(usize, Task),
     CancelTimeout(usize),
     Run(Box<FnBox>),
@@ -129,8 +124,7 @@ enum Message {
 
 const TOKEN_MESSAGES: mio::Token = mio::Token(0);
 const TOKEN_FUTURE: mio::Token = mio::Token(1);
-const TOKEN_NEW_FUTURES: mio::Token = mio::Token(2);
-const TOKEN_START: usize = 3;
+const TOKEN_START: usize = 2;
 
 impl Core {
     /// Creates a new event loop, returning any error that happened during the
@@ -146,52 +140,43 @@ impl Core {
                                                  TOKEN_FUTURE,
                                                  mio::Ready::readable(),
                                                  mio::PollOpt::level());
-        let new_future_pair = mio::Registration::new(&io,
-                                                     TOKEN_NEW_FUTURES,
-                                                     mio::Ready::readable(),
-                                                     mio::PollOpt::level());
         Ok(Core {
-            id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
-            io: io,
             events: mio::Events::with_capacity(1024),
             tx: tx,
             rx: rx,
-            io_dispatch: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
-            task_dispatch: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
-            timeouts: RefCell::new(Slab::with_capacity(SLAB_CAPACITY)),
-            timer_wheel: RefCell::new(TimerWheel::new()),
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
-            _new_futures_registration: new_future_pair.0,
-            new_futures: Rc::new(NewFutures {
-                queue: RefCell::new(Vec::new()),
-                ready: new_future_pair.1,
-            }),
+
+            inner: Rc::new(RefCell::new(Inner {
+                id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
+                io: io,
+                io_dispatch: Slab::with_capacity(SLAB_CAPACITY),
+                task_dispatch: Slab::with_capacity(SLAB_CAPACITY),
+                timeouts: Slab::with_capacity(SLAB_CAPACITY),
+                timer_wheel: TimerWheel::new(),
+            })),
         })
     }
 
-    /// Generates a handle to this event loop used to construct I/O objects and
-    /// send messages.
+    /// Returns a handle to this event loop which cannot be sent across threads
+    /// but can be used as a proxy to the event loop itself.
     ///
-    /// Handles to an event loop are cloneable as well and clones will always
-    /// refer to the same event loop.
+    /// Handles are cloneable and clones always refer to the same event loop.
+    /// This handle is typically passed into functions that create I/O objects
+    /// to bind them to this event loop.
     pub fn handle(&self) -> Handle {
         Handle {
-            id: self.id,
-            tx: self.tx.clone(),
+            remote: self.remote(),
+            inner: Rc::downgrade(&self.inner),
         }
     }
 
-    /// Returns a "pin" of this event loop which cannot be sent across threads
-    /// but can be used as a proxy to the event loop itself.
-    ///
-    /// Currently the primary use for this is to use as a handle to add data
-    /// to the event loop directly. The `Pinned::add_loop_data` method can
-    /// be used to immediately create instances of `LoopData` structures.
-    pub fn pin(&self) -> Pinned {
-        Pinned {
-            handle: self.handle(),
-            futures: Rc::downgrade(&self.new_futures),
+    /// Generates a remote handle to this event loop which can be used to spawn
+    /// tasks from other threads into this event loop.
+    pub fn remote(&self) -> Remote {
+        Remote {
+            id: self.inner.borrow().id,
+            tx: self.tx.clone(),
         }
     }
 
@@ -256,14 +241,15 @@ impl Core {
             // attaching strace, or similar.
             let start = Instant::now();
             loop {
-                let timeout = self.timer_wheel.borrow().next_timeout().map(|t| {
+                let inner = self.inner.borrow_mut();
+                let timeout = inner.timer_wheel.next_timeout().map(|t| {
                     if t < start {
                         Duration::new(0, 0)
                     } else {
                         t - start
                     }
                 });
-                match self.io.poll(&mut self.events, timeout) {
+                match inner.io.poll(&mut self.events, timeout) {
                     Ok(a) => {
                         amt = a;
                         break;
@@ -294,12 +280,6 @@ impl Core {
                     if !finished && CURRENT_LOOP.set(self, || done()) {
                         finished = true;
                     }
-                } else if token == TOKEN_NEW_FUTURES {
-                    self.new_futures.ready.set_readiness(mio::Ready::none()).unwrap();
-                    let mut new_futures = self.new_futures.queue.borrow_mut();
-                    for future in new_futures.drain(..) {
-                        self.spawn(future);
-                    }
                 } else {
                     self.dispatch(token, event.kind());
                 }
@@ -309,7 +289,7 @@ impl Core {
         }
     }
 
-    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
+    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
         if token % 2 == 0 {
             self.dispatch_io(token / 2, ready)
@@ -318,10 +298,11 @@ impl Core {
         }
     }
 
-    fn dispatch_io(&self, token: usize, ready: mio::Ready) {
+    fn dispatch_io(&mut self, token: usize, ready: mio::Ready) {
         let mut reader = None;
         let mut writer = None;
-        if let Some(io) = self.io_dispatch.borrow_mut().get_mut(token) {
+        let mut inner = self.inner.borrow_mut();
+        if let Some(io) = inner.io_dispatch.get_mut(token) {
             if ready.is_readable() {
                 reader = io.reader.take();
                 io.readiness.fetch_or(1, Ordering::Relaxed);
@@ -331,6 +312,7 @@ impl Core {
                 io.readiness.fetch_or(2, Ordering::Relaxed);
             }
         }
+        drop(inner);
         // TODO: don't notify the same task twice
         if let Some(reader) = reader {
             self.notify_handle(reader);
@@ -340,8 +322,9 @@ impl Core {
         }
     }
 
-    fn dispatch_task(&self, token: usize) {
-        let (task, wake) = match self.task_dispatch.borrow_mut().get_mut(token) {
+    fn dispatch_task(&mut self, token: usize) {
+        let mut inner = self.inner.borrow_mut();
+        let (task, wake) = match inner.task_dispatch.get_mut(token) {
             Some(slot) => (slot.spawn.take(), slot.wake.clone()),
             None => return,
         };
@@ -350,24 +333,31 @@ impl Core {
             Some(task) => task,
             None => return,
         };
+        drop(inner);
         let res = CURRENT_LOOP.set(self, || task.poll_future(wake));
-        let mut dispatch = self.task_dispatch.borrow_mut();
+        inner = self.inner.borrow_mut();
         match res {
             Ok(Async::NotReady) => {
-                assert!(dispatch[token].spawn.is_none());
-                dispatch[token].spawn = Some(task);
+                assert!(inner.task_dispatch[token].spawn.is_none());
+                inner.task_dispatch[token].spawn = Some(task);
             }
             Ok(Async::Ready(())) |
             Err(()) => {
-                dispatch.remove(token).unwrap();
+                inner.task_dispatch.remove(token).unwrap();
             }
         }
     }
 
     fn consume_timeouts(&mut self, now: Instant) {
-        while let Some(idx) = self.timer_wheel.borrow_mut().poll(now) {
+        loop {
+            let mut inner = self.inner.borrow_mut();
+            let idx = match inner.timer_wheel.poll(now) {
+                Some(idx) => idx,
+                None => break,
+            };
             trace!("firing timeout: {}", idx);
-            let handle = self.timeouts.borrow_mut()[idx].1.fire();
+            let handle = inner.timeouts[idx].1.fire();
+            drop(inner);
             if let Some(handle) = handle {
                 self.notify_handle(handle);
             }
@@ -383,109 +373,6 @@ impl Core {
         CURRENT_LOOP.set(&self, || handle.unpark());
     }
 
-    fn add_source(&self, source: &mio::Evented)
-                  -> io::Result<(Arc<AtomicUsize>, usize)> {
-        debug!("adding a new I/O source");
-        let sched = ScheduledIo {
-            readiness: Arc::new(AtomicUsize::new(0)),
-            reader: None,
-            writer: None,
-        };
-        let mut dispatch = self.io_dispatch.borrow_mut();
-        if dispatch.vacant_entry().is_none() {
-            let amt = dispatch.len();
-            dispatch.reserve_exact(amt);
-        }
-        let entry = dispatch.vacant_entry().unwrap();
-        try!(self.io.register(source,
-                              mio::Token(TOKEN_START + entry.index() * 2),
-                              mio::Ready::readable() | mio::Ready::writable(),
-                              mio::PollOpt::edge()));
-        Ok((sched.readiness.clone(), entry.insert(sched).index()))
-    }
-
-    fn drop_source(&self, token: usize) {
-        debug!("dropping I/O source: {}", token);
-        self.io_dispatch.borrow_mut().remove(token).unwrap();
-    }
-
-    fn schedule(&self, token: usize, wake: Task, dir: Direction) {
-        debug!("scheduling direction for: {}", token);
-        let to_call = {
-            let mut dispatch = self.io_dispatch.borrow_mut();
-            let sched = dispatch.get_mut(token).unwrap();
-            let (slot, bit) = match dir {
-                Direction::Read => (&mut sched.reader, 1),
-                Direction::Write => (&mut sched.writer, 2),
-            };
-            if sched.readiness.load(Ordering::SeqCst) & bit != 0 {
-                *slot = None;
-                Some(wake)
-            } else {
-                *slot = Some(wake);
-                None
-            }
-        };
-        if let Some(to_call) = to_call {
-            debug!("schedule immediately done");
-            self.notify_handle(to_call);
-        }
-    }
-
-    fn add_timeout(&self, at: Instant) -> io::Result<(usize, Instant)> {
-        let mut timeouts = self.timeouts.borrow_mut();
-        if timeouts.vacant_entry().is_none() {
-            let len = timeouts.len();
-            timeouts.reserve_exact(len);
-        }
-        let entry = timeouts.vacant_entry().unwrap();
-        let timeout = self.timer_wheel.borrow_mut().insert(at, entry.index());
-        let when = *timeout.when();
-        let entry = entry.insert((timeout, TimeoutState::NotFired));
-        debug!("added a timeout: {}", entry.index());
-        Ok((entry.index(), when))
-    }
-
-    fn update_timeout(&self, token: usize, handle: Task) {
-        debug!("updating a timeout: {}", token);
-        let to_wake = self.timeouts.borrow_mut()[token].1.block(handle);
-        if let Some(to_wake) = to_wake {
-            self.notify_handle(to_wake);
-        }
-    }
-
-    fn cancel_timeout(&self, token: usize) {
-        debug!("cancel a timeout: {}", token);
-        let pair = self.timeouts.borrow_mut().remove(token);
-        if let Some((timeout, _state)) = pair {
-            self.timer_wheel.borrow_mut().cancel(&timeout);
-        }
-    }
-
-    fn spawn(&self, future: Box<Future<Item=(), Error=()>>) {
-        let unpark = {
-            let mut dispatch = self.task_dispatch.borrow_mut();
-            if dispatch.vacant_entry().is_none() {
-                let len = dispatch.len();
-                dispatch.reserve_exact(len);
-            }
-            let entry = dispatch.vacant_entry().unwrap();
-            let token = TOKEN_START + 2 * entry.index() + 1;
-            let pair = mio::Registration::new(&self.io,
-                                              mio::Token(token),
-                                              mio::Ready::readable(),
-                                              mio::PollOpt::level());
-            let unpark = Arc::new(MySetReadiness(pair.1));
-            let entry = entry.insert(ScheduledTask {
-                spawn: Some(task::spawn(future)),
-                wake: unpark,
-                _registration: pair.0,
-            });
-            entry.get().wake.clone()
-        };
-        unpark.unpark();
-    }
-
     fn consume_queue(&self) {
         debug!("consuming notification queue");
         // TODO: can we do better than `.unwrap()` here?
@@ -496,21 +383,118 @@ impl Core {
 
     fn notify(&self, msg: Message) {
         match msg {
-            Message::DropSource(tok) => self.drop_source(tok),
-            Message::Schedule(tok, wake, dir) => self.schedule(tok, wake, dir),
-
-            Message::AddTimeout(at, slot) => {
-                slot.try_produce(self.add_timeout(at))
-                    .expect("interference with try_produce on timeout");
+            Message::DropSource(tok) => self.inner.borrow_mut().drop_source(tok),
+            Message::Schedule(tok, wake, dir) => {
+                let task = self.inner.borrow_mut().schedule(tok, wake, dir);
+                if let Some(task) = task {
+                    self.notify_handle(task);
+                }
             }
-            Message::UpdateTimeout(t, handle) => self.update_timeout(t, handle),
-            Message::CancelTimeout(t) => self.cancel_timeout(t),
+            Message::UpdateTimeout(t, handle) => {
+                let task = self.inner.borrow_mut().update_timeout(t, handle);
+                if let Some(task) = task {
+                    self.notify_handle(task);
+                }
+            }
+            Message::CancelTimeout(t) => {
+                self.inner.borrow_mut().cancel_timeout(t)
+            }
             Message::Run(r) => r.call_box(self),
         }
     }
 }
 
-impl Handle {
+impl Inner {
+    fn add_source(&mut self, source: &mio::Evented)
+                  -> io::Result<(Arc<AtomicUsize>, usize)> {
+        debug!("adding a new I/O source");
+        let sched = ScheduledIo {
+            readiness: Arc::new(AtomicUsize::new(0)),
+            reader: None,
+            writer: None,
+        };
+        if self.io_dispatch.vacant_entry().is_none() {
+            let amt = self.io_dispatch.len();
+            self.io_dispatch.reserve_exact(amt);
+        }
+        let entry = self.io_dispatch.vacant_entry().unwrap();
+        try!(self.io.register(source,
+                              mio::Token(TOKEN_START + entry.index() * 2),
+                              mio::Ready::readable() | mio::Ready::writable(),
+                              mio::PollOpt::edge()));
+        Ok((sched.readiness.clone(), entry.insert(sched).index()))
+    }
+
+    fn drop_source(&mut self, token: usize) {
+        debug!("dropping I/O source: {}", token);
+        self.io_dispatch.remove(token).unwrap();
+    }
+
+    fn schedule(&mut self, token: usize, wake: Task, dir: Direction)
+                -> Option<Task> {
+        debug!("scheduling direction for: {}", token);
+        let sched = self.io_dispatch.get_mut(token).unwrap();
+        let (slot, bit) = match dir {
+            Direction::Read => (&mut sched.reader, 1),
+            Direction::Write => (&mut sched.writer, 2),
+        };
+        if sched.readiness.load(Ordering::SeqCst) & bit != 0 {
+            *slot = None;
+            Some(wake)
+        } else {
+            *slot = Some(wake);
+            None
+        }
+    }
+
+    fn add_timeout(&mut self, at: Instant) -> io::Result<(usize, Instant)> {
+        if self.timeouts.vacant_entry().is_none() {
+            let len = self.timeouts.len();
+            self.timeouts.reserve_exact(len);
+        }
+        let entry = self.timeouts.vacant_entry().unwrap();
+        let timeout = self.timer_wheel.insert(at, entry.index());
+        let when = *timeout.when();
+        let entry = entry.insert((timeout, TimeoutState::NotFired));
+        debug!("added a timeout: {}", entry.index());
+        Ok((entry.index(), when))
+    }
+
+    fn update_timeout(&mut self, token: usize, handle: Task) -> Option<Task> {
+        debug!("updating a timeout: {}", token);
+        self.timeouts[token].1.block(handle)
+    }
+
+    fn cancel_timeout(&mut self, token: usize) {
+        debug!("cancel a timeout: {}", token);
+        let pair = self.timeouts.remove(token);
+        if let Some((timeout, _state)) = pair {
+            self.timer_wheel.cancel(&timeout);
+        }
+    }
+
+    fn spawn(&mut self, future: Box<Future<Item=(), Error=()>>) {
+        if self.task_dispatch.vacant_entry().is_none() {
+            let len = self.task_dispatch.len();
+            self.task_dispatch.reserve_exact(len);
+        }
+        let entry = self.task_dispatch.vacant_entry().unwrap();
+        let token = TOKEN_START + 2 * entry.index() + 1;
+        let pair = mio::Registration::new(&self.io,
+                                          mio::Token(token),
+                                          mio::Ready::readable(),
+                                          mio::PollOpt::level());
+        let unpark = Arc::new(MySetReadiness(pair.1));
+        let entry = entry.insert(ScheduledTask {
+            spawn: Some(task::spawn(future)),
+            wake: unpark,
+            _registration: pair.0,
+        });
+        entry.get().wake.clone().unpark();
+    }
+}
+
+impl Remote {
     fn send(&self, msg: Message) {
         self.with_loop(|lp| {
             match lp {
@@ -541,7 +525,8 @@ impl Handle {
     {
         if CURRENT_LOOP.is_set() {
             CURRENT_LOOP.with(|lp| {
-                if lp.id == self.id {
+                let same = lp.inner.borrow().id == self.id;
+                if same {
                     f(Some(lp))
                 } else {
                     f(None)
@@ -561,84 +546,32 @@ impl Handle {
     /// Note that while the closure, `F`, requires the `Send` bound as it might
     /// cross threads, the future `R` does not.
     pub fn spawn<F, R>(&self, f: F)
-        where F: FnOnce(&Pinned) -> R + Send + 'static,
+        where F: FnOnce(&Handle) -> R + Send + 'static,
               R: IntoFuture<Item=(), Error=()>,
               R::Future: 'static,
     {
         self.send(Message::Run(Box::new(|lp: &Core| {
-            let f = f(&lp.pin());
-            lp.spawn(Box::new(f.into_future()));
+            let f = f(&lp.handle());
+            lp.inner.borrow_mut().spawn(Box::new(f.into_future()));
         })));
     }
 }
 
-impl Pinned {
-    /// Returns a reference to the underlying handle to the event loop.
-    pub fn handle(&self) -> &Handle {
-        &self.handle
+impl Handle {
+    /// Returns a reference to the underlying remote handle to the event loop.
+    pub fn remote(&self) -> &Remote {
+        &self.remote
     }
 
     /// Spawns a new future on the event loop this pin is associated this.
     pub fn spawn<F>(&self, f: F)
         where F: Future<Item=(), Error=()> + 'static,
     {
-        let inner = match self.futures.upgrade() {
+        let inner = match self.inner.upgrade() {
             Some(inner) => inner,
             None => return,
         };
-        inner.queue.borrow_mut().push(Box::new(f));
-        inner.ready.set_readiness(mio::Ready::readable()).unwrap();
-    }
-}
-
-struct CoreFuture<T, U> {
-    handle: Handle,
-    data: Option<U>,
-    result: Option<(Arc<Slot<io::Result<T>>>, slot::Token)>,
-}
-
-impl<T, U> CoreFuture<T, U>
-    where T: 'static,
-{
-    fn poll<F, G>(&mut self, f: F, g: G) -> Poll<T, io::Error>
-        where F: FnOnce(&Core, U) -> io::Result<T>,
-              G: FnOnce(U, Arc<Slot<io::Result<T>>>) -> Message,
-    {
-        match self.result {
-            Some((ref result, ref mut token)) => {
-                result.cancel(*token);
-                match result.try_consume() {
-                    Ok(Ok(t)) => return Ok(t.into()),
-                    Ok(Err(e)) => return Err(e),
-                    Err(_) => {}
-                }
-                let task = task::park();
-                *token = result.on_full(move |_| {
-                    task.unpark();
-                });
-                Ok(Async::NotReady)
-            }
-            None => {
-                let data = &mut self.data;
-                let ret = self.handle.with_loop(|lp| {
-                    lp.map(|lp| f(lp, data.take().unwrap()))
-                });
-                if let Some(ret) = ret {
-                    debug!("loop future done immediately on event loop");
-                    return ret.map(|e| e.into())
-                }
-                debug!("loop future needs to send info to event loop");
-
-                let task = task::park();
-                let result = Arc::new(Slot::new(None));
-                let token = result.on_full(move |_| {
-                    task.unpark();
-                });
-                self.result = Some((result.clone(), token));
-                self.handle.send(g(data.take().unwrap(), result));
-                Ok(Async::NotReady)
-            }
-        }
+        inner.borrow_mut().spawn(Box::new(f));
     }
 }
 

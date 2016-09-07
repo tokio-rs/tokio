@@ -2,7 +2,7 @@ use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
 
-use futures::{Future, failed, Poll, Async};
+use futures::{Future, Poll, Async};
 use mio;
 
 use io::IoFuture;
@@ -25,18 +25,14 @@ impl UdpSocket {
     /// `addr` provided. The returned future will be resolved once the socket
     /// has successfully bound. If an error happens during the binding or during
     /// the socket creation, that error will be returned to the future instead.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> UdpSocketNew {
-        let future = match mio::udp::UdpSocket::bind(addr) {
-            Ok(udp) => UdpSocket::new(udp, handle),
-            Err(e) => failed(e).boxed(),
-        };
-        UdpSocketNew { inner: future }
+    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
+        let udp = try!(mio::udp::UdpSocket::bind(addr));
+        UdpSocket::new(udp, handle)
     }
 
-    fn new(socket: mio::udp::UdpSocket, handle: &Handle) -> IoFuture<UdpSocket> {
-        PollEvented::new(socket, handle).map(|io| {
-            UdpSocket { io: io }
-        }).boxed()
+    fn new(socket: mio::udp::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
+        let io = try!(PollEvented::new(socket, handle));
+        Ok(UdpSocket { io: io })
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.
@@ -49,11 +45,9 @@ impl UdpSocket {
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_socket(socket: net::UdpSocket,
-                       handle: &Handle) -> IoFuture<UdpSocket> {
-        match mio::udp::UdpSocket::from_socket(socket) {
-            Ok(udp) => UdpSocket::new(udp, handle),
-            Err(e) => failed(e).boxed(),
-        }
+                       handle: &Handle) -> io::Result<UdpSocket> {
+        let udp = try!(mio::udp::UdpSocket::from_socket(socket));
+        UdpSocket::new(udp, handle)
     }
 
     /// Returns the local address that this stream is bound to.

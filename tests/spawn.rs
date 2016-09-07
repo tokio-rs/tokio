@@ -12,11 +12,11 @@ fn simple() {
 
     let (tx1, rx1) = futures::oneshot();
     let (tx2, rx2) = futures::oneshot();
-    lp.pin().spawn(futures::lazy(|| {
+    lp.handle().spawn(futures::lazy(|| {
         tx1.complete(1);
         Ok(())
     }));
-    lp.handle().spawn(|_| {
+    lp.remote().spawn(|_| {
         futures::lazy(|| {
             tx2.complete(2);
             Ok(())
@@ -33,10 +33,10 @@ fn spawn_in_poll() {
 
     let (tx1, rx1) = futures::oneshot();
     let (tx2, rx2) = futures::oneshot();
-    let handle = lp.handle();
-    lp.pin().spawn(futures::lazy(move || {
+    let remote = lp.remote();
+    lp.handle().spawn(futures::lazy(move || {
         tx1.complete(1);
-        handle.spawn(|_| {
+        remote.spawn(|_| {
             futures::lazy(|| {
                 tx2.complete(2);
                 Ok(())

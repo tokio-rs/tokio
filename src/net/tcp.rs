@@ -4,7 +4,7 @@ use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
 
 use futures::stream::Stream;
-use futures::{Future, IntoFuture, failed, Poll, Async};
+use futures::{self, Future, failed, Poll, Async};
 use mio;
 
 use io::{Io, IoFuture, IoStream};
@@ -16,11 +16,6 @@ use reactor::{Handle, PollEvented};
 /// various forms of processing.
 pub struct TcpListener {
     io: PollEvented<mio::tcp::TcpListener>,
-}
-
-/// Future which will resolve to a `TcpListener`
-pub struct TcpListenerNew {
-    inner: IoFuture<TcpListener>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
@@ -35,12 +30,9 @@ impl TcpListener {
     /// The TCP listener will bind to the provided `addr` address, if available,
     /// and will be returned as a future. The returned future, if resolved
     /// successfully, can then be used to accept incoming connections.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> TcpListenerNew {
-        let future = match mio::tcp::TcpListener::bind(addr) {
-            Ok(l) => TcpListener::new(l, handle),
-            Err(e) => failed(e).boxed(),
-        };
-        TcpListenerNew { inner: future }
+    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
+        let l = try!(mio::tcp::TcpListener::bind(addr));
+        TcpListener::new(l, handle)
     }
 
     /// Create a new TCP listener from the standard library's TCP listener.
@@ -72,19 +64,15 @@ impl TcpListener {
     ///   well (same for IPv6).
     pub fn from_listener(listener: net::TcpListener,
                          addr: &SocketAddr,
-                         handle: &Handle) -> IoFuture<TcpListener> {
-        let handle = handle.clone();
-        mio::tcp::TcpListener::from_listener(listener, addr)
-            .into_future()
-            .and_then(move |l| TcpListener::new(l, &handle))
-            .boxed()
+                         handle: &Handle) -> io::Result<TcpListener> {
+        let l = try!(mio::tcp::TcpListener::from_listener(listener, addr));
+        TcpListener::new(l, handle)
     }
 
     fn new(listener: mio::tcp::TcpListener, handle: &Handle)
-           -> IoFuture<TcpListener> {
-        PollEvented::new(listener, handle).map(|io| {
-            TcpListener { io: io }
-        }).boxed()
+           -> io::Result<TcpListener> {
+        let io = try!(PollEvented::new(listener, handle));
+        Ok(TcpListener { io: io })
     }
 
     /// Test whether this socket is ready to be read or not.
@@ -129,13 +117,19 @@ impl TcpListener {
             }
         }
 
-        let handle = self.io.handle().clone();
+        let remote = self.io.remote().clone();
         let stream = MyIncoming { inner: self };
         Incoming {
             inner: stream.and_then(move |(tcp, addr)| {
-                PollEvented::new(tcp, &handle).map(move |io| {
-                    (TcpStream { io: io }, addr)
-                })
+                let (tx, rx) = futures::oneshot();
+                remote.spawn(move |handle| {
+                    let res = PollEvented::new(tcp, handle).map(move |io| {
+                        (TcpStream { io: io }, addr)
+                    });
+                    tx.complete(res);
+                    Ok(())
+                });
+                rx.then(|r| r.expect("shouldn't be canceled"))
             }).boxed(),
         }
     }
@@ -182,15 +176,6 @@ impl TcpListener {
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
-    }
-}
-
-impl Future for TcpListenerNew {
-    type Item = TcpListener;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<TcpListener, io::Error> {
-        self.inner.poll()
     }
 }
 
@@ -242,7 +227,8 @@ impl TcpStream {
 
     fn new(connected_stream: mio::tcp::TcpStream, handle: &Handle)
            -> IoFuture<TcpStream> {
-        PollEvented::new(connected_stream, handle).and_then(|io| {
+        let tcp = PollEvented::new(connected_stream, handle);
+        futures::done(tcp).and_then(|io| {
             TcpStreamConnect::Waiting(TcpStream { io: io })
         }).boxed()
     }

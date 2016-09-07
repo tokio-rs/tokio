@@ -1,16 +1,9 @@
 use std::io;
 use std::time::Instant;
 
-use futures::{Future, Poll};
 use futures::task;
 
-use reactor::{Message, Core, Handle, CoreFuture};
-
-/// Return value from the `Handle::add_timeout` method, a future that will
-/// resolve to a `TimeoutToken` to configure the behavior of that timeout.
-pub struct TimeoutTokenNew {
-    inner: CoreFuture<(usize, Instant), Instant>,
-}
+use reactor::{Message, Handle, Remote};
 
 /// A token that identifies an active timeout.
 pub struct TimeoutToken {
@@ -21,13 +14,13 @@ pub struct TimeoutToken {
 impl TimeoutToken {
     /// Adds a new timeout to get fired at the specified instant, notifying the
     /// specified task.
-    pub fn new(at: Instant, handle: &Handle) -> TimeoutTokenNew {
-        TimeoutTokenNew {
-            inner: CoreFuture {
-                handle: handle.clone(),
-                data: Some(at),
-                result: None,
-            },
+    pub fn new(at: Instant, handle: &Handle) -> io::Result<TimeoutToken> {
+        match handle.inner.upgrade() {
+            Some(inner) => {
+                let (token, when) = try!(inner.borrow_mut().add_timeout(at));
+                Ok(TimeoutToken { token: token, when: when })
+            }
+            None => Err(io::Error::new(io::ErrorKind::Other, "event loop gone")),
         }
     }
 
@@ -47,7 +40,7 @@ impl TimeoutToken {
     ///
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
-    pub fn update_timeout(&self, handle: &Handle) {
+    pub fn update_timeout(&self, handle: &Remote) {
         handle.send(Message::UpdateTimeout(self.token, task::park()))
     }
 
@@ -57,22 +50,8 @@ impl TimeoutToken {
     ///
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
-    pub fn cancel_timeout(&self, handle: &Handle) {
+    pub fn cancel_timeout(&self, handle: &Remote) {
         debug!("cancel timeout {}", self.token);
         handle.send(Message::CancelTimeout(self.token))
-    }
-}
-
-impl Future for TimeoutTokenNew {
-    type Item = TimeoutToken;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<TimeoutToken, io::Error> {
-        let (t, i) = try_ready!(self.inner.poll(Core::add_timeout,
-                                                Message::AddTimeout));
-        Ok(TimeoutToken {
-            token: t,
-            when: i,
-        }.into())
     }
 }

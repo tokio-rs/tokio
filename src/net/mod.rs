@@ -7,5 +7,5 @@ mod tcp;
 mod udp;
 
 pub use self::tcp::{TcpStream, TcpStreamNew};
-pub use self::tcp::{TcpListener, TcpListenerNew, Incoming};
+pub use self::tcp::{TcpListener, Incoming};
 pub use self::udp::{UdpSocket, UdpSocketNew};
