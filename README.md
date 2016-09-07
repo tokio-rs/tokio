@@ -2,7 +2,7 @@
 
 An implementation of Unix signal handling for Tokio
 
-[![Build Status](https://travis-ci.org/alexcrichton/tokio-signal.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-signal)
+[![Build Status](https://travis-ci.org/alexcrichton/tokio-signal.svg?branch=master)](https://travis-ci.org/alexcrichton/tokio-signal)
 
 [Documentation](https://alexcrichton.github.io/tokio-signal)
 
