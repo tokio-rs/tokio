@@ -48,5 +48,5 @@ fn simple() {
     let status = lp.run(&mut child).unwrap();
     assert_eq!(status.code(), Some(2));
     assert_eq!(child.id(), id);
-    assert!(child.kill().is_ok());
+    drop(child.kill());
 }
