@@ -7,8 +7,6 @@ use std::sync::mpsc::channel;
 use std::sync::{Once, ONCE_INIT};
 use std::thread;
 
-use futures::Future;
-use futures::stream::Stream;
 use tokio_core::{Loop, LoopHandle};
 use tokio_process::Command;
 
