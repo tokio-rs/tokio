@@ -73,7 +73,7 @@
 //!         // We use the `io::copy` future to copy all data from the
 //!         // reading half onto the writing half.
 //!         socket.incoming().for_each(|(socket, addr)| {
-//!             let pair = futures::lazy(|| Ok(socket.task_split()));
+//!             let pair = futures::lazy(|| Ok(socket.split()));
 //!             let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
 //!
 //!             // Once all that is done we print out how much we wrote, and then

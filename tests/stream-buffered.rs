@@ -8,7 +8,7 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::io::{copy, TaskIo};
+use tokio_core::io::{Io, copy};
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
 
@@ -43,7 +43,7 @@ fn echo_server() {
     });
 
     let future = srv.incoming()
-                    .map(|s| TaskIo::new(s.0).split())
+                    .map(|s| s.0.split())
                     .map(|(a, b)| copy(a, b).map(|_| ()))
                     .buffered(10)
                     .take(2)

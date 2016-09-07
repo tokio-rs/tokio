@@ -35,14 +35,14 @@ mod copy;
 mod flush;
 mod read_exact;
 mod read_to_end;
-mod task;
+mod split;
 mod window;
 mod write_all;
 pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
-pub use self::task::{TaskIo, TaskIoRead, TaskIoWrite};
+pub use self::split::{ReadHalf, WriteHalf};
 pub use self::window::Window;
 pub use self::write_all::{write_all, WriteAll};
 
@@ -110,9 +110,9 @@ pub trait Io: Read + Write {
     /// # Panics
     ///
     /// This method will panic if there is not currently an active future task.
-    fn task_split(self) -> (TaskIoRead<Self>, TaskIoWrite<Self>)
+    fn split(self) -> (ReadHalf<Self>, WriteHalf<Self>)
         where Self: Sized
     {
-        TaskIo::new(self).split()
+        split::split(self)
     }
 }

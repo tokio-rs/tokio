@@ -9,7 +9,7 @@ use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::io::{copy, TaskIo};
+use tokio_core::io::{copy, Io};
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
 
@@ -35,8 +35,7 @@ fn main() {
         // We use the `io::copy` future to copy all data from the
         // reading half onto the writing half.
         socket.incoming().for_each(move |(socket, addr)| {
-            let socket = futures::lazy(|| futures::finished(TaskIo::new(socket)));
-            let pair = socket.map(|s| s.split());
+            let pair = futures::lazy(|| futures::finished(socket.split()));
             let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
 
             // Once all that is done we print out how much we wrote, and then
