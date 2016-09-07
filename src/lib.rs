@@ -11,10 +11,16 @@ use futures::{Future, Poll};
 use tokio_core::LoopHandle;
 
 #[path = "unix.rs"]
+#[cfg(unix)]
+mod imp;
+
+#[path = "windows.rs"]
+#[cfg(windows)]
 mod imp;
 
 pub struct Command {
     inner: process::Command,
+    #[allow(dead_code)]
     handle: LoopHandle,
 }
 

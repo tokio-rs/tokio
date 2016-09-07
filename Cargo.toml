@@ -7,6 +7,10 @@ authors = ["Alex Crichton <alex@alexcrichton.com>"]
 tokio-core = { git = "https://github.com/tokio-rs/tokio-core" }
 futures = { git = "https://github.com/alexcrichton/futures-rs" }
 
+[target.'cfg(windows)'.dependencies]
+winapi = "0.2"
+kernel32-sys = "0.2"
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 tokio-signal = { git = "https://github.com/alexcrichton/tokio-signal" }
