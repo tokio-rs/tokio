@@ -69,7 +69,7 @@ struct Inner {
     // state of the timeout itself. The `TimeoutToken` type is an index into the
     // `timeouts` slab.
     timer_heap: Heap<(Instant, usize)>,
-    timeouts: Slab<(Slot, TimeoutState)>,
+    timeouts: Slab<(Option<Slot>, TimeoutState)>,
 }
 
 /// Handle to an event loop, used to construct I/O objects, send messages, and
@@ -359,6 +359,7 @@ impl Core {
             let (_, slab_idx) = inner.timer_heap.pop().unwrap();
 
             trace!("firing timeout: {}", slab_idx);
+            inner.timeouts[slab_idx].0.take().unwrap();
             let handle = inner.timeouts[slab_idx].1.fire();
             drop(inner);
             if let Some(handle) = handle {
@@ -457,7 +458,7 @@ impl Inner {
         }
         let entry = self.timeouts.vacant_entry().unwrap();
         let slot = self.timer_heap.push((at, entry.index()));
-        let entry = entry.insert((slot, TimeoutState::NotFired));
+        let entry = entry.insert((Some(slot), TimeoutState::NotFired));
         debug!("added a timeout: {}", entry.index());
         Ok((entry.index(), at))
     }
@@ -470,7 +471,7 @@ impl Inner {
     fn cancel_timeout(&mut self, token: usize) {
         debug!("cancel a timeout: {}", token);
         let pair = self.timeouts.remove(token);
-        if let Some((slot, _state)) = pair {
+        if let Some((Some(slot), _state)) = pair {
             self.timer_heap.remove(slot);
         }
     }

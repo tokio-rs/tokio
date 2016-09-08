@@ -23,3 +23,15 @@ fn smoke() {
     t!(l.run(timeout));
     assert!(start.elapsed() >= dur);
 }
+
+#[test]
+fn two() {
+    drop(env_logger::init());
+
+    let mut l = t!(Core::new());
+    let dur = Duration::from_millis(10);
+    let timeout = t!(Timeout::new(dur, &l.handle()));
+    t!(l.run(timeout));
+    let timeout = t!(Timeout::new(dur, &l.handle()));
+    t!(l.run(timeout));
+}
