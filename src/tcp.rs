@@ -393,7 +393,7 @@ impl<'a> Read for &'a TcpStream {
         if is_wouldblock(&r) {
             self.io.need_read();
         }
-        return r
+        r
     }
 }
 
@@ -406,7 +406,7 @@ impl<'a> Write for &'a TcpStream {
         if is_wouldblock(&r) {
             self.io.need_write();
         }
-        return r
+        r
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -417,7 +417,7 @@ impl<'a> Write for &'a TcpStream {
         if is_wouldblock(&r) {
             self.io.need_write();
         }
-        return r
+        r
     }
 }
 

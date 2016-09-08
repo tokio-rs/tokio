@@ -356,11 +356,7 @@ impl Loop {
     }
 
     fn consume_timeouts(&mut self, now: Instant) {
-        loop {
-            let idx = match self.timer_wheel.borrow_mut().poll(now) {
-                Some(idx) => idx,
-                None => break,
-            };
+        while let Some(idx) = self.timer_wheel.borrow_mut().poll(now) {
             trace!("firing timeout: {}", idx);
             let handle = self.timeouts.borrow_mut()[idx].1.fire();
             if let Some(handle) = handle {
@@ -496,7 +492,7 @@ impl Loop {
 
             Message::AddTimeout(at, slot) => {
                 slot.try_produce(self.add_timeout(at))
-                    .ok().expect("interference with try_produce on timeout");
+                    .expect("interference with try_produce on timeout");
             }
             Message::UpdateTimeout(t, handle) => self.update_timeout(t, handle),
             Message::CancelTimeout(t) => self.cancel_timeout(t),
