@@ -356,11 +356,7 @@ impl Loop {
     }
 
     fn consume_timeouts(&mut self, now: Instant) {
-        loop {
-            let idx = match self.timer_wheel.borrow_mut().poll(now) {
-                Some(idx) => idx,
-                None => break,
-            };
+        while let Some(idx) = self.timer_wheel.borrow_mut().poll(now) {
             trace!("firing timeout: {}", idx);
             let handle = self.timeouts.borrow_mut()[idx].1.fire();
             if let Some(handle) = handle {
