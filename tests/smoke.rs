@@ -7,7 +7,7 @@ use std::sync::mpsc::channel;
 use std::sync::{Once, ONCE_INIT};
 use std::thread;
 
-use tokio_core::{Loop, LoopHandle};
+use tokio_core::reactor::{Core, Handle};
 use tokio_process::Command;
 
 static INIT: Once = ONCE_INIT;
@@ -16,7 +16,7 @@ fn init() {
     INIT.call_once(|| {
         let (tx, rx) = channel();
         thread::spawn(move || {
-            let mut lp = Loop::new().unwrap();
+            let mut lp = Core::new().unwrap();
             let cmd = exit(&lp.handle());
             let mut child = lp.run(cmd.spawn()).unwrap();
             drop(child.kill());
@@ -28,7 +28,7 @@ fn init() {
     });
 }
 
-fn exit(handle: &LoopHandle) -> Command {
+fn exit(handle: &Handle) -> Command {
     let mut me = env::current_exe().unwrap();
     me.pop();
     me.push("exit");
@@ -39,7 +39,7 @@ fn exit(handle: &LoopHandle) -> Command {
 fn simple() {
     init();
 
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
     let mut cmd = exit(&lp.handle());
     cmd.arg("2");
     let mut child = lp.run(cmd.spawn()).unwrap();

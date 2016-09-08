@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{self, ExitStatus};
 
 use futures::{Future, Poll};
-use tokio_core::LoopHandle;
+use tokio_core::reactor::Handle;
 
 #[path = "unix.rs"]
 #[cfg(unix)]
@@ -21,7 +21,7 @@ mod imp;
 pub struct Command {
     inner: process::Command,
     #[allow(dead_code)]
-    handle: LoopHandle,
+    handle: Handle,
 }
 
 pub struct Spawn {
@@ -33,11 +33,11 @@ pub struct Child {
 }
 
 impl Command {
-    pub fn new<T: AsRef<OsStr>>(exe: T, handle: &LoopHandle) -> Command {
+    pub fn new<T: AsRef<OsStr>>(exe: T, handle: &Handle) -> Command {
         Command::_new(exe.as_ref(), handle)
     }
 
-    fn _new(exe: &OsStr, handle: &LoopHandle) -> Command {
+    fn _new(exe: &OsStr, handle: &Handle) -> Command {
         Command {
             inner: process::Command::new(exe),
             handle: handle.clone(),
