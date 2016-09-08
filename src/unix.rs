@@ -16,11 +16,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT, Mutex};
 
 use futures::stream::{Stream, Fuse};
-use futures::{self, Future, Complete, Oneshot, Poll, Async};
+use futures::{self, Future, IntoFuture, Complete, Oneshot, Poll, Async};
 use self::libc::c_int;
 use self::tokio_uds::UnixStream;
 use tokio_core::io::IoFuture;
-use tokio_core::{LoopHandle, Sender, Receiver, ReadinessStream};
+use tokio_core::reactor::{PollEvented, Handle};
+use tokio_core::channel::{channel, Sender, Receiver};
 
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
@@ -64,7 +65,7 @@ static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
 /// alleviate some of these limitations if possible!
 pub struct Signal {
     signum: c_int,
-    reg: ReadinessStream<MyRegistration>,
+    reg: PollEvented<MyRegistration>,
     _finished: Complete<()>,
 }
 
@@ -84,7 +85,7 @@ enum Message {
 }
 
 struct DriverTask {
-    handle: LoopHandle,
+    handle: Handle,
     read: UnixStream,
     rx: Fuse<Receiver<Message>>,
     signals: [SignalState; 32],
@@ -117,7 +118,7 @@ impl Signal {
     /// A `Signal` stream can be created for a particular signal number
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
-    pub fn new(signum: c_int, handle: &LoopHandle) -> IoFuture<Signal> {
+    pub fn new(signum: c_int, handle: &Handle) -> IoFuture<Signal> {
         let mut init = None;
         INIT.call_once(|| {
             init = Some(global_init(handle));
@@ -133,7 +134,7 @@ impl Signal {
             rx.then(|r| r.unwrap())
         });
         match init {
-            Some(init) => init.and_then(|()| new_signal).boxed(),
+            Some(init) => init.into_future().and_then(|()| new_signal).boxed(),
             None => new_signal.boxed(),
         }
     }
@@ -144,7 +145,9 @@ impl Stream for Signal {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<c_int>, io::Error> {
-        try_ready!(self.reg.poll_read());
+        if !self.reg.poll_read().is_ready() {
+            return Ok(Async::NotReady)
+        }
         self.reg.get_ref()
                 .inner.borrow()
                 .as_ref().unwrap().1
@@ -154,52 +157,49 @@ impl Stream for Signal {
     }
 }
 
-fn global_init(handle: &LoopHandle) -> IoFuture<()> {
-    let handle = handle.clone();
-    let (tx, rx) = handle.clone().channel();
-    let io = rx.join(UnixStream::pair(handle.clone()));
-    io.map(move |(rx, (read, write))| {
-        unsafe {
-            let state = Box::new(GlobalState {
-                write: write,
-                signals: {
-                    fn new() -> GlobalSignalState {
-                        GlobalSignalState {
-                            ready: AtomicBool::new(false),
-                            prev: unsafe { mem::zeroed() },
-                        }
+fn global_init(handle: &Handle) -> io::Result<()> {
+    let (tx, rx) = try!(channel(handle));
+    let (read, write) = try!(UnixStream::pair(handle));
+    unsafe {
+        let state = Box::new(GlobalState {
+            write: write,
+            signals: {
+                fn new() -> GlobalSignalState {
+                    GlobalSignalState {
+                        ready: AtomicBool::new(false),
+                        prev: unsafe { mem::zeroed() },
                     }
-                    [
-                        new(), new(), new(), new(), new(), new(), new(), new(),
-                        new(), new(), new(), new(), new(), new(), new(), new(),
-                        new(), new(), new(), new(), new(), new(), new(), new(),
-                        new(), new(), new(), new(), new(), new(), new(), new(),
-                    ]
-                },
-                tx: Mutex::new(tx.clone()),
-            });
-            GLOBAL_STATE = Box::into_raw(state);
-
-            handle.clone().spawn(|_| {
-                DriverTask {
-                    handle: handle,
-                    rx: rx.fuse(),
-                    read: read,
-                    signals: {
-                        fn new() -> SignalState {
-                            SignalState { registered: false, tasks: Vec::new() }
-                        }
-                        [
-                            new(), new(), new(), new(), new(), new(), new(), new(),
-                            new(), new(), new(), new(), new(), new(), new(), new(),
-                            new(), new(), new(), new(), new(), new(), new(), new(),
-                            new(), new(), new(), new(), new(), new(), new(), new(),
-                        ]
-                    },
                 }
-            });
-        }
-    }).boxed()
+                [
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                ]
+            },
+            tx: Mutex::new(tx.clone()),
+        });
+        GLOBAL_STATE = Box::into_raw(state);
+
+        handle.spawn(DriverTask {
+            handle: handle.clone(),
+            rx: rx.fuse(),
+            read: read,
+            signals: {
+                fn new() -> SignalState {
+                    SignalState { registered: false, tasks: Vec::new() }
+                }
+                [
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                    new(), new(), new(), new(), new(), new(), new(), new(),
+                ]
+            },
+        });
+
+        Ok(())
+    }
 }
 
 impl Future for DriverTask {
@@ -267,10 +267,8 @@ impl DriverTask {
             // Acquire the (registration, set_readiness) pair by... assuming
             // we're on the event loop (true because of the spawn above).
             let reg = MyRegistration { inner: RefCell::new(None) };
-            let mut new = ReadinessStream::new(self.handle.clone(), reg);
-            let reg = match new.poll() {
-                Ok(Async::Ready(reg)) => reg,
-                Ok(Async::NotReady) => panic!("should be on event loop"),
+            let reg = match PollEvented::new(reg, &self.handle) {
+                Ok(reg) => reg,
                 Err(e) => {
                     complete.complete(Err(e));
                     continue
