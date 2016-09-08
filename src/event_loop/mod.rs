@@ -492,7 +492,7 @@ impl Loop {
 
             Message::AddTimeout(at, slot) => {
                 slot.try_produce(self.add_timeout(at))
-                    .ok().expect("interference with try_produce on timeout");
+                    .expect("interference with try_produce on timeout");
             }
             Message::UpdateTimeout(t, handle) => self.update_timeout(t, handle),
             Message::CancelTimeout(t) => self.cancel_timeout(t),
