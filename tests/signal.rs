@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::Loop;
+use tokio_core::reactor::{Core, Timeout};
 use tokio_signal::unix::Signal;
 
 static INIT: Once = ONCE_INIT;
@@ -24,7 +24,7 @@ fn lock() -> MutexGuard<'static, ()> {
             LOCK = Box::into_raw(Box::new(Mutex::new(())));
             let (tx, rx) = channel();
             thread::spawn(move || {
-                let mut lp = Loop::new().unwrap();
+                let mut lp = Core::new().unwrap();
                 let handle = lp.handle();
                 let _signal = lp.run(Signal::new(libc::SIGALRM, &handle)).unwrap();
                 tx.send(()).unwrap();
@@ -40,7 +40,7 @@ fn lock() -> MutexGuard<'static, ()> {
 fn simple() {
     let _lock = lock();
 
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
     unsafe {
@@ -53,7 +53,7 @@ fn simple() {
 fn notify_both() {
     let _lock = lock();
 
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal1 = lp.run(Signal::new(libc::SIGUSR2, &handle)).unwrap();
     let signal2 = lp.run(Signal::new(libc::SIGUSR2, &handle)).unwrap();
@@ -67,22 +67,22 @@ fn notify_both() {
 fn drop_then_get_a_signal() {
     let _lock = lock();
 
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
     drop(signal);
     unsafe {
         assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
     }
-    let timeout = lp.handle().timeout(Duration::from_millis(1));
-    lp.run(timeout.and_then(|t| t)).unwrap();
+    let timeout = Timeout::new(Duration::from_millis(1), &lp.handle()).unwrap();
+    lp.run(timeout).unwrap();
 }
 
 #[test]
 fn twice() {
     let _lock = lock();
 
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
     unsafe {
