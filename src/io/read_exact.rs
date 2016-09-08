@@ -6,7 +6,9 @@ use futures::{Poll, Future};
 /// A future which can be used to easily read exactly enough bytes to fill
 /// a buffer.
 ///
-/// Created by the `read_exact` function.
+/// Created by the [`read_exact`] function.
+///
+/// [`read_exact`]: fn.read_exact.html
 pub struct ReadExact<A, T> {
     state: State<A, T>,
 }

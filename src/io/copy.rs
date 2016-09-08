@@ -4,8 +4,10 @@ use futures::{Future, Poll};
 
 /// A future which will copy all data from a reader into a writer.
 ///
-/// Created by the `copy` function, this future will resolve to the number of
+/// Created by the [`copy`] function, this future will resolve to the number of
 /// bytes copied or an error if one happens.
+///
+/// [`copy`]: fn.copy.html
 pub struct Copy<R, W> {
     reader: R,
     read_done: bool,

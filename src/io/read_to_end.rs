@@ -6,7 +6,9 @@ use futures::{Poll, Future};
 /// A future which can be used to easily read the entire contents of a stream
 /// into a vector.
 ///
-/// Created by the `read_to_end` function.
+/// Created by the [`read_to_end`] function.
+///
+/// [`read_to_end`]: fn.read_to_end.html
 pub struct ReadToEnd<A> {
     state: State<A>,
 }

@@ -5,7 +5,9 @@ use futures::{Poll, Future};
 
 /// A future used to write the entire contents of some data to a stream.
 ///
-/// This is created by the `write_all` top-level method.
+/// This is created by the [`write_all`] top-level method.
+///
+/// [`write_all`]: fn.write_all.html
 pub struct WriteAll<A, T> {
     state: State<A, T>,
 }

@@ -6,7 +6,9 @@ use futures::{Poll, Future, Async};
 ///
 /// Resolves to the underlying I/O object once the flush operation is complete.
 ///
-/// Created by the `flush` function.
+/// Created by the [`flush`] function.
+///
+/// [`flush`]: fn.flush.html
 pub struct Flush<A> {
     a: Option<A>,
 }
