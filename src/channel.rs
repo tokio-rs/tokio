@@ -17,7 +17,9 @@ use reactor::{Handle, PollEvented};
 /// A `Sender` can be `clone`d to have multiple threads or instances sending
 /// messages to one receiver.
 ///
-/// This type is created by the `channel` function.
+/// This type is created by the [`channel`] function.
+///
+/// [`channel`]: fn.channel.html
 pub struct Sender<T> {
     tx: channel::Sender<T>,
 }
@@ -28,8 +30,10 @@ pub struct Sender<T> {
 /// A `Receiver` cannot be cloned, so only one thread can receive messages at a
 /// time.
 ///
-/// This type is created by the `channel` function and implements the `Stream`
-/// trait to represent received messages.
+/// This type is created by the [`channel`] function and implements the
+/// `Stream` trait to represent received messages.
+///
+/// [`channel`]: fn.channel.html
 pub struct Receiver<T> {
     rx: PollEvented<channel::Receiver<T>>,
 }
