@@ -109,7 +109,7 @@ extern crate log;
 pub mod io;
 
 mod mpsc_queue;
-mod timer_wheel;
+mod heap;
 pub mod channel;
 pub mod net;
 pub mod reactor;

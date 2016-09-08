@@ -17,7 +17,7 @@ use futures::task::{self, Unpark, Task, Spawn};
 use mio;
 use slab::Slab;
 
-use timer_wheel::{TimerWheel, Timeout as WheelTimeout};
+use heap::{Heap, Slot};
 
 mod channel;
 mod io_token;
@@ -68,8 +68,8 @@ struct Inner {
     // The slab below keeps track of the timeouts themselves as well as the
     // state of the timeout itself. The `TimeoutToken` type is an index into the
     // `timeouts` slab.
-    timer_wheel: TimerWheel<usize>,
-    timeouts: Slab<(WheelTimeout, TimeoutState)>,
+    timer_heap: Heap<(Instant, usize)>,
+    timeouts: Slab<(Slot, TimeoutState)>,
 }
 
 /// Handle to an event loop, used to construct I/O objects, send messages, and
@@ -153,7 +153,7 @@ impl Core {
                 io_dispatch: Slab::with_capacity(SLAB_CAPACITY),
                 task_dispatch: Slab::with_capacity(SLAB_CAPACITY),
                 timeouts: Slab::with_capacity(SLAB_CAPACITY),
-                timer_wheel: TimerWheel::new(),
+                timer_heap: Heap::new(),
             })),
         })
     }
@@ -242,11 +242,11 @@ impl Core {
             let start = Instant::now();
             loop {
                 let inner = self.inner.borrow_mut();
-                let timeout = inner.timer_wheel.next_timeout().map(|t| {
-                    if t < start {
+                let timeout = inner.timer_heap.peek().map(|t| {
+                    if t.0 < start {
                         Duration::new(0, 0)
                     } else {
-                        t - start
+                        t.0 - start
                     }
                 });
                 match inner.io.poll(&mut self.events, timeout) {
@@ -351,12 +351,15 @@ impl Core {
     fn consume_timeouts(&mut self, now: Instant) {
         loop {
             let mut inner = self.inner.borrow_mut();
-            let idx = match inner.timer_wheel.poll(now) {
-                Some(idx) => idx,
+            match inner.timer_heap.peek() {
+                Some(head) if head.0 <= now => {}
+                Some(_) => break,
                 None => break,
             };
-            trace!("firing timeout: {}", idx);
-            let handle = inner.timeouts[idx].1.fire();
+            let (_, slab_idx) = inner.timer_heap.pop().unwrap();
+
+            trace!("firing timeout: {}", slab_idx);
+            let handle = inner.timeouts[slab_idx].1.fire();
             drop(inner);
             if let Some(handle) = handle {
                 self.notify_handle(handle);
@@ -453,11 +456,10 @@ impl Inner {
             self.timeouts.reserve_exact(len);
         }
         let entry = self.timeouts.vacant_entry().unwrap();
-        let timeout = self.timer_wheel.insert(at, entry.index());
-        let when = *timeout.when();
-        let entry = entry.insert((timeout, TimeoutState::NotFired));
+        let slot = self.timer_heap.push((at, entry.index()));
+        let entry = entry.insert((slot, TimeoutState::NotFired));
         debug!("added a timeout: {}", entry.index());
-        Ok((entry.index(), when))
+        Ok((entry.index(), at))
     }
 
     fn update_timeout(&mut self, token: usize, handle: Task) -> Option<Task> {
@@ -468,8 +470,8 @@ impl Inner {
     fn cancel_timeout(&mut self, token: usize) {
         debug!("cancel a timeout: {}", token);
         let pair = self.timeouts.remove(token);
-        if let Some((timeout, _state)) = pair {
-            self.timer_wheel.cancel(&timeout);
+        if let Some((slot, _state)) = pair {
+            self.timer_heap.remove(slot);
         }
     }
 
