@@ -41,8 +41,10 @@ impl LoopHandle {
     }
 }
 
-/// Return value from the `LoopHandle::add_timeout` method, a future that will
+/// Return value from the [`LoopHandle::add_timeout`] method, a future that will
 /// resolve to a `TimeoutToken` to configure the behavior of that timeout.
+///
+/// [`LoopHandle::add_timeout`]: struct.LoopHandle.html#method.add_timeout
 pub struct AddTimeout {
     inner: LoopFuture<(usize, Instant), Instant>,
 }
