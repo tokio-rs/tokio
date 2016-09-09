@@ -13,11 +13,6 @@ pub struct UdpSocket {
     io: PollEvented<mio::udp::UdpSocket>,
 }
 
-/// Future returned from `UdpSocket::bind` which will resolve to a `UdpSocket`.
-pub struct UdpSocketNew {
-    inner: IoFuture<UdpSocket>,
-}
-
 impl UdpSocket {
     /// Create a new UDP socket bound to the specified address.
     ///
@@ -254,15 +249,6 @@ impl UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
-    }
-}
-
-impl Future for UdpSocketNew {
-    type Item = UdpSocket;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
-        self.inner.poll()
     }
 }
 
