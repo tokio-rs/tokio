@@ -25,4 +25,38 @@
 extern crate futures;
 extern crate tokio_core;
 
+use futures::Future;
+use futures::stream::Stream;
+use tokio_core::reactor::Handle;
+use tokio_core::io::{IoStream, IoFuture};
+
 pub mod unix;
+pub mod windows;
+
+/// Creates a stream which receives "ctrl-c" notifications sent to a process.
+///
+/// In general signals are handled very differently across Unix and Windows, but
+/// this is somewhat cross platform in terms of how it can be handled. A ctrl-c
+/// event to a console process can be represented as a stream for both Windows
+/// and Unix.
+///
+/// This function receives a `Handle` to an event loop and returns a future
+/// which when resolves yields a stream receiving all signal events. Note that
+/// there are a number of caveats listening for signals, and you may wish to
+/// read up on the documentation in the `unix` or `windows` module to take a
+/// peek.
+pub fn ctrl_c(handle: &Handle) -> IoFuture<IoStream<()>> {
+    return ctrl_c_imp(handle);
+
+    #[cfg(unix)]
+    fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
+        unix::Signal::new(unix::libc::SIGINT, handle).map(|x| {
+            x.map(|_| ()).boxed()
+        }).boxed()
+    }
+
+    #[cfg(windows)]
+    fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
+        windows::Event::ctrl_c(handle).map(|x| x.boxed()).boxed()
+    }
+}
