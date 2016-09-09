@@ -5,7 +5,7 @@
 
 #![cfg(unix)]
 
-extern crate libc;
+pub extern crate libc;
 extern crate mio;
 extern crate tokio_uds;
 
@@ -148,6 +148,7 @@ impl Stream for Signal {
         if !self.reg.poll_read().is_ready() {
             return Ok(Async::NotReady)
         }
+        self.reg.need_read();
         self.reg.get_ref()
                 .inner.borrow()
                 .as_ref().unwrap().1

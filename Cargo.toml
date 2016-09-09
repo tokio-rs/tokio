@@ -18,3 +18,8 @@ futures = { git = "https://github.com/alexcrichton/futures-rs" }
 tokio-uds = { git = "https://github.com/tokio-rs/tokio-uds" }
 libc = "0.2"
 mio = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+winapi = "0.2"
+kernel32-sys = "0.2"
+mio = "0.6"
