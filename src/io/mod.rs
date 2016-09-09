@@ -5,7 +5,7 @@
 
 use std::io::{self, Read, Write};
 
-use futures::{BoxFuture, Async};
+use futures::{BoxFuture, Async, Poll};
 use futures::stream::BoxStream;
 
 /// A convenience typedef around a `Future` whose error component is `io::Error`
@@ -115,4 +115,49 @@ pub trait Io: Read + Write {
     {
         split::split(self)
     }
+}
+
+/// A trait for framed reading and writing.
+///
+/// Most implementations of `FramedIo` are for doing protocol level
+/// serialization and deserialization.
+///
+/// Imporantly, the methods of this trait are intended to be used in conjuction
+/// with the current task of a future. Namely whenever any of them return a
+/// value that indicates "would block" the current future's task is arranged to
+/// receive a notification when the method would otherwise not indicate that it
+/// would block.
+pub trait FramedIo {
+    /// Messages written
+    type In;
+
+    /// Messages read
+    type Out;
+
+    /// Tests to see if this `FramedIo` may be readable.
+    fn poll_read(&mut self) -> Async<()>;
+
+    /// Read a message frame from the `FramedIo`
+    fn read(&mut self) -> Poll<Self::Out, io::Error>;
+
+    /// Tests to see if this `FramedIo` may be writable.
+    ///
+    /// Unlike most other calls to poll readiness, it is important that when
+    /// `FramedIo::poll_write` returns `Async::Ready` that a write will
+    /// succeed.
+    fn poll_write(&mut self) -> Async<()>;
+
+    /// Write a message frame to the `FramedIo`
+    fn write(&mut self, req: Self::In) -> Poll<(), io::Error>;
+
+    /// Flush pending writes or do any other work not driven by reading /
+    /// writing.
+    ///
+    /// Since the backing source is non-blocking, there is no guarantee that a
+    /// call to `FramedIo::write` is able to write the full message to the
+    /// backing source immediately. In this case, the `FramedIo` will need to
+    /// buffer the remaining data to write. Calls to `FramedIo:flush` attempt
+    /// to write any remaining data in the write buffer to the underlying
+    /// source.
+    fn flush(&mut self) -> Poll<(), io::Error>;
 }
