@@ -2,20 +2,14 @@ use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
 
-use futures::{Future, Poll, Async};
+use futures::Async;
 use mio;
 
-use io::IoFuture;
 use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
     io: PollEvented<mio::udp::UdpSocket>,
-}
-
-/// Future returned from `UdpSocket::bind` which will resolve to a `UdpSocket`.
-pub struct UdpSocketNew {
-    inner: IoFuture<UdpSocket>,
 }
 
 impl UdpSocket {
@@ -254,15 +248,6 @@ impl UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
-    }
-}
-
-impl Future for UdpSocketNew {
-    type Item = UdpSocket;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
-        self.inner.poll()
     }
 }
 
