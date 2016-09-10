@@ -72,13 +72,13 @@ soon. Listed below is a table of the current status of each crate.
 
 |  Crate               |   Status |
 |----------------------|----------|
-| [`tokio-core`]       | [Nearly 0.1](https://github.com/tokio-rs/tokio-core/milestone/1) |
+| [`tokio-core`]       | 0.1 on crates.io |
 | [`tokio-service`]    | Nearly 0.1 |
 | [`tokio-proto`]      | Waiting on `tokio-core`, next major piece |
-| [`tokio-curl`]       | Waiting on `tokio-core` |
-| [`tokio-timer`]      | Waiting on `tokio-core` |
-| [`tokio-tls`]        | Waiting on `tokio-core` and `native-tls` |
-| [`tokio-uds`]        | Waiting on `tokio-core` |
+| [`tokio-curl`]       | 0.1 on crates.io |
+| [`tokio-timer`]      | Waiting on final audit of APIs |
+| [`tokio-tls`]        | Waiting on `native-tls` |
+| [`tokio-uds`]        | 0.1 on crates.io |
 | [`tokio-middleware`] | Planned soon after `tokio-service` |
 
 Note that the following example projects are not currently intended to be
