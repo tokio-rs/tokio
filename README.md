@@ -14,7 +14,7 @@ First, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tokio-core = { git = "https://github.com/tokio-rs/tokio-core" }
+tokio-core = "0.1"
 ```
 
 Next, add this to your crate:
