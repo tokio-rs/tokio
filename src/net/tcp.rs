@@ -27,9 +27,8 @@ pub struct Incoming {
 impl TcpListener {
     /// Create a new TCP listener associated with this event loop.
     ///
-    /// The TCP listener will bind to the provided `addr` address, if available,
-    /// and will be returned as a future. The returned future, if resolved
-    /// successfully, can then be used to accept incoming connections.
+    /// The TCP listener will bind to the provided `addr` address, if available.
+    /// If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
         let l = try!(mio::tcp::TcpListener::bind(addr));
         TcpListener::new(l, handle)

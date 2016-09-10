@@ -16,9 +16,7 @@ impl UdpSocket {
     /// Create a new UDP socket bound to the specified address.
     ///
     /// This function will create a new UDP socket and attempt to bind it to the
-    /// `addr` provided. The returned future will be resolved once the socket
-    /// has successfully bound. If an error happens during the binding or during
-    /// the socket creation, that error will be returned to the future instead.
+    /// `addr` provided. If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
         let udp = try!(mio::udp::UdpSocket::bind(addr));
         UdpSocket::new(udp, handle)
