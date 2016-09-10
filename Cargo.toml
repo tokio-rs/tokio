@@ -11,11 +11,11 @@ An implementation of an asynchronous Unix signal handling backed futures.
 """
 
 [dependencies]
-tokio-core = { git = "https://github.com/tokio-rs/tokio-core" }
-futures = { git = "https://github.com/alexcrichton/futures-rs" }
+tokio-core = "0.1"
+futures = "0.1"
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { git = "https://github.com/tokio-rs/tokio-uds" }
+tokio-uds = "0.1"
 libc = "0.2"
 mio = "0.6"
 
