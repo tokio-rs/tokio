@@ -12,7 +12,7 @@ various Tokio crates.
 
 ## What is Tokio?
 
-Tokio is a an async I/O stack in Rust running the full gamut in terms of what it
+Tokio is an async I/O stack in Rust running the full gamut in terms of what it
 provides. At the very bottom you'll find the [`tokio-core`] crate with a
 bare-bones event loop and `Future` spawning. Near the top you'll find the
 [`tokio-proto`] crate with generic implementations of protocol details like
