@@ -23,7 +23,7 @@ fn main() {
     let handle = l.handle();
 
     // Create a TCP listener which will listen for incoming connections
-    let socket = TcpListener::bind(&addr, &l.handle()).unwrap();
+    let socket = TcpListener::bind(&addr, &handle).unwrap();
 
     // Once we've got the TCP listener, inform that we have it
     println!("Listening on: {}", addr);
