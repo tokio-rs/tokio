@@ -540,7 +540,7 @@ impl Remote {
         }
     }
 
-    /// Spawns a new future into the event loop this handle is associated this.
+    /// Spawns a new future into the event loop this remote is associated with.
     ///
     /// This function takes a closure which is executed within the context of
     /// the I/O loop itself. The future returned by the closure will be
@@ -566,7 +566,7 @@ impl Handle {
         &self.remote
     }
 
-    /// Spawns a new future on the event loop this pin is associated this.
+    /// Spawns a new future on the event loop this handle is associated with.
     pub fn spawn<F>(&self, f: F)
         where F: Future<Item=(), Error=()> + 'static,
     {
