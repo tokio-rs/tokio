@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
-use futures::{Future, IntoFuture, Async};
+use futures::{self, Future, IntoFuture, Async};
 use futures::task::{self, Unpark, Task, Spawn};
 use mio;
 use slab::Slab;
@@ -575,6 +575,19 @@ impl Handle {
             None => return,
         };
         inner.borrow_mut().spawn(Box::new(f));
+    }
+
+    /// Spawns a closure on this event loop.
+    ///
+    /// This function is a convenience wrapper around the `spawn` function above
+    /// for running a closure wrapped in `futures::lazy`. It will spawn the
+    /// function `f` provided onto the event loop, and continue to run the
+    /// future returned by `f` on the evnet loop as well.
+    pub fn spawn_fn<F, R>(&self, f: F)
+        where F: FnOnce() -> R + 'static,
+              R: IntoFuture<Item=(), Error=()> + 'static,
+    {
+        self.spawn(futures::lazy(f))
     }
 }
 
