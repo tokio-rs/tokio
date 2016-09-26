@@ -107,6 +107,10 @@ impl<E> PollEvented<E> {
     /// The flag indicating that this stream is readable is unset and the
     /// current task is scheduled to receive a notification when the stream is
     /// then again readable.
+    ///
+    /// Note that it is also only valid to call this method if `poll_read`
+    /// previously indicated that the object is readable. That is, this function
+    /// must always be paired with calls to `poll_read` previously.
     pub fn need_read(&self) {
         self.readiness.fetch_and(!1, Ordering::SeqCst);
         self.token.schedule_read(&self.handle)
@@ -123,6 +127,10 @@ impl<E> PollEvented<E> {
     /// The flag indicating that this stream is writable is unset and the
     /// current task is scheduled to receive a notification when the stream is
     /// then again writable.
+    ///
+    /// Note that it is also only valid to call this method if `poll_write`
+    /// previously indicated that the object is writeable. That is, this function
+    /// must always be paired with calls to `poll_write` previously.
     pub fn need_write(&self) {
         self.readiness.fetch_and(!2, Ordering::SeqCst);
         self.token.schedule_write(&self.handle)
