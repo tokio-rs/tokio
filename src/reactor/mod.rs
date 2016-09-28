@@ -582,7 +582,7 @@ impl Handle {
     /// This function is a convenience wrapper around the `spawn` function above
     /// for running a closure wrapped in `futures::lazy`. It will spawn the
     /// function `f` provided onto the event loop, and continue to run the
-    /// future returned by `f` on the evnet loop as well.
+    /// future returned by `f` on the event loop as well.
     pub fn spawn_fn<F, R>(&self, f: F)
         where F: FnOnce() -> R + 'static,
               R: IntoFuture<Item=(), Error=()> + 'static,
