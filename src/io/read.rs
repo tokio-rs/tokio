@@ -11,24 +11,22 @@ enum State<R, T> {
     Empty,
 }
 
-fn eof() -> ::std::io::Error {
-    ::std::io::Error::new(::std::io::ErrorKind::UnexpectedEof, "unexpected EOF")
-}
-
-/// Baz.
-pub fn read_some<R, T>(rd: R, buf: T) -> ReadSome<R, T>
+/// Tries to read some bytes directly into the given `buf` in asynchronous
+/// manner, returning a future type.
+///
+/// The returned future will resolve to both the I/O stream as well as the
+/// buffer once the read operation is completed.
+pub fn read<R, T>(rd: R, buf: T) -> ReadSome<R, T>
     where R: Read,
           T: AsMut<[u8]>
 {
-    ReadSome {
-        state: State::Pending {
-            rd: rd,
-            buf: buf,
-        }
-    }
+    ReadSome { state: State::Pending { rd: rd, buf: buf } }
 }
 
-/// Bar.
+/// A future which can be used to easily read available number of bytes to fill
+/// a buffer.
+///
+/// Created by the [`read`] function.
 pub struct ReadSome<R, T> {
     state: State<R, T>,
 }
@@ -46,7 +44,6 @@ impl<R, T> Future for ReadSome<R, T>
                 let buf = buf.as_mut();
 
                 match rd.read(&mut buf[..]) {
-                    Ok(0) => return Err(eof()),
                     Ok(nread) => nread,
                     Err(ref err) if err.kind() == ::std::io::ErrorKind::WouldBlock => {
                         return Ok(Async::NotReady)

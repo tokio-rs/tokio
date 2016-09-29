@@ -43,7 +43,7 @@ pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
-pub use self::read::{read_some, ReadSome};
+pub use self::read::{read, ReadSome};
 pub use self::split::{ReadHalf, WriteHalf};
 pub use self::window::Window;
 pub use self::write_all::{write_all, WriteAll};
