@@ -54,14 +54,10 @@ impl<A> Future for ReadUntil<A>
         match self.state {
             State::Reading { ref mut a, byte, ref mut buf } => {
                 // If we get `Ok(n)`, then we know the stream hit EOF or the delimiter.
-                // If we got EOF (n == 0), then we return an error.
+                // and just return it, as we are finished.
                 // If we hit "would block" then all the read data so far
                 // is in our buffer, and otherwise we propagate errors.
-                // If we reached our delimiter (n != 0), then we are finished.
-                let n = try_nb!(a.read_until(byte, buf));
-                if n == 0 && buf.len() == 0 {
-                    return Err(io::Error::new(io::ErrorKind::BrokenPipe, "Broken Pipe"));
-                }
+                try_nb!(a.read_until(byte, buf));
             },
             State::Empty => panic!("poll ReadUntil after it's done"),
         }
