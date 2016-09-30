@@ -1,7 +1,6 @@
 use std::mem;
-use std::io::Read;
 
-use futures::{Async, Future, Poll};
+use futures::{Future, Poll};
 
 enum State<R, T> {
     Pending {
@@ -16,23 +15,23 @@ enum State<R, T> {
 ///
 /// The returned future will resolve to both the I/O stream as well as the
 /// buffer once the read operation is completed.
-pub fn read<R, T>(rd: R, buf: T) -> ReadSome<R, T>
-    where R: Read,
+pub fn read<R, T>(rd: R, buf: T) -> Read<R, T>
+    where R: ::std::io::Read,
           T: AsMut<[u8]>
 {
-    ReadSome { state: State::Pending { rd: rd, buf: buf } }
+    Read { state: State::Pending { rd: rd, buf: buf } }
 }
 
 /// A future which can be used to easily read available number of bytes to fill
 /// a buffer.
 ///
 /// Created by the [`read`] function.
-pub struct ReadSome<R, T> {
+pub struct Read<R, T> {
     state: State<R, T>,
 }
 
-impl<R, T> Future for ReadSome<R, T>
-    where R: Read,
+impl<R, T> Future for Read<R, T>
+    where R: ::std::io::Read,
           T: AsMut<[u8]>
 {
     type Item = (R, T, usize);
@@ -40,17 +39,7 @@ impl<R, T> Future for ReadSome<R, T>
 
     fn poll(&mut self) -> Poll<(R, T, usize), ::std::io::Error> {
         let nread = match self.state {
-            State::Pending { ref mut rd, ref mut buf } => {
-                let buf = buf.as_mut();
-
-                match rd.read(&mut buf[..]) {
-                    Ok(nread) => nread,
-                    Err(ref err) if err.kind() == ::std::io::ErrorKind::WouldBlock => {
-                        return Ok(Async::NotReady)
-                    }
-                    Err(err) => return Err(err.into()),
-                }
-            }
+            State::Pending { ref mut rd, ref mut buf } => try_nb!(rd.read(&mut buf.as_mut()[..])),
             State::Empty => panic!("poll a ReadSome after it's done"),
         };
 
