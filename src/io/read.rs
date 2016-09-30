@@ -40,7 +40,7 @@ impl<R, T> Future for Read<R, T>
     fn poll(&mut self) -> Poll<(R, T, usize), ::std::io::Error> {
         let nread = match self.state {
             State::Pending { ref mut rd, ref mut buf } => try_nb!(rd.read(&mut buf.as_mut()[..])),
-            State::Empty => panic!("poll a ReadSome after it's done"),
+            State::Empty => panic!("poll a Read after it's done"),
         };
 
         match mem::replace(&mut self.state, State::Empty) {
