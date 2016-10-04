@@ -13,8 +13,8 @@ enum State<R, T> {
 /// Tries to read some bytes directly into the given `buf` in asynchronous
 /// manner, returning a future type.
 ///
-/// The returned future will resolve to both the I/O stream as well as the
-/// buffer once the read operation is completed.
+/// The returned future will resolve to both the I/O stream and the buffer
+/// as well as the number of bytes read once the read operation is completed.
 pub fn read<R, T>(rd: R, buf: T) -> Read<R, T>
     where R: ::std::io::Read,
           T: AsMut<[u8]>
