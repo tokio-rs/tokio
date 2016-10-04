@@ -31,7 +31,7 @@ enum State<A> {
 /// the buffer will be returned, with all bytes up to, and including, the delimiter
 /// (if found).
 ///
-/// [`ButRead::read_until`]: https://doc.rust-lang.org/std/io/trait.BufRead.html#method.read_until
+/// [`BufRead::read_until`]: https://doc.rust-lang.org/std/io/trait.BufRead.html#method.read_until
 pub fn read_until<A>(a: A, byte: u8, buf: Vec<u8>) -> ReadUntil<A>
     where A: BufRead
 {
