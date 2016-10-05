@@ -11,7 +11,7 @@ pub struct ReadHalf<T> {
     handle: TaskRc<RefCell<T>>,
 }
 
-/// The readable half of an object returned from `Io::split`.
+/// The writable half of an object returned from `Io::split`.
 pub struct WriteHalf<T> {
     handle: TaskRc<RefCell<T>>,
 }
