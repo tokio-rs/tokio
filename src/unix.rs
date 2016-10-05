@@ -96,6 +96,9 @@ struct SignalState {
     tasks: Vec<(RefCell<Oneshot<()>>, mio::SetReadiness)>,
 }
 
+pub use self::libc::{SIGINT, SIGKILL, SIGTERM, SIGUSR1, SIGUSR2};
+pub use self::libc::{SIGHUP, SIGQUIT, SIGPIPE, SIGALRM, SIGTRAP};
+
 impl Signal {
     /// Creates a new stream which will receive notifications when the current
     /// process receives the signal `signum`.
