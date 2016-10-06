@@ -451,7 +451,7 @@ impl Inner {
         }
     }
 
-    fn add_timeout(&mut self, at: Instant) -> io::Result<(usize, Instant)> {
+    fn add_timeout(&mut self, at: Instant) -> usize {
         if self.timeouts.vacant_entry().is_none() {
             let len = self.timeouts.len();
             self.timeouts.reserve_exact(len);
@@ -460,7 +460,7 @@ impl Inner {
         let slot = self.timer_heap.push((at, entry.index()));
         let entry = entry.insert((Some(slot), TimeoutState::NotFired));
         debug!("added a timeout: {}", entry.index());
-        Ok((entry.index(), at))
+        return entry.index();
     }
 
     fn update_timeout(&mut self, token: usize, handle: Task) -> Option<Task> {
