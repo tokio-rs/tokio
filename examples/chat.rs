@@ -34,7 +34,7 @@ fn main() {
         // We create a new future in which we create all other futures.
         // This makes `stream` be bound on the outer future's task, allowing
         // `ReadHalf` and `WriteHalf` to be shared between inner futures.
-        handle.spawn_fn(move || {
+        let main_fn = move || {
             println!("New Connection: {}", addr);
             let (reader, writer) = stream.split();
             // channel to send messages to this connection from other futures
@@ -64,7 +64,7 @@ fn main() {
                 });
                 // convert bytes into string
                 let amt = amt.map(|(reader, vec)| (reader, String::from_utf8(vec)));
-                amt.and_then(move |(reader, message)| {
+                amt.map(move |(reader, message)| {
                     println!("{}: {:?}", addr, message);
                     let conns = connections.borrow_mut();
                     if let Ok(msg) = message {
@@ -72,13 +72,13 @@ fn main() {
                         // via the channel
                         let iter = conns.iter().filter(|&(&k,_)| k != addr).map(|(_,v)| v);
                         for tx in iter {
-                            tx.send(msg.clone()).unwrap();
+                            tx.send(format!("{}: {}", addr, msg)).unwrap();
                         }
                     } else {
                         let tx = conns.get(&addr).unwrap();
                         tx.send("You didn't send valid UTF-8.".to_string()).unwrap();
                     }
-                    futures::finished(reader)
+                    reader
                 })
             });
 
@@ -90,18 +90,19 @@ fn main() {
             });
 
             // In order to fuse the reading and writing futures in the end, we need to have the
-            // same output type. Therefore we use `(Option<BufReader<ReadHalf<TcpStream>>>,
-            // Option<WriteHalf<TcpStream>>)`.
-            let socket_reader = socket_reader.map(|reader| (Some(reader), None));
-            let socket_writer = socket_writer.map(|writer| (None, Some(writer)));
+            // same output type. As we don't need the values anymore, we can just map them
+            // to `()`.
+            let socket_reader = socket_reader.map(|_| ());
+            let socket_writer = socket_writer.map(|_| ());
 
             let amt = socket_reader.select(socket_writer);
             amt.then(move |_| {
                 connections.borrow_mut().remove(&addr);
-                println!("Connection {:?} closed.", addr);
+                println!("Connection {} closed.", addr);
                 Ok(())
             })
-        });
+        };
+        handle.spawn_fn(main_fn);
         Ok(())
     });
 
