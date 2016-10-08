@@ -44,7 +44,7 @@ pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
-pub use self::read::read;
+pub use self::read::{read, ReadOnce};
 pub use self::read_until::{read_until, ReadUntil};
 pub use self::split::{ReadHalf, WriteHalf};
 pub use self::window::Window;
