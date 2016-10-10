@@ -26,8 +26,10 @@ use self::channel::{Sender, Receiver, channel};
 
 mod poll_evented;
 mod timeout;
+mod interval;
 pub use self::poll_evented::PollEvented;
 pub use self::timeout::Timeout;
+pub use self::interval::Interval;
 
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 scoped_thread_local!(static CURRENT_LOOP: Core);
@@ -118,6 +120,7 @@ enum Message {
     DropSource(usize),
     Schedule(usize, Task, Direction),
     UpdateTimeout(usize, Task),
+    ResetTimeout(usize, Instant),
     CancelTimeout(usize),
     Run(Box<FnBox>),
 }
@@ -400,6 +403,9 @@ impl Core {
                     self.notify_handle(task);
                 }
             }
+            Message::ResetTimeout(t, at) => {
+                self.inner.borrow_mut().reset_timeout(t, at);
+            }
             Message::CancelTimeout(t) => {
                 self.inner.borrow_mut().cancel_timeout(t)
             }
@@ -451,7 +457,7 @@ impl Inner {
         }
     }
 
-    fn add_timeout(&mut self, at: Instant) -> io::Result<(usize, Instant)> {
+    fn add_timeout(&mut self, at: Instant) -> usize {
         if self.timeouts.vacant_entry().is_none() {
             let len = self.timeouts.len();
             self.timeouts.reserve_exact(len);
@@ -460,12 +466,25 @@ impl Inner {
         let slot = self.timer_heap.push((at, entry.index()));
         let entry = entry.insert((Some(slot), TimeoutState::NotFired));
         debug!("added a timeout: {}", entry.index());
-        Ok((entry.index(), at))
+        return entry.index();
     }
 
     fn update_timeout(&mut self, token: usize, handle: Task) -> Option<Task> {
         debug!("updating a timeout: {}", token);
         self.timeouts[token].1.block(handle)
+    }
+
+    fn reset_timeout(&mut self, token: usize, at: Instant) {
+        let pair = &mut self.timeouts[token];
+        // TODO: avoid remove + push and instead just do one sift of the heap?
+        // In theory we could update it in place and then do the percolation
+        // as necessary
+        if let Some(slot) = pair.0.take() {
+            self.timer_heap.remove(slot);
+        }
+        let slot = self.timer_heap.push((at, token));
+        *pair = (Some(slot), TimeoutState::NotFired);
+        debug!("set a timeout: {}", token);
     }
 
     fn cancel_timeout(&mut self, token: usize) {
