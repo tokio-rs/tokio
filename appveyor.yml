@@ -11,5 +11,5 @@ install:
 build: false
 
 test_script:
-  - cargo build
-  - cargo test
+  - cargo build --target %TARGET%
+  - cargo test --target %TARGET%
