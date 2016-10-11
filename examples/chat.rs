@@ -49,7 +49,6 @@ fn main() {
             let iter = stream::iter::<_, _, std::io::Error>(iter::repeat(()).map(Ok));
             // Then we fold it as infinite loop
             let socket_reader = iter.fold(reader, move |reader, _| {
-                let connections = connections_inner.clone();
                 // read line
                 let amt = io::read_until(reader, '\n' as u8, vec![]);
                 // check if we hit EOF and need to close the connection
@@ -57,13 +56,14 @@ fn main() {
                     // EOF was hit without reading a delimiter
                     if vec.len() == 0 {
                         let err = Error::new(ErrorKind::BrokenPipe, "Broken Pipe");
-                        futures::failed(err).boxed()
+                        Err(err)
                     } else {
-                        futures::finished((reader, vec)).boxed()
+                        Ok((reader, vec))
                     }
                 });
                 // convert bytes into string
                 let amt = amt.map(|(reader, vec)| (reader, String::from_utf8(vec)));
+                let connections = connections_inner.clone();
                 amt.map(move |(reader, message)| {
                     println!("{}: {:?}", addr, message);
                     let conns = connections.borrow_mut();
