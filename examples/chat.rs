@@ -1,4 +1,8 @@
 //! A chat server that broadcasts a message to all connections.
+//!
+//! This is a simple line-based server which accepts connections, reads lines
+//! from those connections, and broadcasts the lines to all other connected
+//! clients. In a sense this is a bit of a "poor man's chat server".
 
 extern crate tokio_core;
 extern crate futures;
@@ -20,57 +24,71 @@ use futures::Future;
 fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse().unwrap();
-    // We are single-threaded, so we can just use Rc and RefCell.
-    let connections = Rc::new(RefCell::new(HashMap::new()));
 
+    // Create the event loop and TCP listener we'll accept connections on.
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);
 
-    let future = socket.incoming().for_each(move |(stream, addr)| {
-        let connections = connections.clone();
-        let handle_inner = handle.clone();
-        // We create a new future in which we create all other futures.
-        // This makes `stream` be bound on the outer future's task, allowing
-        // `ReadHalf` and `WriteHalf` to be shared between inner futures.
-        let main_fn = move || {
-            println!("New Connection: {}", addr);
-            let (reader, writer) = stream.split();
-            // channel to send messages to this connection from other futures
-            let (tx, rx) = tokio_core::channel::channel(&handle_inner).unwrap();
-            // add sender to hashmap of all current connections
-            connections.borrow_mut().insert(addr, tx);
+    // This is a single-threaded server, so we can just use Rc and RefCell to
+    // store the map of all connections we know about.
+    let connections = Rc::new(RefCell::new(HashMap::new()));
 
+    let srv = socket.incoming().for_each(move |(stream, addr)| {
+        println!("New Connection: {}", addr);
+
+        // Create a channel for for our stream, which other sockets will use to
+        // send us message. Then register our address with the stream to send
+        // data to us.
+        let (tx, rx) = tokio_core::channel::channel(&handle).unwrap();
+        connections.borrow_mut().insert(addr, tx);
+
+        // Note that below we're calling `spawn` to spawn a new future for this
+        // connection. As a result we use `futures::lazy` here to ensure that
+        // the call to `.split()` happens on the right task.
+        //
+        // This `split` will give us a read/write half to work with each portion
+        // of the socket separately.
+        let pair = futures::lazy(|| Ok(stream.split()));
+
+        // Define here what we do for the actual I/O. That is, read a bunch of
+        // lines from the socket and dispatch them while we also write any lines
+        // from other sockets.
+        let connections_inner = connections.clone();
+        let pair = pair.map(move |(reader, writer)| {
             let reader = BufReader::new(reader);
-            let connections_inner = connections.clone();
-            // https://users.rust-lang.org/t/loop-futures-for-client-handling/6950/2
-            // First we need to get an infinite iterator
-            let iter = stream::iter::<_, _, std::io::Error>(iter::repeat(()).map(Ok));
-            // Then we fold it as infinite loop
+
+            // Model the read portion of this socket by mapping an infinite
+            // iterator to each line off the socket. This "loop" is then
+            // terminated with an error once we hit EOF on the socket.
+            let iter = stream::iter(iter::repeat(()).map(Ok));
             let socket_reader = iter.fold(reader, move |reader, _| {
-                // read line
-                let amt = io::read_until(reader, '\n' as u8, vec![]);
-                // check if we hit EOF and need to close the connection
-                let amt = amt.and_then(|(reader, vec)| {
-                    // EOF was hit without reading a delimiter
+                // Read a line off the socket, failing if we're at EOF
+                let line = io::read_until(reader, b'\n', Vec::new());
+                let line = line.and_then(|(reader, vec)| {
                     if vec.len() == 0 {
-                        let err = Error::new(ErrorKind::BrokenPipe, "Broken Pipe");
-                        Err(err)
+                        Err(Error::new(ErrorKind::BrokenPipe, "broken pipe"))
                     } else {
                         Ok((reader, vec))
                     }
                 });
-                // convert bytes into string
-                let amt = amt.map(|(reader, vec)| (reader, String::from_utf8(vec)));
+
+                // Convert the bytes we read into a string, and then send that
+                // string to all other connected clients.
+                let line = line.map(|(reader, vec)| {
+                    (reader, String::from_utf8(vec))
+                });
                 let connections = connections_inner.clone();
-                amt.map(move |(reader, message)| {
+                line.map(move |(reader, message)| {
                     println!("{}: {:?}", addr, message);
                     let conns = connections.borrow_mut();
                     if let Ok(msg) = message {
-                        // For each open connection except the sender, send the string
-                        // via the channel
-                        let iter = conns.iter().filter(|&(&k,_)| k != addr).map(|(_,v)| v);
+                        // For each open connection except the sender, send the
+                        // string via the channel
+                        let iter = conns.iter()
+                                        .filter(|&(&k, _)| k != addr)
+                                        .map(|(_, v)| v);
                         for tx in iter {
                             tx.send(format!("{}: {}", addr, msg)).unwrap();
                         }
@@ -82,31 +100,37 @@ fn main() {
                 })
             });
 
-            // Whenever we receive a string on the Receiver, we write it to `WriteHalf<TcpStream>`.
+            // Whenever we receive a string on the Receiver, we write it to
+            // `WriteHalf<TcpStream>`.
             let socket_writer = rx.fold(writer, |writer, msg| {
                 let amt = io::write_all(writer, msg.into_bytes());
                 let amt = amt.map(|(writer, _)| writer);
                 amt
             });
 
-            // In order to fuse the reading and writing futures in the end, we need to have the
-            // same output type. As we don't need the values anymore, we can just map them
-            // to `()`.
-            let socket_reader = socket_reader.map(|_| ());
-            let socket_writer = socket_writer.map(|_| ());
+            (socket_reader, socket_writer)
+        });
 
-            let amt = socket_reader.select(socket_writer);
-            amt.then(move |_| {
-                connections.borrow_mut().remove(&addr);
-                println!("Connection {} closed.", addr);
-                Ok(())
-            })
-        };
-        handle.spawn_fn(main_fn);
+        // Now that we've got futures representing each half of the socket, join
+        // them together and then spawn off the result. Here we use the `select`
+        // combinator to wait for either half to be done to tear down the other.
+        let connections = connections.clone();
+        let addr = addr;
+        handle.spawn(pair.and_then(|(reader, writer)| {
+            let reader = reader.map(|_| ());
+            let writer = writer.map(|_| ());
+
+            reader.select(writer)
+        }).then(move |_| {
+            connections.borrow_mut().remove(&addr);
+            println!("Connection {} closed.", addr);
+            Ok(())
+        }));
+
         Ok(())
     });
 
-    // exectue server
-    core.run(future).unwrap();
+    // execute server
+    core.run(srv).unwrap();
 }
 
