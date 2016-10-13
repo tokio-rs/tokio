@@ -19,4 +19,4 @@ scoped-tls = "0.1.0"
 slab = "0.3"
 
 [dev-dependencies]
-env_logger = "0.3"
+env_logger = { version = "0.3", default-features = false }
