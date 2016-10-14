@@ -38,8 +38,8 @@ fn main() {
     let srv = socket.incoming().for_each(move |(stream, addr)| {
         println!("New Connection: {}", addr);
 
-        // Create a channel for for our stream, which other sockets will use to
-        // send us message. Then register our address with the stream to send
+        // Create a channel for our stream, which other sockets will use to
+        // send us messages. Then register our address with the stream to send
         // data to us.
         let (tx, rx) = tokio_core::channel::channel(&handle).unwrap();
         connections.borrow_mut().insert(addr, tx);
@@ -85,7 +85,7 @@ fn main() {
                     let conns = connections.borrow_mut();
                     if let Ok(msg) = message {
                         // For each open connection except the sender, send the
-                        // string via the channel
+                        // string via the channel.
                         let iter = conns.iter()
                                         .filter(|&(&k, _)| k != addr)
                                         .map(|(_, v)| v);
@@ -111,9 +111,9 @@ fn main() {
             (socket_reader, socket_writer)
         });
 
-        // Now that we've got futures representing each half of the socket, join
-        // them together and then spawn off the result. Here we use the `select`
-        // combinator to wait for either half to be done to tear down the other.
+        // Now that we've got futures representing each half of the socket, we
+        // use the `select` combinator to wait for either half to be done to
+        // tear down the other. Then we spawn off the result.
         let connections = connections.clone();
         let addr = addr;
         handle.spawn(pair.and_then(|(reader, writer)| {
