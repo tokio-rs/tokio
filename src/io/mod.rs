@@ -3,7 +3,7 @@
 //! Contains various combinators to work with I/O objects and type definitions
 //! as well.
 
-use std::io::{self, Read, Write};
+use std::io;
 
 use futures::{BoxFuture, Async, Poll};
 use futures::stream::BoxStream;
@@ -44,7 +44,7 @@ pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
-pub use self::read::read;
+pub use self::read::{read, Read};
 pub use self::read_until::{read_until, ReadUntil};
 pub use self::split::{ReadHalf, WriteHalf};
 pub use self::window::Window;
@@ -61,7 +61,7 @@ pub use self::write_all::{write_all, WriteAll};
 /// value that indicates "would block" the current future's task is arranged to
 /// receive a notification when the method would otherwise not indicate that it
 /// would block.
-pub trait Io: Read + Write {
+pub trait Io: io::Read + io::Write {
     /// Tests to see if this I/O object may be readable.
     ///
     /// This method returns an `Async<()>` indicating whether the object
