@@ -113,3 +113,4 @@ mod heap;
 pub mod channel;
 pub mod net;
 pub mod reactor;
+pub mod easy;
