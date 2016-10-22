@@ -73,7 +73,7 @@ impl<T: AsRef<[u8]>> Window<T> {
     /// This method will panic if `start` is out of bounds for the underlying
     /// slice or if it comes after the `end` configured in this window.
     pub fn set_start(&mut self, start: usize) -> &mut Window<T> {
-        assert!(start < self.inner.as_ref().len());
+        assert!(start <= self.inner.as_ref().len());
         assert!(start <= self.range.end);
         self.range.start = start;
         self
@@ -86,9 +86,9 @@ impl<T: AsRef<[u8]>> Window<T> {
     /// # Panics
     ///
     /// This method will panic if `end` is out of bounds for the underlying
-    /// slice or if it comes after the `end` configured in this window.
+    /// slice or if it comes before the `start` configured in this window.
     pub fn set_end(&mut self, end: usize) -> &mut Window<T> {
-        assert!(end < self.inner.as_ref().len());
+        assert!(end <= self.inner.as_ref().len());
         assert!(self.range.start <= end);
         self.range.end = end;
         self
