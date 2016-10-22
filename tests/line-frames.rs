@@ -41,10 +41,11 @@ impl Serialize for LineSerialize {
 
 pub struct EchoFramed<T> {
     inner: T,
+    eof: bool,
 }
 
 impl<T, U> Future for EchoFramed<T>
-    where T: FramedIo<In = U, Out = U>,
+    where T: FramedIo<In = U, Out = Option<U>>,
 {
     type Item = ();
     type Error = ();
@@ -56,9 +57,15 @@ impl<T, U> Future for EchoFramed<T>
         }
 
         // Wait until we can simultaneously read and write a message
-        while self.inner.poll_read().is_ready() && self.inner.poll_write().is_ready() {
+        while !self.eof &&
+              self.inner.poll_read().is_ready() &&
+              self.inner.poll_write().is_ready() {
             let frame = match self.inner.read() {
-                Ok(Async::Ready(frame)) => frame,
+                Ok(Async::Ready(Some(frame))) => frame,
+                Ok(Async::Ready(None)) => {
+                    self.eof = true;
+                    break
+                }
                 Ok(Async::NotReady) => break,
                 Err(e) => panic!("error in read: {}", e),
             };
@@ -72,9 +79,11 @@ impl<T, U> Future for EchoFramed<T>
 
         // If we wrote some frames try to flush again. Ignore whether this is
         // ready to finish or not as we're going to continue to return NotReady
-        drop(self.inner.flush().expect("flush error"));
-
-        Ok(Async::NotReady)
+        if self.inner.flush().expect("flush error").is_ready() && self.eof {
+            Ok(().into())
+        } else {
+            Ok(Async::NotReady)
+        }
     }
 }
 
@@ -89,7 +98,7 @@ fn echo() {
     let addr = listener.local_addr().unwrap();
     let srv = listener.incoming().for_each(move |(socket, _)| {
         let framed = EasyFramed::new(socket, LineParser, LineSerialize);
-        handle.spawn(EchoFramed { inner: framed });
+        handle.spawn(EchoFramed { inner: framed, eof: false });
         Ok(())
     });
 
