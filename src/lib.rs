@@ -15,14 +15,13 @@
 //! * Timeouts
 //!
 //! More functionality is likely to be added over time, but otherwise the crate
-//! is intended to be flexible with the `PollEvented` type which accepts any
-//! type which implements `mio::Evented`. Using this if you'd like Unix domain
-//! sockets, for example, the `tokio-uds` is built externally to offer this
-//! functionality.
+//! is intended to be flexible, with the `PollEvented` type accepting any
+//! type that implements `mio::Evented`. For example, the `tokio-uds` crate
+//! uses `PollEvented` to provide support for Unix domain sockets.
 //!
 //! Some other important tasks covered by this crate are:
 //!
-//! * The ability to spawn futures into an even loop. The `Handle` and `Pinned`
+//! * The ability to spawn futures into an event loop. The `Handle` and `Pinned`
 //!   types have a `spawn` method which allows executing a future on an event
 //!   loop. The `Pinned::spawn` method crucially does not require the future
 //!   itself to be `Send`.
