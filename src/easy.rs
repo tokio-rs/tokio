@@ -334,6 +334,21 @@ impl<T, P, S> EasyFramed<T, P, S>
             wr: Vec::with_capacity(8 * 1024),
         }
     }
+
+    /// Returns a reference to the underlying I/O stream wrapped by `EasyFramed`.
+    pub fn get_ref(&self) -> &T {
+        &self.upstream
+    }
+
+    /// Returns a mutable reference to the underlying I/O stream wrapped by `EasyFramed`.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.upstream
+    }
+
+    /// Consumes the `EasyFramed`, returning its underlying I/O stream.
+    pub fn into_inner(self) -> T {
+        self.upstream
+    }
 }
 
 impl<T, P, S> FramedIo for EasyFramed<T, P, S>
