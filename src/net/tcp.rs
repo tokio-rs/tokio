@@ -269,7 +269,7 @@ impl TcpStream {
         self.io.poll_read()
     }
 
-    /// Test whether this socket is writey to be written to or not.
+    /// Test whether this socket is ready to be written to or not.
     ///
     /// If the socket is *not* writable then the current task is scheduled to
     /// get a notification when the socket does become writable. That is, this
