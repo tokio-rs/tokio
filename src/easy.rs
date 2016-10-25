@@ -336,16 +336,29 @@ impl<T, P, S> EasyFramed<T, P, S>
     }
 
     /// Returns a reference to the underlying I/O stream wrapped by `EasyFramed`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise being
+    /// worked with.
     pub fn get_ref(&self) -> &T {
         &self.upstream
     }
 
-    /// Returns a mutable reference to the underlying I/O stream wrapped by `EasyFramed`.
+    /// Returns a mutable reference to the underlying I/O stream wrapped by
+    /// `EasyFramed`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise being
+    /// worked with.
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.upstream
     }
 
     /// Consumes the `EasyFramed`, returning its underlying I/O stream.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise being
+    /// worked with.
     pub fn into_inner(self) -> T {
         self.upstream
     }
