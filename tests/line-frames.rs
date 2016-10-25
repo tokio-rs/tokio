@@ -8,20 +8,20 @@ use std::net::Shutdown;
 use futures::{Future, Async, Poll};
 use futures::stream::Stream;
 use tokio_core::io::{FramedIo, write_all, read};
-use tokio_core::easy::{Parse, Serialize, EasyFramed, EasyBuf};
+use tokio_core::easy::{Encode, Decode, EasyFramed, EasyBuf};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
 
-pub struct LineParser;
-pub struct LineSerialize;
+pub struct LineDecoder;
+pub struct LineEncoder;
 
-impl Parse for LineParser {
+impl Decode for LineDecoder {
     type Out = EasyBuf;
 
-    fn parse(&mut self, buf: &mut EasyBuf) -> Poll<EasyBuf, io::Error> {
+    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<EasyBuf>, io::Error> {
         match buf.as_slice().iter().position(|&b| b == b'\n') {
-            Some(i) => Ok(buf.drain_to(i + 1).into()),
-            None => Ok(Async::NotReady),
+            Some(i) => Ok(Some(buf.drain_to(i + 1).into())),
+            None => Ok(None),
         }
     }
 
@@ -31,10 +31,10 @@ impl Parse for LineParser {
     }
 }
 
-impl Serialize for LineSerialize {
+impl Encode for LineEncoder {
     type In = EasyBuf;
 
-    fn serialize(&mut self, msg: EasyBuf, into: &mut Vec<u8>) {
+    fn encode(&mut self, msg: EasyBuf, into: &mut Vec<u8>) {
         into.extend_from_slice(msg.as_slice());
     }
 }
@@ -97,7 +97,7 @@ fn echo() {
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
     let addr = listener.local_addr().unwrap();
     let srv = listener.incoming().for_each(move |(socket, _)| {
-        let framed = EasyFramed::new(socket, LineParser, LineSerialize);
+        let framed = EasyFramed::new(socket, LineDecoder, LineEncoder);
         handle.spawn(EchoFramed { inner: framed, eof: false });
         Ok(())
     });
