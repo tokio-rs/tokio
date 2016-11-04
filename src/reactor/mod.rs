@@ -435,6 +435,10 @@ impl Inner {
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
 
+    fn deregister_source(&mut self, source: &mio::Evented) -> io::Result<()> {
+        self.io.deregister(source)
+    }
+
     fn drop_source(&mut self, token: usize) {
         debug!("dropping I/O source: {}", token);
         self.io_dispatch.remove(token).unwrap();

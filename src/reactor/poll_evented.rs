@@ -53,6 +53,27 @@ impl<E: mio::Evented> PollEvented<E> {
             io: io,
         })
     }
+
+    /// Deregisters this source of events from the reactor core specified.
+    ///
+    /// This method can optionally be called to unregister the underlying I/O
+    /// object with the event loop that the `handle` provided points to.
+    /// Typically this method is not required as this automatically happens when
+    /// `E` is dropped, but for some use cases the `E` object doesn't represent
+    /// an owned reference, so dropping it won't automatically unreigster with
+    /// the event loop.
+    ///
+    /// This consumes `self` as it will no longer provide events after the
+    /// method is called, and will likely return an error if this `PollEvented`
+    /// was created on a separate event loop from the `handle` specified.
+    pub fn deregister(self, handle: &Handle) -> io::Result<()> {
+        let inner = match handle.inner.upgrade() {
+            Some(inner) => inner,
+            None => return Ok(()),
+        };
+        let ret = inner.borrow_mut().deregister_source(&self.io);
+        return ret
+    }
 }
 
 impl<E> PollEvented<E> {
