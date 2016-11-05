@@ -109,11 +109,7 @@ pub trait Io: io::Read + io::Write {
     /// Helper method for splitting this read/write object into two halves.
     ///
     /// The two halves returned implement the `Read` and `Write` traits,
-    /// respectively, but are only usable on the current task.
-    ///
-    /// # Panics
-    ///
-    /// This method will panic if there is not currently an active future task.
+    /// respectively.
     fn split(self) -> (ReadHalf<Self>, WriteHalf<Self>)
         where Self: Sized
     {

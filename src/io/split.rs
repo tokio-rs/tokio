@@ -1,31 +1,34 @@
-use std::cell::RefCell;
 use std::io::{self, Read, Write};
 
 use futures::Async;
-use futures::task::TaskRc;
+use futures::sync::BiLock;
+use mio;
 
 use io::Io;
 
 /// The readable half of an object returned from `Io::split`.
 pub struct ReadHalf<T> {
-    handle: TaskRc<RefCell<T>>,
+    handle: BiLock<T>,
 }
 
 /// The writable half of an object returned from `Io::split`.
 pub struct WriteHalf<T> {
-    handle: TaskRc<RefCell<T>>,
+    handle: BiLock<T>,
 }
 
 pub fn split<T: Io>(t: T) -> (ReadHalf<T>, WriteHalf<T>) {
-    let rc = TaskRc::new(RefCell::new(t));
-    (ReadHalf { handle: rc.clone() }, WriteHalf { handle: rc })
+    let (a, b) = BiLock::new(t);
+    (ReadHalf { handle: a }, WriteHalf { handle: b })
 }
 
 impl<T: Io> ReadHalf<T> {
     /// Calls the underlying `poll_read` function on this handling, testing to
     /// see if it's ready to be read from.
     pub fn poll_read(&mut self) -> Async<()> {
-        self.handle.with(|t| t.borrow_mut().poll_read())
+        match self.handle.poll_lock() {
+            Async::Ready(mut l) => l.poll_read(),
+            Async::NotReady => Async::NotReady,
+        }
     }
 }
 
@@ -33,22 +36,34 @@ impl<T: Io> WriteHalf<T> {
     /// Calls the underlying `poll_write` function on this handling, testing to
     /// see if it's ready to be written to.
     pub fn poll_write(&mut self) -> Async<()> {
-        self.handle.with(|t| t.borrow_mut().poll_write())
+        match self.handle.poll_lock() {
+            Async::Ready(mut l) => l.poll_write(),
+            Async::NotReady => Async::NotReady,
+        }
     }
 }
 
 impl<T: Read> Read for ReadHalf<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.handle.with(|t| t.borrow_mut().read(buf))
+        match self.handle.poll_lock() {
+            Async::Ready(mut l) => l.read(buf),
+            Async::NotReady => Err(mio::would_block()),
+        }
     }
 }
 
 impl<T: Write> Write for WriteHalf<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.handle.with(|t| t.borrow_mut().write(buf))
+        match self.handle.poll_lock() {
+            Async::Ready(mut l) => l.write(buf),
+            Async::NotReady => Err(mio::would_block()),
+        }
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.handle.with(|t| t.borrow_mut().flush())
+        match self.handle.poll_lock() {
+            Async::Ready(mut l) => l.flush(),
+            Async::NotReady => Err(mio::would_block()),
+        }
     }
 }
