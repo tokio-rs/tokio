@@ -48,8 +48,8 @@ fn main() {
     // We use the `io::copy` future to copy all data from the
     // reading half onto the writing half.
     let done = socket.incoming().for_each(move |(socket, addr)| {
-        let pair = futures::lazy(|| futures::finished(socket.split()));
-        let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
+        let (reader, writer) = socket.split();
+        let amt = copy(reader, writer);
 
         // Once all that is done we print out how much we wrote, and then
         // critically we *spawn* this future which allows it to run
