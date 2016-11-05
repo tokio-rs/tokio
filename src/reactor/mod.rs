@@ -373,7 +373,7 @@ impl Core {
 
     /// Method used to notify a task handle.
     ///
-    /// Note that this should be used instead fo `handle.unpark()` to ensure
+    /// Note that this should be used instead of `handle.unpark()` to ensure
     /// that the `CURRENT_LOOP` variable is set appropriately.
     fn notify_handle(&self, handle: Task) {
         debug!("notifying a task handle");

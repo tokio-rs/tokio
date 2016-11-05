@@ -56,7 +56,7 @@ pub use self::write_all::{write_all, WriteAll};
 /// Additionally, they're associated with the ability to test whether they're
 /// readable or writable.
 ///
-/// Imporantly, the methods of this trait are intended to be used in conjuction
+/// Importantly, the methods of this trait are intended to be used in conjuction
 /// with the current task of a future. Namely whenever any of them return a
 /// value that indicates "would block" the current future's task is arranged to
 /// receive a notification when the method would otherwise not indicate that it
@@ -122,7 +122,7 @@ pub trait Io: io::Read + io::Write {
 /// Most implementations of `FramedIo` are for doing protocol level
 /// serialization and deserialization.
 ///
-/// Imporantly, the methods of this trait are intended to be used in conjuction
+/// Importantly, the methods of this trait are intended to be used in conjuction
 /// with the current task of a future. Namely whenever any of them return a
 /// value that indicates "would block" the current future's task is arranged to
 /// receive a notification when the method would otherwise not indicate that it
