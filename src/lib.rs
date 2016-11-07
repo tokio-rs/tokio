@@ -1,6 +1,6 @@
 //! Asynchronous signal handling for Tokio
 //!
-//! This crate implements asynchronous signal handling for Tokio, and
+//! This crate implements asynchronous signal handling for Tokio, an
 //! asynchronous I/O framework in Rust. The primary type exported from this
 //! crate, `unix::Signal`, allows listening for arbitrary signals on Unix
 //! platforms, receiving them in an asynchronous fashion.
