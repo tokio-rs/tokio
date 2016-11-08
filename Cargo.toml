@@ -12,7 +12,7 @@ the rest of the tokio crates.
 """
 
 [dependencies]
-futures = "0.1"
+futures = { git = "https://github.com/alexcrichton/futures-rs" }
 log = "0.3"
 mio = "0.6"
 scoped-tls = "0.1.0"
@@ -20,6 +20,3 @@ slab = "0.3"
 
 [dev-dependencies]
 env_logger = { version = "0.3", default-features = false }
-
-[replace]
-'futures:0.1.3' = { git = "https://github.com/alexcrichton/futures-rs" }
