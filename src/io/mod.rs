@@ -32,6 +32,7 @@ macro_rules! try_nb {
 }
 
 mod copy;
+mod frame;
 mod flush;
 mod read_exact;
 mod read_to_end;
@@ -41,6 +42,7 @@ mod split;
 mod window;
 mod write_all;
 pub use self::copy::{copy, Copy};
+pub use self::frame::{EasyBuf, EasyBufMut, FramedRead, FramedWrite, Framed, Decode, Encode};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
@@ -106,6 +108,33 @@ pub trait Io: io::Read + io::Write {
         Async::Ready(())
     }
 
+    /// Provides a `Stream` and `Sink` interface for reading and writing to this
+    /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
+    ///
+    /// Raw I/O objects work with byte sequences, but higher-level code usually
+    /// wants to batch these into meaningful chunks, called "frames". This
+    /// method layers framing on top of an I/O object, by using the `Encode` and
+    /// `Decode` traits:
+    ///
+    /// - `Encode` interprets frames we want to send into bytes;
+    /// - `Decode` interprets incoming bytes into a stream of frames.
+    ///
+    /// Note that the incoming and outgoing frame types may be distinct.
+    ///
+    /// This function returns a *single* object that is both `Stream` and
+    /// `Sink`; grouping this into a single object is often useful for layering
+    /// things like gzip or TLS, which require both read and write access to the
+    /// underlying object.
+    ///
+    /// If you want to work more directly with the streams and sink, consider
+    /// calling `split` on the `Framed` returned by this method, which will
+    /// break them into separate objects, allowing them to interact more easily.
+    fn framed<D: Decode, E: Encode>(self) -> Framed<Self, D, E>
+        where Self: Sized,
+    {
+        frame::framed(self)
+    }
+
     /// Helper method for splitting this read/write object into two halves.
     ///
     /// The two halves returned implement the `Read` and `Write` traits,
@@ -130,6 +159,8 @@ pub trait Io: io::Read + io::Write {
 ///
 /// For a sample implementation of `FramedIo` you can take a look at the
 /// `EasyFramed` type in the `easy` module of htis crate.
+#[doc(hidden)]
+#[deprecated(since = "0.1.1", note = "replaced by Sink + Stream")]
 pub trait FramedIo {
     /// Messages written
     type In;
