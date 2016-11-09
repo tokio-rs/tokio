@@ -9,7 +9,7 @@
 //! and in another terminal you can run:
 //!
 //! ```sh
-//! $ echo -n "hello" | nc -4u localhost 8080
+//! $ nc -4u localhost 8080
 //! ```
 //!
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
