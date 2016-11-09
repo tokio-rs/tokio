@@ -57,10 +57,10 @@ fn echo() {
     assert_eq!(amt, 2);
     assert_eq!(&buf[..2], b"a\n");
 
-    let (client, _) = core.run(write_all(client, b"\nb\n")).unwrap();
+    let (client, _) = core.run(write_all(client, b"\n")).unwrap();
     let (client, buf, amt) = core.run(read(client, buf)).unwrap();
-    assert_eq!(amt, 3);
-    assert_eq!(&buf[..3], b"\nb\n");
+    assert_eq!(amt, 1);
+    assert_eq!(&buf[..1], b"\n");
 
     let (client, _) = core.run(write_all(client, b"b")).unwrap();
     client.shutdown(Shutdown::Write).unwrap();
