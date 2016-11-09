@@ -11,6 +11,8 @@ script:
   - cargo build
   - cargo test
   - cargo doc --no-deps
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo bench ; fi
+
 after_success:
   - travis-cargo --only nightly doc-upload
 env:
