@@ -1,21 +1,3 @@
-//! A module for working with "easy" types to interact with other parts of
-//! tokio-core.
-//!
-//! This module contains a number of concrete implementations of various
-//! abstractions in tokio-core. The contents of this module are not necessarily
-//! production ready but are intended to allow projects to get off the ground
-//! quickly while also showing off sample implementations of these traits.
-//!
-//! Currently this module primarily contains `EasyFramed`, a struct which
-//! implements the `FramedIo` trait in `tokio_core::io`. This structure allows
-//! simply defining a decoder (via the `Decode` trait) and a
-//! encoder (via the `Encode` trait) and transforming a stream of bytes
-//! into a stream of frames. Additionally the `Decode` trait passes an
-//! `EasyBuf`, another type here, which primarily supports `drain_to`, to
-//! extract bytes without copying them.
-//!
-//! For more information see the `EasyFramed` and `EasyBuf` types.
-
 use std::io;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -216,7 +198,7 @@ impl<'a> Drop for EasyBufMut<'a> {
 pub trait Decode: Sized {
     /// Attempts to decode a frame from the provided buffer of bytes.
     ///
-    /// This method is called by `EasyFramed` whenever bytes are ready to be parsed.
+    /// This method is called by `Framed` whenever bytes are ready to be parsed.
     /// The provided buffer of bytes is what's been read so far, and this
     /// instance of `Decode` can determine whether an entire frame is in the
     /// buffer and is ready to be returned.
@@ -228,11 +210,11 @@ pub trait Decode: Sized {
     /// most circumstances.
     ///
     /// If the bytes look valid, but a frame isn't fully available yet, then
-    /// `Ok(None)` is returned. This indicates to the `EasyFramed` instance that
+    /// `Ok(None)` is returned. This indicates to the `Framed` instance that
     /// it needs to read some more bytes before calling this method again.
     ///
     /// Finally, if the bytes in the buffer are malformed then an error is
-    /// returned indicating why. This informs `EasyFramed` that the stream is now
+    /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
     fn decode(buf: &mut EasyBuf) -> Result<Option<Self>, io::Error>;
 
@@ -253,16 +235,16 @@ pub trait Decode: Sized {
 
 /// A trait for encoding frames into a byte buffer.
 ///
-/// This trait is used as a building block of `EasyFramed` to define how frames are
+/// This trait is used as a building block of `Framed` to define how frames are
 /// encoded into bytes to get passed to the underlying byte stream. Each
-/// frame written to `EasyFramed` will be encoded with this trait to an internal
+/// frame written to `Framed` will be encoded with this trait to an internal
 /// buffer. That buffer is then written out when possible to the underlying I/O
 /// stream.
 pub trait Encode {
     /// Encodes a frame into the buffer provided.
     ///
     /// This method will encode `msg` into the byte buffer provided by `buf`.
-    /// The `buf` provided is an internal buffer of the `EasyFramed` instance and
+    /// The `buf` provided is an internal buffer of the `Framed` instance and
     /// will be written out when possible.
     fn encode(self, buf: &mut Vec<u8>);
 }
