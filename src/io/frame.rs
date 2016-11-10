@@ -395,6 +395,8 @@ impl<T: Io, E: Encode> Sink for FramedWrite<T, E> {
 
 /// A unified `Stream` and `Sink` interface to an underlying `Io` object, using
 /// the `Encode` and `Decode` traits to encode and decode frames.
+///
+/// You can acquire a `Framd` instance by using the `Io::framed` adapter.
 pub struct Framed<T, D, E> {
     upstream: T,
     read_state: ReadState,
