@@ -7,16 +7,15 @@ extern crate tokio_core;
 
 use std::io;
 use std::net::SocketAddr;
-
-use futures::{Future, Poll, Sink, Stream};
-use tokio_core::net::UdpSocket;
-use tokio_core::reactor::Core;
-use tokio_core::channel::Sender;
-
-use test::Bencher;
 use std::thread;
 
 use futures::sync::oneshot;
+use futures::sync::spsc;
+use futures::{Future, Poll, Sink, Stream};
+use test::Bencher;
+use tokio_core::channel::Sender;
+use tokio_core::net::UdpSocket;
+use tokio_core::reactor::Core;
 
 /// UDP echo server
 struct EchoServer {
@@ -96,7 +95,7 @@ fn udp_echo_latency(b: &mut Bencher) {
 }
 
 #[bench]
-fn channel_latency(b: &mut Bencher) {
+fn tokio_channel_latency(b: &mut Bencher) {
     let (tx, rx) = oneshot::channel();
 
     let child = thread::spawn(move || {
@@ -130,4 +129,29 @@ fn channel_latency(b: &mut Bencher) {
 
     drop(in_tx);
     child.join().unwrap();
+}
+
+#[bench]
+fn futures_channel_latency(b: &mut Bencher) {
+    let (mut in_tx, in_rx) = spsc::channel();
+    let (out_tx, out_rx) = spsc::channel::<_, ()>();
+
+    let child = thread::spawn(|| out_tx.send_all(in_rx).wait());
+    let mut rx_iter = out_rx.wait();
+
+    // warmup phase; for some reason initial couple of runs are much slower
+    //
+    // TODO: Describe the exact reasons; caching? branch predictor? lazy closures?
+    for _ in 0..8 {
+        in_tx.start_send(Ok(Ok(1usize))).unwrap();
+        let _ = rx_iter.next();
+    }
+
+    b.iter(|| {
+        in_tx.start_send(Ok(Ok(1usize))).unwrap();
+        let _ = rx_iter.next();
+    });
+
+    drop(in_tx);
+    child.join().unwrap().unwrap();
 }
