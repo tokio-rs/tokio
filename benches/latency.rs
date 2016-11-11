@@ -8,31 +8,29 @@ extern crate tokio_core;
 use std::io;
 use std::net::SocketAddr;
 
-use futures::{Future, Poll};
+use futures::{Future, Poll, Sink, Stream};
 use tokio_core::net::UdpSocket;
 use tokio_core::reactor::Core;
+use tokio_core::channel::Sender;
 
 use test::Bencher;
 use std::thread;
 
-use futures::stream::Stream;
-use futures::{oneshot, Oneshot};
+use futures::sync::oneshot;
 
 /// UDP echo server
 struct EchoServer {
-    socket : UdpSocket,
-    buf : Vec<u8>,
-    to_send : Option<(usize, SocketAddr)>,
-    stop : Oneshot<()>,
+    socket: UdpSocket,
+    buf: Vec<u8>,
+    to_send: Option<(usize, SocketAddr)>,
 }
 
 impl EchoServer {
-    fn new(s : UdpSocket, stop : Oneshot<()>) -> Self {
+    fn new(s: UdpSocket) -> Self {
         EchoServer {
             socket: s,
             to_send: None,
             buf: vec![0u8; 1600],
-            stop: stop,
         }
     }
 }
@@ -43,94 +41,40 @@ impl Future for EchoServer {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
         loop {
-            if self.stop.poll() != Ok(futures::Async::NotReady) {
-                return Ok(futures::Async::Ready(()))
-            }
-
             if let Some(&(size, peer)) = self.to_send.as_ref() {
-                let _ = try_nb!(self.socket.send_to(&self.buf[..size], &peer));
+                try_nb!(self.socket.send_to(&self.buf[..size], &peer));
+                self.to_send = None;
             }
-            self.to_send = None;
-
-            self.to_send = Some(
-                try_nb!(self.socket.recv_from(&mut self.buf))
-                );
-        }
-    }
-}
-
-/// UDP echo server
-///
-/// TODO: This may be replace-able with the newly-minted Sink::send_all function in the futures crate
-struct ChanServer {
-    rx : tokio_core::channel::Receiver<usize>,
-    tx : tokio_core::channel::Sender<usize>,
-    buf : Option<usize>,
-}
-
-impl ChanServer {
-    fn new(tx : tokio_core::channel::Sender<usize>, rx : tokio_core::channel::Receiver<usize>) -> Self {
-        ChanServer {
-            rx: rx,
-            tx: tx,
-            buf: None,
-        }
-    }
-}
-
-impl Future for ChanServer {
-    type Item = ();
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<(), io::Error> {
-        loop {
-            if let Some(u) = self.buf.take() {
-                match self.tx.send(u) {
-                    Err(e) => {
-                        self.buf = Some(u);
-                        return try_nb!(Err(e));
-                    },
-                    Ok(_) => { }
-                }
-            }
-
-            match self.rx.poll() {
-                Ok(futures::Async::Ready(None)) => return Ok(futures::Async::Ready(())),
-                Ok(futures::Async::Ready(Some(t))) => { self.buf = Some(t) },
-                Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
-                Err(e) => return try_nb!(Err(e)),
-            }
+            self.to_send = Some(try_nb!(self.socket.recv_from(&mut self.buf)));
         }
     }
 }
 
 #[bench]
 fn udp_echo_latency(b: &mut Bencher) {
-    let server_addr= "127.0.0.1:0".to_string();
-    let server_addr = server_addr.parse::<SocketAddr>().unwrap();
-    let client_addr= "127.0.0.1:0".to_string();
-    let client_addr = client_addr.parse::<SocketAddr>().unwrap();
+    let any_addr = "127.0.0.1:0".to_string();
+    let any_addr = any_addr.parse::<SocketAddr>().unwrap();
 
-    let (stop_c, stop_p) = oneshot::<()>();
-
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (stop_c, stop_p) = oneshot::channel::<()>();
+    let (tx, rx) = oneshot::channel();
 
     let child = thread::spawn(move || {
         let mut l = Core::new().unwrap();
         let handle = l.handle();
 
-        let socket = tokio_core::net::UdpSocket::bind(&server_addr, &handle).unwrap();
+        let socket = tokio_core::net::UdpSocket::bind(&any_addr, &handle).unwrap();
+        tx.complete(socket.local_addr().unwrap());
 
-        tx.send(socket.local_addr().unwrap()).unwrap();
-        let server = EchoServer::new(socket, stop_p);
-
-        l.run(server).unwrap();
+        let server = EchoServer::new(socket);
+        let server = server.select(stop_p.map_err(|_| panic!()));
+        let server = server.map_err(|_| ());
+        l.run(server).unwrap()
     });
 
 
-    let client = std::net::UdpSocket::bind(client_addr).unwrap();
+    let client = std::net::UdpSocket::bind(&any_addr).unwrap();
 
-    let server_addr = rx.recv().unwrap();
+    let server_addr = rx.wait().unwrap();
     let mut buf = [0u8; 1000];
 
     // warmup phase; for some reason initial couple of
@@ -148,14 +92,12 @@ fn udp_echo_latency(b: &mut Bencher) {
     });
 
     stop_c.complete(());
-
     child.join().unwrap();
 }
 
 #[bench]
 fn channel_latency(b: &mut Bencher) {
-
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = oneshot::channel();
 
     let child = thread::spawn(move || {
         let mut l = Core::new().unwrap();
@@ -163,31 +105,29 @@ fn channel_latency(b: &mut Bencher) {
 
         let (in_tx, in_rx) = tokio_core::channel::channel(&handle).unwrap();
         let (out_tx, out_rx) = tokio_core::channel::channel(&handle).unwrap();
+        tx.complete((in_tx, out_rx));
 
-        let server = ChanServer::new(out_tx, in_rx);
+        let server = out_tx.send_all(in_rx);
 
-        tx.send((in_tx, out_rx)).unwrap();
         l.run(server).unwrap();
     });
 
-    let (in_tx, out_rx) = rx.recv().unwrap();
-
+    let (in_tx, out_rx) = rx.wait().unwrap();
     let mut rx_iter = out_rx.wait();
 
     // warmup phase; for some reason initial couple of runs are much slower
     //
     // TODO: Describe the exact reasons; caching? branch predictor? lazy closures?
     for _ in 0..8 {
-        in_tx.send(1usize).unwrap();
+        Sender::send(&in_tx, 1usize).unwrap();
         let _ = rx_iter.next();
     }
 
     b.iter(|| {
-        in_tx.send(1usize).unwrap();
+        Sender::send(&in_tx, 1usize).unwrap();
         let _ = rx_iter.next();
     });
 
     drop(in_tx);
-
     child.join().unwrap();
 }

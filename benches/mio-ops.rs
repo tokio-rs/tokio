@@ -13,7 +13,7 @@ use mio::{Token, Ready, PollOpt};
 
 #[bench]
 fn mio_register_deregister(b: &mut Bencher) {
-    let addr = "127.0.0.1:13265".parse().unwrap();
+    let addr = "127.0.0.1:0".parse().unwrap();
     // Setup the server socket
     let sock = TcpListener::bind(&addr).unwrap();
     let poll = mio::Poll::new().unwrap();
@@ -29,7 +29,7 @@ fn mio_register_deregister(b: &mut Bencher) {
 
 #[bench]
 fn mio_reregister(b: &mut Bencher) {
-    let addr = "127.0.0.1:13265".parse().unwrap();
+    let addr = "127.0.0.1:0".parse().unwrap();
     // Setup the server socket
     let sock = TcpListener::bind(&addr).unwrap();
     let poll = mio::Poll::new().unwrap();

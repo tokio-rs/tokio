@@ -6,8 +6,7 @@
 use std::io;
 use std::sync::mpsc::TryRecvError;
 
-use futures::{Poll, Async};
-use futures::stream::Stream;
+use futures::{Poll, Async, Sink, AsyncSink, StartSend, Stream};
 use mio::channel;
 
 use reactor::{Handle, PollEvented};
@@ -79,6 +78,19 @@ impl<T> Sender<T> {
                 }
             }
         })
+    }
+}
+
+impl<T> Sink for Sender<T> {
+    type SinkItem = T;
+    type SinkError = io::Error;
+
+    fn start_send(&mut self, t: T) -> StartSend<T, io::Error> {
+        Sender::send(self, t).map(|()| AsyncSink::Ready)
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), io::Error> {
+        Ok(().into())
     }
 }
 
