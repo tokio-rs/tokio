@@ -212,22 +212,19 @@ impl Core {
     {
         let mut task = task::spawn(f);
         let ready = self.future_readiness.clone();
+        let mut future_fired = true;
 
-        // Next, move all that data into a dynamically dispatched closure to cut
-        // down on monomorphization costs. Inside this closure we unset the
-        // readiness of the future (as we're about to poll it) and then we check
-        // to see if it's done. If it's not then the event loop will turn again.
-        let mut res = None;
-        self._run(&mut || {
-            assert!(res.is_none());
-            match task.poll_future(ready.clone()) {
-                Ok(Async::NotReady) => {}
-                Ok(Async::Ready(e)) => res = Some(Ok(e)),
-                Err(e) => res = Some(Err(e)),
+        loop {
+            if future_fired {
+                let res = try!(CURRENT_LOOP.set(self, || {
+                    task.poll_future(ready.clone())
+                }));
+                if let Async::Ready(e) = res {
+                    return Ok(e)
+                }
             }
-            res.is_some()
-        });
-        res.expect("run should not return until future is done")
+            future_fired = self.poll(None);
+        }
     }
 
     /// Performs one iteration of the event loop, blocking on waiting for events
@@ -239,62 +236,44 @@ impl Core {
     /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
     /// empty future (one that never finishes).
     pub fn turn(&mut self, max_wait: Option<Duration>) {
-        self.poll_internal(max_wait, &mut || true).expect("Error in event loop turn");
+        self.poll(max_wait);
     }
 
-    fn _run(&mut self, done: &mut FnMut() -> bool) {
-        // Check to see if we're done immediately, if so we shouldn't do any
-        // work.
-        if CURRENT_LOOP.set(self, || done()) {
-            return
-        }
-
-        let mut finished = false;
-        while !finished {
-            finished = self.poll_internal(None, done).expect("Error in event loop")
-        }
-    }
-
-    fn poll_internal(&mut self, max_wait: Option<Duration>, done: &mut FnMut() -> bool) -> io::Result<bool> {
-        let amt;
+    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
+        // Given the `max_wait` variable specified, figure out the actual
+        // timeout that we're going to pass to `poll`. This involves taking a
+        // look at active timers on our heap as well.
         let start = Instant::now();
-        {
-            let inner = self.inner.borrow_mut();
-            let timeout = inner.timer_heap.peek().map(|t| {
-                if t.0 < start {
-                    Duration::new(0, 0)
-                } else {
-                    t.0 - start
-                }
-            });
-            let timeout = if let (Some(d1), Some(d2)) = (max_wait, timeout) {
-                Some(cmp::min(d1, d2))
+        let timeout = self.inner.borrow_mut().timer_heap.peek().map(|t| {
+            if t.0 < start {
+                Duration::new(0, 0)
             } else {
-                max_wait.or(timeout)
-            };
-            match inner.io.poll(&mut self.events, timeout) {
-                Ok(a) => {
-                    amt = a;
-                }
-                // On Linux, Poll::poll is epoll_wait, which may return EINTR if a
-                // ptracer attaches.
-                Err(ref e) if e.kind() == ErrorKind::Interrupted => {
-                    return Ok(false)
-                },
-                Err(e) => {
-                    return Err(e)
-                },
+                t.0 - start
             }
-        }
-        debug!("loop poll - {:?}", start.elapsed());
-        debug!("loop time - {:?}", Instant::now());
+        });
+        let timeout = match (max_wait, timeout) {
+            (Some(d1), Some(d2)) => Some(cmp::min(d1, d2)),
+            (max_wait, timeout) => max_wait.or(timeout),
+        };
 
-        // First up, process all timeouts that may have just occurred.
-        let start = Instant::now();
-        self.consume_timeouts(start);
+        // Block waiting for an event to happen, peeling out how many events
+        // happened.
+        let amt = match self.inner.borrow_mut().io.poll(&mut self.events, timeout) {
+            Ok(a) => a,
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
+            Err(e) => panic!("error in poll: {}", e),
+        };
 
-        // Next, process all the events that came in.
-        let mut finished = false;
+        let after_poll = Instant::now();
+        debug!("loop poll - {:?}", after_poll - start);
+        debug!("loop time - {:?}", after_poll);
+
+        // Process all timeouts that may have just occurred, updating the
+        // current time since
+        self.consume_timeouts(after_poll);
+
+        // Process all the events that came in, dispatching appropriately
+        let mut fired = false;
         for i in 0..self.events.len() {
             let event = self.events.get(i).unwrap();
             let token = event.token();
@@ -304,15 +283,13 @@ impl Core {
                 CURRENT_LOOP.set(&self, || self.consume_queue());
             } else if token == TOKEN_FUTURE {
                 self.future_readiness.0.set_readiness(mio::Ready::none()).unwrap();
-                if !finished && CURRENT_LOOP.set(self, || done()) {
-                    finished = true;
-                }
+                fired = true;
             } else {
                 self.dispatch(token, event.kind());
             }
         }
-        debug!("loop process - {} events, {:?}", amt, start.elapsed());
-        Ok(finished)
+        debug!("loop process - {} events, {:?}", amt, after_poll.elapsed());
+        return fired
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
