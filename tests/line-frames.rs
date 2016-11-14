@@ -6,29 +6,30 @@ use std::io;
 use std::net::Shutdown;
 
 use futures::{Future, Stream, Sink};
-use tokio_core::io::{write_all, read, Encode, Decode, EasyBuf, Io};
+use tokio_core::io::{write_all, read, Codec, EasyBuf, Io};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
 
-pub struct Line(EasyBuf);
+pub struct LineCodec;
 
-impl Decode for Line {
-    fn decode(buf: &mut EasyBuf) -> Result<Option<Line>, io::Error> {
+impl Codec for LineCodec {
+    type In = EasyBuf;
+    type Out = EasyBuf;
+
+    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<EasyBuf>, io::Error> {
         match buf.as_slice().iter().position(|&b| b == b'\n') {
-            Some(i) => Ok(Some(Line(buf.drain_to(i + 1).into()))),
+            Some(i) => Ok(Some(buf.drain_to(i + 1).into())),
             None => Ok(None),
         }
     }
 
-    fn done(buf: &mut EasyBuf) -> io::Result<Line> {
+    fn decode_eof(&mut self, buf: &mut EasyBuf) -> io::Result<EasyBuf> {
         let amt = buf.len();
-        Ok(Line(buf.drain_to(amt)))
+        Ok(buf.drain_to(amt))
     }
-}
 
-impl Encode for Line {
-    fn encode(self, into: &mut Vec<u8>) {
-        into.extend_from_slice(self.0.as_slice());
+    fn encode(&mut self, item: EasyBuf, into: &mut Vec<u8>) {
+        into.extend_from_slice(item.as_slice());
     }
 }
 
@@ -42,7 +43,7 @@ fn echo() {
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
     let addr = listener.local_addr().unwrap();
     let srv = listener.incoming().for_each(move |(socket, _)| {
-        let (stream, sink) = socket.framed::<Line, Line>().split();
+        let (stream, sink) = socket.framed(LineCodec).split();
         handle.spawn(sink.send_all(stream).map(|_| ()).map_err(|_| ()));
         Ok(())
     });

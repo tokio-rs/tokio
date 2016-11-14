@@ -1,5 +1,4 @@
 use std::io;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -185,17 +184,24 @@ impl<'a> Drop for EasyBufMut<'a> {
     }
 }
 
-/// Decoding of a frame from an internal buffer.
+/// Encoding and decoding of frames via buffers.
 ///
-/// This trait is used when constructing an instance of `Framed`. It defines how
-/// to decode the incoming bytes on a stream to the specified type of frame for
-/// that framed I/O stream.
+/// This trait is used when constructing an instance of `Framed`. It provides
+/// two types: `In`, for decoded input frames, and `Out`, for outgoing frames
+/// that need to be encoded. It also provides methods to actually perform the
+/// encoding and decoding, which work with corresponding buffer types.
 ///
-/// The primary method of this trait, `decode`, attempts to decode a
-/// frame from a buffer of bytes. It has the option of returning `NotReady`,
-/// indicating that more bytes need to be read before decoding can
-/// continue.
-pub trait Decode: Sized {
+/// The trait itself is implemented on a type that can track state for decoding
+/// or encoding, which is particularly useful for streaming parsers. In many
+/// cases, though, this type will simply be a unit struct (e.g. `struct
+/// HttpCodec`).
+pub trait Codec {
+    /// The type of decoded frames.
+    type In;
+
+    /// The type of frames to be encoded.
+    type Out;
+
     /// Attempts to decode a frame from the provided buffer of bytes.
     ///
     /// This method is called by `Framed` whenever bytes are ready to be parsed.
@@ -216,7 +222,7 @@ pub trait Decode: Sized {
     /// Finally, if the bytes in the buffer are malformed then an error is
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
-    fn decode(buf: &mut EasyBuf) -> Result<Option<Self>, io::Error>;
+    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<Self::In>, io::Error>;
 
     /// A default method available to be called when there are no more bytes
     /// available to be read from the underlying I/O.
@@ -224,49 +230,86 @@ pub trait Decode: Sized {
     /// This method defaults to calling `decode` and returns an error if
     /// `Ok(None)` is returned. Typically this doesn't need to be implemented
     /// unless the framing protocol differs near the end of the stream.
-    fn done(buf: &mut EasyBuf) -> io::Result<Self> {
-        match try!(Self::decode(buf)) {
+    fn decode_eof(&mut self, buf: &mut EasyBuf) -> io::Result<Self::In> {
+        match try!(self.decode(buf)) {
             Some(frame) => Ok(frame),
             None => Err(io::Error::new(io::ErrorKind::Other,
                                        "bytes remaining on stream")),
         }
     }
-}
 
-/// A trait for encoding frames into a byte buffer.
-///
-/// This trait is used as a building block of `Framed` to define how frames are
-/// encoded into bytes to get passed to the underlying byte stream. Each
-/// frame written to `Framed` will be encoded with this trait to an internal
-/// buffer. That buffer is then written out when possible to the underlying I/O
-/// stream.
-pub trait Encode {
     /// Encodes a frame into the buffer provided.
     ///
     /// This method will encode `msg` into the byte buffer provided by `buf`.
     /// The `buf` provided is an internal buffer of the `Framed` instance and
     /// will be written out when possible.
-    fn encode(self, buf: &mut Vec<u8>);
+    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>);
 }
 
-struct ReadState {
-    eof: bool,
-    is_readable: bool,
-    rd: EasyBuf,
+/// A `Stream` interface to an underlying `Io` object, using the `Decode` trait
+/// to decode frames.
+pub struct FramedRead<T, C> {
+    framed: BiLock<Framed<T, C>>,
 }
 
-impl ReadState {
-    fn new() -> ReadState {
-        ReadState {
-            eof: false,
-            is_readable: false,
-            rd: EasyBuf::new(),
+impl<T: Io, C: Codec> Stream for FramedRead<T, C> {
+    type Item = C::In;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Option<C::In>, io::Error> {
+        if let Async::Ready(mut guard) = self.framed.poll_lock() {
+            guard.poll()
+        } else {
+            Ok(Async::NotReady)
         }
     }
 }
 
-impl ReadState {
-    fn poll<T: Io, D: Decode>(&mut self, upstream: &mut T) -> Poll<Option<D>, io::Error> {
+/// A `Sink` interface to an underlying `Io` object, using the `Encode` trait
+/// to encode frames.
+pub struct FramedWrite<T, C> {
+    framed: BiLock<Framed<T, C>>,
+}
+
+impl<T: Io, C: Codec> Sink for FramedWrite<T, C> {
+    type SinkItem = C::Out;
+    type SinkError = io::Error;
+
+    fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, io::Error> {
+        if let Async::Ready(mut guard) = self.framed.poll_lock() {
+            guard.start_send(item)
+        } else {
+            Ok(AsyncSink::NotReady(item))
+        }
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), io::Error> {
+        if let Async::Ready(mut guard) = self.framed.poll_lock() {
+            guard.poll_complete()
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+/// A unified `Stream` and `Sink` interface to an underlying `Io` object, using
+/// the `Encode` and `Decode` traits to encode and decode frames.
+///
+/// You can acquire a `Framed` instance by using the `Io::framed` adapter.
+pub struct Framed<T, C> {
+    upstream: T,
+    codec: C,
+    eof: bool,
+    is_readable: bool,
+    rd: EasyBuf,
+    wr: Vec<u8>,
+}
+
+impl<T: Io, C: Codec> Stream for Framed<T, C> {
+    type Item = C::In;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Option<C::In>, io::Error> {
         loop {
             // If the read buffer has any pending data, then it could be
             // possible that `decode` will return a new frame. We leave it to
@@ -276,12 +319,12 @@ impl ReadState {
                     if self.rd.len() == 0 {
                         return Ok(None.into())
                     } else {
-                        let frame = try!(Decode::done(&mut self.rd));
+                        let frame = try!(self.codec.decode_eof(&mut self.rd));
                         return Ok(Async::Ready(Some(frame)))
                     }
                 }
                 trace!("attempting to decode a frame");
-                if let Some(frame) = try!(Decode::decode(&mut self.rd)) {
+                if let Some(frame) = try!(self.codec.decode(&mut self.rd)) {
                     trace!("frame decoded from buffer");
                     return Ok(Async::Ready(Some(frame)));
                 }
@@ -294,7 +337,7 @@ impl ReadState {
             //
             // TODO: shouldn't read_to_end, that may read a lot
             let before = self.rd.len();
-            let ret = upstream.read_to_end(&mut self.rd.get_mut());
+            let ret = self.upstream.read_to_end(&mut self.rd.get_mut());
             match ret {
                 Ok(_n) => self.eof = true,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -309,26 +352,18 @@ impl ReadState {
     }
 }
 
-struct WriteState {
-    wr: Vec<u8>,
-}
+impl<T: Io, C: Codec> Sink for Framed<T, C> {
+    type SinkItem = C::Out;
+    type SinkError = io::Error;
 
-impl WriteState {
-    fn new() -> WriteState {
-        WriteState {
-            wr: Vec::with_capacity(8 * 1024),
-        }
-    }
-}
-
-impl WriteState {
-    fn write<E: Encode>(&mut self, data: E) {
-        data.encode(&mut self.wr)
+    fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, io::Error> {
+        self.codec.encode(item, &mut self.wr);
+        Ok(AsyncSink::Ready)
     }
 
-    fn poll_complete<T: Io>(&mut self, upstream: &mut T) -> Poll<(), io::Error> {
+    fn poll_complete(&mut self) -> Poll<(), io::Error> {
         // Try flushing the underlying IO
-        try_nb!(upstream.flush());
+        try_nb!(self.upstream.flush());
 
         trace!("flushing framed transport");
 
@@ -340,119 +375,32 @@ impl WriteState {
 
             trace!("writing; remaining={:?}", self.wr.len());
 
-            let n = try_nb!(upstream.write(&self.wr));
+            let n = try_nb!(self.upstream.write(&self.wr));
             self.wr.drain(..n);
         }
     }
 }
 
-/// A `Stream` interface to an underlying `Io` object, using the `Decode` trait
-/// to decode frames.
-pub struct FramedRead<T, D> {
-    upstream: BiLock<T>,
-    read_state: ReadState,
-    _phantom: PhantomData<D>,
-}
-
-impl<T: Io, D: Decode> Stream for FramedRead<T, D> {
-    type Item = D;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<D>, io::Error> {
-        if let Async::Ready(mut guard) = self.upstream.poll_lock() {
-            self.read_state.poll(&mut *guard)
-        } else {
-            Ok(Async::NotReady)
-        }
-    }
-}
-
-/// A `Sink` interface to an underlying `Io` object, using the `Encode` trait
-/// to encode frames.
-pub struct FramedWrite<T, E> {
-    upstream: BiLock<T>,
-    write_state: WriteState,
-    _phantom: PhantomData<E>,
-}
-
-impl<T: Io, E: Encode> Sink for FramedWrite<T, E> {
-    type SinkItem = E;
-    type SinkError = io::Error;
-
-    fn start_send(&mut self, item: E) -> StartSend<E, io::Error> {
-        self.write_state.write(item);
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), io::Error> {
-        if let Async::Ready(mut guard) = self.upstream.poll_lock() {
-            self.write_state.poll_complete(&mut *guard)
-        } else {
-            Ok(Async::NotReady)
-        }
-    }
-}
-
-/// A unified `Stream` and `Sink` interface to an underlying `Io` object, using
-/// the `Encode` and `Decode` traits to encode and decode frames.
-///
-/// You can acquire a `Framed` instance by using the `Io::framed` adapter.
-pub struct Framed<T, D, E> {
-    upstream: T,
-    read_state: ReadState,
-    write_state: WriteState,
-    _phantom: PhantomData<(D, E)>,
-}
-
-impl<T: Io, D: Decode, E: Encode> Stream for Framed<T, D, E> {
-    type Item = D;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<D>, io::Error> {
-        self.read_state.poll(&mut self.upstream)
-    }
-}
-
-impl<T: Io, D: Decode, E: Encode> Sink for Framed<T, D, E> {
-    type SinkItem = E;
-    type SinkError = io::Error;
-
-    fn start_send(&mut self, item: E) -> StartSend<E, io::Error> {
-        self.write_state.write(item);
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), io::Error> {
-        self.write_state.poll_complete(&mut self.upstream)
-    }
-}
-
-pub fn framed<T, D, E>(io: T) -> Framed<T, D, E> {
+pub fn framed<T, C>(io: T, codec: C) -> Framed<T, C> {
     Framed {
         upstream: io,
-        read_state: ReadState::new(),
-        write_state: WriteState::new(),
-        _phantom: PhantomData,
+        codec: codec,
+        eof: false,
+        is_readable: false,
+        rd: EasyBuf::new(),
+        wr: Vec::with_capacity(8 * 1024),
     }
 }
 
-impl<T, D, E> Framed<T, D, E> {
+impl<T, C> Framed<T, C> {
     /// Splits this `Stream + Sink` object into separate `Stream` and `Sink`
     /// objects, which can be useful when you want to split ownership between
     /// tasks, or allow direct interaction between the two objects (e.g. via
     /// `Sink::send_all`).
-    pub fn split(self) -> (FramedRead<T, D>, FramedWrite<T, E>) {
-        let (a, b) = BiLock::new(self.upstream);
-        let read = FramedRead {
-            upstream: a,
-            read_state: ReadState::new(),
-            _phantom: PhantomData,
-        };
-        let write = FramedWrite {
-            upstream: b,
-            write_state: WriteState::new(),
-            _phantom: PhantomData,
-        };
+    pub fn split(self) -> (FramedRead<T, C>, FramedWrite<T, C>) {
+        let (a, b) = BiLock::new(self);
+        let read = FramedRead { framed: a };
+        let write = FramedWrite { framed: b };
         (read, write)
     }
 
