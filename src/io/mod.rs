@@ -42,7 +42,7 @@ mod split;
 mod window;
 mod write_all;
 pub use self::copy::{copy, Copy};
-pub use self::frame::{EasyBuf, EasyBufMut, FramedRead, FramedWrite, Framed, Decode, Encode};
+pub use self::frame::{EasyBuf, EasyBufMut, FramedRead, FramedWrite, Framed, Codec};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
@@ -113,13 +113,9 @@ pub trait Io: io::Read + io::Write {
     ///
     /// Raw I/O objects work with byte sequences, but higher-level code usually
     /// wants to batch these into meaningful chunks, called "frames". This
-    /// method layers framing on top of an I/O object, by using the `Encode` and
-    /// `Decode` traits:
-    ///
-    /// - `Encode` interprets frames we want to send into bytes;
-    /// - `Decode` interprets incoming bytes into a stream of frames.
-    ///
-    /// Note that the incoming and outgoing frame types may be distinct.
+    /// method layers framing on top of an I/O object, by using the `Codec`
+    /// traits to handle encoding and decoding of messages frames. Note that
+    /// the incoming and outgoing frame types may be distinct.
     ///
     /// This function returns a *single* object that is both `Stream` and
     /// `Sink`; grouping this into a single object is often useful for layering
@@ -129,10 +125,10 @@ pub trait Io: io::Read + io::Write {
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
-    fn framed<D: Decode, E: Encode>(self) -> Framed<Self, D, E>
+    fn framed<C: Codec>(self, codec: C) -> Framed<Self, C>
         where Self: Sized,
     {
-        frame::framed(self)
+        frame::framed(self, codec)
     }
 
     /// Helper method for splitting this read/write object into two halves.
