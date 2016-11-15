@@ -156,9 +156,9 @@ pub trait Io: io::Read + io::Write {
 /// value that indicates "would block" the current future's task is arranged to
 /// receive a notification when the method would otherwise not indicate that it
 /// would block.
-///
+//
 /// For a sample implementation of `FramedIo` you can take a look at the
-/// `EasyFramed` type in the `easy` module of htis crate.
+/// `Framed` type in the `frame` module of this crate.
 #[doc(hidden)]
 #[deprecated(since = "0.1.1", note = "replaced by Sink + Stream")]
 pub trait FramedIo {
