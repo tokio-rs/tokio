@@ -34,6 +34,39 @@ impl TcpListener {
         TcpListener::new(l, handle)
     }
 
+    /// Attempt to accept a connection and create a new connected `TcpStream` if successful.
+    ///
+    /// It is more idiomatic to treat incoming connection as a `Stream` of `TcpStream`s.
+    /// See `incoming()` for details.
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+        }
+
+        let res = self.io.get_ref().accept();
+        match res {
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read();
+                }
+                Err(e)
+            },
+            Ok((sock, addr)) => {
+                let (tx, rx) = futures::oneshot();
+                let remote = self.io.remote().clone();
+                remote.spawn(move |handle| {
+                    let res = PollEvented::new(sock, handle)
+                        .map(move |io| {
+                            (TcpStream { io: io }, addr)
+                        });
+                    tx.complete(res);
+                    Ok(())
+                });
+                rx.then(|r| r.expect("shouldn't be canceled")).wait()
+            }
+        }
+    }
+
     /// Create a new TCP listener from the standard library's TCP listener.
     ///
     /// This method can be used when the `Handle::tcp_listen` method isn't
