@@ -357,27 +357,37 @@ impl<T: Io, C: Codec> Sink for Framed<T, C> {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, io::Error> {
+        // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
+        // *still* over 8KiB, then apply backpressure (reject the send).
+        if self.wr.len() > 8 * 1024 {
+            try!(self.poll_complete());
+            if self.wr.len() > 8 * 1024 {
+                return Ok(AsyncSink::NotReady(item));
+            }
+        }
+
         self.codec.encode(item, &mut self.wr);
         Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), io::Error> {
+        trace!("flushing framed transport");
+
+        while !self.wr.is_empty() {
+            trace!("writing; remaining={}", self.wr.len());
+            let n = try_nb!(self.upstream.write(&self.wr));
+            if n == 0 {
+                return Err(io::Error::new(io::ErrorKind::WriteZero,
+                                          "failed to write frame to transport"));
+            }
+            self.wr.drain(..n);
+        }
+
         // Try flushing the underlying IO
         try_nb!(self.upstream.flush());
 
-        trace!("flushing framed transport");
-
-        loop {
-            if self.wr.len() == 0 {
-                trace!("framed transport flushed");
-                return Ok(Async::Ready(()));
-            }
-
-            trace!("writing; remaining={:?}", self.wr.len());
-
-            let n = try_nb!(self.upstream.write(&self.wr));
-            self.wr.drain(..n);
-        }
+        trace!("framed transport flushed");
+        return Ok(Async::Ready(()));
     }
 }
 
