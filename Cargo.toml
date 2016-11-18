@@ -13,6 +13,7 @@ An implementation of an asynchronous process management backed futures.
 [dependencies]
 tokio-core = "0.1"
 futures = "0.1"
+mio = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2"

@@ -1,3 +1,4 @@
+extern crate mio;
 extern crate libc;
 extern crate tokio_signal;
 
@@ -7,8 +8,12 @@ use std::process::{self, ExitStatus};
 
 use futures::stream::Stream;
 use futures::{Future, Poll, Async};
+use tokio_core::reactor::{Handle,PollEvented};
 use self::libc::c_int;
 use self::tokio_signal::unix::Signal;
+
+use mio::{Evented,PollOpt,Ready,Token};
+use mio::unix::EventedFd;
 
 use Command;
 
@@ -16,6 +21,54 @@ pub struct Child {
     child: process::Child,
     reaped: bool,
     sigchld: Signal,
+    pub stdin: Option<ChildStdin>,
+    pub stdout: Option<ChildStdout>,
+    pub stderr: Option<ChildStderr>,
+}
+
+struct RawFdWrap<T>(T);
+
+pub struct StdStream<T> {
+    io: PollEvented<RawFdWrap<T>>,
+}
+
+pub type ChildStdin = StdStream<process::ChildStdin>;
+pub type ChildStdout = StdStream<process::ChildStdout>;
+pub type ChildStderr = StdStream<process::ChildStderr>;
+
+impl<T> Evented for RawFdWrap<T> where T: AsRawFd {
+    fn register(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        EventedFd(&self.0.as_raw_fd()).register(poll, token, interest, opts)
+    }
+    fn reregister(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest, opts)
+    }
+    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
+        EventedFd(&self.0.as_raw_fd()).deregister(poll)
+    }
+}
+
+impl<T> io::Read for StdStream<T> where T: io::Read {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.get_mut().0.read(buf)
+    }
+}
+
+impl<T> io::Write for StdStream<T> where T: io::Write {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.io.get_mut().0.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.io.get_mut().0.flush()
+    }
+}
+
+fn stdio<T>(option: &mut Option<T>, handle: &Handle) -> Result<Option<StdStream<T>>, io::Error>
+    where T: AsRawFd {
+
+    option.take().map_or(Ok(None), |stream| {
+        PollEvented::new(RawFdWrap(stream), handle).map(|io| Some(StdStream { io: io }))
+    })
 }
 
 /// Spawns a new child process.
@@ -42,12 +95,18 @@ pub struct Child {
 /// bad in theory...
 pub fn spawn(mut cmd: Command) -> Box<Future<Item=Child, Error=io::Error>> {
     Box::new(Signal::new(libc::SIGCHLD, &cmd.handle).and_then(move |sigchld| {
-        cmd.inner.spawn().map(|c| {
-            Child {
+        cmd.inner.spawn().and_then(|mut c| {
+            let stdin = try!(stdio(&mut c.stdin, &cmd.handle));
+            let stdout = try!(stdio(&mut c.stdout, &cmd.handle));
+            let stderr = try!(stdio(&mut c.stderr, &cmd.handle));
+            Ok(Child {
                 child: c,
                 reaped: false,
-                sigchld: sigchld
-            }
+                sigchld: sigchld,
+                stdin: stdin,
+                stdout: stdout,
+                stderr: stderr,
+            })
         })
     }))
 }

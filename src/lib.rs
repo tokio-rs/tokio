@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate futures;
 extern crate tokio_core;
+extern crate mio;
 
 use std::ffi::OsStr;
 use std::io;
@@ -17,6 +18,9 @@ mod imp;
 #[path = "windows.rs"]
 #[cfg(windows)]
 mod imp;
+
+pub use imp::ChildStdin;
+pub use imp::ChildStdout;
 
 pub struct Command {
     inner: process::Command,
@@ -94,6 +98,20 @@ impl Command {
         self
     }
 
+    pub fn stdin(&mut self, cfg: process::Stdio) -> &mut Self {
+        self.inner.stdin(cfg);
+        self
+    }
+
+    pub fn stdout(&mut self, cfg: process::Stdio) -> &mut Self {
+        self.inner.stdout(cfg);
+        self
+    }
+    pub fn stderr(&mut self, cfg: process::Stdio) -> &mut Self {
+        self.inner.stderr(cfg);
+        self
+    }
+
     pub fn spawn(self) -> Spawn {
         Spawn {
             inner: Box::new(imp::spawn(self).map(|c| Child { inner: c })),
@@ -117,6 +135,18 @@ impl Child {
 
     pub fn kill(&mut self) -> io::Result<()> {
         self.inner.kill()
+    }
+
+    pub fn stdin(&mut self) -> &mut Option<imp::ChildStdin> {
+        &mut self.inner.stdin
+    }
+
+    pub fn stdout(&mut self) -> &mut Option<imp::ChildStdout> {
+        &mut self.inner.stdout
+    }
+
+    pub fn stderr(&mut self) -> &mut Option<imp::ChildStderr> {
+        &mut self.inner.stderr
     }
 }
 
