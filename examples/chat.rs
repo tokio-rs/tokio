@@ -42,7 +42,7 @@ fn main() {
         // Create a channel for our stream, which other sockets will use to
         // send us messages. Then register our address with the stream to send
         // data to us.
-        let (tx, rx) = tokio_core::channel::channel(&handle).unwrap();
+        let (tx, rx) = futures::sync::mpsc::unbounded();
         connections.borrow_mut().insert(addr, tx);
 
         // Define here what we do for the actual I/O. That is, read a bunch of
@@ -54,7 +54,7 @@ fn main() {
         // Model the read portion of this socket by mapping an infinite
         // iterator to each line off the socket. This "loop" is then
         // terminated with an error once we hit EOF on the socket.
-        let iter = stream::iter(iter::repeat(()).map(Ok));
+        let iter = stream::iter(iter::repeat(()).map(Ok::<(), Error>));
         let socket_reader = iter.fold(reader, move |reader, _| {
             // Read a line off the socket, failing if we're at EOF
             let line = io::read_until(reader, b'\n', Vec::new());
@@ -74,18 +74,18 @@ fn main() {
             let connections = connections_inner.clone();
             line.map(move |(reader, message)| {
                 println!("{}: {:?}", addr, message);
-                let conns = connections.borrow_mut();
+                let mut conns = connections.borrow_mut();
                 if let Ok(msg) = message {
                     // For each open connection except the sender, send the
                     // string via the channel.
-                    let iter = conns.iter()
+                    let iter = conns.iter_mut()
                                     .filter(|&(&k, _)| k != addr)
                                     .map(|(_, v)| v);
                     for tx in iter {
                         tx.send(format!("{}: {}", addr, msg)).unwrap();
                     }
                 } else {
-                    let tx = conns.get(&addr).unwrap();
+                    let tx = conns.get_mut(&addr).unwrap();
                     tx.send("You didn't send valid UTF-8.".to_string()).unwrap();
                 }
                 reader
@@ -97,13 +97,14 @@ fn main() {
         let socket_writer = rx.fold(writer, |writer, msg| {
             let amt = io::write_all(writer, msg.into_bytes());
             let amt = amt.map(|(writer, _)| writer);
-            amt
+            amt.map_err(|_| ())
         });
 
         // Now that we've got futures representing each half of the socket, we
         // use the `select` combinator to wait for either half to be done to
         // tear down the other. Then we spawn off the result.
         let connections = connections.clone();
+        let socket_reader = socket_reader.map_err(|_| ());
         let connection = socket_reader.map(|_| ()).select(socket_writer.map(|_| ()));
         handle.spawn(connection.then(move |_| {
             connections.borrow_mut().remove(&addr);

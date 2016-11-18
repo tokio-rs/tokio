@@ -3,6 +3,9 @@
 //! This module contains a `Sender` and `Receiver` pair types which can be used
 //! to send messages between different future tasks.
 
+#![deprecated(since = "0.1.1", note = "use `futures::sync::mpsc` instead")]
+#![allow(deprecated)]
+
 use std::io;
 use std::sync::mpsc::TryRecvError;
 
