@@ -35,10 +35,10 @@ There are a few small examples showing off how to use this library:
 
 ## What is tokio-core?
 
-This crate is a connection `futures`, a zero-cost implementation of futures in
-Rust, and `mio` and a crate for zero-cost asynchronous I/O. The types and
+This crate is a connection between `futures`, a zero-cost implementation of futures in
+Rust, and `mio`, a crate for zero-cost asynchronous I/O. The types and
 structures implemented in `tokio-core` implement `Future` and `Stream` traits
-as appropriate. For example connecting a TCP stream returns a `Future`
+as appropriate. For example, connecting a TCP stream returns a `Future`
 resolving to a TCP stream, and a TCP listener implements a stream of TCP
 streams (accepted connections).
 
