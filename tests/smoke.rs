@@ -31,6 +31,9 @@ fn init() {
 fn exit(handle: &Handle) -> Command {
     let mut me = env::current_exe().unwrap();
     me.pop();
+    if me.ends_with("deps") {
+        me.pop();
+    }
     me.push("exit");
     Command::new(me, handle)
 }
