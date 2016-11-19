@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 #![feature(test)]
 
 extern crate test;
@@ -10,7 +11,7 @@ use std::net::SocketAddr;
 use std::thread;
 
 use futures::sync::oneshot;
-use futures::sync::spsc;
+use futures::sync::mpsc;
 use futures::{Future, Poll, Sink, Stream};
 use test::Bencher;
 use tokio_core::channel::Sender;
@@ -133,22 +134,22 @@ fn tokio_channel_latency(b: &mut Bencher) {
 
 #[bench]
 fn futures_channel_latency(b: &mut Bencher) {
-    let (mut in_tx, in_rx) = spsc::channel();
-    let (out_tx, out_rx) = spsc::channel::<_, ()>();
+    let (mut in_tx, in_rx) = mpsc::channel(32);
+    let (out_tx, out_rx) = mpsc::channel::<_>(32);
 
-    let child = thread::spawn(|| out_tx.send_all(in_rx).wait());
+    let child = thread::spawn(|| out_tx.send_all(in_rx.then(|r| r.unwrap())).wait());
     let mut rx_iter = out_rx.wait();
 
     // warmup phase; for some reason initial couple of runs are much slower
     //
     // TODO: Describe the exact reasons; caching? branch predictor? lazy closures?
     for _ in 0..8 {
-        in_tx.start_send(Ok(Ok(1usize))).unwrap();
+        in_tx.start_send(Ok(1usize)).unwrap();
         let _ = rx_iter.next();
     }
 
     b.iter(|| {
-        in_tx.start_send(Ok(Ok(1usize))).unwrap();
+        in_tx.start_send(Ok(1usize)).unwrap();
         let _ = rx_iter.next();
     });
 
