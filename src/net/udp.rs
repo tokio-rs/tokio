@@ -42,6 +42,20 @@ impl UdpSocket {
         UdpSocket::new(udp, handle)
     }
 
+    /// Creates a FramedUdp object, which leverages a supplied `EncodeUdp`
+    /// and `DecodeUdp` to implement `Stream` and `Sink` 
+    /// This moves the socket into the newly created FramedUdp object
+    pub fn framed<D, E>(self, decoder : D, encoder : E) -> Framed<D, E> {
+        FramedUdp {
+            socket: self,
+            encoder: encoder,
+            decoder: decoder,
+            is_readable: false,
+            rd: Vec::with_capacity(64 * 1024);
+            wr: Vec::with_capacity(64 * 1024),
+        }
+    }
+
     /// Returns the local address that this stream is bound to.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
