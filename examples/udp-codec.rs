@@ -108,7 +108,7 @@ fn main() {
 
     //Now we instruct `reactor::Core` to iterate, processing events until its future, `SelectAll`
     //has completed
-    if let Err(e) core.run(wait) {
+    if let Err(e) = core.run(wait) {
         error!("{}", e.0);
     }
 }
