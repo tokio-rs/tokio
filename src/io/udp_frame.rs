@@ -34,7 +34,7 @@ pub trait CodecUdp {
     ///
     /// The encode method also determines the destination to which the buffer should
     /// be directed, which will be returned as a SocketAddr;
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> SocketAddr;
+    fn encode(&mut self, msg: &Self::Out, buf: &mut Vec<u8>) -> SocketAddr;
     
     /// Attempts to decode a frame from the provided buffer of bytes.
     ///
@@ -55,7 +55,7 @@ pub trait CodecUdp {
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
     ///
-    fn decode(&mut self, src: &SocketAddr, buf: &mut Vec<u8>) -> Result<Option<Self::In>, io::Error>;
+    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> Result<Option<Self::In>, io::Error>;
 }
 
 /// A unified `Stream` and `Sink` interface to an underlying `Io` object, using
@@ -82,9 +82,8 @@ impl<C : CodecUdp> Stream for FramedUdp<C> {
                 Ok((n, addr)) => { 
                     trace!("read {} bytes", n);
                     trace!("attempting to decode a frame");
-                    if let Some(frame) = try!(self.codec.decode(&addr, &mut self.rd)) {
+                    if let Some(frame) = try!(self.codec.decode(&addr, & self.rd[.. n])) {
                         trace!("frame decoded from buffer");
-                        self.rd.clear();
                         return Ok(Async::Ready(Some(frame)));
                     }
                 }
@@ -109,7 +108,7 @@ impl<C : CodecUdp> Sink for FramedUdp<C> {
             }
         }
 
-        self.out_addr = Some(self.codec.encode(item, &mut self.wr));
+        self.out_addr = Some(self.codec.encode(&item, &mut self.wr));
         Ok(AsyncSink::Ready)
     }
 
@@ -118,11 +117,13 @@ impl<C : CodecUdp> Sink for FramedUdp<C> {
 
         while !self.wr.is_empty() {
             if let Some(outaddr) = self.out_addr {
-                trace!("writing; remaining={}", self.wr.len());
-                let n = try_nb!(self.socket.send_to(&self.wr, &outaddr));
+                let remaining = self.wr.len();
+                trace!("writing; remaining={}", remaining);
+                let n = try_nb!(self.socket.send_to(self.wr.as_slice(), &outaddr));
+                trace!("written {}", n);
                 self.wr.clear();
                 self.out_addr = None;
-                if n != self.wr.len() {
+                if n != remaining {
                     return Err(io::Error::new(io::ErrorKind::WriteZero,
                                               "failed to write frame datagram to socket"));
                 }
@@ -143,7 +144,7 @@ pub fn framed_udp<C>(socket : UdpSocket, codec : C) -> FramedUdp<C> {
     FramedUdp::new(
         socket,
         codec,
-        Vec::with_capacity(64 * 1024),
+        vec![0; 64 * 1024],
         Vec::with_capacity(64 * 1024)
     )
 }

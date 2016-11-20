@@ -2,8 +2,9 @@ use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
 use io::FramedUdp;
-use futures::Async;
+use futures::{Async, Future, Poll};
 use mio;
+use std::mem;
 
 use reactor::{Handle, PollEvented};
 
@@ -49,7 +50,7 @@ impl UdpSocket {
         FramedUdp::new(
             self,
             codec,
-            Vec::with_capacity(64 * 1024),
+            vec![0; 64 * 1024],
             Vec::with_capacity(64 * 1024)
         )
     }
@@ -95,6 +96,33 @@ impl UdpSocket {
                 Err(mio::would_block())
             }
             Err(e) => Err(e),
+        }
+    }
+    
+    /// Creates a future that will write the entire contents of the buffer `buf` to
+    /// the stream `a` provided.
+    ///
+    /// The returned future will return after data has been written to the outbound
+    /// socket. 
+    /// The future will resolve to the stream as well as the buffer (for reuse if
+    /// needed).
+    ///
+    /// Any error which happens during writing will cause both the stream and the
+    /// buffer to get destroyed.
+    ///
+    /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which should
+    /// be broadly applicable to accepting data which can be converted to a slice.
+    /// The `Window` struct is also available in this crate to provide a different
+    /// window into a slice if necessary.
+    pub fn send_dgram<'a, T>(&'a self, buf: T, addr : &'a SocketAddr) -> SendDGram<T>
+        where T: AsRef<[u8]>,
+    {
+        SendDGram {
+            state: UdpState::Writing {
+                sock: self,
+                addr: addr,
+                buf: buf,
+            },
         }
     }
 
@@ -258,6 +286,61 @@ impl UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
+    }
+}
+
+/// A future used to write the entire contents of some data to a stream.
+///
+/// This is created by the [`write_all`] top-level method.
+///
+/// [`write_all`]: fn.write_all.html
+pub struct SendDGram<'a, T> {
+    state: UdpState<'a, T>,
+}
+
+enum UdpState<'a, T> {
+    Writing {
+        sock: &'a UdpSocket,
+        buf: T,
+        addr: &'a SocketAddr,
+    },
+    Empty,
+}
+
+
+fn zero_write() -> io::Error {
+    io::Error::new(io::ErrorKind::WriteZero, "zero-length write")
+}
+
+fn incomplete_write(reason : &str) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, reason)
+}
+
+impl<'a, T> Future for SendDGram<'a, T>
+    where T: AsRef<[u8]>,
+{
+    type Item = T;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<T, io::Error> {
+        match self.state {
+            UdpState::Writing { ref sock, ref buf, ref addr} => {
+                let buf = buf.as_ref();
+                let n = try_nb!(sock.send_to(&buf, addr));
+                if n == 0 {
+                    return Err(zero_write())
+                }
+                if n != buf.len() {
+                    return Err(incomplete_write("Failed to send entire message in datagram"))
+                }
+            }
+            UdpState::Empty => panic!("poll a SendAllTo after it's done"),
+        }
+
+        match mem::replace(&mut self.state, UdpState::Empty) {
+            UdpState::Writing { buf, .. } => Ok((buf).into()),
+            UdpState::Empty => panic!(),
+        }
     }
 }
 
