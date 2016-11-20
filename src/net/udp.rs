@@ -1,7 +1,7 @@
 use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
-
+use io::FramedUdp;
 use futures::Async;
 use mio;
 
@@ -45,15 +45,13 @@ impl UdpSocket {
     /// Creates a FramedUdp object, which leverages a supplied `EncodeUdp`
     /// and `DecodeUdp` to implement `Stream` and `Sink` 
     /// This moves the socket into the newly created FramedUdp object
-    pub fn framed<D, E>(self, decoder : D, encoder : E) -> Framed<D, E> {
-        FramedUdp {
-            socket: self,
-            encoder: encoder,
-            decoder: decoder,
-            is_readable: false,
-            rd: Vec::with_capacity(64 * 1024);
-            wr: Vec::with_capacity(64 * 1024),
-        }
+    pub fn framed<C>(self, codec : C) -> FramedUdp<C> {
+        FramedUdp::new(
+            self,
+            codec,
+            Vec::with_capacity(64 * 1024),
+            Vec::with_capacity(64 * 1024)
+        )
     }
 
     /// Returns the local address that this stream is bound to.
