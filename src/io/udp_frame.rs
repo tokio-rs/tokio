@@ -115,7 +115,7 @@ impl<C : CodecUdp> Sink for FramedUdp<C> {
     fn poll_complete(&mut self) -> Poll<(), io::Error> {
         trace!("flushing framed transport");
 
-        while !self.wr.is_empty() {
+        if !self.wr.is_empty() {
             if let Some(outaddr) = self.out_addr {
                 let remaining = self.wr.len();
                 trace!("writing; remaining={}", remaining);
@@ -124,13 +124,12 @@ impl<C : CodecUdp> Sink for FramedUdp<C> {
                 self.wr.clear();
                 self.out_addr = None;
                 if n != remaining {
-                    return Err(io::Error::new(io::ErrorKind::WriteZero,
-                                              "failed to write frame datagram to socket"));
+                    return Err(io::Error::new(io::ErrorKind::Other,
+                                              "failed to write entire datagram to socket"));
                 }
             }
             else {
-                return Err(io::Error::new(io::ErrorKind::Other,
-                                          "outbound stream in invalid state: out_addr is not known"));
+                panic!("outbound stream in invalid state: out_addr is not known");
             }
         }
 
@@ -153,7 +152,7 @@ impl<C> FramedUdp<C> {
 
     /// Creates a new FramedUdp object.  It moves the supplied socket, codec
     /// supplied vecs. 
-    pub fn new(sock : UdpSocket, codec : C, rd_buf : Vec<u8>, wr_buf : Vec<u8>) -> FramedUdp<C> {
+    fn new(sock : UdpSocket, codec : C, rd_buf : Vec<u8>, wr_buf : Vec<u8>) -> FramedUdp<C> {
         FramedUdp {
             socket: sock,
             codec : codec,

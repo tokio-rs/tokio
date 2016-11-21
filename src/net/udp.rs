@@ -1,7 +1,7 @@
 use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
-use io::FramedUdp;
+use io::{FramedUdp, framed_udp};
 use futures::{Async, Future, Poll};
 use mio;
 use std::mem;
@@ -47,12 +47,7 @@ impl UdpSocket {
     /// and `DecodeUdp` to implement `Stream` and `Sink` 
     /// This moves the socket into the newly created FramedUdp object
     pub fn framed<C>(self, codec : C) -> FramedUdp<C> {
-        FramedUdp::new(
-            self,
-            codec,
-            vec![0; 64 * 1024],
-            Vec::with_capacity(64 * 1024)
-        )
+        framed_udp(self, codec)
     }
 
     /// Returns the local address that this stream is bound to.
@@ -114,7 +109,7 @@ impl UdpSocket {
     /// be broadly applicable to accepting data which can be converted to a slice.
     /// The `Window` struct is also available in this crate to provide a different
     /// window into a slice if necessary.
-    pub fn send_dgram<'a, T>(&'a self, buf: T, addr : &'a SocketAddr) -> SendDGram<T>
+    pub fn send_dgram<T>(self, buf: T, addr : SocketAddr) -> SendDGram<T>
         where T: AsRef<[u8]>,
     {
         SendDGram {
@@ -294,51 +289,43 @@ impl fmt::Debug for UdpSocket {
 /// This is created by the [`write_all`] top-level method.
 ///
 /// [`write_all`]: fn.write_all.html
-pub struct SendDGram<'a, T> {
-    state: UdpState<'a, T>,
+pub struct SendDGram<T> {
+    state: UdpState<T>,
 }
 
-enum UdpState<'a, T> {
+enum UdpState<T> {
     Writing {
-        sock: &'a UdpSocket,
+        sock: UdpSocket,
         buf: T,
-        addr: &'a SocketAddr,
+        addr: SocketAddr,
     },
     Empty,
-}
-
-
-fn zero_write() -> io::Error {
-    io::Error::new(io::ErrorKind::WriteZero, "zero-length write")
 }
 
 fn incomplete_write(reason : &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, reason)
 }
 
-impl<'a, T> Future for SendDGram<'a, T>
+impl<T> Future for SendDGram<T>
     where T: AsRef<[u8]>,
 {
-    type Item = T;
+    type Item = (UdpSocket, T);
     type Error = io::Error;
 
-    fn poll(&mut self) -> Poll<T, io::Error> {
+    fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
         match self.state {
             UdpState::Writing { ref sock, ref buf, ref addr} => {
                 let buf = buf.as_ref();
                 let n = try_nb!(sock.send_to(&buf, addr));
-                if n == 0 {
-                    return Err(zero_write())
-                }
                 if n != buf.len() {
                     return Err(incomplete_write("Failed to send entire message in datagram"))
                 }
             }
-            UdpState::Empty => panic!("poll a SendAllTo after it's done"),
+            UdpState::Empty => panic!("poll a SendDGram after it's done"),
         }
 
         match mem::replace(&mut self.state, UdpState::Empty) {
-            UdpState::Writing { buf, .. } => Ok((buf).into()),
+            UdpState::Writing { sock, buf, .. } => Ok(Async::Ready((sock, (buf).into()))),
             UdpState::Empty => panic!(),
         }
     }

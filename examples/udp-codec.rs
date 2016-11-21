@@ -69,12 +69,10 @@ fn main() {
     let client = UdpSocket::bind(&clientaddr, &handle).unwrap();
 
     //start things off by sending a ping from the client to the server
-    //This doesn't go through the codec to encode the message, but rather
-    //it sends raw data with the send_dgram future
-    {
-        let job = client.send_dgram(b"PING\n", &srvaddr);
-        core.run(job).unwrap();
-    }
+    //This doesn't utilize the codec to encode the message, but rather
+    //it sends raw data directly to the remote peer with the send_dgram future
+    let job = client.send_dgram(b"PING\n", srvaddr);
+    let (client, _buf) = core.run(job).unwrap();
 
     //We create a FramedUdp instance, which associates a socket
     //with a codec. We then immediate split that into the 
