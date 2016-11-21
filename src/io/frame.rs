@@ -243,7 +243,7 @@ pub trait Codec {
     /// This method will encode `msg` into the byte buffer provided by `buf`.
     /// The `buf` provided is an internal buffer of the `Framed` instance and
     /// will be written out when possible.
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>);
+    fn encode(&mut self, msg: Self::Out) -> Result<Vec<u8>, io::Error>;
 }
 
 /// A `Stream` interface to an underlying `Io` object, using the `Decode` trait
@@ -366,7 +366,7 @@ impl<T: Io, C: Codec> Sink for Framed<T, C> {
             }
         }
 
-        self.codec.encode(item, &mut self.wr);
+        self.wr = self.codec.encode(item).unwrap();
         Ok(AsyncSink::Ready)
     }
 
