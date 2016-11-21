@@ -43,7 +43,7 @@ fn echo() {
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
     let addr = listener.local_addr().unwrap();
     let srv = listener.incoming().for_each(move |(socket, _)| {
-        let (stream, sink) = socket.framed(LineCodec).split();
+        let (sink, stream) = socket.framed(LineCodec).split();
         handle.spawn(sink.send_all(stream).map(|_| ()).map_err(|_| ()));
         Ok(())
     });
