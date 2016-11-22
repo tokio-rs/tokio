@@ -8,4 +8,4 @@ mod udp;
 
 pub use self::tcp::{TcpStream, TcpStreamNew};
 pub use self::tcp::{TcpListener, Incoming};
-pub use self::udp::{UdpSocket, UdpCodec, UdpFramed};
+pub use self::udp::{UdpSocket, UdpCodec, UdpFramed, SendDgram, RecvDgram};
