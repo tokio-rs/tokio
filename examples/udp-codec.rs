@@ -25,20 +25,27 @@ use std::str;
 /// so that it can respond back. 
 /// In the real world, one would probably
 /// want an associative of remote peers to their state
+///
+/// Note that this takes a pretty draconian stance by returning
+/// an error if it can't find a newline in the datagram it received
 pub struct LineCodec {
     addr : Option<SocketAddr>
 }
 
 impl CodecUdp for LineCodec {
-    type In = Vec<u8>;
+    type In = Vec<Vec<u8>>;
     type Out = Vec<u8>;
 
-    fn decode(&mut self, addr : &SocketAddr, buf: &[u8]) -> Result<Option<Self::In>, io::Error> {
+    fn decode(&mut self, addr : &SocketAddr, buf: &[u8]) -> Result<Self::In, io::Error> {
         trace!("decoding {} - {}", str::from_utf8(buf).unwrap(), addr);
         self.addr = Some(*addr);
-        match buf.iter().position(|&b| b == b'\n') {
-            Some(i) => Ok(Some(buf[.. i].into())),
-            None => Ok(None),
+        let res : Vec<Vec<u8>> = buf.split(|c| *c == b'\n').map(|s| s.into()).collect();
+        if res.len() > 0 {
+            Ok(res)
+        }
+        else {
+            Err(io::Error::new(io::ErrorKind::Other,
+                                       "failed to find newline in datagram"))
         }
     }
     
@@ -83,8 +90,8 @@ fn main() {
     //Note that we pass srvsink into fold, so that it can be
     //supplied to every iteration. The reason for this is
     //sink.send moves itself into `send` and then returns itself
-    let srvloop = srvstream.fold(srvsink, move |sink, buf| { 
-        println!("{}", str::from_utf8(buf.as_slice()).unwrap());
+    let srvloop = srvstream.fold(srvsink, move |sink, lines| { 
+        println!("{}", str::from_utf8(lines[0].as_slice()).unwrap());
         sink.send(b"PONG".to_vec())
     }).map(|_| ());
     
@@ -92,8 +99,8 @@ fn main() {
     let (clistream, clisink) = client.framed(clicodec).split();
 
     //And another infinite iteration
-    let cliloop = clistream.fold(clisink, move |sink, buf| { 
-            println!("{}", str::from_utf8(buf.as_slice()).unwrap());
+    let cliloop = clistream.fold(clisink, move |sink, lines| { 
+            println!("{}", str::from_utf8(lines[0].as_slice()).unwrap());
             sink.send(b"PING".to_vec())
         }).map(|_| ());
 

@@ -45,17 +45,11 @@ pub trait CodecUdp {
     /// decode, as the next poll_read that occurs will write the next datagram
     /// into the buffer, without regard for what is already there. 
     ///
-    /// If the bytes look valid, but a frame isn't fully available yet, then
-    /// `Ok(None)` is returned. This indicates to the `Framed` instance that
-    /// it needs to read some more bytes before calling this method again.
-    /// In such a case, it is decode's responsibility to copy the data
-    /// into their own internal buffer for future use.
-    ///
     /// Finally, if the bytes in the buffer are malformed then an error is
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
     ///
-    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> Result<Option<Self::In>, io::Error>;
+    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> Result<Self::In, io::Error>;
 }
 
 /// A unified `Stream` and `Sink` interface to an underlying `Io` object, using
@@ -82,10 +76,9 @@ impl<C : CodecUdp> Stream for FramedUdp<C> {
                 Ok((n, addr)) => { 
                     trace!("read {} bytes", n);
                     trace!("attempting to decode a frame");
-                    if let Some(frame) = try!(self.codec.decode(&addr, & self.rd[.. n])) {
-                        trace!("frame decoded from buffer");
-                        return Ok(Async::Ready(Some(frame)));
-                    }
+                    let frame = try!(self.codec.decode(&addr, & self.rd[.. n]));
+                    trace!("frame decoded from buffer");
+                    return Ok(Async::Ready(Some(frame)));
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     return Ok(Async::NotReady)
