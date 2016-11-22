@@ -28,8 +28,9 @@ impl Codec for LineCodec {
         Ok(buf.drain_to(amt))
     }
 
-    fn encode(&mut self, item: EasyBuf, into: &mut Vec<u8>) {
+    fn encode(&mut self, item: EasyBuf, into: &mut Vec<u8>) -> io::Result<()> {
         into.extend_from_slice(item.as_slice());
+        Ok(())
     }
 }
 
