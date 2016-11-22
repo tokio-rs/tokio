@@ -1,9 +1,10 @@
 use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
-
-use futures::Async;
+use io::{FramedUdp, framed_udp};
+use futures::{Async, Future, Poll};
 use mio;
+use std::mem;
 
 use reactor::{Handle, PollEvented};
 
@@ -40,6 +41,13 @@ impl UdpSocket {
                        handle: &Handle) -> io::Result<UdpSocket> {
         let udp = try!(mio::udp::UdpSocket::from_socket(socket));
         UdpSocket::new(udp, handle)
+    }
+
+    /// Creates a FramedUdp object, which leverages a supplied `EncodeUdp`
+    /// and `DecodeUdp` to implement `Stream` and `Sink` 
+    /// This moves the socket into the newly created FramedUdp object
+    pub fn framed<C>(self, codec : C) -> FramedUdp<C> {
+        framed_udp(self, codec)
     }
 
     /// Returns the local address that this stream is bound to.
@@ -83,6 +91,33 @@ impl UdpSocket {
                 Err(mio::would_block())
             }
             Err(e) => Err(e),
+        }
+    }
+    
+    /// Creates a future that will write the entire contents of the buffer `buf` to
+    /// the stream `a` provided.
+    ///
+    /// The returned future will return after data has been written to the outbound
+    /// socket. 
+    /// The future will resolve to the stream as well as the buffer (for reuse if
+    /// needed).
+    ///
+    /// Any error which happens during writing will cause both the stream and the
+    /// buffer to get destroyed.
+    ///
+    /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which should
+    /// be broadly applicable to accepting data which can be converted to a slice.
+    /// The `Window` struct is also available in this crate to provide a different
+    /// window into a slice if necessary.
+    pub fn send_dgram<T>(self, buf: T, addr : SocketAddr) -> SendDGram<T>
+        where T: AsRef<[u8]>,
+    {
+        SendDGram {
+            state: UdpState::Writing {
+                sock: self,
+                addr: addr,
+                buf: buf,
+            },
         }
     }
 
@@ -246,6 +281,53 @@ impl UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
+    }
+}
+
+/// A future used to write the entire contents of some data to a stream.
+///
+/// This is created by the [`write_all`] top-level method.
+///
+/// [`write_all`]: fn.write_all.html
+pub struct SendDGram<T> {
+    state: UdpState<T>,
+}
+
+enum UdpState<T> {
+    Writing {
+        sock: UdpSocket,
+        buf: T,
+        addr: SocketAddr,
+    },
+    Empty,
+}
+
+fn incomplete_write(reason : &str) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, reason)
+}
+
+impl<T> Future for SendDGram<T>
+    where T: AsRef<[u8]>,
+{
+    type Item = (UdpSocket, T);
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
+        match self.state {
+            UdpState::Writing { ref sock, ref buf, ref addr} => {
+                let buf = buf.as_ref();
+                let n = try_nb!(sock.send_to(&buf, addr));
+                if n != buf.len() {
+                    return Err(incomplete_write("Failed to send entire message in datagram"))
+                }
+            }
+            UdpState::Empty => panic!("poll a SendDGram after it's done"),
+        }
+
+        match mem::replace(&mut self.state, UdpState::Empty) {
+            UdpState::Writing { sock, buf, .. } => Ok(Async::Ready((sock, (buf).into()))),
+            UdpState::Empty => panic!(),
+        }
     }
 }
 
