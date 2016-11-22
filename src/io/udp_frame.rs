@@ -241,3 +241,22 @@ impl<C : CodecUdp> Sink for FramedUdpWrite<C> {
     }
 }
 
+/// Default implementation of a DGram "parser"
+/// This receives and produces a tuple of ('SocketAddr', `Vec`<u8>)
+pub struct VecDGramCodec;
+
+impl CodecUdp for VecDGramCodec {
+    type In = (SocketAddr, Vec<u8>);
+    type Out = (SocketAddr, Vec<u8>);
+
+    fn decode(&mut self, addr : &SocketAddr, buf: &[u8]) -> Result<Self::In, io::Error> {
+        Ok((*addr, buf.into()))
+    }
+    
+    fn encode(&mut self, item: &Self::Out, into: &mut Vec<u8>) -> SocketAddr {
+        into.extend_from_slice(item.1.as_slice());
+        into.push('\n' as u8);
+        item.0
+    }
+}
+

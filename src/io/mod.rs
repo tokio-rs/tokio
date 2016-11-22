@@ -44,7 +44,7 @@ mod window;
 mod write_all;
 pub use self::copy::{copy, Copy};
 pub use self::frame::{EasyBuf, EasyBufMut, FramedRead, FramedWrite, Framed, Codec};
-pub use self::udp_frame::{FramedUdp, framed_udp, FramedUdpRead, FramedUdpWrite, CodecUdp};
+pub use self::udp_frame::{FramedUdp, framed_udp, FramedUdpRead, FramedUdpWrite, CodecUdp, VecDGramCodec};
 pub use self::flush::{flush, Flush};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
