@@ -1,10 +1,10 @@
 use std::io;
+use std::mem;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
-use io::{FramedUdp, framed_udp};
+
 use futures::{Async, Future, Poll};
 use mio;
-use std::mem;
 
 use reactor::{Handle, PollEvented};
 
@@ -12,6 +12,9 @@ use reactor::{Handle, PollEvented};
 pub struct UdpSocket {
     io: PollEvented<mio::udp::UdpSocket>,
 }
+
+mod frame;
+pub use self::frame::{UdpFramed, UdpCodec};
 
 impl UdpSocket {
     /// Create a new UDP socket bound to the specified address.
@@ -43,11 +46,27 @@ impl UdpSocket {
         UdpSocket::new(udp, handle)
     }
 
-    /// Creates a FramedUdp object, which leverages a supplied `EncodeUdp`
-    /// and `DecodeUdp` to implement `Stream` and `Sink` 
-    /// This moves the socket into the newly created FramedUdp object
-    pub fn framed<C>(self, codec : C) -> FramedUdp<C> {
-        framed_udp(self, codec)
+    /// Provides a `Stream` and `Sink` interface for reading and writing to this
+    /// `UdpSocket` object, using the provided `UdpCodec` to read and write the
+    /// raw data.
+    ///
+    /// Raw UDP sockets work with datagrams, but higher-level code usually
+    /// wants to batch these into meaningful chunks, called "frames". This
+    /// method layers framing on top of this socket by using the `UdpCodec`
+    /// trait to handle encoding and decoding of messages frames. Note that
+    /// the incoming and outgoing frame types may be distinct.
+    ///
+    /// This function returns a *single* object that is both `Stream` and
+    /// `Sink`; grouping this into a single object is often useful for layering
+    /// things which require both read and write access to the underlying
+    /// object.
+    ///
+    /// If you want to work more directly with the streams and sink, consider
+    /// calling `split` on the `UdpFramed` returned by this method, which will
+    /// break them into separate objects, allowing them to interact more
+    /// easily.
+    pub fn framed<C: UdpCodec>(self, codec: C) -> UdpFramed<C> {
+        frame::new(self, codec)
     }
 
     /// Returns the local address that this stream is bound to.
@@ -93,27 +112,27 @@ impl UdpSocket {
             Err(e) => Err(e),
         }
     }
-    
-    /// Creates a future that will write the entire contents of the buffer `buf` to
-    /// the stream `a` provided.
+
+    /// Creates a future that will write the entire contents of the buffer
+    /// `buf` provided as a datagram to this socket.
     ///
-    /// The returned future will return after data has been written to the outbound
-    /// socket. 
-    /// The future will resolve to the stream as well as the buffer (for reuse if
-    /// needed).
+    /// The returned future will return after data has been written to the
+    /// outbound socket.  The future will resolve to the stream as well as the
+    /// buffer (for reuse if needed).
     ///
-    /// Any error which happens during writing will cause both the stream and the
-    /// buffer to get destroyed.
+    /// Any error which happens during writing will cause both the stream and
+    /// the buffer to get destroyed. Note that failure to write the entire
+    /// buffer is considered an error for the purposes of sending a datagram.
     ///
-    /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which should
-    /// be broadly applicable to accepting data which can be converted to a slice.
-    /// The `Window` struct is also available in this crate to provide a different
-    /// window into a slice if necessary.
-    pub fn send_dgram<T>(self, buf: T, addr : SocketAddr) -> SendDGram<T>
+    /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which
+    /// should be broadly applicable to accepting data which can be converted
+    /// to a slice.  The `Window` struct is also available in this crate to
+    /// provide a different window into a slice if necessary.
+    pub fn send_dgram<T>(self, buf: T, addr: SocketAddr) -> SendDgram<T>
         where T: AsRef<[u8]>,
     {
-        SendDGram {
-            state: UdpState::Writing {
+        SendDgram {
+            state: SendState::Writing {
                 sock: self,
                 addr: addr,
                 buf: buf,
@@ -134,6 +153,31 @@ impl UdpSocket {
                 Err(mio::would_block())
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// Creates a future that receive a datagram to be written to the buffer
+    /// provided.
+    ///
+    /// The returned future will return after a datagram has been received on
+    /// this socket. The future will resolve to the socket, the buffer, the
+    /// amount of data read, and the address the data was received from.
+    ///
+    /// An error during reading will cause the socket and buffer to get
+    /// destroyed and the socket will be returned.
+    ///
+    /// The `buf` parameter here only requires the `AsMut<[u8]>` trait, which
+    /// should be broadly applicable to accepting data which can be converted
+    /// to a slice.  The `Window` struct is also available in this crate to
+    /// provide a different window into a slice if necessary.
+    pub fn recv_dgram<T>(self, buf: T) -> RecvDgram<T>
+        where T: AsMut<[u8]>,
+    {
+        RecvDgram {
+            state: RecvState::Reading {
+                sock: self,
+                buf: buf,
+            },
         }
     }
 
@@ -284,16 +328,14 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-/// A future used to write the entire contents of some data to a stream.
+/// A future used to write the entire contents of some data to a UDP socket.
 ///
-/// This is created by the [`write_all`] top-level method.
-///
-/// [`write_all`]: fn.write_all.html
-pub struct SendDGram<T> {
-    state: UdpState<T>,
+/// This is created by the `UdpSocket::send_dgram` method.
+pub struct SendDgram<T> {
+    state: SendState<T>,
 }
 
-enum UdpState<T> {
+enum SendState<T> {
     Writing {
         sock: UdpSocket,
         buf: T,
@@ -302,11 +344,11 @@ enum UdpState<T> {
     Empty,
 }
 
-fn incomplete_write(reason : &str) -> io::Error {
+fn incomplete_write(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, reason)
 }
 
-impl<T> Future for SendDGram<T>
+impl<T> Future for SendDgram<T>
     where T: AsRef<[u8]>,
 {
     type Item = (UdpSocket, T);
@@ -314,19 +356,59 @@ impl<T> Future for SendDGram<T>
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
         match self.state {
-            UdpState::Writing { ref sock, ref buf, ref addr} => {
-                let buf = buf.as_ref();
-                let n = try_nb!(sock.send_to(&buf, addr));
-                if n != buf.len() {
-                    return Err(incomplete_write("Failed to send entire message in datagram"))
+            SendState::Writing { ref sock, ref buf, ref addr } => {
+                let n = try_nb!(sock.send_to(buf.as_ref(), addr));
+                if n != buf.as_ref().len() {
+                    return Err(incomplete_write("failed to send entire message \
+                                                 in datagram"))
                 }
             }
-            UdpState::Empty => panic!("poll a SendDGram after it's done"),
+            SendState::Empty => panic!("poll a SendDgram after it's done"),
         }
 
-        match mem::replace(&mut self.state, UdpState::Empty) {
-            UdpState::Writing { sock, buf, .. } => Ok(Async::Ready((sock, (buf).into()))),
-            UdpState::Empty => panic!(),
+        match mem::replace(&mut self.state, SendState::Empty) {
+            SendState::Writing { sock, buf, addr: _ } => {
+                Ok(Async::Ready((sock, buf)))
+            }
+            SendState::Empty => panic!(),
+        }
+    }
+}
+
+/// A future used to receive a datagram from a UDP socket.
+///
+/// This is created by the `UdpSocket::recv_dgram` method.
+pub struct RecvDgram<T> {
+    state: RecvState<T>,
+}
+
+enum RecvState<T> {
+    Reading {
+        sock: UdpSocket,
+        buf: T,
+    },
+    Empty,
+}
+
+impl<T> Future for RecvDgram<T>
+    where T: AsMut<[u8]>,
+{
+    type Item = (UdpSocket, T, usize, SocketAddr);
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, io::Error> {
+        let (n, addr) = match self.state {
+            RecvState::Reading { ref sock, ref mut buf } => {
+                try_nb!(sock.recv_from(buf.as_mut()))
+            }
+            RecvState::Empty => panic!("poll a RecvDgram after it's done"),
+        };
+
+        match mem::replace(&mut self.state, RecvState::Empty) {
+            RecvState::Reading { sock, buf } => {
+                Ok(Async::Ready((sock, buf, n, addr)))
+            }
+            RecvState::Empty => panic!(),
         }
     }
 }

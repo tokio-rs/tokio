@@ -8,21 +8,20 @@ extern crate log;
 use std::io;
 use std::net::{SocketAddr};
 use futures::{future, Future, Stream, Sink};
-use tokio_core::io::{CodecUdp};
-use tokio_core::net::{UdpSocket};
+use tokio_core::net::{UdpSocket, UdpCodec};
 use tokio_core::reactor::{Core, Timeout};
 use std::time::Duration;
 use std::str;
 
 /// This is a basic example of leveraging `FramedUdp` to create
-/// a simple UDP client and server which speak a custom Protocol. 
+/// a simple UDP client and server which speak a custom Protocol.
 /// `FramedUdp` applies a `Codec` to the input and output of an
 /// `Evented`
 
-/// Simple Newline based parser, 
+/// Simple Newline based parser,
 /// This is for a connectionless server, it must keep track
 /// of the Socket address of the last peer to contact it
-/// so that it can respond back. 
+/// so that it can respond back.
 /// In the real world, one would probably
 /// want an associative of remote peers to their state
 ///
@@ -32,7 +31,7 @@ pub struct LineCodec {
     addr : Option<SocketAddr>
 }
 
-impl CodecUdp for LineCodec {
+impl UdpCodec for LineCodec {
     type In = Vec<Vec<u8>>;
     type Out = Vec<u8>;
 
@@ -48,12 +47,12 @@ impl CodecUdp for LineCodec {
                                        "failed to find newline in datagram"))
         }
     }
-    
-    fn encode(&mut self, item: &Vec<u8>, into: &mut Vec<u8>) -> SocketAddr {
+
+    fn encode(&mut self, item: Vec<u8>, into: &mut Vec<u8>) -> SocketAddr {
         trace!("encoding {}", str::from_utf8(item.as_slice()).unwrap());
         into.extend_from_slice(item.as_slice());
         into.push('\n' as u8);
-        
+
         self.addr.unwrap()
     }
 }
@@ -64,7 +63,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    //create the line codec parser for each 
+    //create the line codec parser for each
     let srvcodec = LineCodec { addr : None };
     let clicodec = LineCodec { addr : None };
 
@@ -82,24 +81,24 @@ fn main() {
     let (client, _buf) = core.run(job).unwrap();
 
     //We create a FramedUdp instance, which associates a socket
-    //with a codec. We then immediate split that into the 
+    //with a codec. We then immediate split that into the
     //receiving side `Stream` and the writing side `Sink`
-    let (srvstream, srvsink) = server.framed(srvcodec).split();
+    let (srvsink, srvstream) = server.framed(srvcodec).split();
 
     //`Stream::fold` runs once per every received datagram.
     //Note that we pass srvsink into fold, so that it can be
     //supplied to every iteration. The reason for this is
     //sink.send moves itself into `send` and then returns itself
-    let srvloop = srvstream.fold(srvsink, move |sink, lines| { 
+    let srvloop = srvstream.fold(srvsink, move |sink, lines| {
         println!("{}", str::from_utf8(lines[0].as_slice()).unwrap());
         sink.send(b"PONG".to_vec())
     }).map(|_| ());
-    
+
     //We create another FramedUdp instance, this time for the client socket
-    let (clistream, clisink) = client.framed(clicodec).split();
+    let (clisink, clistream) = client.framed(clicodec).split();
 
     //And another infinite iteration
-    let cliloop = clistream.fold(clisink, move |sink, lines| { 
+    let cliloop = clistream.fold(clisink, move |sink, lines| {
             println!("{}", str::from_utf8(lines[0].as_slice()).unwrap());
             sink.send(b"PING".to_vec())
         }).map(|_| ());
