@@ -2,15 +2,11 @@
 //!
 //! If you're on unix you can test this out by in one terminal executing:
 //!
-//! ```sh
-//! $ cargo run --example echo-udp
-//! ```
+//!     cargo run --example echo-udp
 //!
 //! and in another terminal you can run:
 //!
-//! ```sh
-//! $ nc -4u localhost 8080
-//! ```
+//!     nc -4u localhost 8080
 //!
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 

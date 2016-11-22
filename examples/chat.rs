@@ -3,6 +3,19 @@
 //! This is a simple line-based server which accepts connections, reads lines
 //! from those connections, and broadcasts the lines to all other connected
 //! clients. In a sense this is a bit of a "poor man's chat server".
+//!
+//! You can test this out by running:
+//!
+//!     cargo run --example chat
+//!
+//! And then in another window run:
+//!
+//!     nc -4 localhost 8080
+//!
+//! You can run the second command in multiple windows and then chat between the
+//! two, seeing the messages from the other client as they're received. For all
+//! connected clients they'll all join the same room and see everyone else's
+//! messages.
 
 extern crate tokio_core;
 extern crate futures;
@@ -118,4 +131,3 @@ fn main() {
     // execute server
     core.run(srv).unwrap();
 }
-

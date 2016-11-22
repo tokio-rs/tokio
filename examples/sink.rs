@@ -1,7 +1,19 @@
 //! A small server that writes as many nul bytes on all connections it receives.
 //!
 //! There is no concurrency in this server, only one connection is written to at
-//! a time.
+//! a time. You can use this as a benchmark for the raw performance of writing
+//! data to a socket by measuring how much data is being written on each
+//! connection.
+//!
+//! Typically you'll want to run this example with:
+//!
+//!     cargo run --example sink --release
+//!
+//! And then you can connect to it via:
+//!
+//!     nc -4 localhost 8080 > /dev/null
+//!
+//! You should see your CPUs light up as data's being shove into the ether.
 
 extern crate env_logger;
 extern crate futures;
