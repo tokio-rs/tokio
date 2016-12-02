@@ -16,6 +16,7 @@ use reactor::{Handle, PollEvented};
 /// various forms of processing.
 pub struct TcpListener {
     io: PollEvented<mio::tcp::TcpListener>,
+    pending_accept: Option<futures::sync::oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
@@ -38,7 +39,19 @@ impl TcpListener {
     ///
     /// It is more idiomatic to treat incoming connection as a `Stream` of `TcpStream`s.
     /// See `incoming()` for details.
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+    pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
+        if let Some(mut pending) = self.pending_accept.take() {
+            match pending.poll().expect("shouldn't be canceled") {
+                Async::NotReady => {
+                    self.pending_accept = Some(pending);
+                    return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+                },
+                Async::Ready(r) => {
+                    return r
+                }
+            }
+        }
+
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
         }
@@ -62,7 +75,8 @@ impl TcpListener {
                     tx.complete(res);
                     Ok(())
                 });
-                rx.then(|r| r.expect("shouldn't be canceled")).wait()
+                self.pending_accept = Some(rx);
+                return self.accept()
             }
         }
     }
@@ -104,7 +118,7 @@ impl TcpListener {
     fn new(listener: mio::tcp::TcpListener, handle: &Handle)
            -> io::Result<TcpListener> {
         let io = try!(PollEvented::new(listener, handle));
-        Ok(TcpListener { io: io })
+        Ok(TcpListener { io: io, pending_accept: None })
     }
 
     /// Test whether this socket is ready to be read or not.
