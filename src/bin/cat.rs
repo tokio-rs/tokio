@@ -15,4 +15,5 @@ fn main() {
         }
         stdout.write(line.as_bytes()).unwrap();
     }
+    stdout.flush().unwrap();
 }

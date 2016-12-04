@@ -2,6 +2,8 @@
 extern crate futures;
 extern crate tokio_core;
 extern crate mio;
+#[macro_use]
+extern crate log;
 
 use std::ffi::OsStr;
 use std::io;

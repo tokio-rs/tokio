@@ -1,5 +1,5 @@
-extern crate mio;
 extern crate libc;
+extern crate nix;
 extern crate tokio_signal;
 
 use std::io;
@@ -10,9 +10,12 @@ use futures::stream::Stream;
 use futures::{Future, Poll, Async};
 use tokio_core::reactor::{Handle,PollEvented};
 use self::libc::c_int;
+use self::nix::fcntl::FcntlArg::F_SETFL;
+use self::nix::fcntl::{fcntl, O_NONBLOCK};
 use self::tokio_signal::unix::Signal;
 
-use mio::{Evented,PollOpt,Ready,Token};
+use mio;
+use mio::{Evented, PollOpt, Ready, Token};
 use mio::unix::EventedFd;
 
 use Command;
@@ -28,6 +31,40 @@ pub struct Child {
 
 struct RawFdWrap<T>(T);
 
+impl<T> RawFdWrap<T> {
+    fn new(fd: T) -> io::Result<Self>
+        where T: AsRawFd {
+
+        try!(set_nonblock(&fd));
+        Ok(RawFdWrap(fd))
+    }
+}
+
+impl<T> io::Read for RawFdWrap<T> where T: io::Read {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.0.read(bytes)
+    }
+}
+
+impl<T> io::Write for RawFdWrap<T> where T: io::Write {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+
+fn from_nix_error(err: nix::Error) -> io::Error {
+    io::Error::from_raw_os_error(err.errno() as i32)
+}
+
+fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
+    fcntl(s.as_raw_fd(), F_SETFL(O_NONBLOCK)).map_err(from_nix_error)
+                                             .map(|_| ())
+}
+
 pub struct StdStream<T> {
     io: PollEvented<RawFdWrap<T>>,
 }
@@ -37,29 +74,34 @@ pub type ChildStdout = StdStream<process::ChildStdout>;
 pub type ChildStderr = StdStream<process::ChildStderr>;
 
 impl<T> Evented for RawFdWrap<T> where T: AsRawFd {
-    fn register(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).register(poll, token, interest, opts)
+    fn register(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
+                -> io::Result<()> {
+        debug!("Evented::register({:?}, {:?}, {:?}", token, interest, opts);
+        EventedFd(&self.0.as_raw_fd()).register(poll, token, interest | Ready::hup(), opts)
     }
-    fn reregister(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest, opts)
+    fn reregister(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
+                  -> io::Result<()> {
+        debug!("Evented::reregister({:?}, {:?}, {:?}", token, interest, opts);
+        EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest | Ready::hup(), opts)
     }
     fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
+        debug!("Evented::deregister()");
         EventedFd(&self.0.as_raw_fd()).deregister(poll)
     }
 }
 
 impl<T> io::Read for StdStream<T> where T: io::Read {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io.get_mut().0.read(buf)
+        self.io.read(buf)
     }
 }
 
 impl<T> io::Write for StdStream<T> where T: io::Write {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.io.get_mut().0.write(buf)
+        self.io.write(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.io.get_mut().0.flush()
+        self.io.flush()
     }
 }
 
@@ -67,7 +109,9 @@ fn stdio<T>(option: &mut Option<T>, handle: &Handle) -> Result<Option<StdStream<
     where T: AsRawFd {
 
     option.take().map_or(Ok(None), |stream| {
-        PollEvented::new(RawFdWrap(stream), handle).map(|io| Some(StdStream { io: io }))
+        PollEvented::new(try!(RawFdWrap::new(stream)), handle).map(|io| {
+            Some(StdStream { io: io })
+        })
     })
 }
 

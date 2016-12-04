@@ -2,10 +2,13 @@ extern crate futures;
 #[macro_use]
 extern crate tokio_core;
 extern crate tokio_process;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 use std::env;
-use std::io;
-use std::process::Stdio;
+use std::io::{self, Write};
+use std::process::{Stdio, ExitStatus};
 
 use futures::{Future, BoxFuture};
 use futures::stream::{self, Stream};
@@ -23,13 +26,15 @@ fn cat(handle: &Handle) -> Command {
     cmd
 }
 
-fn feed_cat(cat: &mut Child, n: usize) -> BoxFuture<(), io::Error> {
+fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
     let stdin = cat.stdin().take().unwrap();
     let stdout = cat.stdout().take().unwrap();
 
+    debug!("starting to feed");
     // Produce n lines on the child's stdout.
     let numbers = stream::iter((0..n).into_iter().map(Ok));
     let write = numbers.fold(stdin, |stdin, i| {
+        debug!("sending line {} to child", i);
         write_all(stdin, format!("line {}\n", i).into_bytes()).map(|(writer, _)| writer)
     }).map(|_| {});
 
@@ -39,7 +44,10 @@ fn feed_cat(cat: &mut Child, n: usize) -> BoxFuture<(), io::Error> {
     let expected_numbers = stream::iter((0..n + 1).into_iter().map(Ok));
     let read = expected_numbers.fold((reader, 0), move |(reader, i), _| {
         let done = i >= n;
+        debug!("starting read from child");
         read_until(reader, b'\n', Vec::new()).and_then(move |(reader, vec)| {
+            debug!("read line {} from child ({} bytes, done: {})", i, vec.len(), done);
+            io::stdout().flush().unwrap();
             match (done, vec.len()) {
                 (false, 0) => {
                     Err(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"))
@@ -60,7 +68,7 @@ fn feed_cat(cat: &mut Child, n: usize) -> BoxFuture<(), io::Error> {
         })
     });
     // Compose reading and writing concurrently.
-    write.join(read).map(|_| {}).boxed()
+    write.join(read).and_then(|_| cat).boxed()
 }
 
 #[test]
@@ -75,11 +83,14 @@ fn feed_cat(cat: &mut Child, n: usize) -> BoxFuture<(), io::Error> {
 /// - We read the same lines from the child that we fed it.
 //
 /// - The child does produce EOF on stdout after the last line.
-fn cat_loop() {
+fn feed_a_lot() {
+    let _ = ::env_logger::init();
+
     let mut lp = Core::new().unwrap();
     let cmd = cat(&lp.handle());
-    let mut child = lp.run(cmd.spawn()).unwrap();
-    lp.run(feed_cat(&mut child, 10000)).unwrap();
-    let status = lp.run(&mut child).unwrap();
+    let child = cmd.spawn().and_then(|child| {
+        feed_cat(child, 10000)
+    });
+    let status = lp.run(child).unwrap();
     assert_eq!(status.code(), Some(0));
 }

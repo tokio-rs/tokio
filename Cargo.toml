@@ -14,6 +14,8 @@ An implementation of an asynchronous process management backed futures.
 tokio-core = "0.1"
 futures = "0.1"
 mio = "0.6"
+log = "0.3"
+env_logger = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2"
@@ -21,4 +23,9 @@ kernel32-sys = "0.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+nix = "0.6"
 tokio-signal = "0.1"
+
+[replace]
+"mio:0.6.1" = { path = "mio" }
+"tokio-core:0.1.1" = { path = "tokio-core" }
