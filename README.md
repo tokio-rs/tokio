@@ -60,6 +60,7 @@ In addition to the crates above in the `tokio-rs` organization, there are a few
 crates outside the organization which integrate with Tokio:
 
 * [`tokio-dns`] - asynchronous DNS resolution and utilities
+* [`tokio-inotify`] - file system changes as a `Stream`
 * [`tokio-signal`] - Unix signal handling and Windows console control events
 * [`tokio-process`] - process management and spawning
 
@@ -100,6 +101,7 @@ See LICENSE-APACHE, and LICENSE-MIT for details.
 [`tokio-core`]: https://github.com/tokio-rs/tokio-core
 [`tokio-curl`]: https://github.com/tokio-rs/tokio-curl
 [`tokio-dns`]: https://github.com/sbstp/tokio-dns
+[`tokio-inotify`]: https://github.com/dermesser/tokio-inotify
 [`tokio-line`]: https://github.com/tokio-rs/tokio-line
 [`tokio-middleware`]: https://github.com/tokio-rs/tokio-middleware
 [`tokio-minihttp`]: https://github.com/tokio-rs/tokio-minihttp
