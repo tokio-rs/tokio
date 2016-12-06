@@ -306,7 +306,7 @@ impl Core {
         let mut writer = None;
         let mut inner = self.inner.borrow_mut();
         if let Some(io) = inner.io_dispatch.get_mut(token) {
-            if ready.is_readable() {
+            if ready.is_readable() || ready.is_hup() {
                 reader = io.reader.take();
                 io.readiness.fetch_or(1, Ordering::Relaxed);
             }
@@ -430,7 +430,7 @@ impl Inner {
         let entry = self.io_dispatch.vacant_entry().unwrap();
         try!(self.io.register(source,
                               mio::Token(TOKEN_START + entry.index() * 2),
-                              mio::Ready::readable() | mio::Ready::writable(),
+                              mio::Ready::readable() | mio::Ready::writable() | mio::Ready::hup(),
                               mio::PollOpt::edge()));
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
