@@ -20,4 +20,4 @@ slab = "0.3"
 
 [dev-dependencies]
 env_logger = { version = "0.3", default-features = false }
-nix = "0.7"
+libc = "0.2"
