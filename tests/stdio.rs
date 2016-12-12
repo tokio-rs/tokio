@@ -7,7 +7,7 @@ extern crate log;
 extern crate env_logger;
 
 use std::env;
-use std::io::{self, Write};
+use std::io;
 use std::process::{Stdio, ExitStatus};
 
 use futures::{Future, BoxFuture};
@@ -22,7 +22,7 @@ fn cat(handle: &Handle) -> Command {
     path.push("cat");
     let mut cmd = Command::new(path, handle);
     cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped());
+       .stdout(Stdio::piped());
     cmd
 }
 
@@ -35,19 +35,19 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
     let numbers = stream::iter((0..n).into_iter().map(Ok));
     let write = numbers.fold(stdin, |stdin, i| {
         debug!("sending line {} to child", i);
-        write_all(stdin, format!("line {}\n", i).into_bytes()).map(|(writer, _)| writer)
-    }).map(|_| {});
+        write_all(stdin, format!("line {}\n", i).into_bytes()).map(|p| p.0)
+    }).map(|_| ());
 
     // Try to read `n + 1` lines, ensuring the last one is empty
     // (i.e. EOF is reached after `n` lines.
     let reader = io::BufReader::new(stdout);
-    let expected_numbers = stream::iter((0..n + 1).into_iter().map(Ok));
+    let expected_numbers = stream::iter((0..n + 1).map(Ok));
     let read = expected_numbers.fold((reader, 0), move |(reader, i), _| {
         let done = i >= n;
         debug!("starting read from child");
         read_until(reader, b'\n', Vec::new()).and_then(move |(reader, vec)| {
-            debug!("read line {} from child ({} bytes, done: {})", i, vec.len(), done);
-            io::stdout().flush().unwrap();
+            debug!("read line {} from child ({} bytes, done: {})",
+                   i, vec.len(), done);
             match (done, vec.len()) {
                 (false, 0) => {
                     Err(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"))
@@ -67,6 +67,7 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
             }
         })
     });
+
     // Compose reading and writing concurrently.
     write.join(read).and_then(|_| cat).boxed()
 }

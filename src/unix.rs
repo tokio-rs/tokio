@@ -1,5 +1,4 @@
 extern crate libc;
-extern crate nix;
 extern crate tokio_signal;
 
 use std::io;
@@ -10,8 +9,6 @@ use futures::stream::Stream;
 use futures::{Future, Poll, Async};
 use tokio_core::reactor::{Handle,PollEvented};
 use self::libc::c_int;
-use self::nix::fcntl::FcntlArg::F_SETFL;
-use self::nix::fcntl::{fcntl, O_NONBLOCK};
 use self::tokio_signal::unix::Signal;
 
 use mio;
@@ -24,95 +21,6 @@ pub struct Child {
     child: process::Child,
     reaped: bool,
     sigchld: Signal,
-    pub stdin: Option<ChildStdin>,
-    pub stdout: Option<ChildStdout>,
-    pub stderr: Option<ChildStderr>,
-}
-
-struct RawFdWrap<T>(T);
-
-impl<T> RawFdWrap<T> {
-    fn new(fd: T) -> io::Result<Self>
-        where T: AsRawFd {
-
-        try!(set_nonblock(&fd));
-        Ok(RawFdWrap(fd))
-    }
-}
-
-impl<T> io::Read for RawFdWrap<T> where T: io::Read {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        self.0.read(bytes)
-    }
-}
-
-impl<T> io::Write for RawFdWrap<T> where T: io::Write {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0.write(bytes)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
-}
-
-fn from_nix_error(err: nix::Error) -> io::Error {
-    io::Error::from_raw_os_error(err.errno() as i32)
-}
-
-fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
-    fcntl(s.as_raw_fd(), F_SETFL(O_NONBLOCK)).map_err(from_nix_error)
-                                             .map(|_| ())
-}
-
-pub struct StdStream<T> {
-    io: PollEvented<RawFdWrap<T>>,
-}
-
-pub type ChildStdin = StdStream<process::ChildStdin>;
-pub type ChildStdout = StdStream<process::ChildStdout>;
-pub type ChildStderr = StdStream<process::ChildStderr>;
-
-impl<T> Evented for RawFdWrap<T> where T: AsRawFd {
-    fn register(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
-                -> io::Result<()> {
-        debug!("Evented::register({:?}, {:?}, {:?}", token, interest, opts);
-        EventedFd(&self.0.as_raw_fd()).register(poll, token, interest | Ready::hup(), opts)
-    }
-    fn reregister(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
-                  -> io::Result<()> {
-        debug!("Evented::reregister({:?}, {:?}, {:?}", token, interest, opts);
-        EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest | Ready::hup(), opts)
-    }
-    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
-        debug!("Evented::deregister()");
-        EventedFd(&self.0.as_raw_fd()).deregister(poll)
-    }
-}
-
-impl<T> io::Read for StdStream<T> where T: io::Read {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io.read(buf)
-    }
-}
-
-impl<T> io::Write for StdStream<T> where T: io::Write {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.io.write(buf)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.io.flush()
-    }
-}
-
-fn stdio<T>(option: &mut Option<T>, handle: &Handle) -> Result<Option<StdStream<T>>, io::Error>
-    where T: AsRawFd {
-
-    option.take().map_or(Ok(None), |stream| {
-        PollEvented::new(try!(RawFdWrap::new(stream)), handle).map(|io| {
-            Some(StdStream { io: io })
-        })
-    })
 }
 
 /// Spawns a new child process.
@@ -137,19 +45,35 @@ fn stdio<T>(option: &mut Option<T>, handle: &Handle) -> Result<Option<StdStream<
 /// Note that this means that this isn't really scalable, but then again
 /// processes in general aren't scalable (e.g. millions) so it shouldn't be that
 /// bad in theory...
-pub fn spawn(mut cmd: Command) -> Box<Future<Item=Child, Error=io::Error>> {
+pub fn spawn(mut cmd: Command) -> Box<Future<Item=::Child, Error=io::Error>> {
+    struct KillOnDrop(Option<process::Child>);
+
+    impl Drop for KillOnDrop {
+        fn drop(&mut self) {
+            if let Some(mut c) = self.0.take() {
+                drop(c.kill());
+            }
+        }
+    }
+
     Box::new(Signal::new(libc::SIGCHLD, &cmd.handle).and_then(move |sigchld| {
         cmd.inner.spawn().and_then(|mut c| {
-            let stdin = try!(stdio(&mut c.stdin, &cmd.handle));
-            let stdout = try!(stdio(&mut c.stdout, &cmd.handle));
-            let stderr = try!(stdio(&mut c.stderr, &cmd.handle));
-            Ok(Child {
-                child: c,
-                reaped: false,
-                sigchld: sigchld,
-                stdin: stdin,
-                stdout: stdout,
-                stderr: stderr,
+            let stdin = c.stdin.take();
+            let stdout = c.stdout.take();
+            let stderr = c.stderr.take();
+            let mut c = KillOnDrop(Some(c));
+            let stdin = try!(stdio(stdin, &cmd.handle));
+            let stdout = try!(stdio(stdout, &cmd.handle));
+            let stderr = try!(stdio(stderr, &cmd.handle));
+            Ok(::Child {
+                inner: Child {
+                    child: c.0.take().unwrap(),
+                    reaped: false,
+                    sigchld: sigchld,
+                },
+                stdin: stdin.map(|io| ::ChildStdin { inner: io }),
+                stdout: stdout.map(|io| ::ChildStdout { inner: io }),
+                stderr: stderr.map(|io| ::ChildStderr { inner: io }),
             })
         })
     }))
@@ -215,4 +139,81 @@ pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
             }
         }
     }
+}
+
+pub struct Fd<T>(T);
+
+impl<T: io::Read> io::Read for Fd<T> {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.0.read(bytes)
+    }
+}
+
+impl<T: io::Write> io::Write for Fd<T> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+
+pub type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
+pub type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
+pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
+
+impl<T> Evented for Fd<T> where T: AsRawFd {
+    fn register(&self,
+                poll: &mio::Poll,
+                token: Token,
+                interest: Ready,
+                opts: PollOpt)
+                -> io::Result<()> {
+        EventedFd(&self.0.as_raw_fd()).register(poll,
+                                                token,
+                                                interest | Ready::hup(),
+                                                opts)
+    }
+
+    fn reregister(&self,
+                  poll: &mio::Poll,
+                  token: Token,
+                  interest: Ready,
+                  opts: PollOpt)
+                  -> io::Result<()> {
+        EventedFd(&self.0.as_raw_fd()).reregister(poll,
+                                                  token,
+                                                  interest | Ready::hup(),
+                                                  opts)
+    }
+
+    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
+        EventedFd(&self.0.as_raw_fd()).deregister(poll)
+    }
+}
+
+fn stdio<T>(option: Option<T>, handle: &Handle)
+            -> io::Result<Option<PollEvented<Fd<T>>>>
+    where T: AsRawFd
+{
+    let io = match option {
+        Some(io) => io,
+        None => return Ok(None),
+    };
+
+    // Set the fd to nonblocking before we pass it to the event loop
+    unsafe {
+        let fd = io.as_raw_fd();
+        let r = libc::fcntl(fd, libc::F_GETFL);
+        if r == -1 {
+            return Err(io::Error::last_os_error())
+        }
+        let r = libc::fcntl(fd, libc::F_SETFL, r | libc::O_NONBLOCK);
+        if r == -1 {
+            return Err(io::Error::last_os_error())
+        }
+    }
+    let io = try!(PollEvented::new(Fd(io), handle));
+    Ok(Some(io))
 }

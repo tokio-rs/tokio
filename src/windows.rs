@@ -1,12 +1,15 @@
 extern crate winapi;
 extern crate kernel32;
+extern crate mio_named_pipes;
 
 use std::io;
 use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
 use std::process::{self, ExitStatus};
 
+use tokio_core::reactor::{PollEvented, Handle};
 use futures::{self, Future, Poll, Async, Oneshot, Complete, oneshot, Fuse};
+use self::mio_named_pipes::NamedPipe;
 
 use Command;
 
@@ -24,12 +27,35 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
-pub fn spawn(mut cmd: Command) -> Box<Future<Item=Child, Error=io::Error>> {
-    Box::new(futures::done(cmd.inner.spawn().map(|c| {
-        Child {
-            child: c,
-            waiting: None,
+pub fn spawn(mut cmd: Command) -> Box<Future<Item=::Child, Error=io::Error>> {
+    struct KillOnDrop(Option<process::Child>);
+
+    impl Drop for KillOnDrop {
+        fn drop(&mut self) {
+            if let Some(mut c) = self.0.take() {
+                drop(c.kill());
+            }
         }
+    }
+
+    Box::new(futures::done(cmd.inner.spawn().and_then(|mut c| {
+        let stdin = c.stdin.take();
+        let stdout = c.stdout.take();
+        let stderr = c.stderr.take();
+        let mut c = KillOnDrop(Some(c));
+        let stdin = try!(stdio(stdin, &cmd.handle));
+        let stdout = try!(stdio(stdout, &cmd.handle));
+        let stderr = try!(stdio(stderr, &cmd.handle));
+
+        Ok(::Child {
+            inner: Child {
+                child: c.0.take().unwrap(),
+                waiting: None,
+            },
+            stdin: stdin.map(|io| ::ChildStdin { inner: io }),
+            stdout: stdout.map(|io| ::ChildStdout { inner: io }),
+            stderr: stderr.map(|io| ::ChildStderr { inner: io }),
+        })
     })))
 }
 
@@ -120,4 +146,21 @@ pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
             Ok(Some(ExitStatus::from_raw(status)))
         }
     }
+}
+
+pub type ChildStdin = PollEvented<NamedPipe>;
+pub type ChildStdout = PollEvented<NamedPipe>;
+pub type ChildStderr = PollEvented<NamedPipe>;
+
+fn stdio<T>(option: Option<T>, handle: &Handle)
+            -> io::Result<Option<PollEvented<NamedPipe>>>
+    where T: IntoRawHandle,
+{
+    let io = match option {
+        Some(io) => io,
+        None => return Ok(None),
+    };
+    let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
+    let io = try!(PollEvented::new(pipe, handle));
+    Ok(Some(io))
 }

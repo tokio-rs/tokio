@@ -6,7 +6,7 @@ extern crate mio;
 extern crate log;
 
 use std::ffi::OsStr;
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, ExitStatus};
 
@@ -21,9 +21,6 @@ mod imp;
 #[cfg(windows)]
 mod imp;
 
-pub use imp::ChildStdin;
-pub use imp::ChildStdout;
-
 pub struct Command {
     inner: process::Command,
     #[allow(dead_code)]
@@ -36,6 +33,21 @@ pub struct Spawn {
 
 pub struct Child {
     inner: imp::Child,
+    stdin: Option<ChildStdin>,
+    stdout: Option<ChildStdout>,
+    stderr: Option<ChildStderr>,
+}
+
+pub struct ChildStdin {
+    inner: imp::ChildStdin,
+}
+
+pub struct ChildStdout {
+    inner: imp::ChildStdout,
+}
+
+pub struct ChildStderr {
+    inner: imp::ChildStderr,
 }
 
 impl Command {
@@ -116,7 +128,7 @@ impl Command {
 
     pub fn spawn(self) -> Spawn {
         Spawn {
-            inner: Box::new(imp::spawn(self).map(|c| Child { inner: c })),
+            inner: Box::new(imp::spawn(self)),
         }
     }
 }
@@ -139,16 +151,16 @@ impl Child {
         self.inner.kill()
     }
 
-    pub fn stdin(&mut self) -> &mut Option<imp::ChildStdin> {
-        &mut self.inner.stdin
+    pub fn stdin(&mut self) -> &mut Option<ChildStdin> {
+        &mut self.stdin
     }
 
-    pub fn stdout(&mut self) -> &mut Option<imp::ChildStdout> {
-        &mut self.inner.stdout
+    pub fn stdout(&mut self) -> &mut Option<ChildStdout> {
+        &mut self.stdout
     }
 
-    pub fn stderr(&mut self) -> &mut Option<imp::ChildStderr> {
-        &mut self.inner.stderr
+    pub fn stderr(&mut self) -> &mut Option<ChildStderr> {
+        &mut self.stderr
     }
 }
 
@@ -158,5 +170,27 @@ impl Future for Child {
 
     fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
         self.inner.poll()
+    }
+}
+
+impl Write for ChildStdin {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl Read for ChildStdout {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(bytes)
+    }
+}
+
+impl Read for ChildStderr {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(bytes)
     }
 }
