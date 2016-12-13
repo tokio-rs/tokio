@@ -19,6 +19,9 @@ use tokio_process::{Command, Child};
 fn cat(handle: &Handle) -> Command {
     let mut path = env::current_exe().unwrap();
     path.pop();
+    if path.ends_with("deps") {
+        path.pop();
+    }
     path.push("cat");
     let mut cmd = Command::new(path, handle);
     cmd.stdin(Stdio::piped())
