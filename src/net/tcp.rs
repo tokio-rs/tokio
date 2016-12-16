@@ -16,6 +16,7 @@ use reactor::{Handle, PollEvented};
 /// various forms of processing.
 pub struct TcpListener {
     io: PollEvented<mio::tcp::TcpListener>,
+    pending_accept: Option<futures::sync::oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
@@ -32,6 +33,52 @@ impl TcpListener {
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
         let l = try!(mio::tcp::TcpListener::bind(addr));
         TcpListener::new(l, handle)
+    }
+
+    /// Attempt to accept a connection and create a new connected `TcpStream` if successful.
+    ///
+    /// It is more idiomatic to treat incoming connection as a `Stream` of `TcpStream`s.
+    /// See `incoming()` for details.
+    pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
+        if let Some(mut pending) = self.pending_accept.take() {
+            match pending.poll().expect("shouldn't be canceled") {
+                Async::NotReady => {
+                    self.pending_accept = Some(pending);
+                    return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+                },
+                Async::Ready(r) => {
+                    return r
+                }
+            }
+        }
+
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+        }
+
+        let res = self.io.get_ref().accept();
+        match res {
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read();
+                }
+                Err(e)
+            },
+            Ok((sock, addr)) => {
+                let (tx, rx) = futures::oneshot();
+                let remote = self.io.remote().clone();
+                remote.spawn(move |handle| {
+                    let res = PollEvented::new(sock, handle)
+                        .map(move |io| {
+                            (TcpStream { io: io }, addr)
+                        });
+                    tx.complete(res);
+                    Ok(())
+                });
+                self.pending_accept = Some(rx);
+                return self.accept()
+            }
+        }
     }
 
     /// Create a new TCP listener from the standard library's TCP listener.
@@ -71,7 +118,7 @@ impl TcpListener {
     fn new(listener: mio::tcp::TcpListener, handle: &Handle)
            -> io::Result<TcpListener> {
         let io = try!(PollEvented::new(listener, handle));
-        Ok(TcpListener { io: io })
+        Ok(TcpListener { io: io, pending_accept: None })
     }
 
     /// Test whether this socket is ready to be read or not.
@@ -98,38 +145,17 @@ impl TcpListener {
         }
 
         impl Stream for MyIncoming {
-            type Item = (mio::tcp::TcpStream, SocketAddr);
+            type Item = (TcpStream, SocketAddr);
             type Error = io::Error;
 
             fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-                if let Async::NotReady = self.inner.io.poll_read() {
-                    return Ok(Async::NotReady)
-                }
-                match self.inner.io.get_ref().accept() {
-                    Ok(pair) => Ok(Async::Ready(Some(pair))),
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        self.inner.io.need_read();
-                        Ok(Async::NotReady)
-                    }
-                    Err(e) => Err(e)
-                }
+                Ok(Async::Ready(Some(try_nb!(self.inner.accept()))))
             }
         }
 
-        let remote = self.io.remote().clone();
         let stream = MyIncoming { inner: self };
         Incoming {
-            inner: stream.and_then(move |(tcp, addr)| {
-                let (tx, rx) = futures::oneshot();
-                remote.spawn(move |handle| {
-                    let res = PollEvented::new(tcp, handle).map(move |io| {
-                        (TcpStream { io: io }, addr)
-                    });
-                    tx.complete(res);
-                    Ok(())
-                });
-                rx.then(|r| r.expect("shouldn't be canceled"))
-            }).boxed(),
+            inner: stream.boxed(),
         }
     }
 
