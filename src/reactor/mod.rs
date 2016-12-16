@@ -35,8 +35,6 @@ pub use self::interval::Interval;
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 scoped_thread_local!(static CURRENT_LOOP: Core);
 
-const SLAB_CAPACITY: usize = 1024 * 64;
-
 /// An event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
@@ -154,9 +152,9 @@ impl Core {
             inner: Rc::new(RefCell::new(Inner {
                 id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
                 io: io,
-                io_dispatch: Slab::with_capacity(SLAB_CAPACITY),
-                task_dispatch: Slab::with_capacity(SLAB_CAPACITY),
-                timeouts: Slab::with_capacity(SLAB_CAPACITY),
+                io_dispatch: Slab::with_capacity(1),
+                task_dispatch: Slab::with_capacity(1),
+                timeouts: Slab::with_capacity(1),
                 timer_heap: Heap::new(),
             })),
         })
