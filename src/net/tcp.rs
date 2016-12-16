@@ -36,10 +36,24 @@ impl TcpListener {
         TcpListener::new(l, handle)
     }
 
-    /// Attempt to accept a connection and create a new connected `TcpStream` if successful.
+    /// Attempt to accept a connection and create a new connected `TcpStream` if
+    /// successful.
     ///
-    /// It is more idiomatic to treat incoming connection as a `Stream` of `TcpStream`s.
-    /// See `incoming()` for details.
+    /// This function will attempt an accept operation, but will not block
+    /// waiting for it to complete. If the operation would block then a "would
+    /// block" error is returned. Additionally, if this method would block, it
+    /// registers the current task to receive a notification when it would
+    /// otherwise not block.
+    ///
+    /// Note that typically for simple usage it's easier to treat incoming
+    /// connections as a `Stream` of `TcpStream`s with the `incoming` method
+    /// below.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it is called outside the context of a
+    /// future's task. It's recommended to only call this from the
+    /// implementation of a `Future::poll`, if necessary.
     pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
         loop {
             if let Some(mut pending) = self.pending_accept.take() {
