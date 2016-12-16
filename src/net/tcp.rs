@@ -4,10 +4,11 @@ use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
 
 use futures::stream::Stream;
+use futures::sync::oneshot;
 use futures::{self, Future, failed, Poll, Async};
 use mio;
 
-use io::{Io, IoFuture, IoStream};
+use io::{Io, IoFuture};
 use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
@@ -16,13 +17,13 @@ use reactor::{Handle, PollEvented};
 /// various forms of processing.
 pub struct TcpListener {
     io: PollEvented<mio::tcp::TcpListener>,
-    pending_accept: Option<futures::sync::oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
+    pending_accept: Option<oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.
 pub struct Incoming {
-    inner: IoStream<(TcpStream, SocketAddr)>,
+    inner: TcpListener,
 }
 
 impl TcpListener {
@@ -40,43 +41,42 @@ impl TcpListener {
     /// It is more idiomatic to treat incoming connection as a `Stream` of `TcpStream`s.
     /// See `incoming()` for details.
     pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        if let Some(mut pending) = self.pending_accept.take() {
-            match pending.poll().expect("shouldn't be canceled") {
-                Async::NotReady => {
-                    self.pending_accept = Some(pending);
-                    return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
-                },
-                Async::Ready(r) => {
-                    return r
+        loop {
+            if let Some(mut pending) = self.pending_accept.take() {
+                match pending.poll().expect("shouldn't be canceled") {
+                    Async::NotReady => {
+                        self.pending_accept = Some(pending);
+                        return Err(mio::would_block())
+                    },
+                    Async::Ready(r) => return r,
                 }
             }
-        }
 
-        if let Async::NotReady = self.io.poll_read() {
-            return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
-        }
+            if let Async::NotReady = self.io.poll_read() {
+                return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+            }
 
-        let res = self.io.get_ref().accept();
-        match res {
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
+            match self.io.get_ref().accept() {
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::WouldBlock {
+                        self.io.need_read();
+                    }
+                    return Err(e)
+                },
+                Ok((sock, addr)) => {
+                    let (tx, rx) = oneshot::channel();
+                    let remote = self.io.remote().clone();
+                    remote.spawn(move |handle| {
+                        let res = PollEvented::new(sock, handle)
+                            .map(move |io| {
+                                (TcpStream { io: io }, addr)
+                            });
+                        tx.complete(res);
+                        Ok(())
+                    });
+                    self.pending_accept = Some(rx);
+                    // continue to polling the `rx` at the beginning of the loop
                 }
-                Err(e)
-            },
-            Ok((sock, addr)) => {
-                let (tx, rx) = futures::oneshot();
-                let remote = self.io.remote().clone();
-                remote.spawn(move |handle| {
-                    let res = PollEvented::new(sock, handle)
-                        .map(move |io| {
-                            (TcpStream { io: io }, addr)
-                        });
-                    tx.complete(res);
-                    Ok(())
-                });
-                self.pending_accept = Some(rx);
-                return self.accept()
             }
         }
     }
@@ -140,23 +140,7 @@ impl TcpListener {
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
     pub fn incoming(self) -> Incoming {
-        struct MyIncoming {
-            inner: TcpListener,
-        }
-
-        impl Stream for MyIncoming {
-            type Item = (TcpStream, SocketAddr);
-            type Error = io::Error;
-
-            fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-                Ok(Async::Ready(Some(try_nb!(self.inner.accept()))))
-            }
-        }
-
-        let stream = MyIncoming { inner: self };
-        Incoming {
-            inner: stream.boxed(),
-        }
+        Incoming { inner: self }
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -209,7 +193,7 @@ impl Stream for Incoming {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-        self.inner.poll()
+        Ok(Async::Ready(Some(try_nb!(self.inner.accept()))))
     }
 }
 
