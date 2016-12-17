@@ -12,6 +12,7 @@ use io::Io;
 /// be handed out efficiently, each with a `'static` lifetime which keeps the
 /// data alive. The buffer also supports mutation but may require bytes to be
 /// copied to complete the operation.
+#[derive(Clone)]
 pub struct EasyBuf {
     buf: Arc<Vec<u8>>,
     start: usize,
