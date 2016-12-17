@@ -177,6 +177,17 @@ impl<'a> DerefMut for EasyBufMut<'a> {
     }
 }
 
+impl From<Vec<u8>> for EasyBuf {
+    fn from(vec: Vec<u8>) -> EasyBuf {
+        let end = vec.len();
+        EasyBuf {
+            buf: Arc::new(vec),
+            start: 0,
+            end: end,
+        }
+    }
+}
+
 impl<'a> Drop for EasyBufMut<'a> {
     fn drop(&mut self) {
         *self.end = self.buf.len();
