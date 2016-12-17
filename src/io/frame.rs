@@ -12,6 +12,7 @@ use io::Io;
 /// be handed out efficiently, each with a `'static` lifetime which keeps the
 /// data alive. The buffer also supports mutation but may require bytes to be
 /// copied to complete the operation.
+#[derive(Clone)]
 pub struct EasyBuf {
     buf: Arc<Vec<u8>>,
     start: usize,
@@ -174,6 +175,17 @@ impl<'a> Deref for EasyBufMut<'a> {
 impl<'a> DerefMut for EasyBufMut<'a> {
     fn deref_mut(&mut self) -> &mut Vec<u8> {
         self.buf
+    }
+}
+
+impl From<Vec<u8>> for EasyBuf {
+    fn from(vec: Vec<u8>) -> EasyBuf {
+        let end = vec.len();
+        EasyBuf {
+            buf: Arc::new(vec),
+            start: 0,
+            end: end,
+        }
     }
 }
 
