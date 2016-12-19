@@ -111,3 +111,21 @@ fn drop_kills() {
     let err = lp.run(write_all(stdin, b"1234")).err().unwrap();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 }
+
+#[test]
+fn wait_with_output_captures() {
+    let _ = ::env_logger::init();
+
+    let mut core = Core::new().unwrap();
+
+    let mut child = cat().spawn_async(&core.handle()).unwrap();
+    let stdin = child.stdin().take().unwrap();
+    let out = child.wait_with_output();
+
+    let ret = core.run(write_all(stdin, b"1234").map(|p| p.1).join(out)).unwrap();
+    let (written, output) = ret;
+
+    assert!(output.status.success());
+    assert_eq!(output.stdout, written);
+    assert_eq!(output.stderr.len(), 0);
+}
