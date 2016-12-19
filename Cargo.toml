@@ -12,7 +12,7 @@ An implementation of an asynchronous process management backed futures.
 
 [dependencies]
 tokio-core = "0.1"
-futures = "0.1"
+futures = "0.1.7"
 mio = "0.6"
 log = "0.3"
 
@@ -22,12 +22,8 @@ env_logger = { version = "0.3", default-features = false }
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2"
 kernel32-sys = "0.2"
-mio-named-pipes = { git = 'https://github.com/alexcrichton/mio-named-pipes' }
+mio-named-pipes = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 tokio-signal = "0.1"
-
-[replace]
-"mio:0.6.1" = { git = "https://github.com/alexcrichton/mio", branch = "custom-iocp" }
-"tokio-core:0.1.1" = { git = "https://github.com/tokio-rs/tokio-core" }

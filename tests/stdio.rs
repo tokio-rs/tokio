@@ -8,22 +8,22 @@ extern crate env_logger;
 
 use std::env;
 use std::io;
-use std::process::{Stdio, ExitStatus};
+use std::process::{Stdio, ExitStatus, Command};
 
 use futures::{Future, BoxFuture};
 use futures::stream::{self, Stream};
-use tokio_core::io::{read_until, write_all};
-use tokio_core::reactor::{Core, Handle};
-use tokio_process::{Command, Child};
+use tokio_core::io::{read_until, write_all, read_to_end};
+use tokio_core::reactor::Core;
+use tokio_process::{CommandExt, Child};
 
-fn cat(handle: &Handle) -> Command {
+fn cat() -> Command {
     let mut path = env::current_exe().unwrap();
     path.pop();
     if path.ends_with("deps") {
         path.pop();
     }
     path.push("cat");
-    let mut cmd = Command::new(path, handle);
+    let mut cmd = Command::new(path);
     cmd.stdin(Stdio::piped())
        .stdout(Stdio::piped());
     cmd
@@ -85,16 +85,29 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
 ///   concurrently; otherwise this would deadlock.
 ///
 /// - We read the same lines from the child that we fed it.
-//
+///
 /// - The child does produce EOF on stdout after the last line.
 fn feed_a_lot() {
     let _ = ::env_logger::init();
 
     let mut lp = Core::new().unwrap();
-    let cmd = cat(&lp.handle());
-    let child = cmd.spawn().and_then(|child| {
-        feed_cat(child, 10000)
-    });
-    let status = lp.run(child).unwrap();
+    let child = cat().spawn_async(&lp.handle()).unwrap();
+    let status = lp.run(feed_cat(child, 10000)).unwrap();
     assert_eq!(status.code(), Some(0));
+}
+
+#[test]
+fn drop_kills() {
+    let _ = ::env_logger::init();
+
+    let mut lp = Core::new().unwrap();
+    let mut child = cat().spawn_async(&lp.handle()).unwrap();
+    let stdin = child.stdin().take().unwrap();
+    let stdout = child.stdout().take().unwrap();
+    drop(child);
+
+    let (_, output) = lp.run(read_to_end(stdout, Vec::new())).unwrap();
+    assert_eq!(output.len(), 0);
+    let err = lp.run(write_all(stdin, b"1234")).err().unwrap();
+    assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 }

@@ -1,3 +1,20 @@
+//! Windows asynchronous process handling.
+//!
+//! Like with Unix we don't actually have a way of registering a process with an
+//! IOCP object. As a result we similarly need another mechanism for getting a
+//! signal when a process has exited. For now this is implemented with the
+//! `RegisterWaitForSingleObject` function in the kernel32.dll.
+//!
+//! This strategy is the same that libuv takes and essentially just queues up a
+//! wait for the process in a kernel32-specific thread pool. Once the object is
+//! notified (e.g. the process exits) then we have a callback that basically
+//! just completes a `Oneshot`.
+//!
+//! The `poll_exit` implementation will attempt to wait for the process in a
+//! nonblocking fashion, but failing that it'll fire off a
+//! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
+//! from then on out.
+
 extern crate winapi;
 extern crate kernel32;
 extern crate mio_named_pipes;
@@ -7,11 +24,9 @@ use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
 use std::process::{self, ExitStatus};
 
-use tokio_core::reactor::{PollEvented, Handle};
-use futures::{self, Future, Poll, Async, Oneshot, Complete, oneshot, Fuse};
+use futures::{Future, Poll, Async, Oneshot, Complete, oneshot, Fuse};
 use self::mio_named_pipes::NamedPipe;
-
-use Command;
+use tokio_core::reactor::{PollEvented, Handle};
 
 pub struct Child {
     child: process::Child,
@@ -27,39 +42,29 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
-pub fn spawn(mut cmd: Command) -> Box<Future<Item=::Child, Error=io::Error>> {
-    struct KillOnDrop(Option<process::Child>);
-
-    impl Drop for KillOnDrop {
-        fn drop(&mut self) {
-            if let Some(mut c) = self.0.take() {
-                drop(c.kill());
-            }
+impl Child {
+    pub fn new(child: process::Child, _handle: &Handle) -> Child {
+        Child {
+            child: child,
+            waiting: None,
         }
     }
 
-    Box::new(futures::done(cmd.inner.spawn().and_then(|mut c| {
-        let stdin = c.stdin.take();
-        let stdout = c.stdout.take();
-        let stderr = c.stderr.take();
-        let mut c = KillOnDrop(Some(c));
-        let stdin = try!(stdio(stdin, &cmd.handle));
-        let stdout = try!(stdio(stdout, &cmd.handle));
-        let stderr = try!(stdio(stderr, &cmd.handle));
+    pub fn register_stdin(&mut self, handle: &Handle)
+                          -> io::Result<Option<ChildStdin>> {
+        stdio(self.child.stdin.take(), handle)
+    }
 
-        Ok(::Child {
-            inner: Child {
-                child: c.0.take().unwrap(),
-                waiting: None,
-            },
-            stdin: stdin.map(|io| ::ChildStdin { inner: io }),
-            stdout: stdout.map(|io| ::ChildStdout { inner: io }),
-            stderr: stderr.map(|io| ::ChildStderr { inner: io }),
-        })
-    })))
-}
+    pub fn register_stdout(&mut self, handle: &Handle)
+                           -> io::Result<Option<ChildStdout>> {
+        stdio(self.child.stdout.take(), handle)
+    }
 
-impl Child {
+    pub fn register_stderr(&mut self, handle: &Handle)
+                           -> io::Result<Option<ChildStderr>> {
+        stdio(self.child.stderr.take(), handle)
+    }
+
     pub fn id(&self) -> u32 {
         self.child.id()
     }
@@ -67,13 +72,8 @@ impl Child {
     pub fn kill(&mut self) -> io::Result<()> {
         self.child.kill()
     }
-}
 
-impl Future for Child {
-    type Item = ExitStatus;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
+    pub fn poll_exit(&mut self) -> Poll<ExitStatus, io::Error> {
         loop {
             if let Some(ref mut w) = self.waiting {
                 match w.rx.poll().expect("should not be canceled") {
@@ -100,8 +100,9 @@ impl Future for Child {
                                                         winapi::WT_EXECUTEONLYONCE)
             };
             if rc == 0 {
+                let err = io::Error::last_os_error();
                 drop(unsafe { Box::from_raw(ptr) });
-                return Err(io::Error::last_os_error())
+                return Err(err)
             }
             self.waiting = Some(Waiting {
                 rx: rx.fuse(),
