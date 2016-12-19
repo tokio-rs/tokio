@@ -6,7 +6,6 @@ extern crate tokio_process;
 extern crate log;
 extern crate env_logger;
 
-use std::env;
 use std::io;
 use std::process::{Stdio, ExitStatus, Command};
 
@@ -16,14 +15,10 @@ use tokio_core::io::{read_until, write_all, read_to_end};
 use tokio_core::reactor::Core;
 use tokio_process::{CommandExt, Child};
 
+mod support;
+
 fn cat() -> Command {
-    let mut path = env::current_exe().unwrap();
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.push("cat");
-    let mut cmd = Command::new(path);
+    let mut cmd = support::cmd("cat");
     cmd.stdin(Stdio::piped())
        .stdout(Stdio::piped());
     cmd
@@ -88,7 +83,7 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
 ///
 /// - The child does produce EOF on stdout after the last line.
 fn feed_a_lot() {
-    let _ = ::env_logger::init();
+    support::init();
 
     let mut lp = Core::new().unwrap();
     let child = cat().spawn_async(&lp.handle()).unwrap();
@@ -98,7 +93,7 @@ fn feed_a_lot() {
 
 #[test]
 fn drop_kills() {
-    let _ = ::env_logger::init();
+    support::init();
 
     let mut lp = Core::new().unwrap();
     let mut child = cat().spawn_async(&lp.handle()).unwrap();
@@ -114,7 +109,7 @@ fn drop_kills() {
 
 #[test]
 fn wait_with_output_captures() {
-    let _ = ::env_logger::init();
+    support::init();
 
     let mut core = Core::new().unwrap();
 
