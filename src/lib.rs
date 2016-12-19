@@ -448,6 +448,7 @@ impl Read for ChildStderr {
 
 #[deprecated(note = "use std::process::Command instead")]
 #[allow(deprecated, missing_docs)]
+#[doc(hidden)]
 pub struct Command {
     inner: process::Command,
     #[allow(dead_code)]
@@ -456,12 +457,14 @@ pub struct Command {
 
 #[deprecated(note = "use std::process::Command instead")]
 #[allow(deprecated, missing_docs)]
+#[doc(hidden)]
 pub struct Spawn {
     inner: Box<Future<Item=Child, Error=io::Error>>,
 }
 
 #[deprecated(note = "use std::process::Command instead")]
 #[allow(deprecated, missing_docs)]
+#[doc(hidden)]
 impl Command {
     pub fn new<T: AsRef<OsStr>>(exe: T, handle: &Handle) -> Command {
         Command::_new(exe.as_ref(), handle)
@@ -533,6 +536,7 @@ impl Command {
 
 #[deprecated(note = "use std::process::Command instead")]
 #[allow(deprecated)]
+#[doc(hidden)]
 impl Future for Spawn {
     type Item = Child;
     type Error = io::Error;
