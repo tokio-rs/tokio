@@ -1,3 +1,36 @@
+//! An implementation of process management for Tokio.
+//!
+//! This crate provides `Future` implementations for spawning and waiting
+//! on child processes. These implementations are powered by system APIs on
+//! Windows and by signals on Unix systems.
+//!
+//! # Usage
+//!
+//! To achieve efficient polling of running child processes, we will need to
+//! set up an event loop from `tokio-core`:
+// FIXME: add warning that on Unix systems the *first* event loop can't go away?
+//!
+//! ```no_run
+//! extern crate futures;
+//! extern crate tokio_core;
+//! extern crate tokio_process;
+//!
+//! use futures::Future;
+//! use tokio_core::reactor::Core;
+//! use tokio_process::Command;
+//!
+//! fn main() {
+//!     let mut event_loop = Core::new().expect("failed to init event loop!");
+//!     let mut cmd = Command::new("echo", &event_loop.handle());
+//!     cmd.args(&["hello", "world"]);
+//!
+//!     match event_loop.run(cmd.spawn().flatten()) {
+//!         Ok(status) => println!("exited successfully: {}", status.success()),
+//!         Err(e) => panic!("failed to run command: {}", e),
+//!     }
+//! }
+//! ```
+
 #[macro_use]
 extern crate futures;
 extern crate tokio_core;
@@ -27,10 +60,27 @@ pub struct Command {
     handle: Handle,
 }
 
+/// A future that represents a spawned child process.
+///
+/// This future is created by the `Command::spawn` method.
+///
+/// If the caller does not care about the intermediate handle to a spawned
+/// child, this future can be `flatten`ed to directly compute the child's
+/// exit status.
 pub struct Spawn {
     inner: Box<Future<Item=Child, Error=io::Error>>,
 }
 
+/// A future that represents the exit status of a running or exited child process.
+///
+/// This future is created by successfully polling the `Spawn` future.
+///
+/// # Note
+///
+/// Take note that there is no implementation of `Drop` for this future,
+/// so if you do not ensure the `Child` has exited then it will continue to
+/// run, even after the `Child` handle to the child process has gone out of
+/// scope.
 pub struct Child {
     inner: imp::Child,
     stdin: Option<ChildStdin>,
@@ -143,10 +193,13 @@ impl Future for Spawn {
 }
 
 impl Child {
+    /// Returns the OS-assigned process identifier associated with this child.
     pub fn id(&self) -> u32 {
         self.inner.id()
     }
 
+    /// Forces the child to exit. This is equivalent to sending a
+    /// SIGKILL on unix platforms.
     pub fn kill(&mut self) -> io::Result<()> {
         self.inner.kill()
     }
