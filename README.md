@@ -6,7 +6,7 @@ An implementation of process management for Tokio
 [![Build status](https://ci.appveyor.com/api/projects/status/43c8g7fy801e5902?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio-process)
 [![Crates.io](https://img.shields.io/crates/v/tokio-process.svg?maxAge=2592000)](https://crates.io/crates/tokio-process)
 
-[Documentation](https://alexcrichton.github.io/tokio-process)
+[Documentation](https://docs.rs/tokio-process/0.2)
 
 ## Usage
 
@@ -14,7 +14,7 @@ First, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tokio-process = "0.1"
+tokio-process = "0.2"
 ```
 
 Next, add this to your crate:
