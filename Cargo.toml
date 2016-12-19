@@ -11,7 +11,7 @@ An implementation of an asynchronous process management backed futures.
 """
 
 [dependencies]
-tokio-core = "0.1"
+tokio-core = "0.1.2"
 futures = "0.1.7"
 mio = "0.6"
 log = "0.3"
