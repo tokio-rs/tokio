@@ -258,7 +258,7 @@ pub trait Codec {
 }
 
 /// A unified `Stream` and `Sink` interface to an underlying `Io` object, using
-/// the `Encode` and `Decode` traits to encode and decode frames.
+/// the `Codec` trait to encode and decode frames.
 ///
 /// You can acquire a `Framed` instance by using the `Io::framed` adapter.
 pub struct Framed<T, C> {
