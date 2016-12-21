@@ -8,7 +8,7 @@ use futures::sync::oneshot;
 use futures::{self, Future, failed, Poll, Async};
 use mio;
 
-use io::{Io, IoFuture};
+use io::Io;
 use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
@@ -224,7 +224,38 @@ pub struct TcpStream {
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
 pub struct TcpStreamNew {
-    inner: IoFuture<TcpStream>,
+    inner: TcpStreamNewFuture,
+}
+
+pub type TcpStreamNewConnected = ::futures::AndThen<
+    ::futures::future::FutureResult<
+        ::reactor::PollEvented<::mio::tcp::TcpStream>,
+        ::std::io::Error,
+    >,
+    TcpStreamConnect,
+    fn (::reactor::PollEvented<::mio::tcp::TcpStream>) -> ::net::tcp::TcpStreamConnect
+>;
+
+pub enum TcpStreamNewFuture {
+    Connected(TcpStreamNewConnected),
+    Error(::futures::future::Err<TcpStream, ::std::io::Error>),
+}
+
+impl Future for TcpStreamNewFuture {
+    type Item = TcpStream;
+    type Error = io::Error;
+    fn poll(&mut self) -> Result<futures::Async<TcpStream>, ::std::io::Error> {
+        match *self {
+            TcpStreamNewFuture::Connected(ref mut stream) => stream.poll(),
+            TcpStreamNewFuture::Error(ref mut error) => error.poll(),
+        }
+    }
+}
+
+impl TcpStreamConnect {
+    fn from_stream(io: ::reactor::PollEvented<::mio::tcp::TcpStream>) -> Self {
+        TcpStreamConnect::Waiting(TcpStream { io: io })
+    }
 }
 
 enum TcpStreamConnect {
@@ -243,17 +274,18 @@ impl TcpStream {
     pub fn connect(addr: &SocketAddr, handle: &Handle) -> TcpStreamNew {
         let future = match mio::tcp::TcpStream::connect(addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
-            Err(e) => failed(e).boxed(),
+            Err(e) => TcpStreamNewFuture::Error(failed(e)),
         };
         TcpStreamNew { inner: future }
     }
 
     fn new(connected_stream: mio::tcp::TcpStream, handle: &Handle)
-           -> IoFuture<TcpStream> {
+           -> TcpStreamNewFuture
+    {
         let tcp = PollEvented::new(connected_stream, handle);
-        futures::done(tcp).and_then(|io| {
-            TcpStreamConnect::Waiting(TcpStream { io: io })
-        }).boxed()
+        TcpStreamNewFuture::Connected(
+            futures::done(tcp).and_then(TcpStreamConnect::from_stream)
+        )
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -276,10 +308,10 @@ impl TcpStream {
     ///   (perhaps to `INADDR_ANY`) before this method is called.
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr,
-                          handle: &Handle) -> IoFuture<TcpStream> {
+                          handle: &Handle) -> TcpStreamNewFuture {
         match mio::tcp::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
-            Err(e) => failed(e).boxed(),
+            Err(e) => TcpStreamNewFuture::Error(failed(e)),
         }
     }
 
