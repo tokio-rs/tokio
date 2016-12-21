@@ -59,7 +59,7 @@ fn main() {
     // finishes. If we don't have any more data to read or we won't receive any
     // more work from the remote then we can exit.
     let mut stdout = io::stdout();
-    let client = tcp.and_then(|(sink, stream)| {
+    let client = tcp.and_then(|stream| {
         let (sink, stream) = stream.framed(Bytes).split();
         let send_stdin = stdin_rx.forward(sink);
         let write_stdout = stream.for_each(move |buf| {
