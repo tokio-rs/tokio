@@ -227,7 +227,7 @@ pub struct TcpStreamNew {
     inner: TcpStreamNewFuture,
 }
 
-pub type TcpStreamNewConnected = ::futures::AndThen<
+type TcpStreamNewConnected = ::futures::AndThen<
     ::futures::future::FutureResult<
         ::reactor::PollEvented<::mio::tcp::TcpStream>,
         ::std::io::Error,
@@ -236,7 +236,7 @@ pub type TcpStreamNewConnected = ::futures::AndThen<
     fn (::reactor::PollEvented<::mio::tcp::TcpStream>) -> ::net::tcp::TcpStreamConnect
 >;
 
-pub enum TcpStreamNewFuture {
+enum TcpStreamNewFuture {
     Connected(TcpStreamNewConnected),
     Error(::futures::future::Err<TcpStream, ::std::io::Error>),
 }
@@ -308,11 +308,12 @@ impl TcpStream {
     ///   (perhaps to `INADDR_ANY`) before this method is called.
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr,
-                          handle: &Handle) -> TcpStreamNewFuture {
-        match mio::tcp::TcpStream::connect_stream(stream, addr) {
+                          handle: &Handle) -> TcpStreamNew {
+        let future = match mio::tcp::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewFuture::Error(failed(e)),
-        }
+        };
+        TcpStreamNew { inner: future }
     }
 
     /// Test whether this socket is ready to be read or not.
