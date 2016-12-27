@@ -303,7 +303,7 @@ impl Child {
         };
 
         WaitWithOutput {
-            inner: self.join(stdout).join(stderr).map(|((status, stdout), stderr)| {
+            inner: self.join3(stdout, stderr).map(|(status, stdout, stderr)| {
                 Output {
                     status: status,
                     stdout: stdout,
