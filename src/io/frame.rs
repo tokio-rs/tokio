@@ -233,7 +233,7 @@ pub trait Codec {
     /// Finally, if the bytes in the buffer are malformed then an error is
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
-    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<Self::In>, io::Error>;
+    fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<Self::In>>;
 
     /// A default method available to be called when there are no more bytes
     /// available to be read from the underlying I/O.
