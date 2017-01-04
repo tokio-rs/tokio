@@ -102,7 +102,7 @@ fn main() {
 
         // And this is where much of the magic of this server happens. We
         // crucially want all clients to make progress concurrently, rather than
-        // blocking one on completion of another. To achieve this was use the
+        // blocking one on completion of another. To achieve this we use the
         // `spawn` function on `Handle` to essentially execute some work in the
         // background.
         //
