@@ -14,7 +14,8 @@ use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
 use futures::{self, Future, IntoFuture, Async};
-use futures::task::{self, Unpark, Task, Spawn};
+use futures::executor::{self, Spawn, Unpark};
+use futures::task::Task;
 use mio;
 use slab::Slab;
 
@@ -208,7 +209,7 @@ impl Core {
     pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
         where F: Future,
     {
-        let mut task = task::spawn(f);
+        let mut task = executor::spawn(f);
         let ready = self.future_readiness.clone();
         let mut future_fired = true;
 
@@ -510,7 +511,7 @@ impl Inner {
                                           mio::PollOpt::level());
         let unpark = Arc::new(MySetReadiness(pair.1));
         let entry = entry.insert(ScheduledTask {
-            spawn: Some(task::spawn(future)),
+            spawn: Some(executor::spawn(future)),
             wake: unpark,
             _registration: pair.0,
         });
