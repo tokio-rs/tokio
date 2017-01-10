@@ -201,11 +201,6 @@ impl Core {
     /// This method will **not** catch panics from polling the future `f`. If
     /// the future panics then it's the responsibility of the caller to catch
     /// that panic and handle it as appropriate.
-    ///
-    /// Similarly, because the provided future will be pinned not only to this
-    /// thread but also to this task, any attempt to poll the future on a
-    /// separate thread will result in a panic. That is, calls to
-    /// `task::poll_on` must be avoided.
     pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
         where F: Future,
     {
