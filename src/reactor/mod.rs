@@ -15,16 +15,15 @@ use std::time::{Instant, Duration};
 
 use futures::{self, Future, IntoFuture, Async};
 use futures::executor::{self, Spawn, Unpark};
+use futures::sync::mpsc;
 use futures::task::Task;
 use mio;
 use slab::Slab;
 
 use heap::{Heap, Slot};
 
-mod channel;
 mod io_token;
 mod timeout_token;
-use self::channel::{Sender, Receiver, channel};
 
 mod poll_evented;
 mod timeout;
@@ -45,8 +44,11 @@ scoped_thread_local!(static CURRENT_LOOP: Core);
 // TODO: expand this
 pub struct Core {
     events: mio::Events,
-    tx: Sender<Message>,
-    rx: Receiver<Message>,
+    tx: mpsc::UnboundedSender<Message>,
+    rx: RefCell<Spawn<mpsc::UnboundedReceiver<Message>>>,
+    _rx_registration: mio::Registration,
+    rx_readiness: Arc<MySetReadiness>,
+
     inner: Rc<RefCell<Inner>>,
 
     // Used for determining when the future passed to `run` is ready. Once the
@@ -82,7 +84,7 @@ struct Inner {
 #[derive(Clone)]
 pub struct Remote {
     id: usize,
-    tx: Sender<Message>,
+    tx: mpsc::UnboundedSender<Message>,
 }
 
 /// A non-sendable handle to an event loop, useful for manufacturing instances
@@ -133,20 +135,26 @@ impl Core {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Core> {
-        let (tx, rx) = channel();
         let io = try!(mio::Poll::new());
-        try!(io.register(&rx,
-                         TOKEN_MESSAGES,
-                         mio::Ready::readable(),
-                         mio::PollOpt::edge()));
         let future_pair = mio::Registration::new(&io,
                                                  TOKEN_FUTURE,
                                                  mio::Ready::readable(),
                                                  mio::PollOpt::level());
+        let (tx, rx) = mpsc::unbounded();
+        let channel_pair = mio::Registration::new(&io,
+                                                  TOKEN_MESSAGES,
+                                                  mio::Ready::readable(),
+                                                  mio::PollOpt::level());
+        let rx_readiness = Arc::new(MySetReadiness(channel_pair.1));
+        rx_readiness.unpark();
+
         Ok(Core {
             events: mio::Events::with_capacity(1024),
             tx: tx,
-            rx: rx,
+            rx: RefCell::new(executor::spawn(rx)),
+            _rx_registration: channel_pair.0,
+            rx_readiness: rx_readiness,
+
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
 
@@ -274,6 +282,7 @@ impl Core {
             trace!("event {:?} {:?}", event.kind(), event.token());
 
             if token == TOKEN_MESSAGES {
+                self.rx_readiness.0.set_readiness(mio::Ready::none()).unwrap();
                 CURRENT_LOOP.set(&self, || self.consume_queue());
             } else if token == TOKEN_FUTURE {
                 self.future_readiness.0.set_readiness(mio::Ready::none()).unwrap();
@@ -377,8 +386,13 @@ impl Core {
     fn consume_queue(&self) {
         debug!("consuming notification queue");
         // TODO: can we do better than `.unwrap()` here?
-        while let Some(msg) = self.rx.recv().unwrap() {
-            self.notify(msg);
+        let unpark = self.rx_readiness.clone();
+        loop {
+            match self.rx.borrow_mut().poll_stream(unpark.clone()).unwrap() {
+                Async::Ready(Some(msg)) => self.notify(msg),
+                Async::NotReady |
+                Async::Ready(None) => break,
+            }
         }
     }
 
@@ -525,15 +539,15 @@ impl Remote {
                     lp.notify(msg);
                 }
                 None => {
-                    match self.tx.send(msg) {
+                    // TODO: shouldn't have to `clone` here, can we upstream
+                    //       that &self works with `UnboundedSender`?
+                    match mpsc::UnboundedSender::send(&mut self.tx.clone(), msg) {
                         Ok(()) => {}
 
-                        // This should only happen when there was an error
-                        // writing to the pipe to wake up the event loop,
-                        // hopefully that never happens
-                        Err(e) => {
-                            panic!("error sending message to event loop: {}", e)
-                        }
+                        // TODO: this error should punt upwards and we should
+                        //       notify the caller that the message wasn't
+                        //       received. This is tokio-core#17
+                        Err(e) => drop(e),
                     }
                 }
             }

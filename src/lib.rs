@@ -104,7 +104,6 @@ extern crate log;
 #[macro_use]
 pub mod io;
 
-mod mpsc_queue;
 mod heap;
 #[doc(hidden)]
 pub mod channel;
