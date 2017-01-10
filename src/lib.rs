@@ -11,8 +11,8 @@
 //!
 //! * TCP, both streams and listeners
 //! * UDP sockets
-//! * Message queues
 //! * Timeouts
+//! * An event loop to run futures
 //!
 //! More functionality is likely to be added over time, but otherwise the crate
 //! is intended to be flexible, with the `PollEvented` type accepting any
@@ -21,9 +21,9 @@
 //!
 //! Some other important tasks covered by this crate are:
 //!
-//! * The ability to spawn futures into an event loop. The `Handle` and `Pinned`
+//! * The ability to spawn futures into an event loop. The `Handle` and `Remote`
 //!   types have a `spawn` method which allows executing a future on an event
-//!   loop. The `Pinned::spawn` method crucially does not require the future
+//!   loop. The `Handle::spawn` method crucially does not require the future
 //!   itself to be `Send`.
 //!
 //! * The `Io` trait serves as an abstraction for future crates to build on top
@@ -42,52 +42,45 @@
 //! extern crate futures;
 //! extern crate tokio_core;
 //!
-//! use std::env;
-//! use std::net::SocketAddr;
-//!
-//! use futures::Future;
-//! use futures::stream::Stream;
+//! use futures::{Future, Stream};
 //! use tokio_core::io::{copy, Io};
 //! use tokio_core::net::TcpListener;
 //! use tokio_core::reactor::Core;
 //!
 //! fn main() {
-//!     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-//!     let addr = addr.parse::<SocketAddr>().unwrap();
-//!
 //!     // Create the event loop that will drive this server
-//!     let mut l = Core::new().unwrap();
-//!     let handle = l.handle();
+//!     let mut core = Core::new().unwrap();
+//!     let handle = core.handle();
 //!
-//!     // Create a TCP listener which will listen for incoming connections
-//!     let socket = TcpListener::bind(&addr, &handle).unwrap();
+//!     // Bind the server's socket
+//!     let addr = "127.0.0.1:12345".parse().unwrap();
+//!     let sock = TcpListener::bind(&addr, &handle).unwrap();
 //!
-//!     // Once we've got the TCP listener, inform that we have it
-//!     println!("Listening on: {}", addr);
+//!     // Pull out a stream of sockets for incoming connections
+//!     let server = sock.incoming().for_each(|(sock, _)| {
+//!         // Split up the reading and writing parts of the
+//!         // socket
+//!         let (reader, writer) = sock.split();
 //!
-//!     // Pull out the stream of incoming connections and then for each new
-//!     // one spin up a new task copying data.
-//!     //
-//!     // We use the `io::copy` future to copy all data from the
-//!     // reading half onto the writing half.
-//!     let done = socket.incoming().for_each(|(socket, addr)| {
-//!         let pair = futures::lazy(|| Ok(socket.split()));
-//!         let amt = pair.and_then(|(reader, writer)| copy(reader, writer));
+//!         // A future that echos the data and returns how
+//!         // many bytes were copied...
+//!         let bytes_copied = copy(reader, writer);
 //!
-//!         // Once all that is done we print out how much we wrote, and then
-//!         // critically we *spawn* this future which allows it to run
-//!         // concurrently with other connections.
-//!         handle.spawn(amt.then(move |result| {
-//!             println!("wrote {:?} bytes to {}", result, addr);
-//!             Ok(())
-//!         }));
+//!         // ... after which we'll print what happened
+//!         let handle_conn = bytes_copied.map(|amt| {
+//!             println!("wrote {} bytes", amt)
+//!         }).map_err(|err| {
+//!             println!("IO error {:?}", err)
+//!         });
+//!
+//!         // Spawn the future as a concurrent task
+//!         handle.spawn(handle_conn);
 //!
 //!         Ok(())
 //!     });
 //!
-//!     // Execute our server (modeled as a future) and wait for it to
-//!     // complete.
-//!     l.run(done).unwrap();
+//!     // Spin up the server on the event loop
+//!     core.run(server).unwrap();
 //! }
 //! ```
 
@@ -110,6 +103,7 @@ pub mod io;
 
 mod mpsc_queue;
 mod heap;
+#[doc(hidden)]
 pub mod channel;
 pub mod net;
 pub mod reactor;
