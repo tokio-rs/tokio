@@ -5,7 +5,7 @@ authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tokio-rs/tokio-core"
 homepage = "https://github.com/tokio-rs/tokio-core"
-documentation = "https://tokio-rs.github.io/tokio-core"
+documentation = "https://docs.rs/tokio-core"
 description = """
 Core I/O and event loop primitives for asynchronous I/O in Rust. Foundation for
 the rest of the tokio crates.
