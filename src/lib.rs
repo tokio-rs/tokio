@@ -34,6 +34,9 @@
 //!   or "would block", then the current future task is scheduled to receive a
 //!   notification when it would otherwise make progress.
 //!
+//! You can find more extensive documentation in terms of tutorials at
+//! [https://tokio.rs](https://tokio.rs).
+//!
 //! # Examples
 //!
 //! A simple TCP echo server:

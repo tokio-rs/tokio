@@ -8,6 +8,8 @@ Core I/O and event loop abstraction for asynchronous I/O in Rust built on
 
 [Documentation](https://docs.rs/tokio-core)
 
+[Tutorial](https://tokio.rs/)
+
 ## Usage
 
 First, add this to your `Cargo.toml`:
@@ -23,44 +25,10 @@ Next, add this to your crate:
 extern crate tokio_core;
 ```
 
-## Examples
-
-There are a few small examples showing off how to use this library:
-
-* [echo.rs] - a simple TCP echo server
-* [socks5.rs] - an implementation of a SOCKSv5 proxy server
-
-[echo.rs]: https://github.com/tokio-rs/tokio-core/blob/master/examples/echo.rs
-[socks5.rs]: https://github.com/tokio-rs/tokio-socks5/blob/master/src/main.rs
-
-## What is tokio-core?
-
-This crate is a connection between `futures`, a zero-cost implementation of futures in
-Rust, and `mio`, a crate for zero-cost asynchronous I/O. The types and
-structures implemented in `tokio-core` implement `Future` and `Stream` traits
-as appropriate. For example, connecting a TCP stream returns a `Future`
-resolving to a TCP stream, and a TCP listener implements a stream of TCP
-streams (accepted connections).
-
-This crate also provides facilities such as:
-
-* TCP streams
-* TCP listeners
-* UDP sockets
-* Timeouts
-* Data owned and local to the event loop
-* An `Executor` implementation for a futures' `Task`
-
-The intention of `tokio-core` is to provide a concrete implementation for crates
-built on top of asynchronous I/O. For example you can easily turn a TCP stream
-into a TLS/SSL stream with the [`tokio-tls`] crate or use the combinators to
-compose working with data on sockets.
-
-[`tokio-tls`]: https://tokio-rs.github.io/tokio-tls
-
-Check out the [documentation] for more information, and more coming here soon!
-
-[documentation]: https://tokio-rs.github.io/tokio-core
+You can find extensive documentation and examples about how to use this crate
+online at [https://tokio.rs](https://tokio.rs) as well as the `examples` folder
+in this repository. The [API documentation](https://docs.rs/tokio-core) is also
+a great place to get started for the nitty-gritty.
 
 # License
 
