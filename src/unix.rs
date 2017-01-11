@@ -348,14 +348,9 @@ extern fn handler(signum: c_int,
         };
 
         if !state.ready.swap(true, Ordering::SeqCst) {
-            match (&(*GLOBAL_STATE).write).write(&[1]) {
-                Ok(..) => {}
-                Err(e) => {
-                    if e.kind() != io::ErrorKind::WouldBlock {
-                        panic!("bad error on write fd: {}", e)
-                    }
-                }
-            }
+            // Ignore errors here as we're not in a context that can panic,
+            // and otherwise there's not much we can do.
+            drop((&(*GLOBAL_STATE).write).write(&[1]));
         }
 
         let fnptr = state.prev.sa_sigaction;
