@@ -2,6 +2,12 @@
 //!
 //! Contains various combinators to work with I/O objects and type definitions
 //! as well.
+//!
+//! A description of the high-level I/O combinators can be [found online] in
+//! addition to a description of the [low level details].
+//!
+//! [found online]: https://tokio.rs/docs/getting-started/core/
+//! [low level details]: https://tokio.rs/docs/going-deeper/core-low-level/
 
 use std::io;
 

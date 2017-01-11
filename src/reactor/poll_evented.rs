@@ -32,6 +32,10 @@ use reactor::io_token::IoToken;
 /// It's the responsibility of the wrapper to inform the readiness stream when a
 /// "would block" I/O event is seen. The readiness stream will then take care of
 /// any scheduling necessary to get notified when the event is ready again.
+///
+/// You can find more information about creating a custom I/O object [online].
+///
+/// [online]: https://tokio.rs/docs/going-deeper/core-low-level/#custom-io
 pub struct PollEvented<E> {
     token: IoToken,
     handle: Remote,
