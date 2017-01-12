@@ -13,7 +13,7 @@ use std::cell::RefCell;
 use std::io::{self, Write, Read};
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Once, ONCE_INIT, Mutex};
+use std::sync::{Once, ONCE_INIT};
 
 use futures::future;
 use futures::stream::Fuse;
@@ -73,7 +73,7 @@ pub struct Signal {
 
 struct GlobalState {
     write: UnixStream,
-    tx: Mutex<mpsc::UnboundedSender<Message>>,
+    tx: mpsc::UnboundedSender<Message>,
     signals: [GlobalSignalState; 32],
 }
 
@@ -132,7 +132,7 @@ impl Signal {
             let (tx, rx) = oneshot::channel();
             let msg = Message::NewSignal(signum, tx);
             let res = unsafe {
-                (*GLOBAL_STATE).tx.lock().unwrap().send(msg)
+                (*GLOBAL_STATE).tx.clone().send(msg)
             };
             res.expect("failed to request a new signal stream, did the \
                         first event loop go away?");
@@ -183,7 +183,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
                     new(), new(), new(), new(), new(), new(), new(), new(),
                 ]
             },
-            tx: Mutex::new(tx.clone()),
+            tx: tx,
         });
         GLOBAL_STATE = Box::into_raw(state);
 
