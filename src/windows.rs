@@ -14,13 +14,15 @@ extern crate winapi;
 use std::cell::RefCell;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Once, ONCE_INIT, Mutex};
+use std::sync::{Once, ONCE_INIT};
 
-use futures::stream::{Stream, Fuse};
-use futures::{self, Future, IntoFuture, Complete, Oneshot, Poll, Async};
+use futures::future;
+use futures::stream::Fuse;
+use futures::sync::mpsc;
+use futures::sync::oneshot;
+use futures::{Future, IntoFuture, Poll, Async, Stream};
 use tokio_core::io::IoFuture;
 use tokio_core::reactor::{PollEvented, Handle};
-use tokio_core::channel::{channel, Sender, Receiver};
 
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
@@ -40,12 +42,12 @@ static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
 ///   two notifications.
 pub struct Event {
     reg: PollEvented<MyRegistration>,
-    _finished: Complete<()>,
+    _finished: oneshot::Sender<()>,
 }
 
 struct GlobalState {
     ready: mio::SetReadiness,
-    tx: Mutex<Sender<Message>>,
+    tx: mpsc::UnboundedSender<Message>,
     ctrl_c: GlobalEventState,
     ctrl_break: GlobalEventState,
 }
@@ -55,19 +57,19 @@ struct GlobalEventState {
 }
 
 enum Message {
-    NewEvent(winapi::DWORD, Complete<io::Result<Event>>),
+    NewEvent(winapi::DWORD, oneshot::Sender<io::Result<Event>>),
 }
 
 struct DriverTask {
     handle: Handle,
     reg: PollEvented<MyRegistration>,
-    rx: Fuse<Receiver<Message>>,
+    rx: Fuse<mpsc::UnboundedReceiver<Message>>,
     ctrl_c: EventState,
     ctrl_break: EventState,
 }
 
 struct EventState {
-    tasks: Vec<(RefCell<Oneshot<()>>, mio::SetReadiness)>,
+    tasks: Vec<(RefCell<oneshot::Receiver<()>>, mio::SetReadiness)>,
 }
 
 impl Event {
@@ -92,11 +94,11 @@ impl Event {
         INIT.call_once(|| {
             init = Some(global_init(handle));
         });
-        let new_signal = futures::lazy(move || {
-            let (tx, rx) = futures::oneshot();
+        let new_signal = future::lazy(move || {
+            let (tx, rx) = oneshot::channel();
             let msg = Message::NewEvent(signum, tx);
             let res = unsafe {
-                (*GLOBAL_STATE).tx.lock().unwrap().send(msg)
+                (*GLOBAL_STATE).tx.clone().send(msg)
             };
             res.expect("failed to request a new signal stream, did the \
                         first event loop go away?");
@@ -128,7 +130,7 @@ impl Stream for Event {
 }
 
 fn global_init(handle: &Handle) -> io::Result<()> {
-    let (tx, rx) = try!(channel(handle));
+    let (tx, rx) = mpsc::unbounded();
     let reg = MyRegistration { inner: RefCell::new(None) };
     let reg = try!(PollEvented::new(reg, handle));
     let ready = reg.get_ref().inner.borrow().as_ref().unwrap().1.clone();
@@ -137,7 +139,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
             ready: ready,
             ctrl_c: GlobalEventState { ready: AtomicBool::new(false) },
             ctrl_break: GlobalEventState { ready: AtomicBool::new(false) },
-            tx: Mutex::new(tx.clone()),
+            tx: tx,
         });
         GLOBAL_STATE = Box::into_raw(state);
 
@@ -187,11 +189,10 @@ impl DriverTask {
     fn check_messages(&mut self) {
         loop {
             // Acquire the next message
-            let message = match self.rx.poll() {
-                Ok(Async::Ready(Some(e))) => e,
-                Ok(Async::Ready(None)) |
-                Ok(Async::NotReady) => break,
-                Err(e) => panic!("error on rx: {}", e),
+            let message = match self.rx.poll().unwrap() {
+                Async::Ready(Some(e)) => e,
+                Async::Ready(None) |
+                Async::NotReady => break,
             };
             let (sig, complete) = match message {
                 Message::NewEvent(sig, complete) => (sig, complete),
@@ -216,7 +217,7 @@ impl DriverTask {
 
             // Create the `Event` to pass back and then also keep a handle to
             // the `SetReadiness` for ourselves internally.
-            let (tx, rx) = futures::oneshot();
+            let (tx, rx) = oneshot::channel();
             let ready = reg.get_ref().inner.borrow_mut().as_mut().unwrap().1.clone();
             complete.complete(Ok(Event {
                 reg: reg,
