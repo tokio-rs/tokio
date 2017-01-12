@@ -5,7 +5,7 @@ authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/alexcrichton/tokio-signal"
 homepage = "https://github.com/alexcrichton/tokio-signal"
-documentation = "https://alexcrichton.github.io/tokio-signal"
+documentation = "https://docs.rs/tokio-signal/0.1"
 description = """
 An implementation of an asynchronous Unix signal handling backed futures.
 """
