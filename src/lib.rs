@@ -19,6 +19,7 @@
 //! >           It's planned that this will be bound and exported outside the
 //! >           `unix` module in the future!
 
+#![doc(html_root_url = "https://docs.rs/tokio-signal/0.1")]
 #![deny(missing_docs)]
 
 #[macro_use]

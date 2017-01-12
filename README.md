@@ -4,7 +4,7 @@ An implementation of Unix signal handling for Tokio
 
 [![Build Status](https://travis-ci.org/alexcrichton/tokio-signal.svg?branch=master)](https://travis-ci.org/alexcrichton/tokio-signal)
 
-[Documentation](https://alexcrichton.github.io/tokio-signal)
+[Documentation](https://docs.rs/tokio-signal)
 
 ## Usage
 
@@ -12,7 +12,7 @@ First, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tokio-signal = { git = "https://github.com/alexcrichton/tokio-signal" }
+tokio-signal = "0.1"
 ```
 
 Next, add this to your crate:
