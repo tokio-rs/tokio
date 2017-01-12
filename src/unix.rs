@@ -15,13 +15,15 @@ use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT, Mutex};
 
-use futures::stream::{Stream, Fuse};
-use futures::{self, Future, IntoFuture, Complete, Oneshot, Poll, Async};
+use futures::future;
+use futures::stream::Fuse;
+use futures::sync::mpsc;
+use futures::sync::oneshot;
+use futures::{Future, Stream, IntoFuture, Poll, Async};
 use self::libc::c_int;
 use self::tokio_uds::UnixStream;
 use tokio_core::io::IoFuture;
 use tokio_core::reactor::{PollEvented, Handle};
-use tokio_core::channel::{channel, Sender, Receiver};
 
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
@@ -66,12 +68,12 @@ static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
 pub struct Signal {
     signum: c_int,
     reg: PollEvented<MyRegistration>,
-    _finished: Complete<()>,
+    _finished: oneshot::Sender<()>,
 }
 
 struct GlobalState {
     write: UnixStream,
-    tx: Mutex<Sender<Message>>,
+    tx: Mutex<mpsc::UnboundedSender<Message>>,
     signals: [GlobalSignalState; 32],
 }
 
@@ -81,19 +83,19 @@ struct GlobalSignalState {
 }
 
 enum Message {
-    NewSignal(c_int, Complete<io::Result<Signal>>),
+    NewSignal(c_int, oneshot::Sender<io::Result<Signal>>),
 }
 
 struct DriverTask {
     handle: Handle,
     read: UnixStream,
-    rx: Fuse<Receiver<Message>>,
+    rx: Fuse<mpsc::UnboundedReceiver<Message>>,
     signals: [SignalState; 32],
 }
 
 struct SignalState {
     registered: bool,
-    tasks: Vec<(RefCell<Oneshot<()>>, mio::SetReadiness)>,
+    tasks: Vec<(RefCell<oneshot::Receiver<()>>, mio::SetReadiness)>,
 }
 
 pub use self::libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
@@ -126,8 +128,8 @@ impl Signal {
         INIT.call_once(|| {
             init = Some(global_init(handle));
         });
-        let new_signal = futures::lazy(move || {
-            let (tx, rx) = futures::oneshot();
+        let new_signal = future::lazy(move || {
+            let (tx, rx) = oneshot::channel();
             let msg = Message::NewSignal(signum, tx);
             let res = unsafe {
                 (*GLOBAL_STATE).tx.lock().unwrap().send(msg)
@@ -162,7 +164,7 @@ impl Stream for Signal {
 }
 
 fn global_init(handle: &Handle) -> io::Result<()> {
-    let (tx, rx) = try!(channel(handle));
+    let (tx, rx) = mpsc::unbounded();
     let (read, write) = try!(UnixStream::pair(handle));
     unsafe {
         let state = Box::new(GlobalState {
@@ -232,11 +234,10 @@ impl DriverTask {
     fn check_messages(&mut self) {
         loop {
             // Acquire the next message
-            let message = match self.rx.poll() {
-                Ok(Async::Ready(Some(e))) => e,
-                Ok(Async::Ready(None)) |
-                Ok(Async::NotReady) => break,
-                Err(e) => panic!("error on rx: {}", e),
+            let message = match self.rx.poll().unwrap() {
+                Async::Ready(Some(e)) => e,
+                Async::Ready(None) |
+                Async::NotReady => break,
             };
             let (sig, complete) = match message {
                 Message::NewSignal(sig, complete) => (sig, complete),
@@ -281,7 +282,7 @@ impl DriverTask {
 
             // Create the `Signal` to pass back and then also keep a handle to
             // the `SetReadiness` for ourselves internally.
-            let (tx, rx) = futures::oneshot();
+            let (tx, rx) = oneshot::channel();
             let ready = reg.get_ref().inner.borrow_mut().as_mut().unwrap().1.clone();
             complete.complete(Ok(Signal {
                 signum: sig,

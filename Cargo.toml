@@ -12,7 +12,7 @@ An implementation of an asynchronous Unix signal handling backed futures.
 
 [dependencies]
 tokio-core = "0.1"
-futures = "0.1"
+futures = "0.1.7"
 
 [target.'cfg(unix)'.dependencies]
 tokio-uds = "0.1"
