@@ -30,7 +30,7 @@ impl UdpCodec for LineCodec {
 
     fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> SocketAddr {
         into.extend(buf);
-        return addr
+        addr
     }
 }
 
