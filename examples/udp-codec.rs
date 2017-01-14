@@ -28,9 +28,7 @@ impl UdpCodec for LineCodec {
         Ok((*addr, buf.to_vec()))
     }
 
-    fn encode(&mut self,
-              (addr, buf): (SocketAddr, Vec<u8>),
-              into: &mut Vec<u8>) -> SocketAddr {
+    fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> SocketAddr {
         into.extend(buf);
         return addr
     }
