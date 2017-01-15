@@ -76,6 +76,15 @@ struct Inner {
     timeouts: Slab<(Option<Slot>, TimeoutState)>,
 }
 
+/// An unique ID for a Core
+///
+/// An ID by which different cores may be distinguished. Can be compared and used as an index in
+/// a `HashMap`.
+///
+/// The ID is globally unique and never reused.
+#[derive(Clone,Copy,Eq,PartialEq,Hash,Debug)]
+pub struct CoreId(usize);
+
 /// Handle to an event loop, used to construct I/O objects, send messages, and
 /// otherwise interact indirectly with the event loop itself.
 ///
@@ -420,6 +429,11 @@ impl Core {
             Message::Run(r) => r.call_box(self),
         }
     }
+
+    /// Get the ID of this loop
+    pub fn id(&self) -> CoreId {
+        CoreId(self.inner.borrow().id)
+    }
 }
 
 impl Inner {
@@ -589,6 +603,11 @@ impl Remote {
             lp.inner.borrow_mut().spawn(Box::new(f.into_future()));
         })));
     }
+
+    /// Return the ID of the represented Core
+    pub fn id(&self) -> CoreId {
+        CoreId(self.id)
+    }
 }
 
 impl Handle {
@@ -619,6 +638,11 @@ impl Handle {
               R: IntoFuture<Item=(), Error=()> + 'static,
     {
         self.spawn(futures::lazy(f))
+    }
+
+    /// Return the ID of the represented Core
+    pub fn id(&self) -> CoreId {
+        self.remote.id()
     }
 }
 
