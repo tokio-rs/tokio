@@ -7,23 +7,27 @@
 
 pub extern crate libc;
 extern crate mio;
-extern crate tokio_uds;
 extern crate nix;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::os::unix::io::RawFd;
+use std::collections::HashSet;
 use std::io;
 
 use self::libc::c_int;
-use self::nix::unistd::pipe;
-use self::nix::sys::signal::{SigAction, SigHandler, SigSet, SA_NOCLDSTOP, SA_RESTART, sigaction};
+use self::nix::sys::signal::{sigaction, SigAction, SigHandler, SigSet, SA_NOCLDSTOP, SA_RESTART};
 use self::nix::sys::signal::Signal as NixSignal;
-use self::nix::sys::socket::{send, MSG_DONTWAIT};
-use futures::{Future, IntoFuture};
+use self::nix::Error as NixError;
+use self::nix::Errno;
+use self::nix::sys::socket::{recv, send, socketpair, AddressFamily, SockType, SockFlag, MSG_DONTWAIT};
+use self::mio::{Evented, Token, Ready, PollOpt};
+use self::mio::Poll as MioPoll;
+use self::mio::unix::EventedFd;
+use futures::{Async, AsyncSink, Future, IntoFuture};
 use futures::sync::mpsc::{Receiver, Sender, channel};
-use futures::{Stream, Poll};
-use tokio_core::reactor::Handle;
+use futures::{Sink, Stream, Poll};
+use tokio_core::reactor::{Handle, CoreId, PollEvented};
 use tokio_core::io::IoFuture;
 
 pub use self::libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
@@ -45,18 +49,21 @@ struct Globals {
     sender: RawFd,
     receiver: RawFd,
     signals: [Mutex<SignalInfo>; SIGNUM],
+    drivers: Mutex<HashSet<CoreId>>,
 }
 
 impl Globals {
     fn new() -> Self {
         // TODO: Better error handling
-        let (receiver, sender) = pipe().unwrap();
+        // We use socket pair instead of pipe, as it allows send() and recv().
+        let (receiver, sender) = socketpair(AddressFamily::Unix, SockType::Stream, 0, SockFlag::empty()).unwrap();
         Globals {
             // Bunch of false values
             pending: Default::default(),
             sender: sender,
             receiver: receiver,
             signals: Default::default(),
+            drivers: Mutex::new(HashSet::new()),
         }
     }
 }
@@ -64,7 +71,7 @@ impl Globals {
 lazy_static! {
     // TODO: Get rid of lazy_static once the prototype is done ‒ get rid of the dependency as well
     // as the possible lock in there, which *might* be problematic in signals
-    static ref globals: Globals = Globals::new();
+    static ref GLOBALS: Globals = Globals::new();
 }
 
 // Flag the relevant signal and wake up through a self-pipe
@@ -72,23 +79,129 @@ extern "C" fn pipe_wakeup(signal: c_int) {
     let index = signal as usize;
     // TODO: Handle the old signal handler
     // It might be good enough to use some lesser ordering than this, but how to prove it?
-    globals.pending[index].store(true, Ordering::SeqCst);
+    GLOBALS.pending[index].store(true, Ordering::SeqCst);
     // Send a wakeup, ignore any errors (anything reasonably possible is full pipe and then it will
     // wake up anyway).
-    let _ = send(globals.sender, &[0u8], MSG_DONTWAIT);
+    let _ = send(GLOBALS.sender, &[0u8], MSG_DONTWAIT);
 }
 
 // Make sure we listen to the given signal and provide the recipient end of the self-pipe
-fn signal_enable(signal: c_int) -> RawFd {
+fn signal_enable(signal: c_int) {
     let index = signal as usize;
-    let mut siginfo = globals.signals[index].lock().unwrap();
+    let mut siginfo = GLOBALS.signals[index].lock().unwrap();
     if !siginfo.initialized {
         let action = SigAction::new(SigHandler::Handler(pipe_wakeup), SA_NOCLDSTOP | SA_RESTART, SigSet::empty());
         unsafe { sigaction(NixSignal::from_c_int(signal).unwrap(), &action).unwrap() };
         // TODO: Handle the old signal handler
         siginfo.initialized = true;
     }
-    globals.receiver
+}
+
+struct EventedReceiver;
+
+impl Evented for EventedReceiver {
+    fn register(&self, poll: &MioPoll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
+        EventedFd(&GLOBALS.receiver).register(poll, token, events, opts)
+    }
+    fn reregister(&self, poll: &MioPoll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
+        EventedFd(&GLOBALS.receiver).reregister(poll, token, events, opts)
+    }
+    fn deregister(&self, poll: &MioPoll) -> io::Result<()> {
+        EventedFd(&GLOBALS.receiver).deregister(poll)
+    }
+}
+
+// There'll be stuff inside
+struct Driver {
+    id: CoreId,
+    wakeup: PollEvented<EventedReceiver>,
+}
+
+impl Future for Driver {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<(), ()> {
+        // Drain the data from the pipe and maintain interest in getting more
+        let any_wakeup = self.drain();
+        if any_wakeup {
+            self.broadcast();
+        }
+        // This task just lives until the end of the event loop
+        Ok(Async::NotReady)
+    }
+}
+
+impl Drop for Driver {
+    fn drop(&mut self) {
+        let mut drivers = GLOBALS.drivers.lock().unwrap();
+        drivers.remove(&self.id);
+    }
+}
+
+impl Driver {
+    fn new(handle: &Handle) -> Self {
+        Driver {
+            id: handle.id(),
+            // TODO: Any chance of errors here?
+            wakeup: PollEvented::new(EventedReceiver, handle).unwrap(),
+        }
+    }
+    // Drain all data in the pipe and maintain an interest in read-ready
+    fn drain(&self) -> bool {
+        // Inform tokio we're interested in reading. It also hints on
+        // if we may be readable.
+        if let Async::NotReady = self.wakeup.poll_read() {
+            return false;
+        }
+        // Read all available data (until EAGAIN)
+        let mut received = false;
+        let mut buffer = [0; 1024];
+        loop {
+            match recv(GLOBALS.receiver, &mut buffer, MSG_DONTWAIT) {
+                Ok(0) => panic!("EOF on self-pipe"),
+                Ok(_) => received = true,
+                Err(NixError::Sys(Errno::EAGAIN)) => break,
+                Err(NixError::Sys(Errno::EINTR)) => (),
+                Err(e) => panic!("Bad read on self-pipe: {}", e),
+            }
+        }
+
+        // If we got here, it's because we got EAGAIN above. Ask for more data.
+        self.wakeup.need_read();
+
+        received
+    }
+    // Go through all the signals and broadcast everything
+    fn broadcast(&self) {
+        for (sig, value) in GLOBALS.pending.iter().enumerate() {
+            // Any signal of this kind arrived since we checked last?
+            if value.swap(false, Ordering::SeqCst) {
+                let signum = sig as c_int;
+                let mut siginfo = GLOBALS.signals[sig].lock().unwrap();
+                // It doesn't seem to be possible to do this through the iterators for now.
+                // This trick is copied from https://github.com/rust-lang/rfcs/pull/1353.
+                for i in (0 .. siginfo.recipients.len()).rev() {
+                    // TODO: This thing probably generates unnecessary wakups of this task.
+                    // But let's optimise it later on, when we know this works.
+                    match siginfo.recipients[i].start_send(signum) {
+                        // We don't care if it was full or not ‒ we just want to wake up the other
+                        // side.
+                        Ok(AsyncSink::Ready) => {
+                            // We are required to call this if we push something inside
+                            let _ = siginfo.recipients[i].poll_complete();
+                        },
+                        // The channel is full -> it'll get woken up anyway
+                        Ok(AsyncSink::NotReady(_)) => (),
+                        // The other side disappeared, drop this end.
+                        Err(_) => {
+                            siginfo.recipients.swap_remove(i);
+                        },
+                    }
+                }
+            }
+        }
+    }
 }
 
 // TODO: Go through the docs, they are a copy-paste from the previous version
@@ -158,12 +271,20 @@ impl Signal {
         let index = signal as usize;
         // One wakeup in a queue is enough
         let (sender, receiver) = channel(1);
-        { // Hold the mutex only a short while
-            let mut siginfo = globals.signals[index].lock().unwrap();
+        {
+            let mut siginfo = GLOBALS.signals[index].lock().unwrap();
             siginfo.recipients.push(sender);
         }
         // Turn the signal delivery on once we are ready for it
-        let wakeup = signal_enable(signal);
+        signal_enable(signal);
+        let id = handle.id();
+        {
+            let mut drivers = GLOBALS.drivers.lock().unwrap();
+            if !drivers.contains(&id) {
+                handle.spawn(Driver::new(handle));
+                drivers.insert(id);
+            }
+        }
         // TODO: Init the driving task for this handle
         Ok(Signal(receiver)).into_future().boxed()
     }
@@ -180,328 +301,3 @@ impl Stream for Signal {
 }
 
 // TODO: Drop for Signal and remove the other end proactively?
-
-/*
-
-use std::cell::RefCell;
-use std::io::{self, Write, Read};
-use std::mem;
-
-use futures::future;
-use futures::stream::Fuse;
-use futures::sync::mpsc;
-use futures::sync::oneshot;
-use self::tokio_uds::UnixStream;
-use tokio_core::reactor::{PollEvented, Handle};
-
-static INIT: Once = ONCE_INIT;
-static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
-
-pub struct Signal {
-    signum: c_int,
-    reg: PollEvented<MyRegistration>,
-    _finished: oneshot::Sender<()>,
-}
-
-struct GlobalState {
-    write: UnixStream,
-    tx: mpsc::UnboundedSender<Message>,
-    signals: [GlobalSignalState; 32],
-}
-
-struct GlobalSignalState {
-    ready: AtomicBool,
-    prev: libc::sigaction,
-}
-
-enum Message {
-    NewSignal(c_int, oneshot::Sender<io::Result<Signal>>),
-}
-
-struct DriverTask {
-    handle: Handle,
-    read: UnixStream,
-    rx: Fuse<mpsc::UnboundedReceiver<Message>>,
-    signals: [SignalState; 32],
-}
-
-struct SignalState {
-    registered: bool,
-    tasks: Vec<(RefCell<oneshot::Receiver<()>>, mio::SetReadiness)>,
-}
-
-impl Signal {
-    pub fn new(signum: c_int, handle: &Handle) -> IoFuture<Signal> {
-        let mut init = None;
-        INIT.call_once(|| {
-            init = Some(global_init(handle));
-        });
-        let new_signal = future::lazy(move || {
-            let (tx, rx) = oneshot::channel();
-            let msg = Message::NewSignal(signum, tx);
-            let res = unsafe {
-                (*GLOBAL_STATE).tx.clone().send(msg)
-            };
-            res.expect("failed to request a new signal stream, did the \
-                        first event loop go away?");
-            rx.then(|r| r.unwrap())
-        });
-        match init {
-            Some(init) => init.into_future().and_then(|()| new_signal).boxed(),
-            None => new_signal.boxed(),
-        }
-    }
-}
-
-impl Stream for Signal {
-    type Item = c_int;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<c_int>, io::Error> {
-        if !self.reg.poll_read().is_ready() {
-            return Ok(Async::NotReady)
-        }
-        self.reg.need_read();
-        self.reg.get_ref()
-                .inner.borrow()
-                .as_ref().unwrap().1
-                .set_readiness(mio::Ready::none())
-                .expect("failed to set readiness");
-        Ok(Async::Ready(Some(self.signum)))
-    }
-}
-
-fn global_init(handle: &Handle) -> io::Result<()> {
-    let (tx, rx) = mpsc::unbounded();
-    let (read, write) = try!(UnixStream::pair(handle));
-    unsafe {
-        let state = Box::new(GlobalState {
-            write: write,
-            signals: {
-                fn new() -> GlobalSignalState {
-                    GlobalSignalState {
-                        ready: AtomicBool::new(false),
-                        prev: unsafe { mem::zeroed() },
-                    }
-                }
-                [
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                ]
-            },
-            tx: tx,
-        });
-        GLOBAL_STATE = Box::into_raw(state);
-
-        handle.spawn(DriverTask {
-            handle: handle.clone(),
-            rx: rx.fuse(),
-            read: read,
-            signals: {
-                fn new() -> SignalState {
-                    SignalState { registered: false, tasks: Vec::new() }
-                }
-                [
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                    new(), new(), new(), new(), new(), new(), new(), new(),
-                ]
-            },
-        });
-
-        Ok(())
-    }
-}
-
-impl Future for DriverTask {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        self.check_signal_drops();
-        self.check_messages();
-        self.check_signals();
-
-        // TODO: when to finish this task?
-        Ok(Async::NotReady)
-    }
-}
-
-impl DriverTask {
-    fn check_signal_drops(&mut self) {
-        for signal in self.signals.iter_mut() {
-            signal.tasks.retain(|task| {
-                !task.0.borrow_mut().poll().is_err()
-            });
-        }
-    }
-
-    fn check_messages(&mut self) {
-        loop {
-            // Acquire the next message
-            let message = match self.rx.poll().unwrap() {
-                Async::Ready(Some(e)) => e,
-                Async::Ready(None) |
-                Async::NotReady => break,
-            };
-            let (sig, complete) = match message {
-                Message::NewSignal(sig, complete) => (sig, complete),
-            };
-
-            // If the signal's too large, then we return an error, otherwise we
-            // use this index to look at the signal slot.
-            //
-            // If the signal wasn't previously registered then we do so now.
-            let signal = match self.signals.get_mut(sig as usize) {
-                Some(signal) => signal,
-                None => {
-                    complete.complete(Err(io::Error::new(io::ErrorKind::Other,
-                                                         "signum too large")));
-                    continue
-                }
-            };
-            if !signal.registered {
-                unsafe {
-                    let mut new: libc::sigaction = mem::zeroed();
-                    new.sa_sigaction = handler as usize;
-                    new.sa_flags = libc::SA_RESTART | libc::SA_SIGINFO;
-                    let mut prev = mem::zeroed();
-                    if libc::sigaction(sig, &new, &mut prev) != 0 {
-                        complete.complete(Err(io::Error::last_os_error()));
-                        continue
-                    }
-                    signal.registered = true;
-                }
-            }
-
-            // Acquire the (registration, set_readiness) pair by... assuming
-            // we're on the event loop (true because of the spawn above).
-            let reg = MyRegistration { inner: RefCell::new(None) };
-            let reg = match PollEvented::new(reg, &self.handle) {
-                Ok(reg) => reg,
-                Err(e) => {
-                    complete.complete(Err(e));
-                    continue
-                }
-            };
-
-            // Create the `Signal` to pass back and then also keep a handle to
-            // the `SetReadiness` for ourselves internally.
-            let (tx, rx) = oneshot::channel();
-            let ready = reg.get_ref().inner.borrow_mut().as_mut().unwrap().1.clone();
-            complete.complete(Ok(Signal {
-                signum: sig,
-                reg: reg,
-                _finished: tx,
-            }));
-            signal.tasks.push((RefCell::new(rx), ready));
-        }
-    }
-
-    fn check_signals(&mut self) {
-        // Drain all data from the pipe
-        let mut buf = [0; 32];
-        let mut any = false;
-        loop {
-            match self.read.read(&mut buf) {
-                Ok(0) => {  // EOF == something happened
-                    any = true;
-                    break
-                }
-                Ok(..) => any = true,   // data read, but keep draining
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
-                Err(e) => panic!("bad read: {}", e),
-            }
-        }
-
-        // If nothing happened, no need to check the signals
-        if !any {
-            return
-        }
-
-        for (i, slot) in self.signals.iter().enumerate() {
-            // No need to go farther if we haven't even registered a signal
-            if !slot.registered {
-                continue
-            }
-
-            // See if this signal actually happened since we last checked
-            unsafe {
-                if !(*GLOBAL_STATE).signals[i].ready.swap(false, Ordering::SeqCst) {
-                    continue
-                }
-            }
-
-            // Wake up all the tasks waiting on this signal
-            for task in slot.tasks.iter() {
-                task.1.set_readiness(mio::Ready::readable())
-                      .expect("failed to set readiness");
-            }
-        }
-    }
-}
-
-extern fn handler(signum: c_int,
-                  info: *mut libc::siginfo_t,
-                  ptr: *mut libc::c_void) {
-    type FnSigaction = extern fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
-    type FnHandler = extern fn(c_int);
-
-    unsafe {
-        let state = match (*GLOBAL_STATE).signals.get(signum as usize) {
-            Some(state) => state,
-            None => return,
-        };
-
-        if !state.ready.swap(true, Ordering::SeqCst) {
-            // Ignore errors here as we're not in a context that can panic,
-            // and otherwise there's not much we can do.
-            drop((&(*GLOBAL_STATE).write).write(&[1]));
-        }
-
-        let fnptr = state.prev.sa_sigaction;
-        if fnptr == 0 || fnptr == libc::SIG_DFL || fnptr == libc::SIG_IGN {
-            return
-        }
-        if state.prev.sa_flags & libc::SA_SIGINFO == 0 {
-            let action = mem::transmute::<usize, FnHandler>(fnptr);
-            action(signum)
-        } else {
-            let action = mem::transmute::<usize, FnSigaction>(fnptr);
-            action(signum, info, ptr)
-        }
-    }
-}
-
-struct MyRegistration {
-    inner: RefCell<Option<(mio::Registration, mio::SetReadiness)>>,
-}
-
-impl mio::Evented for MyRegistration {
-    fn register(&self,
-                poll: &mio::Poll,
-                token: mio::Token,
-                events: mio::Ready,
-                opts: mio::PollOpt) -> io::Result<()> {
-        let reg = mio::Registration::new(poll, token, events, opts);
-        *self.inner.borrow_mut() = Some(reg);
-        Ok(())
-    }
-
-    fn reregister(&self,
-                  _poll: &mio::Poll,
-                  _token: mio::Token,
-                  _events: mio::Ready,
-                  _opts: mio::PollOpt) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn deregister(&self, _poll: &mio::Poll) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-*/
