@@ -5,9 +5,6 @@ extern crate libc;
 extern crate tokio_core;
 extern crate tokio_signal;
 
-use std::sync::mpsc::channel;
-use std::sync::{Once, ONCE_INIT, Mutex, MutexGuard};
-use std::thread;
 use std::time::Duration;
 
 use futures::Future;
@@ -15,31 +12,8 @@ use futures::stream::Stream;
 use tokio_core::reactor::{Core, Timeout};
 use tokio_signal::unix::Signal;
 
-static INIT: Once = ONCE_INIT;
-static mut LOCK: *mut Mutex<()> = 0 as *mut _;
-
-fn lock() -> MutexGuard<'static, ()> {
-    unsafe {
-        INIT.call_once(|| {
-            LOCK = Box::into_raw(Box::new(Mutex::new(())));
-            let (tx, rx) = channel();
-            thread::spawn(move || {
-                let mut lp = Core::new().unwrap();
-                let handle = lp.handle();
-                let _signal = lp.run(Signal::new(libc::SIGALRM, &handle)).unwrap();
-                tx.send(()).unwrap();
-                drop(lp.run(futures::empty::<(), ()>()));
-            });
-            rx.recv().unwrap();
-        });
-        (*LOCK).lock().unwrap()
-    }
-}
-
 #[test]
 fn simple() {
-    let _lock = lock();
-
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
@@ -51,8 +25,6 @@ fn simple() {
 
 #[test]
 fn notify_both() {
-    let _lock = lock();
-
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal1 = lp.run(Signal::new(libc::SIGUSR2, &handle)).unwrap();
@@ -65,8 +37,6 @@ fn notify_both() {
 
 #[test]
 fn drop_then_get_a_signal() {
-    let _lock = lock();
-
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
@@ -80,8 +50,6 @@ fn drop_then_get_a_signal() {
 
 #[test]
 fn twice() {
-    let _lock = lock();
-
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
     let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
