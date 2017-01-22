@@ -8,19 +8,88 @@
 pub extern crate libc;
 extern crate mio;
 extern crate tokio_uds;
+extern crate nix;
+
+use std::sync::{Once, ONCE_INIT};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+use std::os::unix::io::RawFd;
+
+use self::libc::c_int;
+use self::nix::unistd::pipe;
+use self::nix::sys::signal::{SigAction, SigHandler, SigSet, SA_NOCLDSTOP, SA_RESTART, sigaction};
+use self::nix::sys::signal::Signal as NixSignal;
+use self::nix::sys::socket::{send, MSG_DONTWAIT};
+
+// Number of different unix signals
+const SIGNUM: usize = 32;
+
+#[derive(Default)]
+struct SignalInfo {
+    initialized: bool,
+    // TODO: Other stuff, like the previous sigaction to call
+}
+
+struct Globals {
+    pending: [AtomicBool; SIGNUM],
+    sender: RawFd,
+    receiver: RawFd,
+    signals: [Mutex<SignalInfo>; SIGNUM],
+}
+
+impl Globals {
+    fn new() -> Self {
+        // TODO: Better error handling
+        let (receiver, sender) = pipe().unwrap();
+        Globals {
+            // Bunch of false values
+            pending: Default::default(),
+            sender: sender,
+            receiver: receiver,
+            signals: Default::default(),
+        }
+    }
+}
+
+lazy_static! {
+    // TODO: Get rid of lazy_static once the prototype is done ‒ get rid of the dependency as well
+    // as the possible lock in there, which *might* be problematic in signals
+    static ref globals: Globals = Globals::new();
+}
+
+// Flag the relevant signal and wake up through a self-pipe
+extern "C" fn pipe_wakeup(signal: c_int) {
+    let index = signal as usize;
+    // TODO: Handle the old signal handler
+    // It might be good enough to use some lesser ordering than this, but how to prove it?
+    globals.pending[index].store(true, Ordering::SeqCst);
+    // Send a wakeup, ignore any errors (anything reasonably possible is full pipe and then it will
+    // wake up anyway).
+    let _ = send(globals.sender, &[0u8], MSG_DONTWAIT);
+}
+
+// Make sure we listen to the given signal and provide the recipient end of the self-pipe
+fn signal_enable(signal: c_int) -> RawFd {
+    let index = signal as usize;
+    let mut siginfo = globals.signals[index].lock().unwrap();
+    if !siginfo.initialized {
+        let action = SigAction::new(SigHandler::Handler(pipe_wakeup), SA_NOCLDSTOP | SA_RESTART, SigSet::empty());
+        unsafe { sigaction(NixSignal::from_c_int(signal).unwrap(), &action).unwrap() };
+        // TODO: Handle the old signal handler
+        siginfo.initialized = true;
+    }
+    globals.receiver
+}
 
 use std::cell::RefCell;
 use std::io::{self, Write, Read};
 use std::mem;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Once, ONCE_INIT};
 
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{Future, Stream, IntoFuture, Poll, Async};
-use self::libc::c_int;
 use self::tokio_uds::UnixStream;
 use tokio_core::io::IoFuture;
 use tokio_core::reactor::{PollEvented, Handle};
