@@ -17,7 +17,6 @@ lazy_static = "0.2"
 nix = "0.7"
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = "0.1"
 libc = "0.2"
 mio = "0.6"
 
