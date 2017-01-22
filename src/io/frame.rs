@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -192,6 +193,18 @@ impl From<Vec<u8>> for EasyBuf {
 impl<'a> Drop for EasyBufMut<'a> {
     fn drop(&mut self) {
         *self.end = self.buf.len();
+    }
+}
+
+impl fmt::Debug for EasyBuf {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let bytes = self.as_ref();
+        let len = self.len();
+        if len < 10 {
+            write!(formatter, "EasyBuf{{len={}/{} {:?}}}", self.len(), self.buf.len(), bytes)
+        } else { // choose a more compact representation
+            write!(formatter, "EasyBuf{{len={}/{} [{}, {}, {}, {}, ..., {}, {}, {}, {}]}}", self.len(), self.buf.len(), bytes[0], bytes[1], bytes[2], bytes[3], bytes[len-4], bytes[len-3], bytes[len-2], bytes[len-1])
+        }
     }
 }
 
@@ -396,4 +409,37 @@ impl<T, C> Framed<T, C> {
     pub fn into_inner(self) -> T {
         self.upstream
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EasyBuf;
+
+    #[test]
+    fn debug_empty_easybuf() {
+        let buf: EasyBuf = vec![].into();
+        assert_eq!("EasyBuf{len=0/0 []}", format!("{:?}", buf));
+    }
+
+    #[test]
+    fn debug_small_easybuf() {
+        let buf: EasyBuf = vec![1, 2, 3, 4, 5, 6].into();
+        assert_eq!("EasyBuf{len=6/6 [1, 2, 3, 4, 5, 6]}", format!("{:?}", buf));
+    }
+
+    #[test]
+    fn debug_small_easybuf_split() {
+        let mut buf: EasyBuf = vec![1, 2, 3, 4, 5, 6].into();
+        let split = buf.split_off(4);
+        assert_eq!("EasyBuf{len=4/6 [1, 2, 3, 4]}", format!("{:?}", buf));
+        assert_eq!("EasyBuf{len=2/6 [5, 6]}", format!("{:?}", split));
+    }
+
+    #[test]
+    fn debug_large_easybuf() {
+        let vec: Vec<u8> = (0u8..255u8).collect();
+        let buf: EasyBuf = vec.into();
+        assert_eq!("EasyBuf{len=255/255 [0, 1, 2, 3, ..., 251, 252, 253, 254]}", format!("{:?}", buf));
+    }
+
 }
