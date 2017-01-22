@@ -25,6 +25,8 @@
 #[macro_use]
 extern crate futures;
 extern crate tokio_core;
+#[macro_use]
+extern crate lazy_static;
 
 use futures::Future;
 use futures::stream::Stream;
