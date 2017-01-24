@@ -553,9 +553,7 @@ impl Remote {
                     lp.notify(msg);
                 }
                 None => {
-                    // TODO: shouldn't have to `clone` here, can we upstream
-                    //       that &self works with `UnboundedSender`?
-                    match mpsc::UnboundedSender::send(&mut self.tx.clone(), msg) {
+                    match mpsc::UnboundedSender::send(&self.tx, msg) {
                         Ok(()) => {}
 
                         // TODO: this error should punt upwards and we should
