@@ -10,6 +10,11 @@ description = """
 Core I/O and event loop primitives for asynchronous I/O in Rust. Foundation for
 the rest of the tokio crates.
 """
+categories = ["asynchronous"]
+
+[badges]
+travis-ci = { repository = "tokio-rs/tokio-core" }
+appveyor = { repository = "alexcrichton/tokio-core" }
 
 [dependencies]
 futures = "0.1.9"
