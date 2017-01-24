@@ -20,7 +20,7 @@ use std::sync::{Mutex, Once, ONCE_INIT};
 
 use futures::future;
 use futures::sync::mpsc::{Receiver, Sender, channel};
-use futures::{Async, AsyncSink, Future, IntoFuture};
+use futures::{Async, AsyncSink, Future};
 use futures::{Sink, Stream, Poll};
 use self::libc::c_int;
 use self::mio::Poll as MioPoll;
@@ -191,13 +191,13 @@ impl Drop for Driver {
 }
 
 impl Driver {
-    fn new(handle: &Handle) -> Self {
-        Driver {
+    fn new(handle: &Handle) -> io::Result<Driver> {
+        Ok(Driver {
             id: handle.id(),
-            // TODO: Any chance of errors here?
-            wakeup: PollEvented::new(EventedReceiver, handle).unwrap(),
-        }
+            wakeup: try!(PollEvented::new(EventedReceiver, handle)),
+        })
     }
+
     // Drain all data in the pipe and maintain an interest in read-ready
     fn drain(&self) -> bool {
         // Inform tokio we're interested in reading. It also hints on
@@ -313,24 +313,28 @@ impl Signal {
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
     pub fn new(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
-        // Turn the signal delivery on once we are ready for it
-        if let Err(e) = signal_enable(signal) {
-            return future::err(e).boxed()
-        }
+        let result = (|| {
+            // Turn the signal delivery on once we are ready for it
+            try!(signal_enable(signal));
 
-        // One wakeup in a queue is enough
-        let (tx, rx) = channel(1);
-        globals().signals[signal as usize].recipients.lock().unwrap().push(tx);
-        let id = handle.id();
-        {
+            // Ensure there's a driver for our associated event loop processing
+            // signals.
+            let id = handle.id();
             let mut drivers = globals().drivers.lock().unwrap();
             if !drivers.contains(&id) {
-                handle.spawn(Driver::new(handle));
+                handle.spawn(try!(Driver::new(handle)));
                 drivers.insert(id);
             }
-        }
-        // TODO: Init the driving task for this handle
-        Ok(Signal(rx)).into_future().boxed()
+            drop(drivers);
+
+            // One wakeup in a queue is enough, no need for us to buffer up any
+            // more.
+            let (tx, rx) = channel(1);
+            globals().signals[signal as usize].recipients.lock().unwrap().push(tx);
+            Ok(Signal(rx))
+        })();
+
+        future::result(result).boxed()
     }
 }
 
