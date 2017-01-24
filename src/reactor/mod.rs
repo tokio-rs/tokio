@@ -606,6 +606,33 @@ impl Remote {
     pub fn id(&self) -> CoreId {
         CoreId(self.id)
     }
+
+    /// Attempts to "promote" this remote to a handle, if possible.
+    ///
+    /// This function is intended for structures which typically work through a
+    /// `Remote` but want to optimize runtime when the remote doesn't actually
+    /// leave the thread of the original reactor. This will attempt to return a
+    /// handle if the `Remote` is on the same thread as the event loop and the
+    /// event loop is running.
+    ///
+    /// If this `Remote` has moved to a different thread or if the event loop is
+    /// running, then `None` may be returned. If you need to guarantee access to
+    /// a `Handle`, then you can call this function and fall back to using
+    /// `spawn` above if it returns `None`.
+    pub fn handle(&self) -> Option<Handle> {
+        if CURRENT_LOOP.is_set() {
+            CURRENT_LOOP.with(|lp| {
+                let same = lp.inner.borrow().id == self.id;
+                if same {
+                    Some(lp.handle())
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl Handle {
