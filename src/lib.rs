@@ -79,16 +79,6 @@
 //! future of the child's `ExitStatus`, a child process is terminated if
 //! `tokio_process::Child` is dropped. The behavior of the standard library can
 //! be regained with the `Child::forget` method.
-//!
-//! As a final caveat, currently this crate relies on the `tokio-signal` crate
-//! and therefore inherits its current restriction. Namely, once a child has
-//! been spawned onto an event loop then *that event loop must stay alive for
-//! any spawned child in the future to make progress*. In other words, once
-//! you spawn a child onto an event loop, you should ensure that the event loop
-//! keeps running for the duration of the program if there are multiple event
-//! loops. Unfortunately this makes testing particularly tricky, but you can
-//! work around this with an initial event loop that just runs forever in the
-//! background.
 
 #![deny(missing_docs)]
 

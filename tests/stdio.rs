@@ -83,8 +83,6 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
 ///
 /// - The child does produce EOF on stdout after the last line.
 fn feed_a_lot() {
-    support::init();
-
     let mut lp = Core::new().unwrap();
     let child = cat().spawn_async(&lp.handle()).unwrap();
     let status = lp.run(feed_cat(child, 10000)).unwrap();
@@ -93,8 +91,6 @@ fn feed_a_lot() {
 
 #[test]
 fn drop_kills() {
-    support::init();
-
     let mut lp = Core::new().unwrap();
     let mut child = cat().spawn_async(&lp.handle()).unwrap();
     let stdin = child.stdin().take().unwrap();
@@ -108,8 +104,6 @@ fn drop_kills() {
 
 #[test]
 fn wait_with_output_captures() {
-    support::init();
-
     let mut core = Core::new().unwrap();
 
     let mut child = cat().spawn_async(&core.handle()).unwrap();

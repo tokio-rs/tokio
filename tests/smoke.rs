@@ -8,8 +8,6 @@ mod support;
 
 #[test]
 fn simple() {
-    support::init();
-
     let mut lp = Core::new().unwrap();
     let mut cmd = support::cmd("exit");
     cmd.arg("2");
