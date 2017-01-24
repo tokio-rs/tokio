@@ -267,8 +267,10 @@ impl Driver {
             // has gone away then we can remove that slot.
             for i in (0..recipients.len()).rev() {
                 // TODO: This thing probably generates unnecessary wakups of
-                //       this task. But let's optimise it later on, when we
-                //       know this works.
+                //       this task when `NotReady` is received because we don't
+                //       actually want to get woken up to continue sending a
+                //       message. Let's optimise it later on though, as we know
+                //       this works.
                 match recipients[i].1.start_send(signum) {
                     Ok(AsyncSink::Ready) => {}
                     Ok(AsyncSink::NotReady(_)) => {}
