@@ -9,6 +9,11 @@ documentation = "https://docs.rs/tokio-signal/0.1"
 description = """
 An implementation of an asynchronous Unix signal handling backed futures.
 """
+categories = ["asynchronous"]
+
+[badges]
+travis-ci = { repository = "alexcrichton/tokio-signal" }
+appveyor = { repository = "alexcrichton/tokio-signal" }
 
 [dependencies]
 tokio-core = "0.1.4"
