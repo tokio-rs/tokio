@@ -78,6 +78,15 @@ impl TcpListener {
                     return Err(e)
                 },
                 Ok((sock, addr)) => {
+                    // Fast path if we haven't left the event loop
+                    if let Some(handle) = self.io.remote().handle() {
+                        let io = try!(PollEvented::new(sock, &handle));
+                        return Ok((TcpStream { io: io }, addr))
+                    }
+
+                    // If we're off the event loop then send the socket back
+                    // over there to get registered and then we'll get it back
+                    // eventually.
                     let (tx, rx) = oneshot::channel();
                     let remote = self.io.remote().clone();
                     remote.spawn(move |handle| {
