@@ -85,7 +85,16 @@ fn globals() -> &'static Globals {
     }
 }
 
-// Flag the relevant signal and wake up through a self-pipe
+/// Our global signal handler for all signals registered by this module.
+///
+/// The purpose of this signal handler is to primarily:
+///
+/// 1. Flag that our specific signal was received (e.g. store an atomic flag)
+/// 2. Wake up driver tasks by writing a byte to a pipe
+///
+/// Those two operations shoudl both be async-signal safe. After that's done we
+/// just try to call a previous signal handler, if any, to be "good denizens of
+/// the internet"
 extern fn handler(signum: c_int,
                   info: *mut libc::siginfo_t,
                   ptr: *mut libc::c_void) {
@@ -116,10 +125,18 @@ extern fn handler(signum: c_int,
     }
 }
 
-// Make sure we listen to the given signal and provide the recipient end of the
-// self-pipe
+/// Enable this module to receive signal notifications for the `signal`
+/// provided.
+///
+/// This will register the signal handler if it hasn't already been registered,
+/// returning any error along the way if that fails.
 fn signal_enable(signal: c_int) -> io::Result<()> {
-    let siginfo = &globals().signals[signal as usize];
+    let siginfo = match globals().signals.get(signal as usize) {
+        Some(slot) => slot,
+        None => {
+            return Err(io::Error::new(io::ErrorKind::Other, "signal too large"))
+        }
+    };
 	unsafe {
         let mut err = None;
         siginfo.init.call_once(|| {
@@ -146,6 +163,12 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
 	}
 }
 
+/// A helper struct to register our global receiving end of the signal pipe on
+/// multiple event loops.
+///
+/// This structure represents registering the receiving end on all event loops,
+/// and uses `EventedFd` in mio to do so. It's stored in each driver task and is
+/// used to read data and register interest in new signals coming in.
 struct EventedReceiver;
 
 impl Evented for EventedReceiver {
@@ -160,6 +183,12 @@ impl Evented for EventedReceiver {
     fn deregister(&self, poll: &MioPoll) -> io::Result<()> {
         let fd = globals().receiver.as_raw_fd();
         EventedFd(&fd).deregister(poll)
+    }
+}
+
+impl Read for EventedReceiver {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&globals().receiver).read(buf)
     }
 }
 
@@ -198,30 +227,30 @@ impl Driver {
         })
     }
 
-    // Drain all data in the pipe and maintain an interest in read-ready
-    fn drain(&self) -> bool {
-        // Inform tokio we're interested in reading. It also hints on
-        // if we may be readable.
-        if let Async::NotReady = self.wakeup.poll_read() {
-            return false;
-        }
-        // Read all available data (until EAGAIN)
+    /// Drain all data in the global receiver, returning whether data was to be
+    /// had.
+    ///
+    /// If this function returns `true` then some signal has been received since
+    /// we last checked, otherwise `false` indicates that no signal has been
+    /// received.
+    fn drain(&mut self) -> bool {
         let mut received = false;
         loop {
-            match (&globals().receiver).read(&mut [0; 128]) {
+            match self.wakeup.read(&mut [0; 128]) {
                 Ok(0) => panic!("EOF on self-pipe"),
                 Ok(_) => received = true,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
                 Err(e) => panic!("Bad read on self-pipe: {}", e),
             }
         }
-
-        // If we got here, it's because we got EAGAIN above. Ask for more data.
-        self.wakeup.need_read();
-
         received
     }
-    // Go through all the signals and broadcast everything
+
+    /// Go through all the signals and broadcast everything.
+    ///
+    /// Driver tasks wake up for *any* signal and simply process all globally
+    /// registered signal streams, so each task is sort of cooperatively working
+    /// for all the rest as well.
     fn broadcast(&self) {
         for (sig, slot) in globals().signals.iter().enumerate() {
             // Any signal of this kind arrived since we checked last?
@@ -234,7 +263,8 @@ impl Driver {
 
             // Notify all waiters on this signal that the signal has been
             // received. If we can't push a message into the queue then we don't
-            // worry about it as everything is coalesced anyway.
+            // worry about it as everything is coalesced anyway. If the channel
+            // has gone away then we can remove that slot.
             for i in (0..recipients.len()).rev() {
                 // TODO: This thing probably generates unnecessary wakups of
                 //       this task. But let's optimise it later on, when we
@@ -249,7 +279,6 @@ impl Driver {
     }
 }
 
-// TODO: Go through the docs, they are a copy-paste from the previous version
 /// An implementation of `Stream` for receiving a particular type of signal.
 ///
 /// This structure implements the `Stream` trait and represents notifications
@@ -261,14 +290,6 @@ impl Driver {
 /// structure is no exception! There are some important limitations to keep in
 /// mind when using `Signal` streams:
 ///
-/// * While multiple event loops are supported, the *first* event loop to
-///   register a signal handler is required to be active to ensure that signals
-///   for other event loops are delivered. In other words, once an event loop
-///   registers a signal, it's best to keep it around and running. This is
-///   normally just a problem for tests, and the "workaround" is to spawn a
-///   thread in the background at the beginning of the test suite which is
-///   running an event loop (and listening for a signal).
-///
 /// * Signals handling in Unix already necessitates coalescing signals
 ///   together sometimes. This `Signal` stream is also no exception here in
 ///   that it will also coalesce signals. That is, even if the signal handler
@@ -278,11 +299,16 @@ impl Driver {
 ///   Once `poll` has been called, however, a further signal is guaranteed to
 ///   be yielded as an item.
 ///
+///   Put another way, any element pulled off the returned stream corresponds to
+///   *at least one* signal, but possibly more.
+///
 /// * Signal handling in general is relatively inefficient. Although some
 ///   improvements are possible in this crate, it's recommended to not plan on
 ///   having millions of signal channels open.
 ///
-/// * Currently the "driver task" to process incoming signals never exits.
+/// * Currently the "driver task" to process incoming signals never exits. This
+///   driver task runs in the background of the event loop provided, and
+///   in general you shouldn't need to worry about it.
 ///
 /// If you've got any questions about this feel free to open an issue on the
 /// repo, though, as I'd love to chat about this! In other words, I'd love to
@@ -290,9 +316,8 @@ impl Driver {
 pub struct Signal(Receiver<c_int>);
 
 impl Signal {
-    // TODO: Revisit the docs, they are from the previous version
     /// Creates a new stream which will receive notifications when the current
-    /// process receives the signal `signum`.
+    /// process receives the signal `signal`.
     ///
     /// This function will create a new stream which may be based on the
     /// event loop handle provided. This function returns a future which will
@@ -303,10 +328,7 @@ impl Signal {
     /// found on `Signal` itself, but to reiterate:
     ///
     /// * Signals may be coalesced beyond what the kernel already does.
-    /// * While multiple event loops are supported, the first event loop to
-    ///   register a signal handler must be active to deliver signal
-    ///   notifications
-    /// * Once a signal handle is registered with the process the underlying
+    /// * Once a signal handler is registered with the process the underlying
     ///   libc signal handler is never unregistered.
     ///
     /// A `Signal` stream can be created for a particular signal number
