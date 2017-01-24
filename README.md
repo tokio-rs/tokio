@@ -6,7 +6,7 @@ An implementation of process management for Tokio
 [![Build status](https://ci.appveyor.com/api/projects/status/43c8g7fy801e5902?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio-process)
 [![Crates.io](https://img.shields.io/crates/v/tokio-process.svg?maxAge=2592000)](https://crates.io/crates/tokio-process)
 
-[Documentation](https://docs.rs/tokio-process/0.1)
+[Documentation](https://docs.rs/tokio-process)
 
 ## Usage
 

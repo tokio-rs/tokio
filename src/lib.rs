@@ -81,6 +81,7 @@
 //! be regained with the `Child::forget` method.
 
 #![deny(missing_docs)]
+#![doc(html_root_url = "https://docs.rs/tokio-process/0.1")]
 
 #[macro_use]
 extern crate futures;
