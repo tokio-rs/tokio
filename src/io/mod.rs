@@ -14,6 +14,8 @@ use std::io;
 use futures::{BoxFuture, Async, Poll};
 use futures::stream::BoxStream;
 
+use mio::IoVec;
+
 /// A convenience typedef around a `Future` whose error component is `io::Error`
 pub type IoFuture<T> = BoxFuture<T, io::Error>;
 
@@ -112,6 +114,57 @@ pub trait Io: io::Read + io::Write {
     /// future's task.
     fn poll_write(&mut self) -> Async<()> {
         Async::Ready(())
+    }
+
+    /// Read in a list of buffers all at once.
+    ///
+    /// This operation will attempt to read bytes from this socket and place
+    /// them into the list of buffers provided. Note that each buffer is an
+    /// `IoVec` which can be created from a byte slice.
+    ///
+    /// The buffers provided will be filled in sequentially. A buffer will be
+    /// entirely filled up before the next is written to.
+    ///
+    /// The number of bytes read is returned, if successful, or an error is
+    /// returned otherwise. If no bytes are available to be read yet then
+    /// a "would block" error is returned. This operation should not block.
+    ///
+    /// There is a default implementation for this function which treats this
+    /// as a single read using the first buffer in the list, but objects which
+    /// can implement this as an atomic read using all the buffers are
+    /// recommended to do so. For example, `TcpStream` can implement this
+    /// using the `readv` syscall.
+    fn read_vec(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        if bufs.is_empty() {
+            Ok(0)
+        } else {
+            self.read(bufs[0].as_mut_bytes())
+        }
+    }
+
+    /// Write a list of buffers all at once.
+    ///
+    /// This operation will attempt to write a list of byte buffers to this
+    /// socket. Note that each buffer is an `IoVec` which can be created from a
+    /// byte slice.
+    ///
+    /// The buffers provided will be written sequentially. A buffer will be
+    /// entirely written before the next is written.
+    ///
+    /// The number of bytes written is returned, if successful, or an error is
+    /// returned otherwise. If the socket is not currently writable then a
+    /// "would block" error is returned. This operation should not block.
+    ///
+    /// There is a default implementation for this function which writes the
+    /// first buffer only, but objects which can implement this as an atomic
+    /// write using all the buffers are  recommended to do so. For example,
+    /// `TcpStream` can implement this  using the `writev` syscall.
+    fn write_vec(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
+        if bufs.is_empty() {
+            Ok(0)
+        } else {
+            self.write(bufs[0].as_bytes())
+        }
     }
 
     /// Provides a `Stream` and `Sink` interface for reading and writing to this
