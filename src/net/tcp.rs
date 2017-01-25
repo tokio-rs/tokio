@@ -266,6 +266,13 @@ impl TcpStream {
         }
     }
 
+    /// Create a new `TcpStream` from a `net::TcpStream`.
+    pub fn from_stream(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
+        Ok(TcpStream {
+            io: try!(PollEvented::new(try!(mio::tcp::TcpStream::from_stream(stream)), handle)),
+        })
+    }
+
     /// Creates a new `TcpStream` from the pending socket inside the given
     /// `std::net::TcpStream`, connecting it to the address specified.
     ///
