@@ -154,7 +154,7 @@ impl<E> PollEvented<E> {
     /// then again writable.
     ///
     /// Note that it is also only valid to call this method if `poll_write`
-    /// previously indicated that the object is writeable. That is, this function
+    /// previously indicated that the object is writable. That is, this function
     /// must always be paired with calls to `poll_write` previously.
     pub fn need_write(&self) {
         self.readiness.fetch_and(!2, Ordering::SeqCst);

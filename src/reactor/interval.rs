@@ -158,7 +158,7 @@ mod test {
 
     /// TODO: this test actually should be successful, but since we can't
     ///       multiply Duration on anything larger than u32 easily we decided
-    ///       to allow thit to fail for now
+    ///       to allow it to fail for now
     #[test]
     #[should_panic(expected = "can't skip more than 4 billion intervals")]
     fn large_skip() {

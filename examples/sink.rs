@@ -36,7 +36,7 @@ fn main() {
 
     let mut l = Core::new().unwrap();
     let socket = TcpListener::bind(&addr, &l.handle()).unwrap();
-    println!("Listenering on: {}", addr);
+    println!("Listening on: {}", addr);
     let server = socket.incoming().and_then(|(socket, addr)| {
         println!("got a socket: {}", addr);
         write(socket).or_else(|_| Ok(()))
