@@ -267,9 +267,15 @@ impl TcpStream {
     }
 
     /// Create a new `TcpStream` from a `net::TcpStream`.
-    pub fn from_stream(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
+    ///
+    /// This function will convert a TCP stream in the standard library to a TCP
+    /// stream ready to be used with the provided event loop handle. The object
+    /// returned is associated with the event loop and ready to perform I/O.
+    pub fn from_stream(stream: net::TcpStream, handle: &Handle)
+                       -> io::Result<TcpStream> {
+        let inner = try!(mio::tcp::TcpStream::from_stream(stream));
         Ok(TcpStream {
-            io: try!(PollEvented::new(try!(mio::tcp::TcpStream::from_stream(stream)), handle)),
+            io: try!(PollEvented::new(inner, handle)),
         })
     }
 
