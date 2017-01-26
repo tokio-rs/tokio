@@ -41,7 +41,7 @@ struct SignalInfo {
     // The ones interested in this signal
     recipients: Mutex<Vec<(usize, Sender<c_int>)>>,
 
-	init: Once,
+    init: Once,
     initialized: UnsafeCell<bool>,
     prev: UnsafeCell<libc::sigaction>,
 }
@@ -98,8 +98,8 @@ fn globals() -> &'static Globals {
 extern fn handler(signum: c_int,
                   info: *mut libc::siginfo_t,
                   ptr: *mut libc::c_void) {
-	type FnSigaction = extern fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
-	type FnHandler = extern fn(c_int);
+    type FnSigaction = extern fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
+    type FnHandler = extern fn(c_int);
     unsafe {
         let slot = match (*GLOBALS).signals.get(signum as usize) {
             Some(slot) => slot,
@@ -137,7 +137,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
             return Err(io::Error::new(io::ErrorKind::Other, "signal too large"))
         }
     };
-	unsafe {
+    unsafe {
         let mut err = None;
         siginfo.init.call_once(|| {
             let mut new: libc::sigaction = mem::zeroed();
@@ -160,7 +160,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
             Err(io::Error::new(io::ErrorKind::Other,
                                "failed to register signal handler"))
         }
-	}
+    }
 }
 
 /// A helper struct to register our global receiving end of the signal pipe on
