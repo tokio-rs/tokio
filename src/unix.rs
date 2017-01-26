@@ -15,7 +15,7 @@ use std::io::prelude::*;
 use std::io;
 use std::mem;
 use std::os::unix::prelude::*;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
 use futures::future;
@@ -39,7 +39,7 @@ const SIGNUM: usize = 32;
 struct SignalInfo {
     pending: AtomicBool,
     // The ones interested in this signal
-    recipients: Mutex<Vec<(usize, Sender<c_int>)>>,
+    recipients: Mutex<Vec<Box<Sender<c_int>>>>,
 
     init: Once,
     initialized: UnsafeCell<bool>,
@@ -271,7 +271,7 @@ impl Driver {
                 //       actually want to get woken up to continue sending a
                 //       message. Let's optimise it later on though, as we know
                 //       this works.
-                match recipients[i].1.start_send(signum) {
+                match recipients[i].start_send(signum) {
                     Ok(AsyncSink::Ready) => {}
                     Ok(AsyncSink::NotReady(_)) => {}
                     Err(_) => { recipients.swap_remove(i); }
@@ -317,9 +317,18 @@ impl Driver {
 /// alleviate some of these limitations if possible!
 pub struct Signal {
     signal: c_int,
-    token: usize,
+    // Used only as an identifier. We place the real sender into a Box, so it
+    // stays on the same address forever. That gives us a unique pointer, so we
+    // can use this to identify the sender in a Vec and delete it when we are
+    // dropped.
+    id: *const Sender<c_int>,
     rx: Receiver<c_int>,
 }
+
+// The raw pointer prevents the compiler from determining it as Send
+// automatically. But the only thing we use the raw pointer for is to identify
+// the correct Box to delete, not manipulate any data through that.
+unsafe impl Send for Signal {}
 
 impl Signal {
     /// Creates a new stream which will receive notifications when the current
@@ -341,8 +350,6 @@ impl Signal {
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
     pub fn new(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
-        static TOKENS: AtomicUsize = ATOMIC_USIZE_INIT;
-
         let result = (|| {
             // Turn the signal delivery on once we are ready for it
             try!(signal_enable(signal));
@@ -360,12 +367,13 @@ impl Signal {
             // One wakeup in a queue is enough, no need for us to buffer up any
             // more.
             let (tx, rx) = channel(1);
-            let token = TOKENS.fetch_add(1, Ordering::SeqCst);
+            let tx = Box::new(tx);
+            let id: *const _ = &*tx;
             let idx = signal as usize;
-            globals().signals[idx].recipients.lock().unwrap().push((token, tx));
+            globals().signals[idx].recipients.lock().unwrap().push(tx);
             Ok(Signal {
                 rx: rx,
-                token: token,
+                id: id,
                 signal: signal,
             })
         })();
@@ -388,6 +396,6 @@ impl Drop for Signal {
     fn drop(&mut self) {
         let idx = self.signal as usize;
         let mut list = globals().signals[idx].recipients.lock().unwrap();
-        list.retain(|pair| pair.0 != self.token);
+        list.retain(|sender| &**sender as *const _ != self.id);
     }
 }
