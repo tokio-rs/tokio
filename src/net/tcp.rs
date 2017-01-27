@@ -433,6 +433,38 @@ impl Io for TcpStream {
     fn poll_write(&mut self) -> Async<()> {
         <TcpStream>::poll_write(self)
     }
+
+    fn read_vec(&mut self, bufs: &mut [&mut mio::IoVec]) -> io::Result<usize> {
+        if let Async::NotReady = self.poll_read() {
+            return Err(mio::would_block())
+        }
+        let r = self.io.get_ref().read_bufs(bufs);
+        if is_wouldblock(&r) {
+            self.io.need_read();
+        }
+        return r
+
+
+    }
+
+    fn write_vec(&mut self, bufs: &[&mio::IoVec]) -> io::Result<usize> {
+        if let Async::NotReady = self.poll_write() {
+            return Err(mio::would_block())
+        }
+        let r = self.io.get_ref().write_bufs(bufs);
+        if is_wouldblock(&r) {
+            self.io.need_write();
+        }
+        return r
+
+    }
+}
+
+fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
+    match *r {
+        Ok(_) => false,
+        Err(ref e) => e.kind() == io::ErrorKind::WouldBlock,
+    }
 }
 
 impl<'a> Read for &'a TcpStream {
