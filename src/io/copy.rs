@@ -72,7 +72,7 @@ impl<R, W> Future for Copy<R, W>
                 self.amt += i as u64;
             }
 
-            // If we've written al the data and we've seen EOF, flush out the
+            // If we've written all the data and we've seen EOF, flush out the
             // data and finish the transfer.
             // done with the entire transfer.
             if self.pos == self.cap && self.read_done {
