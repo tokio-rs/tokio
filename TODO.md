@@ -1,4 +1,4 @@
-Have a plan:
+## Planned changes
 
 - futures
   - Streams
@@ -38,7 +38,7 @@ Have a plan:
 - tokio-proto
   - [`bind_client` should return a future](https://github.com/tokio-rs/tokio-proto/issues/132)
 
-Need discussion:
+## Need discussion
 
 - futures
   - Parking/task model
