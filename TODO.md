@@ -55,6 +55,8 @@
     - [Getting a handle](https://github.com/tokio-rs/tokio-core/issues/79); [PR](https://github.com/tokio-rs/tokio-core/pull/84)
     - Also for pure clients (like Hyper)
 
+- Timers
+
 - tokio-service
   - [Backpressure](https://github.com/tokio-rs/tokio-service/issues/12)
     - [Carl's gist](https://gist.github.com/carllerche/5570c2b0e8a4994fb4a849020a5046de)
