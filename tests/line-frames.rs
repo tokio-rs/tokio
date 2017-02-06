@@ -1,35 +1,49 @@
-extern crate tokio_core;
 extern crate env_logger;
 extern crate futures;
+extern crate tokio_core;
+extern crate tokio_io;
+extern crate bytes;
 
 use std::io;
 use std::net::Shutdown;
 
+use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
-use tokio_core::io::{write_all, read, Codec, EasyBuf, Io};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
+use tokio_io::codec::{Encoder, Decoder};
+use tokio_io::io::{write_all, read};
+use tokio_io::AsyncRead;
 
 pub struct LineCodec;
 
-impl Codec for LineCodec {
-    type In = EasyBuf;
-    type Out = EasyBuf;
+impl Decoder for LineCodec {
+    type Item = BytesMut;
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<EasyBuf>, io::Error> {
-        match buf.as_slice().iter().position(|&b| b == b'\n') {
-            Some(i) => Ok(Some(buf.drain_to(i + 1).into())),
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
+        match buf.iter().position(|&b| b == b'\n') {
+            Some(i) => Ok(Some(buf.split_to(i + 1).into())),
             None => Ok(None),
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut EasyBuf) -> io::Result<EasyBuf> {
-        let amt = buf.len();
-        Ok(buf.drain_to(amt))
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+        if buf.len() == 0 {
+            Ok(None)
+        } else {
+            let amt = buf.len();
+            Ok(Some(buf.split_to(amt)))
+        }
     }
+}
 
-    fn encode(&mut self, item: EasyBuf, into: &mut Vec<u8>) -> io::Result<()> {
-        into.extend_from_slice(item.as_slice());
+impl Encoder for LineCodec {
+    type Item = BytesMut;
+    type Error = io::Error;
+
+    fn encode(&mut self, item: BytesMut, into: &mut BytesMut) -> io::Result<()> {
+        into.put(&item[..]);
         Ok(())
     }
 }

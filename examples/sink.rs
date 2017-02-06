@@ -18,6 +18,7 @@
 extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_io;
 
 use std::env;
 use std::iter;
@@ -25,7 +26,7 @@ use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::{self, Stream};
-use tokio_core::io::IoFuture;
+use tokio_io::IoFuture;
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
 
@@ -51,6 +52,6 @@ fn write(socket: TcpStream) -> IoFuture<()> {
     static BUF: &'static [u8] = &[0; 64 * 1024];
     let iter = iter::repeat(()).map(|()| Ok(()));
     stream::iter(iter).fold(socket, |socket, ()| {
-        tokio_core::io::write_all(socket, BUF).map(|(socket, _)| socket)
+        tokio_io::io::write_all(socket, BUF).map(|(socket, _)| socket)
     }).map(|_| ()).boxed()
 }

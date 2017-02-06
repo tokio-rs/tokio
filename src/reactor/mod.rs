@@ -14,11 +14,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
-use futures::{self, Future, IntoFuture, Async};
+use futures::{Future, IntoFuture, Async};
+use futures::future;
 use futures::executor::{self, Spawn, Unpark};
 use futures::sync::mpsc;
 use futures::task::Task;
 use mio;
+use mio::event::Evented;
 use slab::Slab;
 
 use heap::{Heap, Slot};
@@ -153,15 +155,17 @@ impl Core {
     /// creation.
     pub fn new() -> io::Result<Core> {
         let io = try!(mio::Poll::new());
-        let future_pair = mio::Registration::new(&io,
-                                                 TOKEN_FUTURE,
-                                                 mio::Ready::readable(),
-                                                 mio::PollOpt::level());
+        let future_pair = mio::Registration::new2();
+        try!(io.register(&future_pair.0,
+                         TOKEN_FUTURE,
+                         mio::Ready::readable(),
+                         mio::PollOpt::level()));
         let (tx, rx) = mpsc::unbounded();
-        let channel_pair = mio::Registration::new(&io,
-                                                  TOKEN_MESSAGES,
-                                                  mio::Ready::readable(),
-                                                  mio::PollOpt::level());
+        let channel_pair = mio::Registration::new2();
+        try!(io.register(&channel_pair.0,
+                         TOKEN_MESSAGES,
+                         mio::Ready::readable(),
+                         mio::PollOpt::level()));
         let rx_readiness = Arc::new(MySetReadiness(channel_pair.1));
         rx_readiness.unpark();
 
@@ -296,16 +300,16 @@ impl Core {
         for i in 0..self.events.len() {
             let event = self.events.get(i).unwrap();
             let token = event.token();
-            trace!("event {:?} {:?}", event.kind(), event.token());
+            trace!("event {:?} {:?}", event.readiness(), event.token());
 
             if token == TOKEN_MESSAGES {
-                self.rx_readiness.0.set_readiness(mio::Ready::none()).unwrap();
+                self.rx_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
                 CURRENT_LOOP.set(&self, || self.consume_queue());
             } else if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::none()).unwrap();
+                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
                 fired = true;
             } else {
-                self.dispatch(token, event.kind());
+                self.dispatch(token, event.readiness());
             }
         }
         debug!("loop process - {} events, {:?}", amt, after_poll.elapsed());
@@ -326,7 +330,7 @@ impl Core {
         let mut writer = None;
         let mut inner = self.inner.borrow_mut();
         if let Some(io) = inner.io_dispatch.get_mut(token) {
-            if ready.is_readable() || ready.is_hup() {
+            if ready.is_readable() || platform::is_hup(&ready) {
                 reader = io.reader.take();
                 io.readiness.fetch_or(Readiness::Readable as usize,
                     Ordering::Relaxed);
@@ -353,7 +357,7 @@ impl Core {
             Some(slot) => (slot.spawn.take(), slot.wake.clone()),
             None => return,
         };
-        wake.0.set_readiness(mio::Ready::none()).unwrap();
+        wake.0.set_readiness(mio::Ready::empty()).unwrap();
         let mut task = match task {
             Some(task) => task,
             None => return,
@@ -455,7 +459,7 @@ impl fmt::Debug for Core {
 }
 
 impl Inner {
-    fn add_source(&mut self, source: &mio::Evented)
+    fn add_source(&mut self, source: &Evented)
                   -> io::Result<(Arc<AtomicUsize>, usize)> {
         debug!("adding a new I/O source");
         let sched = ScheduledIo {
@@ -470,12 +474,14 @@ impl Inner {
         let entry = self.io_dispatch.vacant_entry().unwrap();
         try!(self.io.register(source,
                               mio::Token(TOKEN_START + entry.index() * 2),
-                              mio::Ready::readable() | mio::Ready::writable() | mio::Ready::hup(),
+                              mio::Ready::readable() |
+                                mio::Ready::writable() |
+                                platform::hup(),
                               mio::PollOpt::edge()));
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
 
-    fn deregister_source(&mut self, source: &mio::Evented) -> io::Result<()> {
+    fn deregister_source(&mut self, source: &Evented) -> io::Result<()> {
         self.io.deregister(source)
     }
 
@@ -546,10 +552,12 @@ impl Inner {
         }
         let entry = self.task_dispatch.vacant_entry().unwrap();
         let token = TOKEN_START + 2 * entry.index() + 1;
-        let pair = mio::Registration::new(&self.io,
-                                          mio::Token(token),
-                                          mio::Ready::readable(),
-                                          mio::PollOpt::level());
+        let pair = mio::Registration::new2();
+        self.io.register(&pair.0,
+                         mio::Token(token),
+                         mio::Ready::readable(),
+                         mio::PollOpt::level())
+            .expect("cannot fail future registration with mio");
         let unpark = Arc::new(MySetReadiness(pair.1));
         let entry = entry.insert(ScheduledTask {
             spawn: Some(executor::spawn(future)),
@@ -688,7 +696,7 @@ impl Handle {
         where F: FnOnce() -> R + 'static,
               R: IntoFuture<Item=(), Error=()> + 'static,
     {
-        self.spawn(futures::lazy(f))
+        self.spawn(future::lazy(f))
     }
 
     /// Return the ID of the represented Core
@@ -740,5 +748,32 @@ trait FnBox: Send + 'static {
 impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
     fn call_box(self: Box<Self>, lp: &Core) {
         (*self)(lp)
+    }
+}
+
+#[cfg(unix)]
+mod platform {
+    use mio::Ready;
+    use mio::unix::UnixReady;
+
+    pub fn is_hup(event: &Ready) -> bool {
+        UnixReady::from(*event).is_hup()
+    }
+
+    pub fn hup() -> Ready {
+        UnixReady::hup().into()
+    }
+}
+
+#[cfg(windows)]
+mod platform {
+    use mio::Ready;
+
+    pub fn is_hup(_event: &Ready) -> bool {
+        false
+    }
+
+    pub fn hup() -> Ready {
+        Ready::empty()
     }
 }

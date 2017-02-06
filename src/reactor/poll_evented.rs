@@ -10,10 +10,10 @@ use std::fmt;
 use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use futures::Async;
-use mio;
+use futures::{Async, Poll};
+use mio::event::Evented;
+use tokio_io::{AsyncRead, AsyncWrite};
 
-use io::Io;
 use reactor::{Handle, Remote};
 use reactor::Readiness::*;
 use reactor::io_token::IoToken;
@@ -45,7 +45,7 @@ pub struct PollEvented<E> {
     io: E,
 }
 
-impl<E: mio::Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
+impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PollEvented")
          .field("io", &self.io)
@@ -53,7 +53,7 @@ impl<E: mio::Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
     }
 }
 
-impl<E: mio::Evented> PollEvented<E> {
+impl<E: Evented> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
     ///
@@ -193,7 +193,7 @@ impl<E> PollEvented<E> {
 impl<E: Read> Read for PollEvented<E> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         let r = self.get_mut().read(buf);
         if is_wouldblock(&r) {
@@ -206,7 +206,7 @@ impl<E: Read> Read for PollEvented<E> {
 impl<E: Write> Write for PollEvented<E> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         let r = self.get_mut().write(buf);
         if is_wouldblock(&r) {
@@ -217,7 +217,7 @@ impl<E: Write> Write for PollEvented<E> {
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         let r = self.get_mut().flush();
         if is_wouldblock(&r) {
@@ -227,7 +227,17 @@ impl<E: Write> Write for PollEvented<E> {
     }
 }
 
-impl<E: Read + Write> Io for PollEvented<E> {
+impl<E: Read> AsyncRead for PollEvented<E> {
+}
+
+impl<E: Write> AsyncWrite for PollEvented<E> {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        Ok(().into())
+    }
+}
+
+#[allow(deprecated)]
+impl<E: Read + Write> ::io::Io for PollEvented<E> {
     fn poll_read(&mut self) -> Async<()> {
         <PollEvented<E>>::poll_read(self)
     }
@@ -242,7 +252,7 @@ impl<'a, E> Read for &'a PollEvented<E>
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         let r = self.get_ref().read(buf);
         if is_wouldblock(&r) {
@@ -257,7 +267,7 @@ impl<'a, E> Write for &'a PollEvented<E>
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         let r = self.get_ref().write(buf);
         if is_wouldblock(&r) {
@@ -268,7 +278,7 @@ impl<'a, E> Write for &'a PollEvented<E>
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         let r = self.get_ref().flush();
         if is_wouldblock(&r) {
@@ -278,7 +288,21 @@ impl<'a, E> Write for &'a PollEvented<E>
     }
 }
 
-impl<'a, E> Io for &'a PollEvented<E>
+impl<'a, E> AsyncRead for &'a PollEvented<E>
+    where &'a E: Read,
+{
+}
+
+impl<'a, E> AsyncWrite for &'a PollEvented<E>
+    where &'a E: Write,
+{
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        Ok(().into())
+    }
+}
+
+#[allow(deprecated)]
+impl<'a, E> ::io::Io for &'a PollEvented<E>
     where &'a E: Read + Write,
 {
     fn poll_read(&mut self) -> Async<()> {

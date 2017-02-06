@@ -19,13 +19,15 @@
 
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_io;
 
 use std::env;
 use std::net::SocketAddr;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::io::{copy, Io};
+use tokio_io::AsyncRead;
+use tokio_io::io::copy;
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
 
@@ -93,7 +95,7 @@ fn main() {
         // information.
         let msg = amt.then(move |result| {
             match result {
-                Ok(amt) => println!("wrote {} bytes to {}", amt, addr),
+                Ok((amt, _, _)) => println!("wrote {} bytes to {}", amt, addr),
                 Err(e) => println!("error on {}: {}", addr, e),
             }
 

@@ -1,6 +1,7 @@
+extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
-extern crate env_logger;
+extern crate tokio_io;
 
 use std::net::TcpStream;
 use std::thread;
@@ -8,7 +9,7 @@ use std::io::{Read, Write, BufReader, BufWriter};
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::io::copy;
+use tokio_io::io::copy;
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
 
@@ -55,7 +56,7 @@ fn echo_server() {
         copy(a, b)
     });
 
-    let amt = t!(l.run(copied));
+    let (amt, _, _) = t!(l.run(copied));
     let (expected, t2) = t.join().unwrap();
     let actual = t2.join().unwrap();
 

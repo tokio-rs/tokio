@@ -5,6 +5,7 @@
 
 #![deprecated(since = "0.1.1", note = "use `futures::sync::mpsc` instead")]
 #![allow(deprecated)]
+#![cfg(feature = "with-deprecated")]
 
 use std::io;
 use std::sync::mpsc::TryRecvError;
@@ -93,6 +94,10 @@ impl<T> Sink for Sender<T> {
     }
 
     fn poll_complete(&mut self) -> Poll<(), io::Error> {
+        Ok(().into())
+    }
+
+    fn close(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
     }
 }

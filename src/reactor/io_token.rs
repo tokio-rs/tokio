@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::io;
 
 use futures::task;
-use mio;
+use mio::event::Evented;
 
 use reactor::{Message, Remote, Handle, Direction};
 
@@ -31,7 +31,7 @@ impl IoToken {
     /// The returned future will panic if the event loop this handle is
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
-    pub fn new(source: &mio::Evented, handle: &Handle) -> io::Result<IoToken> {
+    pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
         match handle.inner.upgrade() {
             Some(inner) => {
                 let (ready, token) = try!(inner.borrow_mut().add_source(source));

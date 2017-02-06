@@ -5,6 +5,7 @@ extern crate futures;
 extern crate libc;
 extern crate mio;
 extern crate tokio_core;
+extern crate tokio_io;
 
 use std::fs::File;
 use std::io::{self, Write};
@@ -12,11 +13,11 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
 
-use mio::{Evented, PollOpt, Ready, Token};
-use mio::unix::EventedFd;
-
-use tokio_core::io::read_to_end;
+use mio::unix::{UnixReady, EventedFd};
+use mio::{PollOpt, Ready, Token};
+use mio::event::Evented;
 use tokio_core::reactor::{Core, PollEvented};
+use tokio_io::io::read_to_end;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -46,11 +47,13 @@ impl io::Read for MyFile {
 impl Evented for MyFile {
     fn register(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
                 -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).register(poll, token, interest | Ready::hup(), opts)
+        let hup: Ready = UnixReady::hup().into();
+        EventedFd(&self.0.as_raw_fd()).register(poll, token, interest | hup, opts)
     }
     fn reregister(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
                   -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest | Ready::hup(), opts)
+        let hup: Ready = UnixReady::hup().into();
+        EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest | hup, opts)
     }
     fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
         EventedFd(&self.0.as_raw_fd()).deregister(poll)

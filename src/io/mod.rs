@@ -9,12 +9,14 @@
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper/core-low-level/
 
+#![deprecated(note = "moved to the `tokio-io` crate")]
+
 use std::io;
 
-use futures::{BoxFuture, Async, Poll};
+use futures::{Async, Poll};
+use futures::future::BoxFuture;
 use futures::stream::BoxStream;
-
-use mio::IoVec;
+use iovec::IoVec;
 
 /// A convenience typedef around a `Future` whose error component is `io::Error`
 pub type IoFuture<T> = BoxFuture<T, io::Error>;
@@ -138,7 +140,7 @@ pub trait Io: io::Read + io::Write {
         if bufs.is_empty() {
             Ok(0)
         } else {
-            self.read(bufs[0].as_mut_bytes())
+            self.read(&mut bufs[0])
         }
     }
 
@@ -163,7 +165,7 @@ pub trait Io: io::Read + io::Write {
         if bufs.is_empty() {
             Ok(0)
         } else {
-            self.write(bufs[0].as_bytes())
+            self.write(&bufs[0])
         }
     }
 

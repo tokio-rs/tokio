@@ -3,12 +3,14 @@ use std::io::{self, Read, Write};
 use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
 
+use bytes::{Buf, BufMut};
 use futures::stream::Stream;
 use futures::sync::oneshot;
 use futures::{Future, Poll, Async};
+use iovec::IoVec;
 use mio;
+use tokio_io::{AsyncRead, AsyncWrite};
 
-use io::{Io, IoFuture};
 use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
@@ -60,7 +62,7 @@ impl TcpListener {
                 match pending.poll().expect("shouldn't be canceled") {
                     Async::NotReady => {
                         self.pending_accept = Some(pending);
-                        return Err(mio::would_block())
+                        return Err(::would_block())
                     },
                     Async::Ready(r) => return r,
                 }
@@ -94,7 +96,7 @@ impl TcpListener {
                             .map(move |io| {
                                 (TcpStream { io: io }, addr)
                             });
-                        tx.complete(res);
+                        drop(tx.send(res));
                         Ok(())
                     });
                     self.pending_accept = Some(rx);
@@ -299,7 +301,8 @@ impl TcpStream {
     ///   (perhaps to `INADDR_ANY`) before this method is called.
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr,
-                          handle: &Handle) -> IoFuture<TcpStream> {
+                          handle: &Handle)
+                          -> Box<Future<Item=TcpStream, Error=io::Error> + Send> {
         let state = match mio::tcp::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
@@ -425,7 +428,28 @@ impl Write for TcpStream {
     }
 }
 
-impl Io for TcpStream {
+impl AsyncRead for TcpStream {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        false
+    }
+
+    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        <&TcpStream>::read_buf(&mut &*self, buf)
+    }
+}
+
+impl AsyncWrite for TcpStream {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        <&TcpStream>::shutdown(&mut &*self)
+    }
+
+    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        <&TcpStream>::write_buf(&mut &*self, buf)
+    }
+}
+
+#[allow(deprecated)]
+impl ::io::Io for TcpStream {
     fn poll_read(&mut self) -> Async<()> {
         <TcpStream>::poll_read(self)
     }
@@ -434,29 +458,26 @@ impl Io for TcpStream {
         <TcpStream>::poll_write(self)
     }
 
-    fn read_vec(&mut self, bufs: &mut [&mut mio::IoVec]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_read() {
-            return Err(mio::would_block())
+    fn read_vec(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        if let Async::NotReady = <TcpStream>::poll_read(self) {
+            return Err(::would_block())
         }
         let r = self.io.get_ref().read_bufs(bufs);
         if is_wouldblock(&r) {
             self.io.need_read();
         }
         return r
-
-
     }
 
-    fn write_vec(&mut self, bufs: &[&mio::IoVec]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_write() {
-            return Err(mio::would_block())
+    fn write_vec(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
+        if let Async::NotReady = <TcpStream>::poll_write(self) {
+            return Err(::would_block())
         }
         let r = self.io.get_ref().write_bufs(bufs);
         if is_wouldblock(&r) {
             self.io.need_write();
         }
         return r
-
     }
 }
 
@@ -483,7 +504,62 @@ impl<'a> Write for &'a TcpStream {
     }
 }
 
-impl<'a> Io for &'a TcpStream {
+impl<'a> AsyncRead for &'a TcpStream {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        false
+    }
+
+    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        if let Async::NotReady = <TcpStream>::poll_read(self) {
+            return Err(::would_block())
+        }
+        let mut bufs: [_; 16] = Default::default();
+        unsafe {
+            let n = buf.bytes_vec_mut(&mut bufs);
+            match self.io.get_ref().read_bufs(&mut bufs[..n]) {
+                Ok(n) => {
+                    buf.advance_mut(n);
+                    Ok(Async::Ready(n))
+                }
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::WouldBlock {
+                        self.io.need_write();
+                    }
+                    Err(e)
+                }
+            }
+        }
+    }
+}
+
+impl<'a> AsyncWrite for &'a TcpStream {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        Ok(().into())
+    }
+
+    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        if let Async::NotReady = <TcpStream>::poll_write(self) {
+            return Err(::would_block())
+        }
+        let mut bufs: [_; 16] = Default::default();
+        let n = buf.bytes_vec(&mut bufs);
+        match self.io.get_ref().write_bufs(&bufs[..n]) {
+            Ok(n) => {
+                buf.advance(n);
+                Ok(Async::Ready(n))
+            }
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_write();
+                }
+                Err(e)
+            }
+        }
+    }
+}
+
+#[allow(deprecated)]
+impl<'a> ::io::Io for &'a TcpStream {
     fn poll_read(&mut self) -> Async<()> {
         <TcpStream>::poll_read(self)
     }

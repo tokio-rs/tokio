@@ -1,6 +1,7 @@
 extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_io;
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -8,9 +9,10 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::io::{copy, Io};
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
+use tokio_io::AsyncRead;
+use tokio_io::io::copy;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -44,7 +46,7 @@ fn echo_server() {
     let halves = client.map(|s| s.0.split());
     let copied = halves.and_then(|(a, b)| copy(a, b));
 
-    let amt = t!(l.run(copied));
+    let (amt, _, _) = t!(l.run(copied));
     t.join().unwrap();
 
     assert_eq!(amt, msg.len() as u64 * 1024);

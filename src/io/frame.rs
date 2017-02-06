@@ -404,6 +404,11 @@ impl<T: Io, C: Codec> Sink for Framed<T, C> {
         trace!("framed transport flushed");
         return Ok(Async::Ready(()));
     }
+
+    fn close(&mut self) -> Poll<(), io::Error> {
+        try_ready!(self.poll_complete());
+        Ok(().into())
+    }
 }
 
 pub fn framed<T, C>(io: T, codec: C) -> Framed<T, C> {

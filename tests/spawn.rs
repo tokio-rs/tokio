@@ -6,6 +6,8 @@ use std::time::Duration;
 use std::sync::mpsc;
 
 use futures::Future;
+use futures::future;
+use futures::sync::oneshot;
 use tokio_core::reactor::Core;
 
 #[test]
@@ -13,15 +15,15 @@ fn simple() {
     drop(env_logger::init());
     let mut lp = Core::new().unwrap();
 
-    let (tx1, rx1) = futures::oneshot();
-    let (tx2, rx2) = futures::oneshot();
-    lp.handle().spawn(futures::lazy(|| {
-        tx1.complete(1);
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+    lp.handle().spawn(future::lazy(|| {
+        tx1.send(1).unwrap();
         Ok(())
     }));
     lp.remote().spawn(|_| {
-        futures::lazy(|| {
-            tx2.complete(2);
+        future::lazy(|| {
+            tx2.send(2).unwrap();
             Ok(())
         })
     });
@@ -38,12 +40,12 @@ fn simple_core_poll() {
     let (tx1, tx2) = (tx.clone(), tx.clone());
 
     lp.turn(Some(Duration::new(0, 0)));
-    lp.handle().spawn(futures::lazy(move || {
+    lp.handle().spawn(future::lazy(move || {
         tx1.send(1).unwrap();
         Ok(())
     }));
     lp.turn(Some(Duration::new(0, 0)));
-    lp.handle().spawn(futures::lazy(move || {
+    lp.handle().spawn(future::lazy(move || {
         tx2.send(2).unwrap();
         Ok(())
     }));
@@ -58,14 +60,14 @@ fn spawn_in_poll() {
     drop(env_logger::init());
     let mut lp = Core::new().unwrap();
 
-    let (tx1, rx1) = futures::oneshot();
-    let (tx2, rx2) = futures::oneshot();
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
     let remote = lp.remote();
-    lp.handle().spawn(futures::lazy(move || {
-        tx1.complete(1);
+    lp.handle().spawn(future::lazy(move || {
+        tx1.send(1).unwrap();
         remote.spawn(|_| {
-            futures::lazy(|| {
-                tx2.complete(2);
+            future::lazy(|| {
+                tx2.send(2).unwrap();
                 Ok(())
             })
         });

@@ -90,9 +90,13 @@
 #![doc(html_root_url = "https://docs.rs/tokio-core/0.1")]
 #![deny(missing_docs)]
 
+extern crate bytes;
+#[macro_use]
 extern crate futures;
+extern crate iovec;
 extern crate mio;
 extern crate slab;
+extern crate tokio_io;
 
 #[macro_use]
 extern crate scoped_tls;
@@ -108,3 +112,9 @@ mod heap;
 pub mod channel;
 pub mod net;
 pub mod reactor;
+
+use std::io as sio;
+
+fn would_block() -> sio::Error {
+    sio::Error::new(sio::ErrorKind::WouldBlock, "would block")
+}

@@ -2,7 +2,6 @@ use std::io::{self, Read, Write};
 
 use futures::Async;
 use futures::sync::BiLock;
-use mio;
 
 use io::Io;
 
@@ -47,7 +46,7 @@ impl<T: Read> Read for ReadHalf<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.handle.poll_lock() {
             Async::Ready(mut l) => l.read(buf),
-            Async::NotReady => Err(mio::would_block()),
+            Async::NotReady => Err(::would_block()),
         }
     }
 }
@@ -56,14 +55,14 @@ impl<T: Write> Write for WriteHalf<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.handle.poll_lock() {
             Async::Ready(mut l) => l.write(buf),
-            Async::NotReady => Err(mio::would_block()),
+            Async::NotReady => Err(::would_block()),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self.handle.poll_lock() {
             Async::Ready(mut l) => l.flush(),
-            Async::NotReady => Err(mio::would_block()),
+            Async::NotReady => Err(::would_block()),
         }
     }
 }

@@ -111,6 +111,11 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
                                "failed to write entire datagram to socket"))
         }
     }
+
+    fn close(&mut self) -> Poll<(), io::Error> {
+        try_ready!(self.poll_complete());
+        Ok(().into())
+    }
 }
 
 pub fn new<C: UdpCodec>(socket: UdpSocket, codec: C) -> UdpFramed<C> {

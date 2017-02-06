@@ -101,13 +101,13 @@ impl UdpSocket {
     /// documentation for concrete examples.
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         match self.io.get_ref().send_to(buf, target) {
             Ok(Some(n)) => Ok(n),
             Ok(None) => {
                 self.io.need_write();
-                Err(mio::would_block())
+                Err(::would_block())
             }
             Err(e) => Err(e),
         }
@@ -144,13 +144,13 @@ impl UdpSocket {
     /// read and the address from whence the data came.
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
-            return Err(mio::would_block())
+            return Err(::would_block())
         }
         match self.io.get_ref().recv_from(buf) {
             Ok(Some(n)) => Ok(n),
             Ok(None) => {
                 self.io.need_read();
-                Err(mio::would_block())
+                Err(::would_block())
             }
             Err(e) => Err(e),
         }

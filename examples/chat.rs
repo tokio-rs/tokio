@@ -17,8 +17,9 @@
 //! connected clients they'll all join the same room and see everyone else's
 //! messages.
 
-extern crate tokio_core;
 extern crate futures;
+extern crate tokio_core;
+extern crate tokio_io;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -27,12 +28,12 @@ use std::iter;
 use std::env;
 use std::io::{Error, ErrorKind, BufReader};
 
+use futures::Future;
+use futures::stream::{self, Stream};
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
-use tokio_core::io::{self, Io};
-
-use futures::stream::{self, Stream};
-use futures::Future;
+use tokio_io::io;
+use tokio_io::AsyncRead;
 
 fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());

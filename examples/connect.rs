@@ -10,17 +10,21 @@
 
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_io;
+extern crate bytes;
 
 use std::env;
 use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::thread;
 
-use futures::{Sink, Future, Stream};
+use bytes::{BufMut, BytesMut};
 use futures::sync::mpsc;
-use tokio_core::reactor::Core;
-use tokio_core::io::{Io, EasyBuf, Codec};
+use futures::{Sink, Future, Stream};
 use tokio_core::net::TcpStream;
+use tokio_core::reactor::Core;
+use tokio_io::AsyncRead;
+use tokio_io::codec::{Encoder, Decoder};
 
 fn main() {
     // Parse what address we're going to connect to
@@ -63,7 +67,7 @@ fn main() {
         let (sink, stream) = stream.framed(Bytes).split();
         let send_stdin = stdin_rx.forward(sink);
         let write_stdout = stream.for_each(move |buf| {
-            stdout.write_all(buf.as_slice())
+            stdout.write_all(&buf)
         });
 
         send_stdin.map(|_| ())
@@ -83,21 +87,30 @@ fn main() {
 /// data into the output location without looking at it.
 struct Bytes;
 
-impl Codec for Bytes {
-    type In = EasyBuf;
-    type Out = Vec<u8>;
+impl Decoder for Bytes {
+    type Item = BytesMut;
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<EasyBuf>> {
+    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
         if buf.len() > 0 {
             let len = buf.len();
-            Ok(Some(buf.drain_to(len)))
+            Ok(Some(buf.split_to(len)))
         } else {
             Ok(None)
         }
     }
 
-    fn encode(&mut self, data: Vec<u8>, buf: &mut Vec<u8>) -> io::Result<()> {
-        buf.extend(data);
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+        self.decode(buf)
+    }
+}
+
+impl Encoder for Bytes {
+    type Item = Vec<u8>;
+    type Error = io::Error;
+
+    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> io::Result<()> {
+        buf.put(&data[..]);
         Ok(())
     }
 }

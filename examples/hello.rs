@@ -11,9 +11,10 @@
 //!
 //! You should see `Hello!` printed out and then the `nc` program will exit.
 
+extern crate env_logger;
 extern crate futures;
 extern crate tokio_core;
-extern crate env_logger;
+extern crate tokio_io;
 
 use std::env;
 use std::net::SocketAddr;
@@ -35,7 +36,7 @@ fn main() {
 
     let clients = listener.incoming();
     let welcomes = clients.and_then(|(socket, _peer_addr)| {
-        tokio_core::io::write_all(socket, b"Hello!\n")
+        tokio_io::io::write_all(socket, b"Hello!\n")
     });
     let server = welcomes.for_each(|(_socket, _welcome)| {
         Ok(())
