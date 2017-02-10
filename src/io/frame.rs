@@ -141,6 +141,7 @@ impl EasyBuf {
         // TODO: this should be a match or an if-let
         if Arc::get_mut(&mut self.buf).is_some() {
             let buf = Arc::get_mut(&mut self.buf).unwrap();
+            buf.drain(self.end..);
             buf.drain(..self.start);
             self.start = 0;
             return EasyBufMut { buf: buf, end: &mut self.end }
@@ -414,6 +415,7 @@ impl<T, C> Framed<T, C> {
 #[cfg(test)]
 mod tests {
     use super::EasyBuf;
+    use std::mem;
 
     #[test]
     fn debug_empty_easybuf() {
@@ -442,4 +444,24 @@ mod tests {
         assert_eq!("EasyBuf{len=255/255 [0, 1, 2, 3, ..., 251, 252, 253, 254]}", format!("{:?}", buf));
     }
 
+    #[test]
+    fn easybuf_get_mut_sliced() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        buf.split_off(9);
+        buf.drain_to(3);
+        assert_eq!(*buf.get_mut(), [3, 4, 5, 6, 7, 8]);
+    }
+
+    #[test]
+    fn easybuf_get_mut_sliced_allocating() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        buf.split_off(9);
+        buf.drain_to(3);
+        // Clone to make shared
+        let clone = buf.clone();
+        assert_eq!(*buf.get_mut(), [3, 4, 5, 6, 7, 8]);
+        mem::drop(clone); // prevent unused warning
+    }
 }
