@@ -1,6 +1,7 @@
 use std::fmt;
 use std::io;
 use std::mem;
+use std::cmp;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -152,7 +153,7 @@ impl EasyBuf {
 
         // If we couldn't get access above then we give ourself a new buffer
         // here.
-        let mut v = Vec::with_capacity(INITIAL_CAPACITY);
+        let mut v = Vec::with_capacity(cmp::min(INITIAL_CAPACITY, self.as_ref().len()));
         v.extend_from_slice(self.as_ref());
         self.start = 0;
         self.buf = Arc::new(v);
