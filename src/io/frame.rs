@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -141,6 +142,7 @@ impl EasyBuf {
         // TODO: this should be a match or an if-let
         if Arc::get_mut(&mut self.buf).is_some() {
             let buf = Arc::get_mut(&mut self.buf).unwrap();
+            buf.drain(self.end..);
             buf.drain(..self.start);
             self.start = 0;
             return EasyBufMut { buf: buf, end: &mut self.end }
@@ -205,6 +207,12 @@ impl fmt::Debug for EasyBuf {
         } else { // choose a more compact representation
             write!(formatter, "EasyBuf{{len={}/{} [{}, {}, {}, {}, ..., {}, {}, {}, {}]}}", self.len(), self.buf.len(), bytes[0], bytes[1], bytes[2], bytes[3], bytes[len-4], bytes[len-3], bytes[len-2], bytes[len-1])
         }
+    }
+}
+
+impl Into<Vec<u8>> for EasyBuf {
+    fn into(mut self) -> Vec<u8> {
+        mem::replace(self.get_mut().buf, vec![])
     }
 }
 
@@ -414,6 +422,7 @@ impl<T, C> Framed<T, C> {
 #[cfg(test)]
 mod tests {
     use super::EasyBuf;
+    use std::mem;
 
     #[test]
     fn debug_empty_easybuf() {
@@ -440,6 +449,71 @@ mod tests {
         let vec: Vec<u8> = (0u8..255u8).collect();
         let buf: EasyBuf = vec.into();
         assert_eq!("EasyBuf{len=255/255 [0, 1, 2, 3, ..., 251, 252, 253, 254]}", format!("{:?}", buf));
+    }
+
+    #[test]
+    fn easybuf_get_mut_sliced() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        buf.split_off(9);
+        buf.drain_to(3);
+        assert_eq!(*buf.get_mut(), [3, 4, 5, 6, 7, 8]);
+    }
+
+    #[test]
+    fn easybuf_get_mut_sliced_allocating() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        buf.split_off(9);
+        buf.drain_to(3);
+        // Clone to make shared
+        let clone = buf.clone();
+        assert_eq!(*buf.get_mut(), [3, 4, 5, 6, 7, 8]);
+        mem::drop(clone); // prevent unused warning
+    }
+
+    #[test]
+    fn easybuf_into_vec_simple() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let reference = vec.clone();
+        let buf: EasyBuf = vec.into();
+        let original_pointer = buf.buf.as_ref().as_ptr();
+        let result: Vec<u8> = buf.into();
+        assert_eq!(result, reference);
+        let new_pointer = result.as_ptr();
+        assert_eq!(original_pointer, new_pointer, "Into<Vec<u8>> should reuse the exclusive Vec");
+    }
+
+    #[test]
+    fn easybuf_into_vec_sliced() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        let original_pointer = buf.buf.as_ref().as_ptr();
+        buf.split_off(9);
+        buf.drain_to(3);
+        let result: Vec<u8> = buf.into();
+        let reference: Vec<u8> = (3u8..9u8).collect();
+        assert_eq!(result, reference);
+        let new_pointer = result.as_ptr();
+        assert_eq!(original_pointer, new_pointer, "Into<Vec<u8>> should reuse the exclusive Vec");
+    }
+
+    #[test]
+    fn easybuf_into_vec_sliced_allocating() {
+        let vec: Vec<u8> = (0u8..10u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        let original_pointer = buf.buf.as_ref().as_ptr();
+        // Create a clone to create second reference to this EasyBuf and force allocation
+        let original = buf.clone();
+        buf.split_off(9);
+        buf.drain_to(3);
+        let result: Vec<u8> = buf.into();
+        let reference: Vec<u8> = (3u8..9u8).collect();
+        assert_eq!(result, reference);
+        let original_reference: EasyBuf =(0u8..10u8).collect::<Vec<u8>>().into();
+        assert_eq!(original.as_ref(), original_reference.as_ref());
+        let new_pointer = result.as_ptr();
+        assert_ne!(original_pointer, new_pointer, "A new vec should be allocated");
     }
 
 }
