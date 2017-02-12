@@ -1,12 +1,15 @@
 use std::fmt;
 use std::io;
 use std::mem;
+use std::cmp;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
 
 use io::Io;
+
+const INITIAL_CAPACITY: usize = 8 * 1024;
 
 /// A reference counted buffer of bytes.
 ///
@@ -31,7 +34,7 @@ pub struct EasyBufMut<'a> {
 impl EasyBuf {
     /// Creates a new EasyBuf with no data and the default capacity.
     pub fn new() -> EasyBuf {
-        EasyBuf::with_capacity(8 * 1024)
+        EasyBuf::with_capacity(INITIAL_CAPACITY)
     }
 
     /// Creates a new EasyBuf with `cap` capacity.
@@ -126,8 +129,8 @@ impl EasyBuf {
     /// If this `EasyBuf` is the only instance pointing at the underlying buffer
     /// of bytes, a direct mutable reference will be returned. Otherwise the
     /// contents of this `EasyBuf` will be reallocated in a fresh `Vec<u8>`
-    /// allocation with the same capacity as this allocation, and that
-    /// allocation will be returned.
+    /// allocation with the same capacity as an `EasyBuf` created with `EasyBuf::new()`,
+    /// and that allocation will be returned.
     ///
     /// This operation **is not O(1)** as it may clone the entire contents of
     /// this buffer.
@@ -150,7 +153,7 @@ impl EasyBuf {
 
         // If we couldn't get access above then we give ourself a new buffer
         // here.
-        let mut v = Vec::with_capacity(self.buf.capacity());
+        let mut v = Vec::with_capacity(cmp::max(INITIAL_CAPACITY, self.as_ref().len()));
         v.extend_from_slice(self.as_ref());
         self.start = 0;
         self.buf = Arc::new(v);
@@ -345,9 +348,10 @@ impl<T: Io, C: Codec> Sink for Framed<T, C> {
     fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, io::Error> {
         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
         // *still* over 8KiB, then apply backpressure (reject the send).
-        if self.wr.len() > 8 * 1024 {
+        const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
+        if self.wr.len() > BACKPRESSURE_BOUNDARY {
             try!(self.poll_complete());
-            if self.wr.len() > 8 * 1024 {
+            if self.wr.len() > BACKPRESSURE_BOUNDARY {
                 return Ok(AsyncSink::NotReady(item));
             }
         }
@@ -384,7 +388,7 @@ pub fn framed<T, C>(io: T, codec: C) -> Framed<T, C> {
         eof: false,
         is_readable: false,
         rd: EasyBuf::new(),
-        wr: Vec::with_capacity(8 * 1024),
+        wr: Vec::with_capacity(INITIAL_CAPACITY),
     }
 }
 
@@ -421,7 +425,7 @@ impl<T, C> Framed<T, C> {
 
 #[cfg(test)]
 mod tests {
-    use super::EasyBuf;
+    use super::{INITIAL_CAPACITY, EasyBuf};
     use std::mem;
 
     #[test]
@@ -461,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn easybuf_get_mut_sliced_allocating() {
+    fn easybuf_get_mut_sliced_allocating_at_least_initial_capacity() {
         let vec: Vec<u8> = (0u8..10u8).collect();
         let mut buf: EasyBuf = vec.into();
         buf.split_off(9);
@@ -469,7 +473,18 @@ mod tests {
         // Clone to make shared
         let clone = buf.clone();
         assert_eq!(*buf.get_mut(), [3, 4, 5, 6, 7, 8]);
+        assert_eq!(buf.get_mut().buf.capacity(), INITIAL_CAPACITY);
         mem::drop(clone); // prevent unused warning
+    }
+
+    #[test]
+    fn easybuf_get_mut_sliced_allocating_required_capacity() {
+        let vec: Vec<u8> = (0..INITIAL_CAPACITY * 2).map(|_|0u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        buf.drain_to(INITIAL_CAPACITY / 2);
+        let clone = buf.clone();
+        assert_eq!(buf.get_mut().buf.capacity(), INITIAL_CAPACITY + INITIAL_CAPACITY / 2);
+        mem::drop(clone)
     }
 
     #[test]
