@@ -153,7 +153,7 @@ impl EasyBuf {
 
         // If we couldn't get access above then we give ourself a new buffer
         // here.
-        let mut v = Vec::with_capacity(cmp::min(INITIAL_CAPACITY, self.as_ref().len()));
+        let mut v = Vec::with_capacity(cmp::max(INITIAL_CAPACITY, self.as_ref().len()));
         v.extend_from_slice(self.as_ref());
         self.start = 0;
         self.buf = Arc::new(v);
@@ -465,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn easybuf_get_mut_sliced_allocating() {
+    fn easybuf_get_mut_sliced_allocating_at_least_initial_capacity() {
         let vec: Vec<u8> = (0u8..10u8).collect();
         let mut buf: EasyBuf = vec.into();
         buf.split_off(9);
@@ -475,6 +475,16 @@ mod tests {
         assert_eq!(*buf.get_mut(), [3, 4, 5, 6, 7, 8]);
         assert_eq!(buf.get_mut().buf.capacity(), INITIAL_CAPACITY);
         mem::drop(clone); // prevent unused warning
+    }
+
+    #[test]
+    fn easybuf_get_mut_sliced_allocating_required_capacity() {
+        let vec: Vec<u8> = (0..INITIAL_CAPACITY * 2).map(|_|0u8).collect();
+        let mut buf: EasyBuf = vec.into();
+        buf.drain_to(INITIAL_CAPACITY / 2);
+        let clone = buf.clone();
+        assert_eq!(buf.get_mut().buf.capacity(), INITIAL_CAPACITY + INITIAL_CAPACITY / 2);
+        mem::drop(clone)
     }
 
     #[test]
