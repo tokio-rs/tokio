@@ -17,11 +17,17 @@ const INITIAL_CAPACITY: usize = 8 * 1024;
 /// be handed out efficiently, each with a `'static` lifetime which keeps the
 /// data alive. The buffer also supports mutation but may require bytes to be
 /// copied to complete the operation.
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct EasyBuf {
     buf: Arc<Vec<u8>>,
     start: usize,
     end: usize,
+}
+
+impl PartialEq for EasyBuf {
+    fn eq(&self, other: &EasyBuf) -> bool {
+        self.as_slice() == other.as_slice()
+    }
 }
 
 /// An RAII object returned from `get_mut` which provides mutable access to the
@@ -531,4 +537,27 @@ mod tests {
         assert_ne!(original_pointer, new_pointer, "A new vec should be allocated");
     }
 
+    #[test]
+    fn easybuf_equality_same_underlying_vec() {
+        let mut buf: EasyBuf = (0u8..10).collect::<Vec<_>>().into();
+        assert_eq!(buf, buf);
+        let other = buf.drain_to(5);
+        assert_ne!(buf, other);
+
+        let buf: EasyBuf = (0u8..5).collect::<Vec<_>>().into();
+        assert_eq!(buf, other);
+    }
+
+    #[test]
+    fn easybuf_equality_different_underlying_vec() {
+        let mut buf: EasyBuf = (0u8..10).collect::<Vec<_>>().into();
+        let mut other: EasyBuf = (0u8..10).collect::<Vec<_>>().into();
+        assert_eq!(buf, other);
+
+        buf = buf.drain_to(5);
+        assert_ne!(buf, other);
+
+        other = other.drain_to(5);
+        assert_eq!(buf, other);
+    }
 }
