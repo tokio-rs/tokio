@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use std::hash;
 use std::mem;
 use std::cmp;
 use std::ops::{Deref, DerefMut};
@@ -22,12 +23,6 @@ pub struct EasyBuf {
     buf: Arc<Vec<u8>>,
     start: usize,
     end: usize,
-}
-
-impl PartialEq for EasyBuf {
-    fn eq(&self, other: &EasyBuf) -> bool {
-        self.as_slice() == other.as_slice()
-    }
 }
 
 /// An RAII object returned from `get_mut` which provides mutable access to the
@@ -198,6 +193,30 @@ impl From<Vec<u8>> for EasyBuf {
             start: 0,
             end: end,
         }
+    }
+}
+
+impl<T: AsRef<[u8]>> PartialEq<T> for EasyBuf {
+    fn eq(&self, other: &T) -> bool {
+        self.as_slice().eq(other.as_ref())
+    }
+}
+
+impl Ord for EasyBuf {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.as_slice().cmp(other.as_slice())
+    }
+}
+
+impl<T: AsRef<[u8]>> PartialOrd<T> for EasyBuf {
+    fn partial_cmp(&self, other: &T) -> Option<cmp::Ordering> {
+        self.as_slice().partial_cmp(other.as_ref())
+    }
+}
+
+impl hash::Hash for EasyBuf {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state)
     }
 }
 
