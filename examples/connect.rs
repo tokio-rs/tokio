@@ -104,7 +104,7 @@ impl Codec for Bytes {
 
 // Our helper method which will read data from stdin and send it along the
 // sender provided.
-fn read_stdin(mut rx: mpsc::Sender<Vec<u8>>) {
+fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
     let mut stdin = io::stdin();
     loop {
         let mut buf = vec![0; 1024];
@@ -114,6 +114,6 @@ fn read_stdin(mut rx: mpsc::Sender<Vec<u8>>) {
             Ok(n) => n,
         };
         buf.truncate(n);
-        rx = rx.send(buf).wait().unwrap();
+        tx = tx.send(buf).wait().unwrap();
     }
 }
