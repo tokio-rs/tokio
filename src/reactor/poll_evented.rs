@@ -6,6 +6,7 @@
 //! acquisition of a token, and tracking of the readiness state on the
 //! underlying I/O primitive.
 
+use std::fmt;
 use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -41,6 +42,12 @@ pub struct PollEvented<E> {
     handle: Remote,
     readiness: AtomicUsize,
     io: E,
+}
+
+impl<E: mio::Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{PollEvented {:?}}}", self.io)
+    }
 }
 
 impl<E: mio::Evented> PollEvented<E> {
