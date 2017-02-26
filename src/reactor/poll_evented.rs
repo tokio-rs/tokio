@@ -46,7 +46,9 @@ pub struct PollEvented<E> {
 
 impl<E: mio::Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{PollEvented {:?}}}", self.io)
+        f.debug_struct("PollEvented")
+         .field("io", &self.io)
+         .finish()
     }
 }
 
