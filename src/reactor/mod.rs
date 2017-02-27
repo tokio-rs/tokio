@@ -204,7 +204,7 @@ impl Core {
     /// otherwise waiting for the future to complete.
     ///
     /// This function will begin executing the event loop and will finish once
-    /// the provided future is resolve. Note that the future argument here
+    /// the provided future is resolved. Note that the future argument here
     /// crucially does not require the `'static` nor `Send` bounds. As a result
     /// the future will be "pinned" to not only this thread but also this stack
     /// frame.
