@@ -209,7 +209,7 @@ impl Core {
     /// the future will be "pinned" to not only this thread but also this stack
     /// frame.
     ///
-    /// This function will returns the value that the future resolves to once
+    /// This function will return the value that the future resolves to once
     /// the future has finished. If the future never resolves then this function
     /// will never return.
     ///
