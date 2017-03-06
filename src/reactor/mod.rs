@@ -6,6 +6,7 @@
 
 use std::cell::RefCell;
 use std::cmp;
+use std::fmt;
 use std::io::{self, ErrorKind};
 use std::mem;
 use std::rc::{Rc, Weak};
@@ -436,6 +437,14 @@ impl Core {
     }
 }
 
+impl fmt::Debug for Core {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Core")
+         .field("id", &self.id())
+         .finish()
+    }
+}
+
 impl Inner {
     fn add_source(&mut self, source: &mio::Evented)
                   -> io::Result<(Arc<AtomicUsize>, usize)> {
@@ -635,6 +644,14 @@ impl Remote {
     }
 }
 
+impl fmt::Debug for Remote {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Remote")
+         .field("id", &self.id())
+         .finish()
+    }
+}
+
 impl Handle {
     /// Returns a reference to the underlying remote handle to the event loop.
     pub fn remote(&self) -> &Remote {
@@ -668,6 +685,14 @@ impl Handle {
     /// Return the ID of the represented Core
     pub fn id(&self) -> CoreId {
         self.remote.id()
+    }
+}
+
+impl fmt::Debug for Handle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Handle")
+         .field("id", &self.id())
+         .finish()
     }
 }
 
