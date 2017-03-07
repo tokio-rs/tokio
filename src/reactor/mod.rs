@@ -137,6 +137,13 @@ enum Message {
     Run(Box<FnBox>),
 }
 
+#[repr(usize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Readiness {
+    Readable = 1,
+    Writable = 2,
+}
+
 const TOKEN_MESSAGES: mio::Token = mio::Token(0);
 const TOKEN_FUTURE: mio::Token = mio::Token(1);
 const TOKEN_START: usize = 2;
@@ -321,11 +328,13 @@ impl Core {
         if let Some(io) = inner.io_dispatch.get_mut(token) {
             if ready.is_readable() || ready.is_hup() {
                 reader = io.reader.take();
-                io.readiness.fetch_or(1, Ordering::Relaxed);
+                io.readiness.fetch_or(Readiness::Readable as usize,
+                    Ordering::Relaxed);
             }
             if ready.is_writable() {
                 writer = io.writer.take();
-                io.readiness.fetch_or(2, Ordering::Relaxed);
+                io.readiness.fetch_or(Readiness::Writable as usize,
+                    Ordering::Relaxed);
             }
         }
         drop(inner);
@@ -480,8 +489,8 @@ impl Inner {
         debug!("scheduling direction for: {}", token);
         let sched = self.io_dispatch.get_mut(token).unwrap();
         let (slot, bit) = match dir {
-            Direction::Read => (&mut sched.reader, 1),
-            Direction::Write => (&mut sched.writer, 2),
+            Direction::Read => (&mut sched.reader, Readiness::Readable as usize),
+            Direction::Write => (&mut sched.writer, Readiness::Writable as usize),
         };
         if sched.readiness.load(Ordering::SeqCst) & bit != 0 {
             *slot = None;
