@@ -35,7 +35,7 @@ impl Future for Server {
         loop {
             // First we check to see if there's a message we need to echo back.
             // If so then we try to send it back to the original source, waiting
-            // until we're writable and able to do so.
+            // until it's writable and we're able to do so.
             if let Some((size, peer)) = self.to_send {
                 let amt = try_nb!(self.socket.send_to(&self.buf[..size], &peer));
                 println!("Echoed {}/{} bytes to {}", amt, size, peer);
