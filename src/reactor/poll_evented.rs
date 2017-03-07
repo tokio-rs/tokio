@@ -14,6 +14,7 @@ use mio;
 
 use io::Io;
 use reactor::{Handle, Remote};
+use reactor::Readiness::*;
 use reactor::io_token::IoToken;
 
 /// A concrete implementation of a stream of readiness notifications for I/O
@@ -89,11 +90,11 @@ impl<E> PollEvented<E> {
     /// to call from within the context of a future's task, typically done in a
     /// `Future::poll` method.
     pub fn poll_read(&self) -> Async<()> {
-        if self.readiness.load(Ordering::SeqCst) & 1 != 0 {
+        if self.readiness.load(Ordering::SeqCst) & Readable as usize != 0 {
             return Async::Ready(())
         }
         self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
-        if self.readiness.load(Ordering::SeqCst) & 1 != 0 {
+        if self.readiness.load(Ordering::SeqCst) & Readable as usize != 0 {
             Async::Ready(())
         } else {
             self.token.schedule_read(&self.handle);
@@ -109,11 +110,11 @@ impl<E> PollEvented<E> {
     /// to call from within the context of a future's task, typically done in a
     /// `Future::poll` method.
     pub fn poll_write(&self) -> Async<()> {
-        if self.readiness.load(Ordering::SeqCst) & 2 != 0 {
+        if self.readiness.load(Ordering::SeqCst) & Writable as usize != 0 {
             return Async::Ready(())
         }
         self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
-        if self.readiness.load(Ordering::SeqCst) & 2 != 0 {
+        if self.readiness.load(Ordering::SeqCst) & Writable as usize != 0 {
             Async::Ready(())
         } else {
             self.token.schedule_write(&self.handle);
@@ -137,7 +138,7 @@ impl<E> PollEvented<E> {
     /// previously indicated that the object is readable. That is, this function
     /// must always be paired with calls to `poll_read` previously.
     pub fn need_read(&self) {
-        self.readiness.fetch_and(!1, Ordering::SeqCst);
+        self.readiness.fetch_and(!(Readable as usize), Ordering::SeqCst);
         self.token.schedule_read(&self.handle)
     }
 
@@ -157,7 +158,7 @@ impl<E> PollEvented<E> {
     /// previously indicated that the object is writable. That is, this function
     /// must always be paired with calls to `poll_write` previously.
     pub fn need_write(&self) {
-        self.readiness.fetch_and(!2, Ordering::SeqCst);
+        self.readiness.fetch_and(!(Writable as usize), Ordering::SeqCst);
         self.token.schedule_write(&self.handle)
     }
 
