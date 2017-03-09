@@ -24,7 +24,9 @@ use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
 use std::process::{self, ExitStatus};
 
-use futures::{Future, Poll, Async, Oneshot, Complete, oneshot, Fuse};
+use futures::{Future, Poll, Async} ;
+use futures::sync::oneshot;
+use futures::future::Fuse;
 use self::mio_named_pipes::NamedPipe;
 use tokio_core::reactor::{PollEvented, Handle};
 
@@ -34,9 +36,9 @@ pub struct Child {
 }
 
 struct Waiting {
-    rx: Fuse<Oneshot<()>>,
+    rx: Fuse<oneshot::Receiver<()>>,
     wait_object: winapi::HANDLE,
-    tx: *mut Option<Complete<()>>,
+    tx: *mut Option<oneshot::Sender<()>>,
 }
 
 unsafe impl Sync for Waiting {}
@@ -87,7 +89,7 @@ impl Child {
             if let Some(e) = try!(try_wait(&self.child)) {
                 return Ok(e.into())
             }
-            let (tx, rx) = oneshot();
+            let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
             let mut wait_object = 0 as *mut _;
             let rc = unsafe {
@@ -128,8 +130,8 @@ impl Drop for Waiting {
 
 unsafe extern "system" fn callback(ptr: winapi::PVOID,
                                    _timer_fired: winapi::BOOLEAN) {
-    let mut complete = &mut *(ptr as *mut Option<Complete<()>>);
-    complete.take().unwrap().complete(());
+    let mut complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
+    drop(complete.take().unwrap().send(()));
 }
 
 pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {

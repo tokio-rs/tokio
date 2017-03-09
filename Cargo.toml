@@ -16,10 +16,11 @@ travis-ci = { repository = "alexcrichton/tokio-process" }
 appveyor = { repository = "alexcrichton/tokio-process" }
 
 [dependencies]
-tokio-core = "0.1.2"
-futures = "0.1.7"
-mio = "0.6"
+futures = "0.1.11"
 log = "0.3"
+mio = "0.6.5"
+tokio-core = "0.1.6"
+tokio-io = "0.1"
 
 [dev-dependencies]
 env_logger = { version = "0.3", default-features = false }
@@ -31,4 +32,4 @@ mio-named-pipes = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-tokio-signal = "0.1.2"
+tokio-signal = "0.1"

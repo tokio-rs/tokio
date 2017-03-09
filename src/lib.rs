@@ -86,6 +86,7 @@
 #[macro_use]
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_io;
 extern crate mio;
 #[macro_use]
 extern crate log;
@@ -98,7 +99,8 @@ use std::process::{self, ExitStatus, Output, Stdio};
 use futures::{Future, Poll, IntoFuture};
 use futures::future::{Flatten, FutureResult, Either, ok};
 use tokio_core::reactor::Handle;
-use tokio_core::io::{IoFuture, read_to_end};
+use tokio_io::io::{read_to_end};
+use tokio_io::{AsyncWrite, AsyncRead, IoFuture};
 
 #[path = "unix.rs"]
 #[cfg(unix)]
@@ -423,16 +425,28 @@ impl Write for ChildStdin {
     }
 }
 
+impl AsyncWrite for ChildStdin {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        self.inner.shutdown()
+    }
+}
+
 impl Read for ChildStdout {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         self.inner.read(bytes)
     }
 }
 
+impl AsyncRead for ChildStdout {
+}
+
 impl Read for ChildStderr {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         self.inner.read(bytes)
     }
+}
+
+impl AsyncRead for ChildStderr {
 }
 
 // deprecated from 0.1.0

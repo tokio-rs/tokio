@@ -30,12 +30,13 @@ use std::process::{self, ExitStatus};
 
 use futures::future::FlattenStream;
 use futures::{Future, Poll, Async, Stream};
-use mio::unix::EventedFd;
-use mio::{Evented, PollOpt, Ready, Token};
+use mio::unix::{EventedFd, UnixReady};
+use mio::{PollOpt, Ready, Token};
+use mio::event::Evented;
 use mio;
 use self::libc::c_int;
 use self::tokio_signal::unix::Signal;
-use tokio_core::io::IoFuture;
+use tokio_io::IoFuture;
 use tokio_core::reactor::{Handle, PollEvented};
 
 pub struct Child {
@@ -155,7 +156,7 @@ impl<T> Evented for Fd<T> where T: AsRawFd {
                 -> io::Result<()> {
         EventedFd(&self.0.as_raw_fd()).register(poll,
                                                 token,
-                                                interest | Ready::hup(),
+                                                interest | UnixReady::hup(),
                                                 opts)
     }
 
@@ -167,7 +168,7 @@ impl<T> Evented for Fd<T> where T: AsRawFd {
                   -> io::Result<()> {
         EventedFd(&self.0.as_raw_fd()).reregister(poll,
                                                   token,
-                                                  interest | Ready::hup(),
+                                                  interest | UnixReady::hup(),
                                                   opts)
     }
 

@@ -1,6 +1,7 @@
 extern crate futures;
 #[macro_use]
 extern crate tokio_core;
+extern crate tokio_io;
 extern crate tokio_process;
 #[macro_use]
 extern crate log;
@@ -9,9 +10,9 @@ extern crate env_logger;
 use std::io;
 use std::process::{Stdio, ExitStatus, Command};
 
-use futures::{Future, BoxFuture};
+use futures::future::{BoxFuture, Future};
 use futures::stream::{self, Stream};
-use tokio_core::io::{read_until, write_all, read_to_end};
+use tokio_io::io::{read_until, write_all, read_to_end};
 use tokio_core::reactor::Core;
 use tokio_process::{CommandExt, Child};
 
