@@ -16,15 +16,15 @@ travis-ci = { repository = "alexcrichton/tokio-signal" }
 appveyor = { repository = "alexcrichton/tokio-signal" }
 
 [dependencies]
-tokio-core = "0.1.4"
-futures = "0.1.7"
+futures = "0.1.11"
+mio = "0.6.5"
+tokio-core = "0.1.6"
+tokio-io = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-mio = "0.6"
 mio-uds = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2"
 kernel32-sys = "0.2"
-mio = "0.6"
