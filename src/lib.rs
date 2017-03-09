@@ -25,11 +25,12 @@
 #[macro_use]
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_io;
 
 use futures::Future;
 use futures::stream::Stream;
 use tokio_core::reactor::Handle;
-use tokio_core::io::{IoStream, IoFuture};
+use tokio_io::{IoStream, IoFuture};
 
 pub mod unix;
 pub mod windows;

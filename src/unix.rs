@@ -27,7 +27,7 @@ use self::mio::Poll as MioPoll;
 use self::mio::unix::EventedFd;
 use self::mio::{Evented, Token, Ready, PollOpt};
 use self::mio_uds::UnixStream;
-use tokio_core::io::IoFuture;
+use tokio_io::IoFuture;
 use tokio_core::reactor::{Handle, CoreId, PollEvented};
 
 pub use self::libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
