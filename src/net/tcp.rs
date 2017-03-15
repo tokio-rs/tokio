@@ -513,20 +513,22 @@ impl<'a> AsyncRead for &'a TcpStream {
         if let Async::NotReady = <TcpStream>::poll_read(self) {
             return Err(::would_block())
         }
-        let mut bufs: [_; 16] = Default::default();
-        unsafe {
+        let r = unsafe {
+            let mut bufs: [_; 16] = Default::default();
             let n = buf.bytes_vec_mut(&mut bufs);
-            match self.io.get_ref().read_bufs(&mut bufs[..n]) {
-                Ok(n) => {
-                    buf.advance_mut(n);
-                    Ok(Async::Ready(n))
+            self.io.get_ref().read_bufs(&mut bufs[..n])
+        };
+
+        match r {
+            Ok(n) => {
+                unsafe { buf.advance_mut(n); }
+                Ok(Async::Ready(n))
+            }
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_write();
                 }
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
-                        self.io.need_write();
-                    }
-                    Err(e)
-                }
+                Err(e)
             }
         }
     }
@@ -541,9 +543,12 @@ impl<'a> AsyncWrite for &'a TcpStream {
         if let Async::NotReady = <TcpStream>::poll_write(self) {
             return Err(::would_block())
         }
-        let mut bufs: [_; 16] = Default::default();
-        let n = buf.bytes_vec(&mut bufs);
-        match self.io.get_ref().write_bufs(&bufs[..n]) {
+        let r = {
+            let mut bufs: [_; 16] = Default::default();
+            let n = buf.bytes_vec(&mut bufs);
+            self.io.get_ref().write_bufs(&bufs[..n])
+        };
+        match r {
             Ok(n) => {
                 buf.advance(n);
                 Ok(Async::Ready(n))
