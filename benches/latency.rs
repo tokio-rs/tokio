@@ -14,7 +14,6 @@ use futures::sync::oneshot;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Sink, Stream};
 use test::Bencher;
-use tokio_core::channel::Sender;
 use tokio_core::net::UdpSocket;
 use tokio_core::reactor::Core;
 
@@ -92,43 +91,6 @@ fn udp_echo_latency(b: &mut Bencher) {
     });
 
     stop_c.complete(());
-    child.join().unwrap();
-}
-
-#[bench]
-fn tokio_channel_latency(b: &mut Bencher) {
-    let (tx, rx) = oneshot::channel();
-
-    let child = thread::spawn(move || {
-        let mut l = Core::new().unwrap();
-        let handle = l.handle();
-
-        let (in_tx, in_rx) = tokio_core::channel::channel(&handle).unwrap();
-        let (out_tx, out_rx) = tokio_core::channel::channel(&handle).unwrap();
-        tx.complete((in_tx, out_rx));
-
-        let server = out_tx.send_all(in_rx);
-
-        l.run(server).unwrap();
-    });
-
-    let (in_tx, out_rx) = rx.wait().unwrap();
-    let mut rx_iter = out_rx.wait();
-
-    // warmup phase; for some reason initial couple of runs are much slower
-    //
-    // TODO: Describe the exact reasons; caching? branch predictor? lazy closures?
-    for _ in 0..8 {
-        Sender::send(&in_tx, 1usize).unwrap();
-        let _ = rx_iter.next();
-    }
-
-    b.iter(|| {
-        Sender::send(&in_tx, 1usize).unwrap();
-        let _ = rx_iter.next();
-    });
-
-    drop(in_tx);
     child.join().unwrap();
 }
 
