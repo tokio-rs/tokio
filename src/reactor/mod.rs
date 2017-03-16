@@ -411,7 +411,8 @@ impl Core {
         // TODO: can we do better than `.unwrap()` here?
         let unpark = self.rx_readiness.clone();
         loop {
-            match self.rx.borrow_mut().poll_stream(unpark.clone()).unwrap() {
+            let msg = self.rx.borrow_mut().poll_stream(unpark.clone()).unwrap();
+            match msg {
                 Async::Ready(Some(msg)) => self.notify(msg),
                 Async::NotReady |
                 Async::Ready(None) => break,
