@@ -511,7 +511,7 @@ impl<'a> AsyncRead for &'a TcpStream {
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = <TcpStream>::poll_read(self) {
-            return Err(::would_block())
+            return Ok(Async::NotReady)
         }
         let r = unsafe {
             let mut bufs: [_; 16] = Default::default();
@@ -524,12 +524,11 @@ impl<'a> AsyncRead for &'a TcpStream {
                 unsafe { buf.advance_mut(n); }
                 Ok(Async::Ready(n))
             }
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
-                }
-                Err(e)
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_read();
+                Ok(Async::NotReady)
             }
+            Err(e) => Err(e),
         }
     }
 }
