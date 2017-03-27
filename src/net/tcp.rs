@@ -541,7 +541,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = <TcpStream>::poll_write(self) {
-            return Err(::would_block())
+            return Ok(Async::NotReady)
         }
         let r = {
             let mut bufs: [_; 16] = Default::default();
@@ -553,12 +553,11 @@ impl<'a> AsyncWrite for &'a TcpStream {
                 buf.advance(n);
                 Ok(Async::Ready(n))
             }
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
-                }
-                Err(e)
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_write();
+                Ok(Async::NotReady)
             }
+            Err(e) => Err(e),
         }
     }
 }
