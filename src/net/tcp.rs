@@ -526,7 +526,7 @@ impl<'a> AsyncRead for &'a TcpStream {
             }
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
+                    self.io.need_read();
                 }
                 Err(e)
             }
