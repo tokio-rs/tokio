@@ -70,6 +70,42 @@
 //! }
 //! ```
 //!
+//! We can also read input line by line.
+//!
+//! ```no_run
+//! extern crate futures;
+//! extern crate tokio_core;
+//! extern crate tokio_process;
+//! extern crate tokio_io;
+//!
+//! use std::io;
+//! use std::process::{Command, Stdio, Output};
+//!
+//! use futures::{BoxFuture, Future, Stream};
+//! use tokio_core::reactor::Core;
+//! use tokio_process::{CommandExt, Child};
+//!
+//! fn get_lines(mut cat: Child) -> BoxFuture<((), Output), io::Error> {
+//!     let stdout = cat.stdout().take().unwrap();
+//!     let reader = io::BufReader::new(stdout);
+//!     let lines = tokio_io::io::lines(reader);
+//!     let cycle = lines.for_each(|l| {
+//!         println!("Line: {}", l);
+//!         Ok(())
+//!     });
+//!     cycle.join(cat.wait_with_output()).boxed()
+//! }
+//!
+//! fn main() {
+//!     let mut cmd = Command::new("cat");
+//!     let mut cat = cmd.stdout(Stdio::piped());
+//!     let mut core = Core::new().unwrap();
+//!     let child = cat.spawn_async(&core.handle()).unwrap();
+//!     core.run(get_lines(child)).unwrap();
+//! }
+//!
+//! ```
+//!
 //! # Caveats
 //!
 //! While similar to the standard library, this crate's `Child` type differs
