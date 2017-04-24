@@ -79,13 +79,13 @@
 //! extern crate tokio_io;
 //!
 //! use std::io;
-//! use std::process::{Command, Stdio, Output};
+//! use std::process::{Command, Stdio, ExitStatus};
 //!
 //! use futures::{BoxFuture, Future, Stream};
 //! use tokio_core::reactor::Core;
 //! use tokio_process::{CommandExt, Child};
 //!
-//! fn get_lines(mut cat: Child) -> BoxFuture<((), Output), io::Error> {
+//! fn print_lines(mut cat: Child) -> BoxFuture<ExitStatus, io::Error> {
 //!     let stdout = cat.stdout().take().unwrap();
 //!     let reader = io::BufReader::new(stdout);
 //!     let lines = tokio_io::io::lines(reader);
@@ -93,17 +93,16 @@
 //!         println!("Line: {}", l);
 //!         Ok(())
 //!     });
-//!     cycle.join(cat.wait_with_output()).boxed()
+//!     cycle.join(cat).map(|((), s)| s).boxed()
 //! }
 //!
 //! fn main() {
+//!     let mut core = Core::new().unwrap();
 //!     let mut cmd = Command::new("cat");
 //!     let mut cat = cmd.stdout(Stdio::piped());
-//!     let mut core = Core::new().unwrap();
 //!     let child = cat.spawn_async(&core.handle()).unwrap();
-//!     core.run(get_lines(child)).unwrap();
+//!     core.run(print_lines(child)).unwrap();
 //! }
-//!
 //! ```
 //!
 //! # Caveats
@@ -119,13 +118,10 @@
 #![deny(missing_docs)]
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.1")]
 
-#[macro_use]
 extern crate futures;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate mio;
-#[macro_use]
-extern crate log;
 
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
