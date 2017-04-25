@@ -37,7 +37,7 @@ use reactor::io_token::IoToken;
 ///
 /// You can find more information about creating a custom I/O object [online].
 ///
-/// [online]: https://tokio.rs/docs/going-deeper/core-low-level/#custom-io
+/// [online]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/#custom-io
 pub struct PollEvented<E> {
     token: IoToken,
     handle: Remote,
