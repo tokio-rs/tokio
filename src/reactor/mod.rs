@@ -364,6 +364,7 @@ impl Core {
         };
         drop(inner);
         let res = CURRENT_LOOP.set(self, || task.poll_future(wake));
+        let _task_to_drop;
         inner = self.inner.borrow_mut();
         match res {
             Ok(Async::NotReady) => {
@@ -372,9 +373,10 @@ impl Core {
             }
             Ok(Async::Ready(())) |
             Err(()) => {
-                inner.task_dispatch.remove(token).unwrap();
+                _task_to_drop = inner.task_dispatch.remove(token).unwrap();
             }
         }
+        drop(inner);
     }
 
     fn consume_timeouts(&mut self, now: Instant) {
