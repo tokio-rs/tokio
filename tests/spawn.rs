@@ -2,11 +2,12 @@ extern crate tokio_core;
 extern crate env_logger;
 extern crate futures;
 
+use std::any::Any;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use futures::Future;
+use futures::{Future, Poll};
 use futures::future;
 use futures::sync::oneshot;
 use tokio_core::reactor::{Core, Timeout};
@@ -90,6 +91,55 @@ fn drop_timeout_in_spawn() {
             drop(Timeout::new(Duration::new(1, 0), handle));
             tx.send(()).unwrap();
             Ok(())
+        });
+    });
+
+    lp.run(rx).unwrap();
+}
+
+#[test]
+fn spawn_in_drop() {
+    drop(env_logger::init());
+    let mut lp = Core::new().unwrap();
+
+    let (tx, rx) = oneshot::channel();
+    let remote = lp.remote();
+
+    struct OnDrop<F: FnMut()>(F);
+
+    impl<F: FnMut()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            (self.0)();
+        }
+    }
+
+    struct MyFuture {
+        _data: Box<Any>,
+    }
+
+    impl Future for MyFuture {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            Ok(().into())
+        }
+    }
+
+    thread::spawn(move || {
+        let mut tx = Some(tx);
+        remote.spawn(|handle| {
+            let handle = handle.clone();
+            MyFuture {
+                _data: Box::new(OnDrop(move || {
+                    let mut tx = tx.take();
+                    handle.spawn_fn(move || {
+                        tx.take().unwrap().send(()).unwrap();
+                        Ok(())
+                    });
+                })),
+
+            }
         });
     });
 
