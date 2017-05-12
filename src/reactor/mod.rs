@@ -616,7 +616,7 @@ impl Remote {
     ///
     /// This function takes a closure which is executed within the context of
     /// the I/O loop itself. The future returned by the closure will be
-    /// scheduled on the event loop an run to completion.
+    /// scheduled on the event loop and run to completion.
     ///
     /// Note that while the closure, `F`, requires the `Send` bound as it might
     /// cross threads, the future `R` does not.
