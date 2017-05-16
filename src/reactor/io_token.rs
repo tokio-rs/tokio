@@ -83,7 +83,7 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_read(&self, handle: &Remote) {
-        handle.send(Message::Schedule(self.token, task::park(), Direction::Read));
+        handle.send(Message::Schedule(self.token, task::current(), Direction::Read));
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -110,7 +110,7 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_write(&self, handle: &Remote) {
-        handle.send(Message::Schedule(self.token, task::park(), Direction::Write));
+        handle.send(Message::Schedule(self.token, task::current(), Direction::Write));
     }
 
     /// Unregister all information associated with a token on an event loop,

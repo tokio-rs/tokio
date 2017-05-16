@@ -30,7 +30,7 @@ impl TimeoutToken {
     /// This method will panic if the timeout specified was not created by this
     /// loop handle's `add_timeout` method.
     pub fn update_timeout(&self, handle: &Remote) {
-        handle.send(Message::UpdateTimeout(self.token, task::park()))
+        handle.send(Message::UpdateTimeout(self.token, task::current()))
     }
 
     /// Resets previously added (or fired) timeout to an new timeout
