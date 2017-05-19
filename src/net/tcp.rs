@@ -18,7 +18,7 @@ use reactor::{Handle, PollEvented};
 /// This object can be converted into a stream of incoming connections for
 /// various forms of processing.
 pub struct TcpListener {
-    io: PollEvented<mio::tcp::TcpListener>,
+    io: PollEvented<mio::net::TcpListener>,
     pending_accept: Option<oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
 }
 
@@ -34,7 +34,7 @@ impl TcpListener {
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::tcp::TcpListener::bind(addr));
+        let l = try!(mio::net::TcpListener::bind(addr));
         TcpListener::new(l, handle)
     }
 
@@ -136,11 +136,11 @@ impl TcpListener {
     pub fn from_listener(listener: net::TcpListener,
                          addr: &SocketAddr,
                          handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::tcp::TcpListener::from_listener(listener, addr));
+        let l = try!(mio::net::TcpListener::from_listener(listener, addr));
         TcpListener::new(l, handle)
     }
 
-    fn new(listener: mio::tcp::TcpListener, handle: &Handle)
+    fn new(listener: mio::net::TcpListener, handle: &Handle)
            -> io::Result<TcpListener> {
         let io = try!(PollEvented::new(listener, handle));
         Ok(TcpListener { io: io, pending_accept: None })
@@ -229,7 +229,7 @@ impl Stream for Incoming {
 /// raw underlying I/O object as well as streams for the read/write
 /// notifications on the stream itself.
 pub struct TcpStream {
-    io: PollEvented<mio::tcp::TcpStream>,
+    io: PollEvented<mio::net::TcpStream>,
 }
 
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
@@ -253,14 +253,14 @@ impl TcpStream {
     /// connection or during the socket creation, that error will be returned to
     /// the future instead.
     pub fn connect(addr: &SocketAddr, handle: &Handle) -> TcpStreamNew {
-        let inner = match mio::tcp::TcpStream::connect(addr) {
+        let inner = match mio::net::TcpStream::connect(addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };
         TcpStreamNew { inner: inner }
     }
 
-    fn new(connected_stream: mio::tcp::TcpStream, handle: &Handle)
+    fn new(connected_stream: mio::net::TcpStream, handle: &Handle)
            -> TcpStreamNewState {
         match PollEvented::new(connected_stream, handle) {
             Ok(io) => TcpStreamNewState::Waiting(TcpStream { io: io }),
@@ -275,7 +275,7 @@ impl TcpStream {
     /// returned is associated with the event loop and ready to perform I/O.
     pub fn from_stream(stream: net::TcpStream, handle: &Handle)
                        -> io::Result<TcpStream> {
-        let inner = try!(mio::tcp::TcpStream::from_stream(stream));
+        let inner = try!(mio::net::TcpStream::from_stream(stream));
         Ok(TcpStream {
             io: try!(PollEvented::new(inner, handle)),
         })
@@ -303,7 +303,7 @@ impl TcpStream {
                           addr: &SocketAddr,
                           handle: &Handle)
                           -> Box<Future<Item=TcpStream, Error=io::Error> + Send> {
-        let state = match mio::tcp::TcpStream::connect_stream(stream, addr) {
+        let state = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };

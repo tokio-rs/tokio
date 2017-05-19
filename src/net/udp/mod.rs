@@ -10,7 +10,7 @@ use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    io: PollEvented<mio::udp::UdpSocket>,
+    io: PollEvented<mio::net::UdpSocket>,
 }
 
 mod frame;
@@ -22,11 +22,11 @@ impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to the
     /// `addr` provided. If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::udp::UdpSocket::bind(addr));
+        let udp = try!(mio::net::UdpSocket::bind(addr));
         UdpSocket::new(udp, handle)
     }
 
-    fn new(socket: mio::udp::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
+    fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
         let io = try!(PollEvented::new(socket, handle));
         Ok(UdpSocket { io: io })
     }
@@ -42,7 +42,7 @@ impl UdpSocket {
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_socket(socket: net::UdpSocket,
                        handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::udp::UdpSocket::from_socket(socket));
+        let udp = try!(mio::net::UdpSocket::from_socket(socket));
         UdpSocket::new(udp, handle)
     }
 
@@ -104,12 +104,13 @@ impl UdpSocket {
             return Err(::would_block())
         }
         match self.io.get_ref().send_to(buf, target) {
-            Ok(Some(n)) => Ok(n),
-            Ok(None) => {
-                self.io.need_write();
-                Err(::would_block())
+            Ok(n) => Ok(n),
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_write();
+                }
+                Err(e)
             }
-            Err(e) => Err(e),
         }
     }
 
@@ -147,12 +148,13 @@ impl UdpSocket {
             return Err(::would_block())
         }
         match self.io.get_ref().recv_from(buf) {
-            Ok(Some(n)) => Ok(n),
-            Ok(None) => {
-                self.io.need_read();
-                Err(::would_block())
+            Ok(n) => Ok(n),
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read();
+                }
+                Err(e)
             }
-            Err(e) => Err(e),
         }
     }
 
