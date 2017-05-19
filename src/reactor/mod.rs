@@ -139,13 +139,6 @@ enum Message {
     Run(Box<FnBox>),
 }
 
-#[repr(usize)]
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Readiness {
-    Readable = 1,
-    Writable = 2,
-}
-
 const TOKEN_MESSAGES: mio::Token = mio::Token(0);
 const TOKEN_FUTURE: mio::Token = mio::Token(1);
 const TOKEN_START: usize = 2;
@@ -330,15 +323,12 @@ impl Core {
         let mut writer = None;
         let mut inner = self.inner.borrow_mut();
         if let Some(io) = inner.io_dispatch.get_mut(token) {
-            if ready.is_readable() || platform::is_hup(&ready) {
-                reader = io.reader.take();
-                io.readiness.fetch_or(Readiness::Readable as usize,
-                    Ordering::Relaxed);
-            }
+            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
             if ready.is_writable() {
                 writer = io.writer.take();
-                io.readiness.fetch_or(Readiness::Writable as usize,
-                    Ordering::Relaxed);
+            }
+            if !(ready & (!mio::Ready::writable())).is_empty() {
+                reader = io.reader.take();
             }
         }
         drop(inner);
@@ -497,14 +487,16 @@ impl Inner {
                 -> Option<Task> {
         debug!("scheduling direction for: {}", token);
         let sched = self.io_dispatch.get_mut(token).unwrap();
-        let (slot, bit) = match dir {
-            Direction::Read => (&mut sched.reader, Readiness::Readable as usize),
-            Direction::Write => (&mut sched.writer, Readiness::Writable as usize),
+        let (slot, ready) = match dir {
+            Direction::Read => (&mut sched.reader, !mio::Ready::writable()),
+            Direction::Write => (&mut sched.writer, mio::Ready::writable()),
         };
-        if sched.readiness.load(Ordering::SeqCst) & bit != 0 {
+        if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
+            debug!("cancelling block");
             *slot = None;
             Some(wake)
         } else {
+            debug!("blocking");
             *slot = Some(wake);
             None
         }
@@ -754,17 +746,68 @@ impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
     }
 }
 
+fn read_ready() -> mio::Ready {
+    mio::Ready::readable() | platform::hup()
+}
+
+const READ: usize = 1 << 0;
+const WRITE: usize = 1 << 1;
+
+fn ready2usize(ready: mio::Ready) -> usize {
+    let mut bits = 0;
+    if ready.is_readable() {
+        bits |= READ;
+    }
+    if ready.is_writable() {
+        bits |= WRITE;
+    }
+    bits | platform::ready2usize(ready)
+}
+
+fn usize2ready(bits: usize) -> mio::Ready {
+    let mut ready = mio::Ready::empty();
+    if bits & READ != 0 {
+        ready.insert(mio::Ready::readable());
+    }
+    if bits & WRITE != 0 {
+        ready.insert(mio::Ready::writable());
+    }
+    ready | platform::usize2ready(bits)
+}
+
 #[cfg(unix)]
 mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
-    pub fn is_hup(event: &Ready) -> bool {
-        UnixReady::from(*event).is_hup()
-    }
-
     pub fn hup() -> Ready {
         UnixReady::hup().into()
+    }
+
+    const HUP: usize = 1 << 2;
+    const ERROR: usize = 1 << 3;
+
+    pub fn ready2usize(ready: Ready) -> usize {
+        let ready = UnixReady::from(ready);
+        let mut bits = 0;
+        if ready.is_error() {
+            bits |= ERROR;
+        }
+        if ready.is_hup() {
+            bits |= HUP;
+        }
+        bits
+    }
+
+    pub fn usize2ready(bits: usize) -> Ready {
+        let mut ready = UnixReady::from(Ready::empty());
+        if bits & HUP != 0 {
+            ready.insert(UnixReady::hup());
+        }
+        if bits & ERROR != 0 {
+            ready.insert(UnixReady::error());
+        }
+        ready.into()
     }
 }
 
@@ -772,11 +815,15 @@ mod platform {
 mod platform {
     use mio::Ready;
 
-    pub fn is_hup(_event: &Ready) -> bool {
-        false
+    pub fn hup() -> Ready {
+        Ready::empty()
     }
 
-    pub fn hup() -> Ready {
+    pub fn ready2usize(_r: Ready) -> usize {
+        0
+    }
+
+    pub fn usize2ready(_r: usize) -> Ready {
         Ready::empty()
     }
 }
