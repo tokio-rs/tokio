@@ -469,8 +469,7 @@ impl Inner {
                               mio::Token(TOKEN_START + entry.index() * 2),
                               mio::Ready::readable() |
                                 mio::Ready::writable() |
-                                platform::hup() |
-                                platform::aio(),
+                                platform::all(),
                               mio::PollOpt::edge()));
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
@@ -748,7 +747,7 @@ impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
 }
 
 fn read_ready() -> mio::Ready {
-    mio::Ready::readable() | platform::hup() | platform::aio()
+    mio::Ready::readable() | platform::hup()
 }
 
 const READ: usize = 1 << 0;
@@ -786,6 +785,10 @@ mod platform {
         // don't implement it with their reactors, so there's no point
         // to using it.
         Ready::empty()
+    }
+
+    pub fn all() -> Ready {
+        hup()
     }
 
     pub fn hup() -> Ready {
@@ -826,6 +829,10 @@ mod platform {
 
     pub fn aio() -> Ready {
         UnixReady::aio().into()
+    }
+
+    pub fn all() -> Ready {
+        hup() | aio()
     }
 
     pub fn hup() -> Ready {
@@ -871,6 +878,11 @@ mod platform {
     use mio::Ready;
 
     pub fn aio() -> Ready {
+        Ready::empty()
+    }
+
+    pub fn all() -> Ready {
+        // No platform-specific Readinesses for Windows
         Ready::empty()
     }
 
