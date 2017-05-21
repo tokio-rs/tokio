@@ -469,7 +469,8 @@ impl Inner {
                               mio::Token(TOKEN_START + entry.index() * 2),
                               mio::Ready::readable() |
                                 mio::Ready::writable() |
-                                platform::hup(),
+                                platform::hup() |
+                                platform::aio(),
                               mio::PollOpt::edge()));
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
@@ -747,7 +748,7 @@ impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
 }
 
 fn read_ready() -> mio::Ready {
-    mio::Ready::readable() | platform::hup()
+    mio::Ready::readable() | platform::hup() | platform::aio()
 }
 
 const READ: usize = 1 << 0;
@@ -775,10 +776,17 @@ fn usize2ready(bits: usize) -> mio::Ready {
     ready | platform::usize2ready(bits)
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(any(target_os = "freebsd", target_os = "dragonfly"))))]
 mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
+
+    pub fn aio() -> Ready {
+        // Even though some of these platforms define EVFILT_AIO, they
+        // don't implement it with their reactors, so there's no point
+        // to using it.
+        Ready::empty()
+    }
 
     pub fn hup() -> Ready {
         UnixReady::hup().into()
@@ -811,9 +819,60 @@ mod platform {
     }
 }
 
+#[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+mod platform {
+    use mio::Ready;
+    use mio::unix::UnixReady;
+
+    pub fn aio() -> Ready {
+        UnixReady::aio().into()
+    }
+
+    pub fn hup() -> Ready {
+        UnixReady::hup().into()
+    }
+
+    const HUP: usize = 1 << 2;
+    const ERROR: usize = 1 << 3;
+    const AIO: usize = 1 << 4;
+
+    pub fn ready2usize(ready: Ready) -> usize {
+        let ready = UnixReady::from(ready);
+        let mut bits = 0;
+        if ready.is_aio() {
+            bits |= AIO;
+        }
+        if ready.is_error() {
+            bits |= ERROR;
+        }
+        if ready.is_hup() {
+            bits |= HUP;
+        }
+        bits
+    }
+
+    pub fn usize2ready(bits: usize) -> Ready {
+        let mut ready = UnixReady::from(Ready::empty());
+        if bits & AIO != 0 {
+            ready.insert(UnixReady::aio());
+        }
+        if bits & HUP != 0 {
+            ready.insert(UnixReady::hup());
+        }
+        if bits & ERROR != 0 {
+            ready.insert(UnixReady::error());
+        }
+        ready.into()
+    }
+}
+
 #[cfg(windows)]
 mod platform {
     use mio::Ready;
+
+    pub fn aio() -> Ready {
+        Ready::empty()
+    }
 
     pub fn hup() -> Ready {
         Ready::empty()
