@@ -1,9 +1,0 @@
-[package]
-name = "ctrl-c"
-version = "0.1.0"
-authors = ["Jules Kerssemakers <jules.kerssemakers+github@gmail.com>", "Alex Crichton <alex@alexcrichton.com>"]
-
-[dependencies]
-futures = "0.1.14"
-tokio-core = "0.1.7"
-tokio-signal = "0.1"
