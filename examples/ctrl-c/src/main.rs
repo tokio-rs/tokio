@@ -10,6 +10,8 @@ fn main() {
     let ctrlc = tokio_signal::ctrl_c(&core.handle());
     let stream = core.run(ctrlc).unwrap();
 
+    println!("This program is now waiting for you to press Ctrl+C");
+
     core.run(stream.for_each(|()| {
         println!("Ctrl-C received!");
         Ok(())
