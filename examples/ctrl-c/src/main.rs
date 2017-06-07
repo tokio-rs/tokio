@@ -23,4 +23,7 @@ fn main() {
         println!("Ctrl-C received!");
         Ok(())
     })).unwrap();
+
+    println!("this won't be printed, because the received Ctrl+C will also kill the program");
+    unreachable!();
 }
