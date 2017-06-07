@@ -15,10 +15,32 @@ First, add this to your `Cargo.toml`:
 tokio-signal = "0.1"
 ```
 
-Next, add this to your crate:
+Next you an use this in conjunction with the `tokio-core` and `futures` crates:
 
-```rust
+```rust,no_run
+extern crate futures;
+extern crate tokio_core;
 extern crate tokio_signal;
+
+use tokio_core::reactor::Core;
+use futures::{Future, Stream};
+
+fn main() {
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+
+    // Create an infinite stream of "Ctrl+C" notifications. Each item received
+    // on this stream may represent multiple ctrl-c signals.
+    let ctrl_c = tokio_signal::ctrl_c(&handle).flatten_stream();
+
+    // Process each ctrl-c as it comes in
+    let prog = ctrl_c.for_each(|()| {
+        println!("ctrl-c received!");
+        Ok(())
+    });
+
+    core.run(prog).unwrap();
+}
 ```
 
 # License

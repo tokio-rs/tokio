@@ -11,6 +11,7 @@ script:
   - cargo build
   - cargo test
   - cargo doc --no-deps
+  - rustdoc --test README.md -L target/debug/deps
 after_success:
   - travis-cargo --only nightly doc-upload
 env:
