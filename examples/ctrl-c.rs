@@ -18,13 +18,19 @@ fn main() {
     // stream we want, reducing boilerplate Future-handling.
     let stream = tokio_signal::ctrl_c(&core.handle()).flatten_stream();
 
-    println!("This program is now waiting for you to press Ctrl+C");
+    println!("This program is now waiting for you to press Ctrl+C
+  * If running via `cargo run --example ctrl-c`, Ctrl+C also kills it, \
+    due to https://github.com/rust-lang-nursery/rustup.rs/issues/806
+  * If running the binary directly, the Ctrl+C is properly trapped. \
+    Terminate by opening a second terminal and issue `pkill -sigkil ctrl-c`");
 
-    // for_each is a powerful primitive provided by the Futures crate
-    // it turns a Stream into a Future that completes after all stream-items
-    // have been completed.
+    // Stream::for_each is a powerful primitive provided by the Futures crate.
+    // It turns a Stream into a Future that completes after all stream-items
+    // have been completed, or the first time the closure returns an error
     let future = stream.for_each(|()| {
         println!("Ctrl+C received!");
+
+        // return Ok-result to continue handling the stream
         Ok(())
     });
 
