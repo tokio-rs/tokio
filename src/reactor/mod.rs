@@ -478,7 +478,7 @@ impl Inner {
                               mio::Token(TOKEN_START + entry.index() * 2),
                               mio::Ready::readable() |
                                 mio::Ready::writable() |
-                                platform::hup(),
+                                platform::all(),
                               mio::PollOpt::edge()));
         Ok((sched.readiness.clone(), entry.insert(sched).index()))
     }
@@ -807,16 +807,28 @@ mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
+    pub fn aio() -> Ready {
+        UnixReady::aio().into()
+    }
+
+    pub fn all() -> Ready {
+        hup() | aio()
+    }
+
     pub fn hup() -> Ready {
         UnixReady::hup().into()
     }
 
     const HUP: usize = 1 << 2;
     const ERROR: usize = 1 << 3;
+    const AIO: usize = 1 << 4;
 
     pub fn ready2usize(ready: Ready) -> usize {
         let ready = UnixReady::from(ready);
         let mut bits = 0;
+        if ready.is_aio() {
+            bits |= AIO;
+        }
         if ready.is_error() {
             bits |= ERROR;
         }
@@ -828,6 +840,9 @@ mod platform {
 
     pub fn usize2ready(bits: usize) -> Ready {
         let mut ready = UnixReady::from(Ready::empty());
+        if bits & AIO != 0 {
+            ready.insert(UnixReady::aio());
+        }
         if bits & HUP != 0 {
             ready.insert(UnixReady::hup());
         }
@@ -841,6 +856,11 @@ mod platform {
 #[cfg(windows)]
 mod platform {
     use mio::Ready;
+
+    pub fn all() -> Ready {
+        // No platform-specific Readinesses for Windows
+        Ready::empty()
+    }
 
     pub fn hup() -> Ready {
         Ready::empty()
