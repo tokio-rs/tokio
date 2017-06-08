@@ -775,54 +775,7 @@ fn usize2ready(bits: usize) -> mio::Ready {
     ready | platform::usize2ready(bits)
 }
 
-#[cfg(all(unix, not(any(target_os = "freebsd", target_os = "dragonfly"))))]
-mod platform {
-    use mio::Ready;
-    use mio::unix::UnixReady;
-
-    pub fn aio() -> Ready {
-        // Even though some of these platforms define EVFILT_AIO, they
-        // don't implement it with their reactors, so there's no point
-        // to using it.
-        Ready::empty()
-    }
-
-    pub fn all() -> Ready {
-        hup()
-    }
-
-    pub fn hup() -> Ready {
-        UnixReady::hup().into()
-    }
-
-    const HUP: usize = 1 << 2;
-    const ERROR: usize = 1 << 3;
-
-    pub fn ready2usize(ready: Ready) -> usize {
-        let ready = UnixReady::from(ready);
-        let mut bits = 0;
-        if ready.is_error() {
-            bits |= ERROR;
-        }
-        if ready.is_hup() {
-            bits |= HUP;
-        }
-        bits
-    }
-
-    pub fn usize2ready(bits: usize) -> Ready {
-        let mut ready = UnixReady::from(Ready::empty());
-        if bits & HUP != 0 {
-            ready.insert(UnixReady::hup());
-        }
-        if bits & ERROR != 0 {
-            ready.insert(UnixReady::error());
-        }
-        ready.into()
-    }
-}
-
-#[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+#[cfg(unix)]
 mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
@@ -876,10 +829,6 @@ mod platform {
 #[cfg(windows)]
 mod platform {
     use mio::Ready;
-
-    pub fn aio() -> Ready {
-        Ready::empty()
-    }
 
     pub fn all() -> Ready {
         // No platform-specific Readinesses for Windows

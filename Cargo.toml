@@ -19,12 +19,12 @@ appveyor = { repository = "alexcrichton/tokio-core" }
 [dependencies]
 bytes = "0.4"
 log = "0.3"
-mio = { git = "https://github.com/carllerche/mio", rev = "d8576d9" }
+mio = "0.6.9"
 scoped-tls = "0.1.0"
 slab = "0.3"
 iovec = "0.1"
 tokio-io = "0.1"
-futures = "0.1.11"
+futures = "0.1.14"
 
 [dev-dependencies]
 env_logger = { version = "0.3", default-features = false }
