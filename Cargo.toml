@@ -27,5 +27,5 @@ tokio-io = "0.1"
 futures = "0.1.14"
 
 [dev-dependencies]
-env_logger = { version = "0.3", default-features = false }
+env_logger = { version = "0.4", default-features = false }
 libc = "0.2"
