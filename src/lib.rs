@@ -115,6 +115,7 @@
 //! `tokio_process::Child` is dropped. The behavior of the standard library can
 //! be regained with the `Child::forget` method.
 
+#![warn(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.1")]
 
@@ -130,6 +131,7 @@ use std::process::{self, ExitStatus, Output, Stdio};
 
 use futures::{Future, Poll, IntoFuture};
 use futures::future::{Flatten, FutureResult, Either, ok};
+use std::fmt;
 use tokio_core::reactor::Handle;
 use tokio_io::io::{read_to_end};
 use tokio_io::{AsyncWrite, AsyncRead, IoFuture};
@@ -261,6 +263,7 @@ impl CommandExt for process::Command {
 /// > done because futures in general take `drop` as a sign of cancellation, and
 /// > this `Child` is itself a future. If you'd like to run a process in the
 /// > background, though, you may use the `forget` method.
+#[derive(Debug)]
 pub struct Child {
     child: imp::Child,
     kill_on_drop: bool,
@@ -373,6 +376,14 @@ pub struct WaitWithOutput {
     inner: IoFuture<Output>,
 }
 
+impl fmt::Debug for WaitWithOutput {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("WaitWithOutput")
+            .field("inner", &"..")
+            .finish()
+    }
+}
+
 impl Future for WaitWithOutput {
     type Item = Output;
     type Error = io::Error;
@@ -387,6 +398,7 @@ impl Future for WaitWithOutput {
 /// This future is used to conveniently spawn a child and simply wait for its
 /// exit status. This future will resolves to the `ExitStatus` type in the
 /// standard library.
+#[derive(Debug)]
 pub struct StatusAsync {
     inner: Flatten<FutureResult<Child, io::Error>>,
 }
@@ -409,6 +421,14 @@ pub struct OutputAsync {
     inner: IoFuture<Output>,
 }
 
+impl fmt::Debug for OutputAsync {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("OutputAsync")
+            .field("inner", &"..")
+            .finish()
+    }
+}
+
 impl Future for OutputAsync {
     type Item = Output;
     type Error = io::Error;
@@ -423,6 +443,7 @@ impl Future for OutputAsync {
 /// This type implements the `Write` trait to pass data to the stdin handle of
 /// a child process. Note that this type is also "futures aware" meaning that it
 /// is both (a) nonblocking and (b) will panic if used off of a future's task.
+#[derive(Debug)]
 pub struct ChildStdin {
     inner: imp::ChildStdin,
 }
@@ -433,6 +454,7 @@ pub struct ChildStdin {
 /// of a child process. Note that this type is also "futures aware" meaning
 /// that it is both (a) nonblocking and (b) will panic if used off of a
 /// future's task.
+#[derive(Debug)]
 pub struct ChildStdout {
     inner: imp::ChildStdout,
 }
@@ -443,6 +465,7 @@ pub struct ChildStdout {
 /// of a child process. Note that this type is also "futures aware" meaning
 /// that it is both (a) nonblocking and (b) will panic if used off of a
 /// future's task.
+#[derive(Debug)]
 pub struct ChildStderr {
     inner: imp::ChildStderr,
 }
@@ -485,6 +508,7 @@ impl AsyncRead for ChildStderr {
 
 #[deprecated(note = "use std::process::Command instead")]
 #[allow(deprecated, missing_docs)]
+#[allow(deprecated, missing_debug_implementations, missing_docs)]
 #[doc(hidden)]
 pub struct Command {
     inner: process::Command,
@@ -493,7 +517,7 @@ pub struct Command {
 }
 
 #[deprecated(note = "use std::process::Command instead")]
-#[allow(deprecated, missing_docs)]
+#[allow(deprecated, missing_debug_implementations, missing_docs)]
 #[doc(hidden)]
 pub struct Spawn {
     inner: Box<Future<Item=Child, Error=io::Error>>,

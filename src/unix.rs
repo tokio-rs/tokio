@@ -36,6 +36,7 @@ use mio::event::Evented;
 use mio;
 use self::libc::c_int;
 use self::tokio_signal::unix::Signal;
+use std::fmt;
 use tokio_io::IoFuture;
 use tokio_core::reactor::{Handle, PollEvented};
 
@@ -43,6 +44,17 @@ pub struct Child {
     inner: process::Child,
     reaped: bool,
     sigchld: FlattenStream<IoFuture<Signal>>,
+}
+
+impl fmt::Debug for Child {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Child")
+            .field("pid", &self.inner.id())
+            .field("inner", &self.inner)
+            .field("reaped", &self.reaped)
+            .field("sigchld", &"..")
+            .finish()
+    }
 }
 
 impl Child {
@@ -125,6 +137,7 @@ impl Child {
     }
 }
 
+#[derive(Debug)]
 pub struct Fd<T>(T);
 
 impl<T: io::Read> io::Read for Fd<T> {

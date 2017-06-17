@@ -19,6 +19,7 @@ extern crate winapi;
 extern crate kernel32;
 extern crate mio_named_pipes;
 
+use std::fmt;
 use std::io;
 use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
@@ -33,6 +34,16 @@ use tokio_core::reactor::{PollEvented, Handle};
 pub struct Child {
     child: process::Child,
     waiting: Option<Waiting>,
+}
+
+impl fmt::Debug for Child {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Child")
+            .field("pid", &self.id())
+            .field("child", &self.child)
+            .field("waiting", &"..")
+            .finish()
+    }
 }
 
 struct Waiting {
