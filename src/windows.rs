@@ -31,6 +31,7 @@ use futures::future::Fuse;
 use self::mio_named_pipes::NamedPipe;
 use tokio_core::reactor::{PollEvented, Handle};
 
+#[must_use = "futures do nothing unless polled"]
 pub struct Child {
     child: process::Child,
     waiting: Option<Waiting>,

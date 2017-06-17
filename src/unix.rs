@@ -40,6 +40,7 @@ use std::fmt;
 use tokio_io::IoFuture;
 use tokio_core::reactor::{Handle, PollEvented};
 
+#[must_use = "futures do nothing unless polled"]
 pub struct Child {
     inner: process::Child,
     reaped: bool,

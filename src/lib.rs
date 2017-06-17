@@ -263,6 +263,7 @@ impl CommandExt for process::Command {
 /// > done because futures in general take `drop` as a sign of cancellation, and
 /// > this `Child` is itself a future. If you'd like to run a process in the
 /// > background, though, you may use the `forget` method.
+#[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Child {
     child: imp::Child,
@@ -372,6 +373,7 @@ impl Drop for Child {
 ///
 /// This future will resolve to the standard library's `Output` type which
 /// contains the exit status, stdout, and stderr of a child process.
+#[must_use = "futures do nothing unless polled"]
 pub struct WaitWithOutput {
     inner: IoFuture<Output>,
 }
@@ -398,6 +400,7 @@ impl Future for WaitWithOutput {
 /// This future is used to conveniently spawn a child and simply wait for its
 /// exit status. This future will resolves to the `ExitStatus` type in the
 /// standard library.
+#[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct StatusAsync {
     inner: Flatten<FutureResult<Child, io::Error>>,
@@ -417,6 +420,7 @@ impl Future for StatusAsync {
 /// This future is mostly equivalent to spawning a process and then calling
 /// `wait_with_output` on it internally. This can be useful to simply spawn a
 /// process, collecting all of its output and its exit status.
+#[must_use = "futures do nothing unless polled"]
 pub struct OutputAsync {
     inner: IoFuture<Output>,
 }
