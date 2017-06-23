@@ -505,7 +505,7 @@ impl Write for TcpStream {
         self.io.write(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.io.flush()
+        Ok(())
     }
 }
 
