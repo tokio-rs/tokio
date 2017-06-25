@@ -8,11 +8,12 @@ extern crate env_logger;
 
 use std::io;
 use std::process::{Stdio, ExitStatus, Command};
+use std::time::Duration;
 
 use futures::future::{BoxFuture, Future};
 use futures::stream::{self, Stream};
 use tokio_io::io::{read_until, write_all, read_to_end};
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Timeout};
 use tokio_process::{CommandExt, Child};
 
 mod support;
@@ -116,4 +117,22 @@ fn wait_with_output_captures() {
     assert!(output.status.success());
     assert_eq!(output.stdout, written);
     assert_eq!(output.stderr.len(), 0);
+}
+
+#[test]
+fn status_closes_any_pipes() {
+    let mut core = Core::new().unwrap();
+
+    // Cat will open a pipe between the parent and child.
+    // If `status_async` doesn't ensure the handles are closed,
+    // we would end up blocking forever (and time out).
+    let child = cat().status_async(&core.handle());
+    let timeout = Timeout::new(Duration::from_secs(1), &core.handle())
+        .expect("timeout registration failed")
+        .map(|()| panic!("time out exceeded! did we get stuck waiting on the child?"));
+
+    match core.run(child.select(timeout)) {
+        Ok((status, _)) => assert!(status.success()),
+        Err(_) => panic!("failed to run futures"),
+    }
 }

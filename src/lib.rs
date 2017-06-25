@@ -178,13 +178,13 @@ pub trait CommandExt {
     ///
     /// The `StatusAsync` future returned will resolve to the `ExitStatus`
     /// type in the standard library representing how the process exited. If
-    /// output handles are set to a pipe then they will be immediately closed
-    /// after the child is spawned.
+    /// any input/output handles are set to a pipe then they will be immediately
+    /// closed after the child is spawned.
     ///
     /// The `handle` specified must be a handle to a valid event loop, and all
     /// I/O this child does will be associated with the specified event loop.
     ///
-    /// If the `OutputAsync` future is dropped before the future resolves, then
+    /// If the `StatusAsync` future is dropped before the future resolves, then
     /// the child will be killed, if it was spawned.
     fn status_async(&mut self, handle: &Handle) -> StatusAsync;
 
@@ -234,8 +234,18 @@ impl CommandExt for process::Command {
     }
 
     fn status_async(&mut self, handle: &Handle) -> StatusAsync {
+        let mut inner = self.spawn_async(handle);
+        if let Ok(child) = inner.as_mut() {
+            // Ensure we close any stdio handles so we can't deadlock
+            // waiting on the child which may be waiting to read/write
+            // to a pipe we're holding.
+            child.stdin.take();
+            child.stdout.take();
+            child.stderr.take();
+        }
+
         StatusAsync {
-            inner: self.spawn_async(handle).into_future().flatten(),
+            inner: inner.into_future().flatten(),
         }
     }
 
