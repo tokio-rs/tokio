@@ -186,7 +186,26 @@ pub trait CommandExt {
     ///
     /// If the `StatusAsync` future is dropped before the future resolves, then
     /// the child will be killed, if it was spawned.
+    #[deprecated(note = "use the more flexible `spawn_async2` method instead")]
+    #[allow(deprecated)]
     fn status_async(&mut self, handle: &Handle) -> StatusAsync;
+
+    /// Executes a command as a child process, waiting for it to finish and
+    /// collecting its exit status.
+    ///
+    /// By default, stdin, stdout and stderr are inherited from the parent.
+    ///
+    /// The `StatusAsync` future returned will resolve to the `ExitStatus`
+    /// type in the standard library representing how the process exited. If
+    /// any input/output handles are set to a pipe then they will be immediately
+    ///  closed after the child is spawned.
+    ///
+    /// The `handle` specified must be a handle to a valid event loop, and all
+    /// I/O this child does will be associated with the specified event loop.
+    ///
+    /// If the `StatusAsync` future is dropped before the future resolves, then
+    /// the child will be killed, if it was spawned.
+    fn status_async2(&mut self, handle: &Handle) -> io::Result<StatusAsync2>;
 
     /// Executes the command as a child process, waiting for it to finish and
     /// collecting all of its output.
@@ -233,6 +252,7 @@ impl CommandExt for process::Command {
         Ok(child)
     }
 
+    #[allow(deprecated)]
     fn status_async(&mut self, handle: &Handle) -> StatusAsync {
         let mut inner = self.spawn_async(handle);
         if let Ok(child) = inner.as_mut() {
@@ -247,6 +267,21 @@ impl CommandExt for process::Command {
         StatusAsync {
             inner: inner.into_future().flatten(),
         }
+    }
+
+    fn status_async2(&mut self, handle: &Handle) -> io::Result<StatusAsync2> {
+        self.spawn_async(handle).map(|mut child| {
+            // Ensure we close any stdio handles so we can't deadlock
+            // waiting on the child which may be waiting to read/write
+            // to a pipe we're holding.
+            child.stdin.take();
+            child.stdout.take();
+            child.stderr.take();
+
+            StatusAsync2 {
+                inner: child,
+            }
+        })
     }
 
     fn output_async(&mut self, handle: &Handle) -> OutputAsync {
@@ -411,12 +446,35 @@ impl Future for WaitWithOutput {
 /// exit status. This future will resolves to the `ExitStatus` type in the
 /// standard library.
 #[must_use = "futures do nothing unless polled"]
+#[deprecated(note = "use the more flexible `SpawnAsync2` adapter instead")]
+#[allow(deprecated)]
 #[derive(Debug)]
 pub struct StatusAsync {
     inner: Flatten<FutureResult<Child, io::Error>>,
 }
 
+#[allow(deprecated)]
 impl Future for StatusAsync {
+    type Item = ExitStatus;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
+        self.inner.poll()
+    }
+}
+
+/// Future returned by the `CommandExt::status_async2` method.
+///
+/// This future is used to conveniently spawn a child and simply wait for its
+/// exit status. This future will resolves to the `ExitStatus` type in the
+/// standard library.
+#[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
+pub struct StatusAsync2 {
+    inner: Child,
+}
+
+impl Future for StatusAsync2 {
     type Item = ExitStatus;
     type Error = io::Error;
 
