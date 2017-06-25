@@ -205,6 +205,12 @@ pub trait CommandExt {
     ///
     /// If the `StatusAsync` future is dropped before the future resolves, then
     /// the child will be killed, if it was spawned.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error immediately if the child process
+    /// cannot be spawned. Otherwise errors obtained while waiting for the child
+    /// are returned through the `StatusAsync2` future.
     fn status_async2(&mut self, handle: &Handle) -> io::Result<StatusAsync2>;
 
     /// Executes the command as a child process, waiting for it to finish and
