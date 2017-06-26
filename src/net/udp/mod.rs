@@ -322,6 +322,27 @@ impl UdpSocket {
                               interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }
+
+    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
+    ///
+    /// If this is set to `true` then the socket is restricted to sending and
+    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
+    /// can bind the same port at the same time.
+    ///
+    /// If this is set to `false` then the socket can be used to send and
+    /// receive packets from an IPv4-mapped IPv6 address.
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.io.get_ref().set_only_v6(only_v6)
+    }
+
+    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
+    ///
+    /// For more information about this option, see [`set_only_v6`][link].
+    ///
+    /// [link]: #method.set_only_v6
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.io.get_ref().only_v6()
+    }
 }
 
 impl fmt::Debug for UdpSocket {
