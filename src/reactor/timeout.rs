@@ -46,6 +46,13 @@ impl Timeout {
             handle: handle.remote().clone(),
         })
     }
+
+    /// Resets this timeout to an new timeout which will fire at the time
+    /// specified by `at`.
+    pub fn reset(&mut self, at: Instant) {
+        self.when = at;
+        self.token.reset_timeout(self.when, &self.handle);
+    }
 }
 
 impl Future for Timeout {
