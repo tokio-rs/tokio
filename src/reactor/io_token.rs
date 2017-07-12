@@ -20,7 +20,7 @@ impl IoToken {
     ///
     /// When a new I/O object is created it needs to be communicated to the
     /// event loop to ensure that it's registered and ready to receive
-    /// notifications. The event loop with then respond back with the I/O object
+    /// notifications. The event loop will then respond back with the I/O object
     /// and a token which can be used to send more messages to the event loop.
     ///
     /// The token returned is then passed in turn to each of the methods below
