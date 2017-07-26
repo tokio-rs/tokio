@@ -621,6 +621,12 @@ impl Remote {
     ///
     /// Note that while the closure, `F`, requires the `Send` bound as it might
     /// cross threads, the future `R` does not.
+    ///
+    /// # Panics
+    ///
+    /// This method will **not** catch panics from polling the future `f`. If
+    /// the future panics then it's the responsibility of the caller to catch
+    /// that panic and handle it as appropriate.
     pub fn spawn<F, R>(&self, f: F)
         where F: FnOnce(&Handle) -> R + Send + 'static,
               R: IntoFuture<Item=(), Error=()>,
@@ -689,6 +695,12 @@ impl Handle {
     }
 
     /// Spawns a new future on the event loop this handle is associated with.
+    ///
+    /// # Panics
+    ///
+    /// This method will **not** catch panics from polling the future `f`. If
+    /// the future panics then it's the responsibility of the caller to catch
+    /// that panic and handle it as appropriate.
     pub fn spawn<F>(&self, f: F)
         where F: Future<Item=(), Error=()> + 'static,
     {
@@ -705,6 +717,12 @@ impl Handle {
     /// for running a closure wrapped in `futures::lazy`. It will spawn the
     /// function `f` provided onto the event loop, and continue to run the
     /// future returned by `f` on the event loop as well.
+    ///
+    /// # Panics
+    ///
+    /// This method will **not** catch panics from polling the future `f`. If
+    /// the future panics then it's the responsibility of the caller to catch
+    /// that panic and handle it as appropriate.
     pub fn spawn_fn<F, R>(&self, f: F)
         where F: FnOnce() -> R + 'static,
               R: IntoFuture<Item=(), Error=()> + 'static,
