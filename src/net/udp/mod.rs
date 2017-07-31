@@ -415,7 +415,7 @@ impl<T> Future for RecvDgram<T>
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 mod sys {
     use std::os::unix::prelude::*;
     use super::UdpSocket;
