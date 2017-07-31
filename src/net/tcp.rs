@@ -706,7 +706,7 @@ impl Future for TcpStreamNewState {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 mod sys {
     use std::os::unix::prelude::*;
     use super::{TcpStream, TcpListener};

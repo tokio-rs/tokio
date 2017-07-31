@@ -820,7 +820,7 @@ fn usize2ready(bits: usize) -> mio::Ready {
     ready | platform::usize2ready(bits)
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
@@ -871,7 +871,7 @@ mod platform {
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "fuchsia"))]
 mod platform {
     use mio::Ready;
 
