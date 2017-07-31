@@ -105,6 +105,7 @@ extern crate scoped_tls;
 extern crate log;
 
 #[macro_use]
+#[doc(hidden)]
 pub mod io;
 
 mod heap;
