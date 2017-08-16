@@ -44,9 +44,11 @@
 //! ```no_run
 //! extern crate futures;
 //! extern crate tokio_core;
+//! extern crate tokio_io;
 //!
 //! use futures::{Future, Stream};
-//! use tokio_core::io::{copy, Io};
+//! use tokio_io::AsyncRead;
+//! use tokio_io::io::copy;
 //! use tokio_core::net::TcpListener;
 //! use tokio_core::reactor::Core;
 //!
@@ -71,7 +73,7 @@
 //!
 //!         // ... after which we'll print what happened
 //!         let handle_conn = bytes_copied.map(|amt| {
-//!             println!("wrote {} bytes", amt)
+//!             println!("wrote {:?} bytes", amt)
 //!         }).map_err(|err| {
 //!             println!("IO error {:?}", err)
 //!         });
