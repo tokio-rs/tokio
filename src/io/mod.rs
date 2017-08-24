@@ -10,6 +10,7 @@
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
 #![deprecated(note = "moved to the `tokio-io` crate")]
+#![allow(deprecated)]
 
 use std::io;
 

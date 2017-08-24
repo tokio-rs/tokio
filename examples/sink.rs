@@ -50,8 +50,8 @@ fn main() {
 
 fn write(socket: TcpStream) -> IoFuture<()> {
     static BUF: &'static [u8] = &[0; 64 * 1024];
-    let iter = iter::repeat(()).map(|()| Ok(()));
-    stream::iter(iter).fold(socket, |socket, ()| {
+    let iter = iter::repeat(());
+    Box::new(stream::iter_ok(iter).fold(socket, |socket, ()| {
         tokio_io::io::write_all(socket, BUF).map(|(socket, _)| socket)
-    }).map(|_| ()).boxed()
+    }).map(|_| ()))
 }

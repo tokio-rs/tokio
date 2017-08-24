@@ -24,7 +24,7 @@ scoped-tls = "0.1.0"
 slab = "0.3"
 iovec = "0.1"
 tokio-io = "0.1"
-futures = "0.1.14"
+futures = "0.1.15"
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }

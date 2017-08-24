@@ -68,7 +68,7 @@ fn main() {
         // Model the read portion of this socket by mapping an infinite
         // iterator to each line off the socket. This "loop" is then
         // terminated with an error once we hit EOF on the socket.
-        let iter = stream::iter(iter::repeat(()).map(Ok::<(), Error>));
+        let iter = stream::iter_ok::<_, Error>(iter::repeat(()));
         let socket_reader = iter.fold(reader, move |reader, _| {
             // Read a line off the socket, failing if we're at EOF
             let line = io::read_until(reader, b'\n', Vec::new());
@@ -96,11 +96,11 @@ fn main() {
                                     .filter(|&(&k, _)| k != addr)
                                     .map(|(_, v)| v);
                     for tx in iter {
-                        tx.send(format!("{}: {}", addr, msg)).unwrap();
+                        tx.unbounded_send(format!("{}: {}", addr, msg)).unwrap();
                     }
                 } else {
                     let tx = conns.get_mut(&addr).unwrap();
-                    tx.send("You didn't send valid UTF-8.".to_string()).unwrap();
+                    tx.unbounded_send("You didn't send valid UTF-8.".to_string()).unwrap();
                 }
                 reader
             })

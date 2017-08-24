@@ -583,7 +583,7 @@ impl Remote {
                     lp.notify(msg);
                 }
                 None => {
-                    match mpsc::UnboundedSender::send(&self.tx, msg) {
+                    match self.tx.unbounded_send(msg) {
                         Ok(()) => {}
 
                         // TODO: this error should punt upwards and we should

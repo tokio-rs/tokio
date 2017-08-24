@@ -308,7 +308,7 @@ impl TcpStream {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };
-        state.boxed()
+        Box::new(state)
     }
 
     /// Test whether this socket is ready to be read or not.
