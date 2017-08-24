@@ -28,21 +28,19 @@ use std::io;
 use std::env;
 use std::net::SocketAddr;
 
+use flate2::write::GzEncoder;
+use futures::thread;
 use futures::{Future, Stream, Poll};
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
 use tokio_io::{AsyncRead, AsyncWrite};
-use flate2::write::GzEncoder;
 
 fn main() {
     // As with many other examples, parse our CLI arguments and prepare the
     // reactor.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     // This is where we're going to offload our computationally heavy work
@@ -53,7 +51,7 @@ fn main() {
     // The compress logic will happen in the function below, but everything's
     // still a future! Each client is spawned to concurrently get processed.
     let server = socket.incoming().for_each(move |(socket, addr)| {
-        handle.spawn(compress(socket, &pool).then(move |result| {
+        thread::spawn_task(compress(socket, &pool).then(move |result| {
             match result {
                 Ok((r, w)) => println!("{}: compressed {} bytes to {}", addr, r, w),
                 Err(e) => println!("{}: failed when compressing: {}", addr, e),
@@ -63,7 +61,7 @@ fn main() {
         Ok(())
     });
 
-    core.run(server).unwrap();
+    thread::block_on_all(server).unwrap();
 }
 
 /// The main workhorse of this example. This'll compress all data read from

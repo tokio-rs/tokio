@@ -51,8 +51,8 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::prelude::*;
+use futures::thread;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
 use tokio_io::AsyncRead;
 use tokio_io::io::{lines, write_all};
 
@@ -82,9 +82,7 @@ fn main() {
     // set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let listener = TcpListener::bind(&addr, &handle).expect("failed to bind");
+    let listener = TcpListener::bind(&addr).expect("failed to bind");
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all
@@ -154,11 +152,11 @@ fn main() {
         // runs concurrently with all other clients, for now ignoring any errors
         // that we see.
         let msg = writes.then(move |_| Ok(()));
-        handle.spawn(msg);
+        thread::spawn_task(msg);
         Ok(())
     });
 
-    core.run(done).unwrap();
+    thread::block_on_all(done).unwrap();
 }
 
 impl Request {

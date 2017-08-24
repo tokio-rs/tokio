@@ -13,10 +13,16 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
 
+use futures::thread::block_until;
+use mio::event::Evented;
 use mio::unix::{UnixReady, EventedFd};
 use mio::{PollOpt, Ready, Token};
+<<<<<<< 822d9f84453ac74646d1b8d8c87395f75bcb7604
 use mio::event::Evented;
 use tokio::reactor::{Core, PollEvented};
+=======
+use tokio::reactor::{PollEvented, Handle};
+>>>>>>> Update as the `tokio` crate
 use tokio_io::io::read_to_end;
 
 macro_rules! t {
@@ -64,7 +70,6 @@ impl Evented for MyFile {
 fn hup() {
     drop(env_logger::init());
 
-    let mut l = t!(Core::new());
     unsafe {
         let mut pipes = [0; 2];
         assert!(libc::pipe(pipes.as_mut_ptr()) != -1,
@@ -77,10 +82,10 @@ fn hup() {
             thread::sleep(Duration::from_millis(100));
         });
 
-        let source = PollEvented::new(MyFile::new(read), &l.handle()).unwrap();
+        let source = PollEvented::new(MyFile::new(read), Handle::default()).unwrap();
 
         let reader = read_to_end(source, Vec::new());
-        let (_, content) = t!(l.run(reader));
+        let (_, content) = t!(block_until(reader));
         assert_eq!(&b"Hello!\nGood bye!\n"[..], &content[..]);
         t.join().unwrap();
     }

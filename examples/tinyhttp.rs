@@ -26,19 +26,19 @@ extern crate tokio_io;
 use std::env;
 use std::fmt;
 use std::io;
-use std::net::{self, SocketAddr};
+use std::net::SocketAddr;
 use std::thread;
 
 use bytes::BytesMut;
 use futures::future;
 use futures::sync::mpsc;
+use futures::thread as futures_thread;
 use futures::{Stream, Future, Sink};
-use http::{Request, Response, StatusCode};
 use http::header::HeaderValue;
-use tokio::net::TcpStream;
-use tokio::reactor::Core;
+use http::{Request, Response, StatusCode};
+use tokio::net::{TcpStream, TcpListener};
+use tokio_io::AsyncRead;
 use tokio_io::codec::{Encoder, Decoder};
-use tokio_io::{AsyncRead};
 
 fn main() {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
@@ -48,7 +48,7 @@ fn main() {
     let num_threads = env::args().nth(2).and_then(|s| s.parse().ok())
         .unwrap_or(num_cpus::get());
 
-    let listener = net::TcpListener::bind(&addr).expect("failed to bind");
+    let listener = TcpListener::bind(&addr).expect("failed to bind");
     println!("Listening on: {}", addr);
 
     let mut channels = Vec::new();
@@ -58,35 +58,30 @@ fn main() {
         thread::spawn(|| worker(rx));
     }
     let mut next = 0;
-    for socket in listener.incoming() {
-        let socket = socket.expect("failed to accept");
+    let done = listener.incoming().for_each(|(socket, _addr)| {
         channels[next].unbounded_send(socket).expect("worker thread died");
         next = (next + 1) % channels.len();
-    }
+        Ok(())
+    });
+    futures_thread::block_on_all(done).unwrap();
 }
 
-fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
+fn worker(rx: mpsc::UnboundedReceiver<TcpStream>) {
     let done = rx.for_each(move |socket| {
         // Associate each socket we get with our local event loop, and then use
         // the codec support in the tokio-io crate to deal with discrete
         // request/response types instead of bytes. Here we'll just use our
         // framing defined below and then use the `send_all` helper to send the
         // responses back on the socket after we've processed them
-        let socket = future::result(TcpStream::from_stream(socket, &handle));
-        let req = socket.and_then(|socket| {
-            let (tx, rx) = socket.framed(Http).split();
-            tx.send_all(rx.and_then(respond))
-        });
-        handle.spawn(req.then(move |result| {
+        let (tx, rx) = socket.framed(Http).split();
+        let req = tx.send_all(rx.and_then(respond));
+        futures_thread::spawn_task(req.then(move |result| {
             drop(result);
             Ok(())
         }));
         Ok(())
     });
-    core.run(done).unwrap();
+    futures_thread::block_on_all(done).unwrap();
 }
 
 /// "Server logic" is implemented in this function.

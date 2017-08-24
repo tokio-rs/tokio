@@ -24,9 +24,9 @@ use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::thread;
 
+use futures::prelude::*;
 use futures::sync::mpsc;
-use futures::{Sink, Future, Stream};
-use tokio::reactor::Core;
+use futures::thread as futures_thread;
 
 fn main() {
     // Determine if we're going to run in TCP or UDP mode
@@ -45,10 +45,6 @@ fn main() {
     });
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    // Create the event loop and initiate the connection to the remote server
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
     // Right now Tokio doesn't support a handle to stdin running on the event
     // loop, so we farm out that work to a separate thread. This thread will
     // read data (with blocking I/O) from stdin and then send it to the event
@@ -61,9 +57,9 @@ fn main() {
     // our UDP connection to get a stream of bytes we're going to emit to
     // stdout.
     let stdout = if tcp {
-        tcp::connect(&addr, &handle, Box::new(stdin_rx))
+        tcp::connect(&addr, Box::new(stdin_rx))
     } else {
-        udp::connect(&addr, &handle, Box::new(stdin_rx))
+        udp::connect(&addr, Box::new(stdin_rx))
     };
 
     // And now with our stream of bytes to write to stdout, we execute that in
@@ -72,7 +68,7 @@ fn main() {
     // loop. In this case, though, we know it's ok as the event loop isn't
     // otherwise running anything useful.
     let mut out = io::stdout();
-    core.run(stdout.for_each(|chunk| {
+    futures_thread::block_on_all(stdout.for_each(|chunk| {
         out.write_all(&chunk)
     })).unwrap();
 }
@@ -82,19 +78,17 @@ mod tcp {
     use std::net::SocketAddr;
 
     use bytes::{BufMut, BytesMut};
-    use futures::{Future, Stream};
+    use futures::prelude::*;
+    use futures::thread;
     use tokio::net::TcpStream;
-    use tokio::reactor::Handle;
     use tokio_io::AsyncRead;
     use tokio_io::codec::{Encoder, Decoder};
 
     pub fn connect(addr: &SocketAddr,
-                   handle: &Handle,
                    stdin: Box<Stream<Item = Vec<u8>, Error = io::Error>>)
         -> Box<Stream<Item = BytesMut, Error = io::Error>>
     {
-        let tcp = TcpStream::connect(addr, handle);
-        let handle = handle.clone();
+        let tcp = TcpStream::connect(addr);
 
         // After the TCP connection has been established, we set up our client
         // to start forwarding data.
@@ -113,7 +107,7 @@ mod tcp {
         // with us reading data from the stream.
         Box::new(tcp.map(move |stream| {
             let (sink, stream) = stream.framed(Bytes).split();
-            handle.spawn(stdin.forward(sink).then(|result| {
+            thread::spawn_daemon(stdin.forward(sink).then(|result| {
                 if let Err(e) = result {
                     panic!("failed to write to socket: {}", e)
                 }
@@ -166,12 +160,11 @@ mod udp {
     use std::net::SocketAddr;
 
     use bytes::BytesMut;
-    use futures::{Future, Stream};
+    use futures::prelude::*;
+    use futures::thread;
     use tokio::net::{UdpCodec, UdpSocket};
-    use tokio::reactor::Handle;
 
     pub fn connect(&addr: &SocketAddr,
-                   handle: &Handle,
                    stdin: Box<Stream<Item = Vec<u8>, Error = io::Error>>)
         -> Box<Stream<Item = BytesMut, Error = io::Error>>
     {
@@ -182,7 +175,7 @@ mod udp {
         } else {
             "[::]:0".parse().unwrap()
         };
-        let udp = UdpSocket::bind(&addr_to_bind, handle)
+        let udp = UdpSocket::bind(&addr_to_bind)
             .expect("failed to bind socket");
 
         // Like above with TCP we use an instance of `UdpCodec` to transform
@@ -193,7 +186,7 @@ mod udp {
 
         // All bytes from `stdin` will go to the `addr` specified in our
         // argument list. Like with TCP this is spawned concurrently
-        handle.spawn(stdin.map(move |chunk| {
+        thread::spawn_daemon(stdin.map(move |chunk| {
             (addr, chunk)
         }).forward(sink).then(|result| {
             if let Err(e) = result {
@@ -232,19 +225,18 @@ mod udp {
 
 // Our helper method which will read data from stdin and send it along the
 // sender provided.
-fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
+fn read_stdin(tx: mpsc::Sender<Vec<u8>>) {
+    use futures::future::{self, loop_fn, Loop};
+
     let mut stdin = io::stdin();
-    loop {
+    drop(futures_thread::block_on_all(loop_fn(tx, |tx| -> Box<Future<Item = _, Error = _>> {
         let mut buf = vec![0; 1024];
         let n = match stdin.read(&mut buf) {
             Err(_) |
-            Ok(0) => break,
+            Ok(0) => return Box::new(future::ok(Loop::Break(()))),
             Ok(n) => n,
         };
         buf.truncate(n);
-        tx = match tx.send(buf).wait() {
-            Ok(tx) => tx,
-            Err(_) => break,
-        };
-    }
+        Box::new(tx.send(buf).map(Loop::Continue))
+    })));
 }
