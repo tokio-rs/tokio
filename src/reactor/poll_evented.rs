@@ -274,7 +274,7 @@ impl<E> PollEvented<E> {
 impl<E: Read> Read for PollEvented<E> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.get_mut().read(buf);
         if is_wouldblock(&r) {
@@ -287,7 +287,7 @@ impl<E: Read> Read for PollEvented<E> {
 impl<E: Write> Write for PollEvented<E> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write() {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.get_mut().write(buf);
         if is_wouldblock(&r) {
@@ -298,7 +298,7 @@ impl<E: Write> Write for PollEvented<E> {
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write() {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.get_mut().flush();
         if is_wouldblock(&r) {
@@ -333,7 +333,7 @@ impl<'a, E> Read for &'a PollEvented<E>
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.get_ref().read(buf);
         if is_wouldblock(&r) {
@@ -348,7 +348,7 @@ impl<'a, E> Write for &'a PollEvented<E>
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write() {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.get_ref().write(buf);
         if is_wouldblock(&r) {
@@ -359,7 +359,7 @@ impl<'a, E> Write for &'a PollEvented<E>
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write() {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.get_ref().flush();
         if is_wouldblock(&r) {
