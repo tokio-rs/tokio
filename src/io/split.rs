@@ -46,7 +46,7 @@ impl<T: Read> Read for ReadHalf<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.handle.poll_lock() {
             Async::Ready(mut l) => l.read(buf),
-            Async::NotReady => Err(::would_block()),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
         }
     }
 }
@@ -55,14 +55,14 @@ impl<T: Write> Write for WriteHalf<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.handle.poll_lock() {
             Async::Ready(mut l) => l.write(buf),
-            Async::NotReady => Err(::would_block()),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self.handle.poll_lock() {
             Async::Ready(mut l) => l.flush(),
-            Async::NotReady => Err(::would_block()),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
         }
     }
 }

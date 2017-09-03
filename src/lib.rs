@@ -115,9 +115,3 @@ mod heap;
 pub mod channel;
 pub mod net;
 pub mod reactor;
-
-use std::io as sio;
-
-fn would_block() -> sio::Error {
-    sio::Error::new(sio::ErrorKind::WouldBlock, "would block")
-}

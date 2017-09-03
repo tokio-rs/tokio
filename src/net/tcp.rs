@@ -63,7 +63,7 @@ impl TcpListener {
                 match pending.poll().expect("shouldn't be canceled") {
                     Async::NotReady => {
                         self.pending_accept = Some(pending);
-                        return Err(::would_block())
+                        return Err(io::ErrorKind::WouldBlock.into())
                     },
                     Async::Ready(r) => return r,
                 }
@@ -541,7 +541,7 @@ impl ::io::Io for TcpStream {
 
     fn read_vec(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         if let Async::NotReady = <TcpStream>::poll_read(self) {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.io.get_ref().read_bufs(bufs);
         if is_wouldblock(&r) {
@@ -552,7 +552,7 @@ impl ::io::Io for TcpStream {
 
     fn write_vec(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
         if let Async::NotReady = <TcpStream>::poll_write(self) {
-            return Err(::would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
         let r = self.io.get_ref().write_bufs(bufs);
         if is_wouldblock(&r) {
