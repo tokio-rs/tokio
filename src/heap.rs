@@ -42,10 +42,10 @@ impl<T: Ord> Heap<T> {
     pub fn push(&mut self, t: T) -> Slot {
         self.assert_consistent();
         let len = self.items.len();
-        if self.index.available() == 0 {
+        if self.index.len() == self.index.capacity() {
             self.index.reserve_exact(len);
         }
-        let slot_idx = self.index.insert(len).unwrap();
+        let slot_idx = self.index.insert(len);
         self.items.push((t, slot_idx));
         self.percolate_up(len);
         self.assert_consistent();
@@ -68,7 +68,7 @@ impl<T: Ord> Heap<T> {
 
     pub fn remove(&mut self, slot: Slot) -> T {
         self.assert_consistent();
-        let idx = self.index.remove(slot.idx).unwrap();
+        let idx = self.index.remove(slot.idx);
         let (item, slot_idx) = self.items.swap_remove(idx);
         debug_assert_eq!(slot.idx, slot_idx);
         if idx < self.items.len() {

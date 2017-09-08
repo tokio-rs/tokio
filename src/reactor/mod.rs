@@ -365,7 +365,7 @@ impl Core {
             }
             Ok(Async::Ready(())) |
             Err(()) => {
-                _task_to_drop = inner.task_dispatch.remove(token).unwrap();
+                _task_to_drop = inner.task_dispatch.remove(token);
             }
         }
         drop(inner);
@@ -469,18 +469,20 @@ impl Inner {
             reader: None,
             writer: None,
         };
-        if self.io_dispatch.vacant_entry().is_none() {
+        if self.io_dispatch.len() == self.io_dispatch.capacity() {
             let amt = self.io_dispatch.len();
             self.io_dispatch.reserve_exact(amt);
         }
-        let entry = self.io_dispatch.vacant_entry().unwrap();
+        let entry = self.io_dispatch.vacant_entry();
+        let key = entry.key();
         try!(self.io.register(source,
-                              mio::Token(TOKEN_START + entry.index() * 2),
+                              mio::Token(TOKEN_START + key * 2),
                               mio::Ready::readable() |
                                 mio::Ready::writable() |
                                 platform::all(),
                               mio::PollOpt::edge()));
-        Ok((sched.readiness.clone(), entry.insert(sched).index()))
+        let sched = entry.insert(sched);
+        Ok((sched.readiness.clone(), key))
     }
 
     fn deregister_source(&mut self, source: &Evented) -> io::Result<()> {
@@ -489,7 +491,7 @@ impl Inner {
 
     fn drop_source(&mut self, token: usize) {
         debug!("dropping I/O source: {}", token);
-        self.io_dispatch.remove(token).unwrap();
+        self.io_dispatch.remove(token);
     }
 
     fn schedule(&mut self, token: usize, wake: Task, dir: Direction)
@@ -512,15 +514,16 @@ impl Inner {
     }
 
     fn add_timeout(&mut self, at: Instant) -> usize {
-        if self.timeouts.vacant_entry().is_none() {
+        if self.timeouts.len() == self.timeouts.capacity() {
             let len = self.timeouts.len();
             self.timeouts.reserve_exact(len);
         }
-        let entry = self.timeouts.vacant_entry().unwrap();
-        let slot = self.timer_heap.push((at, entry.index()));
-        let entry = entry.insert((Some(slot), TimeoutState::NotFired));
-        debug!("added a timeout: {}", entry.index());
-        return entry.index();
+        let entry = self.timeouts.vacant_entry();
+        let key = entry.key();
+        let slot = self.timer_heap.push((at, key));
+        entry.insert((Some(slot), TimeoutState::NotFired));
+        debug!("added a timeout: {}", key);
+        return key;
     }
 
     fn update_timeout(&mut self, token: usize, handle: Task) -> Option<Task> {
@@ -544,18 +547,18 @@ impl Inner {
     fn cancel_timeout(&mut self, token: usize) {
         debug!("cancel a timeout: {}", token);
         let pair = self.timeouts.remove(token);
-        if let Some((Some(slot), _state)) = pair {
+        if let (Some(slot), _state) = pair {
             self.timer_heap.remove(slot);
         }
     }
 
     fn spawn(&mut self, future: Box<Future<Item=(), Error=()>>) {
-        if self.task_dispatch.vacant_entry().is_none() {
+        if self.task_dispatch.len() == self.task_dispatch.capacity() {
             let len = self.task_dispatch.len();
             self.task_dispatch.reserve_exact(len);
         }
-        let entry = self.task_dispatch.vacant_entry().unwrap();
-        let token = TOKEN_START + 2 * entry.index() + 1;
+        let entry = self.task_dispatch.vacant_entry();
+        let token = TOKEN_START + 2 * entry.key() + 1;
         let pair = mio::Registration::new2();
         self.io.register(&pair.0,
                          mio::Token(token),
