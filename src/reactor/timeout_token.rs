@@ -48,7 +48,7 @@ impl TimeoutToken {
     /// # Panics
     ///
     /// This method will panic if the timeout specified was not created by this
-    /// loop handle's `add_timeout` method.
+    /// loop handle's `add_timeout` method or if called multiple times.
     pub fn cancel_timeout(&self, handle: &Remote) {
         debug!("cancel timeout {}", self.token);
         handle.send(Message::CancelTimeout(self.token))
