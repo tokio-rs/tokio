@@ -29,3 +29,4 @@ futures = "0.1.15"
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
 libc = "0.2"
+num_cpus = "1.0"

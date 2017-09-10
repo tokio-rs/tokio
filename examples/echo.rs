@@ -1,4 +1,4 @@
-//! An "hello world" echo server with tokio-core
+//! A "hello world" echo server with tokio-core
 //!
 //! This server will create a TCP listener, accept connections in a loop, and
 //! simply write back everything that's read off of each TCP connection. Each
