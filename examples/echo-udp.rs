@@ -58,7 +58,7 @@ fn main() {
     let mut l = Core::new().unwrap();
     let handle = l.handle();
     let socket = UdpSocket::bind(&addr, &handle).unwrap();
-    println!("Listening on: {}", addr);
+    println!("Listening on: {}", socket.local_addr().unwrap());
 
     // Next we'll create a future to spawn (the one we defined above) and then
     // we'll run the event loop by running the future.

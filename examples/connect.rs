@@ -113,7 +113,12 @@ mod tcp {
         // with us reading data from the stream.
         Box::new(tcp.map(move |stream| {
             let (sink, stream) = stream.framed(Bytes).split();
-            handle.spawn(stdin.forward(sink).then(|_| Ok(())));
+            handle.spawn(stdin.forward(sink).then(|result| {
+                if let Err(e) = result {
+                    panic!("failed to write to socket: {}", e)
+                }
+                Ok(())
+            }));
             stream
         }).flatten_stream())
     }
@@ -172,7 +177,12 @@ mod udp {
     {
         // We'll bind our UDP socket to a local IP/port, but for now we
         // basically let the OS pick both of those.
-        let udp = UdpSocket::bind(&"0.0.0.0:0".parse().unwrap(), handle)
+        let addr_to_bind = if addr.ip().is_ipv4() {
+            "0.0.0.0:0".parse().unwrap()
+        } else {
+            "[::]:0".parse().unwrap()
+        };
+        let udp = UdpSocket::bind(&addr_to_bind, handle)
             .expect("failed to bind socket");
 
         // Like above with TCP we use an instance of `UdpCodec` to transform
@@ -185,7 +195,12 @@ mod udp {
         // argument list. Like with TCP this is spawned concurrently
         handle.spawn(stdin.map(move |chunk| {
             (addr, chunk)
-        }).forward(sink).then(|_| Ok(())));
+        }).forward(sink).then(|result| {
+            if let Err(e) = result {
+                panic!("failed to write to socket: {}", e)
+            }
+            Ok(())
+        }));
 
         // With UDP we could receive data from any source, so filter out
         // anything coming from a different address
@@ -227,6 +242,9 @@ fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
             Ok(n) => n,
         };
         buf.truncate(n);
-        tx = tx.send(buf).wait().unwrap();
+        tx = match tx.send(buf).wait() {
+            Ok(tx) => tx,
+            Err(_) => break,
+        };
     }
 }
