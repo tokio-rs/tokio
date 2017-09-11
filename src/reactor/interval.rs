@@ -135,25 +135,38 @@ mod test {
         Duration::from_millis(millis)
     }
 
+    // The math around Instant/Duration isn't 100% precise due to rounding
+    // errors, see #249 for more info
+    fn almost_eq(a: Instant, b: Instant) -> bool {
+        if a == b {
+            true
+        } else if a > b {
+            a - b < Duration::from_millis(1)
+        } else {
+            b - a < Duration::from_millis(1)
+        }
+    }
+
     #[test]
     fn norm_next() {
         let tm = Timeline::new();
-        assert_eq!(next_interval(tm.at(1), tm.at(2), dur(10)), tm.at(11));
-        assert_eq!(next_interval(tm.at(7777), tm.at(7788), dur(100)),
-                                 tm.at(7877));
-        assert_eq!(next_interval(tm.at(1), tm.at(1000), dur(2100)),
-                                 tm.at(2101));
+        assert!(almost_eq(next_interval(tm.at(1), tm.at(2), dur(10)),
+                                        tm.at(11)));
+        assert!(almost_eq(next_interval(tm.at(7777), tm.at(7788), dur(100)),
+                                        tm.at(7877)));
+        assert!(almost_eq(next_interval(tm.at(1), tm.at(1000), dur(2100)),
+                                        tm.at(2101)));
     }
 
     #[test]
     fn fast_forward() {
         let tm = Timeline::new();
-        assert_eq!(next_interval(tm.at(1), tm.at(1000), dur(10)),
-                                 tm.at(1001));
-        assert_eq!(next_interval(tm.at(7777), tm.at(8888), dur(100)),
-                                 tm.at(8977));
-        assert_eq!(next_interval(tm.at(1), tm.at(10000), dur(2100)),
-                                 tm.at(10501));
+        assert!(almost_eq(next_interval(tm.at(1), tm.at(1000), dur(10)),
+                                        tm.at(1001)));
+        assert!(almost_eq(next_interval(tm.at(7777), tm.at(8888), dur(100)),
+                                        tm.at(8977)));
+        assert!(almost_eq(next_interval(tm.at(1), tm.at(10000), dur(2100)),
+                                        tm.at(10501)));
     }
 
     /// TODO: this test actually should be successful, but since we can't
