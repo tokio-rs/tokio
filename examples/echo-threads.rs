@@ -7,7 +7,7 @@
 //!
 //! To see this server in action, you can run this in one terminal:
 //!
-//!     cargo run --example echoe-threads
+//!     cargo run --example echo-threads
 //!
 //! and in another terminal you can run:
 //!
