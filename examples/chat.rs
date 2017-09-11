@@ -10,7 +10,7 @@
 //!
 //! And then in another window run:
 //!
-//!     nc -4 localhost 8080
+//!     cargo run --example connect 127.0.0.1:8080
 //!
 //! You can run the second command in multiple windows and then chat between the
 //! two, seeing the messages from the other client as they're received. For all

@@ -7,7 +7,7 @@
 //!
 //! and then in another terminal executing
 //!
-//!     nc -4 localhost 8080
+//!     cargo run --example connect 127.0.0.1:8080
 //!
 //! You should see `Hello!` printed out and then the `nc` program will exit.
 
