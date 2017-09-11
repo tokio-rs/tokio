@@ -61,6 +61,7 @@ pub struct UdpFramed<C> {
     rd: Vec<u8>,
     wr: Vec<u8>,
     out_addr: SocketAddr,
+    flushed: bool,
 }
 
 impl<C: UdpCodec> Stream for UdpFramed<C> {
@@ -81,29 +82,35 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, io::Error> {
-        if self.wr.len() > 0 {
-            try!(self.poll_complete());
-            if self.wr.len() > 0 {
-                return Ok(AsyncSink::NotReady(item));
+        trace!("sending frame");
+
+        if !self.flushed {
+            match try!(self.poll_complete()) {
+                Async::Ready(()) => {},
+                Async::NotReady => return Ok(AsyncSink::NotReady(item)),
             }
         }
 
         self.out_addr = self.codec.encode(item, &mut self.wr);
+        self.flushed = false;
+        trace!("frame encoded; length={}", self.wr.len());
+
         Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), io::Error> {
-        trace!("flushing framed transport");
-
-        if self.wr.is_empty() {
+        if self.flushed {
             return Ok(Async::Ready(()))
         }
 
-        trace!("writing; remaining={}", self.wr.len());
+        trace!("flushing frame; length={}", self.wr.len());
         let n = try_nb!(self.socket.send_to(&self.wr, &self.out_addr));
         trace!("written {}", n);
+
         let wrote_all = n == self.wr.len();
         self.wr.clear();
+        self.flushed = true;
+
         if wrote_all {
             Ok(Async::Ready(()))
         } else {
@@ -125,6 +132,7 @@ pub fn new<C: UdpCodec>(socket: UdpSocket, codec: C) -> UdpFramed<C> {
         out_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
         rd: vec![0; 64 * 1024],
         wr: Vec::with_capacity(8 * 1024),
+        flushed: true,
     }
 }
 
