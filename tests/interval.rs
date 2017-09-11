@@ -19,8 +19,8 @@ fn single() {
     drop(env_logger::init());
     let mut l = t!(Core::new());
     let dur = Duration::from_millis(10);
-    let interval = t!(Interval::new(dur, &l.handle()));
     let start = Instant::now();
+    let interval = t!(Interval::new(dur, &l.handle()));
     t!(l.run(interval.take(1).collect()));
     assert!(start.elapsed() >= dur);
 }
@@ -30,8 +30,8 @@ fn two_times() {
     drop(env_logger::init());
     let mut l = t!(Core::new());
     let dur = Duration::from_millis(10);
-    let interval = t!(Interval::new(dur, &l.handle()));
     let start = Instant::now();
+    let interval = t!(Interval::new(dur, &l.handle()));
     let result = t!(l.run(interval.take(2).collect()));
     assert!(start.elapsed() >= dur*2);
     assert_eq!(result, vec![(), ()]);

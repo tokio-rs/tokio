@@ -18,8 +18,8 @@ fn smoke() {
     drop(env_logger::init());
     let mut l = t!(Core::new());
     let dur = Duration::from_millis(10);
-    let timeout = t!(Timeout::new(dur, &l.handle()));
     let start = Instant::now();
+    let timeout = t!(Timeout::new(dur, &l.handle()));
     t!(l.run(timeout));
     assert!(start.elapsed() >= (dur / 2));
 }
