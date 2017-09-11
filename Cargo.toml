@@ -28,5 +28,11 @@ futures = "0.1.15"
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
+http = "0.1"
+httparse = "1.0"
 libc = "0.2"
 num_cpus = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+time = "0.1"
