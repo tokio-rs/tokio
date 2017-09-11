@@ -28,6 +28,8 @@ futures = "0.1.15"
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
+flate2 = { version = "0.2", features = ["tokio"] }
+futures-cpupool = "0.1"
 http = "0.1"
 httparse = "1.0"
 libc = "0.2"

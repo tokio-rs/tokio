@@ -41,6 +41,9 @@ A high level description of each example is:
   objects.
 * `udp-codec` - an example of using the `UdpCodec` trait along with a small
   ping-pong protocol happening locally.
+* `compress` - an echo-like server where instead of echoing back everything read
+  it echos back a gzip-compressed version of everything read! All compression
+  occurs on a CPU pool to offload work from the event loop.
 
 If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
