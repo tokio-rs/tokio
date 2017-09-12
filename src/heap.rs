@@ -140,7 +140,7 @@ impl<T: Ord> Heap<T> {
     }
 
     fn assert_consistent(&self) {
-        if cfg!(not(debug_assertions)) {
+        if !cfg!(assert_timer_heap_consistent) {
             return
         }
 
