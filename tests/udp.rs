@@ -16,52 +16,85 @@ macro_rules! t {
     })
 }
 
-#[test]
-fn send_messages() {
+fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
     let mut l = t!(Core::new());
-    let mut a = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
-    let mut b = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let mut a = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &l.handle()));
+    let mut b = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &l.handle()));
     let a_addr = t!(a.local_addr());
     let b_addr = t!(b.local_addr());
 
     {
-        let send = SendMessage::new(a, b_addr, b"1234");
-        let recv = RecvMessage::new(b, a_addr, b"1234");
+        let send = SendMessage::new(a, send.clone(), b_addr, b"1234");
+        let recv = RecvMessage::new(b, recv.clone(), a_addr, b"1234");
         let (sendt, received) = t!(l.run(send.join(recv)));
         a = sendt;
         b = received;
     }
 
     {
-        let send = SendMessage::new(a, b_addr, b"");
-        let recv = RecvMessage::new(b, a_addr, b"");
+        let send = SendMessage::new(a, send, b_addr, b"");
+        let recv = RecvMessage::new(b, recv, a_addr, b"");
         t!(l.run(send.join(recv)));
     }
 }
 
-struct SendMessage {
+#[test]
+fn send_to_and_recv_from() {
+   send_messages(SendTo {}, RecvFrom {}); 
+}
+
+#[test]
+fn send_and_recv() {
+    send_messages(Send {}, Recv {}); 
+}
+
+trait SendFn {
+    fn send(&self, &UdpSocket, &[u8], &SocketAddr) -> Result<usize, io::Error>;
+}
+
+#[derive(Debug, Clone)]
+struct SendTo {}
+
+impl SendFn for SendTo {
+    fn send(&self, socket: &UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
+        socket.send_to(buf, addr)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Send {}
+
+impl SendFn for Send {
+    fn send(&self, socket: &UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
+        socket.connect(*addr).expect("could not connect");
+        socket.send(buf)
+    }
+}
+
+struct SendMessage<S> {
     socket: Option<UdpSocket>,
+    send: S,
     addr: SocketAddr,
     data: &'static [u8],
 }
 
-impl SendMessage {
-    fn new(socket: UdpSocket, addr: SocketAddr, data: &'static [u8]) -> SendMessage {
+impl<S: SendFn> SendMessage<S> {
+    fn new(socket: UdpSocket, send: S, addr: SocketAddr, data: &'static [u8]) -> SendMessage<S> {
         SendMessage {
             socket: Some(socket),
-            addr: addr,
+            send: send,
+            addr: addr, 
             data: data,
         }
     }
 }
 
-impl Future for SendMessage {
+impl<S: SendFn> Future for SendMessage<S> {
     type Item = UdpSocket;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
-        let n = try_nb!(self.socket.as_ref().unwrap()
-            .send_to(&self.data[..], &self.addr));
+        let n = try_nb!(self.send.send(self.socket.as_ref().unwrap(), &self.data[..], &self.addr));
 
         assert_eq!(n, self.data.len());
 
@@ -69,36 +102,62 @@ impl Future for SendMessage {
     }
 }
 
-struct RecvMessage {
-    socket: Option<UdpSocket>,
-    addr: SocketAddr,
-    data: &'static [u8],
+trait RecvFn {
+    fn recv(&self, &UdpSocket, &mut [u8], &SocketAddr) -> Result<usize, io::Error>;
 }
 
-impl RecvMessage {
-    fn new(socket: UdpSocket, expected_addr: SocketAddr,
-           expected_data: &'static [u8]) -> RecvMessage
-    {
+#[derive(Debug, Clone)]
+struct RecvFrom {}
+
+impl RecvFn for RecvFrom {
+    fn recv(&self, socket: &UdpSocket, buf: &mut [u8],
+            expected_addr: &SocketAddr) -> Result<usize, io::Error> {
+        socket.recv_from(buf).map(|(s, addr)| {
+            assert_eq!(addr, *expected_addr);
+            s
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Recv {}
+
+impl RecvFn for Recv {
+    fn recv(&self, socket: &UdpSocket, buf: &mut [u8], _: &SocketAddr) -> Result<usize, io::Error> {
+        socket.recv(buf)
+    }
+}
+
+struct RecvMessage<R> {
+    socket: Option<UdpSocket>,
+    recv: R,
+    expected_addr: SocketAddr,
+    expected_data: &'static [u8],
+}
+
+impl<R: RecvFn> RecvMessage<R> {
+    fn new(socket: UdpSocket, recv: R, expected_addr: SocketAddr,
+           expected_data: &'static [u8]) -> RecvMessage<R> {
         RecvMessage {
             socket: Some(socket),
-            addr: expected_addr,
-            data: expected_data,
+            recv: recv,
+            expected_addr: expected_addr,
+            expected_data: expected_data,
         }
     }
 }
 
-impl Future for RecvMessage {
+impl<R: RecvFn> Future for RecvMessage<R> {
     type Item = UdpSocket;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
-        let mut buf = vec![0u8; 10 + self.data.len() * 10];
-        let (n, addr) = try_nb!(self.socket.as_ref().unwrap()
-            .recv_from(&mut buf[..]));
+        let mut buf = vec![0u8; 10 + self.expected_data.len() * 10];
+        let n = try_nb!(self.recv.recv(&self.socket.as_ref().unwrap(), &mut buf[..],
+                                       &self.expected_addr));
 
-        assert_eq!(n, self.data.len());
-        assert_eq!(&buf[..self.data.len()], &self.data[..]);
-        assert_eq!(addr, self.addr);
+        assert_eq!(n, self.expected_data.len());
+        assert_eq!(&buf[..self.expected_data.len()], &self.expected_data[..]);
 
         Ok(self.socket.take().unwrap().into())
     }
@@ -185,3 +244,4 @@ fn send_framed() {
         assert_eq!(received.0, Some(()));
     }
 }
+

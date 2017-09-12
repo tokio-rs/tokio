@@ -74,6 +74,46 @@ impl UdpSocket {
         self.io.get_ref().local_addr()
     }
 
+    /// Connects the UDP socket setting the default destination for send() and
+    /// limiting packets that are read via recv from the address specified in addr.
+    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+        self.io.get_ref().connect(addr)
+    }
+
+    /// Sends data on the socket to the address previously bound via connect(). 
+    /// On success, returns the number of bytes written.
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+        if let Async::NotReady = self.io.poll_write() {
+            return Err(io::ErrorKind::WouldBlock.into())
+        }
+        match self.io.get_ref().send(buf) {
+            Ok(n) => Ok(n),
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_write();
+                }
+                Err(e)
+            }
+        }
+    }
+
+    /// Receives data from the socket previously bound with connect(). 
+    /// On success, returns the number of bytes read.
+    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::ErrorKind::WouldBlock.into())
+        }
+        match self.io.get_ref().recv(buf) {
+            Ok(n) => Ok(n),
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read();
+                }
+                Err(e)
+            }
+        }
+    }
+
     /// Test whether this socket is ready to be read or not.
     ///
     /// If the socket is *not* readable then the current task is scheduled to
