@@ -580,9 +580,22 @@ impl Remote {
         self.with_loop(|lp| {
             match lp {
                 Some(lp) => {
-                    // Need to execute all existing requests first, to ensure
-                    // that our message is processed "in order"
-                    lp.consume_queue();
+                    // We want to make sure that all messages are received in
+                    // order, so we need to consume pending messages before
+                    // delivering this message to the core. The actually
+                    // `consume_queue` function, however, can be somewhat slow
+                    // right now where receiving on a channel will acquire a
+                    // lock and block the current task.
+                    //
+                    // To speed this up check the message queue's readiness as a
+                    // sort of preflight check to see if we've actually got any
+                    // messages. This should just involve some atomics and if it
+                    // comes back false then we know for sure there are no
+                    // pending messages, so we can immediately deliver our
+                    // message.
+                    if lp.rx_readiness.0.readiness().is_readable() {
+                        lp.consume_queue();
+                    }
                     lp.notify(msg);
                 }
                 None => {
