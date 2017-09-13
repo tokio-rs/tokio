@@ -64,6 +64,27 @@ impl Timeout {
         self.when = at;
         self.token.reset_timeout(self.when, &self.handle);
     }
+
+    /// Polls this `Timeout` instance to see if it's elapsed, assuming the
+    /// current time is specified by `now`.
+    ///
+    /// The `Future::poll` implementation for `Timeout` will call `Instant::now`
+    /// each time it's invoked, but in some contexts this can be a costly
+    /// operation. This method is provided to amortize the cost by avoiding
+    /// usage of `Instant::now`, assuming that it's been called elsewhere.
+    ///
+    /// This function takes the assumed current time as the first parameter and
+    /// otherwise functions as this future's `poll` function. This will block a
+    /// task if one isn't already blocked or update a previous one if already
+    /// blocked.
+    pub fn poll_at(&mut self, now: Instant) -> Poll<(), io::Error> {
+        if self.when <= now {
+            Ok(Async::Ready(()))
+        } else {
+            self.token.update_timeout(&self.handle);
+            Ok(Async::NotReady)
+        }
+    }
 }
 
 impl Future for Timeout {
@@ -72,13 +93,7 @@ impl Future for Timeout {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
         // TODO: is this fast enough?
-        let now = Instant::now();
-        if self.when <= now {
-            Ok(Async::Ready(()))
-        } else {
-            self.token.update_timeout(&self.handle);
-            Ok(Async::NotReady)
-        }
+        self.poll_at(Instant::now())
     }
 }
 
