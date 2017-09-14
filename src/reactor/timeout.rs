@@ -51,7 +51,7 @@ impl Timeout {
     /// specified by `at`.
     ///
     /// This method is usable even of this instance of `Timeout` has "already
-    /// fired". That is, if this future has resovled, calling this method means
+    /// fired". That is, if this future has resolved, calling this method means
     /// that the future will still re-resolve at the specified instant.
     ///
     /// If `at` is in the past then this future will immediately be resolved
@@ -59,7 +59,7 @@ impl Timeout {
     ///
     /// Note that if any task is currently blocked on this future then that task
     /// will be dropped. It is required to call `poll` again after this method
-    /// has been called to ensure tha ta task is blocked on this future.
+    /// has been called to ensure that a task is blocked on this future.
     pub fn reset(&mut self, at: Instant) {
         self.when = at;
         self.token.reset_timeout(self.when, &self.handle);
