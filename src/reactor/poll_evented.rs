@@ -45,7 +45,7 @@ use reactor::io_token::IoToken;
 ///
 /// ## Readiness to read/write
 ///
-/// A `PollEvented` allows listenting and waiting for an arbitrary `mio::Ready`
+/// A `PollEvented` allows listening and waiting for an arbitrary `mio::Ready`
 /// instance, including the platform-specific contents of `mio::Ready`. At most
 /// two future tasks, however, can be waiting on a `PollEvented`. The
 /// `need_read` and `need_write` methods can block two separate tasks, one on
@@ -99,7 +99,7 @@ impl<E: Evented> PollEvented<E> {
     /// object with the event loop that the `handle` provided points to.
     /// Typically this method is not required as this automatically happens when
     /// `E` is dropped, but for some use cases the `E` object doesn't represent
-    /// an owned reference, so dropping it won't automatically unreigster with
+    /// an owned reference, so dropping it won't automatically unregister with
     /// the event loop.
     ///
     /// This consumes `self` as it will no longer provide events after the

@@ -137,7 +137,7 @@ impl UdpSocket {
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
-    /// Address type can be any implementor of `ToSocketAddrs` trait. See its
+    /// Address type can be any implementer of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
