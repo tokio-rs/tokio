@@ -55,15 +55,20 @@ impl Interval {
             handle: handle.remote().clone(),
         })
     }
-}
 
-impl Stream for Interval {
-    type Item = ();
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<()>, io::Error> {
-        // TODO: is this fast enough?
-        let now = Instant::now();
+    /// Polls this `Interval` instance to see if it's elapsed, assuming the
+    /// current time is specified by `now`.
+    ///
+    /// The `Future::poll` implementation for `Interval` will call `Instant::now`
+    /// each time it's invoked, but in some contexts this can be a costly
+    /// operation. This method is provided to amortize the cost by avoiding
+    /// usage of `Instant::now`, assuming that it's been called elsewhere.
+    ///
+    /// This function takes the assumed current time as the first parameter and
+    /// otherwise functions as this future's `poll` function. This will block a
+    /// task if one isn't already blocked or update a previous one if already
+    /// blocked.
+    pub fn poll_at(&mut self, now: Instant) -> Poll<Option<()>, io::Error> {
         if self.next <= now {
             self.next = next_interval(self.next, now, self.interval);
             self.token.reset_timeout(self.next, &self.handle);
@@ -72,6 +77,16 @@ impl Stream for Interval {
             self.token.update_timeout(&self.handle);
             Ok(Async::NotReady)
         }
+    }
+}
+
+impl Stream for Interval {
+    type Item = ();
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Option<()>, io::Error> {
+        // TODO: is this fast enough?
+        self.poll_at(Instant::now())
     }
 }
 
