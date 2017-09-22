@@ -27,8 +27,8 @@ pub struct Timeout {
 impl Timeout {
     /// Creates a new timeout which will fire at `dur` time into the future.
     ///
-    /// This function will return a future that will resolve to the actual
-    /// timeout object. The timeout object itself is then a future which will be
+    /// This function will return a Result with the actual timeout object or an
+    /// error. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
     pub fn new(dur: Duration, handle: &Handle) -> io::Result<Timeout> {
         Timeout::new_at(Instant::now() + dur, handle)
@@ -36,8 +36,8 @@ impl Timeout {
 
     /// Creates a new timeout which will fire at the time specified by `at`.
     ///
-    /// This function will return a future that will resolve to the actual
-    /// timeout object. The timeout object itself is then a future which will be
+    /// This function will return a Result with the actual timeout object or an
+    /// error. The timeout object itself is then a future which will be
     /// set to fire at the specified point in the future.
     pub fn new_at(at: Instant, handle: &Handle) -> io::Result<Timeout> {
         Ok(Timeout {
