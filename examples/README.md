@@ -44,6 +44,8 @@ A high level description of each example is:
 * `compress` - an echo-like server where instead of echoing back everything read
   it echos back a gzip-compressed version of everything read! All compression
   occurs on a CPU pool to offload work from the event loop.
+* `tinydb` - an in-memory database which shows sharing state between all
+  connected clients, notably the key/value store of this database.
 
 If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
