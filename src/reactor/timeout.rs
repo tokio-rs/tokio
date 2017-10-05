@@ -77,7 +77,7 @@ impl Timeout {
     /// otherwise functions as this future's `poll` function. This will block a
     /// task if one isn't already blocked or update a previous one if already
     /// blocked.
-    pub fn poll_at(&mut self, now: Instant) -> Poll<(), io::Error> {
+    fn poll_at(&mut self, now: Instant) -> Poll<(), io::Error> {
         if self.when <= now {
             Ok(Async::Ready(()))
         } else {

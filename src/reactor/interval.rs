@@ -68,7 +68,7 @@ impl Interval {
     /// otherwise functions as this future's `poll` function. This will block a
     /// task if one isn't already blocked or update a previous one if already
     /// blocked.
-    pub fn poll_at(&mut self, now: Instant) -> Poll<Option<()>, io::Error> {
+    fn poll_at(&mut self, now: Instant) -> Poll<Option<()>, io::Error> {
         if self.next <= now {
             self.next = next_interval(self.next, now, self.interval);
             self.token.reset_timeout(self.next, &self.handle);
