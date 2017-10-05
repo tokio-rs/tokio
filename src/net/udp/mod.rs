@@ -76,11 +76,11 @@ impl UdpSocket {
 
     /// Connects the UDP socket setting the default destination for send() and
     /// limiting packets that are read via recv from the address specified in addr.
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        self.io.get_ref().connect(addr)
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
+        self.io.get_ref().connect(*addr)
     }
 
-    /// Sends data on the socket to the address previously bound via connect(). 
+    /// Sends data on the socket to the address previously bound via connect().
     /// On success, returns the number of bytes written.
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
@@ -97,7 +97,7 @@ impl UdpSocket {
         }
     }
 
-    /// Receives data from the socket previously bound with connect(). 
+    /// Receives data from the socket previously bound with connect().
     /// On success, returns the number of bytes read.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_read() {
