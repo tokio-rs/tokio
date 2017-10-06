@@ -40,12 +40,12 @@ fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
 
 #[test]
 fn send_to_and_recv_from() {
-   send_messages(SendTo {}, RecvFrom {}); 
+   send_messages(SendTo {}, RecvFrom {});
 }
 
 #[test]
 fn send_and_recv() {
-    send_messages(Send {}, Recv {}); 
+    send_messages(Send {}, Recv {});
 }
 
 trait SendFn {
@@ -66,7 +66,7 @@ struct Send {}
 
 impl SendFn for Send {
     fn send(&self, socket: &UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
-        socket.connect(*addr).expect("could not connect");
+        socket.connect(addr).expect("could not connect");
         socket.send(buf)
     }
 }
@@ -83,7 +83,7 @@ impl<S: SendFn> SendMessage<S> {
         SendMessage {
             socket: Some(socket),
             send: send,
-            addr: addr, 
+            addr: addr,
             data: data,
         }
     }
