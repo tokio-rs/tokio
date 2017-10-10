@@ -18,6 +18,7 @@ use reactor::timeout_token::TimeoutToken;
 /// Note that timeouts are not intended for high resolution timers, but rather
 /// they will likely fire some granularity after the exact instant that they're
 /// otherwise indicated to fire at.
+#[derive(Debug)]
 pub struct Timeout {
     token: TimeoutToken,
     when: Instant,

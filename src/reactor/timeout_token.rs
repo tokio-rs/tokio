@@ -6,6 +6,7 @@ use futures::task;
 use reactor::{Message, Handle, Remote};
 
 /// A token that identifies an active timeout.
+#[derive(Debug)]
 pub struct TimeoutToken {
     token: usize,
 }
