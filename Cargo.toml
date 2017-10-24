@@ -1,0 +1,40 @@
+[package]
+name = "tokio-core"
+version = "0.1.10"
+authors = ["Alex Crichton <alex@alexcrichton.com>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/tokio-rs/tokio-core"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-core/0.1"
+description = """
+Core I/O and event loop primitives for asynchronous I/O in Rust. Foundation for
+the rest of the tokio crates.
+"""
+categories = ["asynchronous"]
+
+[badges]
+travis-ci = { repository = "tokio-rs/tokio-core" }
+appveyor = { repository = "alexcrichton/tokio-core" }
+
+[dependencies]
+bytes = "0.4"
+log = "0.3"
+mio = "0.6.10"
+scoped-tls = "0.1.0"
+slab = "0.4"
+iovec = "0.1"
+tokio-io = "0.1"
+futures = "0.1.15"
+
+[dev-dependencies]
+env_logger = { version = "0.4", default-features = false }
+flate2 = { version = "0.2", features = ["tokio"] }
+futures-cpupool = "0.1"
+http = "0.1"
+httparse = "1.0"
+libc = "0.2"
+num_cpus = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+time = "0.1"

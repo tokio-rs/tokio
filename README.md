@@ -1,18 +1,39 @@
-# Tokio
+# tokio-core
 
-Tokio is a one-stop-shop for all your async I/O needs in Rust. At the heart of
-Tokio is the [`futures`] crate to model asynchronous computations, and you'll
-find all layers from futures to event loops to protocols to services in the
-various Tokio crates.
+Core I/O and event loop abstraction for asynchronous I/O in Rust built on
+`futures` and `mio`.
 
-Currently you can find the most detail online at:
+[![Build Status](https://travis-ci.org/tokio-rs/tokio-core.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-core)
+[![Build status](https://ci.appveyor.com/api/projects/status/caxmxbg8181kk9mq/branch/master?svg=true)](https://ci.appveyor.com/project/carllerche/tokio-core)
 
-[https://tokio.rs](https://tokio.rs)
+[Documentation](https://docs.rs/tokio-core)
 
-## License
+[Tutorial](https://tokio.rs/)
 
-Tokio is primarily distributed under the terms of both the MIT license
-and the Apache License (Version 2.0), with portions covered by various
-BSD-like licenses.
+## Usage
+
+First, add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+tokio-core = "0.1"
+```
+
+Next, add this to your crate:
+
+```rust
+extern crate tokio_core;
+```
+
+You can find extensive documentation and examples about how to use this crate
+online at [https://tokio.rs](https://tokio.rs) as well as the `examples` folder
+in this repository. The [API documentation](https://docs.rs/tokio-core) is also
+a great place to get started for the nitty-gritty.
+
+# License
+
+`tokio-core` is primarily distributed under the terms of both the MIT license
+and the Apache License (Version 2.0), with portions covered by various BSD-like
+licenses.
 
 See LICENSE-APACHE, and LICENSE-MIT for details.
