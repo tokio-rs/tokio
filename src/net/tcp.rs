@@ -481,20 +481,6 @@ impl TcpStream {
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.io.get_ref().linger()
     }
-
-    #[deprecated(since = "0.1.8", note = "use set_keepalive")]
-    #[doc(hidden)]
-    pub fn set_keepalive_ms(&self, keepalive: Option<u32>) -> io::Result<()> {
-        #[allow(deprecated)]
-        self.io.get_ref().set_keepalive_ms(keepalive)
-    }
-
-    #[deprecated(since = "0.1.8", note = "use keepalive")]
-    #[doc(hidden)]
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        #[allow(deprecated)]
-        self.io.get_ref().keepalive_ms()
-    }
 }
 
 impl Read for TcpStream {
@@ -529,46 +515,6 @@ impl AsyncWrite for TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         <&TcpStream>::write_buf(&mut &*self, buf)
-    }
-}
-
-#[allow(deprecated)]
-impl ::io::Io for TcpStream {
-    fn poll_read(&mut self) -> Async<()> {
-        <TcpStream>::poll_read(self)
-    }
-
-    fn poll_write(&mut self) -> Async<()> {
-        <TcpStream>::poll_write(self)
-    }
-
-    fn read_vec(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
-        if let Async::NotReady = <TcpStream>::poll_read(self) {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
-        let r = self.io.get_ref().read_bufs(bufs);
-        if is_wouldblock(&r) {
-            self.io.need_read();
-        }
-        return r
-    }
-
-    fn write_vec(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
-        if let Async::NotReady = <TcpStream>::poll_write(self) {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
-        let r = self.io.get_ref().write_bufs(bufs);
-        if is_wouldblock(&r) {
-            self.io.need_write();
-        }
-        return r
-    }
-}
-
-fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
-    match *r {
-        Ok(_) => false,
-        Err(ref e) => e.kind() == io::ErrorKind::WouldBlock,
     }
 }
 
@@ -676,17 +622,6 @@ impl<'a> AsyncWrite for &'a TcpStream {
             }
             Err(e) => Err(e),
         }
-    }
-}
-
-#[allow(deprecated)]
-impl<'a> ::io::Io for &'a TcpStream {
-    fn poll_read(&mut self) -> Async<()> {
-        <TcpStream>::poll_read(self)
-    }
-
-    fn poll_write(&mut self) -> Async<()> {
-        <TcpStream>::poll_write(self)
     }
 }
 

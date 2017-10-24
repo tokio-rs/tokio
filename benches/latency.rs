@@ -1,10 +1,11 @@
-#![allow(deprecated)]
 #![feature(test)]
 
 extern crate test;
 extern crate futures;
 #[macro_use]
 extern crate tokio;
+#[macro_use]
+extern crate tokio_io;
 
 use std::io;
 use std::net::SocketAddr;

@@ -100,6 +100,7 @@ extern crate futures;
 extern crate iovec;
 extern crate mio;
 extern crate slab;
+#[macro_use]
 extern crate tokio_io;
 
 #[macro_use]
@@ -108,12 +109,6 @@ extern crate scoped_tls;
 #[macro_use]
 extern crate log;
 
-#[macro_use]
-#[doc(hidden)]
-pub mod io;
-
 mod heap;
-#[doc(hidden)]
-pub mod channel;
 pub mod net;
 pub mod reactor;
