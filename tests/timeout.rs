@@ -1,10 +1,10 @@
 extern crate env_logger;
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 
 use std::time::{Instant, Duration};
 
-use tokio_core::reactor::{Core, Timeout};
+use tokio::reactor::{Core, Timeout};
 
 macro_rules! t {
     ($e:expr) => (match $e {

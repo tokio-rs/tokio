@@ -15,7 +15,7 @@
 //! stdin/stdout to a server" to get up and running.
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 extern crate bytes;
 
@@ -26,7 +26,7 @@ use std::thread;
 
 use futures::sync::mpsc;
 use futures::{Sink, Future, Stream};
-use tokio_core::reactor::Core;
+use tokio::reactor::Core;
 
 fn main() {
     // Determine if we're going to run in TCP or UDP mode
@@ -83,8 +83,8 @@ mod tcp {
 
     use bytes::{BufMut, BytesMut};
     use futures::{Future, Stream};
-    use tokio_core::net::TcpStream;
-    use tokio_core::reactor::Handle;
+    use tokio::net::TcpStream;
+    use tokio::reactor::Handle;
     use tokio_io::AsyncRead;
     use tokio_io::codec::{Encoder, Decoder};
 
@@ -167,8 +167,8 @@ mod udp {
 
     use bytes::BytesMut;
     use futures::{Future, Stream};
-    use tokio_core::net::{UdpCodec, UdpSocket};
-    use tokio_core::reactor::Handle;
+    use tokio::net::{UdpCodec, UdpSocket};
+    use tokio::reactor::Handle;
 
     pub fn connect(&addr: &SocketAddr,
                    handle: &Handle,

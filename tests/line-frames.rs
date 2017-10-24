@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 extern crate bytes;
 
@@ -9,8 +9,8 @@ use std::net::Shutdown;
 
 use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::reactor::Core;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::io::{write_all, read};
 use tokio_io::AsyncRead;

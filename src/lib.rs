@@ -43,14 +43,14 @@
 //!
 //! ```no_run
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_io;
 //!
 //! use futures::{Future, Stream};
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
-//! use tokio_core::net::TcpListener;
-//! use tokio_core::reactor::Core;
+//! use tokio::net::TcpListener;
+//! use tokio::reactor::Core;
 //!
 //! fn main() {
 //!     // Create the event loop that will drive this server

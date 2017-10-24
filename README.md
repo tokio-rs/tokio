@@ -22,7 +22,7 @@ tokio-core = "0.1"
 Next, add this to your crate:
 
 ```rust
-extern crate tokio_core;
+extern crate tokio;
 ```
 
 You can find extensive documentation and examples about how to use this crate
