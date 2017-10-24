@@ -21,7 +21,7 @@
 extern crate futures;
 extern crate futures_cpupool;
 extern crate flate2;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::io;
@@ -30,8 +30,8 @@ use std::net::SocketAddr;
 
 use futures::{Future, Stream, Poll};
 use futures_cpupool::CpuPool;
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::reactor::Core;
 use tokio_io::{AsyncRead, AsyncWrite};
 use flate2::write::GzEncoder;
 

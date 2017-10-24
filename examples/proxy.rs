@@ -17,7 +17,7 @@
 //! the echo server, and you'll be able to see data flowing between them.
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::sync::Arc;
@@ -27,8 +27,8 @@ use std::io::{self, Read, Write};
 
 use futures::stream::Stream;
 use futures::{Future, Poll};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::reactor::Core;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::io::{copy, shutdown};
 

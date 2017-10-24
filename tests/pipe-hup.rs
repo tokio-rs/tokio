@@ -4,7 +4,7 @@ extern crate env_logger;
 extern crate futures;
 extern crate libc;
 extern crate mio;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::fs::File;
@@ -16,7 +16,7 @@ use std::time::Duration;
 use mio::unix::{UnixReady, EventedFd};
 use mio::{PollOpt, Ready, Token};
 use mio::event::Evented;
-use tokio_core::reactor::{Core, PollEvented};
+use tokio::reactor::{Core, PollEvented};
 use tokio_io::io::read_to_end;
 
 macro_rules! t {

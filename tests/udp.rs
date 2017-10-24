@@ -1,13 +1,13 @@
 extern crate futures;
 #[macro_use]
-extern crate tokio_core;
+extern crate tokio;
 
 use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
-use tokio_core::net::{UdpSocket, UdpCodec};
-use tokio_core::reactor::Core;
+use tokio::net::{UdpSocket, UdpCodec};
+use tokio::reactor::Core;
 
 macro_rules! t {
     ($e:expr) => (match $e {

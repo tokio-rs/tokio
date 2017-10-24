@@ -18,7 +18,7 @@
 //! messages.
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::collections::HashMap;
@@ -30,8 +30,8 @@ use std::io::{Error, ErrorKind, BufReader};
 
 use futures::Future;
 use futures::stream::{self, Stream};
-use tokio_core::net::TcpListener;
-use tokio_core::reactor::Core;
+use tokio::net::TcpListener;
+use tokio::reactor::Core;
 use tokio_io::io;
 use tokio_io::AsyncRead;
 

@@ -12,14 +12,14 @@
 
 extern crate futures;
 #[macro_use]
-extern crate tokio_core;
+extern crate tokio;
 
 use std::{env, io};
 use std::net::SocketAddr;
 
 use futures::{Future, Poll};
-use tokio_core::net::UdpSocket;
-use tokio_core::reactor::Core;
+use tokio::net::UdpSocket;
+use tokio::reactor::Core;
 
 struct Server {
     socket: UdpSocket,

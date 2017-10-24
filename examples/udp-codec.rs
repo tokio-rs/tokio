@@ -6,7 +6,7 @@
 //! new message with a new destination. Overall, we then use this to construct a
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
-extern crate tokio_core;
+extern crate tokio;
 extern crate env_logger;
 extern crate futures;
 
@@ -14,8 +14,8 @@ use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Stream, Sink};
-use tokio_core::net::{UdpSocket, UdpCodec};
-use tokio_core::reactor::Core;
+use tokio::net::{UdpSocket, UdpCodec};
+use tokio::reactor::Core;
 
 pub struct LineCodec;
 
