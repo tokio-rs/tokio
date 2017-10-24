@@ -1,10 +1,11 @@
-#![allow(deprecated)]
 #![feature(test)]
 
 extern crate test;
 extern crate futures;
 #[macro_use]
-extern crate tokio_core;
+extern crate tokio;
+#[macro_use]
+extern crate tokio_io;
 
 use std::io;
 use std::net::SocketAddr;
@@ -14,8 +15,8 @@ use futures::sync::oneshot;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Sink, Stream};
 use test::Bencher;
-use tokio_core::net::UdpSocket;
-use tokio_core::reactor::Core;
+use tokio::net::UdpSocket;
+use tokio::reactor::Core;
 
 /// UDP echo server
 struct EchoServer {
@@ -61,7 +62,7 @@ fn udp_echo_latency(b: &mut Bencher) {
         let mut l = Core::new().unwrap();
         let handle = l.handle();
 
-        let socket = tokio_core::net::UdpSocket::bind(&any_addr, &handle).unwrap();
+        let socket = tokio::net::UdpSocket::bind(&any_addr, &handle).unwrap();
         tx.complete(socket.local_addr().unwrap());
 
         let server = EchoServer::new(socket);

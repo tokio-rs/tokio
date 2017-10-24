@@ -40,7 +40,7 @@
 //!   returning the previous value, if any.
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::cell::RefCell;
@@ -51,8 +51,8 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::prelude::*;
-use tokio_core::net::TcpListener;
-use tokio_core::reactor::Core;
+use tokio::net::TcpListener;
+use tokio::reactor::Core;
 use tokio_io::AsyncRead;
 use tokio_io::io::{lines, write_all};
 

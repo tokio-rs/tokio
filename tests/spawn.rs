@@ -1,4 +1,4 @@
-extern crate tokio_core;
+extern crate tokio;
 extern crate env_logger;
 extern crate futures;
 
@@ -10,7 +10,7 @@ use std::time::Duration;
 use futures::{Future, Poll};
 use futures::future;
 use futures::sync::oneshot;
-use tokio_core::reactor::{Core, Timeout};
+use tokio::reactor::{Core, Timeout};
 
 #[test]
 fn simple() {

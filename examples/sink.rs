@@ -17,7 +17,7 @@
 
 extern crate env_logger;
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::env;
@@ -27,8 +27,8 @@ use std::net::SocketAddr;
 use futures::Future;
 use futures::stream::{self, Stream};
 use tokio_io::IoFuture;
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::reactor::Core;
 
 fn main() {
     env_logger::init().unwrap();

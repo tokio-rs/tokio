@@ -15,7 +15,7 @@
 
 extern crate futures;
 extern crate num_cpus;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::env;
@@ -27,8 +27,8 @@ use futures::stream::Stream;
 use futures::sync::mpsc;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
-use tokio_core::net::TcpStream;
-use tokio_core::reactor::Core;
+use tokio::net::TcpStream;
+use tokio::reactor::Core;
 
 fn main() {
     // First argument, the address to bind
@@ -72,7 +72,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
     let done = rx.for_each(move |socket| {
         // First up when we receive a socket we associate it with our event loop
         // using the `TcpStream::from_stream` API. After that the socket is not
-        // a `tokio_core::net::TcpStream` meaning it's in nonblocking mode and
+        // a `tokio::net::TcpStream` meaning it's in nonblocking mode and
         // ready to be used with Tokio
         let socket = TcpStream::from_stream(socket, &handle)
             .expect("failed to associate TCP stream");

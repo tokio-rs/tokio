@@ -1,7 +1,7 @@
 #![feature(test)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 
 #[macro_use]
 extern crate tokio_io;
@@ -10,8 +10,8 @@ pub extern crate test;
 
 mod prelude {
     pub use futures::*;
-    pub use tokio_core::reactor::Core;
-    pub use tokio_core::net::{TcpListener, TcpStream};
+    pub use tokio::reactor::Core;
+    pub use tokio::net::{TcpListener, TcpStream};
     pub use tokio_io::io::read_to_end;
 
     pub use test::{self, Bencher};

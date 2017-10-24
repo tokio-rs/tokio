@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 
 use std::net;
 use std::sync::mpsc::channel;
@@ -8,8 +8,8 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_core::reactor::Core;
-use tokio_core::net::{TcpListener, TcpStream};
+use tokio::reactor::Core;
+use tokio::net::{TcpListener, TcpStream};
 
 macro_rules! t {
     ($e:expr) => (match $e {

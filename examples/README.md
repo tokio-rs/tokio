@@ -1,7 +1,7 @@
 ## Examples of `tokio-core`
 
 This directory contains a number of examples showcasing various capabilities of
-the `tokio_core` crate. Most of these examples also leverage the `futures` and
+the `tokio` crate. Most of these examples also leverage the `futures` and
 `tokio_io` crates, along with a number of other miscellaneous dependencies for
 various tasks.
 
@@ -15,7 +15,7 @@ A high level description of each example is:
 
 * `hello` - a tiny server that simply writes "Hello!" to all connected clients
   and then terminates the connection, should help see how to create and
-  initialize `tokio_core`.
+  initialize `tokio`.
 * `echo` - this is your standard TCP "echo server" which simply accepts
   connections and then echos back any contents that are read from each connected
   client.

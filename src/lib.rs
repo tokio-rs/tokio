@@ -43,14 +43,14 @@
 //!
 //! ```no_run
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_io;
 //!
 //! use futures::{Future, Stream};
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
-//! use tokio_core::net::TcpListener;
-//! use tokio_core::reactor::Core;
+//! use tokio::net::TcpListener;
+//! use tokio::reactor::Core;
 //!
 //! fn main() {
 //!     // Create the event loop that will drive this server
@@ -98,6 +98,7 @@ extern crate futures;
 extern crate iovec;
 extern crate mio;
 extern crate slab;
+#[macro_use]
 extern crate tokio_io;
 
 #[macro_use]
@@ -106,12 +107,6 @@ extern crate scoped_tls;
 #[macro_use]
 extern crate log;
 
-#[macro_use]
-#[doc(hidden)]
-pub mod io;
-
 mod heap;
-#[doc(hidden)]
-pub mod channel;
 pub mod net;
 pub mod reactor;

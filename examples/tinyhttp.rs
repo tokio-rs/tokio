@@ -20,7 +20,7 @@ extern crate num_cpus;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate time;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 
 use std::env;
@@ -35,8 +35,8 @@ use futures::sync::mpsc;
 use futures::{Stream, Future, Sink};
 use http::{Request, Response, StatusCode};
 use http::header::HeaderValue;
-use tokio_core::net::TcpStream;
-use tokio_core::reactor::Core;
+use tokio::net::TcpStream;
+use tokio::reactor::Core;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::{AsyncRead};
 
