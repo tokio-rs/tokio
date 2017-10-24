@@ -317,17 +317,6 @@ impl<E: Write> AsyncWrite for PollEvented<E> {
     }
 }
 
-#[allow(deprecated)]
-impl<E: Read + Write> ::io::Io for PollEvented<E> {
-    fn poll_read(&mut self) -> Async<()> {
-        <PollEvented<E>>::poll_read(self)
-    }
-
-    fn poll_write(&mut self) -> Async<()> {
-        <PollEvented<E>>::poll_write(self)
-    }
-}
-
 impl<'a, E> Read for &'a PollEvented<E>
     where &'a E: Read,
 {
@@ -379,19 +368,6 @@ impl<'a, E> AsyncWrite for &'a PollEvented<E>
 {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
-    }
-}
-
-#[allow(deprecated)]
-impl<'a, E> ::io::Io for &'a PollEvented<E>
-    where &'a E: Read + Write,
-{
-    fn poll_read(&mut self) -> Async<()> {
-        <PollEvented<E>>::poll_read(self)
-    }
-
-    fn poll_write(&mut self) -> Async<()> {
-        <PollEvented<E>>::poll_write(self)
     }
 }
 
