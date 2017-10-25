@@ -1,14 +1,12 @@
 //! The core reactor driving all I/O
 //!
 //! This module contains the `Core` type which is the reactor for all I/O
-//! happening in `tokio-core`. This reactor (or event loop) is used to run
-//! futures, schedule tasks, issue I/O requests, etc.
+//! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
+//! resources.
 
 use std::cell::RefCell;
-use std::cmp;
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::mem;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
@@ -23,17 +21,10 @@ use mio;
 use mio::event::Evented;
 use slab::Slab;
 
-use heap::{Heap, Slot};
-
 mod io_token;
-mod timeout_token;
 
 mod poll_evented;
-mod timeout;
-mod interval;
 pub use self::poll_evented::PollEvented;
-pub use self::timeout::Timeout;
-pub use self::interval::Interval;
 
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 scoped_thread_local!(static CURRENT_LOOP: Core);
@@ -68,15 +59,6 @@ struct Inner {
     // Dispatch slabs for I/O and futures events
     io_dispatch: Slab<ScheduledIo>,
     task_dispatch: Slab<ScheduledTask>,
-
-    // Timer wheel keeping track of all timeouts. The `usize` stored in the
-    // timer wheel is an index into the slab below.
-    //
-    // The slab below keeps track of the timeouts themselves as well as the
-    // state of the timeout itself. The `TimeoutToken` type is an index into the
-    // `timeouts` slab.
-    timer_heap: Heap<(Instant, usize)>,
-    timeouts: Slab<(Option<Slot>, TimeoutState)>,
 }
 
 /// An unique ID for a Core
@@ -119,12 +101,6 @@ struct ScheduledTask {
     wake: Option<Arc<MySetReadiness>>,
 }
 
-enum TimeoutState {
-    NotFired,
-    Fired,
-    Waiting(Task),
-}
-
 enum Direction {
     Read,
     Write,
@@ -133,9 +109,6 @@ enum Direction {
 enum Message {
     DropSource(usize),
     Schedule(usize, Task, Direction),
-    UpdateTimeout(usize, Task),
-    ResetTimeout(usize, Instant),
-    CancelTimeout(usize),
     Run(Box<FnBox>),
 }
 
@@ -177,8 +150,6 @@ impl Core {
                 io: io,
                 io_dispatch: Slab::with_capacity(1),
                 task_dispatch: Slab::with_capacity(1),
-                timeouts: Slab::with_capacity(1),
-                timer_heap: Heap::new(),
             })),
         })
     }
@@ -255,25 +226,11 @@ impl Core {
     }
 
     fn poll(&mut self, max_wait: Option<Duration>) -> bool {
-        // Given the `max_wait` variable specified, figure out the actual
-        // timeout that we're going to pass to `poll`. This involves taking a
-        // look at active timers on our heap as well.
         let start = Instant::now();
-        let timeout = self.inner.borrow_mut().timer_heap.peek().map(|t| {
-            if t.0 < start {
-                Duration::new(0, 0)
-            } else {
-                t.0 - start
-            }
-        });
-        let timeout = match (max_wait, timeout) {
-            (Some(d1), Some(d2)) => Some(cmp::min(d1, d2)),
-            (max_wait, timeout) => max_wait.or(timeout),
-        };
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        let amt = match self.inner.borrow_mut().io.poll(&mut self.events, timeout) {
+        let amt = match self.inner.borrow_mut().io.poll(&mut self.events, max_wait) {
             Ok(a) => a,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
             Err(e) => panic!("error in poll: {}", e),
@@ -282,10 +239,6 @@ impl Core {
         let after_poll = Instant::now();
         debug!("loop poll - {:?}", after_poll - start);
         debug!("loop time - {:?}", after_poll);
-
-        // Process all timeouts that may have just occurred, updating the
-        // current time since
-        self.consume_timeouts(after_poll);
 
         // Process all the events that came in, dispatching appropriately
         let mut fired = false;
@@ -371,26 +324,6 @@ impl Core {
         drop(inner);
     }
 
-    fn consume_timeouts(&mut self, now: Instant) {
-        loop {
-            let mut inner = self.inner.borrow_mut();
-            match inner.timer_heap.peek() {
-                Some(head) if head.0 <= now => {}
-                Some(_) => break,
-                None => break,
-            };
-            let (_, slab_idx) = inner.timer_heap.pop().unwrap();
-
-            trace!("firing timeout: {}", slab_idx);
-            inner.timeouts[slab_idx].0.take().unwrap();
-            let handle = inner.timeouts[slab_idx].1.fire();
-            drop(inner);
-            if let Some(handle) = handle {
-                self.notify_handle(handle);
-            }
-        }
-    }
-
     /// Method used to notify a task handle.
     ///
     /// Note that this should be used instead of `handle.notify()` to ensure
@@ -421,18 +354,6 @@ impl Core {
                 if let Some(task) = task {
                     self.notify_handle(task);
                 }
-            }
-            Message::UpdateTimeout(t, handle) => {
-                let task = self.inner.borrow_mut().update_timeout(t, handle);
-                if let Some(task) = task {
-                    self.notify_handle(task);
-                }
-            }
-            Message::ResetTimeout(t, at) => {
-                self.inner.borrow_mut().reset_timeout(t, at);
-            }
-            Message::CancelTimeout(t) => {
-                self.inner.borrow_mut().cancel_timeout(t)
             }
             Message::Run(r) => r.call_box(self),
         }
@@ -510,45 +431,6 @@ impl Inner {
             debug!("blocking");
             *slot = Some(wake);
             None
-        }
-    }
-
-    fn add_timeout(&mut self, at: Instant) -> usize {
-        if self.timeouts.len() == self.timeouts.capacity() {
-            let len = self.timeouts.len();
-            self.timeouts.reserve_exact(len);
-        }
-        let entry = self.timeouts.vacant_entry();
-        let key = entry.key();
-        let slot = self.timer_heap.push((at, key));
-        entry.insert((Some(slot), TimeoutState::NotFired));
-        debug!("added a timeout: {}", key);
-        return key;
-    }
-
-    fn update_timeout(&mut self, token: usize, handle: Task) -> Option<Task> {
-        debug!("updating a timeout: {}", token);
-        self.timeouts[token].1.block(handle)
-    }
-
-    fn reset_timeout(&mut self, token: usize, at: Instant) {
-        let pair = &mut self.timeouts[token];
-        // TODO: avoid remove + push and instead just do one sift of the heap?
-        // In theory we could update it in place and then do the percolation
-        // as necessary
-        if let Some(slot) = pair.0.take() {
-            self.timer_heap.remove(slot);
-        }
-        let slot = self.timer_heap.push((at, token));
-        *pair = (Some(slot), TimeoutState::NotFired);
-        debug!("set a timeout: {}", token);
-    }
-
-    fn cancel_timeout(&mut self, token: usize) {
-        debug!("cancel a timeout: {}", token);
-        let pair = self.timeouts.remove(token);
-        if let (Some(slot), _state) = pair {
-            self.timer_heap.remove(slot);
         }
     }
 
@@ -766,25 +648,6 @@ impl fmt::Debug for Handle {
         f.debug_struct("Handle")
          .field("id", &self.id())
          .finish()
-    }
-}
-
-impl TimeoutState {
-    fn block(&mut self, handle: Task) -> Option<Task> {
-        match *self {
-            TimeoutState::Fired => return Some(handle),
-            _ => {}
-        }
-        *self = TimeoutState::Waiting(handle);
-        None
-    }
-
-    fn fire(&mut self) -> Option<Task> {
-        match mem::replace(self, TimeoutState::Fired) {
-            TimeoutState::NotFired => None,
-            TimeoutState::Fired => panic!("fired twice?"),
-            TimeoutState::Waiting(handle) => Some(handle),
-        }
     }
 }
 

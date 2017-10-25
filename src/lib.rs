@@ -1,9 +1,8 @@
 //! `Future`-powered I/O at the core of Tokio
 //!
 //! This crate uses the `futures` crate to provide an event loop ("reactor
-//! core") which can be used to drive I/O like TCP and UDP, spawned future
-//! tasks, and other events like channels/timeouts. All asynchronous I/O is
-//! powered by the `mio` crate.
+//! core") which can be used to drive I/O like TCP and UDP. All asynchronous I/O
+//! is powered by the `mio` crate.
 //!
 //! The concrete types provided in this crate are relatively bare bones but are
 //! intended to be the essential foundation for further projects needing an
@@ -11,7 +10,6 @@
 //!
 //! * TCP, both streams and listeners
 //! * UDP sockets
-//! * Timeouts
 //! * An event loop to run futures
 //!
 //! More functionality is likely to be added over time, but otherwise the crate
@@ -20,15 +18,6 @@
 //! uses `PollEvented` to provide support for Unix domain sockets.
 //!
 //! Some other important tasks covered by this crate are:
-//!
-//! * The ability to spawn futures into an event loop. The `Handle` and `Remote`
-//!   types have a `spawn` method which allows executing a future on an event
-//!   loop. The `Handle::spawn` method crucially does not require the future
-//!   itself to be `Send`.
-//!
-//! * The `Io` trait serves as an abstraction for future crates to build on top
-//!   of. This packages up `Read` and `Write` functionality as well as the
-//!   ability to poll for readiness on both ends.
 //!
 //! * All I/O is futures-aware. If any action in this crate returns "not ready"
 //!   or "would block", then the current future task is scheduled to receive a
@@ -92,7 +81,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-core/0.1")]
 #![deny(missing_docs)]
 #![deny(warnings)]
-#![cfg_attr(test, allow(deprecated))]
 
 extern crate bytes;
 #[macro_use]
@@ -109,6 +97,5 @@ extern crate scoped_tls;
 #[macro_use]
 extern crate log;
 
-mod heap;
 pub mod net;
 pub mod reactor;
