@@ -10,7 +10,7 @@ use std::time::Duration;
 use futures::{Future, Poll};
 use futures::future;
 use futures::sync::oneshot;
-use tokio::reactor::{Core, Timeout};
+use tokio::reactor::Core;
 
 #[test]
 fn simple() {
@@ -77,24 +77,6 @@ fn spawn_in_poll() {
     }));
 
     assert_eq!(lp.run(rx1.join(rx2)).unwrap(), (1, 2));
-}
-
-#[test]
-fn drop_timeout_in_spawn() {
-    drop(env_logger::init());
-    let mut lp = Core::new().unwrap();
-
-    let (tx, rx) = oneshot::channel();
-    let remote = lp.remote();
-    thread::spawn(move || {
-        remote.spawn(|handle| {
-            drop(Timeout::new(Duration::new(1, 0), handle));
-            tx.send(()).unwrap();
-            Ok(())
-        });
-    });
-
-    lp.run(rx).unwrap();
 }
 
 #[test]

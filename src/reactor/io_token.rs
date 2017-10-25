@@ -7,7 +7,7 @@ use mio::event::Evented;
 
 use reactor::{Message, Remote, Handle, Direction};
 
-/// A token that identifies an active timeout.
+/// A token that identifies an active I/O resource.
 pub struct IoToken {
     token: usize,
     // TODO: can we avoid this allocation? It's kind of a bummer...
