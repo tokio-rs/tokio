@@ -9,11 +9,14 @@
 extern crate tokio;
 extern crate env_logger;
 extern crate futures;
+extern crate futures_cpupool;
 
 use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Stream, Sink};
+use futures::future::Executor;
+use futures_cpupool::CpuPool;
 use tokio::net::{UdpSocket, UdpCodec};
 use tokio::reactor::Core;
 
@@ -38,6 +41,8 @@ fn main() {
 
     let mut core = Core::new().unwrap();
     let handle = core.handle();
+
+    let pool = CpuPool::new(1);
 
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
@@ -73,6 +78,6 @@ fn main() {
     let b = b_sink.send_all(b_stream);
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
-    handle.spawn(b.then(|_| Ok(())));
+    pool.execute(b.then(|_| Ok(()))).unwrap();
     drop(core.run(a));
 }

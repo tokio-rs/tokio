@@ -14,6 +14,7 @@
 //!     cargo run --example connect 127.0.0.1:8080
 
 extern crate futures;
+extern crate futures_cpupool;
 extern crate num_cpus;
 extern crate tokio;
 extern crate tokio_io;
@@ -23,8 +24,10 @@ use std::net::{self, SocketAddr};
 use std::thread;
 
 use futures::Future;
+use futures::future::Executor;
 use futures::stream::Stream;
 use futures::sync::mpsc;
+use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpStream;
@@ -69,6 +72,8 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
+    let pool = CpuPool::new(1);
+
     let done = rx.for_each(move |socket| {
         // First up when we receive a socket we associate it with our event loop
         // using the `TcpStream::from_stream` API. After that the socket is not
@@ -92,7 +97,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
 
             Ok(())
         });
-        handle.spawn(msg);
+        pool.execute(msg).unwrap();
 
         Ok(())
     });

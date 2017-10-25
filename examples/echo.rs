@@ -18,6 +18,7 @@
 //! should be able to see them all make progress simultaneously.
 
 extern crate futures;
+extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 
@@ -25,7 +26,9 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::Future;
+use futures::future::Executor;
 use futures::stream::Stream;
+use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
@@ -46,7 +49,7 @@ fn main() {
     //
     // After the event loop is created we acquire a handle to it through the
     // `handle` method. With this handle we'll then later be able to create I/O
-    // objects and spawn futures.
+    // objects.
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
@@ -57,6 +60,9 @@ fn main() {
     // to go and start accepting connections.
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);
+
+    // A CpuPool allows futures to be executed concurrently.
+    let pool = CpuPool::new(1);
 
     // Here we convert the `TcpListener` to a stream of incoming connections
     // with the `incoming` method. We then define how to process each element in
@@ -105,16 +111,16 @@ fn main() {
         // And this is where much of the magic of this server happens. We
         // crucially want all clients to make progress concurrently, rather than
         // blocking one on completion of another. To achieve this we use the
-        // `spawn` function on `Handle` to essentially execute some work in the
-        // background.
+        // `execute` function on the `Executor` trait to essentially execute
+        // some work in the background.
         //
         // This function will transfer ownership of the future (`msg` in this
         // case) to the event loop that `handle` points to. The event loop will
         // then drive the future to completion.
         //
-        // Essentially here we're spawning a new task to run concurrently, which
-        // will allow all of our clients to be processed concurrently.
-        handle.spawn(msg);
+        // Essentially here we're executing a new task to run concurrently,
+        // which will allow all of our clients to be processed concurrently.
+        pool.execute(msg).unwrap();
 
         Ok(())
     });

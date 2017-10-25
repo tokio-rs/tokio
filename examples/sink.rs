@@ -17,6 +17,7 @@
 
 extern crate env_logger;
 extern crate futures;
+extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 
@@ -25,7 +26,9 @@ use std::iter;
 use std::net::SocketAddr;
 
 use futures::Future;
+use futures::future::Executor;
 use futures::stream::{self, Stream};
+use futures_cpupool::CpuPool;
 use tokio_io::IoFuture;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::reactor::Core;
@@ -35,13 +38,15 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
+    let pool = CpuPool::new(1);
+
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);
     let server = socket.incoming().for_each(|(socket, addr)| {
         println!("got a socket: {}", addr);
-        handle.spawn(write(socket).or_else(|_| Ok(())));
+        pool.execute(write(socket).or_else(|_| Ok(()))).unwrap();
         Ok(())
     });
     core.run(server).unwrap();

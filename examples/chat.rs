@@ -18,18 +18,20 @@
 //! messages.
 
 extern crate futures;
+extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 
 use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::iter;
 use std::env;
 use std::io::{Error, ErrorKind, BufReader};
+use std::sync::{Arc, Mutex};
 
 use futures::Future;
+use futures::future::Executor;
 use futures::stream::{self, Stream};
+use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
 use tokio::reactor::Core;
 use tokio_io::io;
@@ -45,9 +47,10 @@ fn main() {
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);
 
-    // This is a single-threaded server, so we can just use Rc and RefCell to
-    // store the map of all connections we know about.
-    let connections = Rc::new(RefCell::new(HashMap::new()));
+    // This is currently a multi threaded server.
+    //
+    // Once the same thread executor lands, transition to single threaded.
+    let connections = Arc::new(Mutex::new(HashMap::new()));
 
     let srv = socket.incoming().for_each(move |(stream, addr)| {
         println!("New Connection: {}", addr);
@@ -57,7 +60,7 @@ fn main() {
         // send us messages. Then register our address with the stream to send
         // data to us.
         let (tx, rx) = futures::sync::mpsc::unbounded();
-        connections.borrow_mut().insert(addr, tx);
+        connections.lock().unwrap().insert(addr, tx);
 
         // Define here what we do for the actual I/O. That is, read a bunch of
         // lines from the socket and dispatch them while we also write any lines
@@ -88,7 +91,7 @@ fn main() {
             let connections = connections_inner.clone();
             line.map(move |(reader, message)| {
                 println!("{}: {:?}", addr, message);
-                let mut conns = connections.borrow_mut();
+                let mut conns = connections.lock().unwrap();
                 if let Ok(msg) = message {
                     // For each open connection except the sender, send the
                     // string via the channel.
@@ -114,17 +117,19 @@ fn main() {
             amt.map_err(|_| ())
         });
 
+        let pool = CpuPool::new(1);
+
         // Now that we've got futures representing each half of the socket, we
         // use the `select` combinator to wait for either half to be done to
         // tear down the other. Then we spawn off the result.
         let connections = connections.clone();
         let socket_reader = socket_reader.map_err(|_| ());
         let connection = socket_reader.map(|_| ()).select(socket_writer.map(|_| ()));
-        handle.spawn(connection.then(move |_| {
-            connections.borrow_mut().remove(&addr);
+        pool.execute(connection.then(move |_| {
+            connections.lock().unwrap().remove(&addr);
             println!("Connection {} closed.", addr);
             Ok(())
-        }));
+        })).unwrap();
 
         Ok(())
     });

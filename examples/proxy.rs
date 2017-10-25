@@ -17,6 +17,7 @@
 //! the echo server, and you'll be able to see data flowing between them.
 
 extern crate futures;
+extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 
@@ -27,6 +28,8 @@ use std::io::{self, Read, Write};
 
 use futures::stream::Stream;
 use futures::{Future, Poll};
+use futures::future::Executor;
+use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::reactor::Core;
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -42,6 +45,8 @@ fn main() {
     // Create the event loop that will drive this server.
     let mut l = Core::new().unwrap();
     let handle = l.handle();
+
+    let pool = CpuPool::new(1);
 
     // Create a TCP listener which will listen for incoming connections.
     let socket = TcpListener::bind(&listen_addr, &l.handle()).unwrap();
@@ -88,7 +93,7 @@ fn main() {
             // Don't panic. Maybe the client just disconnected too soon.
             println!("error: {}", e);
         });
-        handle.spawn(msg);
+        pool.execute(msg).unwrap();
 
         Ok(())
     });

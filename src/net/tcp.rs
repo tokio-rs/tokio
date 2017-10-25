@@ -93,13 +93,12 @@ impl TcpListener {
                     // eventually.
                     let (tx, rx) = oneshot::channel();
                     let remote = self.io.remote().clone();
-                    remote.spawn(move |handle| {
+                    remote.run(move |handle| {
                         let res = PollEvented::new(sock, handle)
                             .map(move |io| {
                                 (TcpStream { io: io }, addr)
                             });
                         drop(tx.send(res));
-                        Ok(())
                     });
                     self.pending_accept = Some(rx);
                     // continue to polling the `rx` at the beginning of the loop

@@ -29,6 +29,7 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::{Future, Stream, Poll};
+use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::reactor::Core;
@@ -53,13 +54,13 @@ fn main() {
     // The compress logic will happen in the function below, but everything's
     // still a future! Each client is spawned to concurrently get processed.
     let server = socket.incoming().for_each(move |(socket, addr)| {
-        handle.spawn(compress(socket, &pool).then(move |result| {
+        pool.execute(compress(socket, &pool).then(move |result| {
             match result {
                 Ok((r, w)) => println!("{}: compressed {} bytes to {}", addr, r, w),
                 Err(e) => println!("{}: failed when compressing: {}", addr, e),
             }
             Ok(())
-        }));
+        })).unwrap();
         Ok(())
     });
 
@@ -70,7 +71,7 @@ fn main() {
 /// `socket` on the `pool` provided, writing it back out to `socket` as it's
 /// available.
 fn compress(socket: TcpStream, pool: &CpuPool)
-    -> Box<Future<Item = (u64, u64), Error = io::Error>>
+    -> Box<Future<Item = (u64, u64), Error = io::Error> + Send>
 {
     use tokio_io::io;
 

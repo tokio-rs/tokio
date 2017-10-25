@@ -32,10 +32,13 @@
 //!
 //! ```no_run
 //! extern crate futures;
+//! extern crate futures_cpupool;
 //! extern crate tokio;
 //! extern crate tokio_io;
 //!
 //! use futures::{Future, Stream};
+//! use futures::future::Executor;
+//! use futures_cpupool::CpuPool;
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
 //! use tokio::net::TcpListener;
@@ -45,6 +48,8 @@
 //!     // Create the event loop that will drive this server
 //!     let mut core = Core::new().unwrap();
 //!     let handle = core.handle();
+//!
+//!     let pool = CpuPool::new_num_cpus();
 //!
 //!     // Bind the server's socket
 //!     let addr = "127.0.0.1:12345".parse().unwrap();
@@ -68,7 +73,7 @@
 //!         });
 //!
 //!         // Spawn the future as a concurrent task
-//!         handle.spawn(handle_conn);
+//!         pool.execute(handle_conn).unwrap();
 //!
 //!         Ok(())
 //!     });

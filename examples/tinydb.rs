@@ -40,17 +40,19 @@
 //!   returning the previous value, if any.
 
 extern crate futures;
+extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::BufReader;
-use std::rc::Rc;
 use std::env;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 
 use futures::prelude::*;
+use futures::future::Executor;
+use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
 use tokio::reactor::Core;
 use tokio_io::AsyncRead;
@@ -58,10 +60,10 @@ use tokio_io::io::{lines, write_all};
 
 /// The in-memory database shared amongst all clients.
 ///
-/// This database will be shared via `Rc`, so to mutate the internal map we're
+/// This database will be shared via `Arc`, so to mutate the internal map we're
 /// also going to use a `RefCell` for interior mutability.
 struct Database {
-    map: RefCell<HashMap<String, String>>,
+    map: Mutex<HashMap<String, String>>,
 }
 
 /// Possible requests our clients can send us
@@ -87,15 +89,18 @@ fn main() {
     let listener = TcpListener::bind(&addr, &handle).expect("failed to bind");
     println!("Listening on: {}", addr);
 
+    // Create a CpuPool to execute tasks
+    let pool = CpuPool::new(1);
+
     // Create the shared state of this server that will be shared amongst all
     // clients. We populate the initial database and then create the `Database`
-    // structure. Note the usage of `Rc` here which will be used to ensure that
+    // structure. Note the usage of `Arc` here which will be used to ensure that
     // each independently spawned client will have a reference to the in-memory
     // database.
     let mut initial_db = HashMap::new();
     initial_db.insert("foo".to_string(), "bar".to_string());
-    let db = Rc::new(Database {
-        map: RefCell::new(initial_db),
+    let db = Arc::new(Database {
+        map: Mutex::new(initial_db),
     });
 
     let done = listener.incoming().for_each(move |(socket, _addr)| {
@@ -125,7 +130,7 @@ fn main() {
                 Err(e) => return Response::Error { msg: e },
             };
 
-            let mut db = db.map.borrow_mut();
+            let mut db = db.map.lock().unwrap();
             match request {
                 Request::Get { key } => {
                     match db.get(&key) {
@@ -154,7 +159,7 @@ fn main() {
         // runs concurrently with all other clients, for now ignoring any errors
         // that we see.
         let msg = writes.then(move |_| Ok(()));
-        handle.spawn(msg);
+        pool.execute(msg).unwrap();
         Ok(())
     });
 

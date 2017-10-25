@@ -1,5 +1,6 @@
 extern crate env_logger;
 extern crate futures;
+extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 extern crate bytes;
@@ -9,6 +10,8 @@ use std::net::Shutdown;
 
 use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
+use futures::future::Executor;
+use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::reactor::Core;
 use tokio_io::codec::{Encoder, Decoder};
@@ -55,16 +58,19 @@ fn echo() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
+    let pool = CpuPool::new(1);
+
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
     let addr = listener.local_addr().unwrap();
+    let pool_inner = pool.clone();
     let srv = listener.incoming().for_each(move |(socket, _)| {
         let (sink, stream) = socket.framed(LineCodec).split();
-        handle.spawn(sink.send_all(stream).map(|_| ()).map_err(|_| ()));
+        pool_inner.execute(sink.send_all(stream).map(|_| ()).map_err(|_| ())).unwrap();
         Ok(())
     });
 
     let handle = core.handle();
-    handle.spawn(srv.map_err(|e| panic!("srv error: {}", e)));
+    pool.execute(srv.map_err(|e| panic!("srv error: {}", e))).unwrap();
 
     let client = TcpStream::connect(&addr, &handle);
     let client = core.run(client).unwrap();
