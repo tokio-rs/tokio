@@ -235,10 +235,12 @@ pub struct TcpStream {
 
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
+#[must_use = "futures do nothing unless polled"]
 pub struct TcpStreamNew {
     inner: TcpStreamNewState,
 }
 
+#[must_use = "futures do nothing unless polled"]
 enum TcpStreamNewState {
     Waiting(TcpStream),
     Error(io::Error),

@@ -8,6 +8,7 @@ use futures::{Poll, Future};
 /// This is created by the [`write_all`] top-level method.
 ///
 /// [`write_all`]: fn.write_all.html
+#[must_use = "futures do nothing unless polled"]
 pub struct WriteAll<A, T> {
     state: State<A, T>,
 }

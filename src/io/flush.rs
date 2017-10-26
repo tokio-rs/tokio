@@ -9,6 +9,7 @@ use futures::{Poll, Future, Async};
 /// Created by the [`flush`] function.
 ///
 /// [`flush`]: fn.flush.html
+#[must_use = "futures do nothing unless polled"]
 pub struct Flush<A> {
     a: Option<A>,
 }

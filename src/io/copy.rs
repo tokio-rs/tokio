@@ -8,6 +8,7 @@ use futures::{Future, Poll};
 /// bytes copied or an error if one happens.
 ///
 /// [`copy`]: fn.copy.html
+#[must_use = "futures do nothing unless polled"]
 pub struct Copy<R, W> {
     reader: R,
     read_done: bool,

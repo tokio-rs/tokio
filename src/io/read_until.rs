@@ -9,6 +9,7 @@ use futures::{Poll, Future};
 /// Created by the [`read_until`] function.
 ///
 /// [`read_until`]: fn.read_until.html
+#[must_use = "futures do nothing unless polled"]
 pub struct ReadUntil<A> {
     state: State<A>,
 }

@@ -9,6 +9,7 @@ use futures::{Poll, Future};
 /// Created by the [`read_exact`] function.
 ///
 /// [`read_exact`]: fn.read_exact.html
+#[must_use = "futures do nothing unless polled"]
 pub struct ReadExact<A, T> {
     state: State<A, T>,
 }
