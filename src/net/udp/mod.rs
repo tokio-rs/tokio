@@ -1,5 +1,4 @@
 use std::io;
-use std::mem;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt;
 
@@ -172,13 +171,7 @@ impl UdpSocket {
     pub fn send_dgram<T>(self, buf: T, addr: SocketAddr) -> SendDgram<T>
         where T: AsRef<[u8]>,
     {
-        SendDgram {
-            state: SendState::Writing {
-                sock: self,
-                addr: addr,
-                buf: buf,
-            },
-        }
+        SendDgram(Some((self, buf, addr)))
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
@@ -215,12 +208,7 @@ impl UdpSocket {
     pub fn recv_dgram<T>(self, buf: T) -> RecvDgram<T>
         where T: AsMut<[u8]>,
     {
-        RecvDgram {
-            state: RecvState::Reading {
-                sock: self,
-                buf: buf,
-            },
-        }
+        RecvDgram(Some((self, buf)))
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
@@ -395,18 +383,7 @@ impl fmt::Debug for UdpSocket {
 ///
 /// This is created by the `UdpSocket::send_dgram` method.
 #[must_use = "futures do nothing unless polled"]
-pub struct SendDgram<T> {
-    state: SendState<T>,
-}
-
-enum SendState<T> {
-    Writing {
-        sock: UdpSocket,
-        buf: T,
-        addr: SocketAddr,
-    },
-    Empty,
-}
+pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
 
 fn incomplete_write(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, reason)
@@ -419,23 +396,18 @@ impl<T> Future for SendDgram<T>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
-        match self.state {
-            SendState::Writing { ref sock, ref buf, ref addr } => {
-                let n = try_nb!(sock.send_to(buf.as_ref(), addr));
-                if n != buf.as_ref().len() {
-                    return Err(incomplete_write("failed to send entire message \
-                                                 in datagram"))
-                }
+        {
+            let (ref sock, ref buf, ref addr) =
+                *self.0.as_ref().expect("SendDgram polled after completion");
+            let n = try_nb!(sock.send_to(buf.as_ref(), addr));
+            if n != buf.as_ref().len() {
+                return Err(incomplete_write("failed to send entire message \
+                                             in datagram"))
             }
-            SendState::Empty => panic!("poll a SendDgram after it's done"),
         }
 
-        match mem::replace(&mut self.state, SendState::Empty) {
-            SendState::Writing { sock, buf, addr: _ } => {
-                Ok(Async::Ready((sock, buf)))
-            }
-            SendState::Empty => panic!(),
-        }
+        let (sock, buf, _addr) = self.0.take().unwrap();
+        Ok(Async::Ready((sock, buf)))
     }
 }
 
@@ -443,17 +415,7 @@ impl<T> Future for SendDgram<T>
 ///
 /// This is created by the `UdpSocket::recv_dgram` method.
 #[must_use = "futures do nothing unless polled"]
-pub struct RecvDgram<T> {
-    state: RecvState<T>,
-}
-
-enum RecvState<T> {
-    Reading {
-        sock: UdpSocket,
-        buf: T,
-    },
-    Empty,
-}
+pub struct RecvDgram<T>(Option<(UdpSocket, T)>);
 
 impl<T> Future for RecvDgram<T>
     where T: AsMut<[u8]>,
@@ -462,19 +424,15 @@ impl<T> Future for RecvDgram<T>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
-        let (n, addr) = match self.state {
-            RecvState::Reading { ref sock, ref mut buf } => {
-                try_nb!(sock.recv_from(buf.as_mut()))
-            }
-            RecvState::Empty => panic!("poll a RecvDgram after it's done"),
+        let (n, addr) = {
+            let (ref socket, ref mut buf) =
+                *self.0.as_mut().expect("RecvDgram polled after completion");
+
+            try_nb!(socket.recv_from(buf.as_mut()))
         };
 
-        match mem::replace(&mut self.state, RecvState::Empty) {
-            RecvState::Reading { sock, buf } => {
-                Ok(Async::Ready((sock, buf, n, addr)))
-            }
-            RecvState::Empty => panic!(),
-        }
+        let (socket, buf) = self.0.take().unwrap();
+        Ok(Async::Ready((socket, buf, n, addr)))
     }
 }
 
