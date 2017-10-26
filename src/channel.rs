@@ -37,6 +37,7 @@ pub struct Sender<T> {
 /// `Stream` trait to represent received messages.
 ///
 /// [`channel`]: fn.channel.html
+#[must_use = "streams do nothing unless polled"]
 pub struct Receiver<T> {
     rx: PollEvented<channel::Receiver<T>>,
 }

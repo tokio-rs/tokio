@@ -25,6 +25,7 @@ pub struct TcpListener {
 
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.
+#[must_use = "streams do nothing unless polled"]
 pub struct Incoming {
     inner: TcpListener,
 }
