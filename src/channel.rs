@@ -23,6 +23,7 @@ use reactor::{Handle, PollEvented};
 /// This type is created by the [`channel`] function.
 ///
 /// [`channel`]: fn.channel.html
+#[must_use = "sinks do nothing unless polled"]
 pub struct Sender<T> {
     tx: channel::Sender<T>,
 }
