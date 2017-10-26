@@ -598,22 +598,22 @@ impl<'a> AsyncRead for &'a TcpStream {
             // The `IoVec` type can't have a 0-length size, so we create a bunch
             // of dummy versions on the stack with 1 length which we'll quickly
             // overwrite.
-            let mut b1: &mut [u8] = &mut [0];
-            let mut b2: &mut [u8] = &mut [0];
-            let mut b3: &mut [u8] = &mut [0];
-            let mut b4: &mut [u8] = &mut [0];
-            let mut b5: &mut [u8] = &mut [0];
-            let mut b6: &mut [u8] = &mut [0];
-            let mut b7: &mut [u8] = &mut [0];
-            let mut b8: &mut [u8] = &mut [0];
-            let mut b9: &mut [u8] = &mut [0];
-            let mut b10: &mut [u8] = &mut [0];
-            let mut b11: &mut [u8] = &mut [0];
-            let mut b12: &mut [u8] = &mut [0];
-            let mut b13: &mut [u8] = &mut [0];
-            let mut b14: &mut [u8] = &mut [0];
-            let mut b15: &mut [u8] = &mut [0];
-            let mut b16: &mut [u8] = &mut [0];
+            let b1: &mut [u8] = &mut [0];
+            let b2: &mut [u8] = &mut [0];
+            let b3: &mut [u8] = &mut [0];
+            let b4: &mut [u8] = &mut [0];
+            let b5: &mut [u8] = &mut [0];
+            let b6: &mut [u8] = &mut [0];
+            let b7: &mut [u8] = &mut [0];
+            let b8: &mut [u8] = &mut [0];
+            let b9: &mut [u8] = &mut [0];
+            let b10: &mut [u8] = &mut [0];
+            let b11: &mut [u8] = &mut [0];
+            let b12: &mut [u8] = &mut [0];
+            let b13: &mut [u8] = &mut [0];
+            let b14: &mut [u8] = &mut [0];
+            let b15: &mut [u8] = &mut [0];
+            let b16: &mut [u8] = &mut [0];
             let mut bufs: [&mut IoVec; 16] = [
                 b1.into(), b2.into(), b3.into(), b4.into(),
                 b5.into(), b6.into(), b7.into(), b8.into(),
