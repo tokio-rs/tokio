@@ -12,7 +12,6 @@ extern crate futures;
 
 use std::io;
 use std::net::SocketAddr;
-use std::str;
 
 use futures::{Future, Stream, Sink};
 use tokio_core::net::{UdpSocket, UdpCodec};
