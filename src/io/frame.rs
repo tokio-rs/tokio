@@ -310,6 +310,7 @@ pub trait Codec {
 /// the `Codec` trait to encode and decode frames.
 ///
 /// You can acquire a `Framed` instance by using the `Io::framed` adapter.
+#[must_use = "streams do nothing unless polled"]
 pub struct Framed<T, C> {
     upstream: T,
     codec: C,

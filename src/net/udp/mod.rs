@@ -394,6 +394,7 @@ impl fmt::Debug for UdpSocket {
 /// A future used to write the entire contents of some data to a UDP socket.
 ///
 /// This is created by the `UdpSocket::send_dgram` method.
+#[must_use = "futures do nothing unless polled"]
 pub struct SendDgram<T> {
     state: SendState<T>,
 }
@@ -441,6 +442,7 @@ impl<T> Future for SendDgram<T>
 /// A future used to receive a datagram from a UDP socket.
 ///
 /// This is created by the `UdpSocket::recv_dgram` method.
+#[must_use = "futures do nothing unless polled"]
 pub struct RecvDgram<T> {
     state: RecvState<T>,
 }

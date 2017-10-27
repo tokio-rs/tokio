@@ -23,6 +23,7 @@ use reactor::{Handle, PollEvented};
 /// This type is created by the [`channel`] function.
 ///
 /// [`channel`]: fn.channel.html
+#[must_use = "sinks do nothing unless polled"]
 pub struct Sender<T> {
     tx: channel::Sender<T>,
 }
@@ -37,6 +38,7 @@ pub struct Sender<T> {
 /// `Stream` trait to represent received messages.
 ///
 /// [`channel`]: fn.channel.html
+#[must_use = "streams do nothing unless polled"]
 pub struct Receiver<T> {
     rx: PollEvented<channel::Receiver<T>>,
 }

@@ -26,6 +26,7 @@ pub fn read<R, T>(rd: R, buf: T) -> Read<R, T>
 /// a buffer.
 ///
 /// Created by the [`read`] function.
+#[must_use = "futures do nothing unless polled"]
 pub struct Read<R, T> {
     state: State<R, T>,
 }
