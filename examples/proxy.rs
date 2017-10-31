@@ -25,12 +25,11 @@ use std::env;
 use std::net::{Shutdown, SocketAddr};
 use std::io::{self, Read, Write};
 
-use futures::stream::Stream;
-use futures::{Future, Poll};
+use futures::prelude::*;
+use futures::thread;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
-use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::io::{copy, shutdown};
+use tokio_io::{AsyncRead, AsyncWrite};
 
 fn main() {
     let listen_addr = env::args().nth(1).unwrap_or("127.0.0.1:8081".to_string());
@@ -39,17 +38,13 @@ fn main() {
     let server_addr = env::args().nth(2).unwrap_or("127.0.0.1:8080".to_string());
     let server_addr = server_addr.parse::<SocketAddr>().unwrap();
 
-    // Create the event loop that will drive this server.
-    let mut l = Core::new().unwrap();
-    let handle = l.handle();
-
     // Create a TCP listener which will listen for incoming connections.
-    let socket = TcpListener::bind(&listen_addr, &l.handle()).unwrap();
+    let socket = TcpListener::bind(&listen_addr).unwrap();
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
     let done = socket.incoming().for_each(move |(client, client_addr)| {
-        let server = TcpStream::connect(&server_addr, &handle);
+        let server = TcpStream::connect(&server_addr);
         let amounts = server.and_then(move |server| {
             // Create separate read/write handles for the TCP clients that we're
             // proxying data between. Note that typically you'd use
@@ -88,11 +83,11 @@ fn main() {
             // Don't panic. Maybe the client just disconnected too soon.
             println!("error: {}", e);
         });
-        handle.spawn(msg);
+        thread::spawn_task(msg);
 
         Ok(())
     });
-    l.run(done).unwrap();
+    thread::block_on_all(done).unwrap();
 }
 
 // This is a custom type used to have a custom implementation of the

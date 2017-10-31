@@ -19,16 +19,15 @@ extern crate tokio;
 extern crate tokio_io;
 
 use std::env;
-use std::net::{self, SocketAddr};
+use std::net::SocketAddr;
 use std::thread;
 
-use futures::Future;
-use futures::stream::Stream;
+use futures::prelude::*;
 use futures::sync::mpsc;
+use futures::thread as futures_thread;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
-use tokio::net::TcpStream;
-use tokio::reactor::Core;
 
 fn main() {
     // First argument, the address to bind
@@ -41,7 +40,7 @@ fn main() {
 
     // Use `std::net` to bind the requested port, we'll use this on the main
     // thread below
-    let listener = net::TcpListener::bind(&addr).expect("failed to bind");
+    let listener = TcpListener::bind(&addr).expect("failed to bind");
     println!("Listening on: {}", addr);
 
     // Spin up our worker threads, creating a channel routing to each worker
@@ -58,24 +57,20 @@ fn main() {
     // thread which will associate the socket with the corresponding event loop
     // and process the connection.
     let mut next = 0;
-    for socket in listener.incoming() {
-        let socket = socket.expect("failed to accept");
+    let done = listener.incoming().for_each(|(socket, _addr)| {
         channels[next].unbounded_send(socket).expect("worker thread died");
         next = (next + 1) % channels.len();
-    }
+        Ok(())
+    });
+    futures_thread::block_on_all(done).unwrap();
 }
 
-fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
+fn worker(rx: mpsc::UnboundedReceiver<TcpStream>) {
     let done = rx.for_each(move |socket| {
         // First up when we receive a socket we associate it with our event loop
         // using the `TcpStream::from_stream` API. After that the socket is not
         // a `tokio::net::TcpStream` meaning it's in nonblocking mode and
         // ready to be used with Tokio
-        let socket = TcpStream::from_stream(socket, &handle)
-            .expect("failed to associate TCP stream");
         let addr = socket.peer_addr().expect("failed to get remote address");
 
         // Like the single-threaded `echo` example we split the socket halves
@@ -92,9 +87,9 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
 
             Ok(())
         });
-        handle.spawn(msg);
+        futures_thread::spawn_task(msg);
 
         Ok(())
     });
-    core.run(done).unwrap();
+    futures_thread::block_on_all(done).unwrap();
 }

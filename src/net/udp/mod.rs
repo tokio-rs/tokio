@@ -5,7 +5,7 @@ use std::fmt;
 use futures::{Async, Future, Poll};
 use mio;
 
-use reactor::{Handle, PollEvented};
+use reactor::{PollEvented, Handle};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
@@ -20,9 +20,9 @@ impl UdpSocket {
     ///
     /// This function will create a new UDP socket and attempt to bind it to the
     /// `addr` provided. If the result is `Ok`, the socket has successfully bound.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
         let udp = try!(mio::net::UdpSocket::bind(addr));
-        UdpSocket::new(udp, handle)
+        UdpSocket::new(udp, &Handle::default())
     }
 
     fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
@@ -39,8 +39,7 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
-    pub fn from_socket(socket: net::UdpSocket,
-                       handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn from_std(socket: net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
         let udp = try!(mio::net::UdpSocket::from_socket(socket));
         UdpSocket::new(udp, handle)
     }
@@ -89,7 +88,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
+                    self.io.need_write()?;
                 }
                 Err(e)
             }
@@ -106,7 +105,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
+                    self.io.need_read()?;
                 }
                 Err(e)
             }
@@ -146,7 +145,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
+                    self.io.need_write()?;
                 }
                 Err(e)
             }
@@ -184,7 +183,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
+                    self.io.need_read()?;
                 }
                 Err(e)
             }

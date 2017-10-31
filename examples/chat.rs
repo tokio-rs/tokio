@@ -29,20 +29,18 @@ use std::env;
 use std::io::{Error, ErrorKind, BufReader};
 
 use futures::Future;
+use futures::thread;
 use futures::stream::{self, Stream};
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
-use tokio_io::io;
 use tokio_io::AsyncRead;
+use tokio_io::io;
 
 fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse().unwrap();
 
     // Create the event loop and TCP listener we'll accept connections on.
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     // This is a single-threaded server, so we can just use Rc and RefCell to
@@ -120,7 +118,7 @@ fn main() {
         let connections = connections.clone();
         let socket_reader = socket_reader.map_err(|_| ());
         let connection = socket_reader.map(|_| ()).select(socket_writer.map(|_| ()));
-        handle.spawn(connection.then(move |_| {
+        thread::spawn_task(connection.then(move |_| {
             connections.borrow_mut().remove(&addr);
             println!("Connection {} closed.", addr);
             Ok(())
@@ -130,5 +128,5 @@ fn main() {
     });
 
     // execute server
-    core.run(srv).unwrap();
+    thread::block_on_all(srv).unwrap();
 }

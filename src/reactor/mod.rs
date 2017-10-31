@@ -1,74 +1,62 @@
 //! The core reactor driving all I/O
 //!
-//! This module contains the `Core` type which is the reactor for all I/O
-//! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
-//! resources.
+//! This module contains the `Reactor` type which is the reactor for all I/O
+//! happening in `tokio-core`. This reactor (or event loop) is used to run
+//! futures, schedule tasks, issue I/O requests, etc.
 
 use std::cell::RefCell;
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::rc::{Rc, Weak};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
 use std::time::{Instant, Duration};
 
-use futures::{Future, IntoFuture, Async};
-use futures::future::{self, Executor, ExecuteError};
-use futures::executor::{self, Spawn, Notify};
-use futures::sync::mpsc;
-use futures::task::Task;
-use mio;
+use futures::executor::{self, Enter};
+use futures::task::AtomicTask;
+use log::LogLevel;
 use mio::event::Evented;
-use slab::Slab;
+use mio;
 
-mod io_token;
+use atomic_slab::AtomicSlab;
 
 mod poll_evented;
 pub use self::poll_evented::PollEvented;
 
-static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-scoped_thread_local!(static CURRENT_LOOP: Core);
-
-/// An event loop.
+// An event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
 /// all other I/O events and notifications happening. Each event loop can have
 /// multiple handles pointing to it, each of which can then be used to create
 /// various I/O objects to interact with the event loop in interesting ways.
 // TODO: expand this
-pub struct Core {
+pub struct Reactor {
+    inner: Arc<Inner>,
+    handle: Handle,
     events: mio::Events,
-    tx: mpsc::UnboundedSender<Message>,
-    rx: RefCell<Spawn<mpsc::UnboundedReceiver<Message>>>,
-    _rx_registration: mio::Registration,
-    rx_readiness: Arc<MySetReadiness>,
-
-    inner: Rc<RefCell<Inner>>,
-
-    // Used for determining when the future passed to `run` is ready. Once the
-    // registration is passed to `io` above we never touch it again, just keep
-    // it alive.
-    _future_registration: mio::Registration,
-    future_readiness: Arc<MySetReadiness>,
+    _wakeup_registration: mio::Registration,
 }
 
 struct Inner {
-    id: usize,
+    // Actual event loop itself, aka an "epoll set"
     io: mio::Poll,
 
-    // Dispatch slabs for I/O and futures events
-    io_dispatch: Slab<ScheduledIo>,
-    task_dispatch: Slab<ScheduledTask>,
+    // All known I/O objects and the tasks that are blocked on them. This slab
+    // gives each scheduled I/O an index which is used to refer to it elsewhere.
+    io_dispatch: Arc<AtomicSlab<Arc<ScheduledIo>>>,
+
+    // The default readiness for all new I/O objects, this is used to turn I/O
+    // objects defunkt during the destructor of `Reactor`.
+    default_readiness: AtomicUsize,
+
+    // Used to wake up the reactor from a call to `turn`
+    wakeup: mio::SetReadiness,
 }
 
-/// An unique ID for a Core
-///
-/// An ID by which different cores may be distinguished. Can be compared and used as an index in
-/// a `HashMap`.
-///
-/// The ID is globally unique and never reused.
-#[derive(Clone,Copy,Eq,PartialEq,Hash,Debug)]
-pub struct CoreId(usize);
+fn _assert() {
+    fn _assert<T: Send + Sync>() {}
+    _assert::<Reactor>();
+    _assert::<Handle>();
+}
 
 /// Handle to an event loop, used to construct I/O objects, send messages, and
 /// otherwise interact indirectly with the event loop itself.
@@ -76,597 +64,294 @@ pub struct CoreId(usize);
 /// Handles can be cloned, and when cloned they will still refer to the
 /// same underlying event loop.
 #[derive(Clone)]
-pub struct Remote {
-    id: usize,
-    tx: mpsc::UnboundedSender<Message>,
+#[allow(deprecated)]
+pub struct Handle {
+    repr: HandleRepr,
 }
 
-/// A non-sendable handle to an event loop, useful for manufacturing instances
-/// of `LoopData`.
 #[derive(Clone)]
-pub struct Handle {
-    remote: Remote,
-    inner: Weak<RefCell<Inner>>,
+enum HandleRepr {
+    Ptr { inner: Weak<Inner> },
+    Global,
 }
 
 struct ScheduledIo {
-    readiness: Arc<AtomicUsize>,
-    reader: Option<Task>,
-    writer: Option<Task>,
+    readiness: AtomicUsize,
+    reader: AtomicTask,
+    writer: AtomicTask,
+    idx: AtomicUsize,
+    slab: Weak<AtomicSlab<Arc<ScheduledIo>>>,
 }
 
-struct ScheduledTask {
-    _registration: mio::Registration,
-    spawn: Option<Spawn<Box<Future<Item=(), Error=()>>>>,
-    wake: Option<Arc<MySetReadiness>>,
-}
+const TOKEN_WAKEUP: mio::Token = mio::Token(0);
+const TOKEN_START: usize = 1;
 
-enum Direction {
-    Read,
-    Write,
-}
-
-enum Message {
-    DropSource(usize),
-    Schedule(usize, Task, Direction),
-    Run(Box<FnBox>),
-}
-
-const TOKEN_MESSAGES: mio::Token = mio::Token(0);
-const TOKEN_FUTURE: mio::Token = mio::Token(1);
-const TOKEN_START: usize = 2;
-
-impl Core {
+impl Reactor {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub fn new() -> io::Result<Core> {
-        let io = try!(mio::Poll::new());
+    pub fn new() -> io::Result<Reactor> {
+        let io = mio::Poll::new()?;
         let future_pair = mio::Registration::new2();
-        try!(io.register(&future_pair.0,
-                         TOKEN_FUTURE,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
-        let (tx, rx) = mpsc::unbounded();
-        let channel_pair = mio::Registration::new2();
-        try!(io.register(&channel_pair.0,
-                         TOKEN_MESSAGES,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
-        let rx_readiness = Arc::new(MySetReadiness(channel_pair.1));
-        rx_readiness.notify(0);
+        io.register(&future_pair.0,
+                    TOKEN_WAKEUP,
+                    mio::Ready::readable(),
+                    mio::PollOpt::level())?;
 
-        Ok(Core {
+        let inner = Arc::new(Inner {
+            io: io,
+            io_dispatch: Arc::new(AtomicSlab::new()),
+            default_readiness: AtomicUsize::new(0),
+            wakeup: future_pair.1,
+        });
+
+        Ok(Reactor {
+            handle: Handle {
+                repr: HandleRepr::Ptr {
+                    inner: Arc::downgrade(&inner),
+                },
+            },
             events: mio::Events::with_capacity(1024),
-            tx: tx,
-            rx: RefCell::new(executor::spawn(rx)),
-            _rx_registration: channel_pair.0,
-            rx_readiness: rx_readiness,
-
-            _future_registration: future_pair.0,
-            future_readiness: Arc::new(MySetReadiness(future_pair.1)),
-
-            inner: Rc::new(RefCell::new(Inner {
-                id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
-                io: io,
-                io_dispatch: Slab::with_capacity(1),
-                task_dispatch: Slab::with_capacity(1),
-            })),
+            inner: inner,
+            _wakeup_registration: future_pair.0,
         })
     }
 
-    /// Returns a handle to this event loop which cannot be sent across threads
-    /// but can be used as a proxy to the event loop itself.
-    ///
-    /// Handles are cloneable and clones always refer to the same event loop.
-    /// This handle is typically passed into functions that create I/O objects
-    /// to bind them to this event loop.
-    pub fn handle(&self) -> Handle {
-        Handle {
-            remote: self.remote(),
-            inner: Rc::downgrade(&self.inner),
-        }
+    /// Returns the handle to this event loop which can be used to associate new
+    /// I/O objects with this event loop.
+    pub fn handle(&self) -> &Handle {
+        &self.handle
     }
 
-    /// Generates a remote handle to this event loop which can be used to spawn
-    /// tasks from other threads into this event loop.
-    pub fn remote(&self) -> Remote {
-        Remote {
-            id: self.inner.borrow().id,
-            tx: self.tx.clone(),
-        }
-    }
-
-    /// Runs a future until completion, driving the event loop while we're
-    /// otherwise waiting for the future to complete.
+    /// Performs an iteration of this reactor's processing.
     ///
-    /// This function will begin executing the event loop and will finish once
-    /// the provided future is resolved. Note that the future argument here
-    /// crucially does not require the `'static` nor `Send` bounds. As a result
-    /// the future will be "pinned" to not only this thread but also this stack
-    /// frame.
+    /// This function will block the current thread until one of the following
+    /// occurs:
     ///
-    /// This function will return the value that the future resolves to once
-    /// the future has finished. If the future never resolves then this function
-    /// will never return.
+    /// * The interval specified by `max_wait` elapses. This condition is never
+    ///   met if `max_wait` is specified as `None`.
+    /// * A `NotifyHandle` created from this reactor is notified. This id
+    ///   done through the `From<&Reactor> for NotifyHandle` implementation
+    ///   which is typically used when polling futures.
+    /// * An I/O event occurs for any object associated with this reactor.
+    ///
+    /// When any of the above events occurs this function will internally
+    /// dispatch all events for the reactor and then return.
+    ///
+    /// # Return value
+    ///
+    /// This function returns a `Turn` value so you may learn why the reactor
+    /// returned. Currently this return value only has one method,
+    /// `last_notify_id`, which indicates that a `NotifyHandle` created from
+    /// this reactor was notified. The `last_notify_id` will return the last id
+    /// passed to `notify`.
     ///
     /// # Panics
     ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
-        where F: Future,
-    {
-        let mut task = executor::spawn(f);
-        let mut future_fired = true;
-
-        loop {
-            if future_fired {
-                let res = try!(CURRENT_LOOP.set(self, || {
-                    task.poll_future_notify(&self.future_readiness, 0)
-                }));
-                if let Async::Ready(e) = res {
-                    return Ok(e)
-                }
-            }
-            future_fired = self.poll(None);
-        }
-    }
-
-    /// Performs one iteration of the event loop, blocking on waiting for events
-    /// for at most `max_wait` (forever if `None`).
-    ///
-    /// It only makes sense to call this method if you've previously spawned
-    /// a future onto this event loop.
-    ///
-    /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
-    /// empty future (one that never finishes).
-    pub fn turn(&mut self, max_wait: Option<Duration>) {
+    /// This function will panic if an error happens while polling for events
+    /// (at the OS layer). This should never happend outside of situations that
+    /// indicate a serious application error.
+    pub fn turn(&mut self, max_wait: Option<Duration>) -> Turn {
+        let _enter = executor::enter();
         self.poll(max_wait);
+        Turn { _priv: () }
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
-        let start = Instant::now();
-
-        // Block waiting for an event to happen, peeling out how many events
-        // happened.
-        let amt = match self.inner.borrow_mut().io.poll(&mut self.events, max_wait) {
-            Ok(a) => a,
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
+    fn poll(&mut self, max_wait: Option<Duration>) {
+        // Fill in `self.events` with anything that happened, blocking until
+        // something occurs.
+        match self.inner.io.poll(&mut self.events, max_wait) {
+            Ok(_) => (),
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => return,
             Err(e) => panic!("error in poll: {}", e),
+        }
+
+        let start = if log_enabled!(LogLevel::Debug) {
+            Some(Instant::now())
+        } else {
+            None
         };
 
-        let after_poll = Instant::now();
-        debug!("loop poll - {:?}", after_poll - start);
-        debug!("loop time - {:?}", after_poll);
-
         // Process all the events that came in, dispatching appropriately
-        let mut fired = false;
-        for i in 0..self.events.len() {
-            let event = self.events.get(i).unwrap();
+        let mut events = 0;
+        for event in self.events.iter() {
+            events += 1;
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
-            if token == TOKEN_MESSAGES {
-                self.rx_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                CURRENT_LOOP.set(&self, || self.consume_queue());
-            } else if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                fired = true;
+            if token == TOKEN_WAKEUP {
+                self.inner.wakeup.set_readiness(mio::Ready::empty()).unwrap();
             } else {
                 self.dispatch(token, event.readiness());
             }
         }
-        debug!("loop process - {} events, {:?}", amt, after_poll.elapsed());
-        return fired
+        if let Some(start) = start {
+            debug!("loop process - {} events, {:?}", events, start.elapsed());
+        }
     }
 
-    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
+    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
-        if token % 2 == 0 {
-            self.dispatch_io(token / 2, ready)
-        } else {
-            self.dispatch_task(token / 2)
-        }
-    }
-
-    fn dispatch_io(&mut self, token: usize, ready: mio::Ready) {
-        let mut reader = None;
-        let mut writer = None;
-        let mut inner = self.inner.borrow_mut();
-        if let Some(io) = inner.io_dispatch.get_mut(token) {
-            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
-            if ready.is_writable() {
-                writer = io.writer.take();
-            }
-            if !(ready & (!mio::Ready::writable())).is_empty() {
-                reader = io.reader.take();
-            }
-        }
-        drop(inner);
-        // TODO: don't notify the same task twice
-        if let Some(reader) = reader {
-            self.notify_handle(reader);
-        }
-        if let Some(writer) = writer {
-            self.notify_handle(writer);
-        }
-    }
-
-    fn dispatch_task(&mut self, token: usize) {
-        let mut inner = self.inner.borrow_mut();
-        let (task, wake) = match inner.task_dispatch.get_mut(token) {
-            Some(slot) => (slot.spawn.take(), slot.wake.take()),
+        let io = match self.inner.io_dispatch.get(token) {
+            Some(io) => io,
             None => return,
         };
-        let (mut task, wake) = match (task, wake) {
-            (Some(task), Some(wake)) => (task, wake),
-            _ => return,
-        };
-        wake.0.set_readiness(mio::Ready::empty()).unwrap();
-        drop(inner);
-        let res = CURRENT_LOOP.set(self, || {
-            task.poll_future_notify(&wake, 0)
-        });
-        let _task_to_drop;
-        inner = self.inner.borrow_mut();
-        match res {
-            Ok(Async::NotReady) => {
-                assert!(inner.task_dispatch[token].spawn.is_none());
-                inner.task_dispatch[token].spawn = Some(task);
-                inner.task_dispatch[token].wake = Some(wake);
-            }
-            Ok(Async::Ready(())) |
-            Err(()) => {
-                _task_to_drop = inner.task_dispatch.remove(token);
-            }
+        io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
+        if ready.is_writable() {
+            io.writer.notify();
         }
-        drop(inner);
-    }
-
-    /// Method used to notify a task handle.
-    ///
-    /// Note that this should be used instead of `handle.notify()` to ensure
-    /// that the `CURRENT_LOOP` variable is set appropriately.
-    fn notify_handle(&self, handle: Task) {
-        debug!("notifying a task handle");
-        CURRENT_LOOP.set(&self, || handle.notify());
-    }
-
-    fn consume_queue(&self) {
-        debug!("consuming notification queue");
-        // TODO: can we do better than `.unwrap()` here?
-        loop {
-            let msg = self.rx.borrow_mut().poll_stream_notify(&self.rx_readiness, 0).unwrap();
-            match msg {
-                Async::Ready(Some(msg)) => self.notify(msg),
-                Async::NotReady |
-                Async::Ready(None) => break,
-            }
+        if !(ready & (!mio::Ready::writable())).is_empty() {
+            io.reader.notify();
         }
-    }
-
-    fn notify(&self, msg: Message) {
-        match msg {
-            Message::DropSource(tok) => self.inner.borrow_mut().drop_source(tok),
-            Message::Schedule(tok, wake, dir) => {
-                let task = self.inner.borrow_mut().schedule(tok, wake, dir);
-                if let Some(task) = task {
-                    self.notify_handle(task);
-                }
-            }
-            Message::Run(r) => r.call_box(self),
-        }
-    }
-
-    /// Get the ID of this loop
-    pub fn id(&self) -> CoreId {
-        CoreId(self.inner.borrow().id)
     }
 }
 
-impl<F> Executor<F> for Core
-    where F: Future<Item = (), Error = ()> + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.handle().execute(future)
-    }
-}
-
-impl fmt::Debug for Core {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Core")
-         .field("id", &self.id())
-         .finish()
-    }
+/// Return value of the `turn` method
+pub struct Turn {
+    _priv: (),
 }
 
 impl Inner {
-    fn add_source(&mut self, source: &Evented)
-                  -> io::Result<(Arc<AtomicUsize>, usize)> {
+    fn add_source(&self, source: &Evented) -> io::Result<Arc<ScheduledIo>> {
         debug!("adding a new I/O source");
-        let sched = ScheduledIo {
-            readiness: Arc::new(AtomicUsize::new(0)),
-            reader: None,
-            writer: None,
-        };
-        if self.io_dispatch.len() == self.io_dispatch.capacity() {
-            let amt = self.io_dispatch.len();
-            self.io_dispatch.reserve_exact(amt);
-        }
-        let entry = self.io_dispatch.vacant_entry();
-        let key = entry.key();
-        try!(self.io.register(source,
-                              mio::Token(TOKEN_START + key * 2),
-                              mio::Ready::readable() |
-                                mio::Ready::writable() |
-                                platform::all(),
-                              mio::PollOpt::edge()));
-        let sched = entry.insert(sched);
-        Ok((sched.readiness.clone(), key))
-    }
-
-    fn deregister_source(&mut self, source: &Evented) -> io::Result<()> {
-        self.io.deregister(source)
-    }
-
-    fn drop_source(&mut self, token: usize) {
-        debug!("dropping I/O source: {}", token);
-        self.io_dispatch.remove(token);
-    }
-
-    fn schedule(&mut self, token: usize, wake: Task, dir: Direction)
-                -> Option<Task> {
-        debug!("scheduling direction for: {}", token);
-        let sched = self.io_dispatch.get_mut(token).unwrap();
-        let (slot, ready) = match dir {
-            Direction::Read => (&mut sched.reader, !mio::Ready::writable()),
-            Direction::Write => (&mut sched.writer, mio::Ready::writable()),
-        };
-        if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
-            debug!("cancelling block");
-            *slot = None;
-            Some(wake)
-        } else {
-            debug!("blocking");
-            *slot = Some(wake);
-            None
-        }
-    }
-
-    fn spawn(&mut self, future: Box<Future<Item=(), Error=()>>) {
-        if self.task_dispatch.len() == self.task_dispatch.capacity() {
-            let len = self.task_dispatch.len();
-            self.task_dispatch.reserve_exact(len);
-        }
-        let entry = self.task_dispatch.vacant_entry();
-        let token = TOKEN_START + 2 * entry.key() + 1;
-        let pair = mio::Registration::new2();
-        self.io.register(&pair.0,
-                         mio::Token(token),
-                         mio::Ready::readable(),
-                         mio::PollOpt::level())
-            .expect("cannot fail future registration with mio");
-        let unpark = Arc::new(MySetReadiness(pair.1));
-        unpark.notify(0);
-        entry.insert(ScheduledTask {
-            spawn: Some(executor::spawn(future)),
-            wake: Some(unpark),
-            _registration: pair.0,
+        let state = Arc::new(ScheduledIo {
+            readiness: AtomicUsize::new(0),
+            reader: AtomicTask::new(),
+            writer: AtomicTask::new(),
+            idx: AtomicUsize::new(0),
+            slab: Arc::downgrade(&self.io_dispatch),
         });
+        let idx = match self.io_dispatch.insert(state.clone()) {
+            Some(idx) => idx,
+            None => return Err(io::Error::new(io::ErrorKind::Other,
+                                              "too many I/O objects registered")),
+        };
+        state.idx.store(idx, Ordering::SeqCst);
+
+        // Set ourselves to the default readiness. By default this is "nothing
+        // ready" but when the reactor is being destroyed this'll get set to
+        // MAX to say that it's an invalid object.
+        //
+        // Note that this happens *after* we successfully store ourselves in
+        // the slab to be sure that we see the "now invalid" flag during
+        // destruction.
+        let readiness = self.default_readiness.load(Ordering::SeqCst);
+        state.readiness.store(readiness, Ordering::SeqCst);
+
+        self.io.register(source,
+                         mio::Token(TOKEN_START + idx),
+                         mio::Ready::readable() |
+                             mio::Ready::writable() |
+                             platform::all(),
+                         mio::PollOpt::edge())?;
+        Ok(state)
     }
 }
 
-impl Remote {
-    fn send(&self, msg: Message) {
-        self.with_loop(|lp| {
-            match lp {
-                Some(lp) => {
-                    // We want to make sure that all messages are received in
-                    // order, so we need to consume pending messages before
-                    // delivering this message to the core. The actually
-                    // `consume_queue` function, however, can be somewhat slow
-                    // right now where receiving on a channel will acquire a
-                    // lock and block the current task.
-                    //
-                    // To speed this up check the message queue's readiness as a
-                    // sort of preflight check to see if we've actually got any
-                    // messages. This should just involve some atomics and if it
-                    // comes back false then we know for sure there are no
-                    // pending messages, so we can immediately deliver our
-                    // message.
-                    if lp.rx_readiness.0.readiness().is_readable() {
-                        lp.consume_queue();
-                    }
-                    lp.notify(msg);
-                }
-                None => {
-                    match self.tx.unbounded_send(msg) {
-                        Ok(()) => {}
-
-                        // TODO: this error should punt upwards and we should
-                        //       notify the caller that the message wasn't
-                        //       received. This is tokio-core#17
-                        Err(e) => drop(e),
-                    }
-                }
-            }
-        })
-    }
-
-    fn with_loop<F, R>(&self, f: F) -> R
-        where F: FnOnce(Option<&Core>) -> R
-    {
-        if CURRENT_LOOP.is_set() {
-            CURRENT_LOOP.with(|lp| {
-                let same = lp.inner.borrow().id == self.id;
-                if same {
-                    f(Some(lp))
-                } else {
-                    f(None)
-                }
-            })
-        } else {
-            f(None)
-        }
-    }
-
-    /// Spawns a new future into the event loop this remote is associated with.
-    ///
-    /// This function takes a closure which is executed within the context of
-    /// the I/O loop itself. The future returned by the closure will be
-    /// scheduled on the event loop and run to completion.
-    ///
-    /// Note that while the closure, `F`, requires the `Send` bound as it might
-    /// cross threads, the future `R` does not.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn spawn<F, R>(&self, f: F)
-        where F: FnOnce(&Handle) -> R + Send + 'static,
-              R: IntoFuture<Item=(), Error=()>,
-              R::Future: 'static,
-    {
-        self.send(Message::Run(Box::new(|lp: &Core| {
-            let f = f(&lp.handle());
-            lp.inner.borrow_mut().spawn(Box::new(f.into_future()));
-        })));
-    }
-
-    /// Return the ID of the represented Core
-    pub fn id(&self) -> CoreId {
-        CoreId(self.id)
-    }
-
-    /// Attempts to "promote" this remote to a handle, if possible.
-    ///
-    /// This function is intended for structures which typically work through a
-    /// `Remote` but want to optimize runtime when the remote doesn't actually
-    /// leave the thread of the original reactor. This will attempt to return a
-    /// handle if the `Remote` is on the same thread as the event loop and the
-    /// event loop is running.
-    ///
-    /// If this `Remote` has moved to a different thread or if the event loop is
-    /// running, then `None` may be returned. If you need to guarantee access to
-    /// a `Handle`, then you can call this function and fall back to using
-    /// `spawn` above if it returns `None`.
-    pub fn handle(&self) -> Option<Handle> {
-        if CURRENT_LOOP.is_set() {
-            CURRENT_LOOP.with(|lp| {
-                let same = lp.inner.borrow().id == self.id;
-                if same {
-                    Some(lp.handle())
-                } else {
-                    None
-                }
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl<F> Executor<F> for Remote
-    where F: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.spawn(|_| future);
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Remote {
+impl fmt::Debug for Reactor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Remote")
-         .field("id", &self.id())
+        f.debug_struct("Reactor")
          .finish()
     }
 }
 
-impl Handle {
-    /// Returns a reference to the underlying remote handle to the event loop.
-    pub fn remote(&self) -> &Remote {
-        &self.remote
-    }
+impl Drop for Reactor {
+    fn drop(&mut self) {
+        // Ensure that all newly registered I/O objects will receive a "defunkt"
+        // sentinel for readiness. This means that anything we miss in the below
+        // loop will automatically be flagged as "not ready"
+        self.inner.default_readiness.store(usize::max_value(), Ordering::SeqCst);
 
-    /// Spawns a new future on the event loop this handle is associated with.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn spawn<F>(&self, f: F)
-        where F: Future<Item=(), Error=()> + 'static,
-    {
-        let inner = match self.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-        inner.borrow_mut().spawn(Box::new(f));
-    }
-
-    /// Spawns a closure on this event loop.
-    ///
-    /// This function is a convenience wrapper around the `spawn` function above
-    /// for running a closure wrapped in `futures::lazy`. It will spawn the
-    /// function `f` provided onto the event loop, and continue to run the
-    /// future returned by `f` on the event loop as well.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn spawn_fn<F, R>(&self, f: F)
-        where F: FnOnce() -> R + 'static,
-              R: IntoFuture<Item=(), Error=()> + 'static,
-    {
-        self.spawn(future::lazy(f))
-    }
-
-    /// Return the ID of the represented Core
-    pub fn id(&self) -> CoreId {
-        self.remote.id()
+        // Wake up any I/O object that's still blocked, we'll never wake them up
+        // again so we need to let them know that they should start immediately
+        // returning errors.
+        self.inner.io_dispatch.for_each(|io| {
+            io.readiness.store(usize::max_value(), Ordering::SeqCst);
+            io.reader.notify();
+            io.writer.notify();
+        });
     }
 }
 
-impl<F> Executor<F> for Handle
-    where F: Future<Item = (), Error = ()> + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.spawn(future);
-        Ok(())
+thread_local!(static THREAD_DEFAULT: RefCell<Option<Handle>> = RefCell::new(None));
+
+impl Handle {
+    /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
+    /// makes the next call to `turn` return immediately.
+    ///
+    /// This method is intended to be used in situations where a notification
+    /// needs to otherwise be sent to the main reactor. If the reactor is
+    /// currently blocked inside of `turn` then it will wake up and soon return
+    /// after this method has been called. If the reactor is not currently
+    /// blocked in `turn`, then the next call to `turn` will not block and
+    /// return immediately.
+    pub fn wakeup(&self) {
+        if let Some(inner) = self.inner() {
+            inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
+        }
+    }
+
+    /// Sets this handle as the default (returned by `Handle::default`)
+    /// within the current thread, for the duration of `Enter`'s lifetime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called twice
+    ///
+    /// TODO: fill this out
+    pub fn make_default_for(&self, scope: &mut Enter) {
+        THREAD_DEFAULT.with(|default| {
+            let mut default = default.borrow_mut();
+            if default.is_some() {
+                panic!()
+            }
+
+            *default = Some(self.clone());
+        });
+        scope.on_exit(|| {
+            THREAD_DEFAULT.with(|default| {
+                assert!(default.borrow().is_some());
+                drop(default.borrow_mut().take());
+            });
+        });
+    }
+
+    fn inner(&self) -> Option<Arc<Inner>> {
+        self.repr.inner()
+    }
+}
+
+impl Default for Handle {
+    /// Acquires a handle to the global reactor.
+    ///
+    /// The global reactor is run in a separate thread in this process and is
+    /// lazily initialized. The first invocation of this function will spin up
+    /// the reactor.
+    ///
+    /// The `Handle` returned can be used to register I/O objects with the
+    /// reactor and create timeouts.
+    fn default() -> Handle {
+        THREAD_DEFAULT.with(|default| {
+            match *default.borrow() {
+                Some(ref h) => h.clone(),
+                None => Handle { repr: HandleRepr::Global },
+            }
+        })
+    }
+}
+
+impl HandleRepr {
+    fn inner(&self) -> Option<Arc<Inner>> {
+        match *self {
+            HandleRepr::Ptr { ref inner, .. } => inner.upgrade(),
+            HandleRepr::Global => ::global::reactor().and_then(|x| x.inner()),
+        }
     }
 }
 
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Handle")
-         .field("id", &self.id())
          .finish()
-    }
-}
-
-struct MySetReadiness(mio::SetReadiness);
-
-impl Notify for MySetReadiness {
-    fn notify(&self, _id: usize) {
-        self.0.set_readiness(mio::Ready::readable())
-              .expect("failed to set readiness");
-    }
-}
-
-trait FnBox: Send + 'static {
-    fn call_box(self: Box<Self>, lp: &Core);
-}
-
-impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
-    fn call_box(self: Box<Self>, lp: &Core) {
-        (*self)(lp)
     }
 }
 

@@ -18,13 +18,11 @@ appveyor = { repository = "alexcrichton/tokio" }
 
 [dependencies]
 bytes = "0.4"
+futures = "0.1.16"
+iovec = "0.1"
 log = "0.3"
 mio = "0.6.10"
-scoped-tls = "0.1.0"
-slab = "0.4"
-iovec = "0.1"
 tokio-io = "0.1"
-futures = "0.1.15"
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
@@ -38,3 +36,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 time = "0.1"
+
+[patch.crates-io]
+futures = { git = 'https://github.com/alexcrichton/futures-rs', branch = 'spawn' }
+mio = { git = 'https://github.com/carllerche/mio' }

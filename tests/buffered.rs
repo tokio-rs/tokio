@@ -11,7 +11,10 @@ use futures::Future;
 use futures::stream::Stream;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
+<<<<<<< 822d9f84453ac74646d1b8d8c87395f75bcb7604
 use tokio::reactor::Core;
+=======
+>>>>>>> Update as the `tokio` crate
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -25,8 +28,7 @@ fn echo_server() {
     const N: usize = 1024;
     drop(env_logger::init());
 
-    let mut l = t!(Core::new());
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let msg = "foo bar baz";
@@ -56,7 +58,7 @@ fn echo_server() {
         copy(a, b)
     });
 
-    let (amt, _, _) = t!(l.run(copied));
+    let (amt, _, _) = t!(futures::thread::block_until(copied));
     let (expected, t2) = t.join().unwrap();
     let actual = t2.join().unwrap();
 

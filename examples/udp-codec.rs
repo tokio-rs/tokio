@@ -13,9 +13,10 @@ extern crate futures;
 use std::io;
 use std::net::SocketAddr;
 
-use futures::{Future, Stream, Sink};
+use futures::future;
+use futures::prelude::*;
+use futures::thread;
 use tokio::net::{UdpSocket, UdpCodec};
-use tokio::reactor::Core;
 
 pub struct LineCodec;
 
@@ -36,14 +37,11 @@ impl UdpCodec for LineCodec {
 fn main() {
     drop(env_logger::init());
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     // Bind both our sockets and then figure out what ports we got.
-    let a = UdpSocket::bind(&addr, &handle).unwrap();
-    let b = UdpSocket::bind(&addr, &handle).unwrap();
+    let a = UdpSocket::bind(&addr).unwrap();
+    let b = UdpSocket::bind(&addr).unwrap();
     let b_addr = b.local_addr().unwrap();
 
     // We're parsing each socket with the `LineCodec` defined above, and then we
@@ -73,6 +71,8 @@ fn main() {
     let b = b_sink.send_all(b_stream);
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
-    handle.spawn(b.then(|_| Ok(())));
-    drop(core.run(a));
+    drop(thread::block_on_all(future::lazy(|| {
+        thread::spawn_daemon(b.then(|_| Ok(())));
+        a
+    })));
 }

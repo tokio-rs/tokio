@@ -11,7 +11,6 @@
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 
 extern crate futures;
-#[macro_use]
 extern crate tokio;
 #[macro_use]
 extern crate tokio_io;
@@ -21,7 +20,6 @@ use std::net::SocketAddr;
 
 use futures::{Future, Poll};
 use tokio::net::UdpSocket;
-use tokio::reactor::Core;
 
 struct Server {
     socket: UdpSocket,
@@ -57,14 +55,12 @@ fn main() {
 
     // Create the event loop that will drive this server, and also bind the
     // socket we'll be listening to.
-    let mut l = Core::new().unwrap();
-    let handle = l.handle();
-    let socket = UdpSocket::bind(&addr, &handle).unwrap();
+    let socket = UdpSocket::bind(&addr).unwrap();
     println!("Listening on: {}", socket.local_addr().unwrap());
 
     // Next we'll create a future to spawn (the one we defined above) and then
     // we'll run the event loop by running the future.
-    l.run(Server {
+    futures::thread::block_on_all(Server {
         socket: socket,
         buf: vec![0; 1024],
         to_send: None,

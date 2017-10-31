@@ -25,26 +25,24 @@ use std::iter;
 use std::net::SocketAddr;
 
 use futures::Future;
+use futures::thread;
 use futures::stream::{self, Stream};
 use tokio_io::IoFuture;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
 
 fn main() {
     env_logger::init().unwrap();
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
     let server = socket.incoming().for_each(|(socket, addr)| {
         println!("got a socket: {}", addr);
-        handle.spawn(write(socket).or_else(|_| Ok(())));
+        thread::spawn_task(write(socket).or_else(|_| Ok(())));
         Ok(())
     });
-    core.run(server).unwrap();
+    thread::block_on_all(server).unwrap();
 }
 
 fn write(socket: TcpStream) -> IoFuture<()> {

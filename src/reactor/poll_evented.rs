@@ -8,15 +8,16 @@
 
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
 
 use futures::{Async, Poll};
 use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::{Handle, Remote};
-use reactor::io_token::IoToken;
+use reactor::{Handle, ScheduledIo};
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -64,58 +65,35 @@ use reactor::io_token::IoToken;
 /// method you want to also use `need_read` to signal blocking and you should
 /// otherwise probably avoid using two tasks on the same `PollEvented`.
 pub struct PollEvented<E> {
-    token: IoToken,
-    handle: Remote,
+    state: Arc<ScheduledIo>,
+    handle: Handle,
     readiness: AtomicUsize,
     io: E,
 }
 
-impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("PollEvented")
-         .field("io", &self.io)
-         .finish()
-    }
-}
-
-impl<E: Evented> PollEvented<E> {
+impl<E> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
     ///
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
-    pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
+    pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>>
+        where E: Evented,
+    {
+        let inner = match handle.inner() {
+            Some(inner) => inner,
+            None => return Err(io::Error::new(io::ErrorKind::Other,
+                                              "core has gone away")),
+        };
+        let state = try!(inner.add_source(&io));
         Ok(PollEvented {
-            token: try!(IoToken::new(&io, handle)),
-            handle: handle.remote().clone(),
+            state: state,
+            handle: handle.clone(),
             readiness: AtomicUsize::new(0),
             io: io,
         })
     }
 
-    /// Deregisters this source of events from the reactor core specified.
-    ///
-    /// This method can optionally be called to unregister the underlying I/O
-    /// object with the event loop that the `handle` provided points to.
-    /// Typically this method is not required as this automatically happens when
-    /// `E` is dropped, but for some use cases the `E` object doesn't represent
-    /// an owned reference, so dropping it won't automatically unregister with
-    /// the event loop.
-    ///
-    /// This consumes `self` as it will no longer provide events after the
-    /// method is called, and will likely return an error if this `PollEvented`
-    /// was created on a separate event loop from the `handle` specified.
-    pub fn deregister(self, handle: &Handle) -> io::Result<()> {
-        let inner = match handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return Ok(()),
-        };
-        let ret = inner.borrow_mut().deregister_source(&self.io);
-        return ret
-    }
-}
-
-impl<E> PollEvented<E> {
     /// Tests to see if this source is ready to be read from or not.
     ///
     /// If this stream is not ready for a read then `NotReady` will be returned
@@ -179,17 +157,26 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn poll_ready(&self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
-        match self.readiness.load(Ordering::SeqCst) & bits {
+        match self.readiness.load(SeqCst) & bits {
             0 => {}
             n => return Async::Ready(super::usize2ready(n)),
         }
-        self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
-        match self.readiness.load(Ordering::SeqCst) & bits {
+        let actual_readiness = self.state.readiness.swap(0, SeqCst);
+        self.readiness.fetch_or(actual_readiness, SeqCst);
+        match actual_readiness & bits {
             0 => {
+                // Block the current task. If we can't because our reactor has
+                // gone away, then we immediately say that we're ready and the
+                // corresponding operation will invoke `needs_*` and return the
+                // real error.
                 if mask.is_writable() {
-                    self.need_write();
+                    if self.need_write().is_err() {
+                        return Async::Ready(mask)
+                    }
                 } else {
-                    self.need_read();
+                    if self.need_read().is_err() {
+                        return Async::Ready(mask)
+                    }
                 }
                 Async::NotReady
             }
@@ -213,17 +200,20 @@ impl<E> PollEvented<E> {
     /// hup/error this may also be relevant.
     ///
     /// Note that it is also only valid to call this method if `poll_read`
-    /// previously indicated that the object is readable. That is, this function
-    /// must always be paired with calls to `poll_read` previously.
+    /// previously indicated that the object is readable. That is, this function must always be paired with calls to `poll_read` previously.
     ///
     /// # Panics
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn need_read(&self) {
+    pub fn need_read(&self) -> io::Result<()> {
         let bits = super::ready2usize(super::read_ready());
-        self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_read(&self.handle)
+        self.unset_readiness(bits)?;
+        self.state.reader.register();
+        if self.state.readiness.load(SeqCst) & bits != 0 {
+            self.state.reader.notify();
+        }
+        Ok(())
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -246,16 +236,28 @@ impl<E> PollEvented<E> {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn need_write(&self) {
+    pub fn need_write(&self) -> io::Result<()> {
         let bits = super::ready2usize(Ready::writable());
-        self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_write(&self.handle)
+        self.unset_readiness(bits)?;
+        self.state.writer.register();
+        if self.state.readiness.load(SeqCst) & bits != 0 {
+            self.state.writer.notify();
+        }
+        Ok(())
     }
 
-    /// Returns a reference to the event loop handle that this readiness stream
-    /// is associated with.
-    pub fn remote(&self) -> &Remote {
-        &self.handle
+    fn unset_readiness(&self, bits: usize) -> io::Result<()> {
+        let mut readiness = self.readiness.load(SeqCst);
+        loop {
+            if readiness == usize::max_value() {
+                return Err(reactor_gone())
+            }
+            let new = readiness & !bits;
+            match self.readiness.compare_exchange(readiness, new, SeqCst, SeqCst) {
+                Ok(_) => return Ok(()),
+                Err(r) => readiness = r,
+            }
+        }
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -269,6 +271,49 @@ impl<E> PollEvented<E> {
     pub fn get_mut(&mut self) -> &mut E {
         &mut self.io
     }
+
+    /// Returns the handle that this instance is associated with.
+    ///
+    /// This handle is a connection to the event loop that this handle's I/O
+    /// events are routed from. This can be used to register more I/O objects or
+    /// create timeouts.
+    pub fn handle(&self) -> &Handle {
+        &self.handle
+    }
+
+    /// Deregisters this source of events from the reactor core specified.
+    ///
+    /// This method can optionally be called to unregister the underlying I/O
+    /// object with the event loop that the `handle` provided points to.
+    /// Typically this method is not required as this automatically happens when
+    /// `E` is dropped, but for some use cases the `E` object doesn't represent
+    /// an owned reference, so dropping it won't automatically unreigster with
+    /// the event loop.
+    ///
+    /// This consumes `self` as it will no longer provide events after the
+    /// method is called, and will likely return an error if this `PollEvented`
+    /// was created on a separate event loop from the `handle` specified.
+    pub fn deregister(&self) -> io::Result<()>
+        where E: Evented,
+    {
+        let io = match self.handle.inner() {
+            Some(inner) => inner,
+            None => return Ok(()),
+        };
+        io.io.deregister(&self.io)
+    }
+}
+
+fn reactor_gone() -> io::Error {
+    io::Error::new(io::ErrorKind::Other, "reactor has been destroyed")
+}
+
+impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PollEvented")
+         .field("io", &self.io)
+         .finish()
+    }
 }
 
 impl<E: Read> Read for PollEvented<E> {
@@ -278,7 +323,7 @@ impl<E: Read> Read for PollEvented<E> {
         }
         let r = self.get_mut().read(buf);
         if is_wouldblock(&r) {
-            self.need_read();
+            self.need_read()?;
         }
         return r
     }
@@ -291,7 +336,7 @@ impl<E: Write> Write for PollEvented<E> {
         }
         let r = self.get_mut().write(buf);
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -302,7 +347,7 @@ impl<E: Write> Write for PollEvented<E> {
         }
         let r = self.get_mut().flush();
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -326,7 +371,7 @@ impl<'a, E> Read for &'a PollEvented<E>
         }
         let r = self.get_ref().read(buf);
         if is_wouldblock(&r) {
-            self.need_read();
+            self.need_read()?;
         }
         return r
     }
@@ -341,7 +386,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         }
         let r = self.get_ref().write(buf);
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -352,7 +397,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         }
         let r = self.get_ref().flush();
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -380,6 +425,8 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 
 impl<E> Drop for PollEvented<E> {
     fn drop(&mut self) {
-        self.token.drop_source(&self.handle);
+        if let Some(slab) = self.state.slab.upgrade() {
+            slab.flag_remove(self.state.idx.load(SeqCst));
+        }
     }
 }
