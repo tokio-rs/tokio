@@ -77,7 +77,7 @@ impl<E> PollEvented<E> {
     ///
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
-    pub fn new(io: E, handle: Handle) -> io::Result<PollEvented<E>>
+    pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>>
         where E: Evented,
     {
         let inner = match handle.inner() {
@@ -88,7 +88,7 @@ impl<E> PollEvented<E> {
         let state = try!(inner.add_source(&io));
         Ok(PollEvented {
             state: state,
-            handle: handle,
+            handle: handle.clone(),
             readiness: AtomicUsize::new(0),
             io: io,
         })
