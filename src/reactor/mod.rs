@@ -4,13 +4,14 @@
 //! happening in `tokio-core`. This reactor (or event loop) is used to run
 //! futures, schedule tasks, issue I/O requests, etc.
 
+use std::cell::RefCell;
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
 use std::time::{Instant, Duration};
 
-use futures::executor;
+use futures::executor::{self, Enter};
 use futures::task::AtomicTask;
 use log::LogLevel;
 use mio::event::Evented;
@@ -271,6 +272,8 @@ impl Drop for Reactor {
     }
 }
 
+thread_local!(static THREAD_DEFAULT: RefCell<Option<Handle>> = RefCell::new(None));
+
 impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
@@ -285,6 +288,31 @@ impl Handle {
         if let Some(inner) = self.inner() {
             inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
         }
+    }
+
+    /// Sets this handle as the default (returned by `Handle::default`)
+    /// within the current thread, for the duration of `Enter`'s lifetime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called twice
+    ///
+    /// TODO: fill this out
+    pub fn make_default_for(&self, scope: &mut Enter) {
+        THREAD_DEFAULT.with(|default| {
+            let mut default = default.borrow_mut();
+            if default.is_some() {
+                panic!()
+            }
+
+            *default = Some(self.clone());
+        });
+        scope.on_exit(|| {
+            THREAD_DEFAULT.with(|default| {
+                assert!(default.borrow().is_some());
+                drop(default.borrow_mut().take());
+            });
+        });
     }
 
     fn inner(&self) -> Option<Arc<Inner>> {
@@ -302,7 +330,12 @@ impl Default for Handle {
     /// The `Handle` returned can be used to register I/O objects with the
     /// reactor and create timeouts.
     fn default() -> Handle {
-        Handle { repr: HandleRepr::Global }
+        THREAD_DEFAULT.with(|default| {
+            match *default.borrow() {
+                Some(ref h) => h.clone(),
+                None => Handle { repr: HandleRepr::Global },
+            }
+        })
     }
 }
 
