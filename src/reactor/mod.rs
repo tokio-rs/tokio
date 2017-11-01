@@ -12,8 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
-use futures::{Future, IntoFuture, Async};
-use futures::future::{self, Executor, ExecuteError};
+use futures::{Future, Async};
 use futures::executor::{self, Spawn, Notify};
 use futures::sync::mpsc;
 use futures::task::Task;
@@ -58,7 +57,6 @@ struct Inner {
 
     // Dispatch slabs for I/O and futures events
     io_dispatch: Slab<ScheduledIo>,
-    task_dispatch: Slab<ScheduledTask>,
 }
 
 /// An unique ID for a Core
@@ -93,12 +91,6 @@ struct ScheduledIo {
     readiness: Arc<AtomicUsize>,
     reader: Option<Task>,
     writer: Option<Task>,
-}
-
-struct ScheduledTask {
-    _registration: mio::Registration,
-    spawn: Option<Spawn<Box<Future<Item=(), Error=()>>>>,
-    wake: Option<Arc<MySetReadiness>>,
 }
 
 enum Direction {
@@ -149,7 +141,6 @@ impl Core {
                 id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
                 io: io,
                 io_dispatch: Slab::with_capacity(1),
-                task_dispatch: Slab::with_capacity(1),
             })),
         })
     }
@@ -263,11 +254,7 @@ impl Core {
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
-        if token % 2 == 0 {
-            self.dispatch_io(token / 2, ready)
-        } else {
-            self.dispatch_task(token / 2)
-        }
+        self.dispatch_io(token, ready)
     }
 
     fn dispatch_io(&mut self, token: usize, ready: mio::Ready) {
@@ -291,37 +278,6 @@ impl Core {
         if let Some(writer) = writer {
             self.notify_handle(writer);
         }
-    }
-
-    fn dispatch_task(&mut self, token: usize) {
-        let mut inner = self.inner.borrow_mut();
-        let (task, wake) = match inner.task_dispatch.get_mut(token) {
-            Some(slot) => (slot.spawn.take(), slot.wake.take()),
-            None => return,
-        };
-        let (mut task, wake) = match (task, wake) {
-            (Some(task), Some(wake)) => (task, wake),
-            _ => return,
-        };
-        wake.0.set_readiness(mio::Ready::empty()).unwrap();
-        drop(inner);
-        let res = CURRENT_LOOP.set(self, || {
-            task.poll_future_notify(&wake, 0)
-        });
-        let _task_to_drop;
-        inner = self.inner.borrow_mut();
-        match res {
-            Ok(Async::NotReady) => {
-                assert!(inner.task_dispatch[token].spawn.is_none());
-                inner.task_dispatch[token].spawn = Some(task);
-                inner.task_dispatch[token].wake = Some(wake);
-            }
-            Ok(Async::Ready(())) |
-            Err(()) => {
-                _task_to_drop = inner.task_dispatch.remove(token);
-            }
-        }
-        drop(inner);
     }
 
     /// Method used to notify a task handle.
@@ -365,14 +321,6 @@ impl Core {
     }
 }
 
-impl<F> Executor<F> for Core
-    where F: Future<Item = (), Error = ()> + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.handle().execute(future)
-    }
-}
-
 impl fmt::Debug for Core {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Core")
@@ -397,7 +345,7 @@ impl Inner {
         let entry = self.io_dispatch.vacant_entry();
         let key = entry.key();
         try!(self.io.register(source,
-                              mio::Token(TOKEN_START + key * 2),
+                              mio::Token(TOKEN_START + key),
                               mio::Ready::readable() |
                                 mio::Ready::writable() |
                                 platform::all(),
@@ -432,28 +380,6 @@ impl Inner {
             *slot = Some(wake);
             None
         }
-    }
-
-    fn spawn(&mut self, future: Box<Future<Item=(), Error=()>>) {
-        if self.task_dispatch.len() == self.task_dispatch.capacity() {
-            let len = self.task_dispatch.len();
-            self.task_dispatch.reserve_exact(len);
-        }
-        let entry = self.task_dispatch.vacant_entry();
-        let token = TOKEN_START + 2 * entry.key() + 1;
-        let pair = mio::Registration::new2();
-        self.io.register(&pair.0,
-                         mio::Token(token),
-                         mio::Ready::readable(),
-                         mio::PollOpt::level())
-            .expect("cannot fail future registration with mio");
-        let unpark = Arc::new(MySetReadiness(pair.1));
-        unpark.notify(0);
-        entry.insert(ScheduledTask {
-            spawn: Some(executor::spawn(future)),
-            wake: Some(unpark),
-            _registration: pair.0,
-        });
     }
 }
 
@@ -525,14 +451,11 @@ impl Remote {
     /// This method will **not** catch panics from polling the future `f`. If
     /// the future panics then it's the responsibility of the caller to catch
     /// that panic and handle it as appropriate.
-    pub fn spawn<F, R>(&self, f: F)
-        where F: FnOnce(&Handle) -> R + Send + 'static,
-              R: IntoFuture<Item=(), Error=()>,
-              R::Future: 'static,
+    pub(crate) fn run<F>(&self, f: F)
+        where F: FnOnce(&Handle) + Send + 'static,
     {
         self.send(Message::Run(Box::new(|lp: &Core| {
-            let f = f(&lp.handle());
-            lp.inner.borrow_mut().spawn(Box::new(f.into_future()));
+            f(&lp.handle());
         })));
     }
 
@@ -569,15 +492,6 @@ impl Remote {
     }
 }
 
-impl<F> Executor<F> for Remote
-    where F: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.spawn(|_| future);
-        Ok(())
-    }
-}
-
 impl fmt::Debug for Remote {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Remote")
@@ -592,54 +506,9 @@ impl Handle {
         &self.remote
     }
 
-    /// Spawns a new future on the event loop this handle is associated with.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn spawn<F>(&self, f: F)
-        where F: Future<Item=(), Error=()> + 'static,
-    {
-        let inner = match self.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-        inner.borrow_mut().spawn(Box::new(f));
-    }
-
-    /// Spawns a closure on this event loop.
-    ///
-    /// This function is a convenience wrapper around the `spawn` function above
-    /// for running a closure wrapped in `futures::lazy`. It will spawn the
-    /// function `f` provided onto the event loop, and continue to run the
-    /// future returned by `f` on the event loop as well.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn spawn_fn<F, R>(&self, f: F)
-        where F: FnOnce() -> R + 'static,
-              R: IntoFuture<Item=(), Error=()> + 'static,
-    {
-        self.spawn(future::lazy(f))
-    }
-
     /// Return the ID of the represented Core
     pub fn id(&self) -> CoreId {
         self.remote.id()
-    }
-}
-
-impl<F> Executor<F> for Handle
-    where F: Future<Item = (), Error = ()> + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.spawn(future);
-        Ok(())
     }
 }
 

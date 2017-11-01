@@ -13,6 +13,7 @@
 
 extern crate bytes;
 extern crate futures;
+extern crate futures_cpupool;
 extern crate http;
 extern crate httparse;
 extern crate num_cpus;
@@ -31,8 +32,10 @@ use std::thread;
 
 use bytes::BytesMut;
 use futures::future;
+use futures::future::Executor;
 use futures::sync::mpsc;
 use futures::{Stream, Future, Sink};
+use futures_cpupool::CpuPool;
 use http::{Request, Response, StatusCode};
 use http::header::HeaderValue;
 use tokio::net::TcpStream;
@@ -69,6 +72,8 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
+    let pool = CpuPool::new(1);
+
     let done = rx.for_each(move |socket| {
         // Associate each socket we get with our local event loop, and then use
         // the codec support in the tokio-io crate to deal with discrete
@@ -80,10 +85,10 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
             let (tx, rx) = socket.framed(Http).split();
             tx.send_all(rx.and_then(respond))
         });
-        handle.spawn(req.then(move |result| {
+        pool.execute(req.then(move |result| {
             drop(result);
             Ok(())
-        }));
+        })).unwrap();
         Ok(())
     });
     core.run(done).unwrap();
@@ -95,7 +100,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
 /// represents the various handling a server might do. Currently the contents
 /// here are pretty uninteresting.
 fn respond(req: Request<()>)
-    -> Box<Future<Item = Response<String>, Error = io::Error>>
+    -> Box<Future<Item = Response<String>, Error = io::Error> + Send>
 {
     let mut ret = Response::builder();
     let body = match req.uri().path() {
