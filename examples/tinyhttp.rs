@@ -59,9 +59,10 @@ fn main() {
     }
     let mut next = 0;
     for socket in listener.incoming() {
-        let socket = socket.expect("failed to accept");
-        channels[next].unbounded_send(socket).expect("worker thread died");
-        next = (next + 1) % channels.len();
+        if let Ok(socket) = socket {
+            channels[next].unbounded_send(socket).expect("worker thread died");
+            next = (next + 1) % channels.len();
+        }
     }
 }
 
