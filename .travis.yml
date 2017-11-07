@@ -29,4 +29,3 @@ notifications:
 
 os:
   - linux
-  - osx
