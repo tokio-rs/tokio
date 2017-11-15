@@ -34,7 +34,7 @@ impl IoToken {
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
         match handle.inner.upgrade() {
             Some(inner) => {
-                let (ready, token) = try!(inner.borrow_mut().add_source(source));
+                let (ready, token) = try!(inner.add_source(source));
                 Ok(IoToken { token: token, readiness: ready })
             }
             None => Err(io::Error::new(io::ErrorKind::Other, "event loop gone")),

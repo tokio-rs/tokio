@@ -110,7 +110,7 @@ impl<E: Evented> PollEvented<E> {
             Some(inner) => inner,
             None => return Ok(()),
         };
-        let ret = inner.borrow_mut().deregister_source(&self.io);
+        let ret = inner.deregister_source(&self.io);
         return ret
     }
 }

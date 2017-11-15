@@ -4,11 +4,9 @@
 //! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
 //! resources.
 
-use std::cell::RefCell;
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::rc::{Rc, Weak};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Instant, Duration};
 
@@ -38,11 +36,11 @@ scoped_thread_local!(static CURRENT_LOOP: Core);
 pub struct Core {
     events: mio::Events,
     tx: mpsc::UnboundedSender<Message>,
-    rx: RefCell<Spawn<mpsc::UnboundedReceiver<Message>>>,
+    rx: Mutex<Spawn<mpsc::UnboundedReceiver<Message>>>,
     _rx_registration: mio::Registration,
     rx_readiness: Arc<MySetReadiness>,
 
-    inner: Rc<RefCell<Inner>>,
+    inner: Arc<Inner>,
 
     // Used for determining when the future passed to `run` is ready. Once the
     // registration is passed to `io` above we never touch it again, just keep
@@ -51,12 +49,20 @@ pub struct Core {
     future_readiness: Arc<MySetReadiness>,
 }
 
+fn _assert_kinds() {
+    fn _assert<T: Send + Sync>() {}
+
+    _assert::<Core>();
+    _assert::<Handle>();
+    _assert::<Remote>();
+}
+
 struct Inner {
     id: usize,
     io: mio::Poll,
 
     // Dispatch slabs for I/O and futures events
-    io_dispatch: Slab<ScheduledIo>,
+    io_dispatch: Mutex<Slab<ScheduledIo>>,
 }
 
 /// An unique ID for a Core
@@ -84,7 +90,7 @@ pub struct Remote {
 #[derive(Clone)]
 pub struct Handle {
     remote: Remote,
-    inner: Weak<RefCell<Inner>>,
+    inner: Weak<Inner>,
 }
 
 struct ScheduledIo {
@@ -130,18 +136,18 @@ impl Core {
         Ok(Core {
             events: mio::Events::with_capacity(1024),
             tx: tx,
-            rx: RefCell::new(executor::spawn(rx)),
+            rx: Mutex::new(executor::spawn(rx)),
             _rx_registration: channel_pair.0,
             rx_readiness: rx_readiness,
 
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
 
-            inner: Rc::new(RefCell::new(Inner {
+            inner: Arc::new(Inner {
                 id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
                 io: io,
-                io_dispatch: Slab::with_capacity(1),
-            })),
+                io_dispatch: Mutex::new(Slab::with_capacity(1)),
+            }),
         })
     }
 
@@ -154,7 +160,7 @@ impl Core {
     pub fn handle(&self) -> Handle {
         Handle {
             remote: self.remote(),
-            inner: Rc::downgrade(&self.inner),
+            inner: Arc::downgrade(&self.inner),
         }
     }
 
@@ -162,7 +168,7 @@ impl Core {
     /// tasks from other threads into this event loop.
     pub fn remote(&self) -> Remote {
         Remote {
-            id: self.inner.borrow().id,
+            id: self.inner.id,
             tx: self.tx.clone(),
         }
     }
@@ -221,7 +227,7 @@ impl Core {
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        let amt = match self.inner.borrow_mut().io.poll(&mut self.events, max_wait) {
+        let amt = match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(a) => a,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
             Err(e) => panic!("error in poll: {}", e),
@@ -260,8 +266,8 @@ impl Core {
     fn dispatch_io(&mut self, token: usize, ready: mio::Ready) {
         let mut reader = None;
         let mut writer = None;
-        let mut inner = self.inner.borrow_mut();
-        if let Some(io) = inner.io_dispatch.get_mut(token) {
+        let mut io_dispatch = self.inner.io_dispatch.lock().unwrap();
+        if let Some(io) = io_dispatch.get_mut(token) {
             io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
             if ready.is_writable() {
                 writer = io.writer.take();
@@ -270,7 +276,7 @@ impl Core {
                 reader = io.reader.take();
             }
         }
-        drop(inner);
+        drop(io_dispatch);
         // TODO: don't notify the same task twice
         if let Some(reader) = reader {
             self.notify_handle(reader);
@@ -293,7 +299,7 @@ impl Core {
         debug!("consuming notification queue");
         // TODO: can we do better than `.unwrap()` here?
         loop {
-            let msg = self.rx.borrow_mut().poll_stream_notify(&self.rx_readiness, 0).unwrap();
+            let msg = self.rx.lock().unwrap().poll_stream_notify(&self.rx_readiness, 0).unwrap();
             match msg {
                 Async::Ready(Some(msg)) => self.notify(msg),
                 Async::NotReady |
@@ -304,9 +310,9 @@ impl Core {
 
     fn notify(&self, msg: Message) {
         match msg {
-            Message::DropSource(tok) => self.inner.borrow_mut().drop_source(tok),
+            Message::DropSource(tok) => self.inner.drop_source(tok),
             Message::Schedule(tok, wake, dir) => {
-                let task = self.inner.borrow_mut().schedule(tok, wake, dir);
+                let task = self.inner.schedule(tok, wake, dir);
                 if let Some(task) = task {
                     self.notify_handle(task);
                 }
@@ -317,7 +323,7 @@ impl Core {
 
     /// Get the ID of this loop
     pub fn id(&self) -> CoreId {
-        CoreId(self.inner.borrow().id)
+        CoreId(self.inner.id)
     }
 }
 
@@ -330,7 +336,7 @@ impl fmt::Debug for Core {
 }
 
 impl Inner {
-    fn add_source(&mut self, source: &Evented)
+    fn add_source(&self, source: &Evented)
                   -> io::Result<(Arc<AtomicUsize>, usize)> {
         debug!("adding a new I/O source");
         let sched = ScheduledIo {
@@ -338,11 +344,12 @@ impl Inner {
             reader: None,
             writer: None,
         };
-        if self.io_dispatch.len() == self.io_dispatch.capacity() {
-            let amt = self.io_dispatch.len();
-            self.io_dispatch.reserve_exact(amt);
+        let mut io_dispatch = self.io_dispatch.lock().unwrap();
+        if io_dispatch.len() == io_dispatch.capacity() {
+            let amt = io_dispatch.len();
+            io_dispatch.reserve_exact(amt);
         }
-        let entry = self.io_dispatch.vacant_entry();
+        let entry = io_dispatch.vacant_entry();
         let key = entry.key();
         try!(self.io.register(source,
                               mio::Token(TOKEN_START + key),
@@ -354,19 +361,20 @@ impl Inner {
         Ok((sched.readiness.clone(), key))
     }
 
-    fn deregister_source(&mut self, source: &Evented) -> io::Result<()> {
+    fn deregister_source(&self, source: &Evented) -> io::Result<()> {
         self.io.deregister(source)
     }
 
-    fn drop_source(&mut self, token: usize) {
+    fn drop_source(&self, token: usize) {
         debug!("dropping I/O source: {}", token);
-        self.io_dispatch.remove(token);
+        self.io_dispatch.lock().unwrap().remove(token);
     }
 
-    fn schedule(&mut self, token: usize, wake: Task, dir: Direction)
+    fn schedule(&self, token: usize, wake: Task, dir: Direction)
                 -> Option<Task> {
         debug!("scheduling direction for: {}", token);
-        let sched = self.io_dispatch.get_mut(token).unwrap();
+        let mut io_dispatch = self.io_dispatch.lock().unwrap();
+        let sched = io_dispatch.get_mut(token).unwrap();
         let (slot, ready) = match dir {
             Direction::Read => (&mut sched.reader, !mio::Ready::writable()),
             Direction::Write => (&mut sched.writer, mio::Ready::writable()),
@@ -425,7 +433,7 @@ impl Remote {
     {
         if CURRENT_LOOP.is_set() {
             CURRENT_LOOP.with(|lp| {
-                let same = lp.inner.borrow().id == self.id;
+                let same = lp.inner.id == self.id;
                 if same {
                     f(Some(lp))
                 } else {
@@ -479,7 +487,7 @@ impl Remote {
     pub fn handle(&self) -> Option<Handle> {
         if CURRENT_LOOP.is_set() {
             CURRENT_LOOP.with(|lp| {
-                let same = lp.inner.borrow().id == self.id;
+                let same = lp.inner.id == self.id;
                 if same {
                     Some(lp.handle())
                 } else {
