@@ -8,7 +8,6 @@
 
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures::{Async, Poll};
 use mio::event::Evented;
@@ -65,7 +64,7 @@ use reactor::io_token::IoToken;
 /// otherwise probably avoid using two tasks on the same `PollEvented`.
 pub struct PollEvented<E> {
     token: IoToken,
-    readiness: AtomicUsize,
+    readiness: usize,
     io: E,
 }
 
@@ -88,7 +87,7 @@ impl<E: Evented> PollEvented<E> {
 
         Ok(PollEvented {
             token,
-            readiness: AtomicUsize::new(0),
+            readiness: 0,
             io: io,
         })
     }
@@ -180,12 +179,15 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn poll_ready(&mut self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
-        match self.readiness.load(Ordering::SeqCst) & bits {
+
+        match self.readiness & bits {
             0 => {}
             n => return Async::Ready(super::usize2ready(n)),
         }
-        self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
-        match self.readiness.load(Ordering::SeqCst) & bits {
+
+        self.readiness |= self.token.take_readiness();
+
+        match self.readiness & bits {
             0 => {
                 if mask.is_writable() {
                     self.need_write();
@@ -223,7 +225,7 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn need_read(&mut self) {
         let bits = super::ready2usize(super::read_ready());
-        self.readiness.fetch_and(!bits, Ordering::SeqCst);
+        self.readiness &= !bits;
         self.token.schedule_read();
     }
 
@@ -249,7 +251,7 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn need_write(&mut self) {
         let bits = super::ready2usize(Ready::writable());
-        self.readiness.fetch_and(!bits, Ordering::SeqCst);
+        self.readiness &= !bits;
         self.token.schedule_write();
     }
 
@@ -277,10 +279,13 @@ impl<E: Read> Read for PollEvented<E> {
         if let Async::NotReady = self.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         let r = self.get_mut().read(buf);
+
         if is_wouldblock(&r) {
             self.need_read();
         }
+
         return r
     }
 }
@@ -290,10 +295,13 @@ impl<E: Write> Write for PollEvented<E> {
         if let Async::NotReady = self.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         let r = self.get_mut().write(buf);
+
         if is_wouldblock(&r) {
             self.need_write();
         }
+
         return r
     }
 
@@ -301,10 +309,13 @@ impl<E: Write> Write for PollEvented<E> {
         if let Async::NotReady = self.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         let r = self.get_mut().flush();
+
         if is_wouldblock(&r) {
             self.need_write();
         }
+
         return r
     }
 }
