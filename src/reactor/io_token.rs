@@ -1,17 +1,14 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::io;
 
-use futures::task;
 use mio::event::Evented;
 
-use reactor::{Message, Remote, Handle, Direction};
+use reactor::{Remote, Handle, Direction};
 
 /// A token that identifies an active I/O resource.
 pub struct IoToken {
     token: usize,
-    // TODO: can we avoid this allocation? It's kind of a bummer...
-    readiness: Arc<AtomicUsize>,
+    handle: Remote,
 }
 
 impl IoToken {
@@ -32,32 +29,45 @@ impl IoToken {
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
-        match handle.inner.upgrade() {
+        match handle.remote.inner.upgrade() {
             Some(inner) => {
-                let (ready, token) = try!(inner.borrow_mut().add_source(source));
-                Ok(IoToken { token: token, readiness: ready })
+                let token = try!(inner.add_source(source));
+                let handle = handle.remote().clone();
+
+                Ok(IoToken { token, handle })
             }
             None => Err(io::Error::new(io::ErrorKind::Other, "event loop gone")),
         }
     }
 
-	/// Consumes the last readiness notification the token this source is for
+    /// Returns a reference to the remote handle
+    pub fn remote(&self) -> &Remote {
+        &self.handle
+    }
+
+    /// Consumes the last readiness notification the token this source is for
     /// registered.
-	///
-	/// Currently sources receive readiness notifications on an edge-basis. That
-	/// is, once you receive a notification that an object can be read, you
-	/// won't receive any more notifications until all of that data has been
-	/// read.
-	///
-	/// The event loop will fill in this information and then inform futures
-	/// that they're ready to go with the `schedule` method, and then the `poll`
-	/// method can use this to figure out what happened.
+    ///
+    /// Currently sources receive readiness notifications on an edge-basis. That
+    /// is, once you receive a notification that an object can be read, you
+    /// won't receive any more notifications until all of that data has been
+    /// read.
+    ///
+    /// The event loop will fill in this information and then inform futures
+    /// that they're ready to go with the `schedule` method, and then the `poll`
+    /// method can use this to figure out what happened.
     ///
     /// > **Note**: This method should generally not be used directly, but
     /// >           rather the `ReadinessStream` type should be used instead.
     // TODO: this should really return a proper newtype/enum, not a usize
     pub fn take_readiness(&self) -> usize {
-        self.readiness.swap(0, Ordering::SeqCst)
+        let inner = match self.handle.inner.upgrade() {
+            Some(inner) => inner,
+            None => return 0,
+        };
+
+        let io_dispatch = inner.io_dispatch.read().unwrap();
+        io_dispatch[self.token].readiness.swap(0, Ordering::SeqCst)
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -82,8 +92,13 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_read(&self, handle: &Remote) {
-        handle.send(Message::Schedule(self.token, task::current(), Direction::Read));
+    pub fn schedule_read(&self) {
+        let inner = match self.handle.inner.upgrade() {
+            Some(inner) => inner,
+            None => return,
+        };
+
+        inner.schedule(self.token, Direction::Read);
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -109,8 +124,13 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_write(&self, handle: &Remote) {
-        handle.send(Message::Schedule(self.token, task::current(), Direction::Write));
+    pub fn schedule_write(&self) {
+        let inner = match self.handle.inner.upgrade() {
+            Some(inner) => inner,
+            None => return,
+        };
+
+        inner.schedule(self.token, Direction::Write);
     }
 
     /// Unregister all information associated with a token on an event loop,
@@ -135,7 +155,12 @@ impl IoToken {
     /// This function will panic if the event loop this handle is associated
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
-    pub fn drop_source(&self, handle: &Remote) {
-        handle.send(Message::DropSource(self.token));
+    pub fn drop_source(&self) {
+        let inner = match self.handle.inner.upgrade() {
+            Some(inner) => inner,
+            None => return,
+        };
+
+        inner.drop_source(self.token)
     }
 }
