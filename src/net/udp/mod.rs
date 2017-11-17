@@ -81,10 +81,11 @@ impl UdpSocket {
 
     /// Sends data on the socket to the address previously bound via connect().
     /// On success, returns the number of bytes written.
-    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+    pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().send(buf) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -98,10 +99,11 @@ impl UdpSocket {
 
     /// Receives data from the socket previously bound with connect().
     /// On success, returns the number of bytes read.
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().recv(buf) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -113,35 +115,16 @@ impl UdpSocket {
         }
     }
 
-    /// Test whether this socket is ready to be read or not.
-    ///
-    /// If the socket is *not* readable then the current task is scheduled to
-    /// get a notification when the socket does become readable. That is, this
-    /// is only suitable for calling in a `Future::poll` method and will
-    /// automatically handle ensuring a retry once the socket is readable again.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
-    /// Test whether this socket is ready to be written to or not.
-    ///
-    /// If the socket is *not* writable then the current task is scheduled to
-    /// get a notification when the socket does become writable. That is, this
-    /// is only suitable for calling in a `Future::poll` method and will
-    /// automatically handle ensuring a retry once the socket is writable again.
-    pub fn poll_write(&self) -> Async<()> {
-        self.io.poll_write()
-    }
-
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
     /// Address type can be any implementer of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().send_to(buf, target) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -176,10 +159,11 @@ impl UdpSocket {
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().recv_from(buf) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -397,8 +381,8 @@ impl<T> Future for SendDgram<T>
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
         {
-            let (ref sock, ref buf, ref addr) =
-                *self.0.as_ref().expect("SendDgram polled after completion");
+            let (ref mut sock, ref buf, ref addr) =
+                *self.0.as_mut().expect("SendDgram polled after completion");
             let n = try_nb!(sock.send_to(buf.as_ref(), addr));
             if n != buf.as_ref().len() {
                 return Err(incomplete_write("failed to send entire message \
@@ -425,7 +409,7 @@ impl<T> Future for RecvDgram<T>
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
         let (n, addr) = {
-            let (ref socket, ref mut buf) =
+            let (ref mut socket, ref mut buf) =
                 *self.0.as_mut().expect("RecvDgram polled after completion");
 
             try_nb!(socket.recv_from(buf.as_mut()))

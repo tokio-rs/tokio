@@ -147,11 +147,6 @@ impl TcpListener {
         Ok(TcpListener { io: io, pending_accept: None })
     }
 
-    /// Test whether this socket is ready to be read or not.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
     /// Returns the local address that this listener is bound to.
     ///
     /// This can be useful, for example, when binding to port 0 to figure out
@@ -311,26 +306,6 @@ impl TcpStream {
             Err(e) => TcpStreamNewState::Error(e),
         };
         Box::new(state)
-    }
-
-    /// Test whether this socket is ready to be read or not.
-    ///
-    /// If the socket is *not* readable then the current task is scheduled to
-    /// get a notification when the socket does become readable. That is, this
-    /// is only suitable for calling in a `Future::poll` method and will
-    /// automatically handle ensuring a retry once the socket is readable again.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
-    /// Test whether this socket is ready to be written to or not.
-    ///
-    /// If the socket is *not* writable then the current task is scheduled to
-    /// get a notification when the socket does become writable. That is, this
-    /// is only suitable for calling in a `Future::poll` method and will
-    /// automatically handle ensuring a retry once the socket is writable again.
-    pub fn poll_write(&self) -> Async<()> {
-        self.io.poll_write()
     }
 
     /// Returns the local address that this stream is bound to.
@@ -503,45 +478,10 @@ impl AsyncRead for TcpStream {
     }
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        <&TcpStream>::read_buf(&mut &*self, buf)
-    }
-}
-
-impl AsyncWrite for TcpStream {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        <&TcpStream>::shutdown(&mut &*self)
-    }
-
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        <&TcpStream>::write_buf(&mut &*self, buf)
-    }
-}
-
-impl<'a> Read for &'a TcpStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&self.io).read(buf)
-    }
-}
-
-impl<'a> Write for &'a TcpStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&self.io).write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        (&self.io).flush()
-    }
-}
-
-impl<'a> AsyncRead for &'a TcpStream {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
-    }
-
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <TcpStream>::poll_read(self) {
+        if let Async::NotReady = self.io.poll_read() {
             return Ok(Async::NotReady)
         }
+
         let r = unsafe {
             // The `IoVec` type can't have a 0-length size, so we create a bunch
             // of dummy versions on the stack with 1 length which we'll quickly
@@ -586,15 +526,16 @@ impl<'a> AsyncRead for &'a TcpStream {
     }
 }
 
-impl<'a> AsyncWrite for &'a TcpStream {
+impl AsyncWrite for TcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <TcpStream>::poll_write(self) {
+        if let Async::NotReady = self.io.poll_write() {
             return Ok(Async::NotReady)
         }
+
         let r = {
             // The `IoVec` type can't have a zero-length size, so create a dummy
             // version from a 1-length slice which we'll overwrite with the
@@ -646,7 +587,7 @@ impl Future for TcpStreamNewState {
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
         {
             let stream = match *self {
-                TcpStreamNewState::Waiting(ref s) => s,
+                TcpStreamNewState::Waiting(ref mut s) => s,
                 TcpStreamNewState::Error(_) => {
                     let e = match mem::replace(self, TcpStreamNewState::Empty) {
                         TcpStreamNewState::Error(e) => e,

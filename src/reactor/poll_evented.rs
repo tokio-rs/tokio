@@ -131,7 +131,7 @@ impl<E> PollEvented<E> {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn poll_read(&self) -> Async<()> {
+    pub fn poll_read(&mut self) -> Async<()> {
         self.poll_ready(super::read_ready())
             .map(|_| ())
     }
@@ -150,7 +150,7 @@ impl<E> PollEvented<E> {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn poll_write(&self) -> Async<()> {
+    pub fn poll_write(&mut self) -> Async<()> {
         self.poll_ready(Ready::writable())
             .map(|_| ())
     }
@@ -178,7 +178,7 @@ impl<E> PollEvented<E> {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn poll_ready(&self, mask: Ready) -> Async<Ready> {
+    pub fn poll_ready(&mut self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
         match self.readiness.load(Ordering::SeqCst) & bits {
             0 => {}
@@ -221,7 +221,7 @@ impl<E> PollEvented<E> {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn need_read(&self) {
+    pub fn need_read(&mut self) {
         let bits = super::ready2usize(super::read_ready());
         self.readiness.fetch_and(!bits, Ordering::SeqCst);
         self.token.schedule_read();
@@ -247,7 +247,7 @@ impl<E> PollEvented<E> {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn need_write(&self) {
+    pub fn need_write(&mut self) {
         let bits = super::ready2usize(Ready::writable());
         self.readiness.fetch_and(!bits, Ordering::SeqCst);
         self.token.schedule_write();
@@ -313,60 +313,6 @@ impl<E: Read> AsyncRead for PollEvented<E> {
 }
 
 impl<E: Write> AsyncWrite for PollEvented<E> {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        Ok(().into())
-    }
-}
-
-impl<'a, E> Read for &'a PollEvented<E>
-    where &'a E: Read,
-{
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_read() {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
-        let r = self.get_ref().read(buf);
-        if is_wouldblock(&r) {
-            self.need_read();
-        }
-        return r
-    }
-}
-
-impl<'a, E> Write for &'a PollEvented<E>
-    where &'a E: Write,
-{
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_write() {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
-        let r = self.get_ref().write(buf);
-        if is_wouldblock(&r) {
-            self.need_write();
-        }
-        return r
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        if let Async::NotReady = self.poll_write() {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
-        let r = self.get_ref().flush();
-        if is_wouldblock(&r) {
-            self.need_write();
-        }
-        return r
-    }
-}
-
-impl<'a, E> AsyncRead for &'a PollEvented<E>
-    where &'a E: Read,
-{
-}
-
-impl<'a, E> AsyncWrite for &'a PollEvented<E>
-    where &'a E: Write,
-{
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
     }
