@@ -86,6 +86,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-core/0.1")]
 #![deny(missing_docs)]
 #![deny(warnings)]
+#![allow(unused_macros)]
 
 extern crate bytes;
 #[macro_use]
@@ -95,9 +96,6 @@ extern crate mio;
 extern crate slab;
 #[macro_use]
 extern crate tokio_io;
-
-#[macro_use]
-extern crate scoped_tls;
 
 #[macro_use]
 extern crate log;

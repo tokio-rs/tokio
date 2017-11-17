@@ -65,7 +65,6 @@ use reactor::io_token::IoToken;
 /// otherwise probably avoid using two tasks on the same `PollEvented`.
 pub struct PollEvented<E> {
     token: IoToken,
-    handle: Remote,
     readiness: AtomicUsize,
     io: E,
 }
@@ -85,9 +84,10 @@ impl<E: Evented> PollEvented<E> {
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
+        let token = IoToken::new(&io, handle)?;
+
         Ok(PollEvented {
-            token: try!(IoToken::new(&io, handle)),
-            handle: handle.remote().clone(),
+            token,
             readiness: AtomicUsize::new(0),
             io: io,
         })
@@ -106,11 +106,12 @@ impl<E: Evented> PollEvented<E> {
     /// method is called, and will likely return an error if this `PollEvented`
     /// was created on a separate event loop from the `handle` specified.
     pub fn deregister(self, handle: &Handle) -> io::Result<()> {
-        let inner = match handle.inner.upgrade() {
+        let inner = match handle.remote.inner.upgrade() {
             Some(inner) => inner,
             None => return Ok(()),
         };
-        let ret = inner.borrow_mut().deregister_source(&self.io);
+
+        let ret = inner.deregister_source(&self.io);
         return ret
     }
 }
@@ -223,7 +224,7 @@ impl<E> PollEvented<E> {
     pub fn need_read(&self) {
         let bits = super::ready2usize(super::read_ready());
         self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_read(&self.handle)
+        self.token.schedule_read();
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -249,13 +250,13 @@ impl<E> PollEvented<E> {
     pub fn need_write(&self) {
         let bits = super::ready2usize(Ready::writable());
         self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_write(&self.handle)
+        self.token.schedule_write();
     }
 
     /// Returns a reference to the event loop handle that this readiness stream
     /// is associated with.
     pub fn remote(&self) -> &Remote {
-        &self.handle
+        self.token.remote()
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -380,6 +381,6 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 
 impl<E> Drop for PollEvented<E> {
     fn drop(&mut self) {
-        self.token.drop_source(&self.handle);
+        self.token.drop_source();
     }
 }
