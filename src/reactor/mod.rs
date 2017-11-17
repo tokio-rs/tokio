@@ -4,16 +4,14 @@
 //! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
 //! resources.
 
-use std::cell::RefCell;
 use std::fmt;
 use std::io::{self, ErrorKind};
 use std::sync::{Arc, Weak, RwLock};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use std::time::{Instant, Duration};
+use std::time::{Duration};
 
 use futures::{Future, Async};
-use futures::executor::{self, Spawn, Notify};
-use futures::sync::mpsc;
+use futures::executor::{self, Notify};
 use futures::task::{AtomicTask};
 use mio;
 use mio::event::Evented;
@@ -24,8 +22,8 @@ mod io_token;
 mod poll_evented;
 pub use self::poll_evented::PollEvented;
 
+/// Global counter used to assign unique IDs to reactor instances.
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-scoped_thread_local!(static CURRENT_LOOP: Core);
 
 /// An event loop.
 ///
@@ -33,28 +31,28 @@ scoped_thread_local!(static CURRENT_LOOP: Core);
 /// all other I/O events and notifications happening. Each event loop can have
 /// multiple handles pointing to it, each of which can then be used to create
 /// various I/O objects to interact with the event loop in interesting ways.
-// TODO: expand this
 pub struct Core {
+    /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
-    _tx: mpsc::UnboundedSender<Message>,
-    rx: RefCell<Spawn<mpsc::UnboundedReceiver<Message>>>,
-    _rx_registration: mio::Registration,
-    rx_readiness: Arc<MySetReadiness>,
 
+    /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
 
-    // Used for determining when the future passed to `run` is ready. Once the
-    // registration is passed to `io` above we never touch it again, just keep
-    // it alive.
+    /// Used for determining when the future passed to `run` is ready. Once the
+    /// registration is passed to `io` above we never touch it again, just keep
+    /// it alive.
     _future_registration: mio::Registration,
     future_readiness: Arc<MySetReadiness>,
 }
 
 struct Inner {
+    /// Unique identifier referencing this reactor.
     id: usize,
+
+    /// The underlying system event queue.
     io: mio::Poll,
 
-    // Dispatch slabs for I/O and futures events
+    /// Dispatch slabs for I/O and futures events
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 }
 
@@ -96,10 +94,6 @@ enum Direction {
     Write,
 }
 
-enum Message {
-}
-
-const TOKEN_MESSAGES: mio::Token = mio::Token(0);
 const TOKEN_FUTURE: mio::Token = mio::Token(1);
 const TOKEN_START: usize = 2;
 
@@ -114,31 +108,21 @@ impl Core {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Core> {
+        // Create the I/O poller
         let io = try!(mio::Poll::new());
+
+        // Create a registration for unblocking the reactor when the "run"
+        // future becomes ready.
         let future_pair = mio::Registration::new2();
         try!(io.register(&future_pair.0,
                          TOKEN_FUTURE,
                          mio::Ready::readable(),
                          mio::PollOpt::level()));
-        let (tx, rx) = mpsc::unbounded();
-        let channel_pair = mio::Registration::new2();
-        try!(io.register(&channel_pair.0,
-                         TOKEN_MESSAGES,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
-        let rx_readiness = Arc::new(MySetReadiness(channel_pair.1));
-        rx_readiness.notify(0);
 
         Ok(Core {
             events: mio::Events::with_capacity(1024),
-            _tx: tx,
-            rx: RefCell::new(executor::spawn(rx)),
-            _rx_registration: channel_pair.0,
-            rx_readiness: rx_readiness,
-
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
-
             inner: Arc::new(Inner {
                 id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
                 io: io,
@@ -193,9 +177,7 @@ impl Core {
 
         loop {
             if future_fired {
-                let res = try!(CURRENT_LOOP.set(self, || {
-                    task.poll_future_notify(&self.future_readiness, 0)
-                }));
+                let res = task.poll_future_notify(&self.future_readiness, 0)?;
                 if let Async::Ready(e) = res {
                     return Ok(e)
                 }
@@ -217,19 +199,14 @@ impl Core {
     }
 
     fn poll(&mut self, max_wait: Option<Duration>) -> bool {
-        let start = Instant::now();
-
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        let amt = match self.inner.io.poll(&mut self.events, max_wait) {
-            Ok(a) => a,
+        match self.inner.io.poll(&mut self.events, max_wait) {
+            Ok(_) => {}
             Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
+            // TODO: This should return an io::Result instead of panic.
             Err(e) => panic!("error in poll: {}", e),
-        };
-
-        let after_poll = Instant::now();
-        debug!("loop poll - {:?}", after_poll - start);
-        debug!("loop time - {:?}", after_poll);
+        }
 
         // Process all the events that came in, dispatching appropriately
         let mut fired = false;
@@ -238,27 +215,22 @@ impl Core {
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
-            if token == TOKEN_MESSAGES {
-                self.rx_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                CURRENT_LOOP.set(&self, || self.consume_queue());
-            } else if token == TOKEN_FUTURE {
+            if token == TOKEN_FUTURE {
                 self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
                 fired = true;
             } else {
                 self.dispatch(token, event.readiness());
             }
         }
-        debug!("loop process - {} events, {:?}", amt, after_poll.elapsed());
+
         return fired
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
-        self.dispatch_io(token, ready)
-    }
+        let io_dispatch = self.inner.io_dispatch.read().unwrap();
 
-    fn dispatch_io(&mut self, token: usize, ready: mio::Ready) {
-        if let Some(io) = self.inner.io_dispatch.read().unwrap().get(token) {
+        if let Some(io) = io_dispatch.get(token) {
             io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
             if ready.is_writable() {
                 io.writer.notify();
@@ -266,24 +238,6 @@ impl Core {
             if !(ready & (!mio::Ready::writable())).is_empty() {
                 io.reader.notify();
             }
-        }
-    }
-
-    fn consume_queue(&self) {
-        debug!("consuming notification queue");
-        // TODO: can we do better than `.unwrap()` here?
-        loop {
-            let msg = self.rx.borrow_mut().poll_stream_notify(&self.rx_readiness, 0).unwrap();
-            match msg {
-                Async::Ready(Some(msg)) => self.notify(msg),
-                Async::NotReady |
-                Async::Ready(None) => break,
-            }
-        }
-    }
-
-    fn notify(&self, msg: Message) {
-        match msg {
         }
     }
 
