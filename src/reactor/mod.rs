@@ -182,7 +182,7 @@ impl Core {
                     return Ok(e)
                 }
             }
-            future_fired = self.poll(None);
+            future_fired = self.poll(None).unwrap();
         }
     }
 
@@ -195,17 +195,16 @@ impl Core {
     /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
     /// empty future (one that never finishes).
     pub fn turn(&mut self, max_wait: Option<Duration>) {
-        self.poll(max_wait);
+        self.poll(max_wait).unwrap();
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
+    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<bool> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
-            // TODO: This should return an io::Result instead of panic.
-            Err(e) => panic!("error in poll: {}", e),
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => return Ok(false),
+            Err(e) => return Err(e),
         }
 
         // Process all the events that came in, dispatching appropriately
@@ -223,7 +222,7 @@ impl Core {
             }
         }
 
-        return fired
+        return Ok(fired)
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
