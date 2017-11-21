@@ -56,15 +56,6 @@ struct Inner {
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 }
 
-/// An unique ID for a Core
-///
-/// An ID by which different cores may be distinguished. Can be compared and used as an index in
-/// a `HashMap`.
-///
-/// The ID is globally unique and never reused.
-#[derive(Clone,Copy,Eq,PartialEq,Hash,Debug)]
-pub struct CoreId(usize);
-
 /// Handle to an event loop, used to construct I/O objects, send messages, and
 /// otherwise interact indirectly with the event loop itself.
 ///
@@ -240,18 +231,11 @@ impl Core {
             }
         }
     }
-
-    /// Get the ID of this loop
-    pub fn id(&self) -> CoreId {
-        CoreId(self.inner.id)
-    }
 }
 
 impl fmt::Debug for Core {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Core")
-         .field("id", &self.id())
-         .finish()
+        write!(f, "Core")
     }
 }
 
@@ -309,11 +293,6 @@ impl Inner {
 }
 
 impl Remote {
-    /// Return the ID of the represented Core
-    pub fn id(&self) -> CoreId {
-        CoreId(self.id)
-    }
-
     /// Attempts to "promote" this remote to a handle, if possible.
     ///
     /// This function is intended for structures which typically work through a
@@ -355,9 +334,7 @@ impl Remote {
 
 impl fmt::Debug for Remote {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Remote")
-         .field("id", &self.id())
-         .finish()
+        write!(f,"Remote")
     }
 }
 
@@ -366,18 +343,11 @@ impl Handle {
     pub fn remote(&self) -> &Remote {
         &self.remote
     }
-
-    /// Return the ID of the represented Core
-    pub fn id(&self) -> CoreId {
-        self.remote.id()
-    }
 }
 
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Handle")
-         .field("id", &self.id())
-         .finish()
+        write!(f, "Handle")
     }
 }
 
