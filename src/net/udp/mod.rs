@@ -1,5 +1,5 @@
 use std::io;
-use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::fmt;
 
 use futures::{Async, Future, Poll};
@@ -13,7 +13,7 @@ pub struct UdpSocket {
 }
 
 mod frame;
-pub use self::frame::{UdpFramed, UdpCodec};
+pub use self::frame::{UdpCodec, UdpFramed};
 
 impl UdpSocket {
     /// Create a new UDP socket bound to the specified address.
