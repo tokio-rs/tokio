@@ -171,7 +171,12 @@ impl Core {
                     return Ok(e)
                 }
             }
-            future_fired = self.poll(None);
+            match self.poll(None) {
+                Ok(fired) => future_fired = fired,
+                // TODO: change `F::error` to `io::Error` and return this error
+                // rather then panicing? Or `Result<(), Result<F::Item, F:Error>>`
+                Err(err) => panic!("error in poll: {}", err),
+            }
         }
     }
 
@@ -184,50 +189,33 @@ impl Core {
     /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
     /// empty future (one that never finishes).
     pub fn turn(&mut self, max_wait: Option<Duration>) {
-        self.poll(max_wait);
+        // TODO: return `Result<bool, io::Error>`, see `poll`.
+        let _ = self.poll(max_wait);
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
-        // Block waiting for an event to happen, peeling out how many events
-        // happened.
+    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<bool> {
+        // Block waiting for an event to happen.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
-            // TODO: This should return an io::Result instead of panic.
-            Err(e) => panic!("error in poll: {}", e),
+            Err(ref err) if err.kind() == ErrorKind::Interrupted => return Ok(false),
+            Err(err) => return Err(err),
         }
 
-        // Process all the events that came in, dispatching appropriately
-        let mut fired = false;
-        for i in 0..self.events.len() {
-            let event = self.events.get(i).unwrap();
+        // Process all the events that came in, dispatching appropriately.
+        let fired = self.events.iter().fold(false, |fired, event| {
             let token = event.token();
-            trace!("event {:?} {:?}", event.readiness(), event.token());
+            trace!("event {:?} {:?}", event.readiness(), token);
 
             if token == TOKEN_FUTURE {
                 self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                fired = true;
+                true
             } else {
-                self.dispatch(token, event.readiness());
+                self.inner.dispatch(token, event.readiness());
+                fired
             }
-        }
+        });
 
-        return fired
-    }
-
-    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
-        let token = usize::from(token) - TOKEN_START;
-        let io_dispatch = self.inner.io_dispatch.read().unwrap();
-
-        if let Some(io) = io_dispatch.get(token) {
-            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
-            if ready.is_writable() {
-                io.writer.notify();
-            }
-            if !(ready & (!mio::Ready::writable())).is_empty() {
-                io.reader.notify();
-            }
-        }
+        Ok(fired)
     }
 }
 
@@ -283,6 +271,22 @@ impl Inner {
 
         if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
             task.notify();
+        }
+    }
+
+    // TODO: add doc; used in Core.poll.
+    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
+        let token = usize::from(token) - TOKEN_START;
+        let io_dispatch = self.io_dispatch.read().unwrap();
+
+        if let Some(io) = io_dispatch.get(token) {
+            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
+            if ready.is_writable() {
+                io.writer.notify();
+            }
+            if !(ready & (!mio::Ready::writable())).is_empty() {
+                io.reader.notify();
+            }
         }
     }
 }
