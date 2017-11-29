@@ -360,16 +360,6 @@ impl Notify for MySetReadiness {
     }
 }
 
-trait FnBox: Send + 'static {
-    fn call_box(self: Box<Self>, lp: &Core);
-}
-
-impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
-    fn call_box(self: Box<Self>, lp: &Core) {
-        (*self)(lp)
-    }
-}
-
 fn read_ready() -> mio::Ready {
     mio::Ready::readable() | platform::hup()
 }
