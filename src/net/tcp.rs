@@ -71,7 +71,7 @@ impl TcpListener {
             }
 
             if let Async::NotReady = self.io.poll_read() {
-                return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+                return Err(io::ErrorKind::WouldBlock.into())
             }
 
             match self.io.get_ref().accept() {
