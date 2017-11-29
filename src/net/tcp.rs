@@ -36,7 +36,7 @@ impl TcpListener {
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::bind(addr));
+        let l = mio::net::TcpListener::bind(addr)?;
         TcpListener::new(l, handle)
     }
 
@@ -84,7 +84,7 @@ impl TcpListener {
                 Ok((sock, addr)) => {
                     // Fast path if we haven't left the event loop
                     if let Some(handle) = self.io.remote().handle() {
-                        let io = try!(PollEvented::new(sock, &handle));
+                        let io = PollEvented::new(sock, &handle)?;
                         return Ok((TcpStream { io: io }, addr))
                     }
 
@@ -137,13 +137,13 @@ impl TcpListener {
     pub fn from_listener(listener: net::TcpListener,
                          addr: &SocketAddr,
                          handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::from_listener(listener, addr));
+        let l = mio::net::TcpListener::from_listener(listener, addr)?;
         TcpListener::new(l, handle)
     }
 
     fn new(listener: mio::net::TcpListener, handle: &Handle)
            -> io::Result<TcpListener> {
-        let io = try!(PollEvented::new(listener, handle));
+        let io = PollEvented::new(listener, handle)?;
         Ok(TcpListener { io: io, pending_accept: None })
     }
 
@@ -278,9 +278,9 @@ impl TcpStream {
     /// returned is associated with the event loop and ready to perform I/O.
     pub fn from_stream(stream: net::TcpStream, handle: &Handle)
                        -> io::Result<TcpStream> {
-        let inner = try!(mio::net::TcpStream::from_stream(stream));
+        let inner = mio::net::TcpStream::from_stream(stream)?;
         Ok(TcpStream {
-            io: try!(PollEvented::new(inner, handle)),
+            io: PollEvented::new(inner, handle)?,
         })
     }
 
@@ -666,7 +666,7 @@ impl Future for TcpStreamNewState {
             if let Async::NotReady = stream.io.poll_write() {
                 return Ok(Async::NotReady)
             }
-            if let Some(e) = try!(stream.io.get_ref().take_error()) {
+            if let Some(e) = stream.io.get_ref().take_error()? {
                 return Err(e)
             }
         }

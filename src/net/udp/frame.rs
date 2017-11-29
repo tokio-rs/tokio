@@ -72,7 +72,7 @@ impl<C: UdpCodec> Stream for UdpFramed<C> {
     fn poll(&mut self) -> Poll<Option<C::In>, io::Error> {
         let (n, addr) = try_nb!(self.socket.recv_from(&mut self.rd));
         trace!("received {} bytes, decoding", n);
-        let frame = try!(self.codec.decode(&addr, &self.rd[..n]));
+        let frame = self.codec.decode(&addr, &self.rd[..n])?;
         trace!("frame decoded from buffer");
         Ok(Async::Ready(Some(frame)))
     }

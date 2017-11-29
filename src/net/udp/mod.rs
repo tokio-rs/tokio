@@ -21,12 +21,12 @@ impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to the
     /// `addr` provided. If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::net::UdpSocket::bind(addr));
+        let udp = mio::net::UdpSocket::bind(addr)?;
         UdpSocket::new(udp, handle)
     }
 
     fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
-        let io = try!(PollEvented::new(socket, handle));
+        let io = PollEvented::new(socket, handle)?;
         Ok(UdpSocket { io: io })
     }
 
@@ -41,7 +41,7 @@ impl UdpSocket {
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_socket(socket: net::UdpSocket,
                        handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::net::UdpSocket::from_socket(socket));
+        let udp = mio::net::UdpSocket::from_socket(socket)?;
         UdpSocket::new(udp, handle)
     }
 

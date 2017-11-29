@@ -100,15 +100,13 @@ impl Core {
     /// creation.
     pub fn new() -> io::Result<Core> {
         // Create the I/O poller
-        let io = try!(mio::Poll::new());
+        let io = mio::Poll::new()?;
 
         // Create a registration for unblocking the reactor when the "run"
         // future becomes ready.
         let future_pair = mio::Registration::new2();
-        try!(io.register(&future_pair.0,
-                         TOKEN_FUTURE,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
+        io.register(&future_pair.0, TOKEN_FUTURE,
+             mio::Ready::readable(), mio::PollOpt::level())?;
 
         Ok(Core {
             events: mio::Events::with_capacity(1024),
@@ -254,12 +252,9 @@ impl Inner {
                 writer: AtomicTask::new(),
             });
 
-        try!(self.io.register(source,
-                              mio::Token(TOKEN_START + key),
-                              mio::Ready::readable() |
-                                mio::Ready::writable() |
-                                platform::all(),
-                              mio::PollOpt::edge()));
+        self.io.register(source, mio::Token(TOKEN_START + key),
+            mio::Ready::readable() | mio::Ready::writable() | platform::all(),
+            mio::PollOpt::edge())?;
 
         Ok(key)
     }
