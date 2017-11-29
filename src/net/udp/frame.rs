@@ -101,7 +101,7 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
 
     fn poll_complete(&mut self) -> Poll<(), io::Error> {
         if self.flushed {
-            return Ok(Async::Ready(()))
+            return Ok(Async::Ready(()));
         }
 
         trace!("flushing frame; length={}", self.wr.len());

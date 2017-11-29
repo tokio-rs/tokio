@@ -168,7 +168,7 @@ impl Core {
             if future_fired {
                 let res = task.poll_future_notify(&self.future_readiness, 0)?;
                 if let Async::Ready(e) = res {
-                    return Ok(e)
+                    return Ok(e);
                 }
             }
             match self.poll(None) {
@@ -229,9 +229,7 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    fn add_source(&self, source: &Evented)
-        -> io::Result<usize>
-    {
+    fn add_source(&self, source: &Evented) -> io::Result<usize> {
         // Acquire a write lock
         let key = self.io_dispatch.write().unwrap()
             .insert(ScheduledIo {
@@ -306,7 +304,7 @@ impl Remote {
     /// `spawn` above if it returns `None`.
     pub fn handle(&self) -> Option<Handle> {
         let remote = self.clone();
-        Some(Handle { remote } )
+        Some(Handle { remote })
     }
 
     /// Spawns a new future into the event loop this remote is associated with.
@@ -333,7 +331,7 @@ impl Remote {
 
 impl fmt::Debug for Remote {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"Remote")
+        write!(f, "Remote")
     }
 }
 

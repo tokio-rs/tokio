@@ -64,14 +64,14 @@ impl TcpListener {
                 match pending.poll().expect("shouldn't be canceled") {
                     Async::NotReady => {
                         self.pending_accept = Some(pending);
-                        return Err(io::ErrorKind::WouldBlock.into())
+                        return Err(io::ErrorKind::WouldBlock.into());
                     },
                     Async::Ready(r) => return r,
                 }
             }
 
             if let Async::NotReady = self.io.poll_read() {
-                return Err(io::ErrorKind::WouldBlock.into())
+                return Err(io::ErrorKind::WouldBlock.into());
             }
 
             match self.io.get_ref().accept() {
@@ -79,13 +79,13 @@ impl TcpListener {
                     if e.kind() == io::ErrorKind::WouldBlock {
                         self.io.need_read();
                     }
-                    return Err(e)
+                    return Err(e);
                 },
                 Ok((sock, addr)) => {
                     // Fast path if we haven't left the event loop
                     if let Some(handle) = self.io.remote().handle() {
                         let io = PollEvented::new(sock, &handle)?;
-                        return Ok((TcpStream { io: io }, addr))
+                        return Ok((TcpStream { io: io }, addr));
                     }
 
                     // If we're off the event loop then send the socket back
@@ -141,8 +141,7 @@ impl TcpListener {
         TcpListener::new(l, handle)
     }
 
-    fn new(listener: mio::net::TcpListener, handle: &Handle)
-           -> io::Result<TcpListener> {
+    fn new(listener: mio::net::TcpListener, handle: &Handle) -> io::Result<TcpListener> {
         let io = PollEvented::new(listener, handle)?;
         Ok(TcpListener { io: io, pending_accept: None })
     }
@@ -263,8 +262,7 @@ impl TcpStream {
         TcpStreamNew { inner: inner }
     }
 
-    fn new(connected_stream: mio::net::TcpStream, handle: &Handle)
-           -> TcpStreamNewState {
+    fn new(connected_stream: mio::net::TcpStream, handle: &Handle) -> TcpStreamNewState {
         match PollEvented::new(connected_stream, handle) {
             Ok(io) => TcpStreamNewState::Waiting(TcpStream { io: io }),
             Err(e) => TcpStreamNewState::Error(e),
@@ -276,8 +274,7 @@ impl TcpStream {
     /// This function will convert a TCP stream in the standard library to a TCP
     /// stream ready to be used with the provided event loop handle. The object
     /// returned is associated with the event loop and ready to perform I/O.
-    pub fn from_stream(stream: net::TcpStream, handle: &Handle)
-                       -> io::Result<TcpStream> {
+    pub fn from_stream(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
         let inner = mio::net::TcpStream::from_stream(stream)?;
         Ok(TcpStream {
             io: PollEvented::new(inner, handle)?,
@@ -540,7 +537,7 @@ impl<'a> AsyncRead for &'a TcpStream {
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = <TcpStream>::poll_read(self) {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
         let r = unsafe {
             // The `IoVec` type can't have a 0-length size, so we create a bunch
@@ -593,7 +590,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = <TcpStream>::poll_write(self) {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
         let r = {
             // The `IoVec` type can't have a zero-length size, so create a dummy
@@ -652,7 +649,7 @@ impl Future for TcpStreamNewState {
                         TcpStreamNewState::Error(e) => e,
                         _ => panic!(),
                     };
-                    return Err(e)
+                    return Err(e);
                 }
                 TcpStreamNewState::Empty => panic!("can't poll TCP stream twice"),
             };
@@ -664,10 +661,10 @@ impl Future for TcpStreamNewState {
             //
             // If all that succeeded then we ship everything on up.
             if let Async::NotReady = stream.io.poll_write() {
-                return Ok(Async::NotReady)
+                return Ok(Async::NotReady);
             }
             if let Some(e) = stream.io.get_ref().take_error()? {
-                return Err(e)
+                return Err(e);
             }
         }
         match mem::replace(self, TcpStreamNewState::Empty) {
