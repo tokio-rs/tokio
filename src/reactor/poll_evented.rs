@@ -111,8 +111,7 @@ impl<E: Evented> PollEvented<E> {
             None => return Ok(()),
         };
 
-        let ret = inner.deregister_source(&self.io);
-        return ret
+        inner.deregister_source(&self.io)
     }
 }
 
