@@ -31,7 +31,7 @@ impl IoToken {
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
         match handle.remote.inner.upgrade() {
             Some(inner) => {
-                let token = try!(inner.add_source(source));
+                let token = inner.add_source(source)?;
                 let handle = handle.remote().clone();
 
                 Ok(IoToken { token, handle })
