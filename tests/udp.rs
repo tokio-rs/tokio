@@ -1,5 +1,4 @@
 extern crate futures;
-#[macro_use]
 extern crate tokio;
 #[macro_use]
 extern crate tokio_io;
