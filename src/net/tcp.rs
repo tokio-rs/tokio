@@ -1,13 +1,13 @@
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
-use std::net::{self, SocketAddr, Shutdown};
+use std::net::{self, Shutdown, SocketAddr};
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use futures::stream::Stream;
 use futures::sync::oneshot;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 use iovec::IoVec;
 use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -680,7 +680,7 @@ impl Future for TcpStreamNewState {
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 mod sys {
     use std::os::unix::prelude::*;
-    use super::{TcpStream, TcpListener};
+    use super::{TcpListener, TcpStream};
 
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {

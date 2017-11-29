@@ -3,7 +3,7 @@ use std::io;
 
 use mio::event::Evented;
 
-use reactor::{Remote, Handle, Direction};
+use reactor::{Direction, Handle, Remote};
 
 /// A token that identifies an active I/O resource.
 pub struct IoToken {

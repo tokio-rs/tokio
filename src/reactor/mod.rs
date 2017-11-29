@@ -6,13 +6,13 @@
 
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::sync::{Arc, Weak, RwLock};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use std::time::{Duration};
+use std::sync::{Arc, RwLock, Weak};
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::time::Duration;
 
-use futures::{Future, Async};
+use futures::{Async, Future};
 use futures::executor::{self, Notify};
-use futures::task::{AtomicTask};
+use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
 use slab::Slab;
