@@ -33,9 +33,8 @@ impl IoToken {
             Some(inner) => {
                 let token = inner.add_source(source)?;
                 let handle = handle.remote().clone();
-
                 Ok(IoToken { token, handle })
-            }
+            },
             None => Err(io::Error::new(io::ErrorKind::Other, "event loop gone")),
         }
     }
@@ -93,12 +92,10 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_read(&self) {
-        let inner = match self.handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.schedule(self.token, Direction::Read);
+        match self.handle.inner.upgrade() {
+            Some(inner) => inner.schedule(self.token, Direction::Read),
+            None => {},
+        }
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -125,12 +122,10 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_write(&self) {
-        let inner = match self.handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.schedule(self.token, Direction::Write);
+        match self.handle.inner.upgrade() {
+            Some(inner) => inner.schedule(self.token, Direction::Write),
+            None => {},
+        }
     }
 
     /// Unregister all information associated with a token on an event loop,
@@ -156,11 +151,9 @@ impl IoToken {
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
     pub fn drop_source(&self) {
-        let inner = match self.handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.drop_source(self.token)
+        match self.handle.inner.upgrade() {
+            Some(inner) => inner.drop_source(self.token),
+            None => {},
+        }
     }
 }
