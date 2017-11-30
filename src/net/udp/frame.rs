@@ -5,7 +5,7 @@ use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
 
 use net::UdpSocket;
 
-/// Encoding of frames via buffers.
+/// Encoding of datagrams into frames via buffers.
 ///
 /// This trait is used when constructing an instance of `UdpFramed` and provides
 /// the `In` and `Out` types which are decoded and encoded from the socket,
@@ -18,7 +18,7 @@ use net::UdpSocket;
 /// The trait itself is implemented on a type that can track state for decoding
 /// or encoding, which is particularly useful for streaming parsers. In many
 /// cases, though, this type will simply be a unit struct (e.g. `struct
-/// HttpCodec`).
+/// MyCodec`).
 pub trait UdpCodec {
     /// The type of decoded frames.
     type In;
@@ -140,9 +140,11 @@ pub fn new<C: UdpCodec>(socket: UdpSocket, codec: C) -> UdpFramed<C> {
 impl<C> UdpFramed<C> {
     /// Returns a reference to the underlying I/O stream wrapped by `Framed`.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
+    /// # Note
+    ///
+    /// Care should be taken to not tamper with the underlying stream of data
+    /// coming in as it may corrupt the stream of frames otherwise being worked
+    /// with.
     pub fn get_ref(&self) -> &UdpSocket {
         &self.socket
     }
@@ -150,18 +152,16 @@ impl<C> UdpFramed<C> {
     /// Returns a mutable reference to the underlying I/O stream wrapped by
     /// `Framed`.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
+    /// # Note
+    ///
+    /// Care should be taken to not tamper with the underlying stream of data
+    /// coming in as it may corrupt the stream of frames otherwise being worked
+    /// with.
     pub fn get_mut(&mut self) -> &mut UdpSocket {
         &mut self.socket
     }
 
     /// Consumes the `Framed`, returning its underlying I/O stream.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
     pub fn into_inner(self) -> UdpSocket {
         self.socket
     }
