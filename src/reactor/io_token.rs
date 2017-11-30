@@ -12,8 +12,8 @@ pub struct IoToken {
 }
 
 impl IoToken {
-    /// Add a new source to an event loop, returning a future which will resolve
-    /// to the token that can be used to identify this source.
+    /// Add a new source to an event loop, returning a token that can be used to
+    /// identify this source.
     ///
     /// When a new I/O object is created it needs to be communicated to the
     /// event loop to ensure that it's registered and ready to receive
@@ -40,7 +40,7 @@ impl IoToken {
         }
     }
 
-    /// Returns a reference to the remote handle
+    /// Returns a reference to the remote handle.
     pub fn remote(&self) -> &Remote {
         &self.handle
     }
@@ -137,8 +137,8 @@ impl IoToken {
     /// deallocating all internal resources assigned to the given token.
     ///
     /// This method should be called whenever a source of events is being
-    /// destroyed. This will ensure that the event loop can reuse `tok` for
-    /// another I/O object if necessary and also remove it from any poll
+    /// destroyed. This will ensure that the event loop can reuse the `token`
+    /// for another I/O object if necessary and also remove it from any poll
     /// notifications and callbacks.
     ///
     /// Note that wake callbacks may still be invoked after this method is
