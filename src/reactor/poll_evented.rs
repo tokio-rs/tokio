@@ -15,8 +15,8 @@ use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::{Handle, Remote};
-use reactor::io_token::IoToken;
+use super::{Handle, Remote};
+use super::io_token::IoToken;
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -84,10 +84,8 @@ impl<E: Evented> PollEvented<E> {
     /// This method returns a future which will resolve to the readiness stream
     /// when it's ready.
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
-        let token = IoToken::new(&io, handle)?;
-
         Ok(PollEvented {
-            token,
+            token: IoToken::new(&io, handle)?,
             readiness: AtomicUsize::new(0),
             io: io,
         })
@@ -106,13 +104,10 @@ impl<E: Evented> PollEvented<E> {
     /// method is called, and will likely return an error if this `PollEvented`
     /// was created on a separate event loop from the `handle` specified.
     pub fn deregister(self, handle: &Handle) -> io::Result<()> {
-        let inner = match handle.remote.inner.upgrade() {
-            Some(inner) => inner,
-            None => return Ok(()),
-        };
-
-        let ret = inner.deregister_source(&self.io);
-        return ret
+        match handle.remote.inner.upgrade() {
+            Some(inner) => inner.deregister_source(&self.io),
+            None => Ok(()),
+        }
     }
 }
 
@@ -181,7 +176,7 @@ impl<E> PollEvented<E> {
     pub fn poll_ready(&self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
         match self.readiness.load(Ordering::SeqCst) & bits {
-            0 => {}
+            0 => {},
             n => return Async::Ready(super::usize2ready(n)),
         }
         self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
@@ -193,7 +188,7 @@ impl<E> PollEvented<E> {
                     self.need_read();
                 }
                 Async::NotReady
-            }
+            },
             n => Async::Ready(super::usize2ready(n)),
         }
     }
@@ -275,7 +270,7 @@ impl<E> PollEvented<E> {
 impl<E: Read> Read for PollEvented<E> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
         let r = self.get_mut().read(buf);
         if is_wouldblock(&r) {
