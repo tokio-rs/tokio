@@ -6,8 +6,9 @@
 
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::sync::{Arc, RwLock, Weak};
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::{Arc, RwLock, Weak};
 use std::time::Duration;
 
 use futures::{Async, Future};
@@ -166,9 +167,10 @@ impl Core {
 
         loop {
             if future_fired {
-                let res = task.poll_future_notify(&self.future_readiness, 0)?;
-                if let Async::Ready(e) = res {
-                    return Ok(e);
+                match task.poll_future_notify(&self.future_readiness, 0) {
+                    Ok(Async::Ready(res)) => return Ok(res),
+                    Err(err) => return Err(err),
+                    Ok(Async::NotReady) => {}, // continue.
                 }
             }
             match self.poll(None) {
@@ -205,18 +207,18 @@ impl Core {
         }
 
         // Process all the events that came in, dispatching appropriately.
-        let fired = self.events.iter().fold(false, |fired, event| {
+        let mut fired = false;
+        for event in self.events.iter() {
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), token);
 
             if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                true
+                self.future_readiness.0.set_readiness(mio::Ready::empty())?;
+                fired = true
             } else {
                 self.inner.dispatch(token, event.readiness());
-                fired
             }
-        });
+        }
 
         Ok(fired)
     }
@@ -240,8 +242,7 @@ impl Inner {
                 writer: AtomicTask::new(),
             });
 
-        self.io.register(source, mio::Token(TOKEN_START + key),
-            mio::Ready::readable() | mio::Ready::writable() | platform::all(),
+        self.io.register(source, mio::Token(TOKEN_START + key), all_ready(),
             mio::PollOpt::edge())?;
 
         Ok(key)
@@ -263,7 +264,7 @@ impl Inner {
         let sched = io_dispatch.get(token).unwrap();
 
         let (task, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
+            Direction::Read => (&sched.reader, mio::Ready::readable()),
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
@@ -284,7 +285,7 @@ impl Inner {
             if ready.is_writable() {
                 io.writer.notify();
             }
-            if !(ready & (!mio::Ready::writable())).is_empty() {
+            if ready.is_readable() {
                 io.reader.notify();
             }
         }
@@ -358,6 +359,10 @@ impl Notify for MySetReadiness {
         self.0.set_readiness(mio::Ready::readable())
               .expect("failed to set readiness");
     }
+}
+
+fn all_ready() -> mio::Ready {
+    mio::Ready::readable() | mio::Ready::writable() | platform::all()
 }
 
 fn read_ready() -> mio::Ready {
