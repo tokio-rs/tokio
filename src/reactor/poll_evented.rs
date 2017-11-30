@@ -280,7 +280,7 @@ impl<E: Read> Read for PollEvented<E> {
         if is_wouldblock(&r) {
             self.need_read();
         }
-        return r
+        r
     }
 }
 
@@ -293,7 +293,7 @@ impl<E: Write> Write for PollEvented<E> {
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -304,7 +304,7 @@ impl<E: Write> Write for PollEvented<E> {
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 }
 
@@ -328,7 +328,7 @@ impl<'a, E> Read for &'a PollEvented<E>
         if is_wouldblock(&r) {
             self.need_read();
         }
-        return r
+        r
     }
 }
 
@@ -343,7 +343,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -354,7 +354,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 }
 
