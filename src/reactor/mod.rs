@@ -25,12 +25,12 @@ pub use self::poll_evented::PollEvented;
 /// Global counter used to assign unique IDs to reactor instances.
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
-/// An event loop.
+/// The reactor core, or event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
-/// all other I/O events and notifications happening. Each event loop can have
-/// multiple handles pointing to it, each of which can then be used to create
-/// various I/O objects to interact with the event loop in interesting ways.
+/// all other I/O events and notifications. Each event loop can have multiple
+/// handles pointing to it, each of which can then be used to create various I/O
+/// objects to interact with the event loop in interesting ways.
 pub struct Core {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
@@ -39,8 +39,8 @@ pub struct Core {
     inner: Arc<Inner>,
 
     /// Used for determining when the future passed to `run` is ready. Once the
-    /// registration is passed to `io` above we never touch it again, just keep
-    /// it alive.
+    /// registration is passed to `inner.io` above we never touch it again, just
+    /// keep it alive.
     _future_registration: mio::Registration,
     future_readiness: Arc<MySetReadiness>,
 }
@@ -80,6 +80,7 @@ struct ScheduledIo {
     writer: AtomicTask,
 }
 
+/// What kind of I/O interest there is.
 enum Direction {
     Read,
     Write,
@@ -99,7 +100,6 @@ impl Core {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Core> {
-        // Create the I/O poller
         let io = mio::Poll::new()?;
 
         // Create a registration for unblocking the reactor when the "run"
@@ -174,7 +174,8 @@ impl Core {
             match self.poll(None) {
                 Ok(fired) => future_fired = fired,
                 // TODO: change `F::error` to `io::Error` and return this error
-                // rather then panicing? Or `Result<(), Result<F::Item, F:Error>>`
+                // rather then panicing? Or return
+                // `Result<(), Result<F::Item, F:Error>>`?
                 Err(err) => panic!("error in poll: {}", err),
             }
         }
@@ -189,14 +190,16 @@ impl Core {
     /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
     /// empty future (one that never finishes).
     pub fn turn(&mut self, max_wait: Option<Duration>) {
-        // TODO: return `Result<bool, io::Error>`, see `poll`.
+        // TODO: return `Result<(), io::Error>`, see `poll`.
         let _ = self.poll(max_wait);
     }
 
+    /// Poll mio for events, returning a boolean indicating wether or not the
+    /// future used in `run` was notified.
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<bool> {
         // Block waiting for an event to happen.
         match self.inner.io.poll(&mut self.events, max_wait) {
-            Ok(_) => {}
+            Ok(_) => {}, // continue.
             Err(ref err) if err.kind() == ErrorKind::Interrupted => return Ok(false),
             Err(err) => return Err(err),
         }
@@ -230,7 +233,6 @@ impl Inner {
     ///
     /// The registration token is returned.
     fn add_source(&self, source: &Evented) -> io::Result<usize> {
-        // Acquire a write lock
         let key = self.io_dispatch.write().unwrap()
             .insert(ScheduledIo {
                 readiness: AtomicUsize::new(0),
@@ -272,7 +274,7 @@ impl Inner {
         }
     }
 
-    // TODO: add doc; used in Core.poll.
+    /// Dispatch a notification to scheduled I/O.
     fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
         let io_dispatch = self.io_dispatch.read().unwrap();
@@ -348,6 +350,7 @@ impl fmt::Debug for Handle {
     }
 }
 
+/// Wrapper around mio SetReadiness to implement futures Notify on.
 struct MySetReadiness(mio::SetReadiness);
 
 impl Notify for MySetReadiness {
