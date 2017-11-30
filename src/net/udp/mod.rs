@@ -1,6 +1,7 @@
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::fmt;
+use std::mem;
 
 use futures::{Async, Future, Poll};
 use mio;
@@ -376,10 +377,6 @@ impl fmt::Debug for UdpSocket {
 #[must_use = "futures do nothing unless polled"]
 pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
 
-fn incomplete_write(reason: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, reason)
-}
-
 impl<T> Future for SendDgram<T>
     where T: AsRef<[u8]>,
 {
@@ -387,18 +384,23 @@ impl<T> Future for SendDgram<T>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
-        {
-            let (ref sock, ref buf, ref addr) =
-                *self.0.as_ref().expect("SendDgram polled after completion");
-            let n = try_nb!(sock.send_to(buf.as_ref(), addr));
-            if n != buf.as_ref().len() {
-                return Err(incomplete_write("failed to send entire message \
-                                             in datagram"))
-            }
-        }
+        let (sock, buf, addr) = match self.0.take() {
+            Some(all) => all,
+            None => panic!("SendDgram polled after completion"),
+        };
 
-        let (sock, buf, _addr) = self.0.take().unwrap();
-        Ok(Async::Ready((sock, buf)))
+        match sock.send_to(buf.as_ref(), &addr) {
+            Ok(n) if n != buf.as_ref().len() => {
+                Err(io::Error::new(io::ErrorKind::Other,
+                    "failed to send entire message in datagram"))
+            },
+            Ok(_) => Ok(Async::Ready((sock, buf))),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                mem::replace(&mut self.0, Some((sock, buf, addr)));
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -415,15 +417,19 @@ impl<T> Future for RecvDgram<T>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
-        let (n, addr) = {
-            let (ref socket, ref mut buf) =
-                *self.0.as_mut().expect("RecvDgram polled after completion");
-
-            try_nb!(socket.recv_from(buf.as_mut()))
+        let (sock, mut buf) = match self.0.take() {
+            Some(all) => all,
+            None => panic!("RecvDgram polled after completion"),
         };
 
-        let (socket, buf) = self.0.take().unwrap();
-        Ok(Async::Ready((socket, buf, n, addr)))
+        match sock.recv_from(buf.as_mut()) {
+            Ok((n, addr)) => Ok(Async::Ready((sock, buf, n, addr))),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                mem::replace(&mut self.0, Some((sock, buf)));
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
