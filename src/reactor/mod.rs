@@ -22,7 +22,6 @@
 
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, RwLock, Weak};
 use std::time::Duration;
