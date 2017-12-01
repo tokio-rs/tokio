@@ -56,6 +56,7 @@ pub trait UdpCodec {
 /// You can acquire a `UdpFramed` instance by using the `UdpSocket::framed`
 /// adapter.
 #[must_use = "sinks do nothing unless polled"]
+#[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,
     codec: C,
@@ -116,7 +117,7 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
             Ok(Async::Ready(()))
         } else {
             Err(io::Error::new(io::ErrorKind::Other,
-                               "failed to write entire datagram to socket"))
+                "failed to write entire datagram to socket"))
         }
     }
 
