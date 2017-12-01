@@ -1,8 +1,24 @@
-//! The core reactor driving all I/O
+//! The core reactor driving all I/O.
 //!
-//! This module contains the `Core` type which is the reactor for all I/O
-//! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
-//! resources.
+//! This module contains the [`Core`] reactor type which is the event loop for
+//! all I/O happening in `tokio`. This core reactor (or event loop) is used to
+//! drive I/O resources.
+//!
+//! The [`Handle`] and [`Remote`] structs are refences to the event loop,
+//! created by the [`handle`][handle_method] and [`remote`][remote_method]
+//! respectively, and are used to construct I/O objects. `Remote` is sendable,
+//! while `Handle` is not.
+//!
+//! Lastly [`PollEvented`] can be used to construct I/O objects that interact
+//! with the event loop, e.g. [`TcpStream`] in the net module.
+//!
+//! [`Core`]: struct.Core.html
+//! [`Handle`]: struct.Handle.html
+//! [`Remote`]: struct.Remote.html
+//! [handle_method]: struct.Core.html#method.handle
+//! [remote_method]: struct.Core.html#method.remote
+//! [`PollEvented`]: struct.PollEvented.html
+//! [`TcpStream`]: ../net/struct.TcpStream.html
 
 use std::fmt;
 use std::io::{self, ErrorKind};
@@ -25,7 +41,7 @@ pub use self::poll_evented::PollEvented;
 /// Global counter used to assign unique IDs to reactor instances.
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
-/// An event loop.
+/// The core reactor, or event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
 /// all other I/O events and notifications happening. Each event loop can have
