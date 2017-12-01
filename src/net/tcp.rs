@@ -82,7 +82,7 @@ impl TcpListener {
                     return Err(e);
                 },
                 Ok((sock, addr)) => {
-                    // Fast path if we haven't left the event loop
+                    // Fast path if we haven't left the event loop.
                     if let Some(handle) = self.io.remote().handle() {
                         let io = PollEvented::new(sock, &handle)?;
                         return Ok((TcpStream { io: io }, addr));
@@ -101,8 +101,9 @@ impl TcpListener {
                         drop(tx.send(res));
                     });
                     self.pending_accept = Some(rx);
-                    // continue to polling the `rx` at the beginning of the loop
-                }
+                    // continue to polling the `rx` at the beginning of the
+                    // loop.
+                },
             }
         }
     }
@@ -134,9 +135,7 @@ impl TcpListener {
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
-    pub fn from_listener(listener: net::TcpListener,
-                         addr: &SocketAddr,
-                         handle: &Handle) -> io::Result<TcpListener> {
+    pub fn from_listener(listener: net::TcpListener, addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
         let l = mio::net::TcpListener::from_listener(listener, addr)?;
         TcpListener::new(l, handle)
     }
@@ -494,6 +493,7 @@ impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.io.write(buf)
     }
+
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
@@ -578,11 +578,11 @@ impl<'a> AsyncRead for &'a TcpStream {
             Ok(n) => {
                 unsafe { buf.advance_mut(n); }
                 Ok(Async::Ready(n))
-            }
+            },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.need_read();
                 Ok(Async::NotReady)
-            }
+            },
             Err(e) => Err(e),
         }
     }
@@ -616,11 +616,11 @@ impl<'a> AsyncWrite for &'a TcpStream {
             Ok(n) => {
                 buf.advance(n);
                 Ok(Async::Ready(n))
-            }
+            },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.need_write();
                 Ok(Async::NotReady)
-            }
+            },
             Err(e) => Err(e),
         }
     }
