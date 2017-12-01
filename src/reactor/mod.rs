@@ -1,18 +1,34 @@
-//! The core reactor driving all I/O
+//! The core reactor driving all I/O.
 //!
-//! This module contains the `Core` type which is the reactor for all I/O
-//! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
-//! resources.
+//! This module contains the [`Core`] reactor type which is the event loop for
+//! all I/O happening in `tokio`. This core reactor (or event loop) is used to
+//! drive I/O resources.
+//!
+//! The [`Handle`] and [`Remote`] structs are refences to the event loop,
+//! created by the [`handle`][handle_method] and [`remote`][remote_method]
+//! respectively, and are used to construct I/O objects. `Remote` is sendable,
+//! while `Handle` is not.
+//!
+//! Lastly [`PollEvented`] can be used to construct I/O objects that interact
+//! with the event loop, e.g. [`TcpStream`] in the net module.
+//!
+//! [`Core`]: struct.Core.html
+//! [`Handle`]: struct.Handle.html
+//! [`Remote`]: struct.Remote.html
+//! [handle_method]: struct.Core.html#method.handle
+//! [remote_method]: struct.Core.html#method.remote
+//! [`PollEvented`]: struct.PollEvented.html
+//! [`TcpStream`]: ../net/struct.TcpStream.html
 
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::sync::{Arc, Weak, RwLock};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use std::time::{Duration};
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::{Arc, RwLock, Weak};
+use std::time::Duration;
 
-use futures::{Future, Async};
+use futures::{Async, Future};
 use futures::executor::{self, Notify};
-use futures::task::{AtomicTask};
+use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
 use slab::Slab;
@@ -25,12 +41,12 @@ pub use self::poll_evented::PollEvented;
 /// Global counter used to assign unique IDs to reactor instances.
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
-/// An event loop.
+/// The core reactor, or event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
-/// all other I/O events and notifications happening. Each event loop can have
-/// multiple handles pointing to it, each of which can then be used to create
-/// various I/O objects to interact with the event loop in interesting ways.
+/// all other I/O events and notifications. Each event loop can have multiple
+/// handles pointing to it, each of which can then be used to create various I/O
+/// objects to interact with the event loop in interesting ways.
 pub struct Core {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
@@ -39,8 +55,8 @@ pub struct Core {
     inner: Arc<Inner>,
 
     /// Used for determining when the future passed to `run` is ready. Once the
-    /// registration is passed to `io` above we never touch it again, just keep
-    /// it alive.
+    /// registration is passed to `inner.io` above we never touch it again, just
+    /// keep it alive.
     _future_registration: mio::Registration,
     future_readiness: Arc<MySetReadiness>,
 }
@@ -56,19 +72,27 @@ struct Inner {
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 }
 
-/// Handle to an event loop, used to construct I/O objects, send messages, and
-/// otherwise interact indirectly with the event loop itself.
+/// A remote handle to an event loop, for more information see [`Handle`].
 ///
-/// Handles can be cloned, and when cloned they will still refer to the
+/// This handle can be cloned, and when cloned they will still refer to the
 /// same underlying event loop.
+///
+/// [`Handle`]: struct.Handle.html
 #[derive(Clone)]
 pub struct Remote {
     id: usize,
     inner: Weak<Inner>,
 }
 
-/// A non-sendable handle to an event loop, useful for manufacturing instances
-/// of `LoopData`.
+/// A handle to an event loop, used to construct I/O objects, send messages, and
+/// otherwise interact indirectly with the event loop itself.
+///
+/// Handles can be cloned, and when cloned they will still refer to the
+/// same underlying event loop.
+///
+/// Handles are non-sendable, see [`Remote`] for a sendable reference.
+///
+/// [`Remote`]: struct.Remote.html
 #[derive(Clone)]
 pub struct Handle {
     remote: Remote,
@@ -80,6 +104,7 @@ struct ScheduledIo {
     writer: AtomicTask,
 }
 
+/// What kind of I/O interest there is.
 enum Direction {
     Read,
     Write,
@@ -99,16 +124,13 @@ impl Core {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Core> {
-        // Create the I/O poller
-        let io = try!(mio::Poll::new());
+        let io = mio::Poll::new()?;
 
         // Create a registration for unblocking the reactor when the "run"
         // future becomes ready.
         let future_pair = mio::Registration::new2();
-        try!(io.register(&future_pair.0,
-                         TOKEN_FUTURE,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
+        io.register(&future_pair.0, TOKEN_FUTURE,
+             mio::Ready::readable(), mio::PollOpt::level())?;
 
         Ok(Core {
             events: mio::Events::with_capacity(1024),
@@ -168,12 +190,19 @@ impl Core {
 
         loop {
             if future_fired {
-                let res = task.poll_future_notify(&self.future_readiness, 0)?;
-                if let Async::Ready(e) = res {
-                    return Ok(e)
+                match task.poll_future_notify(&self.future_readiness, 0) {
+                    Ok(Async::Ready(res)) => return Ok(res),
+                    Err(err) => return Err(err),
+                    Ok(Async::NotReady) => {}, // continue.
                 }
             }
-            future_fired = self.poll(None);
+            match self.poll(None) {
+                Ok(fired) => future_fired = fired,
+                // TODO: change `F::error` to `io::Error` and return this error
+                // rather then panicing? Or return
+                // `Result<(), Result<F::Item, F:Error>>`?
+                Err(err) => panic!("error in poll: {}", err),
+            }
         }
     }
 
@@ -186,50 +215,35 @@ impl Core {
     /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
     /// empty future (one that never finishes).
     pub fn turn(&mut self, max_wait: Option<Duration>) {
-        self.poll(max_wait);
+        // TODO: return `Result<(), io::Error>`, see `poll`.
+        let _ = self.poll(max_wait);
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
-        // Block waiting for an event to happen, peeling out how many events
-        // happened.
+    /// Poll mio for events, returning a boolean indicating wether or not the
+    /// future used in `run` was notified.
+    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<bool> {
+        // Block waiting for an event to happen.
         match self.inner.io.poll(&mut self.events, max_wait) {
-            Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
-            // TODO: This should return an io::Result instead of panic.
-            Err(e) => panic!("error in poll: {}", e),
+            Ok(_) => {}, // continue.
+            Err(ref err) if err.kind() == ErrorKind::Interrupted => return Ok(false),
+            Err(err) => return Err(err),
         }
 
-        // Process all the events that came in, dispatching appropriately
+        // Process all the events that came in, dispatching appropriately.
         let mut fired = false;
-        for i in 0..self.events.len() {
-            let event = self.events.get(i).unwrap();
+        for event in self.events.iter() {
             let token = event.token();
-            trace!("event {:?} {:?}", event.readiness(), event.token());
+            trace!("event {:?} {:?}", event.readiness(), token);
 
             if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                fired = true;
+                self.future_readiness.0.set_readiness(mio::Ready::empty())?;
+                fired = true
             } else {
-                self.dispatch(token, event.readiness());
+                self.inner.dispatch(token, event.readiness());
             }
         }
 
-        return fired
-    }
-
-    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
-        let token = usize::from(token) - TOKEN_START;
-        let io_dispatch = self.inner.io_dispatch.read().unwrap();
-
-        if let Some(io) = io_dispatch.get(token) {
-            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
-            if ready.is_writable() {
-                io.writer.notify();
-            }
-            if !(ready & (!mio::Ready::writable())).is_empty() {
-                io.reader.notify();
-            }
-        }
+        Ok(fired)
     }
 }
 
@@ -243,10 +257,7 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    fn add_source(&self, source: &Evented)
-        -> io::Result<usize>
-    {
-        // Acquire a write lock
+    fn add_source(&self, source: &Evented) -> io::Result<usize> {
         let key = self.io_dispatch.write().unwrap()
             .insert(ScheduledIo {
                 readiness: AtomicUsize::new(0),
@@ -254,12 +265,8 @@ impl Inner {
                 writer: AtomicTask::new(),
             });
 
-        try!(self.io.register(source,
-                              mio::Token(TOKEN_START + key),
-                              mio::Ready::readable() |
-                                mio::Ready::writable() |
-                                platform::all(),
-                              mio::PollOpt::edge()));
+        self.io.register(source, mio::Token(TOKEN_START + key), all_ready(),
+            mio::PollOpt::edge())?;
 
         Ok(key)
     }
@@ -280,7 +287,7 @@ impl Inner {
         let sched = io_dispatch.get(token).unwrap();
 
         let (task, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
+            Direction::Read => (&sched.reader, mio::Ready::readable()),
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
@@ -288,6 +295,22 @@ impl Inner {
 
         if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
             task.notify();
+        }
+    }
+
+    /// Dispatch a notification to scheduled I/O.
+    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
+        let token = usize::from(token) - TOKEN_START;
+        let io_dispatch = self.io_dispatch.read().unwrap();
+
+        if let Some(io) = io_dispatch.get(token) {
+            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
+            if ready.is_writable() {
+                io.writer.notify();
+            }
+            if ready.is_readable() {
+                io.reader.notify();
+            }
         }
     }
 }
@@ -307,7 +330,7 @@ impl Remote {
     /// `spawn` above if it returns `None`.
     pub fn handle(&self) -> Option<Handle> {
         let remote = self.clone();
-        Some(Handle { remote } )
+        Some(Handle { remote })
     }
 
     /// Spawns a new future into the event loop this remote is associated with.
@@ -316,8 +339,8 @@ impl Remote {
     /// the I/O loop itself. The future returned by the closure will be
     /// scheduled on the event loop and run to completion.
     ///
-    /// Note that while the closure, `F`, requires the `Send` bound as it might
-    /// cross threads, the future `R` does not.
+    /// Note that the closure, `F`, requires the `Send` bound as it might cross
+    /// threads.
     ///
     /// # Panics
     ///
@@ -334,7 +357,7 @@ impl Remote {
 
 impl fmt::Debug for Remote {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"Remote")
+        write!(f, "Remote")
     }
 }
 
@@ -351,6 +374,7 @@ impl fmt::Debug for Handle {
     }
 }
 
+/// Wrapper around mio `SetReadiness` to implement futures Notify on.
 struct MySetReadiness(mio::SetReadiness);
 
 impl Notify for MySetReadiness {
@@ -360,21 +384,15 @@ impl Notify for MySetReadiness {
     }
 }
 
-trait FnBox: Send + 'static {
-    fn call_box(self: Box<Self>, lp: &Core);
-}
-
-impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
-    fn call_box(self: Box<Self>, lp: &Core) {
-        (*self)(lp)
-    }
+fn all_ready() -> mio::Ready {
+    mio::Ready::readable() | mio::Ready::writable() | platform::all()
 }
 
 fn read_ready() -> mio::Ready {
     mio::Ready::readable() | platform::hup()
 }
 
-const READ: usize = 1 << 0;
+const READ: usize = 1;
 const WRITE: usize = 1 << 1;
 
 fn ready2usize(ready: mio::Ready) -> usize {

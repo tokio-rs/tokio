@@ -1,11 +1,11 @@
 use std::io;
-use std::net::{SocketAddr, Ipv4Addr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
+use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 use net::UdpSocket;
 
-/// Encoding of frames via buffers.
+/// Encoding of datagrams into frames via buffers.
 ///
 /// This trait is used when constructing an instance of `UdpFramed` and provides
 /// the `In` and `Out` types which are decoded and encoded from the socket,
@@ -18,7 +18,7 @@ use net::UdpSocket;
 /// The trait itself is implemented on a type that can track state for decoding
 /// or encoding, which is particularly useful for streaming parsers. In many
 /// cases, though, this type will simply be a unit struct (e.g. `struct
-/// HttpCodec`).
+/// MyCodec`).
 pub trait UdpCodec {
     /// The type of decoded frames.
     type In;
@@ -56,6 +56,7 @@ pub trait UdpCodec {
 /// You can acquire a `UdpFramed` instance by using the `UdpSocket::framed`
 /// adapter.
 #[must_use = "sinks do nothing unless polled"]
+#[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,
     codec: C,
@@ -72,7 +73,7 @@ impl<C: UdpCodec> Stream for UdpFramed<C> {
     fn poll(&mut self) -> Poll<Option<C::In>, io::Error> {
         let (n, addr) = try_nb!(self.socket.recv_from(&mut self.rd));
         trace!("received {} bytes, decoding", n);
-        let frame = try!(self.codec.decode(&addr, &self.rd[..n]));
+        let frame = self.codec.decode(&addr, &self.rd[..n])?;
         trace!("frame decoded from buffer");
         Ok(Async::Ready(Some(frame)))
     }
@@ -101,7 +102,7 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
 
     fn poll_complete(&mut self) -> Poll<(), io::Error> {
         if self.flushed {
-            return Ok(Async::Ready(()))
+            return Ok(Async::Ready(()));
         }
 
         trace!("flushing frame; length={}", self.wr.len());
@@ -116,7 +117,7 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
             Ok(Async::Ready(()))
         } else {
             Err(io::Error::new(io::ErrorKind::Other,
-                               "failed to write entire datagram to socket"))
+                "failed to write entire datagram to socket"))
         }
     }
 
@@ -140,9 +141,11 @@ pub fn new<C: UdpCodec>(socket: UdpSocket, codec: C) -> UdpFramed<C> {
 impl<C> UdpFramed<C> {
     /// Returns a reference to the underlying I/O stream wrapped by `Framed`.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
+    /// # Note
+    ///
+    /// Care should be taken to not tamper with the underlying stream of data
+    /// coming in as it may corrupt the stream of frames otherwise being worked
+    /// with.
     pub fn get_ref(&self) -> &UdpSocket {
         &self.socket
     }
@@ -150,18 +153,16 @@ impl<C> UdpFramed<C> {
     /// Returns a mutable reference to the underlying I/O stream wrapped by
     /// `Framed`.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
+    /// # Note
+    ///
+    /// Care should be taken to not tamper with the underlying stream of data
+    /// coming in as it may corrupt the stream of frames otherwise being worked
+    /// with.
     pub fn get_mut(&mut self) -> &mut UdpSocket {
         &mut self.socket
     }
 
     /// Consumes the `Framed`, returning its underlying I/O stream.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
     pub fn into_inner(self) -> UdpSocket {
         self.socket
     }

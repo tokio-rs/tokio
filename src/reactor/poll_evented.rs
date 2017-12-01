@@ -15,8 +15,8 @@ use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::{Handle, Remote};
-use reactor::io_token::IoToken;
+use super::{Handle, Remote};
+use super::io_token::IoToken;
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -69,7 +69,7 @@ pub struct PollEvented<E> {
     io: E,
 }
 
-impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
+impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PollEvented")
          .field("io", &self.io)
@@ -80,14 +80,9 @@ impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
 impl<E: Evented> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
-    ///
-    /// This method returns a future which will resolve to the readiness stream
-    /// when it's ready.
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
-        let token = IoToken::new(&io, handle)?;
-
         Ok(PollEvented {
-            token,
+            token: IoToken::new(&io, handle)?,
             readiness: AtomicUsize::new(0),
             io: io,
         })
@@ -106,24 +101,21 @@ impl<E: Evented> PollEvented<E> {
     /// method is called, and will likely return an error if this `PollEvented`
     /// was created on a separate event loop from the `handle` specified.
     pub fn deregister(self, handle: &Handle) -> io::Result<()> {
-        let inner = match handle.remote.inner.upgrade() {
-            Some(inner) => inner,
-            None => return Ok(()),
-        };
-
-        let ret = inner.deregister_source(&self.io);
-        return ret
+        match handle.remote.inner.upgrade() {
+            Some(inner) => inner.deregister_source(&self.io),
+            None => Ok(()),
+        }
     }
 }
 
 impl<E> PollEvented<E> {
     /// Tests to see if this source is ready to be read from or not.
     ///
-    /// If this stream is not ready for a read then `NotReady` will be returned
-    /// and the current task will be scheduled to receive a notification when
-    /// the stream is readable again. In other words, this method is only safe
-    /// to call from within the context of a future's task, typically done in a
-    /// `Future::poll` method.
+    /// If this stream is not ready for a read then `Async::NotReady` will be
+    /// returned and the current task will be scheduled to receive a
+    /// notification when the stream is readable again. In other words, this
+    /// method is only safe to call from within the context of a future's task,
+    /// typically done in a `Future::poll` method.
     ///
     /// This is mostly equivalent to `self.poll_ready(Ready::readable())`.
     ///
@@ -138,7 +130,7 @@ impl<E> PollEvented<E> {
 
     /// Tests to see if this source is ready to be written to or not.
     ///
-    /// If this stream is not ready for a write then `NotReady` will be returned
+    /// If this stream is not ready for a write then `Async::NotReady` will be returned
     /// and the current task will be scheduled to receive a notification when
     /// the stream is writable again. In other words, this method is only safe
     /// to call from within the context of a future's task, typically done in a
@@ -181,7 +173,7 @@ impl<E> PollEvented<E> {
     pub fn poll_ready(&self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
         match self.readiness.load(Ordering::SeqCst) & bits {
-            0 => {}
+            0 => {},
             n => return Async::Ready(super::usize2ready(n)),
         }
         self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
@@ -193,7 +185,7 @@ impl<E> PollEvented<E> {
                     self.need_read();
                 }
                 Async::NotReady
-            }
+            },
             n => Async::Ready(super::usize2ready(n)),
         }
     }
@@ -275,13 +267,13 @@ impl<E> PollEvented<E> {
 impl<E: Read> Read for PollEvented<E> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
         let r = self.get_mut().read(buf);
         if is_wouldblock(&r) {
             self.need_read();
         }
-        return r
+        r
     }
 }
 
@@ -294,7 +286,7 @@ impl<E: Write> Write for PollEvented<E> {
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -305,7 +297,7 @@ impl<E: Write> Write for PollEvented<E> {
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 }
 
@@ -329,7 +321,7 @@ impl<'a, E> Read for &'a PollEvented<E>
         if is_wouldblock(&r) {
             self.need_read();
         }
-        return r
+        r
     }
 }
 
@@ -344,7 +336,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -355,7 +347,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         if is_wouldblock(&r) {
             self.need_write();
         }
-        return r
+        r
     }
 }
 
