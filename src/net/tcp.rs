@@ -147,6 +147,11 @@ impl TcpListener {
     }
 
     /// Test whether this socket is ready to be read or not.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called outside the context of a future's
+    /// task.
     pub fn poll_read(&self) -> Async<()> {
         self.io.poll_read()
     }
@@ -168,6 +173,15 @@ impl TcpListener {
         Incoming { inner: self }
     }
 
+    /// Gets the value of the `IP_TTL` option for this socket.
+    ///
+    /// For more information about this option, see [`set_ttl`].
+    ///
+    /// [`set_ttl`]: #method.set_ttl
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.io.get_ref().ttl()
+    }
+
     /// Sets the value for the `IP_TTL` option on this socket.
     ///
     /// This value sets the time-to-live field that is used in every packet sent
@@ -176,13 +190,13 @@ impl TcpListener {
         self.io.get_ref().set_ttl(ttl)
     }
 
-    /// Gets the value of the `IP_TTL` option for this socket.
+    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
     ///
-    /// For more information about this option, see [`set_ttl`][link].
+    /// For more information about this option, see [`set_only_v6`].
     ///
-    /// [link]: #method.set_ttl
-    pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
+    /// [`set_only_v6`]: #method.set_only_v6
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.io.get_ref().only_v6()
     }
 
     /// Sets the value for the `IPV6_V6ONLY` option on this socket.
@@ -195,15 +209,6 @@ impl TcpListener {
     /// receive packets from an IPv4-mapped IPv6 address.
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
         self.io.get_ref().set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
     }
 }
 
