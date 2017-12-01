@@ -69,7 +69,7 @@ pub struct PollEvented<E> {
     io: E,
 }
 
-impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
+impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PollEvented")
          .field("io", &self.io)
@@ -111,8 +111,7 @@ impl<E: Evented> PollEvented<E> {
             None => return Ok(()),
         };
 
-        let ret = inner.deregister_source(&self.io);
-        return ret
+        inner.deregister_source(&self.io)
     }
 }
 

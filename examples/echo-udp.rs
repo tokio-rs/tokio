@@ -11,7 +11,6 @@
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 
 extern crate futures;
-#[macro_use]
 extern crate tokio;
 #[macro_use]
 extern crate tokio_io;
