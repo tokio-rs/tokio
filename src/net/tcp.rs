@@ -674,7 +674,7 @@ impl Future for TcpStreamNewState {
                 //
                 // If all that succeeded then we ship everything on up.
                 if let Async::NotReady = stream.io.poll_write() {
-                    mem::replace(self, TcpStreamNewState::Waiting(stream));
+                    *self = TcpStreamNewState::Waiting(stream);
                     return Ok(Async::NotReady);
                 }
                 if let Some(err) = stream.io.get_ref().take_error()? {
