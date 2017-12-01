@@ -92,9 +92,8 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_read(&self) {
-        match self.handle.inner.upgrade() {
-            Some(inner) => inner.schedule(self.token, Direction::Read),
-            None => {},
+        if let Some(inner) = self.handle.inner.upgrade() {
+            inner.schedule(self.token, Direction::Read);
         }
     }
 
@@ -122,9 +121,8 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_write(&self) {
-        match self.handle.inner.upgrade() {
-            Some(inner) => inner.schedule(self.token, Direction::Write),
-            None => {},
+        if let Some(inner) = self.handle.inner.upgrade() {
+            inner.schedule(self.token, Direction::Write);
         }
     }
 
@@ -151,9 +149,8 @@ impl IoToken {
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
     pub fn drop_source(&self) {
-        match self.handle.inner.upgrade() {
-            Some(inner) => inner.drop_source(self.token),
-            None => {},
+        if let Some(inner) = self.handle.inner.upgrade() {
+            inner.drop_source(self.token);
         }
     }
 }
