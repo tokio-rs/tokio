@@ -305,15 +305,12 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream,
-                          addr: &SocketAddr,
-                          handle: &Handle)
-                          -> Box<Future<Item=TcpStream, Error=io::Error> + Send> {
-        let state = match mio::net::TcpStream::connect_stream(stream, addr) {
+    pub fn connect_stream(stream: net::TcpStream, addr: &SocketAddr, handle: &Handle) -> TcpStreamNew {
+        let inner = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };
-        Box::new(state)
+        TcpStreamNew { inner: inner }
     }
 
     /// Test whether this stream is ready to be read or not.
