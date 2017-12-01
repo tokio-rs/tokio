@@ -6,13 +6,13 @@
 
 use std::fmt;
 use std::io::{self, ErrorKind};
-use std::sync::{Arc, Weak, RwLock};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use std::time::{Duration};
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::{Arc, RwLock, Weak};
+use std::time::Duration;
 
-use futures::{Future, Async};
+use futures::{Async, Future};
 use futures::executor::{self, Notify};
-use futures::task::{AtomicTask};
+use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
 use slab::Slab;
@@ -100,15 +100,13 @@ impl Core {
     /// creation.
     pub fn new() -> io::Result<Core> {
         // Create the I/O poller
-        let io = try!(mio::Poll::new());
+        let io = mio::Poll::new()?;
 
         // Create a registration for unblocking the reactor when the "run"
         // future becomes ready.
         let future_pair = mio::Registration::new2();
-        try!(io.register(&future_pair.0,
-                         TOKEN_FUTURE,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
+        io.register(&future_pair.0, TOKEN_FUTURE,
+             mio::Ready::readable(), mio::PollOpt::level())?;
 
         Ok(Core {
             events: mio::Events::with_capacity(1024),
@@ -168,12 +166,18 @@ impl Core {
 
         loop {
             if future_fired {
-                let res = task.poll_future_notify(&self.future_readiness, 0)?;
-                if let Async::Ready(e) = res {
-                    return Ok(e)
+                match task.poll_future_notify(&self.future_readiness, 0) {
+                    Ok(Async::Ready(res)) => return Ok(res),
+                    Err(err) => return Err(err),
+                    Ok(Async::NotReady) => {}, // continue.
                 }
             }
-            future_fired = self.poll(None);
+            match self.poll(None) {
+                Ok(fired) => future_fired = fired,
+                // TODO: change `F::error` to `io::Error` and return this error
+                // rather then panicing? Or `Result<(), Result<F::Item, F:Error>>`
+                Err(err) => panic!("error in poll: {}", err),
+            }
         }
     }
 
@@ -186,50 +190,33 @@ impl Core {
     /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
     /// empty future (one that never finishes).
     pub fn turn(&mut self, max_wait: Option<Duration>) {
-        self.poll(max_wait);
+        // TODO: return `Result<bool, io::Error>`, see `poll`.
+        let _ = self.poll(max_wait);
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
-        // Block waiting for an event to happen, peeling out how many events
-        // happened.
+    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<bool> {
+        // Block waiting for an event to happen.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
-            // TODO: This should return an io::Result instead of panic.
-            Err(e) => panic!("error in poll: {}", e),
+            Err(ref err) if err.kind() == ErrorKind::Interrupted => return Ok(false),
+            Err(err) => return Err(err),
         }
 
-        // Process all the events that came in, dispatching appropriately
+        // Process all the events that came in, dispatching appropriately.
         let mut fired = false;
-        for i in 0..self.events.len() {
-            let event = self.events.get(i).unwrap();
+        for event in self.events.iter() {
             let token = event.token();
-            trace!("event {:?} {:?}", event.readiness(), event.token());
+            trace!("event {:?} {:?}", event.readiness(), token);
 
             if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                fired = true;
+                self.future_readiness.0.set_readiness(mio::Ready::empty())?;
+                fired = true
             } else {
-                self.dispatch(token, event.readiness());
+                self.inner.dispatch(token, event.readiness());
             }
         }
 
-        return fired
-    }
-
-    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
-        let token = usize::from(token) - TOKEN_START;
-        let io_dispatch = self.inner.io_dispatch.read().unwrap();
-
-        if let Some(io) = io_dispatch.get(token) {
-            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
-            if ready.is_writable() {
-                io.writer.notify();
-            }
-            if !(ready & (!mio::Ready::writable())).is_empty() {
-                io.reader.notify();
-            }
-        }
+        Ok(fired)
     }
 }
 
@@ -243,9 +230,7 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    fn add_source(&self, source: &Evented)
-        -> io::Result<usize>
-    {
+    fn add_source(&self, source: &Evented) -> io::Result<usize> {
         // Acquire a write lock
         let key = self.io_dispatch.write().unwrap()
             .insert(ScheduledIo {
@@ -254,12 +239,8 @@ impl Inner {
                 writer: AtomicTask::new(),
             });
 
-        try!(self.io.register(source,
-                              mio::Token(TOKEN_START + key),
-                              mio::Ready::readable() |
-                                mio::Ready::writable() |
-                                platform::all(),
-                              mio::PollOpt::edge()));
+        self.io.register(source, mio::Token(TOKEN_START + key), all_ready(),
+            mio::PollOpt::edge())?;
 
         Ok(key)
     }
@@ -280,7 +261,7 @@ impl Inner {
         let sched = io_dispatch.get(token).unwrap();
 
         let (task, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
+            Direction::Read => (&sched.reader, mio::Ready::readable()),
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
@@ -288,6 +269,22 @@ impl Inner {
 
         if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
             task.notify();
+        }
+    }
+
+    // TODO: add doc; used in Core.poll.
+    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
+        let token = usize::from(token) - TOKEN_START;
+        let io_dispatch = self.io_dispatch.read().unwrap();
+
+        if let Some(io) = io_dispatch.get(token) {
+            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
+            if ready.is_writable() {
+                io.writer.notify();
+            }
+            if ready.is_readable() {
+                io.reader.notify();
+            }
         }
     }
 }
@@ -307,7 +304,7 @@ impl Remote {
     /// `spawn` above if it returns `None`.
     pub fn handle(&self) -> Option<Handle> {
         let remote = self.clone();
-        Some(Handle { remote } )
+        Some(Handle { remote })
     }
 
     /// Spawns a new future into the event loop this remote is associated with.
@@ -334,7 +331,7 @@ impl Remote {
 
 impl fmt::Debug for Remote {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"Remote")
+        write!(f, "Remote")
     }
 }
 
@@ -360,21 +357,15 @@ impl Notify for MySetReadiness {
     }
 }
 
-trait FnBox: Send + 'static {
-    fn call_box(self: Box<Self>, lp: &Core);
-}
-
-impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
-    fn call_box(self: Box<Self>, lp: &Core) {
-        (*self)(lp)
-    }
+fn all_ready() -> mio::Ready {
+    mio::Ready::readable() | mio::Ready::writable() | platform::all()
 }
 
 fn read_ready() -> mio::Ready {
     mio::Ready::readable() | platform::hup()
 }
 
-const READ: usize = 1 << 0;
+const READ: usize = 1;
 const WRITE: usize = 1 << 1;
 
 fn ready2usize(ready: mio::Ready) -> usize {

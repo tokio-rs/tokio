@@ -1,6 +1,7 @@
 use std::io;
-use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::fmt;
+use std::mem;
 
 use futures::{Async, Future, Poll};
 use mio;
@@ -13,7 +14,7 @@ pub struct UdpSocket {
 }
 
 mod frame;
-pub use self::frame::{UdpFramed, UdpCodec};
+pub use self::frame::{UdpCodec, UdpFramed};
 
 impl UdpSocket {
     /// Create a new UDP socket bound to the specified address.
@@ -21,12 +22,12 @@ impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to the
     /// `addr` provided. If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::net::UdpSocket::bind(addr));
+        let udp = mio::net::UdpSocket::bind(addr)?;
         UdpSocket::new(udp, handle)
     }
 
     fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
-        let io = try!(PollEvented::new(socket, handle));
+        let io = PollEvented::new(socket, handle)?;
         Ok(UdpSocket { io: io })
     }
 
@@ -39,9 +40,8 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
-    pub fn from_socket(socket: net::UdpSocket,
-                       handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::net::UdpSocket::from_socket(socket));
+    pub fn from_socket(socket: net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
+        let udp = mio::net::UdpSocket::from_socket(socket)?;
         UdpSocket::new(udp, handle)
     }
 
@@ -83,7 +83,7 @@ impl UdpSocket {
     /// On success, returns the number of bytes written.
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
         match self.io.get_ref().send(buf) {
             Ok(n) => Ok(n),
@@ -100,7 +100,7 @@ impl UdpSocket {
     /// On success, returns the number of bytes read.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_read() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
         match self.io.get_ref().recv(buf) {
             Ok(n) => Ok(n),
@@ -140,7 +140,7 @@ impl UdpSocket {
     /// documentation for concrete examples.
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
         match self.io.get_ref().send_to(buf, target) {
             Ok(n) => Ok(n),
@@ -178,7 +178,7 @@ impl UdpSocket {
     /// read and the address from whence the data came.
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
         match self.io.get_ref().recv_from(buf) {
             Ok(n) => Ok(n),
@@ -310,9 +310,7 @@ impl UdpSocket {
     /// address of the local interface with which the system should join the
     /// multicast group. If it's equal to `INADDR_ANY` then an appropriate
     /// interface is chosen by the system.
-    pub fn join_multicast_v4(&self,
-                             multiaddr: &Ipv4Addr,
-                             interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
         self.io.get_ref().join_multicast_v4(multiaddr, interface)
     }
 
@@ -321,9 +319,7 @@ impl UdpSocket {
     /// This function specifies a new multicast group for this socket to join.
     /// The address must be a valid multicast address, and `interface` is the
     /// index of the interface to join/leave (or 0 to indicate any interface).
-    pub fn join_multicast_v6(&self,
-                             multiaddr: &Ipv6Addr,
-                             interface: u32) -> io::Result<()> {
+    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.get_ref().join_multicast_v6(multiaddr, interface)
     }
 
@@ -333,9 +329,7 @@ impl UdpSocket {
     /// [`join_multicast_v4`][link].
     ///
     /// [link]: #method.join_multicast_v4
-    pub fn leave_multicast_v4(&self,
-                              multiaddr: &Ipv4Addr,
-                              interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v4(multiaddr, interface)
     }
 
@@ -345,9 +339,7 @@ impl UdpSocket {
     /// [`join_multicast_v6`][link].
     ///
     /// [link]: #method.join_multicast_v6
-    pub fn leave_multicast_v6(&self,
-                              multiaddr: &Ipv6Addr,
-                              interface: u32) -> io::Result<()> {
+    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }
 
@@ -385,10 +377,6 @@ impl fmt::Debug for UdpSocket {
 #[must_use = "futures do nothing unless polled"]
 pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
 
-fn incomplete_write(reason: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, reason)
-}
-
 impl<T> Future for SendDgram<T>
     where T: AsRef<[u8]>,
 {
@@ -396,18 +384,23 @@ impl<T> Future for SendDgram<T>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
-        {
-            let (ref sock, ref buf, ref addr) =
-                *self.0.as_ref().expect("SendDgram polled after completion");
-            let n = try_nb!(sock.send_to(buf.as_ref(), addr));
-            if n != buf.as_ref().len() {
-                return Err(incomplete_write("failed to send entire message \
-                                             in datagram"))
-            }
-        }
+        let (sock, buf, addr) = match self.0.take() {
+            Some(all) => all,
+            None => panic!("SendDgram polled after completion"),
+        };
 
-        let (sock, buf, _addr) = self.0.take().unwrap();
-        Ok(Async::Ready((sock, buf)))
+        match sock.send_to(buf.as_ref(), &addr) {
+            Ok(n) if n != buf.as_ref().len() => {
+                Err(io::Error::new(io::ErrorKind::Other,
+                    "failed to send entire message in datagram"))
+            },
+            Ok(_) => Ok(Async::Ready((sock, buf))),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                mem::replace(&mut self.0, Some((sock, buf, addr)));
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -424,15 +417,19 @@ impl<T> Future for RecvDgram<T>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
-        let (n, addr) = {
-            let (ref socket, ref mut buf) =
-                *self.0.as_mut().expect("RecvDgram polled after completion");
-
-            try_nb!(socket.recv_from(buf.as_mut()))
+        let (sock, mut buf) = match self.0.take() {
+            Some(all) => all,
+            None => panic!("RecvDgram polled after completion"),
         };
 
-        let (socket, buf) = self.0.take().unwrap();
-        Ok(Async::Ready((socket, buf, n, addr)))
+        match sock.recv_from(buf.as_mut()) {
+            Ok((n, addr)) => Ok(Async::Ready((sock, buf, n, addr))),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                mem::replace(&mut self.0, Some((sock, buf)));
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 

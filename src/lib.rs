@@ -92,13 +92,12 @@ extern crate bytes;
 #[macro_use]
 extern crate futures;
 extern crate iovec;
+#[macro_use]
+extern crate log;
 extern crate mio;
 extern crate slab;
 #[macro_use]
 extern crate tokio_io;
-
-#[macro_use]
-extern crate log;
 
 pub mod net;
 pub mod reactor;

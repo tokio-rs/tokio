@@ -3,7 +3,7 @@ use std::io;
 
 use mio::event::Evented;
 
-use reactor::{Remote, Handle, Direction};
+use reactor::{Direction, Handle, Remote};
 
 /// A token that identifies an active I/O resource.
 pub struct IoToken {
@@ -31,11 +31,10 @@ impl IoToken {
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
         match handle.remote.inner.upgrade() {
             Some(inner) => {
-                let token = try!(inner.add_source(source));
+                let token = inner.add_source(source)?;
                 let handle = handle.remote().clone();
-
                 Ok(IoToken { token, handle })
-            }
+            },
             None => Err(io::Error::new(io::ErrorKind::Other, "event loop gone")),
         }
     }
@@ -93,12 +92,9 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_read(&self) {
-        let inner = match self.handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.schedule(self.token, Direction::Read);
+        if let Some(inner) = self.handle.inner.upgrade() {
+            inner.schedule(self.token, Direction::Read);
+        }
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -125,12 +121,9 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_write(&self) {
-        let inner = match self.handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.schedule(self.token, Direction::Write);
+        if let Some(inner) = self.handle.inner.upgrade() {
+            inner.schedule(self.token, Direction::Write);
+        }
     }
 
     /// Unregister all information associated with a token on an event loop,
@@ -156,11 +149,8 @@ impl IoToken {
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
     pub fn drop_source(&self) {
-        let inner = match self.handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.drop_source(self.token)
+        if let Some(inner) = self.handle.inner.upgrade() {
+            inner.drop_source(self.token);
+        }
     }
 }

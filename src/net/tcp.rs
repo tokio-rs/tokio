@@ -1,13 +1,13 @@
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
-use std::net::{self, SocketAddr, Shutdown};
+use std::net::{self, Shutdown, SocketAddr};
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use futures::stream::Stream;
 use futures::sync::oneshot;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 use iovec::IoVec;
 use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -36,7 +36,7 @@ impl TcpListener {
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::bind(addr));
+        let l = mio::net::TcpListener::bind(addr)?;
         TcpListener::new(l, handle)
     }
 
@@ -64,14 +64,14 @@ impl TcpListener {
                 match pending.poll().expect("shouldn't be canceled") {
                     Async::NotReady => {
                         self.pending_accept = Some(pending);
-                        return Err(io::ErrorKind::WouldBlock.into())
+                        return Err(io::ErrorKind::WouldBlock.into());
                     },
                     Async::Ready(r) => return r,
                 }
             }
 
             if let Async::NotReady = self.io.poll_read() {
-                return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+                return Err(io::ErrorKind::WouldBlock.into());
             }
 
             match self.io.get_ref().accept() {
@@ -79,13 +79,13 @@ impl TcpListener {
                     if e.kind() == io::ErrorKind::WouldBlock {
                         self.io.need_read();
                     }
-                    return Err(e)
+                    return Err(e);
                 },
                 Ok((sock, addr)) => {
-                    // Fast path if we haven't left the event loop
+                    // Fast path if we haven't left the event loop.
                     if let Some(handle) = self.io.remote().handle() {
-                        let io = try!(PollEvented::new(sock, &handle));
-                        return Ok((TcpStream { io: io }, addr))
+                        let io = PollEvented::new(sock, &handle)?;
+                        return Ok((TcpStream { io: io }, addr));
                     }
 
                     // If we're off the event loop then send the socket back
@@ -101,8 +101,9 @@ impl TcpListener {
                         drop(tx.send(res));
                     });
                     self.pending_accept = Some(rx);
-                    // continue to polling the `rx` at the beginning of the loop
-                }
+                    // continue to polling the `rx` at the beginning of the
+                    // loop.
+                },
             }
         }
     }
@@ -134,16 +135,13 @@ impl TcpListener {
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
-    pub fn from_listener(listener: net::TcpListener,
-                         addr: &SocketAddr,
-                         handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::from_listener(listener, addr));
+    pub fn from_listener(listener: net::TcpListener, addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
+        let l = mio::net::TcpListener::from_listener(listener, addr)?;
         TcpListener::new(l, handle)
     }
 
-    fn new(listener: mio::net::TcpListener, handle: &Handle)
-           -> io::Result<TcpListener> {
-        let io = try!(PollEvented::new(listener, handle));
+    fn new(listener: mio::net::TcpListener, handle: &Handle) -> io::Result<TcpListener> {
+        let io = PollEvented::new(listener, handle)?;
         Ok(TcpListener { io: io, pending_accept: None })
     }
 
@@ -263,8 +261,7 @@ impl TcpStream {
         TcpStreamNew { inner: inner }
     }
 
-    fn new(connected_stream: mio::net::TcpStream, handle: &Handle)
-           -> TcpStreamNewState {
+    fn new(connected_stream: mio::net::TcpStream, handle: &Handle) -> TcpStreamNewState {
         match PollEvented::new(connected_stream, handle) {
             Ok(io) => TcpStreamNewState::Waiting(TcpStream { io: io }),
             Err(e) => TcpStreamNewState::Error(e),
@@ -276,11 +273,10 @@ impl TcpStream {
     /// This function will convert a TCP stream in the standard library to a TCP
     /// stream ready to be used with the provided event loop handle. The object
     /// returned is associated with the event loop and ready to perform I/O.
-    pub fn from_stream(stream: net::TcpStream, handle: &Handle)
-                       -> io::Result<TcpStream> {
-        let inner = try!(mio::net::TcpStream::from_stream(stream));
+    pub fn from_stream(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
+        let inner = mio::net::TcpStream::from_stream(stream)?;
         Ok(TcpStream {
-            io: try!(PollEvented::new(inner, handle)),
+            io: PollEvented::new(inner, handle)?,
         })
     }
 
@@ -302,15 +298,12 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream,
-                          addr: &SocketAddr,
-                          handle: &Handle)
-                          -> Box<Future<Item=TcpStream, Error=io::Error> + Send> {
-        let state = match mio::net::TcpStream::connect_stream(stream, addr) {
+    pub fn connect_stream(stream: net::TcpStream, addr: &SocketAddr, handle: &Handle) -> TcpStreamNew {
+        let inner = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };
-        Box::new(state)
+        TcpStreamNew { inner: inner }
     }
 
     /// Test whether this socket is ready to be read or not.
@@ -492,6 +485,7 @@ impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.io.write(buf)
     }
+
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
@@ -540,7 +534,7 @@ impl<'a> AsyncRead for &'a TcpStream {
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = <TcpStream>::poll_read(self) {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
         let r = unsafe {
             // The `IoVec` type can't have a 0-length size, so we create a bunch
@@ -576,11 +570,11 @@ impl<'a> AsyncRead for &'a TcpStream {
             Ok(n) => {
                 unsafe { buf.advance_mut(n); }
                 Ok(Async::Ready(n))
-            }
+            },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.need_read();
                 Ok(Async::NotReady)
-            }
+            },
             Err(e) => Err(e),
         }
     }
@@ -593,7 +587,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = <TcpStream>::poll_write(self) {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
         let r = {
             // The `IoVec` type can't have a zero-length size, so create a dummy
@@ -614,11 +608,11 @@ impl<'a> AsyncWrite for &'a TcpStream {
             Ok(n) => {
                 buf.advance(n);
                 Ok(Async::Ready(n))
-            }
+            },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.need_write();
                 Ok(Async::NotReady)
-            }
+            },
             Err(e) => Err(e),
         }
     }
@@ -644,35 +638,25 @@ impl Future for TcpStreamNewState {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
-        {
-            let stream = match *self {
-                TcpStreamNewState::Waiting(ref s) => s,
-                TcpStreamNewState::Error(_) => {
-                    let e = match mem::replace(self, TcpStreamNewState::Empty) {
-                        TcpStreamNewState::Error(e) => e,
-                        _ => panic!(),
-                    };
-                    return Err(e)
-                }
-                TcpStreamNewState::Empty => panic!("can't poll TCP stream twice"),
-            };
-
-            // Once we've connected, wait for the stream to be writable as
-            // that's when the actual connection has been initiated. Once we're
-            // writable we check for `take_socket_error` to see if the connect
-            // actually hit an error or not.
-            //
-            // If all that succeeded then we ship everything on up.
-            if let Async::NotReady = stream.io.poll_write() {
-                return Ok(Async::NotReady)
-            }
-            if let Some(e) = try!(stream.io.get_ref().take_error()) {
-                return Err(e)
-            }
-        }
         match mem::replace(self, TcpStreamNewState::Empty) {
-            TcpStreamNewState::Waiting(stream) => Ok(Async::Ready(stream)),
-            _ => panic!(),
+            TcpStreamNewState::Waiting(stream) => {
+                // Once we've connected, wait for the stream to be writable as
+                // that's when the actual connection has been initiated. Once
+                // we're writable we check for `take_socket_error` to see if the
+                // connect actually hit an error or not.
+                //
+                // If all that succeeded then we ship everything on up.
+                if let Async::NotReady = stream.io.poll_write() {
+                    *self = TcpStreamNewState::Waiting(stream);
+                    return Ok(Async::NotReady);
+                }
+                if let Some(err) = stream.io.get_ref().take_error()? {
+                    return Err(err);
+                }
+                Ok(Async::Ready(stream))
+            },
+            TcpStreamNewState::Error(err) => Err(err),
+            TcpStreamNewState::Empty => panic!("TcpStreamNew polled after compltion"),
         }
     }
 }
@@ -680,7 +664,7 @@ impl Future for TcpStreamNewState {
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 mod sys {
     use std::os::unix::prelude::*;
-    use super::{TcpStream, TcpListener};
+    use super::{TcpListener, TcpStream};
 
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {
