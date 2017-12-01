@@ -73,19 +73,27 @@ struct Inner {
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 }
 
-/// Handle to an event loop, used to construct I/O objects, send messages, and
-/// otherwise interact indirectly with the event loop itself.
+/// A remote handle to an event loop, for more information see [`Handle`].
 ///
-/// Handles can be cloned, and when cloned they will still refer to the
+/// This handle can be cloned, and when cloned they will still refer to the
 /// same underlying event loop.
+///
+/// [`Handle`]: struct.Handle.html
 #[derive(Clone)]
 pub struct Remote {
     id: usize,
     inner: Weak<Inner>,
 }
 
-/// A non-sendable handle to an event loop, useful for manufacturing instances
-/// of `LoopData`.
+/// A handle to an event loop, used to construct I/O objects, send messages, and
+/// otherwise interact indirectly with the event loop itself.
+///
+/// Handles can be cloned, and when cloned they will still refer to the
+/// same underlying event loop.
+///
+/// Handles are non-sendable, see [`Remote`] for a sendable reference.
+///
+/// [`Remote`]: struct.Remote.html
 #[derive(Clone)]
 pub struct Handle {
     remote: Remote,
