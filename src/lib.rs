@@ -93,6 +93,7 @@
 
 #![doc(html_root_url = "https://docs.rs/tokio-core/0.1")]
 #![deny(missing_docs)]
+#![warn(missing_debug_implementations)]
 #![deny(warnings)]
 
 extern crate bytes;
