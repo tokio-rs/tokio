@@ -374,7 +374,7 @@ impl fmt::Debug for Handle {
     }
 }
 
-/// Wrapper around mio SetReadiness to implement futures Notify on.
+/// Wrapper around mio `SetReadiness` to implement futures Notify on.
 struct MySetReadiness(mio::SetReadiness);
 
 impl Notify for MySetReadiness {
@@ -392,7 +392,7 @@ fn read_ready() -> mio::Ready {
     mio::Ready::readable() | platform::hup()
 }
 
-const READ: usize = 1 << 0;
+const READ: usize = 1;
 const WRITE: usize = 1 << 1;
 
 fn ready2usize(ready: mio::Ready) -> usize {
