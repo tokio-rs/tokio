@@ -641,35 +641,25 @@ impl Future for TcpStreamNewState {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
-        {
-            let stream = match *self {
-                TcpStreamNewState::Waiting(ref s) => s,
-                TcpStreamNewState::Error(_) => {
-                    let e = match mem::replace(self, TcpStreamNewState::Empty) {
-                        TcpStreamNewState::Error(e) => e,
-                        _ => panic!(),
-                    };
-                    return Err(e);
-                }
-                TcpStreamNewState::Empty => panic!("can't poll TCP stream twice"),
-            };
-
-            // Once we've connected, wait for the stream to be writable as
-            // that's when the actual connection has been initiated. Once we're
-            // writable we check for `take_socket_error` to see if the connect
-            // actually hit an error or not.
-            //
-            // If all that succeeded then we ship everything on up.
-            if let Async::NotReady = stream.io.poll_write() {
-                return Ok(Async::NotReady);
-            }
-            if let Some(e) = stream.io.get_ref().take_error()? {
-                return Err(e);
-            }
-        }
         match mem::replace(self, TcpStreamNewState::Empty) {
-            TcpStreamNewState::Waiting(stream) => Ok(Async::Ready(stream)),
-            _ => panic!(),
+            TcpStreamNewState::Waiting(stream) => {
+                // Once we've connected, wait for the stream to be writable as
+                // that's when the actual connection has been initiated. Once
+                // we're writable we check for `take_socket_error` to see if the
+                // connect actually hit an error or not.
+                //
+                // If all that succeeded then we ship everything on up.
+                if let Async::NotReady = stream.io.poll_write() {
+                    mem::replace(self, TcpStreamNewState::Waiting(stream));
+                    return Ok(Async::NotReady);
+                }
+                if let Some(err) = stream.io.get_ref().take_error()? {
+                    return Err(err);
+                }
+                Ok(Async::Ready(stream))
+            },
+            TcpStreamNewState::Error(err) => Err(err),
+            TcpStreamNewState::Empty => panic!("TcpStreamNew polled after compltion"),
         }
     }
 }
