@@ -1,4 +1,3 @@
-use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
 use std::net::{self, SocketAddr, Shutdown};
@@ -18,6 +17,7 @@ use reactor::{Handle, PollEvented};
 ///
 /// This object can be converted into a stream of incoming connections for
 /// various forms of processing.
+#[derive(Debug)]
 pub struct TcpListener {
     io: PollEvented<mio::net::TcpListener>,
     pending_accept: Option<oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
@@ -26,6 +26,7 @@ pub struct TcpListener {
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.
 #[must_use = "streams do nothing unless polled"]
+#[derive(Debug)]
 pub struct Incoming {
     inner: TcpListener,
 }
@@ -208,12 +209,6 @@ impl TcpListener {
     }
 }
 
-impl fmt::Debug for TcpListener {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.io.get_ref().fmt(f)
-    }
-}
-
 impl Stream for Incoming {
     type Item = (TcpStream, SocketAddr);
     type Error = io::Error;
@@ -229,6 +224,7 @@ impl Stream for Incoming {
 /// accepting a connection from a listener. Inside the stream is access to the
 /// raw underlying I/O object as well as streams for the read/write
 /// notifications on the stream itself.
+#[derive(Debug)]
 pub struct TcpStream {
     io: PollEvented<mio::net::TcpStream>,
 }
@@ -236,11 +232,13 @@ pub struct TcpStream {
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct TcpStreamNew {
     inner: TcpStreamNewState,
 }
 
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 enum TcpStreamNewState {
     Waiting(TcpStream),
     Error(io::Error),
@@ -621,12 +619,6 @@ impl<'a> AsyncWrite for &'a TcpStream {
             }
             Err(e) => Err(e),
         }
-    }
-}
-
-impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.io.get_ref().fmt(f)
     }
 }
 
