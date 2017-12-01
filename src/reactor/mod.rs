@@ -340,8 +340,8 @@ impl Remote {
     /// the I/O loop itself. The future returned by the closure will be
     /// scheduled on the event loop and run to completion.
     ///
-    /// Note that while the closure, `F`, requires the `Send` bound as it might
-    /// cross threads, the future `R` does not.
+    /// Note that the closure, `F`, requires the `Send` bound as it might cross
+    /// threads.
     ///
     /// # Panics
     ///
