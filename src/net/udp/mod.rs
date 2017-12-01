@@ -1,6 +1,5 @@
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::fmt;
 use std::mem;
 
 use futures::{Async, Future, Poll};
@@ -9,6 +8,7 @@ use mio;
 use reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
+#[derive(Debug)]
 pub struct UdpSocket {
     io: PollEvented<mio::net::UdpSocket>,
 }
@@ -387,16 +387,11 @@ impl UdpSocket {
     }
 }
 
-impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.io.get_ref().fmt(f)
-    }
-}
-
 /// A future used to write the entire contents of some data to a UDP socket.
 ///
 /// This is created by the `UdpSocket::send_dgram` method.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
 
 impl<T> Future for SendDgram<T>
@@ -430,6 +425,7 @@ impl<T> Future for SendDgram<T>
 ///
 /// This is created by the `UdpSocket::recv_dgram` method.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct RecvDgram<T>(Option<(UdpSocket, T)>);
 
 impl<T> Future for RecvDgram<T>
