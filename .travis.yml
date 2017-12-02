@@ -1,25 +1,29 @@
 language: rust
-
-rust:
-  - stable
-  - beta
-  - nightly
 sudo: false
-before_script:
-  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+
+matrix:
+  include:
+    - rust: 1.21.0
+    - rust: stable
+    - os: osx
+    - rust: beta
+    - rust: nightly
+
+    - rust: nightly
+      before_script:
+        - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+      script:
+        - cargo doc --no-deps --all-features
+      after_success:
+        - travis-cargo --only nightly doc-upload
+
 script:
-  - cargo build
   - cargo test
-  - cargo doc --no-deps
-after_success:
-  - travis-cargo --only nightly doc-upload
+
 env:
   global:
-    - secure: "mTrrxm6AHgbh+k6/GKhKwQoKmLF4tZQLZ7671jvJ42Yu3U6mH4xGWnQDEQ6E883SvoBi0W5KwsvRqKRqNpPXYbWIMsS46gpMu0jEL6uz7+zwip64847OdbXAbS8NZsnXhS0w5b9dYdQUCoj71TrbWGVS/sqNb2twn+GJGIqfsjUHRnkHLIMmwoILgzYMbd3d1Jy/KlicIGtHq8Sb23EVr7tdkN++k21ZSDbmD+q5Pmf9MZH3yyk2YIpgCooVzqYAtS8Ua6ug1L+u3MBDWtqUFEOxGP5ya1+s312TGsBShaVvtQrH2IFOG+izdVjvRkpeM/FJXlqQAh02VxHK8ST9B6zjYO7Mnn8yT4gAA5PfoMlwZ5UxYQmr5fcjPAWvUkIdb6qRdqEupBbtCGO4EWTi2Gw8/w8tZGMS3JqPSsl8QJCu+fj3FWRwRwKmUaFIgIojbJQ3NCRCu9RGdbOoOOlhjYbw51lN9kxGxHLiiZzEtxv+nay5vNqIVkprRz4gbXOAi27Fglz2rYie88vb7XgrAVnaoahBA7C6l7KXZ/W3EuDDGjlxChj0kAqKz9AbbKAkYGN02hOn2Y26ag/THd4LKNE7QfcaEBKfJx3YEKVBI0fmoyT+iT1RMr9vmEySJmgZXHgd6TTIIpvIN8ouIy6LxzQby0bgP1++NSH05jgf/Sk="
+    secure: "mTrrxm6AHgbh+k6/GKhKwQoKmLF4tZQLZ7671jvJ42Yu3U6mH4xGWnQDEQ6E883SvoBi0W5KwsvRqKRqNpPXYbWIMsS46gpMu0jEL6uz7+zwip64847OdbXAbS8NZsnXhS0w5b9dYdQUCoj71TrbWGVS/sqNb2twn+GJGIqfsjUHRnkHLIMmwoILgzYMbd3d1Jy/KlicIGtHq8Sb23EVr7tdkN++k21ZSDbmD+q5Pmf9MZH3yyk2YIpgCooVzqYAtS8Ua6ug1L+u3MBDWtqUFEOxGP5ya1+s312TGsBShaVvtQrH2IFOG+izdVjvRkpeM/FJXlqQAh02VxHK8ST9B6zjYO7Mnn8yT4gAA5PfoMlwZ5UxYQmr5fcjPAWvUkIdb6qRdqEupBbtCGO4EWTi2Gw8/w8tZGMS3JqPSsl8QJCu+fj3FWRwRwKmUaFIgIojbJQ3NCRCu9RGdbOoOOlhjYbw51lN9kxGxHLiiZzEtxv+nay5vNqIVkprRz4gbXOAi27Fglz2rYie88vb7XgrAVnaoahBA7C6l7KXZ/W3EuDDGjlxChj0kAqKz9AbbKAkYGN02hOn2Y26ag/THd4LKNE7QfcaEBKfJx3YEKVBI0fmoyT+iT1RMr9vmEySJmgZXHgd6TTIIpvIN8ouIy6LxzQby0bgP1++NSH05jgf/Sk="
 
 notifications:
   email:
     on_success: never
-os:
-  - linux
-  - osx
