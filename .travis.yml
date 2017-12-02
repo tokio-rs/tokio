@@ -16,7 +16,7 @@ script:
   - cargo --version
   - rustc --version
   - cargo build --verbose
-  - cargo test --verbose
+  - RUST_LOG=tokio=trace cargo test --verbose
   - cargo doc --no-deps
 after_success:
   - travis-cargo --only nightly doc-upload --branch new-crate
