@@ -9,8 +9,8 @@ rust:
   - beta
   - nightly
 before_script:
-  # OS X doesn't come with Python by default.
-  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install python fi
+  # OS X doesn't come with Python or pip by default.
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew brew install python ; fi
   - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
 script:
   - cargo --version
