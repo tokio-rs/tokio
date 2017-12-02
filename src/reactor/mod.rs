@@ -261,7 +261,7 @@ impl Inner {
         let sched = io_dispatch.get(token).unwrap();
 
         let (task, ready) = match dir {
-            Direction::Read => (&sched.reader, mio::Ready::readable()),
+            Direction::Read => (&sched.reader, !mio::Ready::writable()),
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
@@ -282,7 +282,7 @@ impl Inner {
             if ready.is_writable() {
                 io.writer.notify();
             }
-            if ready.is_readable() {
+            if !(ready & (!mio::Ready::writable())).is_empty() {
                 io.reader.notify();
             }
         }
