@@ -355,10 +355,10 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`join_multicast_v4`].
     ///
+    /// [`join_multicast_v4`]: #method.join_multicast_v4
     pub fn leave_multicast_v4(&self,
                               multiaddr: &Ipv4Addr,
                               interface: &Ipv4Addr) -> io::Result<()> {
-    /// [`join_multicast_v4`]: #method.join_multicast_v4
         self.io.get_ref().leave_multicast_v4(multiaddr, interface)
     }
 
@@ -366,10 +366,10 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`join_multicast_v6`].
     ///
+    /// [`join_multicast_v6`]: #method.join_multicast_v6
     pub fn leave_multicast_v6(&self,
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
-    /// [`join_multicast_v6`]: #method.join_multicast_v6
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }
 
