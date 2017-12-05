@@ -87,6 +87,7 @@
 #![deny(missing_docs)]
 #![warn(missing_debug_implementations)]
 #![deny(warnings)]
+#![warn(missing_debug_implementations)]
 #![allow(unused_macros)]
 
 extern crate bytes;
