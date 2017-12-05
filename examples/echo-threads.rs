@@ -79,7 +79,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         // using the `TcpStream::from_stream` API. After that the socket is not
         // a `tokio::net::TcpStream` meaning it's in nonblocking mode and
         // ready to be used with Tokio
-        let socket = TcpStream::from_stream(socket, &handle)
+        let socket = TcpStream::from_std(socket, &handle)
             .expect("failed to associate TCP stream");
         let addr = socket.peer_addr().expect("failed to get remote address");
 

@@ -103,10 +103,10 @@ impl TcpListener {
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
-    pub fn from_listener(listener: net::TcpListener,
-                         addr: &SocketAddr,
-                         handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::from_listener(listener, addr));
+    pub fn from_std(listener: net::TcpListener,
+                    addr: &SocketAddr,
+                    handle: &Handle) -> io::Result<TcpListener> {
+        let l = mio::net::TcpListener::from_listener(listener, addr)?;
         TcpListener::new(l, handle)
     }
 
@@ -252,9 +252,10 @@ impl TcpStream {
     /// to a TCP stream ready to be used with the provided event loop handle.
     /// The stream returned is associated with the event loop and ready to
     /// perform I/O.
-    pub fn from_stream(stream: net::TcpStream, handle: &Handle)
-                       -> io::Result<TcpStream> {
-        let inner = try!(mio::net::TcpStream::from_stream(stream));
+    pub fn from_std(stream: net::TcpStream, handle: &Handle)
+        -> io::Result<TcpStream>
+    {
+        let inner = mio::net::TcpStream::from_stream(stream)?;
         Ok(TcpStream {
             io: try!(PollEvented::new(inner, handle)),
         })
@@ -278,10 +279,11 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream,
-                          addr: &SocketAddr,
-                          handle: &Handle)
-                          -> Box<Future<Item=TcpStream, Error=io::Error> + Send> {
+    pub fn connect_std(stream: net::TcpStream,
+                       addr: &SocketAddr,
+                       handle: &Handle)
+        -> Box<Future<Item=TcpStream, Error=io::Error> + Send>
+    {
         let state = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),

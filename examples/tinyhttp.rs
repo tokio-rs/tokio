@@ -81,7 +81,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         // request/response types instead of bytes. Here we'll just use our
         // framing defined below and then use the `send_all` helper to send the
         // responses back on the socket after we've processed them
-        let socket = future::result(TcpStream::from_stream(socket, &handle));
+        let socket = future::result(TcpStream::from_std(socket, &handle));
         let req = socket.and_then(|socket| {
             let (tx, rx) = socket.framed(Http).split();
             tx.send_all(rx.and_then(respond))
