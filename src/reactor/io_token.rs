@@ -29,7 +29,7 @@ impl IoToken {
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
-        match handle.inner.upgrade() {
+        match handle.inner() {
             Some(inner) => {
                 let token = try!(inner.add_source(source));
                 let handle = handle.clone();
@@ -61,7 +61,7 @@ impl IoToken {
     /// >           rather the `ReadinessStream` type should be used instead.
     // TODO: this should really return a proper newtype/enum, not a usize
     pub fn take_readiness(&self) -> usize {
-        let inner = match self.handle.inner.upgrade() {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return 0,
         };
@@ -93,7 +93,7 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_read(&self) -> io::Result<()> {
-        let inner = match self.handle.inner.upgrade() {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
@@ -126,7 +126,7 @@ impl IoToken {
     /// This function will also panic if there is not a currently running future
     /// task.
     pub fn schedule_write(&self) -> io::Result<()> {
-        let inner = match self.handle.inner.upgrade() {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
@@ -158,7 +158,7 @@ impl IoToken {
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
     pub fn drop_source(&self) {
-        let inner = match self.handle.inner.upgrade() {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return,
         };
