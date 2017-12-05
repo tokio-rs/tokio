@@ -18,7 +18,7 @@ use futures::{Future, Stream, Sink};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{UdpSocket, UdpCodec};
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 
 pub struct LineCodec;
 
@@ -39,8 +39,7 @@ impl UdpCodec for LineCodec {
 fn main() {
     drop(env_logger::init());
 
-    let mut core = Reactor::new().unwrap();
-    let handle = core.handle();
+    let handle = Handle::default();
 
     let pool = CpuPool::new(1);
 
@@ -79,5 +78,5 @@ fn main() {
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
     pool.execute(b.then(|_| Ok(()))).unwrap();
-    drop(core.run(a));
+    drop(a.wait());
 }

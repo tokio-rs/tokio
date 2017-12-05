@@ -31,7 +31,7 @@ use futures::{Future, Poll};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::io::{copy, shutdown};
 
@@ -42,14 +42,12 @@ fn main() {
     let server_addr = env::args().nth(2).unwrap_or("127.0.0.1:8080".to_string());
     let server_addr = server_addr.parse::<SocketAddr>().unwrap();
 
-    // Create the event loop that will drive this server.
-    let mut l = Reactor::new().unwrap();
-    let handle = l.handle();
+    let handle = Handle::default();
 
     let pool = CpuPool::new(1);
 
     // Create a TCP listener which will listen for incoming connections.
-    let socket = TcpListener::bind(&listen_addr, &l.handle()).unwrap();
+    let socket = TcpListener::bind(&listen_addr, &handle).unwrap();
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
@@ -97,7 +95,7 @@ fn main() {
 
         Ok(())
     });
-    l.run(done).unwrap();
+    done.wait().unwrap();
 }
 
 // This is a custom type used to have a custom implementation of the

@@ -32,7 +32,7 @@ use futures::{Future, Stream, Poll};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 use tokio_io::{AsyncRead, AsyncWrite};
 use flate2::write::GzEncoder;
 
@@ -41,8 +41,7 @@ fn main() {
     // reactor.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut core = Reactor::new().unwrap();
-    let handle = core.handle();
+    let handle = Handle::default();
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);
 
@@ -64,7 +63,7 @@ fn main() {
         Ok(())
     });
 
-    core.run(server).unwrap();
+    server.wait().unwrap();
 }
 
 /// The main workhorse of this example. This'll compress all data read from

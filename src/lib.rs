@@ -43,18 +43,16 @@
 //! extern crate tokio;
 //! extern crate tokio_io;
 //!
-//! use futures::{Future, Stream};
+//! use futures::prelude::*;
 //! use futures::future::Executor;
 //! use futures_cpupool::CpuPool;
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
 //! use tokio::net::TcpListener;
-//! use tokio::reactor::Reactor;
+//! use tokio::reactor::Handle;
 //!
 //! fn main() {
-//!     // Create the event loop that will drive this server.
-//!     let mut core = Reactor::new().unwrap();
-//!     let handle = core.handle();
+//!     let handle = Handle::default();
 //!
 //!     let pool = CpuPool::new_num_cpus();
 //!
@@ -86,8 +84,8 @@
 //!         Ok(())
 //!     });
 //!
-//!     // Spin up the server on the event loop.
-//!     core.run(server).unwrap();
+//!     // Spin up the server on this thread
+//!     server.wait().unwrap();
 //! }
 //! ```
 

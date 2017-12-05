@@ -28,9 +28,7 @@ use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, Weak, RwLock};
 use std::time::{Duration};
 
-use futures::{Future, Async};
-use futures::executor::{self, Notify};
-use futures::task::{AtomicTask};
+use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
 use slab::Slab;
@@ -53,12 +51,6 @@ pub struct Reactor {
 
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
-
-    /// Used for determining when the future passed to `run` is ready. Once the
-    /// registration is passed to `io` above we never touch it again, just keep
-    /// it alive.
-    _future_registration: mio::Registration,
-    future_readiness: Arc<MySetReadiness>,
 }
 
 struct Inner {
@@ -90,8 +82,7 @@ enum Direction {
     Write,
 }
 
-const TOKEN_FUTURE: mio::Token = mio::Token(1);
-const TOKEN_START: usize = 2;
+const TOKEN_START: usize = 1;
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -106,18 +97,8 @@ impl Reactor {
         // Create the I/O poller
         let io = try!(mio::Poll::new());
 
-        // Create a registration for unblocking the reactor when the "run"
-        // future becomes ready.
-        let future_pair = mio::Registration::new2();
-        try!(io.register(&future_pair.0,
-                         TOKEN_FUTURE,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
-
         Ok(Reactor {
             events: mio::Events::with_capacity(1024),
-            _future_registration: future_pair.0,
-            future_readiness: Arc::new(MySetReadiness(future_pair.1)),
             inner: Arc::new(Inner {
                 io: io,
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
@@ -137,41 +118,6 @@ impl Reactor {
         }
     }
 
-    /// Runs a future until completion, driving the event loop while we're
-    /// otherwise waiting for the future to complete.
-    ///
-    /// This function will begin executing the event loop and will finish once
-    /// the provided future is resolved. Note that the future argument here
-    /// crucially does not require the `'static` nor `Send` bounds. As a result
-    /// the future will be "pinned" to not only this thread but also this stack
-    /// frame.
-    ///
-    /// This function will return the value that the future resolves to once
-    /// the future has finished. If the future never resolves then this function
-    /// will never return.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
-        where F: Future,
-    {
-        let mut task = executor::spawn(f);
-        let mut future_fired = true;
-
-        loop {
-            if future_fired {
-                let res = task.poll_future_notify(&self.future_readiness, 0)?;
-                if let Async::Ready(e) = res {
-                    return Ok(e)
-                }
-            }
-            future_fired = self.poll(None);
-        }
-    }
-
     /// Performs one iteration of the event loop, blocking on waiting for events
     /// for at most `max_wait` (forever if `None`).
     ///
@@ -184,32 +130,24 @@ impl Reactor {
         self.poll(max_wait);
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
+    fn poll(&mut self, max_wait: Option<Duration>) {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => return,
             // TODO: This should return an io::Result instead of panic.
             Err(e) => panic!("error in poll: {}", e),
         }
 
         // Process all the events that came in, dispatching appropriately
-        let mut fired = false;
         for i in 0..self.events.len() {
             let event = self.events.get(i).unwrap();
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
-            if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                fired = true;
-            } else {
-                self.dispatch(token, event.readiness());
-            }
+            self.dispatch(token, event.readiness());
         }
-
-        return fired
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
@@ -404,15 +342,6 @@ impl Default for Handle {
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Handle")
-    }
-}
-
-struct MySetReadiness(mio::SetReadiness);
-
-impl Notify for MySetReadiness {
-    fn notify(&self, _id: usize) {
-        self.0.set_readiness(mio::Ready::readable())
-              .expect("failed to set readiness");
     }
 }
 

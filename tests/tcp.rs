@@ -8,7 +8,7 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 use tokio::net::{TcpListener, TcpStream};
 
 macro_rules! t {
@@ -21,15 +21,15 @@ macro_rules! t {
 #[test]
 fn connect() {
     drop(env_logger::init());
-    let mut l = t!(Reactor::new());
+    let handle = Handle::default();
     let srv = t!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = t!(srv.local_addr());
     let t = thread::spawn(move || {
         t!(srv.accept()).0
     });
 
-    let stream = TcpStream::connect(&addr, &l.handle());
-    let mine = t!(l.run(stream));
+    let stream = TcpStream::connect(&addr, &handle);
+    let mine = t!(stream.wait());
     let theirs = t.join().unwrap();
 
     assert_eq!(t!(mine.local_addr()), t!(theirs.peer_addr()));
@@ -39,8 +39,8 @@ fn connect() {
 #[test]
 fn accept() {
     drop(env_logger::init());
-    let mut l = t!(Reactor::new());
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let handle = Handle::default();
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &handle));
     let addr = t!(srv.local_addr());
 
     let (tx, rx) = channel();
@@ -53,7 +53,7 @@ fn accept() {
         net::TcpStream::connect(&addr).unwrap()
     });
 
-    let (mine, _remaining) = t!(l.run(client));
+    let (mine, _remaining) = t!(client.wait());
     let mine = mine.unwrap();
     let theirs = t.join().unwrap();
 
@@ -64,8 +64,8 @@ fn accept() {
 #[test]
 fn accept2() {
     drop(env_logger::init());
-    let mut l = t!(Reactor::new());
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let handle = Handle::default();
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &handle));
     let addr = t!(srv.local_addr());
 
     let t = thread::spawn(move || {
@@ -79,7 +79,7 @@ fn accept2() {
     }).into_future().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
 
-    let (mine, _remaining) = t!(l.run(client));
+    let (mine, _remaining) = t!(client.wait());
     mine.unwrap();
     t.join().unwrap();
 }
