@@ -57,21 +57,35 @@ impl TcpListener {
     /// future's task. It's recommended to only call this from the
     /// implementation of a `Future::poll`, if necessary.
     pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
+        let (stream, addr) = self.accept_std()?;
+        let stream = TcpStream::from_std(stream, self.io.handle())?;
+        Ok((stream, addr))
+    }
+
+    /// Attempt to accept a connection and create a new connected `TcpStream` if
+    /// successful.
+    ///
+    /// This function is the asme as `accept` above except that it returns a
+    /// `std::net::TcpStream` instead of a `tokio::net::TcpStream`. This in turn
+    /// can then allow for the TCP stream to be assoiated with a different
+    /// reactor than the one this `TcpListener` is associated with.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic for the same reasons as `accept`, notably if
+    /// called outside the context of a future.
+    pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
         }
 
-        match self.io.get_ref().accept() {
+        match self.io.get_ref().accept_std() {
+            Ok(pair) => Ok(pair),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
                     self.io.need_read()?;
                 }
                 Err(e)
-            },
-            Ok((sock, addr)) => {
-                let handle = self.io.handle();
-                let io = try!(PollEvented::new(sock, &handle));
-                Ok((TcpStream { io: io }, addr))
             }
         }
     }
