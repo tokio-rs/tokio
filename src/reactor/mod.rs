@@ -51,6 +51,8 @@ pub struct Reactor {
 
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
+
+    _wakeup_registration: mio::Registration,
 }
 
 struct Inner {
@@ -59,6 +61,9 @@ struct Inner {
 
     /// Dispatch slabs for I/O and futures events
     io_dispatch: RwLock<Slab<ScheduledIo>>,
+
+    /// Used to wake up the reactor from a call to `turn`
+    wakeup: mio::SetReadiness
 }
 
 /// A handle to an event loop.
@@ -82,6 +87,7 @@ enum Direction {
     Write,
 }
 
+const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_START: usize = 1;
 
 fn _assert_kinds() {
@@ -94,14 +100,21 @@ impl Reactor {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Reactor> {
-        // Create the I/O poller
-        let io = try!(mio::Poll::new());
+        let io = mio::Poll::new()?;
+        let wakeup_pair = mio::Registration::new2();
+
+        io.register(&wakeup_pair.0,
+                    TOKEN_WAKEUP,
+                    mio::Ready::readable(),
+                    mio::PollOpt::level())?;
 
         Ok(Reactor {
             events: mio::Events::with_capacity(1024),
+            _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
                 io: io,
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
+                wakeup: wakeup_pair.1,
             }),
         })
     }
@@ -146,7 +159,12 @@ impl Reactor {
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
-            self.dispatch(token, event.readiness());
+
+            if token == TOKEN_WAKEUP {
+                self.inner.wakeup.set_readiness(mio::Ready::empty()).unwrap();
+            } else {
+                self.dispatch(token, event.readiness());
+            }
         }
     }
 
@@ -278,6 +296,21 @@ impl Handle {
                     Err(SetDefaultError(()))
                 }
             }
+        }
+    }
+
+    /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
+    /// makes the next call to `turn` return immediately.
+    ///
+    /// This method is intended to be used in situations where a notification
+    /// needs to otherwise be sent to the main reactor. If the reactor is
+    /// currently blocked inside of `turn` then it will wake up and soon return
+    /// after this method has been called. If the reactor is not currently
+    /// blocked in `turn`, then the next call to `turn` will not block and
+    /// return immediately.
+    pub fn wakeup(&self) {
+        if let Some(inner) = self.inner() {
+            inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
         }
     }
 

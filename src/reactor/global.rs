@@ -1,22 +1,28 @@
 use std::io;
 use std::thread;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use reactor::{Reactor, Handle};
 
 pub struct HelperThread {
     thread: Option<thread::JoinHandle<()>>,
     reactor: Handle,
+    done: Arc<AtomicBool>,
 }
 
 impl HelperThread {
     pub fn new() -> io::Result<HelperThread> {
         let reactor = Reactor::new()?;
         let reactor_handle = reactor.handle().clone();
-        let thread = thread::Builder::new().spawn(move || run(reactor))?;
+        let done = Arc::new(AtomicBool::new(false));
+        let done2 = done.clone();
+        let thread = thread::Builder::new().spawn(move || run(reactor, done))?;
 
         Ok(HelperThread {
             thread: Some(thread),
             reactor: reactor_handle,
+            done: done2,
         })
     }
 
@@ -31,13 +37,18 @@ impl HelperThread {
 
 impl Drop for HelperThread {
     fn drop(&mut self) {
-        // TODO: kill the reactor thread and wait for it to exit, needs
-        //       `Handle::wakeup` to be implemented in a future PR
+        let thread = match self.thread.take() {
+            Some(thread) => thread,
+            None => return
+        };
+        self.done.store(true, Ordering::SeqCst);
+        self.reactor.wakeup();
+        thread.join().unwrap();
     }
 }
 
-fn run(mut reactor: Reactor) {
-    loop {
+fn run(mut reactor: Reactor, done: Arc<AtomicBool>) {
+    while !done.load(Ordering::SeqCst) {
         reactor.turn(None);
     }
 }
