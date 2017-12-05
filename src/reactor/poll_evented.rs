@@ -281,7 +281,7 @@ impl<E> PollEvented<E> {
     pub fn deregister(&self) -> io::Result<()>
         where E: Evented,
     {
-        let inner = match self.handle().inner.upgrade() {
+        let inner = match self.handle().inner() {
             Some(inner) => inner,
             None => return Ok(()),
         };
