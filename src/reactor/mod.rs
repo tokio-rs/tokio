@@ -72,30 +72,15 @@ struct Inner {
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 }
 
-/// A remote handle to an event loop, for more information see [`Handle`].
+/// A handle to an event loop.
 ///
-/// This handle can be cloned, and when cloned they will still refer to the
-/// same underlying event loop.
-///
-/// [`Handle`]: struct.Handle.html
-#[derive(Clone)]
-pub struct Remote {
-    id: usize,
-    inner: Weak<Inner>,
-}
-
-/// A handle to an event loop, used to construct I/O objects, send messages, and
-/// otherwise interact indirectly with the event loop itself.
-///
-/// Handles can be cloned, and when cloned they will still refer to the
-/// same underlying event loop.
-///
-/// Handles are non-sendable, see [`Remote`] for a sendable reference.
-///
-/// [`Remote`]: struct.Remote.html
+/// A `Handle` is used for associating I/O objects with an event loop
+/// explicitly. Typically though you won't end up using a `Handle` that often
+/// and will instead use and implicitly configured handle for your thread.
 #[derive(Clone)]
 pub struct Handle {
-    remote: Remote,
+    id: usize,
+    inner: Weak<Inner>,
 }
 
 struct ScheduledIo {
@@ -116,7 +101,6 @@ fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
 
     _assert::<Handle>();
-    _assert::<Remote>();
 }
 
 impl Core {
@@ -153,14 +137,7 @@ impl Core {
     /// This handle is typically passed into functions that create I/O objects
     /// to bind them to this event loop.
     pub fn handle(&self) -> Handle {
-        let remote = self.remote();
-        Handle { remote }
-    }
-
-    /// Generates a remote handle to this event loop which can be used to spawn
-    /// tasks from other threads into this event loop.
-    pub fn remote(&self) -> Remote {
-        Remote {
+        Handle {
             id: self.inner.id,
             inner: Arc::downgrade(&self.inner),
         }
@@ -313,59 +290,6 @@ impl Inner {
         if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
             task.notify();
         }
-    }
-}
-
-impl Remote {
-    /// Attempts to "promote" this remote to a handle, if possible.
-    ///
-    /// This function is intended for structures which typically work through a
-    /// `Remote` but want to optimize runtime when the remote doesn't actually
-    /// leave the thread of the original reactor. This will attempt to return a
-    /// handle if the `Remote` is on the same thread as the event loop and the
-    /// event loop is running.
-    ///
-    /// If this `Remote` has moved to a different thread or if the event loop is
-    /// running, then `None` may be returned. If you need to guarantee access to
-    /// a `Handle`, then you can call this function and fall back to using
-    /// `spawn` above if it returns `None`.
-    pub fn handle(&self) -> Option<Handle> {
-        let remote = self.clone();
-        Some(Handle { remote } )
-    }
-
-    /// Spawns a new future into the event loop this remote is associated with.
-    ///
-    /// This function takes a closure which is executed within the context of
-    /// the I/O loop itself. The future returned by the closure will be
-    /// scheduled on the event loop and run to completion.
-    ///
-    /// Note that the closure, `F`, requires the `Send` bound as it might cross
-    /// threads.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub(crate) fn run<F>(&self, f: F)
-        where F: FnOnce(&Handle) + Send + 'static,
-    {
-        let handle = self.handle().unwrap();
-        f(&handle);
-    }
-}
-
-impl fmt::Debug for Remote {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"Remote")
-    }
-}
-
-impl Handle {
-    /// Returns a reference to the underlying remote handle to the event loop.
-    pub fn remote(&self) -> &Remote {
-        &self.remote
     }
 }
 

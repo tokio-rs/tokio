@@ -3,12 +3,12 @@ use std::io;
 
 use mio::event::Evented;
 
-use reactor::{Remote, Handle, Direction};
+use reactor::{Handle, Direction};
 
 /// A token that identifies an active I/O resource.
 pub struct IoToken {
     token: usize,
-    handle: Remote,
+    handle: Handle,
 }
 
 impl IoToken {
@@ -29,10 +29,10 @@ impl IoToken {
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
-        match handle.remote.inner.upgrade() {
+        match handle.inner.upgrade() {
             Some(inner) => {
                 let token = try!(inner.add_source(source));
-                let handle = handle.remote().clone();
+                let handle = handle.clone();
 
                 Ok(IoToken { token, handle })
             }
@@ -40,8 +40,8 @@ impl IoToken {
         }
     }
 
-    /// Returns a reference to the remote handle.
-    pub fn remote(&self) -> &Remote {
+    /// Returns a reference to this I/O token's event loop's handle.
+    pub fn handle(&self) -> &Handle {
         &self.handle
     }
 

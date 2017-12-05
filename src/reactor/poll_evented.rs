@@ -15,7 +15,7 @@ use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::{Handle, Remote};
+use reactor::Handle;
 use reactor::io_token::IoToken;
 
 /// A concrete implementation of a stream of readiness notifications for I/O
@@ -103,7 +103,7 @@ impl<E: Evented> PollEvented<E> {
     /// method is called, and will likely return an error if this `PollEvented`
     /// was created on a separate event loop from the `handle` specified.
     pub fn deregister(self, handle: &Handle) -> io::Result<()> {
-        let inner = match handle.remote.inner.upgrade() {
+        let inner = match handle.inner.upgrade() {
             Some(inner) => inner,
             None => return Ok(()),
         };
@@ -251,8 +251,8 @@ impl<E> PollEvented<E> {
 
     /// Returns a reference to the event loop handle that this readiness stream
     /// is associated with.
-    pub fn remote(&self) -> &Remote {
-        self.token.remote()
+    pub fn handle(&self) -> &Handle {
+        self.token.handle()
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
