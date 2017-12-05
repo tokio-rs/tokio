@@ -77,10 +77,12 @@ impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
     }
 }
 
-impl<E: Evented> PollEvented<E> {
+impl<E> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
-    pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
+    pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>>
+        where E: Evented,
+    {
         let token = IoToken::new(&io, handle)?;
 
         Ok(PollEvented {
@@ -90,29 +92,6 @@ impl<E: Evented> PollEvented<E> {
         })
     }
 
-    /// Deregisters this source of events from the reactor core specified.
-    ///
-    /// This method can optionally be called to unregister the underlying I/O
-    /// object with the event loop that the `handle` provided points to.
-    /// Typically this method is not required as this automatically happens when
-    /// `E` is dropped, but for some use cases the `E` object doesn't represent
-    /// an owned reference, so dropping it won't automatically unregister with
-    /// the event loop.
-    ///
-    /// This consumes `self` as it will no longer provide events after the
-    /// method is called, and will likely return an error if this `PollEvented`
-    /// was created on a separate event loop from the `handle` specified.
-    pub fn deregister(self, handle: &Handle) -> io::Result<()> {
-        let inner = match handle.inner.upgrade() {
-            Some(inner) => inner,
-            None => return Ok(()),
-        };
-
-        inner.deregister_source(&self.io)
-    }
-}
-
-impl<E> PollEvented<E> {
     /// Tests to see if this source is ready to be read from or not.
     ///
     /// If this stream is not ready for a read then `Async::NotReady` will be
@@ -285,6 +264,29 @@ impl<E> PollEvented<E> {
     /// stream is wrapping.
     pub fn get_mut(&mut self) -> &mut E {
         &mut self.io
+    }
+
+    /// Deregisters this source of events from the reactor core specified.
+    ///
+    /// This method can optionally be called to unregister the underlying I/O
+    /// object with the event loop that the `handle` provided points to.
+    /// Typically this method is not required as this automatically happens when
+    /// `E` is dropped, but for some use cases the `E` object doesn't represent
+    /// an owned reference, so dropping it won't automatically unregister with
+    /// the event loop.
+    ///
+    /// This consumes `self` as it will no longer provide events after the
+    /// method is called, and will likely return an error if this `PollEvented`
+    /// was created on a separate event loop from the `handle` specified.
+    pub fn deregister(&self) -> io::Result<()>
+        where E: Evented,
+    {
+        let inner = match self.handle().inner.upgrade() {
+            Some(inner) => inner,
+            None => return Ok(()),
+        };
+
+        inner.deregister_source(&self.io)
     }
 }
 
