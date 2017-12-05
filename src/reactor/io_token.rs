@@ -92,13 +92,14 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_read(&self) {
+    pub fn schedule_read(&self) -> io::Result<()> {
         let inner = match self.handle.inner.upgrade() {
             Some(inner) => inner,
-            None => return,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
 
         inner.schedule(self.token, Direction::Read);
+        Ok(())
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -124,13 +125,14 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_write(&self) {
+    pub fn schedule_write(&self) -> io::Result<()> {
         let inner = match self.handle.inner.upgrade() {
             Some(inner) => inner,
-            None => return,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
 
         inner.schedule(self.token, Direction::Write);
+        Ok(())
     }
 
     /// Unregister all information associated with a token on an event loop,

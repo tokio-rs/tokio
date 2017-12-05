@@ -64,7 +64,7 @@ impl TcpListener {
         match self.io.get_ref().accept() {
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
+                    self.io.need_read()?;
                 }
                 Err(e)
             },
@@ -576,7 +576,7 @@ impl<'a> AsyncRead for &'a TcpStream {
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read();
+                self.io.need_read()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -614,7 +614,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write();
+                self.io.need_write()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),

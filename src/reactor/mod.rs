@@ -231,6 +231,19 @@ impl fmt::Debug for Core {
     }
 }
 
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // When a reactor is dropped it needs to wake up all blocked tasks as
+        // they'll never receive a notification, and all connected I/O objects
+        // will start returning errors pretty quickly.
+        let io = self.io_dispatch.read().unwrap();
+        for (_, io) in io.iter() {
+            io.writer.notify();
+            io.reader.notify();
+        }
+    }
+}
+
 impl Inner {
     /// Register an I/O resource with the reactor.
     ///

@@ -184,9 +184,13 @@ impl<E> PollEvented<E> {
         match self.readiness.load(Ordering::SeqCst) & bits {
             0 => {
                 if mask.is_writable() {
-                    self.need_write();
+                    if self.need_write().is_err() {
+                        return Async::Ready(mask)
+                    }
                 } else {
-                    self.need_read();
+                    if self.need_read().is_err() {
+                        return Async::Ready(mask)
+                    }
                 }
                 Async::NotReady
             }
@@ -213,14 +217,22 @@ impl<E> PollEvented<E> {
     /// previously indicated that the object is readable. That is, this function
     /// must always be paired with calls to `poll_read` previously.
     ///
+    /// # Errors
+    ///
+    /// This function will return an error if the `Core` that this `PollEvented`
+    /// is associated with has gone away (been destroyed). The error means that
+    /// the ambient futures task could not be scheduled to receive a
+    /// notification and typically means that the error should be propagated
+    /// outwards.
+    ///
     /// # Panics
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn need_read(&self) {
+    pub fn need_read(&self) -> io::Result<()> {
         let bits = super::ready2usize(super::read_ready());
         self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_read();
+        self.token.schedule_read()
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -239,14 +251,22 @@ impl<E> PollEvented<E> {
     /// previously indicated that the object is writable. That is, this function
     /// must always be paired with calls to `poll_write` previously.
     ///
+    /// # Errors
+    ///
+    /// This function will return an error if the `Core` that this `PollEvented`
+    /// is associated with has gone away (been destroyed). The error means that
+    /// the ambient futures task could not be scheduled to receive a
+    /// notification and typically means that the error should be propagated
+    /// outwards.
+    ///
     /// # Panics
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn need_write(&self) {
+    pub fn need_write(&self) -> io::Result<()> {
         let bits = super::ready2usize(Ready::writable());
         self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_write();
+        self.token.schedule_write()
     }
 
     /// Returns a reference to the event loop handle that this readiness stream
@@ -275,7 +295,7 @@ impl<E: Read> Read for PollEvented<E> {
         }
         let r = self.get_mut().read(buf);
         if is_wouldblock(&r) {
-            self.need_read();
+            self.need_read()?;
         }
         return r
     }
@@ -288,7 +308,7 @@ impl<E: Write> Write for PollEvented<E> {
         }
         let r = self.get_mut().write(buf);
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -299,7 +319,7 @@ impl<E: Write> Write for PollEvented<E> {
         }
         let r = self.get_mut().flush();
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -323,7 +343,7 @@ impl<'a, E> Read for &'a PollEvented<E>
         }
         let r = self.get_ref().read(buf);
         if is_wouldblock(&r) {
-            self.need_read();
+            self.need_read()?;
         }
         return r
     }
@@ -338,7 +358,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         }
         let r = self.get_ref().write(buf);
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
@@ -349,7 +369,7 @@ impl<'a, E> Write for &'a PollEvented<E>
         }
         let r = self.get_ref().flush();
         if is_wouldblock(&r) {
-            self.need_write();
+            self.need_write()?;
         }
         return r
     }
