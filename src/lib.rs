@@ -1,21 +1,28 @@
 //! `Future`-powered I/O at the core of Tokio
 //!
-//! This crate uses the `futures` crate to provide an event loop ("reactor
+//! This crate uses the [`futures`] crate to provide an event loop ("reactor
 //! core") which can be used to drive I/O like TCP and UDP. All asynchronous I/O
-//! is powered by the `mio` crate.
+//! is powered by the [`mio`] crate.
+//!
+//! [`futures`]: ../futures/index.html
+//! [`mio`]: ../mio/index.html
 //!
 //! The concrete types provided in this crate are relatively bare bones but are
 //! intended to be the essential foundation for further projects needing an
 //! event loop. In this crate you'll find:
 //!
-//! * TCP, both streams and listeners
-//! * UDP sockets
-//! * An event loop to run futures
+//! * TCP, both streams and listeners.
+//! * UDP sockets.
+//! * An event loop to run futures.
 //!
 //! More functionality is likely to be added over time, but otherwise the crate
-//! is intended to be flexible, with the `PollEvented` type accepting any
-//! type that implements `mio::Evented`. For example, the `tokio-uds` crate
-//! uses `PollEvented` to provide support for Unix domain sockets.
+//! is intended to be flexible, with the [`PollEvented`] type accepting any
+//! type that implements [`mio::Evented`]. For example, the [`tokio-uds`] crate
+//! uses [`PollEvented`] to provide support for Unix domain sockets.
+//!
+//! [`PollEvented`]: ./reactor/struct.PollEvented.html
+//! [`mio::Evented`]: ../mio/event/trait.Evented.html
+//! [`tokio-uds`]: https://crates.io/crates/tokio-uds
 //!
 //! Some other important tasks covered by this crate are:
 //!
@@ -45,40 +52,41 @@
 //! use tokio::reactor::Core;
 //!
 //! fn main() {
-//!     // Create the event loop that will drive this server
+//!     // Create the event loop that will drive this server.
 //!     let mut core = Core::new().unwrap();
 //!     let handle = core.handle();
 //!
 //!     let pool = CpuPool::new_num_cpus();
 //!
-//!     // Bind the server's socket
+//!     // Bind the server's socket.
 //!     let addr = "127.0.0.1:12345".parse().unwrap();
-//!     let listener = TcpListener::bind(&addr, &handle).unwrap();
+//!     let listener = TcpListener::bind(&addr, &handle)
+//!         .expect("unable to bind TCP listener");
 //!
 //!     // Pull out a stream of sockets for incoming connections
 //!     let server = listener.incoming().for_each(|(sock, _)| {
 //!         // Split up the reading and writing parts of the
-//!         // socket
+//!         // socket.
 //!         let (reader, writer) = sock.split();
 //!
 //!         // A future that echos the data and returns how
 //!         // many bytes were copied...
 //!         let bytes_copied = copy(reader, writer);
 //!
-//!         // ... after which we'll print what happened
+//!         // ... after which we'll print what happened.
 //!         let handle_conn = bytes_copied.map(|amt| {
 //!             println!("wrote {:?} bytes", amt)
 //!         }).map_err(|err| {
-//!             println!("IO error {:?}", err)
+//!             eprintln!("IO error {:?}", err)
 //!         });
 //!
-//!         // Spawn the future as a concurrent task
+//!         // Spawn the future as a concurrent task.
 //!         pool.execute(handle_conn).unwrap();
 //!
 //!         Ok(())
 //!     });
 //!
-//!     // Spin up the server on the event loop
+//!     // Spin up the server on the event loop.
 //!     core.run(server).unwrap();
 //! }
 //! ```

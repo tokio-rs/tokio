@@ -80,9 +80,6 @@ impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
 impl<E: Evented> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
-    ///
-    /// This method returns a future which will resolve to the readiness stream
-    /// when it's ready.
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>> {
         let token = IoToken::new(&io, handle)?;
 
@@ -118,11 +115,11 @@ impl<E: Evented> PollEvented<E> {
 impl<E> PollEvented<E> {
     /// Tests to see if this source is ready to be read from or not.
     ///
-    /// If this stream is not ready for a read then `NotReady` will be returned
-    /// and the current task will be scheduled to receive a notification when
-    /// the stream is readable again. In other words, this method is only safe
-    /// to call from within the context of a future's task, typically done in a
-    /// `Future::poll` method.
+    /// If this stream is not ready for a read then `Async::NotReady` will be
+    /// returned and the current task will be scheduled to receive a
+    /// notification when the stream is readable again. In other words, this
+    /// method is only safe to call from within the context of a future's task,
+    /// typically done in a `Future::poll` method.
     ///
     /// This is mostly equivalent to `self.poll_ready(Ready::readable())`.
     ///
@@ -137,7 +134,7 @@ impl<E> PollEvented<E> {
 
     /// Tests to see if this source is ready to be written to or not.
     ///
-    /// If this stream is not ready for a write then `NotReady` will be returned
+    /// If this stream is not ready for a write then `Async::NotReady` will be returned
     /// and the current task will be scheduled to receive a notification when
     /// the stream is writable again. In other words, this method is only safe
     /// to call from within the context of a future's task, typically done in a

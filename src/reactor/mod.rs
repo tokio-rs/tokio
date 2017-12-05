@@ -1,8 +1,24 @@
-//! The core reactor driving all I/O
+//! The core reactor driving all I/O.
 //!
-//! This module contains the `Core` type which is the reactor for all I/O
-//! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
-//! resources.
+//! This module contains the [`Core`] reactor type which is the event loop for
+//! all I/O happening in `tokio`. This core reactor (or event loop) is used to
+//! drive I/O resources.
+//!
+//! The [`Handle`] and [`Remote`] structs are refences to the event loop,
+//! created by the [`handle`][handle_method] and [`remote`][remote_method]
+//! respectively, and are used to construct I/O objects. `Remote` is sendable,
+//! while `Handle` is not.
+//!
+//! Lastly [`PollEvented`] can be used to construct I/O objects that interact
+//! with the event loop, e.g. [`TcpStream`] in the net module.
+//!
+//! [`Core`]: struct.Core.html
+//! [`Handle`]: struct.Handle.html
+//! [`Remote`]: struct.Remote.html
+//! [handle_method]: struct.Core.html#method.handle
+//! [remote_method]: struct.Core.html#method.remote
+//! [`PollEvented`]: struct.PollEvented.html
+//! [`TcpStream`]: ../net/struct.TcpStream.html
 
 use std::fmt;
 use std::io::{self, ErrorKind};
@@ -25,7 +41,7 @@ pub use self::poll_evented::PollEvented;
 /// Global counter used to assign unique IDs to reactor instances.
 static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
-/// An event loop.
+/// The core reactor, or event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
 /// all other I/O events and notifications happening. Each event loop can have
@@ -56,19 +72,27 @@ struct Inner {
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 }
 
-/// Handle to an event loop, used to construct I/O objects, send messages, and
-/// otherwise interact indirectly with the event loop itself.
+/// A remote handle to an event loop, for more information see [`Handle`].
 ///
-/// Handles can be cloned, and when cloned they will still refer to the
+/// This handle can be cloned, and when cloned they will still refer to the
 /// same underlying event loop.
+///
+/// [`Handle`]: struct.Handle.html
 #[derive(Clone)]
 pub struct Remote {
     id: usize,
     inner: Weak<Inner>,
 }
 
-/// A non-sendable handle to an event loop, useful for manufacturing instances
-/// of `LoopData`.
+/// A handle to an event loop, used to construct I/O objects, send messages, and
+/// otherwise interact indirectly with the event loop itself.
+///
+/// Handles can be cloned, and when cloned they will still refer to the
+/// same underlying event loop.
+///
+/// Handles are non-sendable, see [`Remote`] for a sendable reference.
+///
+/// [`Remote`]: struct.Remote.html
 #[derive(Clone)]
 pub struct Handle {
     remote: Remote,
@@ -316,8 +340,8 @@ impl Remote {
     /// the I/O loop itself. The future returned by the closure will be
     /// scheduled on the event loop and run to completion.
     ///
-    /// Note that while the closure, `F`, requires the `Send` bound as it might
-    /// cross threads, the future `R` does not.
+    /// Note that the closure, `F`, requires the `Send` bound as it might cross
+    /// threads.
     ///
     /// # Panics
     ///
