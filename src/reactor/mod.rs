@@ -23,7 +23,7 @@
 use std::fmt;
 use std::io::{self, ErrorKind};
 use std::sync::{Arc, Weak, RwLock};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration};
 
 use futures::{Future, Async};
@@ -37,9 +37,6 @@ mod io_token;
 
 mod poll_evented;
 pub use self::poll_evented::PollEvented;
-
-/// Global counter used to assign unique IDs to reactor instances.
-static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
 /// The core reactor, or event loop.
 ///
@@ -62,9 +59,6 @@ pub struct Core {
 }
 
 struct Inner {
-    /// Unique identifier referencing this reactor.
-    id: usize,
-
     /// The underlying system event queue.
     io: mio::Poll,
 
@@ -79,7 +73,6 @@ struct Inner {
 /// and will instead use and implicitly configured handle for your thread.
 #[derive(Clone)]
 pub struct Handle {
-    id: usize,
     inner: Weak<Inner>,
 }
 
@@ -123,7 +116,6 @@ impl Core {
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
             inner: Arc::new(Inner {
-                id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
                 io: io,
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
             }),
@@ -138,7 +130,6 @@ impl Core {
     /// to bind them to this event loop.
     pub fn handle(&self) -> Handle {
         Handle {
-            id: self.inner.id,
             inner: Arc::downgrade(&self.inner),
         }
     }
