@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use futures::stream::Stream;
-use futures::sync::oneshot;
 use futures::{Future, Poll, Async};
 use iovec::IoVec;
 use mio;
@@ -20,7 +19,6 @@ use reactor::{Handle, PollEvented};
 /// various forms of processing.
 pub struct TcpListener {
     io: PollEvented<mio::net::TcpListener>,
-    pending_accept: Option<oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
@@ -59,33 +57,21 @@ impl TcpListener {
     /// future's task. It's recommended to only call this from the
     /// implementation of a `Future::poll`, if necessary.
     pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        loop {
-            if let Some(mut pending) = self.pending_accept.take() {
-                match pending.poll().expect("shouldn't be canceled") {
-                    Async::NotReady => {
-                        self.pending_accept = Some(pending);
-                        return Err(io::ErrorKind::WouldBlock.into())
-                    },
-                    Async::Ready(r) => return r,
-                }
-            }
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+        }
 
-            if let Async::NotReady = self.io.poll_read() {
-                return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
-            }
-
-            match self.io.get_ref().accept() {
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
-                        self.io.need_read();
-                    }
-                    return Err(e)
-                },
-                Ok((sock, addr)) => {
-                    let handle = self.io.handle();
-                    let io = try!(PollEvented::new(sock, &handle));
-                    return Ok((TcpStream { io: io }, addr))
+        match self.io.get_ref().accept() {
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read();
                 }
+                Err(e)
+            },
+            Ok((sock, addr)) => {
+                let handle = self.io.handle();
+                let io = try!(PollEvented::new(sock, &handle));
+                Ok((TcpStream { io: io }, addr))
             }
         }
     }
@@ -127,7 +113,7 @@ impl TcpListener {
     fn new(listener: mio::net::TcpListener, handle: &Handle)
            -> io::Result<TcpListener> {
         let io = try!(PollEvented::new(listener, handle));
-        Ok(TcpListener { io: io, pending_accept: None })
+        Ok(TcpListener { io: io })
     }
 
     /// Test whether this socket is ready to be read or not.
