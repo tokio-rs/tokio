@@ -16,7 +16,7 @@ use std::time::Duration;
 use mio::unix::{UnixReady, EventedFd};
 use mio::{PollOpt, Ready, Token};
 use mio::event::Evented;
-use tokio::reactor::{Core, PollEvented};
+use tokio::reactor::{Reactor, PollEvented};
 use tokio_io::io::read_to_end;
 
 macro_rules! t {
@@ -64,7 +64,7 @@ impl Evented for MyFile {
 fn hup() {
     drop(env_logger::init());
 
-    let mut l = t!(Core::new());
+    let mut l = t!(Reactor::new());
     unsafe {
         let mut pipes = [0; 2];
         assert!(libc::pipe(pipes.as_mut_ptr()) != -1,

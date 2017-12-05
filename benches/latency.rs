@@ -16,7 +16,7 @@ use futures::sync::mpsc;
 use futures::{Future, Poll, Sink, Stream};
 use test::Bencher;
 use tokio::net::UdpSocket;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 /// UDP echo server
 struct EchoServer {
@@ -59,7 +59,7 @@ fn udp_echo_latency(b: &mut Bencher) {
     let (tx, rx) = oneshot::channel();
 
     let child = thread::spawn(move || {
-        let mut l = Core::new().unwrap();
+        let mut l = Reactor::new().unwrap();
         let handle = l.handle();
 
         let socket = tokio::net::UdpSocket::bind(&any_addr, &handle).unwrap();

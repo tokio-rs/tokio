@@ -28,7 +28,7 @@ use std::thread;
 use futures::sync::mpsc;
 use futures::{Sink, Future, Stream};
 use futures_cpupool::CpuPool;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 fn main() {
     // Determine if we're going to run in TCP or UDP mode
@@ -48,7 +48,7 @@ fn main() {
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     // Create the event loop and initiate the connection to the remote server
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
 
     let pool = CpuPool::new(1);

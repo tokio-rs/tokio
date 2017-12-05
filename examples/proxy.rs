@@ -31,7 +31,7 @@ use futures::{Future, Poll};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::io::{copy, shutdown};
 
@@ -43,7 +43,7 @@ fn main() {
     let server_addr = server_addr.parse::<SocketAddr>().unwrap();
 
     // Create the event loop that will drive this server.
-    let mut l = Core::new().unwrap();
+    let mut l = Reactor::new().unwrap();
     let handle = l.handle();
 
     let pool = CpuPool::new(1);

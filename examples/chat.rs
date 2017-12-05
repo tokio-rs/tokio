@@ -33,7 +33,7 @@ use futures::future::Executor;
 use futures::stream::{self, Stream};
 use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 use tokio_io::io;
 use tokio_io::AsyncRead;
 
@@ -42,7 +42,7 @@ fn main() {
     let addr = addr.parse().unwrap();
 
     // Create the event loop and TCP listener we'll accept connections on.
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);

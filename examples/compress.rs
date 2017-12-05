@@ -32,7 +32,7 @@ use futures::{Future, Stream, Poll};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 use tokio_io::{AsyncRead, AsyncWrite};
 use flate2::write::GzEncoder;
 
@@ -41,7 +41,7 @@ fn main() {
     // reactor.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);

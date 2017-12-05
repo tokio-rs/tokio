@@ -20,7 +20,7 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::stream::Stream;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 use tokio::net::TcpListener;
 
 fn main() {
@@ -28,7 +28,7 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let listener = TcpListener::bind(&addr, &core.handle()).unwrap();
 
     let addr = listener.local_addr().unwrap();

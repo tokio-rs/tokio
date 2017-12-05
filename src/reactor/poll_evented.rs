@@ -198,7 +198,7 @@ impl<E> PollEvented<E> {
     ///
     /// # Errors
     ///
-    /// This function will return an error if the `Core` that this `PollEvented`
+    /// This function will return an error if the `Reactor` that this `PollEvented`
     /// is associated with has gone away (been destroyed). The error means that
     /// the ambient futures task could not be scheduled to receive a
     /// notification and typically means that the error should be propagated
@@ -232,7 +232,7 @@ impl<E> PollEvented<E> {
     ///
     /// # Errors
     ///
-    /// This function will return an error if the `Core` that this `PollEvented`
+    /// This function will return an error if the `Reactor` that this `PollEvented`
     /// is associated with has gone away (been destroyed). The error means that
     /// the ambient futures task could not be scheduled to receive a
     /// notification and typically means that the error should be propagated

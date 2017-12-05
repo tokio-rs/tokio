@@ -49,11 +49,11 @@
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
 //! use tokio::net::TcpListener;
-//! use tokio::reactor::Core;
+//! use tokio::reactor::Reactor;
 //!
 //! fn main() {
 //!     // Create the event loop that will drive this server.
-//!     let mut core = Core::new().unwrap();
+//!     let mut core = Reactor::new().unwrap();
 //!     let handle = core.handle();
 //!
 //!     let pool = CpuPool::new_num_cpus();

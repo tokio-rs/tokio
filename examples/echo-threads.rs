@@ -31,7 +31,7 @@ use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpStream;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 fn main() {
     // First argument, the address to bind
@@ -69,7 +69,7 @@ fn main() {
 }
 
 fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
 
     let pool = CpuPool::new(1);

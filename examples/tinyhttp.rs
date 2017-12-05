@@ -39,7 +39,7 @@ use futures_cpupool::CpuPool;
 use http::{Request, Response, StatusCode};
 use http::header::HeaderValue;
 use tokio::net::TcpStream;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::{AsyncRead};
 
@@ -70,7 +70,7 @@ fn main() {
 }
 
 fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
 
     let pool = CpuPool::new(1);

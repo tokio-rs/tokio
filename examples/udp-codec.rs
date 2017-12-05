@@ -18,7 +18,7 @@ use futures::{Future, Stream, Sink};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{UdpSocket, UdpCodec};
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 pub struct LineCodec;
 
@@ -39,7 +39,7 @@ impl UdpCodec for LineCodec {
 fn main() {
     drop(env_logger::init());
 
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
 
     let pool = CpuPool::new(1);

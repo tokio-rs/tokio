@@ -10,7 +10,7 @@ use futures::Future;
 use futures::stream::Stream;
 use tokio_io::io::read_to_end;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -21,7 +21,7 @@ macro_rules! t {
 
 #[test]
 fn limit() {
-    let mut l = t!(Core::new());
+    let mut l = t!(Reactor::new());
     let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let addr = t!(srv.local_addr());
 

@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
 use tokio::net::{UdpSocket, UdpCodec};
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -18,7 +18,7 @@ macro_rules! t {
 }
 
 fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
-    let mut l = t!(Core::new());
+    let mut l = t!(Reactor::new());
     let mut a = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &l.handle()));
     let mut b = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &l.handle()));
     let a_addr = t!(a.local_addr());
@@ -166,7 +166,7 @@ impl<R: RecvFn> Future for RecvMessage<R> {
 
 #[test]
 fn send_dgrams() {
-    let mut l = t!(Core::new());
+    let mut l = t!(Reactor::new());
     let mut a = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let mut b = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let mut buf = [0u8; 50];
@@ -216,7 +216,7 @@ impl UdpCodec for Codec {
 
 #[test]
 fn send_framed() {
-    let mut l = t!(Core::new());
+    let mut l = t!(Reactor::new());
     let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
     let a_addr = t!(a_soc.local_addr());

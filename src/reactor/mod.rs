@@ -1,6 +1,6 @@
 //! The core reactor driving all I/O.
 //!
-//! This module contains the [`Core`] reactor type which is the event loop for
+//! This module contains the [`Reactor`] reactor type which is the event loop for
 //! all I/O happening in `tokio`. This core reactor (or event loop) is used to
 //! drive I/O resources.
 //!
@@ -12,11 +12,11 @@
 //! Lastly [`PollEvented`] can be used to construct I/O objects that interact
 //! with the event loop, e.g. [`TcpStream`] in the net module.
 //!
-//! [`Core`]: struct.Core.html
+//! [`Reactor`]: struct.Reactor.html
 //! [`Handle`]: struct.Handle.html
 //! [`Remote`]: struct.Remote.html
-//! [handle_method]: struct.Core.html#method.handle
-//! [remote_method]: struct.Core.html#method.remote
+//! [handle_method]: struct.Reactor.html#method.handle
+//! [remote_method]: struct.Reactor.html#method.remote
 //! [`PollEvented`]: struct.PollEvented.html
 //! [`TcpStream`]: ../net/struct.TcpStream.html
 
@@ -44,7 +44,7 @@ pub use self::poll_evented::PollEvented;
 /// all other I/O events and notifications happening. Each event loop can have
 /// multiple handles pointing to it, each of which can then be used to create
 /// various I/O objects to interact with the event loop in interesting ways.
-pub struct Core {
+pub struct Reactor {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
@@ -96,10 +96,10 @@ fn _assert_kinds() {
     _assert::<Handle>();
 }
 
-impl Core {
+impl Reactor {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub fn new() -> io::Result<Core> {
+    pub fn new() -> io::Result<Reactor> {
         // Create the I/O poller
         let io = try!(mio::Poll::new());
 
@@ -111,7 +111,7 @@ impl Core {
                          mio::Ready::readable(),
                          mio::PollOpt::level()));
 
-        Ok(Core {
+        Ok(Reactor {
             events: mio::Events::with_capacity(1024),
             _future_registration: future_pair.0,
             future_readiness: Arc::new(MySetReadiness(future_pair.1)),
@@ -225,9 +225,9 @@ impl Core {
     }
 }
 
-impl fmt::Debug for Core {
+impl fmt::Debug for Reactor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Core")
+        write!(f, "Reactor")
     }
 }
 

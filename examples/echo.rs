@@ -32,7 +32,7 @@ use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 fn main() {
     // Allow passing an address to listen on as the first argument of this
@@ -42,15 +42,15 @@ fn main() {
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     // First up we'll create the event loop that's going to drive this server.
-    // This is done by creating an instance of the `Core` type, tokio-core's
+    // This is done by creating an instance of the `Reactor` type, tokio-core's
     // event loop. Most functions in tokio-core return an `io::Result`, and
-    // `Core::new` is no exception. For this example, though, we're mostly just
+    // `Reactor::new` is no exception. For this example, though, we're mostly just
     // ignoring errors, so we unwrap the return value.
     //
     // After the event loop is created we acquire a handle to it through the
     // `handle` method. With this handle we'll then later be able to create I/O
     // objects.
-    let mut core = Core::new().unwrap();
+    let mut core = Reactor::new().unwrap();
     let handle = core.handle();
 
     // Next up we create a TCP listener which will listen for incoming
@@ -126,7 +126,7 @@ fn main() {
     });
 
     // And finally now that we've define what our server is, we run it! We
-    // didn't actually do much I/O up to this point and this `Core::run` method
+    // didn't actually do much I/O up to this point and this `Reactor::run` method
     // is responsible for driving the entire server to completion.
     //
     // The `run` method will return the result of the future that it's running,

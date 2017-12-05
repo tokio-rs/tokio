@@ -20,7 +20,7 @@ use std::net::SocketAddr;
 
 use futures::{Future, Poll};
 use tokio::net::UdpSocket;
-use tokio::reactor::Core;
+use tokio::reactor::Reactor;
 
 struct Server {
     socket: UdpSocket,
@@ -56,7 +56,7 @@ fn main() {
 
     // Create the event loop that will drive this server, and also bind the
     // socket we'll be listening to.
-    let mut l = Core::new().unwrap();
+    let mut l = Reactor::new().unwrap();
     let handle = l.handle();
     let socket = UdpSocket::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", socket.local_addr().unwrap());
