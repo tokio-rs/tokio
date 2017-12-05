@@ -30,7 +30,6 @@ use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::{TcpStream, TcpListener};
-use tokio::reactor::Handle;
 
 fn main() {
     // First argument, the address to bind
@@ -41,8 +40,7 @@ fn main() {
     let num_threads = env::args().nth(2).and_then(|s| s.parse().ok())
         .unwrap_or(num_cpus::get());
 
-    let handle = Handle::default();
-    let listener = TcpListener::bind(&addr, &handle).expect("failed to bind");
+    let listener = TcpListener::bind(&addr).expect("failed to bind");
     println!("Listening on: {}", addr);
 
     // Spin up our worker threads, creating a channel routing to each worker

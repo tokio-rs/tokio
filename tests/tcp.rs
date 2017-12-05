@@ -8,7 +8,6 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio::reactor::Handle;
 use tokio::net::{TcpListener, TcpStream};
 
 macro_rules! t {
@@ -21,14 +20,13 @@ macro_rules! t {
 #[test]
 fn connect() {
     drop(env_logger::init());
-    let handle = Handle::default();
     let srv = t!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = t!(srv.local_addr());
     let t = thread::spawn(move || {
         t!(srv.accept()).0
     });
 
-    let stream = TcpStream::connect(&addr, &handle);
+    let stream = TcpStream::connect(&addr);
     let mine = t!(stream.wait());
     let theirs = t.join().unwrap();
 
@@ -39,8 +37,7 @@ fn connect() {
 #[test]
 fn accept() {
     drop(env_logger::init());
-    let handle = Handle::default();
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &handle));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let (tx, rx) = channel();
@@ -64,8 +61,7 @@ fn accept() {
 #[test]
 fn accept2() {
     drop(env_logger::init());
-    let handle = Handle::default();
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &handle));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let t = thread::spawn(move || {

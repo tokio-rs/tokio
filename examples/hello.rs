@@ -21,15 +21,13 @@ use std::net::SocketAddr;
 
 use futures::prelude::*;
 use tokio::net::TcpListener;
-use tokio::reactor::Handle;
 
 fn main() {
     env_logger::init().unwrap();
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let handle = Handle::default();
-    let listener = TcpListener::bind(&addr, &handle).unwrap();
+    let listener = TcpListener::bind(&addr).unwrap();
 
     let addr = listener.local_addr().unwrap();
     println!("Listening for connections on {}", addr);

@@ -5,7 +5,6 @@ use std::thread;
 
 use futures::prelude::*;
 use tokio::net::{TcpStream, TcpListener};
-use tokio::reactor::Handle;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -18,10 +17,9 @@ macro_rules! t {
 fn hammer() {
     let threads = (0..10).map(|_| {
         thread::spawn(|| {
-            let handle = Handle::default();
-            let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle));
+            let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
             let addr = t!(srv.local_addr());
-            let mine = TcpStream::connect(&addr, &handle);
+            let mine = TcpStream::connect(&addr);
             let theirs = srv.incoming().into_future()
                 .map(|(s, _)| s.unwrap().0)
                 .map_err(|(s, _)| s);

@@ -13,7 +13,6 @@ use futures::{Future, Stream, Sink};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Handle;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::io::{write_all, read};
 use tokio_io::AsyncRead;
@@ -56,9 +55,8 @@ fn echo() {
     drop(env_logger::init());
 
     let pool = CpuPool::new(1);
-    let handle = Handle::default();
 
-    let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
+    let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = listener.local_addr().unwrap();
     let pool_inner = pool.clone();
     let srv = listener.incoming().for_each(move |(socket, _)| {
@@ -69,7 +67,7 @@ fn echo() {
 
     pool.execute(srv.map_err(|e| panic!("srv error: {}", e))).unwrap();
 
-    let client = TcpStream::connect(&addr, &handle);
+    let client = TcpStream::connect(&addr);
     let client = client.wait().unwrap();
     let (client, _) = write_all(client, b"a\n").wait().unwrap();
     let (client, buf, amt) = read(client, vec![0; 1024]).wait().unwrap();

@@ -31,7 +31,6 @@ use futures::{Future, Poll};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Handle;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::io::{copy, shutdown};
 
@@ -42,17 +41,15 @@ fn main() {
     let server_addr = env::args().nth(2).unwrap_or("127.0.0.1:8080".to_string());
     let server_addr = server_addr.parse::<SocketAddr>().unwrap();
 
-    let handle = Handle::default();
-
     let pool = CpuPool::new(1);
 
     // Create a TCP listener which will listen for incoming connections.
-    let socket = TcpListener::bind(&listen_addr, &handle).unwrap();
+    let socket = TcpListener::bind(&listen_addr).unwrap();
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
     let done = socket.incoming().for_each(move |(client, client_addr)| {
-        let server = TcpStream::connect(&server_addr, &handle);
+        let server = TcpStream::connect(&server_addr);
         let amounts = server.and_then(move |server| {
             // Create separate read/write handles for the TCP clients that we're
             // proxying data between. Note that typically you'd use

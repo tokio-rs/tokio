@@ -34,9 +34,9 @@ impl TcpListener {
     ///
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
+    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         let l = try!(mio::net::TcpListener::bind(addr));
-        TcpListener::new(l, handle)
+        TcpListener::new(l, &Handle::default())
     }
 
     /// Attempt to accept a connection and create a new connected `TcpStream` if
@@ -247,9 +247,9 @@ impl TcpStream {
     /// the `addr` provided. The returned future will be resolved once the
     /// stream has successfully connected, or it wil return an error if one
     /// occurs.
-    pub fn connect(addr: &SocketAddr, handle: &Handle) -> TcpStreamNew {
+    pub fn connect(addr: &SocketAddr) -> TcpStreamNew {
         let inner = match mio::net::TcpStream::connect(addr) {
-            Ok(tcp) => TcpStream::new(tcp, handle),
+            Ok(tcp) => TcpStream::new(tcp, &Handle::default()),
             Err(e) => TcpStreamNewState::Error(e),
         };
         TcpStreamNew { inner: inner }
