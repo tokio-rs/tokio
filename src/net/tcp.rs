@@ -24,6 +24,7 @@ pub struct TcpListener {
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.
 #[must_use = "streams do nothing unless polled"]
+#[derive(Debug)]
 pub struct Incoming {
     inner: TcpListener,
 }
@@ -226,11 +227,13 @@ pub struct TcpStream {
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct TcpStreamNew {
     inner: TcpStreamNewState,
 }
 
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 enum TcpStreamNewState {
     Waiting(TcpStream),
     Error(io::Error),

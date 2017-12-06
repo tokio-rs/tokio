@@ -56,6 +56,7 @@ pub trait UdpCodec {
 /// You can acquire a `UdpFramed` instance by using the `UdpSocket::framed`
 /// adapter.
 #[must_use = "sinks do nothing unless polled"]
+#[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,
     codec: C,

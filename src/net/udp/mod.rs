@@ -405,6 +405,7 @@ impl fmt::Debug for UdpSocket {
 ///
 /// This is created by the `UdpSocket::send_dgram` method.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
 
 fn incomplete_write(reason: &str) -> io::Error {
@@ -437,6 +438,7 @@ impl<T> Future for SendDgram<T>
 ///
 /// This is created by the `UdpSocket::recv_dgram` method.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct RecvDgram<T>(Option<(UdpSocket, T)>);
 
 impl<T> Future for RecvDgram<T>
