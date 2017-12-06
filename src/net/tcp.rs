@@ -77,7 +77,7 @@ impl TcpListener {
     /// called outside the context of a future.
     pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
-            return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         match self.io.get_ref().accept_std() {
