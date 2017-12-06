@@ -299,13 +299,13 @@ impl TcpStream {
     pub fn connect_std(stream: net::TcpStream,
                        addr: &SocketAddr,
                        handle: &Handle)
-        -> Box<Future<Item=TcpStream, Error=io::Error> + Send>
+        -> TcpStreamNew
     {
-        let state = match mio::net::TcpStream::connect_stream(stream, addr) {
+        let inner = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };
-        Box::new(state)
+        TcpStreamNew { inner: inner }
     }
 
     /// Test whether this stream is ready to be read or not.
