@@ -108,6 +108,26 @@ impl TcpListener {
         }
     }
 
+    /// Like `accept`, except that it returns a raw `std::net::TcpStream`.
+    ///
+    /// The stream is *in blocking mode*, and is not associated with the Tokio
+    /// event loop.
+    pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
+        }
+
+        match self.io.get_ref().accept_std() {
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read();
+                }
+                Err(e)
+            },
+            Ok((sock, addr)) => Ok((sock, addr)),
+        }
+    }
+
     /// Create a new TCP listener from the standard library's TCP listener.
     ///
     /// This method can be used when the `Handle::tcp_listen` method isn't
