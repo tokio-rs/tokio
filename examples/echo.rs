@@ -32,7 +32,7 @@ use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 
 fn main() {
     // Allow passing an address to listen on as the first argument of this
@@ -41,17 +41,7 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    // First up we'll create the event loop that's going to drive this server.
-    // This is done by creating an instance of the `Reactor` type, tokio-core's
-    // event loop. Most functions in tokio-core return an `io::Result`, and
-    // `Reactor::new` is no exception. For this example, though, we're mostly just
-    // ignoring errors, so we unwrap the return value.
-    //
-    // After the event loop is created we acquire a handle to it through the
-    // `handle` method. With this handle we'll then later be able to create I/O
-    // objects.
-    let mut core = Reactor::new().unwrap();
-    let handle = core.handle();
+    let handle = Handle::default();
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
@@ -125,13 +115,8 @@ fn main() {
         Ok(())
     });
 
-    // And finally now that we've define what our server is, we run it! We
-    // didn't actually do much I/O up to this point and this `Reactor::run` method
-    // is responsible for driving the entire server to completion.
-    //
-    // The `run` method will return the result of the future that it's running,
-    // but in our case the `done` future won't ever finish because a TCP
-    // listener is never done accepting clients. That basically just means that
-    // we're going to be running the server until it's killed (e.g. ctrl-c).
-    core.run(done).unwrap();
+    // And finally now that we've define what our server is, we run it! Here we
+    // just need to execute the future we've created and wait for it to complete
+    // using the standard methods in the `futures` crate.
+    done.wait().unwrap();
 }

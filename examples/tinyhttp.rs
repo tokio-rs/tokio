@@ -31,15 +31,15 @@ use std::net::{self, SocketAddr};
 use std::thread;
 
 use bytes::BytesMut;
-use futures::future;
 use futures::future::Executor;
+use futures::future;
 use futures::sync::mpsc;
 use futures::{Stream, Future, Sink};
 use futures_cpupool::CpuPool;
-use http::{Request, Response, StatusCode};
 use http::header::HeaderValue;
+use http::{Request, Response, StatusCode};
 use tokio::net::TcpStream;
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::{AsyncRead};
 
@@ -70,8 +70,7 @@ fn main() {
 }
 
 fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
-    let mut core = Reactor::new().unwrap();
-    let handle = core.handle();
+    let handle = Handle::default();
 
     let pool = CpuPool::new(1);
 
@@ -92,7 +91,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         })).unwrap();
         Ok(())
     });
-    core.run(done).unwrap();
+    done.wait().unwrap();
 }
 
 /// "Server logic" is implemented in this function.

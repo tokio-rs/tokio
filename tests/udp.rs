@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
 use tokio::net::{UdpSocket, UdpCodec};
-use tokio::reactor::Reactor;
+use tokio::reactor::Handle;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -18,16 +18,16 @@ macro_rules! t {
 }
 
 fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
-    let mut l = t!(Reactor::new());
-    let mut a = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &l.handle()));
-    let mut b = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &l.handle()));
+    let handle = Handle::default();
+    let mut a = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &handle));
+    let mut b = t!(UdpSocket::bind(&([127, 0, 0, 1], 0).into(), &handle));
     let a_addr = t!(a.local_addr());
     let b_addr = t!(b.local_addr());
 
     {
         let send = SendMessage::new(a, send.clone(), b_addr, b"1234");
         let recv = RecvMessage::new(b, recv.clone(), a_addr, b"1234");
-        let (sendt, received) = t!(l.run(send.join(recv)));
+        let (sendt, received) = t!(send.join(recv).wait());
         a = sendt;
         b = received;
     }
@@ -35,7 +35,7 @@ fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
     {
         let send = SendMessage::new(a, send, b_addr, b"");
         let recv = RecvMessage::new(b, recv, a_addr, b"");
-        t!(l.run(send.join(recv)));
+        t!(send.join(recv).wait());
     }
 }
 
@@ -166,16 +166,16 @@ impl<R: RecvFn> Future for RecvMessage<R> {
 
 #[test]
 fn send_dgrams() {
-    let mut l = t!(Reactor::new());
-    let mut a = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
-    let mut b = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let handle = Handle::default();
+    let mut a = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &handle));
+    let mut b = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &handle));
     let mut buf = [0u8; 50];
     let b_addr = t!(b.local_addr());
 
     {
         let send = a.send_dgram(&b"4321"[..], b_addr);
         let recv = b.recv_dgram(&mut buf[..]);
-        let (sendt, received) = t!(l.run(send.join(recv)));
+        let (sendt, received) = t!(send.join(recv).wait());
         assert_eq!(received.2, 4);
         assert_eq!(&received.1[..4], b"4321");
         a = sendt.0;
@@ -185,7 +185,7 @@ fn send_dgrams() {
     {
         let send = a.send_dgram(&b""[..], b_addr);
         let recv = b.recv_dgram(&mut buf[..]);
-        let received = t!(l.run(send.join(recv))).1;
+        let received = t!(send.join(recv).wait()).1;
         assert_eq!(received.2, 0);
     }
 }
@@ -216,9 +216,9 @@ impl UdpCodec for Codec {
 
 #[test]
 fn send_framed() {
-    let mut l = t!(Reactor::new());
-    let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
-    let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let handle = Handle::default();
+    let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &handle));
+    let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse()), &handle));
     let a_addr = t!(a_soc.local_addr());
     let b_addr = t!(b_soc.local_addr());
 
@@ -228,7 +228,7 @@ fn send_framed() {
 
         let send = a.send(&b"4567"[..]);
         let recv = b.into_future().map_err(|e| e.0);
-        let (sendt, received) = t!(l.run(send.join(recv)));
+        let (sendt, received) = t!(send.join(recv).wait());
         assert_eq!(received.0, Some(()));
 
         a_soc = sendt.into_inner();
@@ -241,7 +241,7 @@ fn send_framed() {
 
         let send = a.send(&b""[..]);
         let recv = b.into_future().map_err(|e| e.0);
-        let received = t!(l.run(send.join(recv))).1;
+        let received = t!(send.join(recv).wait()).1;
         assert_eq!(received.0, Some(()));
     }
 }
