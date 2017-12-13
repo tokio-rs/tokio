@@ -7,7 +7,7 @@ use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
-use tokio::net::{UdpSocket, UdpCodec};
+use tokio::net::UdpSocket;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -186,59 +186,3 @@ fn send_dgrams() {
         assert_eq!(received.2, 0);
     }
 }
-
-#[derive(Debug, Clone)]
-struct Codec {
-    data: &'static [u8],
-    from: SocketAddr,
-    to: SocketAddr,
-}
-
-impl UdpCodec for Codec {
-    type In = ();
-    type Out = &'static [u8];
-
-    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
-        assert_eq!(src, &self.from);
-        assert_eq!(buf, self.data);
-        Ok(())
-    }
-
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> SocketAddr {
-        assert_eq!(msg, self.data);
-        buf.extend_from_slice(msg);
-        self.to
-    }
-}
-
-#[test]
-fn send_framed() {
-    let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
-    let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
-    let a_addr = t!(a_soc.local_addr());
-    let b_addr = t!(b_soc.local_addr());
-
-    {
-        let a = a_soc.framed(Codec { data: &b"4567"[..], from: a_addr, to: b_addr});
-        let b = b_soc.framed(Codec { data: &b"4567"[..], from: a_addr, to: b_addr});
-
-        let send = a.send(&b"4567"[..]);
-        let recv = b.into_future().map_err(|e| e.0);
-        let (sendt, received) = t!(send.join(recv).wait());
-        assert_eq!(received.0, Some(()));
-
-        a_soc = sendt.into_inner();
-        b_soc = received.1.into_inner();
-    }
-
-    {
-        let a = a_soc.framed(Codec { data: &b""[..], from: a_addr, to: b_addr});
-        let b = b_soc.framed(Codec { data: &b""[..], from: a_addr, to: b_addr});
-
-        let send = a.send(&b""[..]);
-        let recv = b.into_future().map_err(|e| e.0);
-        let received = t!(send.join(recv).wait()).1;
-        assert_eq!(received.0, Some(()));
-    }
-}
-
