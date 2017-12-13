@@ -134,13 +134,23 @@ impl Reactor {
     /// Performs one iteration of the event loop, blocking on waiting for events
     /// for at most `max_wait` (forever if `None`).
     ///
-    /// It only makes sense to call this method if you've previously spawned
-    /// a future onto this event loop.
+    /// This method is the primary method of running this reactor and processing
+    /// I/O events that occur. This method executes one iteration of an event
+    /// loop, blocking at most once waiting for events to happen.
     ///
-    /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
-    /// empty future (one that never finishes).
-    pub fn turn(&mut self, max_wait: Option<Duration>) {
+    /// If a `max_wait` is specified then the method should block no longer than
+    /// the duration specified, but this shouldn't be used as a super-precise
+    /// timer but rather a "ballpark approximation"
+    ///
+    /// # Return value
+    ///
+    /// This function returns an instance of `Turn` which as of today has no
+    /// extra information with it and can be safely discarded. In the future
+    /// this return value may contain information about what happened while this
+    /// reactor blocked.
+    pub fn turn(&mut self, max_wait: Option<Duration>) -> Turn {
         self.poll(max_wait);
+        Turn { _priv: () }
     }
 
     fn poll(&mut self, max_wait: Option<Duration>) {
@@ -182,6 +192,15 @@ impl Reactor {
             }
         }
     }
+}
+
+/// Return value from the `turn` method on `Reactor`.
+///
+/// Currently this value doesn't actually provide any functionality, but it may
+/// in the future give insight into what happened during `turn`.
+#[derive(Debug)]
+pub struct Turn {
+    _priv: (),
 }
 
 impl fmt::Debug for Reactor {
