@@ -12,7 +12,6 @@ use futures::stream::Stream;
 use tokio_io::io::copy;
 use tokio_io::AsyncRead;
 use tokio::net::TcpListener;
-use tokio::reactor::Handle;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -25,8 +24,7 @@ macro_rules! t {
 fn echo_server() {
     drop(env_logger::init());
 
-    let handle = Handle::default();
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &handle));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let t = thread::spawn(move || {

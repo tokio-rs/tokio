@@ -49,16 +49,13 @@
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
 //! use tokio::net::TcpListener;
-//! use tokio::reactor::Handle;
 //!
 //! fn main() {
-//!     let handle = Handle::default();
-//!
 //!     let pool = CpuPool::new_num_cpus();
 //!
 //!     // Bind the server's socket.
 //!     let addr = "127.0.0.1:12345".parse().unwrap();
-//!     let listener = TcpListener::bind(&addr, &handle)
+//!     let listener = TcpListener::bind(&addr)
 //!         .expect("unable to bind TCP listener");
 //!
 //!     // Pull out a stream of sockets for incoming connections

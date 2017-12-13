@@ -32,7 +32,6 @@ use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
-use tokio::reactor::Handle;
 
 fn main() {
     // Allow passing an address to listen on as the first argument of this
@@ -41,14 +40,12 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let handle = Handle::default();
-
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
     // above and must be associated with an event loop, so we pass in a handle
     // to our event loop. After the socket's created we inform that we're ready
     // to go and start accepting connections.
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     // A CpuPool allows futures to be executed concurrently.

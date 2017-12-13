@@ -18,9 +18,9 @@ pub use self::frame::{UdpFramed, UdpCodec};
 impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
     /// the `addr` provided.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
         let udp = try!(mio::net::UdpSocket::bind(addr));
-        UdpSocket::new(udp, handle)
+        UdpSocket::new(udp, &Handle::default())
     }
 
     fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {

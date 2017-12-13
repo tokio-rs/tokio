@@ -10,7 +10,6 @@ use std::thread;
 use futures::Future;
 use futures::stream::Stream;
 use tokio::net::TcpListener;
-use tokio::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 
@@ -25,8 +24,7 @@ macro_rules! t {
 fn echo_server() {
     drop(env_logger::init());
 
-    let handle = Handle::default();
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &handle));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let msg = "foo bar baz";
