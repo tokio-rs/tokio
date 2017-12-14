@@ -203,7 +203,7 @@ mod udp {
         // With UDP we could receive data from any source, so filter out
         // anything coming from a different address
         Box::new(stream::poll_fn(move || {
-            let mut buf = [0; 1024];
+            let mut buf = [0; 1500];
 
             loop {
                 let (n, src) = try_nb!(rx.recv_from(&mut buf));
@@ -222,7 +222,7 @@ fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
     let mut stdin = io::stdin();
     loop {
         // Use a smaller buffer so that each chunk can fit in a UDP packet.
-        let mut buf = vec![0; 512];
+        let mut buf = vec![0; 1500];
         let n = match stdin.read(&mut buf) {
             Err(_) |
             Ok(0) => break,
