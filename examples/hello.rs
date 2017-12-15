@@ -19,8 +19,7 @@ extern crate tokio_io;
 use std::env;
 use std::net::SocketAddr;
 
-use futures::stream::Stream;
-use tokio::reactor::Core;
+use futures::prelude::*;
 use tokio::net::TcpListener;
 
 fn main() {
@@ -28,8 +27,7 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let listener = TcpListener::bind(&addr, &core.handle()).unwrap();
+    let listener = TcpListener::bind(&addr).unwrap();
 
     let addr = listener.local_addr().unwrap();
     println!("Listening for connections on {}", addr);
@@ -42,5 +40,5 @@ fn main() {
         Ok(())
     });
 
-    core.run(server).unwrap();
+    server.wait().unwrap();
 }

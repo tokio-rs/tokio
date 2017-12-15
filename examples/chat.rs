@@ -33,7 +33,6 @@ use futures::future::Executor;
 use futures::stream::{self, Stream};
 use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
 use tokio_io::io;
 use tokio_io::AsyncRead;
 
@@ -41,10 +40,8 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse().unwrap();
 
-    // Create the event loop and TCP listener we'll accept connections on.
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    // Create the TCP listener we'll accept connections on.
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     // This is currently a multi threaded server.
@@ -135,5 +132,5 @@ fn main() {
     });
 
     // execute server
-    core.run(srv).unwrap();
+    srv.wait().unwrap();
 }

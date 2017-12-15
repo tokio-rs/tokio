@@ -28,7 +28,6 @@ use std::thread;
 use futures::sync::mpsc;
 use futures::{Sink, Future, Stream};
 use futures_cpupool::CpuPool;
-use tokio::reactor::Core;
 
 fn main() {
     // Determine if we're going to run in TCP or UDP mode
@@ -47,10 +46,6 @@ fn main() {
     });
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    // Create the event loop and initiate the connection to the remote server
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
     let pool = CpuPool::new(1);
 
     // Right now Tokio doesn't support a handle to stdin running on the event
@@ -65,9 +60,9 @@ fn main() {
     // our UDP connection to get a stream of bytes we're going to emit to
     // stdout.
     let stdout = if tcp {
-        tcp::connect(&addr, &handle, &pool, Box::new(stdin_rx))
+        tcp::connect(&addr, &pool, Box::new(stdin_rx))
     } else {
-        udp::connect(&addr, &handle, &pool, Box::new(stdin_rx))
+        udp::connect(&addr, &pool, Box::new(stdin_rx))
     };
 
     // And now with our stream of bytes to write to stdout, we execute that in
@@ -76,9 +71,9 @@ fn main() {
     // loop. In this case, though, we know it's ok as the event loop isn't
     // otherwise running anything useful.
     let mut out = io::stdout();
-    core.run(stdout.for_each(|chunk| {
+    stdout.for_each(|chunk| {
         out.write_all(&chunk)
-    })).unwrap();
+    }).wait().unwrap();
 }
 
 mod tcp {
@@ -90,17 +85,15 @@ mod tcp {
     use futures::future::Executor;
     use futures_cpupool::CpuPool;
     use tokio::net::TcpStream;
-    use tokio::reactor::Handle;
     use tokio_io::AsyncRead;
     use tokio_io::codec::{Encoder, Decoder};
 
     pub fn connect(addr: &SocketAddr,
-                   handle: &Handle,
                    pool: &CpuPool,
                    stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>)
         -> Box<Stream<Item = BytesMut, Error = io::Error>>
     {
-        let tcp = TcpStream::connect(addr, handle);
+        let tcp = TcpStream::connect(addr);
         let pool = pool.clone();
 
         // After the TCP connection has been established, we set up our client
@@ -177,10 +170,8 @@ mod udp {
     use futures::future::Executor;
     use futures_cpupool::CpuPool;
     use tokio::net::{UdpCodec, UdpSocket};
-    use tokio::reactor::Handle;
 
     pub fn connect(&addr: &SocketAddr,
-                   handle: &Handle,
                    pool: &CpuPool,
                    stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>)
         -> Box<Stream<Item = BytesMut, Error = io::Error>>
@@ -192,7 +183,7 @@ mod udp {
         } else {
             "[::]:0".parse().unwrap()
         };
-        let udp = UdpSocket::bind(&addr_to_bind, handle)
+        let udp = UdpSocket::bind(&addr_to_bind)
             .expect("failed to bind socket");
 
         // Like above with TCP we use an instance of `UdpCodec` to transform

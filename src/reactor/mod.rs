@@ -1,86 +1,79 @@
-//! The core reactor driving all I/O
+//! The core reactor driving all I/O.
 //!
-//! This module contains the `Core` type which is the reactor for all I/O
-//! happening in `tokio-core`. This reactor (or event loop) is used to drive I/O
-//! resources.
+//! This module contains the [`Reactor`] reactor type which is the event loop for
+//! all I/O happening in `tokio`. This core reactor (or event loop) is used to
+//! drive I/O resources.
+//!
+//! The [`Handle`] and [`Remote`] structs are refences to the event loop,
+//! created by the [`handle`][handle_method] and [`remote`][remote_method]
+//! respectively, and are used to construct I/O objects. `Remote` is sendable,
+//! while `Handle` is not.
+//!
+//! Lastly [`PollEvented`] can be used to construct I/O objects that interact
+//! with the event loop, e.g. [`TcpStream`] in the net module.
+//!
+//! [`Reactor`]: struct.Reactor.html
+//! [`Handle`]: struct.Handle.html
+//! [`Remote`]: struct.Remote.html
+//! [handle_method]: struct.Reactor.html#method.handle
+//! [remote_method]: struct.Reactor.html#method.remote
+//! [`PollEvented`]: struct.PollEvented.html
+//! [`TcpStream`]: ../net/struct.TcpStream.html
 
 use std::fmt;
 use std::io::{self, ErrorKind};
+use std::mem;
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, Weak, RwLock};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Duration};
 
-use futures::{Future, Async};
-use futures::executor::{self, Notify};
-use futures::task::{AtomicTask};
+use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
 use slab::Slab;
 
 mod io_token;
+mod global;
 
 mod poll_evented;
 pub use self::poll_evented::PollEvented;
 
-/// Global counter used to assign unique IDs to reactor instances.
-static NEXT_LOOP_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-
-/// An event loop.
+/// The core reactor, or event loop.
 ///
 /// The event loop is the main source of blocking in an application which drives
 /// all other I/O events and notifications happening. Each event loop can have
 /// multiple handles pointing to it, each of which can then be used to create
 /// various I/O objects to interact with the event loop in interesting ways.
-pub struct Core {
+pub struct Reactor {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
 
-    /// Used for determining when the future passed to `run` is ready. Once the
-    /// registration is passed to `io` above we never touch it again, just keep
-    /// it alive.
-    _future_registration: mio::Registration,
-    future_readiness: Arc<MySetReadiness>,
+    _wakeup_registration: mio::Registration,
 }
 
 struct Inner {
-    /// Unique identifier referencing this reactor.
-    id: usize,
-
     /// The underlying system event queue.
     io: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
     io_dispatch: RwLock<Slab<ScheduledIo>>,
+
+    /// Used to wake up the reactor from a call to `turn`
+    wakeup: mio::SetReadiness
 }
 
-/// An unique ID for a Core
+/// A handle to an event loop.
 ///
-/// An ID by which different cores may be distinguished. Can be compared and used as an index in
-/// a `HashMap`.
-///
-/// The ID is globally unique and never reused.
-#[derive(Clone,Copy,Eq,PartialEq,Hash,Debug)]
-pub struct CoreId(usize);
-
-/// Handle to an event loop, used to construct I/O objects, send messages, and
-/// otherwise interact indirectly with the event loop itself.
-///
-/// Handles can be cloned, and when cloned they will still refer to the
-/// same underlying event loop.
-#[derive(Clone)]
-pub struct Remote {
-    id: usize,
-    inner: Weak<Inner>,
-}
-
-/// A non-sendable handle to an event loop, useful for manufacturing instances
-/// of `LoopData`.
+/// A `Handle` is used for associating I/O objects with an event loop
+/// explicitly. Typically though you won't end up using a `Handle` that often
+/// and will instead use and implicitly configured handle for your thread.
 #[derive(Clone)]
 pub struct Handle {
-    remote: Remote,
+    inner: Weak<Inner>,
 }
 
 struct ScheduledIo {
@@ -94,39 +87,34 @@ enum Direction {
     Write,
 }
 
-const TOKEN_FUTURE: mio::Token = mio::Token(1);
-const TOKEN_START: usize = 2;
+const TOKEN_WAKEUP: mio::Token = mio::Token(0);
+const TOKEN_START: usize = 1;
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
 
     _assert::<Handle>();
-    _assert::<Remote>();
 }
 
-impl Core {
+impl Reactor {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub fn new() -> io::Result<Core> {
-        // Create the I/O poller
-        let io = try!(mio::Poll::new());
+    pub fn new() -> io::Result<Reactor> {
+        let io = mio::Poll::new()?;
+        let wakeup_pair = mio::Registration::new2();
 
-        // Create a registration for unblocking the reactor when the "run"
-        // future becomes ready.
-        let future_pair = mio::Registration::new2();
-        try!(io.register(&future_pair.0,
-                         TOKEN_FUTURE,
-                         mio::Ready::readable(),
-                         mio::PollOpt::level()));
+        io.register(&wakeup_pair.0,
+                    TOKEN_WAKEUP,
+                    mio::Ready::readable(),
+                    mio::PollOpt::level())?;
 
-        Ok(Core {
+        Ok(Reactor {
             events: mio::Events::with_capacity(1024),
-            _future_registration: future_pair.0,
-            future_readiness: Arc::new(MySetReadiness(future_pair.1)),
+            _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
-                id: NEXT_LOOP_ID.fetch_add(1, Ordering::Relaxed),
                 io: io,
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
+                wakeup: wakeup_pair.1,
             }),
         })
     }
@@ -138,92 +126,56 @@ impl Core {
     /// This handle is typically passed into functions that create I/O objects
     /// to bind them to this event loop.
     pub fn handle(&self) -> Handle {
-        let remote = self.remote();
-        Handle { remote }
-    }
-
-    /// Generates a remote handle to this event loop which can be used to spawn
-    /// tasks from other threads into this event loop.
-    pub fn remote(&self) -> Remote {
-        Remote {
-            id: self.inner.id,
+        Handle {
             inner: Arc::downgrade(&self.inner),
-        }
-    }
-
-    /// Runs a future until completion, driving the event loop while we're
-    /// otherwise waiting for the future to complete.
-    ///
-    /// This function will begin executing the event loop and will finish once
-    /// the provided future is resolved. Note that the future argument here
-    /// crucially does not require the `'static` nor `Send` bounds. As a result
-    /// the future will be "pinned" to not only this thread but also this stack
-    /// frame.
-    ///
-    /// This function will return the value that the future resolves to once
-    /// the future has finished. If the future never resolves then this function
-    /// will never return.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub fn run<F>(&mut self, f: F) -> Result<F::Item, F::Error>
-        where F: Future,
-    {
-        let mut task = executor::spawn(f);
-        let mut future_fired = true;
-
-        loop {
-            if future_fired {
-                let res = task.poll_future_notify(&self.future_readiness, 0)?;
-                if let Async::Ready(e) = res {
-                    return Ok(e)
-                }
-            }
-            future_fired = self.poll(None);
         }
     }
 
     /// Performs one iteration of the event loop, blocking on waiting for events
     /// for at most `max_wait` (forever if `None`).
     ///
-    /// It only makes sense to call this method if you've previously spawned
-    /// a future onto this event loop.
+    /// This method is the primary method of running this reactor and processing
+    /// I/O events that occur. This method executes one iteration of an event
+    /// loop, blocking at most once waiting for events to happen.
     ///
-    /// `loop { lp.turn(None) }` is equivalent to calling `run` with an
-    /// empty future (one that never finishes).
-    pub fn turn(&mut self, max_wait: Option<Duration>) {
+    /// If a `max_wait` is specified then the method should block no longer than
+    /// the duration specified, but this shouldn't be used as a super-precise
+    /// timer but rather a "ballpark approximation"
+    ///
+    /// # Return value
+    ///
+    /// This function returns an instance of `Turn` which as of today has no
+    /// extra information with it and can be safely discarded. In the future
+    /// this return value may contain information about what happened while this
+    /// reactor blocked.
+    pub fn turn(&mut self, max_wait: Option<Duration>) -> Turn {
         self.poll(max_wait);
+        Turn { _priv: () }
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) -> bool {
+    fn poll(&mut self, max_wait: Option<Duration>) {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return false,
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => return,
             // TODO: This should return an io::Result instead of panic.
             Err(e) => panic!("error in poll: {}", e),
         }
 
         // Process all the events that came in, dispatching appropriately
-        let mut fired = false;
         for i in 0..self.events.len() {
             let event = self.events.get(i).unwrap();
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
-            if token == TOKEN_FUTURE {
-                self.future_readiness.0.set_readiness(mio::Ready::empty()).unwrap();
-                fired = true;
+
+            if token == TOKEN_WAKEUP {
+                self.inner.wakeup.set_readiness(mio::Ready::empty()).unwrap();
             } else {
                 self.dispatch(token, event.readiness());
             }
         }
-
-        return fired
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
@@ -231,7 +183,7 @@ impl Core {
         let io_dispatch = self.inner.io_dispatch.read().unwrap();
 
         if let Some(io) = io_dispatch.get(token) {
-            io.readiness.fetch_or(ready2usize(ready), Ordering::Relaxed);
+            io.readiness.fetch_or(ready2usize(ready), Relaxed);
             if ready.is_writable() {
                 io.writer.notify();
             }
@@ -240,18 +192,33 @@ impl Core {
             }
         }
     }
+}
 
-    /// Get the ID of this loop
-    pub fn id(&self) -> CoreId {
-        CoreId(self.inner.id)
+/// Return value from the `turn` method on `Reactor`.
+///
+/// Currently this value doesn't actually provide any functionality, but it may
+/// in the future give insight into what happened during `turn`.
+#[derive(Debug)]
+pub struct Turn {
+    _priv: (),
+}
+
+impl fmt::Debug for Reactor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Reactor")
     }
 }
 
-impl fmt::Debug for Core {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Core")
-         .field("id", &self.id())
-         .finish()
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // When a reactor is dropped it needs to wake up all blocked tasks as
+        // they'll never receive a notification, and all connected I/O objects
+        // will start returning errors pretty quickly.
+        let io = self.io_dispatch.read().unwrap();
+        for (_, io) in io.iter() {
+            io.writer.notify();
+            io.reader.notify();
+        }
     }
 }
 
@@ -302,101 +269,131 @@ impl Inner {
 
         task.register();
 
-        if sched.readiness.load(Ordering::SeqCst) & ready2usize(ready) != 0 {
+        if sched.readiness.load(SeqCst) & ready2usize(ready) != 0 {
             task.notify();
         }
     }
 }
 
-impl Remote {
-    /// Return the ID of the represented Core
-    pub fn id(&self) -> CoreId {
-        CoreId(self.id)
-    }
+static HANDLE_FALLBACK: AtomicUsize = ATOMIC_USIZE_INIT;
 
-    /// Attempts to "promote" this remote to a handle, if possible.
-    ///
-    /// This function is intended for structures which typically work through a
-    /// `Remote` but want to optimize runtime when the remote doesn't actually
-    /// leave the thread of the original reactor. This will attempt to return a
-    /// handle if the `Remote` is on the same thread as the event loop and the
-    /// event loop is running.
-    ///
-    /// If this `Remote` has moved to a different thread or if the event loop is
-    /// running, then `None` may be returned. If you need to guarantee access to
-    /// a `Handle`, then you can call this function and fall back to using
-    /// `spawn` above if it returns `None`.
-    pub fn handle(&self) -> Option<Handle> {
-        let remote = self.clone();
-        Some(Handle { remote } )
-    }
-
-    /// Spawns a new future into the event loop this remote is associated with.
-    ///
-    /// This function takes a closure which is executed within the context of
-    /// the I/O loop itself. The future returned by the closure will be
-    /// scheduled on the event loop and run to completion.
-    ///
-    /// Note that while the closure, `F`, requires the `Send` bound as it might
-    /// cross threads, the future `R` does not.
-    ///
-    /// # Panics
-    ///
-    /// This method will **not** catch panics from polling the future `f`. If
-    /// the future panics then it's the responsibility of the caller to catch
-    /// that panic and handle it as appropriate.
-    pub(crate) fn run<F>(&self, f: F)
-        where F: FnOnce(&Handle) + Send + 'static,
-    {
-        let handle = self.handle().unwrap();
-        f(&handle);
-    }
-}
-
-impl fmt::Debug for Remote {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Remote")
-         .field("id", &self.id())
-         .finish()
-    }
-}
+/// Error returned from `Handle::set_fallback`.
+#[derive(Clone, Debug)]
+pub struct SetDefaultError(());
 
 impl Handle {
-    /// Returns a reference to the underlying remote handle to the event loop.
-    pub fn remote(&self) -> &Remote {
-        &self.remote
+    /// Configures the fallback handle to be returned from `Handle::default`.
+    ///
+    /// The `Handle::default()` function will by default lazily spin up a global
+    /// thread and run a reactor on this global thread. This behavior is not
+    /// always desirable in all applications, however, and sometimes a different
+    /// fallback reactor is desired.
+    ///
+    /// This function will attempt to globally alter the return value of
+    /// `Handle::default()` to return the `handle` specified rather than a
+    /// lazily initialized global thread. If successful then all future calls to
+    /// `Handle::default()` which would otherwise fall back to the global thread
+    /// will instead return a clone of the handle specified.
+    ///
+    /// # Errors
+    ///
+    /// This function may not always succeed in configuring the fallback handle.
+    /// If this function was previously called (or perhaps concurrently called
+    /// on many threads) only the *first* invocation of this function will
+    /// succeed. All other invocations will return an error.
+    ///
+    /// Additionally if the global reactor thread has already been initialized
+    /// then this function will also return an error. (aka if `Handle::default`
+    /// has been called previously in this program).
+    pub fn set_fallback(handle: Handle) -> Result<(), SetDefaultError> {
+        unsafe {
+            let val = handle.into_usize();
+            match HANDLE_FALLBACK.compare_exchange(0, val, SeqCst, SeqCst) {
+                Ok(_) => Ok(()),
+                Err(_) => {
+                    drop(Handle::from_usize(val));
+                    Err(SetDefaultError(()))
+                }
+            }
+        }
     }
 
-    /// Return the ID of the represented Core
-    pub fn id(&self) -> CoreId {
-        self.remote.id()
+    /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
+    /// makes the next call to `turn` return immediately.
+    ///
+    /// This method is intended to be used in situations where a notification
+    /// needs to otherwise be sent to the main reactor. If the reactor is
+    /// currently blocked inside of `turn` then it will wake up and soon return
+    /// after this method has been called. If the reactor is not currently
+    /// blocked in `turn`, then the next call to `turn` will not block and
+    /// return immediately.
+    pub fn wakeup(&self) {
+        if let Some(inner) = self.inner() {
+            inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
+        }
+    }
+
+    fn into_usize(self) -> usize {
+        unsafe {
+            mem::transmute::<Weak<Inner>, usize>(self.inner)
+        }
+    }
+
+    unsafe fn from_usize(val: usize) -> Handle {
+        let inner = mem::transmute::<usize, Weak<Inner>>(val);;
+        Handle { inner }
+    }
+
+    fn inner(&self) -> Option<Arc<Inner>> {
+        self.inner.upgrade()
+    }
+}
+
+impl Default for Handle {
+    fn default() -> Handle {
+        let mut fallback = HANDLE_FALLBACK.load(SeqCst);
+
+        // If the fallback hasn't been previously initialized then let's spin
+        // up a helper thread and try to initialize with that. If we can't
+        // actually create a helper thread then we'll just return a "defunkt"
+        // handle which will return errors when I/O objects are attempted to be
+        // associated.
+        if fallback == 0 {
+            let helper = match global::HelperThread::new() {
+                Ok(helper) => helper,
+                Err(_) => return Handle { inner: Weak::new() },
+            };
+
+            // If we successfully set ourselves as the actual fallback then we
+            // want to `forget` the helper thread to ensure that it persists
+            // globally. If we fail to set ourselves as the fallback that means
+            // that someone was racing with this call to `Handle::default`.
+            // They ended up winning so we'll destroy our helper thread (which
+            // shuts down the thread) and reload the fallback.
+            if Handle::set_fallback(helper.handle().clone()).is_ok() {
+                let ret = helper.handle().clone();
+                helper.forget();
+                return ret
+            }
+            fallback = HANDLE_FALLBACK.load(SeqCst);
+        }
+
+        // At this point our fallback handle global was configured so we use
+        // its value to reify a handle, clone it, and then forget our reified
+        // handle as we don't actually have an owning reference to it.
+        assert!(fallback != 0);
+        unsafe {
+            let handle = Handle::from_usize(fallback);
+            let ret = handle.clone();
+            drop(handle.into_usize());
+            return ret
+        }
     }
 }
 
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Handle")
-         .field("id", &self.id())
-         .finish()
-    }
-}
-
-struct MySetReadiness(mio::SetReadiness);
-
-impl Notify for MySetReadiness {
-    fn notify(&self, _id: usize) {
-        self.0.set_readiness(mio::Ready::readable())
-              .expect("failed to set readiness");
-    }
-}
-
-trait FnBox: Send + 'static {
-    fn call_box(self: Box<Self>, lp: &Core);
-}
-
-impl<F: FnOnce(&Core) + Send + 'static> FnBox for F {
-    fn call_box(self: Box<Self>, lp: &Core) {
-        (*self)(lp)
+        write!(f, "Handle")
     }
 }
 

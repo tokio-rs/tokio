@@ -3,17 +3,17 @@ use std::io;
 
 use mio::event::Evented;
 
-use reactor::{Remote, Handle, Direction};
+use reactor::{Handle, Direction};
 
 /// A token that identifies an active I/O resource.
 pub struct IoToken {
     token: usize,
-    handle: Remote,
+    handle: Handle,
 }
 
 impl IoToken {
-    /// Add a new source to an event loop, returning a future which will resolve
-    /// to the token that can be used to identify this source.
+    /// Add a new source to an event loop, returning a token that can be used to
+    /// identify this source.
     ///
     /// When a new I/O object is created it needs to be communicated to the
     /// event loop to ensure that it's registered and ready to receive
@@ -29,10 +29,10 @@ impl IoToken {
     /// associated with has gone away, or if there is an error communicating
     /// with the event loop.
     pub fn new(source: &Evented, handle: &Handle) -> io::Result<IoToken> {
-        match handle.remote.inner.upgrade() {
+        match handle.inner() {
             Some(inner) => {
                 let token = try!(inner.add_source(source));
-                let handle = handle.remote().clone();
+                let handle = handle.clone();
 
                 Ok(IoToken { token, handle })
             }
@@ -40,8 +40,8 @@ impl IoToken {
         }
     }
 
-    /// Returns a reference to the remote handle
-    pub fn remote(&self) -> &Remote {
+    /// Returns a reference to this I/O token's event loop's handle.
+    pub fn handle(&self) -> &Handle {
         &self.handle
     }
 
@@ -61,7 +61,7 @@ impl IoToken {
     /// >           rather the `ReadinessStream` type should be used instead.
     // TODO: this should really return a proper newtype/enum, not a usize
     pub fn take_readiness(&self) -> usize {
-        let inner = match self.handle.inner.upgrade() {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return 0,
         };
@@ -92,13 +92,14 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_read(&self) {
-        let inner = match self.handle.inner.upgrade() {
+    pub fn schedule_read(&self) -> io::Result<()> {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
-            None => return,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
 
         inner.schedule(self.token, Direction::Read);
+        Ok(())
     }
 
     /// Schedule the current future task to receive a notification when the
@@ -124,21 +125,22 @@ impl IoToken {
     ///
     /// This function will also panic if there is not a currently running future
     /// task.
-    pub fn schedule_write(&self) {
-        let inner = match self.handle.inner.upgrade() {
+    pub fn schedule_write(&self) -> io::Result<()> {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
-            None => return,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
 
         inner.schedule(self.token, Direction::Write);
+        Ok(())
     }
 
     /// Unregister all information associated with a token on an event loop,
     /// deallocating all internal resources assigned to the given token.
     ///
     /// This method should be called whenever a source of events is being
-    /// destroyed. This will ensure that the event loop can reuse `tok` for
-    /// another I/O object if necessary and also remove it from any poll
+    /// destroyed. This will ensure that the event loop can reuse the `token`
+    /// for another I/O object if necessary and also remove it from any poll
     /// notifications and callbacks.
     ///
     /// Note that wake callbacks may still be invoked after this method is
@@ -156,7 +158,7 @@ impl IoToken {
     /// with has gone away, or if there is an error communicating with the event
     /// loop.
     pub fn drop_source(&self) {
-        let inner = match self.handle.inner.upgrade() {
+        let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return,
         };

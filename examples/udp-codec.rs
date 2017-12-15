@@ -18,7 +18,6 @@ use futures::{Future, Stream, Sink};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{UdpSocket, UdpCodec};
-use tokio::reactor::Core;
 
 pub struct LineCodec;
 
@@ -39,16 +38,13 @@ impl UdpCodec for LineCodec {
 fn main() {
     drop(env_logger::init());
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
     let pool = CpuPool::new(1);
 
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     // Bind both our sockets and then figure out what ports we got.
-    let a = UdpSocket::bind(&addr, &handle).unwrap();
-    let b = UdpSocket::bind(&addr, &handle).unwrap();
+    let a = UdpSocket::bind(&addr).unwrap();
+    let b = UdpSocket::bind(&addr).unwrap();
     let b_addr = b.local_addr().unwrap();
 
     // We're parsing each socket with the `LineCodec` defined above, and then we
@@ -79,5 +75,5 @@ fn main() {
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
     pool.execute(b.then(|_| Ok(()))).unwrap();
-    drop(core.run(a));
+    drop(a.wait());
 }

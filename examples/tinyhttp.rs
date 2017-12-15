@@ -31,15 +31,15 @@ use std::net::{self, SocketAddr};
 use std::thread;
 
 use bytes::BytesMut;
-use futures::future;
 use futures::future::Executor;
+use futures::future;
 use futures::sync::mpsc;
 use futures::{Stream, Future, Sink};
 use futures_cpupool::CpuPool;
-use http::{Request, Response, StatusCode};
 use http::header::HeaderValue;
+use http::{Request, Response, StatusCode};
 use tokio::net::TcpStream;
-use tokio::reactor::Core;
+use tokio::reactor::Handle;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::{AsyncRead};
 
@@ -70,8 +70,7 @@ fn main() {
 }
 
 fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
+    let handle = Handle::default();
 
     let pool = CpuPool::new(1);
 
@@ -81,7 +80,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         // request/response types instead of bytes. Here we'll just use our
         // framing defined below and then use the `send_all` helper to send the
         // responses back on the socket after we've processed them
-        let socket = future::result(TcpStream::from_stream(socket, &handle));
+        let socket = future::result(TcpStream::from_std(socket, &handle));
         let req = socket.and_then(|socket| {
             let (tx, rx) = socket.framed(Http).split();
             tx.send_all(rx.and_then(respond))
@@ -92,7 +91,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         })).unwrap();
         Ok(())
     });
-    core.run(done).unwrap();
+    done.wait().unwrap();
 }
 
 /// "Server logic" is implemented in this function.

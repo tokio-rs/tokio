@@ -31,7 +31,6 @@ use futures::stream::{self, Stream};
 use futures_cpupool::CpuPool;
 use tokio_io::IoFuture;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
 
 fn main() {
     env_logger::init().unwrap();
@@ -40,16 +39,14 @@ fn main() {
 
     let pool = CpuPool::new(1);
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
     let server = socket.incoming().for_each(|(socket, addr)| {
         println!("got a socket: {}", addr);
         pool.execute(write(socket).or_else(|_| Ok(()))).unwrap();
         Ok(())
     });
-    core.run(server).unwrap();
+    server.wait().unwrap();
 }
 
 fn write(socket: TcpStream) -> IoFuture<()> {

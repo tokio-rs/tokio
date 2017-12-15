@@ -10,7 +10,7 @@ pub extern crate test;
 
 mod prelude {
     pub use futures::*;
-    pub use tokio::reactor::Core;
+    pub use tokio::reactor::Reactor;
     pub use tokio::net::{TcpListener, TcpStream};
     pub use tokio_io::io::read_to_end;
 
@@ -29,7 +29,7 @@ mod connect_churn {
     #[bench]
     fn one_thread(b: &mut Bencher) {
         let addr = "127.0.0.1:0".parse().unwrap();
-        let mut core = Core::new().unwrap();
+        let mut core = Reactor::new().unwrap();
         let handle = core.handle();
         let listener = TcpListener::bind(&addr, &handle).unwrap();
         let addr = listener.local_addr().unwrap();
@@ -63,7 +63,7 @@ mod connect_churn {
         // Spawn reactor thread
         thread::spawn(move || {
             // Create the core
-            let mut core = Core::new().unwrap();
+            let mut core = Reactor::new().unwrap();
 
             // Reactor handles
             let handle = core.handle();
@@ -209,7 +209,7 @@ mod transfer {
 
     fn one_thread(b: &mut Bencher, read_size: usize, write_size: usize) {
         let addr = "127.0.0.1:0".parse().unwrap();
-        let mut core = Core::new().unwrap();
+        let mut core = Reactor::new().unwrap();
         let handle = core.handle();
         let listener = TcpListener::bind(&addr, &handle).unwrap();
         let addr = listener.local_addr().unwrap();
@@ -255,7 +255,7 @@ mod transfer {
         // Spawn reactor thread
         thread::spawn(move || {
             // Create the core
-            let mut core = Core::new().unwrap();
+            let mut core = Reactor::new().unwrap();
 
             // Reactor handles
             let handle = core.handle();
