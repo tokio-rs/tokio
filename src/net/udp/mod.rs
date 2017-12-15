@@ -122,32 +122,6 @@ impl UdpSocket {
         }
     }
 
-    /// Test whether this socket is ready to be read or not.
-    ///
-    /// If the socket is *not* readable then the current task is scheduled to
-    /// get a notification when the socket does become readable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
-    /// Test whether this socket is ready to be written to or not.
-    ///
-    /// If the socket is *not* writable then the current task is scheduled to
-    /// get a notification when the socket does become writable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_write(&self) -> Async<()> {
-        self.io.poll_write()
-    }
-
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
