@@ -49,6 +49,6 @@ impl Drop for HelperThread {
 
 fn run(mut reactor: Reactor, done: Arc<AtomicBool>) {
     while !done.load(Ordering::SeqCst) {
-        let _ = reactor.turn(None);
+        reactor.turn(None).unwrap();
     }
 }
