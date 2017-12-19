@@ -144,23 +144,25 @@ impl Reactor {
     ///
     /// # Return value
     ///
-    /// This function returns an instance of `Turn` which as of today has no
-    /// extra information with it and can be safely discarded. In the future
-    /// this return value may contain information about what happened while this
+    /// This function returns an instance of `Turn` or `io::Error`.
+    ///
+    /// `Turn` as of today has no extra information with it and can be safely discarded.
+    /// In the future `Turn` may contain information about what happened while this
     /// reactor blocked.
-    pub fn turn(&mut self, max_wait: Option<Duration>) -> Turn {
-        self.poll(max_wait);
-        Turn { _priv: () }
+    ///
+    /// `io::Error` is possible when there is an internal `tokio` bug or I/O error.
+    pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<Turn> {
+        self.poll(max_wait)?;
+        Ok(Turn { _priv: () })
     }
 
-    fn poll(&mut self, max_wait: Option<Duration>) {
+    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return,
-            // TODO: This should return an io::Result instead of panic.
-            Err(e) => panic!("error in poll: {}", e),
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => return Ok(()),
+            Err(e) => return Err(e),
         }
 
         // Process all the events that came in, dispatching appropriately
@@ -176,6 +178,8 @@ impl Reactor {
                 self.dispatch(token, event.readiness());
             }
         }
+
+        Ok(())
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {

@@ -10,13 +10,13 @@ use tokio::reactor::Reactor;
 fn works() {
     let mut r = Reactor::new().unwrap();
     r.handle().wakeup();
-    r.turn(None);
+    r.turn(None).unwrap();
 
     let now = Instant::now();
     let mut n = 0;
     while now.elapsed() < Duration::from_millis(10) {
         n += 1;
-        r.turn(Some(Duration::from_millis(10)));
+        r.turn(Some(Duration::from_millis(10))).unwrap();
     }
     assert!(n < 5);
 }
@@ -37,7 +37,7 @@ fn wakes() {
 
     for _ in 0..N {
         tx.send(()).unwrap();
-        r.turn(None);
+        r.turn(None).unwrap();
     }
     t.join().unwrap();
 }
