@@ -144,10 +144,13 @@ impl Reactor {
     ///
     /// # Return value
     ///
-    /// This function returns an instance of `Turn` which as of today has no
-    /// extra information with it and can be safely discarded. In the future
-    /// this return value may contain information about what happened while this
+    /// This function returns an instance of `Turn` or `io::Error`.
+    ///
+    /// `Turn` as of today has no extra information with it and can be safely discarded.
+    /// In the future `Turn` may contain information about what happened while this
     /// reactor blocked.
+    ///
+    /// `io::Error` is possible when there is an internal `tokio` bug or I/O error.
     pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<Turn> {
         self.poll(max_wait)?;
         Ok(Turn { _priv: () })
