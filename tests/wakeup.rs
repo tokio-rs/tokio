@@ -10,7 +10,7 @@ use tokio::reactor::Reactor;
 fn works() {
     let mut r = Reactor::new().unwrap();
     r.handle().wakeup();
-    let _ = r.turn(None);
+    r.turn(None).unwrap();
 
     let now = Instant::now();
     let mut n = 0;
