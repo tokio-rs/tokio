@@ -144,13 +144,19 @@ impl Reactor {
     ///
     /// # Return value
     ///
-    /// This function returns an instance of `Turn` or `io::Error`.
+    /// This function returns an instance of `Turn`
     ///
-    /// `Turn` as of today has no extra information with it and can be safely discarded.
-    /// In the future `Turn` may contain information about what happened while this
-    /// reactor blocked.
+    /// `Turn` as of today has no extra information with it and can be safely
+    /// discarded.  In the future `Turn` may contain information about what
+    /// happened while this reactor blocked.
     ///
-    /// `io::Error` is possible when there is an internal `tokio` bug or I/O error.
+    /// # Errors
+    ///
+    /// This function may also return any I/O error which occurs when polling
+    /// for readiness of I/O objects with the OS. This is quite unlikely to
+    /// arise and typically mean that things have gone horribly wrong at that
+    /// point. Currently this is primarily only known to happen for internal
+    /// bugs to `tokio` itself.
     pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<Turn> {
         self.poll(max_wait)?;
         Ok(Turn { _priv: () })
@@ -170,7 +176,6 @@ impl Reactor {
             let event = self.events.get(i).unwrap();
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
-
 
             if token == TOKEN_WAKEUP {
                 self.inner.wakeup.set_readiness(mio::Ready::empty()).unwrap();
