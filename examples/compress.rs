@@ -90,7 +90,7 @@ fn compress(socket: TcpStream, pool: &CpuPool)
     // done to ensure that all gz footers are written.
     let (read, write) = socket.split();
     let write = Count { io: write, amt: 0 };
-    let write = GzEncoder::new(write, flate2::Compression::Best);
+    let write = GzEncoder::new(write, flate2::Compression::best());
     let process = io::copy(read, write).and_then(|(amt, _read, write)| {
         io::shutdown(write).map(move |io| (amt, io.get_ref().amt))
     });

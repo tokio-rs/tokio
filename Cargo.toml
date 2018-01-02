@@ -18,7 +18,7 @@ appveyor = { repository = "alexcrichton/tokio-core" }
 
 [dependencies]
 bytes = "0.4"
-log = "0.3"
+log = "0.4"
 mio = "0.6.10"
 scoped-tls = "0.1.0"
 slab = "0.4"
@@ -28,7 +28,7 @@ futures = "0.1.16"
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
-flate2 = { version = "0.2", features = ["tokio"] }
+flate2 = { version = "1", features = ["tokio"] }
 futures-cpupool = "0.1"
 http = "0.1"
 httparse = "1.0"
