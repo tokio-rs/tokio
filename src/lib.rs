@@ -294,9 +294,9 @@ impl CommandExt for process::Command {
         self.stdout(Stdio::piped());
         self.stderr(Stdio::piped());
         OutputAsync {
-            inner: self.spawn_async(handle).into_future().and_then(|c| {
+            inner: Box::new(self.spawn_async(handle).into_future().and_then(|c| {
                 c.wait_with_output()
-            }).boxed(),
+            })),
         }
     }
 }
@@ -383,13 +383,13 @@ impl Child {
         };
 
         WaitWithOutput {
-            inner: self.join3(stdout, stderr).map(|(status, stdout, stderr)| {
+            inner: Box::new(self.join3(stdout, stderr).map(|(status, stdout, stderr)| {
                 Output {
                     status: status,
                     stdout: stdout,
                     stderr: stderr,
                 }
-            }).boxed()
+            }))
         }
     }
 
@@ -668,7 +668,7 @@ impl Command {
 
     pub fn spawn(mut self) -> Spawn {
         Spawn {
-            inner: self.inner.spawn_async(&self.handle).into_future().boxed()
+            inner: Box::new(self.inner.spawn_async(&self.handle).into_future()),
         }
     }
 }

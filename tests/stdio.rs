@@ -10,7 +10,7 @@ use std::io;
 use std::process::{Stdio, ExitStatus, Command};
 use std::time::Duration;
 
-use futures::future::{BoxFuture, Future};
+use futures::future::Future;
 use futures::stream::{self, Stream};
 use tokio_io::io::{read_until, write_all, read_to_end};
 use tokio_core::reactor::{Core, Timeout};
@@ -25,13 +25,13 @@ fn cat() -> Command {
     cmd
 }
 
-fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
+fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = io::Error>> {
     let stdin = cat.stdin().take().unwrap();
     let stdout = cat.stdout().take().unwrap();
 
     debug!("starting to feed");
     // Produce n lines on the child's stdout.
-    let numbers = stream::iter((0..n).into_iter().map(Ok));
+    let numbers = stream::iter_ok(0..n);
     let write = numbers.fold(stdin, |stdin, i| {
         debug!("sending line {} to child", i);
         write_all(stdin, format!("line {}\n", i).into_bytes()).map(|p| p.0)
@@ -40,7 +40,7 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
     // Try to read `n + 1` lines, ensuring the last one is empty
     // (i.e. EOF is reached after `n` lines.
     let reader = io::BufReader::new(stdout);
-    let expected_numbers = stream::iter((0..n + 1).map(Ok));
+    let expected_numbers = stream::iter_ok(0..n + 1);
     let read = expected_numbers.fold((reader, 0), move |(reader, i), _| {
         let done = i >= n;
         debug!("starting read from child");
@@ -68,7 +68,7 @@ fn feed_cat(mut cat: Child, n: usize) -> BoxFuture<ExitStatus, io::Error> {
     });
 
     // Compose reading and writing concurrently.
-    write.join(read).and_then(|_| cat).boxed()
+    Box::new(write.join(read).and_then(|_| cat))
 }
 
 #[test]

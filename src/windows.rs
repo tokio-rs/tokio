@@ -16,7 +16,6 @@
 //! from then on out.
 
 extern crate winapi;
-extern crate kernel32;
 extern crate mio_named_pipes;
 
 use std::fmt;
@@ -25,10 +24,18 @@ use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
 use std::process::{self, ExitStatus};
 
-use futures::{Future, Poll, Async} ;
-use futures::sync::oneshot;
 use futures::future::Fuse;
+use futures::sync::oneshot;
+use futures::{Future, Poll, Async} ;
 use self::mio_named_pipes::NamedPipe;
+use self::winapi::shared::minwindef::*;
+use self::winapi::shared::winerror::*;
+use self::winapi::um::handleapi::*;
+use self::winapi::um::processthreadsapi::*;
+use self::winapi::um::synchapi::*;
+use self::winapi::um::threadpoollegacyapiset::*;
+use self::winapi::um::winbase::*;
+use self::winapi::um::winnt::*;
 use tokio_core::reactor::{PollEvented, Handle};
 
 #[must_use = "futures do nothing unless polled"]
@@ -49,7 +56,7 @@ impl fmt::Debug for Child {
 
 struct Waiting {
     rx: Fuse<oneshot::Receiver<()>>,
-    wait_object: winapi::HANDLE,
+    wait_object: HANDLE,
     tx: *mut Option<oneshot::Sender<()>>,
 }
 
@@ -105,13 +112,13 @@ impl Child {
             let ptr = Box::into_raw(Box::new(Some(tx)));
             let mut wait_object = 0 as *mut _;
             let rc = unsafe {
-                kernel32::RegisterWaitForSingleObject(&mut wait_object,
-                                                      self.child.as_raw_handle(),
-                                                      Some(callback),
-                                                      ptr as *mut _,
-                                                      winapi::INFINITE,
-                                                      winapi::WT_EXECUTEINWAITTHREAD |
-                                                        winapi::WT_EXECUTEONLYONCE)
+                RegisterWaitForSingleObject(&mut wait_object,
+                                            self.child.as_raw_handle(),
+                                            Some(callback),
+                                            ptr as *mut _,
+                                            INFINITE,
+                                            WT_EXECUTEINWAITTHREAD |
+                                              WT_EXECUTEONLYONCE)
             };
             if rc == 0 {
                 let err = io::Error::last_os_error();
@@ -130,8 +137,7 @@ impl Child {
 impl Drop for Waiting {
     fn drop(&mut self) {
         unsafe {
-            let rc = kernel32::UnregisterWaitEx(self.wait_object,
-                                                winapi::INVALID_HANDLE_VALUE);
+            let rc = UnregisterWaitEx(self.wait_object, INVALID_HANDLE_VALUE);
             if rc == 0 {
                 panic!("failed to unregister: {}", io::Error::last_os_error());
             }
@@ -140,22 +146,22 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: winapi::PVOID,
-                                   _timer_fired: winapi::BOOLEAN) {
-    let mut complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
+unsafe extern "system" fn callback(ptr: PVOID,
+                                   _timer_fired: BOOLEAN) {
+    let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     drop(complete.take().unwrap().send(()));
 }
 
 pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
     unsafe {
-        match kernel32::WaitForSingleObject(child.as_raw_handle(), 0) {
-            winapi::WAIT_OBJECT_0 => {}
-            winapi::WAIT_TIMEOUT => return Ok(None),
+        match WaitForSingleObject(child.as_raw_handle(), 0) {
+            WAIT_OBJECT_0 => {}
+            WAIT_TIMEOUT => return Ok(None),
             _ => return Err(io::Error::last_os_error()),
         }
         let mut status = 0;
-        let rc = kernel32::GetExitCodeProcess(child.as_raw_handle(), &mut status);
-        if rc == winapi::FALSE {
+        let rc = GetExitCodeProcess(child.as_raw_handle(), &mut status);
+        if rc == FALSE {
             Err(io::Error::last_os_error())
         } else {
             Ok(Some(ExitStatus::from_raw(status)))

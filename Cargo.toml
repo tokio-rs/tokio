@@ -26,9 +26,20 @@ env_logger = { version = "0.3", default-features = false }
 log = "0.3"
 
 [target.'cfg(windows)'.dependencies]
-winapi = "0.2"
-kernel32-sys = "0.2"
 mio-named-pipes = "0.1"
+
+[target.'cfg(windows)'.dependencies.winapi]
+version = "0.3"
+features = [
+  "handleapi",
+  "winerror",
+  "minwindef",
+  "processthreadsapi",
+  "synchapi",
+  "threadpoollegacyapiset",
+  "winbase",
+  "winnt",
+]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
