@@ -22,8 +22,8 @@ tokio-core = "0.1.6"
 tokio-io = "0.1"
 
 [dev-dependencies]
-env_logger = { version = "0.3", default-features = false }
-log = "0.3"
+env_logger = { version = "0.4", default-features = false }
+log = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 mio-named-pipes = "0.1"
