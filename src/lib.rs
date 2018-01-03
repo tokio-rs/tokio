@@ -78,18 +78,23 @@
 #![doc(html_root_url = "https://docs.rs/tokio-signal/0.1")]
 #![deny(missing_docs)]
 
-#[macro_use]
 extern crate futures;
 extern crate tokio_core;
 extern crate tokio_io;
 
+use std::io;
+
 use futures::Future;
 use futures::stream::Stream;
 use tokio_core::reactor::Handle;
-use tokio_io::{IoStream, IoFuture};
 
 pub mod unix;
 pub mod windows;
+
+/// A future whose error is `io::Error`
+pub type IoFuture<T> = Box<Future<Item = T, Error = io::Error> + Send>;
+/// A stream whose error is `io::Error`
+pub type IoStream<T> = Box<Stream<Item = T, Error = io::Error> + Send>;
 
 /// Creates a stream which receives "ctrl-c" notifications sent to a process.
 ///
@@ -108,13 +113,15 @@ pub fn ctrl_c(handle: &Handle) -> IoFuture<IoStream<()>> {
 
     #[cfg(unix)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        unix::Signal::new(unix::libc::SIGINT, handle).map(|x| {
-            x.map(|_| ()).boxed()
-        }).boxed()
+        Box::new(unix::Signal::new(unix::libc::SIGINT, handle).map(|x| {
+            Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>
+        }))
     }
 
     #[cfg(windows)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        windows::Event::ctrl_c(handle).map(|x| x.boxed()).boxed()
+        Box::new(windows::Event::ctrl_c(handle).map(|x| {
+            Box::new(x) as Box<Stream<Item = _, Error = _> + Send>
+        }))
     }
 }
