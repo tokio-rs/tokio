@@ -7,7 +7,6 @@
 
 #![cfg(windows)]
 
-extern crate kernel32;
 extern crate mio;
 extern crate winapi;
 
@@ -21,8 +20,15 @@ use futures::stream::Fuse;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{Future, IntoFuture, Poll, Async, Stream};
-use tokio_core::io::IoFuture;
 use tokio_core::reactor::{PollEvented, Handle};
+use self::winapi::shared::minwindef::*;
+use self::winapi::um::wincon::*;
+
+use IoFuture;
+
+extern "system" {
+    fn SetConsoleCtrlHandler(HandlerRoutine: usize, Add: BOOL) -> BOOL;
+}
 
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
@@ -57,7 +63,7 @@ struct GlobalEventState {
 }
 
 enum Message {
-    NewEvent(winapi::DWORD, oneshot::Sender<io::Result<Event>>),
+    NewEvent(DWORD, oneshot::Sender<io::Result<Event>>),
 }
 
 struct DriverTask {
@@ -78,7 +84,7 @@ impl Event {
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
     pub fn ctrl_c(handle: &Handle) -> IoFuture<Event> {
-        Event::new(winapi::CTRL_C_EVENT, handle)
+        Event::new(CTRL_C_EVENT, handle)
     }
 
     /// Creates a new stream listening for the `CTRL_BREAK_EVENT` events.
@@ -86,10 +92,10 @@ impl Event {
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
     pub fn ctrl_break(handle: &Handle) -> IoFuture<Event> {
-        Event::new(winapi::CTRL_BREAK_EVENT, handle)
+        Event::new(CTRL_BREAK_EVENT, handle)
     }
 
-    fn new(signum: winapi::DWORD, handle: &Handle) -> IoFuture<Event> {
+    fn new(signum: DWORD, handle: &Handle) -> IoFuture<Event> {
         let mut init = None;
         INIT.call_once(|| {
             init = Some(global_init(handle));
@@ -98,15 +104,15 @@ impl Event {
             let (tx, rx) = oneshot::channel();
             let msg = Message::NewEvent(signum, tx);
             let res = unsafe {
-                (*GLOBAL_STATE).tx.clone().send(msg)
+                (*GLOBAL_STATE).tx.clone().unbounded_send(msg)
             };
             res.expect("failed to request a new signal stream, did the \
                         first event loop go away?");
             rx.then(|r| r.unwrap())
         });
         match init {
-            Some(init) => init.into_future().and_then(|()| new_signal).boxed(),
-            None => new_signal.boxed(),
+            Some(init) => Box::new(init.into_future().and_then(|()| new_signal)),
+            None => Box::new(new_signal),
         }
     }
 }
@@ -123,7 +129,7 @@ impl Stream for Event {
         self.reg.get_ref()
                 .inner.borrow()
                 .as_ref().unwrap().1
-                .set_readiness(mio::Ready::none())
+                .set_readiness(mio::Ready::empty())
                 .expect("failed to set readiness");
         Ok(Async::Ready(Some(())))
     }
@@ -143,7 +149,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
         });
         GLOBAL_STATE = Box::into_raw(state);
 
-        let rc = kernel32::SetConsoleCtrlHandler(Some(handler), winapi::TRUE);
+        let rc = SetConsoleCtrlHandler(handler as usize, TRUE);
         if rc == 0 {
             Box::from_raw(GLOBAL_STATE);
             GLOBAL_STATE = 0 as *mut _;
@@ -198,7 +204,7 @@ impl DriverTask {
                 Message::NewEvent(sig, complete) => (sig, complete),
             };
 
-            let event = if sig == winapi::CTRL_C_EVENT {
+            let event = if sig == CTRL_C_EVENT {
                 &mut self.ctrl_c
             } else {
                 &mut self.ctrl_break
@@ -210,7 +216,7 @@ impl DriverTask {
             let reg = match PollEvented::new(reg, &self.handle) {
                 Ok(reg) => reg,
                 Err(e) => {
-                    complete.complete(Err(e));
+                    drop(complete.send(Err(e)));
                     continue
                 }
             };
@@ -219,10 +225,10 @@ impl DriverTask {
             // the `SetReadiness` for ourselves internally.
             let (tx, rx) = oneshot::channel();
             let ready = reg.get_ref().inner.borrow_mut().as_mut().unwrap().1.clone();
-            complete.complete(Ok(Event {
+            drop(complete.send(Ok(Event {
                 reg: reg,
                 _finished: tx,
-            }));
+            })));
             event.tasks.push((RefCell::new(rx), ready));
         }
     }
@@ -233,7 +239,7 @@ impl DriverTask {
         }
         self.reg.need_read();
         self.reg.get_ref().inner.borrow().as_ref().unwrap()
-            .1.set_readiness(mio::Ready::none()).unwrap();
+            .1.set_readiness(mio::Ready::empty()).unwrap();
 
         if unsafe { (*GLOBAL_STATE).ctrl_c.ready.swap(false, Ordering::SeqCst) } {
             for task in self.ctrl_c.tasks.iter() {
@@ -248,20 +254,20 @@ impl DriverTask {
     }
 }
 
-unsafe extern "system" fn handler(ty: winapi::DWORD) -> winapi::BOOL {
+unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
     let event = match ty {
-        winapi::CTRL_C_EVENT => &(*GLOBAL_STATE).ctrl_c,
-        winapi::CTRL_BREAK_EVENT => &(*GLOBAL_STATE).ctrl_break,
-        _ => return winapi::FALSE
+        CTRL_C_EVENT => &(*GLOBAL_STATE).ctrl_c,
+        CTRL_BREAK_EVENT => &(*GLOBAL_STATE).ctrl_break,
+        _ => return FALSE
     };
     if event.ready.swap(true, Ordering::SeqCst) {
-        winapi::FALSE
+        FALSE
     } else {
         drop((*GLOBAL_STATE).ready.set_readiness(mio::Ready::readable()));
         // TODO: this will report that we handled a CTRL_BREAK_EVENT when in
         //       fact we may not have any streams actually created for that
         //       event.
-        winapi::TRUE
+        TRUE
     }
 }
 

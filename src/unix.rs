@@ -378,7 +378,7 @@ impl Signal {
             })
         })();
 
-        future::result(result).boxed()
+        Box::new(future::result(result))
     }
 }
 
