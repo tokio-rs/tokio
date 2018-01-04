@@ -33,7 +33,6 @@ use mio;
 use mio::event::Evented;
 use slab::Slab;
 
-mod io_token;
 mod global;
 
 mod poll_evented;
