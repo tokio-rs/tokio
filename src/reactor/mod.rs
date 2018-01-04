@@ -26,8 +26,9 @@ use std::mem;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, Weak, RwLock};
-use std::time::{Duration};
+use std::time::{Duration, Instant};
 
+use log::Level;
 use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
@@ -171,8 +172,16 @@ impl Reactor {
             Err(e) => return Err(e),
         }
 
+        let start = if log_enabled!(Level::Debug) {
+            Some(Instant::now())
+        } else {
+            None
+        };
+
         // Process all the events that came in, dispatching appropriately
+        let mut events = 0;
         for event in self.events.iter() {
+            events += 1;
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
@@ -181,6 +190,14 @@ impl Reactor {
             } else {
                 self.dispatch(token, event.readiness());
             }
+        }
+
+        if let Some(start) = start {
+            let dur = start.elapsed();
+            debug!("loop process - {} events, {}.{:03}s",
+                   events,
+                   dur.as_secs(),
+                   dur.subsec_nanos() / 1_000_000);
         }
 
         Ok(())
