@@ -33,7 +33,6 @@ use mio;
 use mio::event::Evented;
 use slab::Slab;
 
-mod io_token;
 mod global;
 
 mod poll_evented;
@@ -60,10 +59,15 @@ struct Inner {
     io: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
-    io_dispatch: RwLock<Slab<ScheduledIo>>,
+    io_dispatch: RwLock<Slab<Arc<ScheduledIo>>>,
 
     /// Used to wake up the reactor from a call to `turn`
-    wakeup: mio::SetReadiness
+    wakeup: mio::SetReadiness,
+
+    /// The default readiness for all new I/O objects. This is primarily used to
+    /// turn I/O objects defunkt during the destructor of `Reactor` to ensure
+    /// that when a reactor is dropped all I/O ceases to attempt to block.
+    default_readiness: AtomicUsize,
 }
 
 /// A handle to an event loop.
@@ -77,14 +81,10 @@ pub struct Handle {
 }
 
 struct ScheduledIo {
+    idx: AtomicUsize,
     readiness: AtomicUsize,
     reader: AtomicTask,
     writer: AtomicTask,
-}
-
-enum Direction {
-    Read,
-    Write,
 }
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
@@ -115,6 +115,7 @@ impl Reactor {
                 io: io,
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
                 wakeup: wakeup_pair.1,
+                default_readiness: AtomicUsize::new(0),
             }),
         })
     }
@@ -202,6 +203,26 @@ impl Reactor {
     }
 }
 
+impl Drop for Reactor {
+    fn drop(&mut self) {
+        // Ensure that all newly registered I/O objects will receive a "defunkt"
+        // sentinel for readiness, meaning that anything we miss below in our
+        // loop will automatically be flagged as "not ready" and return errors
+        // for a missing reactor.
+        self.inner.default_readiness.store(usize::max_value(), SeqCst);
+
+        // Now that all new I/O objects are shut down we need to wake up any I/O
+        // object that's already blocked. They'll see their new readiness when
+        // they wake up and start returning errors if they need to block.
+        let io = self.inner.io_dispatch.read().unwrap();
+        for (_, io) in io.iter() {
+            io.readiness.store(usize::max_value(), SeqCst);
+            io.writer.notify();
+            io.reader.notify();
+        }
+    }
+}
+
 /// Return value from the `turn` method on `Reactor`.
 ///
 /// Currently this value doesn't actually provide any functionality, but it may
@@ -217,33 +238,30 @@ impl fmt::Debug for Reactor {
     }
 }
 
-impl Drop for Inner {
-    fn drop(&mut self) {
-        // When a reactor is dropped it needs to wake up all blocked tasks as
-        // they'll never receive a notification, and all connected I/O objects
-        // will start returning errors pretty quickly.
-        let io = self.io_dispatch.read().unwrap();
-        for (_, io) in io.iter() {
-            io.writer.notify();
-            io.reader.notify();
-        }
-    }
-}
-
 impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
     fn add_source(&self, source: &Evented)
-        -> io::Result<usize>
+        -> io::Result<Arc<ScheduledIo>>
     {
-        // Acquire a write lock
-        let key = self.io_dispatch.write().unwrap()
-            .insert(ScheduledIo {
-                readiness: AtomicUsize::new(0),
-                reader: AtomicTask::new(),
-                writer: AtomicTask::new(),
-            });
+        let ret = Arc::new(ScheduledIo {
+            idx: AtomicUsize::new(0),
+            readiness: AtomicUsize::new(0),
+            reader: AtomicTask::new(),
+            writer: AtomicTask::new(),
+        });
+        let key = self.io_dispatch.write().unwrap().insert(ret.clone());
+        ret.idx.store(key, SeqCst);
+
+        // After we've inserted into the slab then we copy over the default
+        // readiness of the reactor. We need to be careful to execute in this
+        // order (store in slab then set readiness) because the destructor of
+        // `Reactor` does the opposite ordering (sets readiness then iterates
+        // the slab). This way we'll be sure that any concurrently registered
+        // objects while the reactor is being dropped are correctly flagged as
+        // 'no longer able to block'
+        ret.readiness.store(self.default_readiness.load(SeqCst), SeqCst);
 
         try!(self.io.register(source,
                               mio::Token(TOKEN_START + key),
@@ -252,7 +270,7 @@ impl Inner {
                                 platform::all(),
                               mio::PollOpt::edge()));
 
-        Ok(key)
+        Ok(ret)
     }
 
     fn deregister_source(&self, source: &Evented) -> io::Result<()> {
@@ -262,24 +280,6 @@ impl Inner {
     fn drop_source(&self, token: usize) {
         debug!("dropping I/O source: {}", token);
         self.io_dispatch.write().unwrap().remove(token);
-    }
-
-    /// Registers interest in the I/O resource associated with `token`.
-    fn schedule(&self, token: usize, dir: Direction) {
-        debug!("scheduling direction for: {}", token);
-        let io_dispatch = self.io_dispatch.read().unwrap();
-        let sched = io_dispatch.get(token).unwrap();
-
-        let (task, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
-            Direction::Write => (&sched.writer, mio::Ready::writable()),
-        };
-
-        task.register();
-
-        if sched.readiness.load(SeqCst) & ready2usize(ready) != 0 {
-            task.notify();
-        }
     }
 }
 

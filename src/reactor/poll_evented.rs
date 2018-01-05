@@ -8,15 +8,16 @@
 
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
 
 use futures::{Async, Poll};
 use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::Handle;
-use reactor::io_token::IoToken;
+use reactor::{Handle, ScheduledIo};
 
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
@@ -64,7 +65,8 @@ use reactor::io_token::IoToken;
 /// method you want to also use `need_read` to signal blocking and you should
 /// otherwise probably avoid using two tasks on the same `PollEvented`.
 pub struct PollEvented<E> {
-    token: IoToken,
+    handle: Handle,
+    state: Arc<ScheduledIo>,
     readiness: AtomicUsize,
     io: E,
 }
@@ -83,10 +85,14 @@ impl<E> PollEvented<E> {
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>>
         where E: Evented,
     {
-        let token = IoToken::new(&io, handle)?;
+        let state = match handle.inner() {
+            Some(inner) => inner.add_source(&io)?,
+            None => return Err(reactor_gone()),
+        };
 
         Ok(PollEvented {
-            token,
+            state,
+            handle: handle.clone(),
             readiness: AtomicUsize::new(0),
             io: io,
         })
@@ -155,12 +161,14 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn poll_ready(&self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
-        match self.readiness.load(Ordering::SeqCst) & bits {
+        match self.readiness.load(SeqCst) & bits {
             0 => {}
             n => return Async::Ready(super::usize2ready(n)),
         }
-        self.readiness.fetch_or(self.token.take_readiness(), Ordering::SeqCst);
-        match self.readiness.load(Ordering::SeqCst) & bits {
+
+        let token_readiness = self.state.readiness.swap(0, SeqCst);
+        self.readiness.fetch_or(token_readiness, SeqCst);
+        match self.readiness.load(SeqCst) & bits {
             0 => {
                 if mask.is_writable() {
                     if self.need_write().is_err() {
@@ -210,8 +218,12 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn need_read(&self) -> io::Result<()> {
         let bits = super::ready2usize(super::read_ready());
-        self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_read()
+        self.unset_readiness(bits)?;
+        self.state.reader.register();
+        if self.state.readiness.load(SeqCst) & bits != 0 {
+            self.state.reader.notify();
+        }
+        Ok(())
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -244,14 +256,32 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn need_write(&self) -> io::Result<()> {
         let bits = super::ready2usize(Ready::writable());
-        self.readiness.fetch_and(!bits, Ordering::SeqCst);
-        self.token.schedule_write()
+        self.unset_readiness(bits)?;
+        self.state.writer.register();
+        if self.state.readiness.load(SeqCst) & bits != 0 {
+            self.state.writer.notify();
+        }
+        Ok(())
+    }
+
+    fn unset_readiness(&self, bits: usize) -> io::Result<()> {
+        let mut readiness = self.readiness.load(SeqCst);
+        loop {
+            if readiness == usize::max_value() {
+                return Err(reactor_gone())
+            }
+            let new = readiness & !bits;
+            match self.readiness.compare_exchange(readiness, new, SeqCst, SeqCst) {
+                Ok(_) => return Ok(()),
+                Err(r) => readiness = r,
+            }
+        }
     }
 
     /// Returns a reference to the event loop handle that this readiness stream
     /// is associated with.
     pub fn handle(&self) -> &Handle {
-        self.token.handle()
+        &self.handle
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -399,6 +429,12 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 
 impl<E> Drop for PollEvented<E> {
     fn drop(&mut self) {
-        self.token.drop_source();
+        if let Some(inner) = self.handle.inner() {
+            inner.drop_source(self.state.idx.load(SeqCst));
+        }
     }
+}
+
+fn reactor_gone() -> io::Error {
+    io::Error::new(io::ErrorKind::Other, "reactor has been dropped")
 }
