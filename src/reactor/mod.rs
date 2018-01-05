@@ -172,8 +172,7 @@ impl Reactor {
         }
 
         // Process all the events that came in, dispatching appropriately
-        for i in 0..self.events.len() {
-            let event = self.events.get(i).unwrap();
+        for event in self.events.iter() {
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
@@ -187,7 +186,7 @@ impl Reactor {
         Ok(())
     }
 
-    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
+    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
         let io_dispatch = self.inner.io_dispatch.read().unwrap();
 
