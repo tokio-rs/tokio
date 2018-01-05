@@ -17,6 +17,7 @@
 extern crate futures;
 extern crate futures_cpupool;
 extern crate tokio;
+#[macro_use]
 extern crate tokio_io;
 extern crate bytes;
 
@@ -164,12 +165,13 @@ mod tcp {
 mod udp {
     use std::io;
     use std::net::SocketAddr;
+    use std::sync::Arc;
 
     use bytes::BytesMut;
-    use futures::{Future, Stream};
+    use futures::{stream, Future, Stream};
     use futures::future::Executor;
     use futures_cpupool::CpuPool;
-    use tokio::net::{UdpCodec, UdpSocket};
+    use tokio::net::{UdpSocket};
 
     pub fn connect(&addr: &SocketAddr,
                    pool: &CpuPool,
@@ -186,48 +188,31 @@ mod udp {
         let udp = UdpSocket::bind(&addr_to_bind)
             .expect("failed to bind socket");
 
-        // Like above with TCP we use an instance of `UdpCodec` to transform
-        // this UDP socket into a framed sink/stream which operates over
-        // discrete values. In this case we're working with *pairs* of socket
-        // addresses and byte buffers.
-        let (sink, stream) = udp.framed(Bytes).split();
+        // Move the udp socket into an `Arc` so that it can be used from
+        // multiple tasks.
+        let rx = Arc::new(udp);
+        let tx = rx.clone();
 
-        // All bytes from `stdin` will go to the `addr` specified in our
-        // argument list. Like with TCP this is spawned concurrently
-        pool.execute(stdin.map(move |chunk| {
-            (addr, chunk)
-        }).forward(sink).then(|result| {
-            if let Err(e) = result {
-                panic!("failed to write to socket: {}", e)
-            }
-            Ok(())
-        })).unwrap();
+        pool.execute(stdin.for_each(move |chunk| {
+            // The `read_stdin` provides chunks small enough to fit in a UDP
+            // packet.
+            tx.send_to(&chunk, &addr)
+                .map(|_| ())
+        }).map_err(|_| ())).unwrap();
 
         // With UDP we could receive data from any source, so filter out
         // anything coming from a different address
-        Box::new(stream.filter_map(move |(src, chunk)| {
-            if src == addr {
-                Some(chunk.into())
-            } else {
-                None
+        Box::new(stream::poll_fn(move || {
+            let mut buf = [0; 1500];
+
+            loop {
+                let (n, src) = try_nb!(rx.recv_from(&mut buf));
+
+                if src == addr {
+                    return Ok(Some(BytesMut::from(&buf[..n])).into());
+                }
             }
         }))
-    }
-
-    struct Bytes;
-
-    impl UdpCodec for Bytes {
-        type In = (SocketAddr, Vec<u8>);
-        type Out = (SocketAddr, Vec<u8>);
-
-        fn decode(&mut self, addr: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
-            Ok((*addr, buf.to_vec()))
-        }
-
-        fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> SocketAddr {
-            into.extend(buf);
-            addr
-        }
     }
 }
 
@@ -236,7 +221,8 @@ mod udp {
 fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
     let mut stdin = io::stdin();
     loop {
-        let mut buf = vec![0; 1024];
+        // Use a smaller buffer so that each chunk can fit in a UDP packet.
+        let mut buf = vec![0; 1500];
         let n = match stdin.read(&mut buf) {
             Err(_) |
             Ok(0) => break,
