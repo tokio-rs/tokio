@@ -1,22 +1,23 @@
----
 language: rust
 sudo: false
 
-rust:
-  - stable
-  - beta
-  - nightly
+matrix:
+  include:
+    - rust: stable
+    - os: osx
+    - rust: beta
+    - rust: nightly
 
-before_script:
-  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+    - rust: nightly
+      before_script:
+        - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+      script:
+        - cargo doc --no-deps --all-features
+      after_success:
+        - travis-cargo doc-upload
 
 script:
-  - cargo build
   - cargo test
-  - cargo doc --no-deps
-
-after_success:
-  - travis-cargo --only nightly doc-upload --branch new-crate
 
 env:
   global:
@@ -25,6 +26,3 @@ env:
 notifications:
   email:
     on_success: never
-
-os:
-  - linux
