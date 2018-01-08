@@ -289,6 +289,9 @@ impl Core {
 
         // Process all the events that came in, dispatching appropriately
         let mut fired = false;
+
+        // events.len() and .get() deprecated in favor of iter()
+        #[allow(deprecated)]
         for i in 0..self.events.len() {
             let event = self.events.get(i).unwrap();
             let token = event.token();
@@ -841,6 +844,8 @@ mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
+    // aio() deprecated
+    #[allow(deprecated)]
     pub fn aio() -> Ready {
         UnixReady::aio().into()
     }
@@ -857,6 +862,8 @@ mod platform {
     const ERROR: usize = 1 << 3;
     const AIO: usize = 1 << 4;
 
+    // is_aio() deprecated
+    #[allow(deprecated)]
     pub fn ready2usize(ready: Ready) -> usize {
         let ready = UnixReady::from(ready);
         let mut bits = 0;
@@ -872,6 +879,8 @@ mod platform {
         bits
     }
 
+    // is_aio() deprecated
+    #[allow(deprecated)]
     pub fn usize2ready(bits: usize) -> Ready {
         let mut ready = UnixReady::from(Ready::empty());
         if bits & AIO != 0 {

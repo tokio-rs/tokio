@@ -364,6 +364,24 @@ impl TcpStream {
         self.io.get_ref().peer_addr()
     }
 
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying recv system call.
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        if let Async::NotReady = self.poll_read() {
+            return Err(io::ErrorKind::WouldBlock.into())
+        }
+        let r = self.io.get_ref().peek(buf);
+        if is_wouldblock(&r) {
+            self.io.need_read();
+        }
+        return r
+
+    }
+
     /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function will cause all pending and future I/O on the specified

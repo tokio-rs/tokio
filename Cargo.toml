@@ -19,7 +19,7 @@ appveyor = { repository = "alexcrichton/tokio-core" }
 [dependencies]
 bytes = "0.4"
 log = "0.4"
-mio = "0.6.10"
+mio = "0.6.12"
 scoped-tls = "0.1.0"
 slab = "0.4"
 iovec = "0.1"
