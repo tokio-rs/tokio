@@ -197,6 +197,7 @@ struct Codec {
 impl UdpCodec for Codec {
     type In = ();
     type Out = &'static [u8];
+    type Error = io::Error;
 
     fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
         assert_eq!(src, &self.from);
@@ -204,10 +205,10 @@ impl UdpCodec for Codec {
         Ok(())
     }
 
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> SocketAddr {
+    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<SocketAddr> {
         assert_eq!(msg, self.data);
         buf.extend_from_slice(msg);
-        self.to
+        Ok(self.to)
     }
 }
 
@@ -241,4 +242,3 @@ fn send_framed() {
         assert_eq!(received.0, Some(()));
     }
 }
-

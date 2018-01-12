@@ -26,6 +26,16 @@ pub trait UdpCodec {
     /// The type of frames to be encoded.
     type Out;
 
+    /// The type of unrecoverable frame encoding/decoding errors.
+    ///
+    /// If an individual message is ill-formed but can be ignored without
+    /// interfering with the processing of future messages, it may be more
+    /// useful to report the failure as an `Item`.
+    ///
+    /// Note that implementors of this trait can simply indicate `type Error =
+    /// io::Error` to use I/O errors as this type.
+    type Error: From<io::Error>;
+
     /// Attempts to decode a frame from the provided buffer of bytes.
     ///
     /// This method is called by `UdpFramed` on a single datagram which has been
@@ -37,7 +47,7 @@ pub trait UdpCodec {
     /// Finally, if the bytes in the buffer are malformed then an error is
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
-    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> io::Result<Self::In>;
+    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> Result<Self::In, Self::Error>;
 
     /// Encodes a frame into the buffer provided.
     ///
@@ -47,7 +57,7 @@ pub trait UdpCodec {
     ///
     /// The encode method also determines the destination to which the buffer
     /// should be directed, which will be returned as a `SocketAddr`.
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> SocketAddr;
+    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> Result<SocketAddr, Self::Error>;
 }
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
@@ -68,12 +78,12 @@ pub struct UdpFramed<C> {
 
 impl<C: UdpCodec> Stream for UdpFramed<C> {
     type Item = C::In;
-    type Error = io::Error;
+    type Error = C::Error;
 
-    fn poll(&mut self) -> Poll<Option<C::In>, io::Error> {
+    fn poll(&mut self) -> Poll<Option<C::In>, C::Error> {
         let (n, addr) = try_nb!(self.socket.recv_from(&mut self.rd));
         trace!("received {} bytes, decoding", n);
-        let frame = try!(self.codec.decode(&addr, &self.rd[..n]));
+        let frame = self.codec.decode(&addr, &self.rd[..n])?;
         trace!("frame decoded from buffer");
         Ok(Async::Ready(Some(frame)))
     }
@@ -81,9 +91,9 @@ impl<C: UdpCodec> Stream for UdpFramed<C> {
 
 impl<C: UdpCodec> Sink for UdpFramed<C> {
     type SinkItem = C::Out;
-    type SinkError = io::Error;
+    type SinkError = C::Error;
 
-    fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, io::Error> {
+    fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, C::Error> {
         trace!("sending frame");
 
         if !self.flushed {
@@ -93,14 +103,14 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
             }
         }
 
-        self.out_addr = self.codec.encode(item, &mut self.wr);
+        self.out_addr = self.codec.encode(item, &mut self.wr)?;
         self.flushed = false;
         trace!("frame encoded; length={}", self.wr.len());
 
         Ok(AsyncSink::Ready)
     }
 
-    fn poll_complete(&mut self) -> Poll<(), io::Error> {
+    fn poll_complete(&mut self) -> Poll<(), C::Error> {
         if self.flushed {
             return Ok(Async::Ready(()))
         }
@@ -117,11 +127,11 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
             Ok(Async::Ready(()))
         } else {
             Err(io::Error::new(io::ErrorKind::Other,
-                               "failed to write entire datagram to socket"))
+                               "failed to write entire datagram to socket").into())
         }
     }
 
-    fn close(&mut self) -> Poll<(), io::Error> {
+    fn close(&mut self) -> Poll<(), C::Error> {
         try_ready!(self.poll_complete());
         Ok(().into())
     }

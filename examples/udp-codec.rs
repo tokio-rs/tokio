@@ -24,14 +24,15 @@ pub struct LineCodec;
 impl UdpCodec for LineCodec {
     type In = (SocketAddr, Vec<u8>);
     type Out = (SocketAddr, Vec<u8>);
+    type Error = io::Error;
 
     fn decode(&mut self, addr: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
         Ok((*addr, buf.to_vec()))
     }
 
-    fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> SocketAddr {
+    fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> io::Result<SocketAddr> {
         into.extend(buf);
-        addr
+        Ok(addr)
     }
 }
 
