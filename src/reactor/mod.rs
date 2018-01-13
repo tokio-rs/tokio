@@ -289,11 +289,7 @@ impl Core {
 
         // Process all the events that came in, dispatching appropriately
         let mut fired = false;
-
-        // events.len() and .get() deprecated in favor of iter()
-        #[allow(deprecated)]
-        for i in 0..self.events.len() {
-            let event = self.events.get(i).unwrap();
+        for event in &self.events {
             let token = event.token();
             trace!("event {:?} {:?}", event.readiness(), event.token());
 
@@ -311,7 +307,7 @@ impl Core {
         return fired
     }
 
-    fn dispatch(&mut self, token: mio::Token, ready: mio::Ready) {
+    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
         let token = usize::from(token) - TOKEN_START;
         if token % 2 == 0 {
             self.dispatch_io(token / 2, ready)
@@ -320,7 +316,7 @@ impl Core {
         }
     }
 
-    fn dispatch_io(&mut self, token: usize, ready: mio::Ready) {
+    fn dispatch_io(&self, token: usize, ready: mio::Ready) {
         let mut reader = None;
         let mut writer = None;
         let mut inner = self.inner.borrow_mut();
@@ -343,7 +339,7 @@ impl Core {
         }
     }
 
-    fn dispatch_task(&mut self, token: usize) {
+    fn dispatch_task(&self, token: usize) {
         let mut inner = self.inner.borrow_mut();
         let (task, wake) = match inner.task_dispatch.get_mut(token) {
             Some(slot) => (slot.spawn.take(), slot.wake.take()),
@@ -844,14 +840,16 @@ mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
-    // aio() deprecated
-    #[allow(deprecated)]
-    pub fn aio() -> Ready {
-        UnixReady::aio().into()
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+              target_os = "macos"))]
+    pub fn all() -> Ready {
+        hup() | UnixReady::aio().into()
     }
 
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+                  target_os = "macos")))]
     pub fn all() -> Ready {
-        hup() | aio()
+        hup()
     }
 
     pub fn hup() -> Ready {
@@ -862,12 +860,22 @@ mod platform {
     const ERROR: usize = 1 << 3;
     const AIO: usize = 1 << 4;
 
-    // is_aio() deprecated
-    #[allow(deprecated)]
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+              target_os = "macos"))]
+    fn is_aio(ready: &Ready) -> bool {
+        ready.is_aio()
+    }
+
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+                  target_os = "macos")))]
+    fn is_aio(_ready: &Ready) -> bool {
+        false
+    }
+
     pub fn ready2usize(ready: Ready) -> usize {
         let ready = UnixReady::from(ready);
         let mut bits = 0;
-        if ready.is_aio() {
+        if is_aio(&ready) {
             bits |= AIO;
         }
         if ready.is_error() {
@@ -879,12 +887,22 @@ mod platform {
         bits
     }
 
-    // is_aio() deprecated
-    #[allow(deprecated)]
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+              target_os = "macos"))]
+    fn usize2ready_aio(ready: &mut UnixReady) {
+        ready.insert(UnixReady::aio());
+    }
+
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    fn usize2ready_aio(_ready: &mut UnixReady) {
+        // aio not available here → empty
+    }
+
     pub fn usize2ready(bits: usize) -> Ready {
         let mut ready = UnixReady::from(Ready::empty());
         if bits & AIO != 0 {
-            ready.insert(UnixReady::aio());
+            usize2ready_aio(&mut ready);
         }
         if bits & HUP != 0 {
             ready.insert(UnixReady::hup());
