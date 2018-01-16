@@ -187,7 +187,7 @@ impl UdpSocket {
     pub fn send_dgram<T>(self, buf: T, addr: SocketAddr) -> SendDgram<T>
         where T: AsRef<[u8]>,
     {
-        SendDgram(Some((self, buf, addr)))
+        SendDgram::new(self, buf, addr)
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
@@ -228,7 +228,7 @@ impl UdpSocket {
     pub fn recv_dgram<T>(self, buf: T) -> RecvDgram<T>
         where T: AsMut<[u8]>,
     {
-        RecvDgram(Some((self, buf)))
+        RecvDgram::new(self, buf)
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
@@ -401,12 +401,36 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
+// ===== Future SendDgram =====
+
 /// A future used to write the entire contents of some data to a UDP socket.
 ///
 /// This is created by the `UdpSocket::send_dgram` method.
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
-pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
+pub struct SendDgram<T> {
+    /// None means future was completed
+    state: Option<SendDgramInner<T>>
+}
+
+/// A struct is used to represent the full info of SendDgram.
+#[derive(Debug)]
+struct SendDgramInner<T> {
+    /// Tx socket
+    socket: UdpSocket,
+    /// The whole buffer will be sent
+    buffer: T,
+    /// Destination addr
+    addr: SocketAddr,
+}
+
+impl<T> SendDgram<T> {
+    /// Create a new future to send UDP Datagram
+    fn new(socket: UdpSocket, buffer: T, addr: SocketAddr) -> SendDgram<T> {
+        let inner = SendDgramInner { socket: socket, buffer: buffer, addr: addr };
+        SendDgram { state: Some(inner) }
+    }
+}
 
 fn incomplete_write(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, reason)
@@ -420,26 +444,48 @@ impl<T> Future for SendDgram<T>
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
         {
-            let (ref sock, ref buf, ref addr) =
-                *self.0.as_ref().expect("SendDgram polled after completion");
-            let n = try_nb!(sock.send_to(buf.as_ref(), addr));
-            if n != buf.as_ref().len() {
+            let ref inner =
+                self.state.as_ref().expect("SendDgram polled after completion");
+            let n = try_nb!(inner.socket.send_to(inner.buffer.as_ref(), &inner.addr));
+            if n != inner.buffer.as_ref().len() {
                 return Err(incomplete_write("failed to send entire message \
                                              in datagram"))
             }
         }
 
-        let (sock, buf, _addr) = self.0.take().unwrap();
-        Ok(Async::Ready((sock, buf)))
+        let inner = self.state.take().unwrap();
+        Ok(Async::Ready((inner.socket, inner.buffer)))
     }
 }
+
+// ===== Future RecvDgram =====
 
 /// A future used to receive a datagram from a UDP socket.
 ///
 /// This is created by the `UdpSocket::recv_dgram` method.
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
-pub struct RecvDgram<T>(Option<(UdpSocket, T)>);
+pub struct RecvDgram<T> {
+    /// None means future was completed
+    state: Option<RecvDgramInner<T>>
+}
+
+/// A struct is used to represent the full info of RecvDgram.
+#[derive(Debug)]
+struct RecvDgramInner<T> {
+    /// Rx socket
+    socket: UdpSocket,
+    /// The received data will be put in the buffer
+    buffer: T
+}
+
+impl<T> RecvDgram<T> {
+    /// Create a new future to receive UDP Datagram
+    fn new(socket: UdpSocket, buffer: T) -> RecvDgram<T> {
+        let inner = RecvDgramInner { socket: socket, buffer: buffer };
+        RecvDgram { state: Some(inner) }
+    }
+}
 
 impl<T> Future for RecvDgram<T>
     where T: AsMut<[u8]>,
@@ -449,14 +495,14 @@ impl<T> Future for RecvDgram<T>
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
         let (n, addr) = {
-            let (ref socket, ref mut buf) =
-                *self.0.as_mut().expect("RecvDgram polled after completion");
+            let ref mut inner =
+                self.state.as_mut().expect("RecvDgram polled after completion");
 
-            try_nb!(socket.recv_from(buf.as_mut()))
+            try_nb!(inner.socket.recv_from(inner.buffer.as_mut()))
         };
 
-        let (socket, buf) = self.0.take().unwrap();
-        Ok(Async::Ready((socket, buf, n, addr)))
+        let inner = self.state.take().unwrap();
+        Ok(Async::Ready((inner.socket, inner.buffer, n, addr)))
     }
 }
 
