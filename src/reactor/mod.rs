@@ -860,14 +860,12 @@ mod platform {
     const ERROR: usize = 1 << 3;
     const AIO: usize = 1 << 4;
 
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
-              target_os = "macos"))]
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios"))]
     fn is_aio(ready: &Ready) -> bool {
         ready.is_aio()
     }
 
-    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
-                  target_os = "macos")))]
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios")))]
     fn is_aio(_ready: &Ready) -> bool {
         false
     }
