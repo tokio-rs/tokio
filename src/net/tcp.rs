@@ -694,12 +694,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
             // `bytes_vec` method.
             static DUMMY: &[u8] = &[0];
             let iovec = <&IoVec>::from(DUMMY);
-            let mut bufs = [
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-            ];
+            let mut bufs = [iovec; 64];
             let n = buf.bytes_vec(&mut bufs);
             self.io.get_ref().write_bufs(&bufs[..n])
         };
