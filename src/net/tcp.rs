@@ -344,6 +344,27 @@ impl TcpStream {
         self.io.get_ref().peer_addr()
     }
 
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying recv system call.
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        if let Async::NotReady = self.poll_read() {
+            return Err(io::ErrorKind::WouldBlock.into())
+        }
+
+        match self.io.get_ref().peek(buf) {
+            Ok(v) => Ok(v),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_read()?;
+                Err(io::ErrorKind::WouldBlock.into())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function will cause all pending and future I/O on the specified
@@ -616,12 +637,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
             // `bytes_vec` method.
             static DUMMY: &[u8] = &[0];
             let iovec = <&IoVec>::from(DUMMY);
-            let mut bufs = [
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-            ];
+            let mut bufs = [iovec; 64];
             let n = buf.bytes_vec(&mut bufs);
             self.io.get_ref().write_bufs(&bufs[..n])
         };

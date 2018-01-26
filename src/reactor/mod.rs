@@ -455,12 +455,14 @@ mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
-    pub fn aio() -> Ready {
-        UnixReady::aio().into()
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    pub fn all() -> Ready {
+        hup() | UnixReady::aio().into()
     }
 
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
     pub fn all() -> Ready {
-        hup() | aio()
+        hup()
     }
 
     pub fn hup() -> Ready {
@@ -471,10 +473,20 @@ mod platform {
     const ERROR: usize = 1 << 3;
     const AIO: usize = 1 << 4;
 
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    fn is_aio(ready: &Ready) -> bool {
+        ready.is_aio()
+    }
+
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
+    fn is_aio(_ready: &Ready) -> bool {
+        false
+    }
+
     pub fn ready2usize(ready: Ready) -> usize {
         let ready = UnixReady::from(ready);
         let mut bits = 0;
-        if ready.is_aio() {
+        if is_aio(&ready) {
             bits |= AIO;
         }
         if ready.is_error() {
@@ -486,10 +498,22 @@ mod platform {
         bits
     }
 
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+              target_os = "macos"))]
+    fn usize2ready_aio(ready: &mut UnixReady) {
+        ready.insert(UnixReady::aio());
+    }
+
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    fn usize2ready_aio(_ready: &mut UnixReady) {
+        // aio not available here → empty
+    }
+
     pub fn usize2ready(bits: usize) -> Ready {
         let mut ready = UnixReady::from(Ready::empty());
         if bits & AIO != 0 {
-            ready.insert(UnixReady::aio());
+            usize2ready_aio(&mut ready);
         }
         if bits & HUP != 0 {
             ready.insert(UnixReady::hup());
