@@ -26,7 +26,7 @@ use std::iter;
 use std::net::SocketAddr;
 
 use futures::Future;
-use futures::future::Executor;
+use futures::future::{self, Executor};
 use futures::stream::{self, Stream};
 use futures_cpupool::CpuPool;
 use tokio_io::IoFuture;
@@ -46,7 +46,7 @@ fn main() {
         pool.execute(write(socket).or_else(|_| Ok(()))).unwrap();
         Ok(())
     });
-    server.wait().unwrap();
+    future::blocking(server).wait().unwrap();
 }
 
 fn write(socket: TcpStream) -> IoFuture<()> {

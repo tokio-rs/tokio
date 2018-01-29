@@ -19,6 +19,7 @@ extern crate tokio_io;
 use std::env;
 use std::net::SocketAddr;
 
+use futures::future;
 use futures::prelude::*;
 use tokio::net::TcpListener;
 
@@ -40,5 +41,5 @@ fn main() {
         Ok(())
     });
 
-    server.wait().unwrap();
+    future::blocking(server).wait().unwrap();
 }
