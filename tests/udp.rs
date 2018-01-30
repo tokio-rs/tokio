@@ -170,7 +170,7 @@ fn send_dgrams() {
     let b_addr = t!(b.local_addr());
 
     {
-        let send = a.send_dgram(&b"4321"[..], b_addr);
+        let send = a.send_dgram(&b"4321"[..], &b_addr);
         let recv = b.recv_dgram(&mut buf[..]);
         let (sendt, received) = t!(send.join(recv).wait());
         assert_eq!(received.2, 4);
@@ -180,7 +180,7 @@ fn send_dgrams() {
     }
 
     {
-        let send = a.send_dgram(&b""[..], b_addr);
+        let send = a.send_dgram(&b""[..], &b_addr);
         let recv = b.recv_dgram(&mut buf[..]);
         let received = t!(send.join(recv).wait()).1;
         assert_eq!(received.2, 0);
