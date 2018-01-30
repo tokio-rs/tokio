@@ -86,7 +86,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/tokio-core/0.1")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.0")]
 #![deny(missing_docs)]
 #![deny(warnings)]
 #![warn(missing_debug_implementations)]
