@@ -15,8 +15,7 @@ fn tcp_doesnt_block() {
     let core = Reactor::new().unwrap();
     let handle = core.handle();
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let listener = TcpListener::from_std(listener, &addr, &handle).unwrap();
+    let listener = TcpListener::from_std(listener, &handle).unwrap();
     drop(core);
     assert!(listener.incoming().wait().next().unwrap().is_err());
 }
@@ -26,8 +25,7 @@ fn drop_wakes() {
     let core = Reactor::new().unwrap();
     let handle = core.handle();
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let listener = TcpListener::from_std(listener, &addr, &handle).unwrap();
+    let listener = TcpListener::from_std(listener, &handle).unwrap();
     let (tx, rx) = oneshot::channel::<()>();
     let t = thread::spawn(move || {
         let incoming = listener.incoming();
