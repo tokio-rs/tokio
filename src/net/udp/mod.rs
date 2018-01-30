@@ -184,10 +184,10 @@ impl UdpSocket {
     /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which
     /// should be broadly applicable to accepting data which can be converted
     /// to a slice.
-    pub fn send_dgram<T>(self, buf: T, addr: SocketAddr) -> SendDgram<T>
+    pub fn send_dgram<T>(self, buf: T, addr: &SocketAddr) -> SendDgram<T>
         where T: AsRef<[u8]>,
     {
-        SendDgram::new(self, buf, addr)
+        SendDgram::new(self, buf, *addr)
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
