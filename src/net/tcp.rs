@@ -119,9 +119,8 @@ impl TcpListener {
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
     pub fn from_std(listener: net::TcpListener,
-                    addr: &SocketAddr,
                     handle: &Handle) -> io::Result<TcpListener> {
-        let l = mio::net::TcpListener::from_listener(listener, addr)?;
+        let l = mio::net::TcpListener::from_std(listener)?;
         TcpListener::new(l, handle)
     }
 
