@@ -182,11 +182,12 @@ impl fmt::Debug for TcpListener {
 }
 
 impl Stream for Incoming {
-    type Item = (TcpStream, SocketAddr);
+    type Item = TcpStream;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-        Ok(Async::Ready(Some(try_nb!(self.inner.accept()))))
+        let (socket, _) = try_nb!(self.inner.accept());
+        Ok(Async::Ready(Some(socket)))
     }
 }
 

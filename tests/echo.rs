@@ -41,7 +41,7 @@ fn echo_server() {
 
     let clients = srv.incoming();
     let client = clients.into_future().map(|e| e.0.unwrap()).map_err(|e| e.0);
-    let halves = client.map(|s| s.0.split());
+    let halves = client.map(|s| s.split());
     let copied = halves.and_then(|(a, b)| copy(a, b));
 
     let (amt, _, _) = t!(copied.wait());

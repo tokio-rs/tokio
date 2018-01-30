@@ -50,7 +50,8 @@ fn main() {
 
     // The compress logic will happen in the function below, but everything's
     // still a future! Each client is spawned to concurrently get processed.
-    let server = socket.incoming().for_each(move |(socket, addr)| {
+    let server = socket.incoming().for_each(move |socket| {
+        let addr = socket.peer_addr().unwrap();
         pool.execute(compress(socket, &pool).then(move |result| {
             match result {
                 Ok((r, w)) => println!("{}: compressed {} bytes to {}", addr, r, w),

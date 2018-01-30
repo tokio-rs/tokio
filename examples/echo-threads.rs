@@ -56,7 +56,7 @@ fn main() {
     // shipped round-robin to a particular thread which will associate the
     // socket with the corresponding event loop and process the connection.
     let mut next = 0;
-    let srv = listener.incoming().for_each(|(socket, _)| {
+    let srv = listener.incoming().for_each(|socket| {
         channels[next].unbounded_send(socket).expect("worker thread died");
         next = (next + 1) % channels.len();
         Ok(())

@@ -46,7 +46,7 @@ fn echo_server() {
         (expected, t2)
     });
 
-    let clients = srv.incoming().take(2).map(|e| e.0).collect();
+    let clients = srv.incoming().take(2).collect();
     let copied = clients.and_then(|clients| {
         let mut clients = clients.into_iter();
         let a = BufReader::new(clients.next().unwrap());

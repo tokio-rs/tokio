@@ -48,7 +48,7 @@ fn main() {
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
-    let done = socket.incoming().for_each(move |(client, client_addr)| {
+    let done = socket.incoming().for_each(move |client| {
         let server = TcpStream::connect(&server_addr);
         let amounts = server.and_then(move |server| {
             // Create separate read/write handles for the TCP clients that we're
@@ -82,8 +82,8 @@ fn main() {
         });
 
         let msg = amounts.map(move |(from_client, from_server)| {
-            println!("client at {} wrote {} bytes and received {} bytes",
-                     client_addr, from_client, from_server);
+            println!("client wrote {} bytes and received {} bytes",
+                     from_client, from_server);
         }).map_err(|e| {
             // Don't panic. Maybe the client just disconnected too soon.
             println!("error: {}", e);

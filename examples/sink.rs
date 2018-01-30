@@ -41,8 +41,8 @@ fn main() {
 
     let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
-    let server = socket.incoming().for_each(|(socket, addr)| {
-        println!("got a socket: {}", addr);
+    let server = socket.incoming().for_each(|socket| {
+        println!("got a socket: {}", socket.peer_addr().unwrap());
         pool.execute(write(socket).or_else(|_| Ok(()))).unwrap();
         Ok(())
     });

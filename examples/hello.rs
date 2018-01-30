@@ -33,7 +33,7 @@ fn main() {
     println!("Listening for connections on {}", addr);
 
     let clients = listener.incoming();
-    let welcomes = clients.and_then(|(socket, _peer_addr)| {
+    let welcomes = clients.and_then(|socket| {
         tokio_io::io::write_all(socket, b"Hello!\n")
     });
     let server = welcomes.for_each(|(_socket, _welcome)| {
