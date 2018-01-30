@@ -42,7 +42,7 @@ fn echo_server() {
     });
 
     let future = srv.incoming()
-                    .map(|s| s.0.split())
+                    .map(|s| s.split())
                     .map(|(a, b)| copy(a, b).map(|_| ()))
                     .buffered(10)
                     .take(2)

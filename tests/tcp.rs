@@ -43,7 +43,7 @@ fn accept() {
     let (tx, rx) = channel();
     let client = srv.incoming().map(move |t| {
         tx.send(()).unwrap();
-        t.0
+        t
     }).into_future().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
     let t = thread::spawn(move || {
@@ -71,7 +71,7 @@ fn accept2() {
     let (tx, rx) = channel();
     let client = srv.incoming().map(move |t| {
         tx.send(()).unwrap();
-        t.0
+        t
     }).into_future().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
 

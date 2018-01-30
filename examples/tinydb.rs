@@ -100,7 +100,7 @@ fn main() {
         map: Mutex::new(initial_db),
     });
 
-    let done = listener.incoming().for_each(move |(socket, _addr)| {
+    let done = listener.incoming().for_each(move |socket| {
         // As with many other small examples, the first thing we'll do is
         // *split* this TCP stream into two separately owned halves. This'll
         // allow us to work with the read and write halves independently.

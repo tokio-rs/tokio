@@ -32,7 +32,7 @@ fn chain_clients() {
         s3.write_all(b"baz").unwrap();
     });
 
-    let clients = srv.incoming().map(|e| e.0).take(3);
+    let clients = srv.incoming().take(3);
     let copied = clients.collect().and_then(|clients| {
         let mut clients = clients.into_iter();
         let a = clients.next().unwrap();

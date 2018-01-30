@@ -28,7 +28,7 @@ fn limit() {
         s1.write_all(b"foo bar baz").unwrap();
     });
 
-    let clients = srv.incoming().map(|e| e.0).take(1);
+    let clients = srv.incoming().take(1);
     let copied = clients.collect().and_then(|clients| {
         let mut clients = clients.into_iter();
         let a = clients.next().unwrap();
