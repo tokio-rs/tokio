@@ -13,7 +13,6 @@ use futures::{Future, Stream, Sink};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::io::{write_all, read};
 use tokio_io::AsyncRead;
@@ -55,38 +54,34 @@ impl Encoder for LineCodec {
 fn echo() {
     drop(env_logger::init());
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
     let pool = CpuPool::new(1);
 
-    let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
+    let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = listener.local_addr().unwrap();
     let pool_inner = pool.clone();
-    let srv = listener.incoming().for_each(move |(socket, _)| {
+    let srv = listener.incoming().for_each(move |socket| {
         let (sink, stream) = socket.framed(LineCodec).split();
         pool_inner.execute(sink.send_all(stream).map(|_| ()).map_err(|_| ())).unwrap();
         Ok(())
     });
 
-    let handle = core.handle();
     pool.execute(srv.map_err(|e| panic!("srv error: {}", e))).unwrap();
 
-    let client = TcpStream::connect(&addr, &handle);
-    let client = core.run(client).unwrap();
-    let (client, _) = core.run(write_all(client, b"a\n")).unwrap();
-    let (client, buf, amt) = core.run(read(client, vec![0; 1024])).unwrap();
+    let client = TcpStream::connect(&addr);
+    let client = client.wait().unwrap();
+    let (client, _) = write_all(client, b"a\n").wait().unwrap();
+    let (client, buf, amt) = read(client, vec![0; 1024]).wait().unwrap();
     assert_eq!(amt, 2);
     assert_eq!(&buf[..2], b"a\n");
 
-    let (client, _) = core.run(write_all(client, b"\n")).unwrap();
-    let (client, buf, amt) = core.run(read(client, buf)).unwrap();
+    let (client, _) = write_all(client, b"\n").wait().unwrap();
+    let (client, buf, amt) = read(client, buf).wait().unwrap();
     assert_eq!(amt, 1);
     assert_eq!(&buf[..1], b"\n");
 
-    let (client, _) = core.run(write_all(client, b"b")).unwrap();
+    let (client, _) = write_all(client, b"b").wait().unwrap();
     client.shutdown(Shutdown::Write).unwrap();
-    let (_client, buf, amt) = core.run(read(client, buf)).unwrap();
+    let (_client, buf, amt) = read(client, buf).wait().unwrap();
     assert_eq!(amt, 1);
     assert_eq!(&buf[..1], b"b");
 }

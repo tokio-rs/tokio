@@ -32,7 +32,6 @@ use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
 
 fn main() {
     // Allow passing an address to listen on as the first argument of this
@@ -41,24 +40,12 @@ fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    // First up we'll create the event loop that's going to drive this server.
-    // This is done by creating an instance of the `Core` type, tokio-core's
-    // event loop. Most functions in tokio-core return an `io::Result`, and
-    // `Core::new` is no exception. For this example, though, we're mostly just
-    // ignoring errors, so we unwrap the return value.
-    //
-    // After the event loop is created we acquire a handle to it through the
-    // `handle` method. With this handle we'll then later be able to create I/O
-    // objects.
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
     // above and must be associated with an event loop, so we pass in a handle
     // to our event loop. After the socket's created we inform that we're ready
     // to go and start accepting connections.
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     // A CpuPool allows futures to be executed concurrently.
@@ -73,12 +60,11 @@ fn main() {
     // connections made to the server).  The return value of the `for_each`
     // method is itself a future representing processing the entire stream of
     // connections, and ends up being our server.
-    let done = socket.incoming().for_each(move |(socket, addr)| {
+    let done = socket.incoming().for_each(move |socket| {
 
         // Once we're inside this closure this represents an accepted client
-        // from our server. The `socket` is the client connection and `addr` is
-        // the remote address of the client (similar to how the standard library
-        // operates).
+        // from our server. The `socket` is the client connection (similar to
+        // how the standard library operates).
         //
         // We just want to copy all data read from the socket back onto the
         // socket itself (e.g. "echo"). We can use the standard `io::copy`
@@ -101,8 +87,8 @@ fn main() {
         // information.
         let msg = amt.then(move |result| {
             match result {
-                Ok((amt, _, _)) => println!("wrote {} bytes to {}", amt, addr),
-                Err(e) => println!("error on {}: {}", addr, e),
+                Ok((amt, _, _)) => println!("wrote {} bytes", amt),
+                Err(e) => println!("error: {}", e),
             }
 
             Ok(())
@@ -125,13 +111,8 @@ fn main() {
         Ok(())
     });
 
-    // And finally now that we've define what our server is, we run it! We
-    // didn't actually do much I/O up to this point and this `Core::run` method
-    // is responsible for driving the entire server to completion.
-    //
-    // The `run` method will return the result of the future that it's running,
-    // but in our case the `done` future won't ever finish because a TCP
-    // listener is never done accepting clients. That basically just means that
-    // we're going to be running the server until it's killed (e.g. ctrl-c).
-    core.run(done).unwrap();
+    // And finally now that we've define what our server is, we run it! Here we
+    // just need to execute the future we've created and wait for it to complete
+    // using the standard methods in the `futures` crate.
+    done.wait().unwrap();
 }

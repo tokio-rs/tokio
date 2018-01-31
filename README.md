@@ -1,34 +1,20 @@
-# tokio-core
+# tokio
 
-Core I/O and event loop abstraction for asynchronous I/O in Rust built on
-`futures` and `mio`.
+A work-in-progress rearchitecting of the [tokio-core] crate in line with
+[tokio-rs/tokio-rfcs#3][rfc]
 
-[![Build Status](https://travis-ci.org/tokio-rs/tokio-core.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-core)
-[![Build status](https://ci.appveyor.com/api/projects/status/caxmxbg8181kk9mq/branch/master?svg=true)](https://ci.appveyor.com/project/carllerche/tokio-core)
+[tokio-core]: https://github.com/tokio-rs/tokio-core
+[rfc]: https://github.com/tokio-rs/tokio-rfcs/pull/3
 
-[Documentation](https://docs.rs/tokio-core)
+[![Build Status](https://travis-ci.org/tokio-rs/tokio.svg?branch=new-crate)](https://travis-ci.org/tokio-rs/tokio)
+[![Build status](https://ci.appveyor.com/api/projects/status/uxiinkgipvy6ehrj/branch/new-crate?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio/branch/new-crate)
 
-[Tutorial](https://tokio.rs/)
+[Documentation](https://tokio-rs.github.io/tokio)
 
 ## Usage
 
-First, add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-tokio-core = "0.1"
-```
-
-Next, add this to your crate:
-
-```rust
-extern crate tokio;
-```
-
-You can find extensive documentation and examples about how to use this crate
-online at [https://tokio.rs](https://tokio.rs) as well as the `examples` folder
-in this repository. The [API documentation](https://docs.rs/tokio-core) is also
-a great place to get started for the nitty-gritty.
+This project is a **work in progress**, more information will be added here as
+it progresses.
 
 # License
 

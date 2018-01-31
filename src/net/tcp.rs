@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use futures::stream::Stream;
-use futures::sync::oneshot;
 use futures::{Future, Poll, Async};
 use iovec::IoVec;
 use mio;
@@ -20,12 +19,12 @@ use reactor::{Handle, PollEvented};
 /// various forms of processing.
 pub struct TcpListener {
     io: PollEvented<mio::net::TcpListener>,
-    pending_accept: Option<oneshot::Receiver<io::Result<(TcpStream, SocketAddr)>>>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.
 #[must_use = "streams do nothing unless polled"]
+#[derive(Debug)]
 pub struct Incoming {
     inner: TcpListener,
 }
@@ -35,9 +34,9 @@ impl TcpListener {
     ///
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<TcpListener> {
+    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         let l = try!(mio::net::TcpListener::bind(addr));
-        TcpListener::new(l, handle)
+        TcpListener::new(l, &Handle::default())
     }
 
     /// Attempt to accept a connection and create a new connected `TcpStream` if
@@ -59,50 +58,35 @@ impl TcpListener {
     /// future's task. It's recommended to only call this from the
     /// implementation of a `Future::poll`, if necessary.
     pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        loop {
-            if let Some(mut pending) = self.pending_accept.take() {
-                match pending.poll().expect("shouldn't be canceled") {
-                    Async::NotReady => {
-                        self.pending_accept = Some(pending);
-                        return Err(io::ErrorKind::WouldBlock.into())
-                    },
-                    Async::Ready(r) => return r,
+        let (stream, addr) = self.accept_std()?;
+        let stream = TcpStream::from_std(stream, self.io.handle())?;
+        Ok((stream, addr))
+    }
+
+    /// Attempt to accept a connection and create a new connected `TcpStream` if
+    /// successful.
+    ///
+    /// This function is the asme as `accept` above except that it returns a
+    /// `std::net::TcpStream` instead of a `tokio::net::TcpStream`. This in turn
+    /// can then allow for the TCP stream to be assoiated with a different
+    /// reactor than the one this `TcpListener` is associated with.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic for the same reasons as `accept`, notably if
+    /// called outside the context of a future.
+    pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::ErrorKind::WouldBlock.into())
+        }
+
+        match self.io.get_ref().accept_std() {
+            Ok(pair) => Ok(pair),
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.need_read()?;
                 }
-            }
-
-            if let Async::NotReady = self.io.poll_read() {
-                return Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready"))
-            }
-
-            match self.io.get_ref().accept() {
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
-                        self.io.need_read();
-                    }
-                    return Err(e)
-                },
-                Ok((sock, addr)) => {
-                    // Fast path if we haven't left the event loop
-                    if let Some(handle) = self.io.remote().handle() {
-                        let io = try!(PollEvented::new(sock, &handle));
-                        return Ok((TcpStream { io: io }, addr))
-                    }
-
-                    // If we're off the event loop then send the socket back
-                    // over there to get registered and then we'll get it back
-                    // eventually.
-                    let (tx, rx) = oneshot::channel();
-                    let remote = self.io.remote().clone();
-                    remote.run(move |handle| {
-                        let res = PollEvented::new(sock, handle)
-                            .map(move |io| {
-                                (TcpStream { io: io }, addr)
-                            });
-                        drop(tx.send(res));
-                    });
-                    self.pending_accept = Some(rx);
-                    // continue to polling the `rx` at the beginning of the loop
-                }
+                Err(e)
             }
         }
     }
@@ -134,17 +118,16 @@ impl TcpListener {
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
-    pub fn from_listener(listener: net::TcpListener,
-                         addr: &SocketAddr,
-                         handle: &Handle) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::from_listener(listener, addr));
+    pub fn from_std(listener: net::TcpListener,
+                    handle: &Handle) -> io::Result<TcpListener> {
+        let l = mio::net::TcpListener::from_std(listener)?;
         TcpListener::new(l, handle)
     }
 
     fn new(listener: mio::net::TcpListener, handle: &Handle)
            -> io::Result<TcpListener> {
         let io = try!(PollEvented::new(listener, handle));
-        Ok(TcpListener { io: io, pending_accept: None })
+        Ok(TcpListener { io: io })
     }
 
     /// Returns the local address that this listener is bound to.
@@ -164,42 +147,21 @@ impl TcpListener {
         Incoming { inner: self }
     }
 
+    /// Gets the value of the `IP_TTL` option for this socket.
+    ///
+    /// For more information about this option, see [`set_ttl`].
+    ///
+    /// [`set_ttl`]: #method.set_ttl
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.io.get_ref().ttl()
+    }
+
     /// Sets the value for the `IP_TTL` option on this socket.
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
-    }
-
-    /// Gets the value of the `IP_TTL` option for this socket.
-    ///
-    /// For more information about this option, see [`set_ttl`][link].
-    ///
-    /// [link]: #method.set_ttl
-    pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.get_ref().set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
     }
 }
 
@@ -210,20 +172,23 @@ impl fmt::Debug for TcpListener {
 }
 
 impl Stream for Incoming {
-    type Item = (TcpStream, SocketAddr);
+    type Item = TcpStream;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-        Ok(Async::Ready(Some(try_nb!(self.inner.accept()))))
+        let (socket, _) = try_nb!(self.inner.accept());
+        Ok(Async::Ready(Some(socket)))
     }
 }
 
 /// An I/O object representing a TCP stream connected to a remote endpoint.
 ///
-/// A TCP stream can either be created by connecting to an endpoint or by
-/// accepting a connection from a listener. Inside the stream is access to the
-/// raw underlying I/O object as well as streams for the read/write
-/// notifications on the stream itself.
+/// A TCP stream can either be created by connecting to an endpoint, via the
+/// [`connect`] method, or by [accepting] a connection from a [listener].
+///
+/// [`connect`]: struct.TcpStream.html#method.connect
+/// [accepting]: struct.TcpListener.html#method.accept
+/// [listener]: struct.TcpListener.html
 pub struct TcpStream {
     io: PollEvented<mio::net::TcpStream>,
 }
@@ -231,11 +196,13 @@ pub struct TcpStream {
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct TcpStreamNew {
     inner: TcpStreamNewState,
 }
 
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 enum TcpStreamNewState {
     Waiting(TcpStream),
     Error(io::Error),
@@ -247,12 +214,11 @@ impl TcpStream {
     ///
     /// This function will create a new TCP socket and attempt to connect it to
     /// the `addr` provided. The returned future will be resolved once the
-    /// stream has successfully connected. If an error happens during the
-    /// connection or during the socket creation, that error will be returned to
-    /// the future instead.
-    pub fn connect(addr: &SocketAddr, handle: &Handle) -> TcpStreamNew {
+    /// stream has successfully connected, or it wil return an error if one
+    /// occurs.
+    pub fn connect(addr: &SocketAddr) -> TcpStreamNew {
         let inner = match mio::net::TcpStream::connect(addr) {
-            Ok(tcp) => TcpStream::new(tcp, handle),
+            Ok(tcp) => TcpStream::new(tcp, &Handle::default()),
             Err(e) => TcpStreamNewState::Error(e),
         };
         TcpStreamNew { inner: inner }
@@ -268,12 +234,14 @@ impl TcpStream {
 
     /// Create a new `TcpStream` from a `net::TcpStream`.
     ///
-    /// This function will convert a TCP stream in the standard library to a TCP
-    /// stream ready to be used with the provided event loop handle. The object
-    /// returned is associated with the event loop and ready to perform I/O.
-    pub fn from_stream(stream: net::TcpStream, handle: &Handle)
-                       -> io::Result<TcpStream> {
-        let inner = try!(mio::net::TcpStream::from_stream(stream));
+    /// This function will convert a TCP stream created by the standard library
+    /// to a TCP stream ready to be used with the provided event loop handle.
+    /// The stream returned is associated with the event loop and ready to
+    /// perform I/O.
+    pub fn from_std(stream: net::TcpStream, handle: &Handle)
+        -> io::Result<TcpStream>
+    {
+        let inner = mio::net::TcpStream::from_stream(stream)?;
         Ok(TcpStream {
             io: try!(PollEvented::new(inner, handle)),
         })
@@ -297,15 +265,16 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream,
-                          addr: &SocketAddr,
-                          handle: &Handle)
-                          -> Box<Future<Item=TcpStream, Error=io::Error> + Send> {
-        let state = match mio::net::TcpStream::connect_stream(stream, addr) {
+    pub fn connect_std(stream: net::TcpStream,
+                       addr: &SocketAddr,
+                       handle: &Handle)
+        -> TcpStreamNew
+    {
+        let inner = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
             Err(e) => TcpStreamNewState::Error(e),
         };
-        Box::new(state)
+        TcpStreamNew { inner: inner }
     }
 
     /// Returns the local address that this stream is bound to.
@@ -318,6 +287,27 @@ impl TcpStream {
         self.io.get_ref().peer_addr()
     }
 
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying recv system call.
+    pub fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if let Async::NotReady = self.io.poll_read() {
+            return Err(io::ErrorKind::WouldBlock.into())
+        }
+
+        match self.io.get_ref().peek(buf) {
+            Ok(v) => Ok(v),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_read()?;
+                Err(io::ErrorKind::WouldBlock.into())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function will cause all pending and future I/O on the specified
@@ -325,6 +315,15 @@ impl TcpStream {
     /// documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
+    }
+
+    /// Gets the value of the `TCP_NODELAY` option on this socket.
+    ///
+    /// For more information about this option, see [`set_nodelay`].
+    ///
+    /// [`set_nodelay`]: #method.set_nodelay
+    pub fn nodelay(&self) -> io::Result<bool> {
+        self.io.get_ref().nodelay()
     }
 
     /// Sets the value of the `TCP_NODELAY` option on this socket.
@@ -338,13 +337,13 @@ impl TcpStream {
         self.io.get_ref().set_nodelay(nodelay)
     }
 
-    /// Gets the value of the `TCP_NODELAY` option on this socket.
+    /// Gets the value of the `SO_RCVBUF` option on this socket.
     ///
-    /// For more information about this option, see [`set_nodelay`][link].
+    /// For more information about this option, see [`set_recv_buffer_size`].
     ///
-    /// [link]: #method.set_nodelay
-    pub fn nodelay(&self) -> io::Result<bool> {
-        self.io.get_ref().nodelay()
+    /// [`set_recv_buffer_size`]: #tymethod.set_recv_buffer_size
+    pub fn recv_buffer_size(&self) -> io::Result<usize> {
+        self.io.get_ref().recv_buffer_size()
     }
 
     /// Sets the value of the `SO_RCVBUF` option on this socket.
@@ -355,14 +354,13 @@ impl TcpStream {
         self.io.get_ref().set_recv_buffer_size(size)
     }
 
-    /// Gets the value of the `SO_RCVBUF` option on this socket.
+    /// Gets the value of the `SO_SNDBUF` option on this socket.
     ///
-    /// For more information about this option, see
-    /// [`set_recv_buffer_size`][link].
+    /// For more information about this option, see [`set_send_buffer`].
     ///
-    /// [link]: #tymethod.set_recv_buffer_size
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().recv_buffer_size()
+    /// [`set_send_buffer`]: #tymethod.set_send_buffer
+    pub fn send_buffer_size(&self) -> io::Result<usize> {
+        self.io.get_ref().send_buffer_size()
     }
 
     /// Sets the value of the `SO_SNDBUF` option on this socket.
@@ -373,13 +371,14 @@ impl TcpStream {
         self.io.get_ref().set_send_buffer_size(size)
     }
 
-    /// Gets the value of the `SO_SNDBUF` option on this socket.
+    /// Returns whether keepalive messages are enabled on this socket, and if so
+    /// the duration of time between them.
     ///
-    /// For more information about this option, see [`set_send_buffer`][link].
+    /// For more information about this option, see [`set_keepalive`].
     ///
-    /// [link]: #tymethod.set_send_buffer
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().send_buffer_size()
+    /// [`set_keepalive`]: #tymethod.set_keepalive
+    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
+        self.io.get_ref().keepalive()
     }
 
     /// Sets whether keepalive messages are enabled to be sent on this socket.
@@ -398,14 +397,13 @@ impl TcpStream {
         self.io.get_ref().set_keepalive(keepalive)
     }
 
-    /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the duration of time between them.
+    /// Gets the value of the `IP_TTL` option for this socket.
     ///
-    /// For more information about this option, see [`set_keepalive`][link].
+    /// For more information about this option, see [`set_ttl`].
     ///
-    /// [link]: #tymethod.set_keepalive
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().keepalive()
+    /// [`set_ttl`]: #tymethod.set_ttl
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.io.get_ref().ttl()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -416,44 +414,29 @@ impl TcpStream {
         self.io.get_ref().set_ttl(ttl)
     }
 
-    /// Gets the value of the `IP_TTL` option for this socket.
+    /// Reads the linger duration for this socket by getting the `SO_LINGER`
+    /// option.
     ///
-    /// For more information about this option, see [`set_ttl`][link].
+    /// For more information about this option, see [`set_linger`].
     ///
-    /// [link]: #tymethod.set_ttl
-    pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.get_ref().set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #tymethod.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
-    }
-
-    /// Sets the linger duration of this socket by setting the SO_LINGER option
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_linger(dur)
-    }
-
-    /// reads the linger duration for this socket by getting the SO_LINGER option
+    /// [`set_linger`]: #tymethod.set_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.io.get_ref().linger()
+    }
+
+    /// Sets the linger duration of this socket by setting the `SO_LINGER`
+    /// option.
+    ///
+    /// This option controls the action taken when a stream has unsent messages
+    /// and the stream is closed. If `SO_LINGER` is set, the system
+    /// shall block the process  until it can transmit the data or until the
+    /// time expires.
+    ///
+    /// If `SO_LINGER` is not specified, and the stream is closed, the system
+    /// handles the call in a way that allows the process to continue as quickly
+    /// as possible.
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        self.io.get_ref().set_linger(dur)
     }
 }
 
@@ -518,7 +501,7 @@ impl AsyncRead for TcpStream {
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read();
+                self.io.need_read()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -542,12 +525,7 @@ impl AsyncWrite for TcpStream {
             // `bytes_vec` method.
             static DUMMY: &[u8] = &[0];
             let iovec = <&IoVec>::from(DUMMY);
-            let mut bufs = [
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-                iovec, iovec, iovec, iovec,
-            ];
+            let mut bufs = [iovec; 64];
             let n = buf.bytes_vec(&mut bufs);
             self.io.get_ref().write_bufs(&bufs[..n])
         };
@@ -557,7 +535,7 @@ impl AsyncWrite for TcpStream {
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write();
+                self.io.need_write()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),

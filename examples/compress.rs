@@ -32,7 +32,6 @@ use futures::{Future, Stream, Poll};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::reactor::Core;
 use tokio_io::{AsyncRead, AsyncWrite};
 use flate2::write::GzEncoder;
 
@@ -41,9 +40,7 @@ fn main() {
     // reactor.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     // This is where we're going to offload our computationally heavy work
@@ -53,7 +50,8 @@ fn main() {
 
     // The compress logic will happen in the function below, but everything's
     // still a future! Each client is spawned to concurrently get processed.
-    let server = socket.incoming().for_each(move |(socket, addr)| {
+    let server = socket.incoming().for_each(move |socket| {
+        let addr = socket.peer_addr().unwrap();
         pool.execute(compress(socket, &pool).then(move |result| {
             match result {
                 Ok((r, w)) => println!("{}: compressed {} bytes to {}", addr, r, w),
@@ -64,7 +62,7 @@ fn main() {
         Ok(())
     });
 
-    core.run(server).unwrap();
+    server.wait().unwrap();
 }
 
 /// The main workhorse of this example. This'll compress all data read from
@@ -91,7 +89,7 @@ fn compress(socket: TcpStream, pool: &CpuPool)
     // done to ensure that all gz footers are written.
     let (read, write) = socket.split();
     let write = Count { io: write, amt: 0 };
-    let write = GzEncoder::new(write, flate2::Compression::Best);
+    let write = GzEncoder::new(write, flate2::Compression::best());
     let process = io::copy(read, write).and_then(|(amt, _read, write)| {
         io::shutdown(write).map(move |io| (amt, io.get_ref().amt))
     });

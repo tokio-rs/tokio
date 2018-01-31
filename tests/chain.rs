@@ -10,7 +10,6 @@ use futures::Future;
 use futures::stream::Stream;
 use tokio_io::io::read_to_end;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -21,8 +20,7 @@ macro_rules! t {
 
 #[test]
 fn chain_clients() {
-    let mut l = t!(Core::new());
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let t = thread::spawn(move || {
@@ -34,7 +32,7 @@ fn chain_clients() {
         s3.write_all(b"baz").unwrap();
     });
 
-    let clients = srv.incoming().map(|e| e.0).take(3);
+    let clients = srv.incoming().take(3);
     let copied = clients.collect().and_then(|clients| {
         let mut clients = clients.into_iter();
         let a = clients.next().unwrap();
@@ -44,7 +42,7 @@ fn chain_clients() {
         read_to_end(a.chain(b).chain(c), Vec::new())
     });
 
-    let (_, data) = t!(l.run(copied));
+    let (_, data) = t!(copied.wait());
     t.join().unwrap();
 
     assert_eq!(data, b"foo bar baz");

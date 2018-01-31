@@ -54,7 +54,6 @@ use futures::prelude::*;
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
 use tokio_io::AsyncRead;
 use tokio_io::io::{lines, write_all};
 
@@ -80,13 +79,11 @@ enum Response {
 }
 
 fn main() {
-    // Parse the address we're going to run this server on, create a `Core`, and
-    // set up our TCP listener to accept connections.
+    // Parse the address we're going to run this server on
+    // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let listener = TcpListener::bind(&addr, &handle).expect("failed to bind");
+    let listener = TcpListener::bind(&addr).expect("failed to bind");
     println!("Listening on: {}", addr);
 
     // Create a CpuPool to execute tasks
@@ -103,7 +100,7 @@ fn main() {
         map: Mutex::new(initial_db),
     });
 
-    let done = listener.incoming().for_each(move |(socket, _addr)| {
+    let done = listener.incoming().for_each(move |socket| {
         // As with many other small examples, the first thing we'll do is
         // *split* this TCP stream into two separately owned halves. This'll
         // allow us to work with the read and write halves independently.
@@ -163,7 +160,7 @@ fn main() {
         Ok(())
     });
 
-    core.run(done).unwrap();
+    done.wait().unwrap();
 }
 
 impl Request {

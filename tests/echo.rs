@@ -10,7 +10,6 @@ use std::thread;
 use futures::Future;
 use futures::stream::Stream;
 use tokio::net::TcpListener;
-use tokio::reactor::Core;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 
@@ -25,8 +24,7 @@ macro_rules! t {
 fn echo_server() {
     drop(env_logger::init());
 
-    let mut l = t!(Core::new());
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse()), &l.handle()));
+    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
     let msg = "foo bar baz";
@@ -43,10 +41,10 @@ fn echo_server() {
 
     let clients = srv.incoming();
     let client = clients.into_future().map(|e| e.0.unwrap()).map_err(|e| e.0);
-    let halves = client.map(|s| s.0.split());
+    let halves = client.map(|s| s.split());
     let copied = halves.and_then(|(a, b)| copy(a, b));
 
-    let (amt, _, _) = t!(l.run(copied));
+    let (amt, _, _) = t!(copied.wait());
     t.join().unwrap();
 
     assert_eq!(amt, msg.len() as u64 * 1024);

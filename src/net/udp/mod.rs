@@ -16,13 +16,11 @@ mod frame;
 pub use self::frame::{UdpFramed, UdpCodec};
 
 impl UdpSocket {
-    /// Create a new UDP socket bound to the specified address.
-    ///
-    /// This function will create a new UDP socket and attempt to bind it to the
-    /// `addr` provided. If the result is `Ok`, the socket has successfully bound.
-    pub fn bind(addr: &SocketAddr, handle: &Handle) -> io::Result<UdpSocket> {
+    /// This function will create a new UDP socket and attempt to bind it to
+    /// the `addr` provided.
+    pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
         let udp = try!(mio::net::UdpSocket::bind(addr));
-        UdpSocket::new(udp, handle)
+        UdpSocket::new(udp, &Handle::default())
     }
 
     fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
@@ -32,15 +30,15 @@ impl UdpSocket {
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.
     ///
-    /// The socket given will be registered with the event loop that `handle` is
-    /// associated with. This function requires that `socket` has previously
+    /// The socket given will be registered with the event loop that `handle`
+    /// is associated with. This function requires that `socket` has previously
     /// been bound to an address to work correctly.
     ///
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
-    pub fn from_socket(socket: net::UdpSocket,
-                       handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn from_std(socket: net::UdpSocket,
+                    handle: &Handle) -> io::Result<UdpSocket> {
         let udp = try!(mio::net::UdpSocket::from_socket(socket));
         UdpSocket::new(udp, handle)
     }
@@ -68,19 +66,25 @@ impl UdpSocket {
         frame::new(self, codec)
     }
 
-    /// Returns the local address that this stream is bound to.
+    /// Returns the local address that this socket is bound to.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
     }
 
     /// Connects the UDP socket setting the default destination for send() and
-    /// limiting packets that are read via recv from the address specified in addr.
+    /// limiting packets that are read via recv from the address specified in
+    /// `addr`.
     pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
         self.io.get_ref().connect(*addr)
     }
 
     /// Sends data on the socket to the address previously bound via connect().
     /// On success, returns the number of bytes written.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called outside the context of a future's
+    /// task.
     pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
@@ -90,7 +94,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
+                    self.io.need_write()?;
                 }
                 Err(e)
             }
@@ -99,6 +103,11 @@ impl UdpSocket {
 
     /// Receives data from the socket previously bound with connect().
     /// On success, returns the number of bytes read.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called outside the context of a future's
+    /// task.
     pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
@@ -108,7 +117,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
+                    self.io.need_read()?;
                 }
                 Err(e)
             }
@@ -120,6 +129,11 @@ impl UdpSocket {
     ///
     /// Address type can be any implementer of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called outside the context of a future's
+    /// task.
     pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
@@ -129,7 +143,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
+                    self.io.need_write()?;
                 }
                 Err(e)
             }
@@ -140,7 +154,7 @@ impl UdpSocket {
     /// `buf` provided as a datagram to this socket.
     ///
     /// The returned future will return after data has been written to the
-    /// outbound socket.  The future will resolve to the stream as well as the
+    /// outbound socket. The future will resolve to the stream as well as the
     /// buffer (for reuse if needed).
     ///
     /// Any error which happens during writing will cause both the stream and
@@ -149,16 +163,20 @@ impl UdpSocket {
     ///
     /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which
     /// should be broadly applicable to accepting data which can be converted
-    /// to a slice.  The `Window` struct is also available in this crate to
-    /// provide a different window into a slice if necessary.
-    pub fn send_dgram<T>(self, buf: T, addr: SocketAddr) -> SendDgram<T>
+    /// to a slice.
+    pub fn send_dgram<T>(self, buf: T, addr: &SocketAddr) -> SendDgram<T>
         where T: AsRef<[u8]>,
     {
-        SendDgram(Some((self, buf, addr)))
+        SendDgram::new(self, buf, *addr)
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called outside the context of a future's
+    /// task.
     pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
@@ -168,7 +186,7 @@ impl UdpSocket {
             Ok(n) => Ok(n),
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read();
+                    self.io.need_read()?;
                 }
                 Err(e)
             }
@@ -183,24 +201,22 @@ impl UdpSocket {
     /// amount of data read, and the address the data was received from.
     ///
     /// An error during reading will cause the socket and buffer to get
-    /// destroyed and the socket will be returned.
+    /// destroyed.
     ///
     /// The `buf` parameter here only requires the `AsMut<[u8]>` trait, which
     /// should be broadly applicable to accepting data which can be converted
-    /// to a slice.  The `Window` struct is also available in this crate to
-    /// provide a different window into a slice if necessary.
+    /// to a slice.
     pub fn recv_dgram<T>(self, buf: T) -> RecvDgram<T>
         where T: AsMut<[u8]>,
     {
-        RecvDgram(Some((self, buf)))
+        RecvDgram::new(self, buf)
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
     ///
-    /// For more information about this option, see
-    /// [`set_broadcast`][link].
+    /// For more information about this option, see [`set_broadcast`].
     ///
-    /// [link]: #method.set_broadcast
+    /// [`set_broadcast`]: #method.set_broadcast
     pub fn broadcast(&self) -> io::Result<bool> {
         self.io.get_ref().broadcast()
     }
@@ -215,10 +231,9 @@ impl UdpSocket {
 
     /// Gets the value of the `IP_MULTICAST_LOOP` option for this socket.
     ///
-    /// For more information about this option, see
-    /// [`set_multicast_loop_v4`][link].
+    /// For more information about this option, see [`set_multicast_loop_v4`].
     ///
-    /// [link]: #method.set_multicast_loop_v4
+    /// [`set_multicast_loop_v4`]: #method.set_multicast_loop_v4
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
         self.io.get_ref().multicast_loop_v4()
     }
@@ -226,17 +241,19 @@ impl UdpSocket {
     /// Sets the value of the `IP_MULTICAST_LOOP` option for this socket.
     ///
     /// If enabled, multicast packets will be looped back to the local socket.
-    /// Note that this may not have any affect on IPv6 sockets.
+    ///
+    /// # Note
+    ///
+    /// This may not have any affect on IPv6 sockets.
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
         self.io.get_ref().set_multicast_loop_v4(on)
     }
 
     /// Gets the value of the `IP_MULTICAST_TTL` option for this socket.
     ///
-    /// For more information about this option, see
-    /// [`set_multicast_ttl_v4`][link].
+    /// For more information about this option, see [`set_multicast_ttl_v4`].
     ///
-    /// [link]: #method.set_multicast_ttl_v4
+    /// [`set_multicast_ttl_v4`]: #method.set_multicast_ttl_v4
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
         self.io.get_ref().multicast_ttl_v4()
     }
@@ -247,17 +264,18 @@ impl UdpSocket {
     /// this socket. The default value is 1 which means that multicast packets
     /// don't leave the local network unless explicitly requested.
     ///
-    /// Note that this may not have any affect on IPv6 sockets.
+    /// # Note
+    ///
+    /// This may not have any affect on IPv6 sockets.
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_multicast_ttl_v4(ttl)
     }
 
     /// Gets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
     ///
-    /// For more information about this option, see
-    /// [`set_multicast_loop_v6`][link].
+    /// For more information about this option, see [`set_multicast_loop_v6`].
     ///
-    /// [link]: #method.set_multicast_loop_v6
+    /// [`set_multicast_loop_v6`]: #method.set_multicast_loop_v6
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
         self.io.get_ref().multicast_loop_v6()
     }
@@ -265,16 +283,19 @@ impl UdpSocket {
     /// Sets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
     ///
     /// Controls whether this socket sees the multicast packets it sends itself.
-    /// Note that this may not have any affect on IPv4 sockets.
+    ///
+    /// # Note
+    ///
+    /// This may not have any affect on IPv4 sockets.
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
         self.io.get_ref().set_multicast_loop_v6(on)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
-    /// For more information about this option, see [`set_ttl`][link].
+    /// For more information about this option, see [`set_ttl`].
     ///
-    /// [link]: #method.set_ttl
+    /// [`set_ttl`]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
     }
@@ -313,10 +334,9 @@ impl UdpSocket {
 
     /// Executes an operation of the `IP_DROP_MEMBERSHIP` type.
     ///
-    /// For more information about this option, see
-    /// [`join_multicast_v4`][link].
+    /// For more information about this option, see [`join_multicast_v4`].
     ///
-    /// [link]: #method.join_multicast_v4
+    /// [`join_multicast_v4`]: #method.join_multicast_v4
     pub fn leave_multicast_v4(&self,
                               multiaddr: &Ipv4Addr,
                               interface: &Ipv4Addr) -> io::Result<()> {
@@ -325,35 +345,13 @@ impl UdpSocket {
 
     /// Executes an operation of the `IPV6_DROP_MEMBERSHIP` type.
     ///
-    /// For more information about this option, see
-    /// [`join_multicast_v6`][link].
+    /// For more information about this option, see [`join_multicast_v6`].
     ///
-    /// [link]: #method.join_multicast_v6
+    /// [`join_multicast_v6`]: #method.join_multicast_v6
     pub fn leave_multicast_v6(&self,
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.get_ref().set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
     }
 }
 
@@ -363,11 +361,36 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
+// ===== Future SendDgram =====
+
 /// A future used to write the entire contents of some data to a UDP socket.
 ///
 /// This is created by the `UdpSocket::send_dgram` method.
 #[must_use = "futures do nothing unless polled"]
-pub struct SendDgram<T>(Option<(UdpSocket, T, SocketAddr)>);
+#[derive(Debug)]
+pub struct SendDgram<T> {
+    /// None means future was completed
+    state: Option<SendDgramInner<T>>
+}
+
+/// A struct is used to represent the full info of SendDgram.
+#[derive(Debug)]
+struct SendDgramInner<T> {
+    /// Tx socket
+    socket: UdpSocket,
+    /// The whole buffer will be sent
+    buffer: T,
+    /// Destination addr
+    addr: SocketAddr,
+}
+
+impl<T> SendDgram<T> {
+    /// Create a new future to send UDP Datagram
+    fn new(socket: UdpSocket, buffer: T, addr: SocketAddr) -> SendDgram<T> {
+        let inner = SendDgramInner { socket: socket, buffer: buffer, addr: addr };
+        SendDgram { state: Some(inner) }
+    }
+}
 
 fn incomplete_write(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, reason)
@@ -381,25 +404,48 @@ impl<T> Future for SendDgram<T>
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
         {
-            let (ref mut sock, ref buf, ref addr) =
-                *self.0.as_mut().expect("SendDgram polled after completion");
-            let n = try_nb!(sock.send_to(buf.as_ref(), addr));
-            if n != buf.as_ref().len() {
+            let ref mut inner =
+                self.state.as_mut().expect("SendDgram polled after completion");
+            let n = try_nb!(inner.socket.send_to(inner.buffer.as_ref(), &inner.addr));
+            if n != inner.buffer.as_ref().len() {
                 return Err(incomplete_write("failed to send entire message \
                                              in datagram"))
             }
         }
 
-        let (sock, buf, _addr) = self.0.take().unwrap();
-        Ok(Async::Ready((sock, buf)))
+        let inner = self.state.take().unwrap();
+        Ok(Async::Ready((inner.socket, inner.buffer)))
     }
 }
+
+// ===== Future RecvDgram =====
 
 /// A future used to receive a datagram from a UDP socket.
 ///
 /// This is created by the `UdpSocket::recv_dgram` method.
 #[must_use = "futures do nothing unless polled"]
-pub struct RecvDgram<T>(Option<(UdpSocket, T)>);
+#[derive(Debug)]
+pub struct RecvDgram<T> {
+    /// None means future was completed
+    state: Option<RecvDgramInner<T>>
+}
+
+/// A struct is used to represent the full info of RecvDgram.
+#[derive(Debug)]
+struct RecvDgramInner<T> {
+    /// Rx socket
+    socket: UdpSocket,
+    /// The received data will be put in the buffer
+    buffer: T
+}
+
+impl<T> RecvDgram<T> {
+    /// Create a new future to receive UDP Datagram
+    fn new(socket: UdpSocket, buffer: T) -> RecvDgram<T> {
+        let inner = RecvDgramInner { socket: socket, buffer: buffer };
+        RecvDgram { state: Some(inner) }
+    }
+}
 
 impl<T> Future for RecvDgram<T>
     where T: AsMut<[u8]>,
@@ -409,14 +455,14 @@ impl<T> Future for RecvDgram<T>
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
         let (n, addr) = {
-            let (ref mut socket, ref mut buf) =
-                *self.0.as_mut().expect("RecvDgram polled after completion");
+            let ref mut inner =
+                self.state.as_mut().expect("RecvDgram polled after completion");
 
-            try_nb!(socket.recv_from(buf.as_mut()))
+            try_nb!(inner.socket.recv_from(inner.buffer.as_mut()))
         };
 
-        let (socket, buf) = self.0.take().unwrap();
-        Ok(Async::Ready((socket, buf, n, addr)))
+        let inner = self.state.take().unwrap();
+        Ok(Async::Ready((inner.socket, inner.buffer, n, addr)))
     }
 }
 
