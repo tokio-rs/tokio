@@ -59,7 +59,7 @@ fn echo() {
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = listener.local_addr().unwrap();
     let pool_inner = pool.clone();
-    let srv = listener.incoming().for_each(move |(socket, _)| {
+    let srv = listener.incoming().for_each(move |socket| {
         let (sink, stream) = socket.framed(LineCodec).split();
         pool_inner.execute(sink.send_all(stream).map(|_| ()).map_err(|_| ())).unwrap();
         Ok(())

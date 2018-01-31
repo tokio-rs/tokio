@@ -184,10 +184,10 @@ impl UdpSocket {
     /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which
     /// should be broadly applicable to accepting data which can be converted
     /// to a slice.
-    pub fn send_dgram<T>(self, buf: T, addr: SocketAddr) -> SendDgram<T>
+    pub fn send_dgram<T>(self, buf: T, addr: &SocketAddr) -> SendDgram<T>
         where T: AsRef<[u8]>,
     {
-        SendDgram::new(self, buf, addr)
+        SendDgram::new(self, buf, *addr)
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
@@ -371,27 +371,6 @@ impl UdpSocket {
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.get_ref().set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`].
-    ///
-    /// [`set_only_v6`]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
     }
 }
 

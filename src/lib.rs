@@ -59,7 +59,7 @@
 //!         .expect("unable to bind TCP listener");
 //!
 //!     // Pull out a stream of sockets for incoming connections
-//!     let server = listener.incoming().for_each(|(sock, _)| {
+//!     let server = listener.incoming().for_each(|sock| {
 //!         // Split up the reading and writing parts of the
 //!         // socket.
 //!         let (reader, writer) = sock.split();
@@ -86,7 +86,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/tokio-core/0.1")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.0")]
 #![deny(missing_docs)]
 #![deny(warnings)]
 #![warn(missing_debug_implementations)]

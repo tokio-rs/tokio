@@ -60,12 +60,11 @@ fn main() {
     // connections made to the server).  The return value of the `for_each`
     // method is itself a future representing processing the entire stream of
     // connections, and ends up being our server.
-    let done = socket.incoming().for_each(move |(socket, addr)| {
+    let done = socket.incoming().for_each(move |socket| {
 
         // Once we're inside this closure this represents an accepted client
-        // from our server. The `socket` is the client connection and `addr` is
-        // the remote address of the client (similar to how the standard library
-        // operates).
+        // from our server. The `socket` is the client connection (similar to
+        // how the standard library operates).
         //
         // We just want to copy all data read from the socket back onto the
         // socket itself (e.g. "echo"). We can use the standard `io::copy`
@@ -88,8 +87,8 @@ fn main() {
         // information.
         let msg = amt.then(move |result| {
             match result {
-                Ok((amt, _, _)) => println!("wrote {} bytes to {}", amt, addr),
-                Err(e) => println!("error on {}: {}", addr, e),
+                Ok((amt, _, _)) => println!("wrote {} bytes", amt),
+                Err(e) => println!("error: {}", e),
             }
 
             Ok(())

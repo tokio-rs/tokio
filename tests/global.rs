@@ -22,7 +22,7 @@ fn hammer() {
             let addr = t!(srv.local_addr());
             let mine = TcpStream::connect(&addr);
             let theirs = srv.incoming().into_future()
-                .map(|(s, _)| s.unwrap().0)
+                .map(|(s, _)| s.unwrap())
                 .map_err(|(s, _)| s);
             let (mine, theirs) = t!(blocking(mine.join(theirs)).wait());
 

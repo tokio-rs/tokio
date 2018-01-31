@@ -131,6 +131,33 @@ impl Reactor {
         }
     }
 
+    /// Configures the fallback handle to be returned from `Handle::default`.
+    ///
+    /// The `Handle::default()` function will by default lazily spin up a global
+    /// thread and run a reactor on this global thread. This behavior is not
+    /// always desirable in all applications, however, and sometimes a different
+    /// fallback reactor is desired.
+    ///
+    /// This function will attempt to globally alter the return value of
+    /// `Handle::default()` to return the `handle` specified rather than a
+    /// lazily initialized global thread. If successful then all future calls to
+    /// `Handle::default()` which would otherwise fall back to the global thread
+    /// will instead return a clone of the handle specified.
+    ///
+    /// # Errors
+    ///
+    /// This function may not always succeed in configuring the fallback handle.
+    /// If this function was previously called (or perhaps concurrently called
+    /// on many threads) only the *first* invocation of this function will
+    /// succeed. All other invocations will return an error.
+    ///
+    /// Additionally if the global reactor thread has already been initialized
+    /// then this function will also return an error. (aka if `Handle::default`
+    /// has been called previously in this program).
+    pub fn set_fallback(&self) -> Result<(), SetDefaultError> {
+        set_fallback(self.handle())
+    }
+
     /// Performs one iteration of the event loop, blocking on waiting for events
     /// for at most `max_wait` (forever if `None`).
     ///
@@ -306,42 +333,6 @@ static HANDLE_FALLBACK: AtomicUsize = ATOMIC_USIZE_INIT;
 pub struct SetDefaultError(());
 
 impl Handle {
-    /// Configures the fallback handle to be returned from `Handle::default`.
-    ///
-    /// The `Handle::default()` function will by default lazily spin up a global
-    /// thread and run a reactor on this global thread. This behavior is not
-    /// always desirable in all applications, however, and sometimes a different
-    /// fallback reactor is desired.
-    ///
-    /// This function will attempt to globally alter the return value of
-    /// `Handle::default()` to return the `handle` specified rather than a
-    /// lazily initialized global thread. If successful then all future calls to
-    /// `Handle::default()` which would otherwise fall back to the global thread
-    /// will instead return a clone of the handle specified.
-    ///
-    /// # Errors
-    ///
-    /// This function may not always succeed in configuring the fallback handle.
-    /// If this function was previously called (or perhaps concurrently called
-    /// on many threads) only the *first* invocation of this function will
-    /// succeed. All other invocations will return an error.
-    ///
-    /// Additionally if the global reactor thread has already been initialized
-    /// then this function will also return an error. (aka if `Handle::default`
-    /// has been called previously in this program).
-    pub fn set_fallback(handle: Handle) -> Result<(), SetDefaultError> {
-        unsafe {
-            let val = handle.into_usize();
-            match HANDLE_FALLBACK.compare_exchange(0, val, SeqCst, SeqCst) {
-                Ok(_) => Ok(()),
-                Err(_) => {
-                    drop(Handle::from_usize(val));
-                    Err(SetDefaultError(()))
-                }
-            }
-        }
-    }
-
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///
@@ -394,7 +385,7 @@ impl Default for Handle {
             // that someone was racing with this call to `Handle::default`.
             // They ended up winning so we'll destroy our helper thread (which
             // shuts down the thread) and reload the fallback.
-            if Handle::set_fallback(helper.handle().clone()).is_ok() {
+            if set_fallback(helper.handle().clone()).is_ok() {
                 let ret = helper.handle().clone();
                 helper.forget();
                 return ret
@@ -418,6 +409,19 @@ impl Default for Handle {
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Handle")
+    }
+}
+
+fn set_fallback(handle: Handle) -> Result<(), SetDefaultError> {
+    unsafe {
+        let val = handle.into_usize();
+        match HANDLE_FALLBACK.compare_exchange(0, val, SeqCst, SeqCst) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                drop(Handle::from_usize(val));
+                Err(SetDefaultError(()))
+            }
+        }
     }
 }
 

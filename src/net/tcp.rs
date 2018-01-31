@@ -119,9 +119,8 @@ impl TcpListener {
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
     pub fn from_std(listener: net::TcpListener,
-                    addr: &SocketAddr,
                     handle: &Handle) -> io::Result<TcpListener> {
-        let l = mio::net::TcpListener::from_listener(listener, addr)?;
+        let l = mio::net::TcpListener::from_std(listener)?;
         TcpListener::new(l, handle)
     }
 
@@ -174,27 +173,6 @@ impl TcpListener {
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
     }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`].
-    ///
-    /// [`set_only_v6`]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.get_ref().set_only_v6(only_v6)
-    }
 }
 
 impl fmt::Debug for TcpListener {
@@ -204,11 +182,12 @@ impl fmt::Debug for TcpListener {
 }
 
 impl Stream for Incoming {
-    type Item = (TcpStream, SocketAddr);
+    type Item = TcpStream;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-        Ok(Async::Ready(Some(try_nb!(self.inner.accept()))))
+        let (socket, _) = try_nb!(self.inner.accept());
+        Ok(Async::Ready(Some(socket)))
     }
 }
 
@@ -469,27 +448,6 @@ impl TcpStream {
     /// from this socket.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`].
-    ///
-    /// [`set_only_v6`]: #tymethod.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.get_ref().only_v6()
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.get_ref().set_only_v6(only_v6)
     }
 
     /// Reads the linger duration for this socket by getting the `SO_LINGER`

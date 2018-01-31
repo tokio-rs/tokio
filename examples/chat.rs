@@ -49,7 +49,9 @@ fn main() {
     // Once the same thread executor lands, transition to single threaded.
     let connections = Arc::new(Mutex::new(HashMap::new()));
 
-    let srv = socket.incoming().for_each(move |(stream, addr)| {
+    let srv = socket.incoming().for_each(move |stream| {
+        let addr = stream.peer_addr().unwrap();
+
         println!("New Connection: {}", addr);
         let (reader, writer) = stream.split();
 
