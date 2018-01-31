@@ -138,13 +138,23 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
         }
     };
     unsafe {
+        #[cfg(target_os = "android")]
+        fn flags() -> libc::c_ulong {
+            (libc::SA_RESTART as libc::c_ulong) |
+                libc::SA_SIGINFO |
+                (libc::SA_NOCLDSTOP as libc::c_ulong)
+        }
+        #[cfg(not(target_os = "android"))]
+        fn flags() -> c_int {
+            libc::SA_RESTART |
+                libc::SA_SIGINFO |
+                libc::SA_NOCLDSTOP
+        }
         let mut err = None;
         siginfo.init.call_once(|| {
             let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = handler as usize;
-            new.sa_flags = libc::SA_RESTART |
-                            libc::SA_SIGINFO |
-                            libc::SA_NOCLDSTOP;
+            new.sa_flags = flags();
             if libc::sigaction(signal, &new, &mut *siginfo.prev.get()) != 0 {
                 err = Some(io::Error::last_os_error());
             } else {
