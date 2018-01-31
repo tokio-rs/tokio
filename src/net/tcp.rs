@@ -130,16 +130,6 @@ impl TcpListener {
         Ok(TcpListener { io: io })
     }
 
-    /// Test whether this socket is ready to be read or not.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
     /// Returns the local address that this listener is bound to.
     ///
     /// This can be useful, for example, when binding to port 0 to figure out
@@ -285,32 +275,6 @@ impl TcpStream {
             Err(e) => TcpStreamNewState::Error(e),
         };
         TcpStreamNew { inner: inner }
-    }
-
-    /// Test whether this stream is ready to be read or not.
-    ///
-    /// If the stream is *not* readable then the current task is scheduled to
-    /// get a notification when the stream does become readable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
-    /// Test whether this stream is ready to be written or not.
-    ///
-    /// If the stream is *not* writable then the current task is scheduled to
-    /// get a notification when the stream does become writable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_write(&self) -> Async<()> {
-        self.io.poll_write()
     }
 
     /// Returns the local address that this stream is bound to.
@@ -533,7 +497,7 @@ impl<'a> AsyncRead for &'a TcpStream {
     }
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <TcpStream>::poll_read(self) {
+        if let Async::NotReady = self.io.poll_read() {
             return Ok(Async::NotReady)
         }
         let r = unsafe {
@@ -586,7 +550,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <TcpStream>::poll_write(self) {
+        if let Async::NotReady = self.io.poll_write() {
             return Ok(Async::NotReady)
         }
         let r = {
