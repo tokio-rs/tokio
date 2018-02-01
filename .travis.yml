@@ -4,15 +4,15 @@ sudo: false
 
 matrix:
   include:
-    - rust: 1.21.0
-    - rust: stable
-      - before_deploy: cargo doc --all --no-deps
-    - os: osx
-    - rust: beta
-    - rust: nightly
+  - rust: 1.21.0
+  - rust: stable
+    before_deploy: cargo doc --all --no-deps
+  - os: osx
+  - rust: beta
+  - rust: nightly
 
 script:
-  - cargo test --all
+- cargo test --all
 
 deploy:
   provider:  pages
