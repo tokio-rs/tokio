@@ -29,7 +29,7 @@ use std::io::{Error, ErrorKind, BufReader};
 use std::sync::{Arc, Mutex};
 
 use futures::Future;
-use futures::future::Executor;
+use futures::future::{self, Executor};
 use futures::stream::{self, Stream};
 use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
@@ -134,5 +134,5 @@ fn main() {
     });
 
     // execute server
-    srv.wait().unwrap();
+    future::blocking(srv).wait().unwrap();
 }

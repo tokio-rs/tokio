@@ -7,6 +7,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 use futures::Future;
+use futures::future::blocking;
 use futures::stream::Stream;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -27,7 +28,7 @@ fn connect() {
     });
 
     let stream = TcpStream::connect(&addr);
-    let mine = t!(stream.wait());
+    let mine = t!(blocking(stream).wait());
     let theirs = t.join().unwrap();
 
     assert_eq!(t!(mine.local_addr()), t!(theirs.peer_addr()));
@@ -50,7 +51,7 @@ fn accept() {
         net::TcpStream::connect(&addr).unwrap()
     });
 
-    let (mine, _remaining) = t!(client.wait());
+    let (mine, _remaining) = t!(blocking(client).wait());
     let mine = mine.unwrap();
     let theirs = t.join().unwrap();
 
@@ -75,7 +76,7 @@ fn accept2() {
     }).into_future().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
 
-    let (mine, _remaining) = t!(client.wait());
+    let (mine, _remaining) = t!(blocking(client).wait());
     mine.unwrap();
     t.join().unwrap();
 }

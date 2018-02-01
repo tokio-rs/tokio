@@ -7,6 +7,7 @@ use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
+use futures::future::blocking;
 use tokio::net::{UdpSocket, UdpCodec};
 
 macro_rules! t {
@@ -25,7 +26,7 @@ fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
     {
         let send = SendMessage::new(a, send.clone(), b_addr, b"1234");
         let recv = RecvMessage::new(b, recv.clone(), a_addr, b"1234");
-        let (sendt, received) = t!(send.join(recv).wait());
+        let (sendt, received) = t!(blocking(send.join(recv)).wait());
         a = sendt;
         b = received;
     }
@@ -33,7 +34,7 @@ fn send_messages<S: SendFn + Clone, R: RecvFn + Clone>(send: S, recv: R) {
     {
         let send = SendMessage::new(a, send, b_addr, b"");
         let recv = RecvMessage::new(b, recv, a_addr, b"");
-        t!(send.join(recv).wait());
+        t!(blocking(send.join(recv)).wait());
     }
 }
 
@@ -172,7 +173,7 @@ fn send_dgrams() {
     {
         let send = a.send_dgram(&b"4321"[..], &b_addr);
         let recv = b.recv_dgram(&mut buf[..]);
-        let (sendt, received) = t!(send.join(recv).wait());
+        let (sendt, received) = t!(blocking(send.join(recv)).wait());
         assert_eq!(received.2, 4);
         assert_eq!(&received.1[..4], b"4321");
         a = sendt.0;
@@ -182,7 +183,7 @@ fn send_dgrams() {
     {
         let send = a.send_dgram(&b""[..], &b_addr);
         let recv = b.recv_dgram(&mut buf[..]);
-        let received = t!(send.join(recv).wait()).1;
+        let received = t!(blocking(send.join(recv)).wait()).1;
         assert_eq!(received.2, 0);
     }
 }
@@ -225,7 +226,7 @@ fn send_framed() {
 
         let send = a.send(&b"4567"[..]);
         let recv = b.into_future().map_err(|e| e.0);
-        let (sendt, received) = t!(send.join(recv).wait());
+        let (sendt, received) = t!(blocking(send.join(recv)).wait());
         assert_eq!(received.0, Some(()));
 
         a_soc = sendt.into_inner();
@@ -238,7 +239,7 @@ fn send_framed() {
 
         let send = a.send(&b""[..]);
         let recv = b.into_future().map_err(|e| e.0);
-        let received = t!(send.join(recv).wait()).1;
+        let received = t!(blocking(send.join(recv)).wait()).1;
         assert_eq!(received.0, Some(()));
     }
 }

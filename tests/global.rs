@@ -3,6 +3,7 @@ extern crate tokio;
 
 use std::thread;
 
+use futures::future::blocking;
 use futures::prelude::*;
 use tokio::net::{TcpStream, TcpListener};
 
@@ -23,7 +24,7 @@ fn hammer() {
             let theirs = srv.incoming().into_future()
                 .map(|(s, _)| s.unwrap())
                 .map_err(|(s, _)| s);
-            let (mine, theirs) = t!(mine.join(theirs).wait());
+            let (mine, theirs) = t!(blocking(mine.join(theirs)).wait());
 
             assert_eq!(t!(mine.local_addr()), t!(theirs.peer_addr()));
             assert_eq!(t!(theirs.local_addr()), t!(mine.peer_addr()));

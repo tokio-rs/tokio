@@ -4,7 +4,7 @@ extern crate futures;
 use std::thread;
 use std::net;
 
-use futures::future;
+use futures::{future, stream};
 use futures::prelude::*;
 use futures::sync::oneshot;
 use tokio::net::TcpListener;
@@ -17,7 +17,7 @@ fn tcp_doesnt_block() {
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let listener = TcpListener::from_std(listener, &handle).unwrap();
     drop(core);
-    assert!(listener.incoming().wait().next().unwrap().is_err());
+    assert!(stream::blocking(listener.incoming()).next().unwrap().is_err());
 }
 
 #[test]
@@ -34,9 +34,9 @@ fn drop_wakes() {
             drop(tx);
             future::ok(())
         });
-        assert!(new_socket.join(drop_tx).wait().is_err());
+        assert!(future::blocking(new_socket.join(drop_tx)).wait().is_err());
     });
-    drop(rx.wait());
+    drop(future::blocking(rx).wait());
     drop(core);
     t.join().unwrap();
 }

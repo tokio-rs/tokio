@@ -7,6 +7,7 @@ use std::thread;
 use std::io::{Write, Read};
 
 use futures::Future;
+use futures::future::blocking;
 use futures::stream::Stream;
 use tokio_io::io::read_to_end;
 use tokio::net::TcpListener;
@@ -42,7 +43,7 @@ fn chain_clients() {
         read_to_end(a.chain(b).chain(c), Vec::new())
     });
 
-    let (_, data) = t!(copied.wait());
+    let (_, data) = t!(blocking(copied).wait());
     t.join().unwrap();
 
     assert_eq!(data, b"foo bar baz");

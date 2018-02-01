@@ -8,6 +8,7 @@ use std::thread;
 use std::io::{Read, Write, BufReader, BufWriter};
 
 use futures::Future;
+use futures::future::blocking;
 use futures::stream::Stream;
 use tokio_io::io::copy;
 use tokio::net::TcpListener;
@@ -54,7 +55,7 @@ fn echo_server() {
         copy(a, b)
     });
 
-    let (amt, _, _) = t!(copied.wait());
+    let (amt, _, _) = t!(blocking(copied).wait());
     let (expected, t2) = t.join().unwrap();
     let actual = t2.join().unwrap();
 

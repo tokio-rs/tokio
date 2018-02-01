@@ -28,7 +28,7 @@ use std::io::{self, Read, Write};
 
 use futures::stream::Stream;
 use futures::{Future, Poll};
-use futures::future::Executor;
+use futures::future::{self, Executor};
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -92,7 +92,7 @@ fn main() {
 
         Ok(())
     });
-    done.wait().unwrap();
+    future::blocking(done).wait().unwrap();
 }
 
 // This is a custom type used to have a custom implementation of the

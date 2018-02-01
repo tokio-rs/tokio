@@ -24,7 +24,7 @@ use std::net::SocketAddr;
 use std::thread;
 
 use futures::prelude::*;
-use futures::future::Executor;
+use futures::future::{self, Executor};
 use futures::sync::mpsc;
 use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
@@ -61,7 +61,7 @@ fn main() {
         next = (next + 1) % channels.len();
         Ok(())
     });
-    srv.wait().unwrap();
+    future::blocking(srv).wait().unwrap();
 }
 
 fn worker(rx: mpsc::UnboundedReceiver<TcpStream>) {
@@ -88,5 +88,5 @@ fn worker(rx: mpsc::UnboundedReceiver<TcpStream>) {
 
         Ok(())
     });
-    done.wait().unwrap();
+    future::blocking(done).wait().unwrap();
 }

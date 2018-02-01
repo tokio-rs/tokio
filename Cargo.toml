@@ -52,4 +52,5 @@ serde_json = "1.0"
 time = "0.1"
 
 [patch.crates-io]
+futures = { git = "https://github.com/rust-lang-nursery/futures-rs", branch = "tokio-reform" }
 mio = { git = "https://github.com/carllerche/mio" }

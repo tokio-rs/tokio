@@ -31,8 +31,7 @@ use std::net::{self, SocketAddr};
 use std::thread;
 
 use bytes::BytesMut;
-use futures::future::Executor;
-use futures::future;
+use futures::future::{self, Executor};
 use futures::sync::mpsc;
 use futures::{Stream, Future, Sink};
 use futures_cpupool::CpuPool;
@@ -91,7 +90,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         })).unwrap();
         Ok(())
     });
-    done.wait().unwrap();
+    future::blocking(done).wait().unwrap();
 }
 
 /// "Server logic" is implemented in this function.

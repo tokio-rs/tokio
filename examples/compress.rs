@@ -29,7 +29,7 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::{Future, Stream, Poll};
-use futures::future::Executor;
+use futures::future::{self, Executor};
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -62,7 +62,7 @@ fn main() {
         Ok(())
     });
 
-    server.wait().unwrap();
+    future::blocking(server).wait().unwrap();
 }
 
 /// The main workhorse of this example. This'll compress all data read from
