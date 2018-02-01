@@ -18,6 +18,13 @@ the rest of the tokio crates.
 """
 categories = ["asynchronous"]
 
+[workspace]
+
+members = [
+  "./",
+  "tokio-io",
+]
+
 [badges]
 travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "alexcrichton/tokio" }
