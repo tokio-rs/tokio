@@ -20,7 +20,7 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [`TcpStream`]: ../net/struct.TcpStream.html
 
-use std::fmt;
+use std::{fmt, usize};
 use std::io::{self, ErrorKind};
 use std::mem;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -89,6 +89,9 @@ enum Direction {
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_START: usize = 1;
+
+// Kind of arbitrary, but this reserves some token space for later usage.
+const MAX_SOURCES: usize = usize::MAX >> 4;
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -280,13 +283,18 @@ impl Inner {
     fn add_source(&self, source: &Evented)
         -> io::Result<usize>
     {
+        let mut io_dispatch = self.io_dispatch.write().unwrap();
+
+        if io_dispatch.len() == MAX_SOURCES {
+            return Err(io::Error::new(io::ErrorKind::Other, "reactor at max registered I/O resources"));
+        }
+
         // Acquire a write lock
-        let key = self.io_dispatch.write().unwrap()
-            .insert(ScheduledIo {
-                readiness: AtomicUsize::new(0),
-                reader: AtomicTask::new(),
-                writer: AtomicTask::new(),
-            });
+        let key = io_dispatch.insert(ScheduledIo {
+            readiness: AtomicUsize::new(0),
+            reader: AtomicTask::new(),
+            writer: AtomicTask::new(),
+        });
 
         try!(self.io.register(source,
                               mio::Token(TOKEN_START + key),
