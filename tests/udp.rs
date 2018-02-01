@@ -48,14 +48,14 @@ fn send_and_recv() {
 }
 
 trait SendFn {
-    fn send(&self, &UdpSocket, &[u8], &SocketAddr) -> Result<usize, io::Error>;
+    fn send(&self, &mut UdpSocket, &[u8], &SocketAddr) -> Result<usize, io::Error>;
 }
 
 #[derive(Debug, Clone)]
 struct SendTo {}
 
 impl SendFn for SendTo {
-    fn send(&self, socket: &UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
+    fn send(&self, socket: &mut UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
         socket.send_to(buf, addr)
     }
 }
@@ -64,7 +64,7 @@ impl SendFn for SendTo {
 struct Send {}
 
 impl SendFn for Send {
-    fn send(&self, socket: &UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
+    fn send(&self, socket: &mut UdpSocket, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error> {
         socket.connect(addr).expect("could not connect");
         socket.send(buf)
     }
@@ -93,7 +93,7 @@ impl<S: SendFn> Future for SendMessage<S> {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
-        let n = try_nb!(self.send.send(self.socket.as_ref().unwrap(), &self.data[..], &self.addr));
+        let n = try_nb!(self.send.send(self.socket.as_mut().unwrap(), &self.data[..], &self.addr));
 
         assert_eq!(n, self.data.len());
 
@@ -102,14 +102,14 @@ impl<S: SendFn> Future for SendMessage<S> {
 }
 
 trait RecvFn {
-    fn recv(&self, &UdpSocket, &mut [u8], &SocketAddr) -> Result<usize, io::Error>;
+    fn recv(&self, &mut UdpSocket, &mut [u8], &SocketAddr) -> Result<usize, io::Error>;
 }
 
 #[derive(Debug, Clone)]
 struct RecvFrom {}
 
 impl RecvFn for RecvFrom {
-    fn recv(&self, socket: &UdpSocket, buf: &mut [u8],
+    fn recv(&self, socket: &mut UdpSocket, buf: &mut [u8],
             expected_addr: &SocketAddr) -> Result<usize, io::Error> {
         socket.recv_from(buf).map(|(s, addr)| {
             assert_eq!(addr, *expected_addr);
@@ -122,7 +122,7 @@ impl RecvFn for RecvFrom {
 struct Recv {}
 
 impl RecvFn for Recv {
-    fn recv(&self, socket: &UdpSocket, buf: &mut [u8], _: &SocketAddr) -> Result<usize, io::Error> {
+    fn recv(&self, socket: &mut UdpSocket, buf: &mut [u8], _: &SocketAddr) -> Result<usize, io::Error> {
         socket.recv(buf)
     }
 }
@@ -152,7 +152,7 @@ impl<R: RecvFn> Future for RecvMessage<R> {
 
     fn poll(&mut self) -> Poll<UdpSocket, io::Error> {
         let mut buf = vec![0u8; 10 + self.expected_data.len() * 10];
-        let n = try_nb!(self.recv.recv(&self.socket.as_ref().unwrap(), &mut buf[..],
+        let n = try_nb!(self.recv.recv(&mut self.socket.as_mut().unwrap(), &mut buf[..],
                                        &self.expected_addr));
 
         assert_eq!(n, self.expected_data.len());

@@ -21,7 +21,7 @@ extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::env;
 use std::net::{Shutdown, SocketAddr};
 use std::io::{self, Read, Write};
@@ -60,9 +60,9 @@ fn main() {
             //
             // As a result, we wrap up our client/server manually in arcs and
             // use the impls below on our custom `MyTcpStream` type.
-            let client_reader = MyTcpStream(Arc::new(client));
+            let client_reader = MyTcpStream(Arc::new(Mutex::new(client)));
             let client_writer = client_reader.clone();
-            let server_reader = MyTcpStream(Arc::new(server));
+            let server_reader = MyTcpStream(Arc::new(Mutex::new(server)));
             let server_writer = server_reader.clone();
 
             // Copy the data (in parallel) between the client and the server.
@@ -99,17 +99,17 @@ fn main() {
 // `AsyncWrite::shutdown` method which actually calls `TcpStream::shutdown` to
 // notify the remote end that we're done writing.
 #[derive(Clone)]
-struct MyTcpStream(Arc<TcpStream>);
+struct MyTcpStream(Arc<Mutex<TcpStream>>);
 
 impl Read for MyTcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&*self.0).read(buf)
+        self.0.lock().unwrap().read(buf)
     }
 }
 
 impl Write for MyTcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&*self.0).write(buf)
+        self.0.lock().unwrap().write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -121,7 +121,7 @@ impl AsyncRead for MyTcpStream {}
 
 impl AsyncWrite for MyTcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        try!(self.0.shutdown(Shutdown::Write));
+        try!(self.0.lock().unwrap().shutdown(Shutdown::Write));
         Ok(().into())
     }
 }

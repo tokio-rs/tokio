@@ -85,10 +85,11 @@ impl UdpSocket {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+    pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().send(buf) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -107,10 +108,11 @@ impl UdpSocket {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().recv(buf) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -122,43 +124,21 @@ impl UdpSocket {
         }
     }
 
-    /// Test whether this socket is ready to be read or not.
-    ///
-    /// If the socket is *not* readable then the current task is scheduled to
-    /// get a notification when the socket does become readable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
-    /// Test whether this socket is ready to be written to or not.
-    ///
-    /// If the socket is *not* writable then the current task is scheduled to
-    /// get a notification when the socket does become writable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn poll_write(&self) -> Async<()> {
-        self.io.poll_write()
-    }
-
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
+    /// Address type can be any implementer of `ToSocketAddrs` trait. See its
+    /// documentation for concrete examples.
+    ///
     /// # Panics
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         if let Async::NotReady = self.io.poll_write() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().send_to(buf, target) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -197,10 +177,11 @@ impl UdpSocket {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         if let Async::NotReady = self.io.poll_read() {
             return Err(io::ErrorKind::WouldBlock.into())
         }
+
         match self.io.get_ref().recv_from(buf) {
             Ok(n) => Ok(n),
             Err(e) => {
@@ -423,8 +404,8 @@ impl<T> Future for SendDgram<T>
 
     fn poll(&mut self) -> Poll<(UdpSocket, T), io::Error> {
         {
-            let ref inner =
-                self.state.as_ref().expect("SendDgram polled after completion");
+            let ref mut inner =
+                self.state.as_mut().expect("SendDgram polled after completion");
             let n = try_nb!(inner.socket.send_to(inner.buffer.as_ref(), &inner.addr));
             if n != inner.buffer.as_ref().len() {
                 return Err(incomplete_write("failed to send entire message \
