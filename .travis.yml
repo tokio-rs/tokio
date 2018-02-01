@@ -1,3 +1,4 @@
+---
 language: rust
 sudo: false
 
@@ -5,18 +6,24 @@ matrix:
   include:
     - rust: 1.21.0
     - rust: stable
+      - before_deploy: cargo doc --all --no-deps
     - os: osx
     - rust: beta
     - rust: nightly
-      before_script:
-        - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
-      script:
-        - cargo doc --no-deps --all-features
-      after_success:
-        - travis-cargo --only nightly doc-upload
 
 script:
-  - cargo test
+  - cargo test --all
+
+deploy:
+  provider:  pages
+  skip_cleanup: true
+  github_token: $GH_TOKEN
+  target_branch: gh-pages
+  local_dir: target/doc
+  on:
+    branch: master
+    repo: tokio-rs/tokio
+    rust: stable
 
 env:
   global:
