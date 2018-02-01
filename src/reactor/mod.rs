@@ -286,7 +286,7 @@ impl Inner {
         let mut io_dispatch = self.io_dispatch.write().unwrap();
 
         if io_dispatch.len() == MAX_SOURCES {
-            return Err(io::Error::new(io::ErrorKind::Other, "max registered I/O resources"));
+            return Err(io::Error::new(io::ErrorKind::Other, "reactor at max registered I/O resources"));
         }
 
         // Acquire a write lock
