@@ -9,7 +9,7 @@ A work-in-progress rearchitecting of the [tokio-core] crate in line with
 [![Build Status](https://travis-ci.org/tokio-rs/tokio.svg?branch=new-crate)](https://travis-ci.org/tokio-rs/tokio)
 [![Build status](https://ci.appveyor.com/api/projects/status/uxiinkgipvy6ehrj/branch/new-crate?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio/branch/new-crate)
 
-[Documentation](https://tokio-rs.github.io/tokio)
+[Documentation](https://tokio-rs.github.io/tokio/tokio)
 
 ## Usage
 
