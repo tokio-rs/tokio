@@ -195,7 +195,7 @@ mod udp {
         // All bytes from `stdin` will go to the `addr` specified in our
         // argument list. Like with TCP this is spawned concurrently
         pool.execute(stdin.map(move |chunk| {
-            (addr, chunk)
+            (chunk, addr)
         }).forward(sink).then(|result| {
             if let Err(e) = result {
                 panic!("failed to write to socket: {}", e)
@@ -205,7 +205,7 @@ mod udp {
 
         // With UDP we could receive data from any source, so filter out
         // anything coming from a different address
-        Box::new(stream.filter_map(move |(src, chunk)| {
+        Box::new(stream.filter_map(move |(chunk, src)| {
             if src == addr {
                 Some(chunk.into())
             } else {
@@ -217,17 +217,17 @@ mod udp {
     struct Bytes;
 
     impl UdpCodec for Bytes {
-        type In = (SocketAddr, Vec<u8>);
-        type Out = (SocketAddr, Vec<u8>);
+        type In = Vec<u8>;
+        type Out = Vec<u8>;
         type Error = io::Error;
 
-        fn decode(&mut self, addr: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
-            Ok((*addr, buf.to_vec()))
+        fn decode(&mut self, buf: &[u8]) -> io::Result<Self::In> {
+            Ok(buf.to_vec())
         }
 
-        fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> io::Result<SocketAddr> {
+        fn encode(&mut self, buf: Self::Out, into: &mut Vec<u8>) -> io::Result<()> {
             into.extend(buf);
-            Ok(addr)
+            Ok(())
         }
     }
 }

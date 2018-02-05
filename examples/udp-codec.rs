@@ -22,17 +22,17 @@ use tokio::net::{UdpSocket, UdpCodec};
 pub struct LineCodec;
 
 impl UdpCodec for LineCodec {
-    type In = (SocketAddr, Vec<u8>);
-    type Out = (SocketAddr, Vec<u8>);
+    type In = Vec<u8>;
+    type Out = Vec<u8>;
     type Error = io::Error;
 
-    fn decode(&mut self, addr: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
-        Ok((*addr, buf.to_vec()))
+    fn decode(&mut self, buf: &[u8]) -> io::Result<Self::In> {
+        Ok(buf.to_vec())
     }
 
-    fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> io::Result<SocketAddr> {
+    fn encode(&mut self, buf: Self::Out, into: &mut Vec<u8>) -> io::Result<()> {
         into.extend(buf);
-        Ok(addr)
+        Ok(())
     }
 }
 
@@ -56,21 +56,21 @@ fn main() {
     // Start off by sending a ping from a to b, afterwards we just print out
     // what they send us and continually send pings
     // let pings = stream::iter((0..5).map(Ok));
-    let a = a_sink.send((b_addr, b"PING".to_vec())).and_then(|a_sink| {
+    let a = a_sink.send((b"PING".to_vec(), b_addr)).and_then(|a_sink| {
         let mut i = 0;
-        let a_stream = a_stream.take(4).map(move |(addr, msg)| {
+        let a_stream = a_stream.take(4).map(move |(msg, addr)| {
             i += 1;
             println!("[a] recv: {}", String::from_utf8_lossy(&msg));
-            (addr, format!("PING {}", i).into_bytes())
+            (format!("PING {}", i).into_bytes(), addr)
         });
         a_sink.send_all(a_stream)
     });
 
     // The second client we have will receive the pings from `a` and then send
     // back pongs.
-    let b_stream = b_stream.map(|(addr, msg)| {
+    let b_stream = b_stream.map(|(msg, addr)| {
         println!("[b] recv: {}", String::from_utf8_lossy(&msg));
-        (addr, b"PONG".to_vec())
+        (b"PONG".to_vec(), addr)
     });
     let b = b_sink.send_all(b_stream);
 
