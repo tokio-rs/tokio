@@ -47,7 +47,7 @@ pub trait UdpCodec {
     /// Finally, if the bytes in the buffer are malformed then an error is
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
-    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> Result<Self::In, Self::Error>;
+    fn decode(&mut self, buf: &[u8]) -> Result<Self::In, Self::Error>;
 
     /// Encodes a frame into the buffer provided.
     ///
@@ -57,7 +57,7 @@ pub trait UdpCodec {
     ///
     /// The encode method also determines the destination to which the buffer
     /// should be directed, which will be returned as a `SocketAddr`.
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> Result<SocketAddr, Self::Error>;
+    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> Result<(), Self::Error>;
 }
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
@@ -77,23 +77,23 @@ pub struct UdpFramed<C> {
 }
 
 impl<C: UdpCodec> Stream for UdpFramed<C> {
-    type Item = C::In;
+    type Item = (C::In, SocketAddr);
     type Error = C::Error;
 
-    fn poll(&mut self) -> Poll<Option<C::In>, C::Error> {
+    fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
         let (n, addr) = try_nb!(self.socket.recv_from(&mut self.rd));
         trace!("received {} bytes, decoding", n);
-        let frame = self.codec.decode(&addr, &self.rd[..n])?;
+        let frame = self.codec.decode(&self.rd[..n])?;
         trace!("frame decoded from buffer");
-        Ok(Async::Ready(Some(frame)))
+        Ok(Async::Ready(Some((frame, addr))))
     }
 }
 
 impl<C: UdpCodec> Sink for UdpFramed<C> {
-    type SinkItem = C::Out;
+    type SinkItem = (C::Out, SocketAddr);
     type SinkError = C::Error;
 
-    fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, C::Error> {
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         trace!("sending frame");
 
         if !self.flushed {
@@ -103,7 +103,9 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
             }
         }
 
-        self.out_addr = self.codec.encode(item, &mut self.wr)?;
+        let (frame, out_addr) = item;
+        self.codec.encode(frame, &mut self.wr)?;
+        self.out_addr = out_addr;
         self.flushed = false;
         trace!("frame encoded; length={}", self.wr.len());
 
