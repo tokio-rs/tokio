@@ -197,13 +197,13 @@ pub struct TcpStream {
 /// when the stream is connected.
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
-pub struct TcpStreamNew {
-    inner: TcpStreamNewState,
+pub struct ConnectFuture {
+    inner: ConnectFutureState,
 }
 
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
-enum TcpStreamNewState {
+enum ConnectFutureState {
     Waiting(TcpStream),
     Error(io::Error),
     Empty,
@@ -216,19 +216,19 @@ impl TcpStream {
     /// the `addr` provided. The returned future will be resolved once the
     /// stream has successfully connected, or it wil return an error if one
     /// occurs.
-    pub fn connect(addr: &SocketAddr) -> TcpStreamNew {
+    pub fn connect(addr: &SocketAddr) -> ConnectFuture {
         let inner = match mio::net::TcpStream::connect(addr) {
             Ok(tcp) => TcpStream::new(tcp, &Handle::default()),
-            Err(e) => TcpStreamNewState::Error(e),
+            Err(e) => ConnectFutureState::Error(e),
         };
-        TcpStreamNew { inner: inner }
+        ConnectFuture { inner: inner }
     }
 
     fn new(connected_stream: mio::net::TcpStream, handle: &Handle)
-           -> TcpStreamNewState {
+           -> ConnectFutureState {
         match PollEvented::new(connected_stream, handle) {
-            Ok(io) => TcpStreamNewState::Waiting(TcpStream { io: io }),
-            Err(e) => TcpStreamNewState::Error(e),
+            Ok(io) => ConnectFutureState::Waiting(TcpStream { io: io }),
+            Err(e) => ConnectFutureState::Error(e),
         }
     }
 
@@ -268,13 +268,13 @@ impl TcpStream {
     pub fn connect_std(stream: net::TcpStream,
                        addr: &SocketAddr,
                        handle: &Handle)
-        -> TcpStreamNew
+        -> ConnectFuture
     {
         let inner = match mio::net::TcpStream::connect_stream(stream, addr) {
             Ok(tcp) => TcpStream::new(tcp, handle),
-            Err(e) => TcpStreamNewState::Error(e),
+            Err(e) => ConnectFutureState::Error(e),
         };
-        TcpStreamNew { inner: inner }
+        ConnectFuture { inner: inner }
     }
 
     /// Returns the local address that this stream is bound to.
@@ -549,7 +549,7 @@ impl fmt::Debug for TcpStream {
     }
 }
 
-impl Future for TcpStreamNew {
+impl Future for ConnectFuture {
     type Item = TcpStream;
     type Error = io::Error;
 
@@ -558,22 +558,22 @@ impl Future for TcpStreamNew {
     }
 }
 
-impl Future for TcpStreamNewState {
+impl Future for ConnectFutureState {
     type Item = TcpStream;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
         {
             let stream = match *self {
-                TcpStreamNewState::Waiting(ref mut s) => s,
-                TcpStreamNewState::Error(_) => {
-                    let e = match mem::replace(self, TcpStreamNewState::Empty) {
-                        TcpStreamNewState::Error(e) => e,
+                ConnectFutureState::Waiting(ref mut s) => s,
+                ConnectFutureState::Error(_) => {
+                    let e = match mem::replace(self, ConnectFutureState::Empty) {
+                        ConnectFutureState::Error(e) => e,
                         _ => panic!(),
                     };
                     return Err(e)
                 }
-                TcpStreamNewState::Empty => panic!("can't poll TCP stream twice"),
+                ConnectFutureState::Empty => panic!("can't poll TCP stream twice"),
             };
 
             // Once we've connected, wait for the stream to be writable as
@@ -589,8 +589,8 @@ impl Future for TcpStreamNewState {
                 return Err(e)
             }
         }
-        match mem::replace(self, TcpStreamNewState::Empty) {
-            TcpStreamNewState::Waiting(stream) => Ok(Async::Ready(stream)),
+        match mem::replace(self, ConnectFutureState::Empty) {
+            ConnectFutureState::Waiting(stream) => Ok(Async::Ready(stream)),
             _ => panic!(),
         }
     }

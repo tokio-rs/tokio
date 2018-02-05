@@ -6,7 +6,7 @@
 //! # TCP
 //!
 //! Connecting to an address, via TCP, can be done using [`TcpStream`]'s
-//! [`connect`] method, which returns [`TcpStreamNew`]. `TcpStreamNew`
+//! [`connect`] method, which returns [`ConnectFuture`]. `ConnectFuture`
 //! implements a future which returns a `TcpStream`.
 //!
 //! To listen on an address [`TcpListener`] can be used. `TcpListener`'s
@@ -16,7 +16,7 @@
 //!
 //! [`TcpStream`]: struct.TcpStream.html
 //! [`connect`]: struct.TcpStream.html#method.connect
-//! [`TcpStreamNew`]: struct.TcpStreamNew.html
+//! [`ConnectFuture`]: struct.ConnectFuture.html
 //! [`TcpListener`]: struct.TcpListener.html
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
@@ -41,6 +41,6 @@
 mod tcp;
 mod udp;
 
-pub use self::tcp::{TcpStream, TcpStreamNew};
+pub use self::tcp::{TcpStream, ConnectFuture};
 pub use self::tcp::{TcpListener, Incoming};
 pub use self::udp::{UdpSocket, UdpCodec, UdpFramed, SendDgram, RecvDgram};
