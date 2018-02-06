@@ -3,6 +3,7 @@ extern crate bytes;
 extern crate futures;
 
 use futures::{Stream, Future};
+use futures::future::blocking;
 use std::io::{self, Read};
 use tokio_io::codec::{Framed, FramedParts, Decoder, Encoder};
 use tokio_io::AsyncRead;
@@ -58,13 +59,15 @@ fn can_read_from_existing_buf() {
     };
     let framed = Framed::from_parts(parts, U32Codec);
 
-    let num = framed
+    let read_future = framed
         .into_future()
         .map(|(first_num, _)| {
             first_num.unwrap()
         })
+        .map_err(|e| e.0);
+
+    let num = blocking(read_future)
         .wait()
-        .map_err(|e| e.0)
         .unwrap();
     assert_eq!(num, 42);
 }
@@ -94,4 +97,3 @@ fn external_buf_does_not_shrink() {
 
     assert_eq!(readbuf.capacity(), INITIAL_CAPACITY * 2);
 }
-
