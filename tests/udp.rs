@@ -2,12 +2,17 @@ extern crate futures;
 extern crate tokio;
 #[macro_use]
 extern crate tokio_io;
+extern crate bytes;
+extern crate env_logger;
 
 use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
-use tokio::net::{UdpSocket, UdpCodec};
+
+use tokio::net::UdpSocket;
+use tokio_io::codec::{Encoder, Decoder};
+use bytes::{BytesMut, BufMut};
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -189,23 +194,31 @@ fn send_dgrams() {
 
 pub struct ByteCodec;
 
-impl UdpCodec for ByteCodec {
-    type In = Vec<u8>;
-    type Out = Vec<u8>;
+impl Decoder for ByteCodec {
+    type Item = Vec<u8>;
     type Error = io::Error;
 
-    fn decode(&mut self, buf: &[u8]) -> io::Result<Self::In> {
-        Ok(buf.to_vec())
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Vec<u8>>, io::Error> {
+        let len = buf.len();
+        Ok(Some(buf.split_to(len).to_vec()))
     }
+}
 
-    fn encode(&mut self, buf: Self::Out, into: &mut Vec<u8>) -> io::Result<()> {
-        into.extend(buf);
+impl Encoder for ByteCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
+
+    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
+        buf.reserve(data.len());
+        buf.put(data);
         Ok(())
     }
 }
 
 #[test]
 fn send_framed() {
+    drop(env_logger::init());
+
     let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
     let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
     let a_addr = t!(a_soc.local_addr());
