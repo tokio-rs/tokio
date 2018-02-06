@@ -51,7 +51,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use futures::prelude::*;
-use futures::future::{self, Executor};
+use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::TcpListener;
 use tokio_io::AsyncRead;
@@ -160,7 +160,7 @@ fn main() {
         Ok(())
     });
 
-    future::blocking(done).wait().unwrap();
+    done.wait().unwrap();
 }
 
 impl Request {

@@ -8,7 +8,6 @@ use std::net::TcpStream;
 use std::thread;
 
 use futures::Future;
-use futures::future::blocking;
 use futures::stream::Stream;
 use tokio_io::io::copy;
 use tokio_io::AsyncRead;
@@ -49,7 +48,7 @@ fn echo_server() {
                     .take(2)
                     .collect();
 
-    t!(blocking(future).wait());
+    t!(future.wait());
 
     t.join().unwrap();
 }

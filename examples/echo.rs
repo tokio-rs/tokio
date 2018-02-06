@@ -26,7 +26,7 @@ use std::env;
 use std::net::SocketAddr;
 
 use futures::Future;
-use futures::future::{self, Executor};
+use futures::future::Executor;
 use futures::stream::Stream;
 use futures_cpupool::CpuPool;
 use tokio_io::AsyncRead;
@@ -114,5 +114,5 @@ fn main() {
     // And finally now that we've define what our server is, we run it! Here we
     // just need to execute the future we've created and wait for it to complete
     // using the standard methods in the `futures` crate.
-    future::blocking(done).wait().unwrap();
+    done.wait().unwrap();
 }

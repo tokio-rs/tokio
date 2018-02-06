@@ -33,10 +33,10 @@ extern crate tokio;
 extern crate tokio_io;
 extern crate bytes;
 
+use tokio::executor::current_thread;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_io::{AsyncRead};
 use futures::prelude::*;
-use futures::current_thread;
 use futures::sync::mpsc;
 use futures::future::{self, Either};
 use bytes::{BytesMut, Bytes, BufMut};

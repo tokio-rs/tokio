@@ -15,7 +15,7 @@ use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Stream, Sink};
-use futures::future::{self, Executor};
+use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{UdpSocket, UdpCodec};
 
@@ -76,5 +76,5 @@ fn main() {
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
     pool.execute(b.then(|_| Ok(()))).unwrap();
-    drop(future::blocking(a).wait());
+    drop(a.wait());
 }

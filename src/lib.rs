@@ -103,5 +103,6 @@ extern crate tokio_io;
 #[macro_use]
 extern crate log;
 
+pub mod executor;
 pub mod net;
 pub mod reactor;

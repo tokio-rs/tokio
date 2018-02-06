@@ -18,7 +18,7 @@ extern crate tokio_io;
 use std::{env, io};
 use std::net::SocketAddr;
 
-use futures::{future, Future, Poll};
+use futures::{Future, Poll};
 use tokio::net::UdpSocket;
 
 struct Server {
@@ -58,9 +58,9 @@ fn main() {
 
     // Next we'll create a future to spawn (the one we defined above) and then
     // we'll block our current thread waiting on the result of the future
-    future::blocking(Server {
+    Server {
         socket: socket,
         buf: vec![0; 1024],
         to_send: None,
-    }).wait().unwrap();
+    }.wait().unwrap();
 }

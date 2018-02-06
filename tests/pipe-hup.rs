@@ -13,12 +13,12 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
 
-use futures::future::blocking;
 use mio::event::Evented;
 use mio::unix::{UnixReady, EventedFd};
 use mio::{PollOpt, Ready, Token};
 use tokio::reactor::{Handle, PollEvented};
 use tokio_io::io::read_to_end;
+use futures::Future;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -81,7 +81,7 @@ fn hup() {
         let source = PollEvented::new(MyFile::new(read), &handle).unwrap();
 
         let reader = read_to_end(source, Vec::new());
-        let (_, content) = t!(blocking(reader).wait());
+        let (_, content) = t!(reader.wait());
         assert_eq!(&b"Hello!\nGood bye!\n"[..], &content[..]);
         t.join().unwrap();
     }
