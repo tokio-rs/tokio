@@ -5,63 +5,11 @@ use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
 
 use net::UdpSocket;
 
-/// Encoding of datagrams into frames via buffers.
-///
-/// This trait is used when constructing an instance of `UdpFramed` and provides
-/// the `In` and `Out` types which are decoded and encoded from the socket,
-/// respectively.
-///
-/// Because UDP is a connectionless protocol, the `decode` method receives the
-/// address where data came from and the `encode` method is also responsible for
-/// determining the remote host to which the datagram should be sent
-///
-/// The trait itself is implemented on a type that can track state for decoding
-/// or encoding, which is particularly useful for streaming parsers. In many
-/// cases, though, this type will simply be a unit struct (e.g. `struct
-/// MyCodec`).
-pub trait UdpCodec {
-    /// The type of decoded frames.
-    type In;
-
-    /// The type of frames to be encoded.
-    type Out;
-
-    /// The type of unrecoverable frame encoding/decoding errors.
-    ///
-    /// If an individual message is ill-formed but can be ignored without
-    /// interfering with the processing of future messages, it may be more
-    /// useful to report the failure as an `Item`.
-    ///
-    /// Note that implementors of this trait can simply indicate `type Error =
-    /// io::Error` to use I/O errors as this type.
-    type Error: From<io::Error>;
-
-    /// Attempts to decode a frame from the provided buffer of bytes.
-    ///
-    /// This method is called by `UdpFramed` on a single datagram which has been
-    /// read from a socket. The `buf` argument contains the data that was
-    /// received from the remote address, and `src` is the address the data came
-    /// from. Note that typically this method should require the entire contents
-    /// of `buf` to be valid or otherwise return an error with trailing data.
-    ///
-    /// Finally, if the bytes in the buffer are malformed then an error is
-    /// returned indicating why. This informs `Framed` that the stream is now
-    /// corrupt and should be terminated.
-    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> Result<Self::In, Self::Error>;
-
-    /// Encodes a frame into the buffer provided.
-    ///
-    /// This method will encode `msg` into the byte buffer provided by `buf`.
-    /// The `buf` provided is an internal buffer of the `Framed` instance and
-    /// will be written out when possible.
-    ///
-    /// The encode method also determines the destination to which the buffer
-    /// should be directed, which will be returned as a `SocketAddr`.
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> Result<SocketAddr, Self::Error>;
-}
+use tokio_io::codec::{Decoder, Encoder};
+use bytes::{BytesMut, BufMut};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
-/// the `UdpCodec` trait to encode and decode frames.
+/// the `Encoder` and `Decoder` traits to encode and decode frames.
 ///
 /// You can acquire a `UdpFramed` instance by using the `UdpSocket::framed`
 /// adapter.
@@ -70,30 +18,40 @@ pub trait UdpCodec {
 pub struct UdpFramed<C> {
     socket: UdpSocket,
     codec: C,
-    rd: Vec<u8>,
-    wr: Vec<u8>,
+    rd: BytesMut,
+    wr: BytesMut,
     out_addr: SocketAddr,
     flushed: bool,
 }
 
-impl<C: UdpCodec> Stream for UdpFramed<C> {
-    type Item = C::In;
+impl<C: Decoder> Stream for UdpFramed<C> {
+    type Item = (C::Item, SocketAddr);
     type Error = C::Error;
 
-    fn poll(&mut self) -> Poll<Option<C::In>, C::Error> {
-        let (n, addr) = try_nb!(self.socket.recv_from(&mut self.rd));
+    fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
+        self.rd.reserve(INITIAL_RD_CAPACITY);
+
+        let (n, addr) = unsafe {
+            // Read into the buffer without having to initialize the memory.
+            let (n, addr) = try_nb!(self.socket.recv_from(self.rd.bytes_mut()));
+            self.rd.advance_mut(n);
+            (n, addr)
+        };
         trace!("received {} bytes, decoding", n);
-        let frame = self.codec.decode(&addr, &self.rd[..n])?;
+        let frame_res = self.codec.decode(&mut self.rd);
+        self.rd.clear();
+        let frame = frame_res?;
+        let result = frame.map(|frame| (frame, addr)); // frame -> (frame, addr)
         trace!("frame decoded from buffer");
-        Ok(Async::Ready(Some(frame)))
+        Ok(Async::Ready(result))
     }
 }
 
-impl<C: UdpCodec> Sink for UdpFramed<C> {
-    type SinkItem = C::Out;
+impl<C: Encoder> Sink for UdpFramed<C> {
+    type SinkItem = (C::Item, SocketAddr);
     type SinkError = C::Error;
 
-    fn start_send(&mut self, item: C::Out) -> StartSend<C::Out, C::Error> {
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         trace!("sending frame");
 
         if !self.flushed {
@@ -103,7 +61,9 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
             }
         }
 
-        self.out_addr = self.codec.encode(item, &mut self.wr)?;
+        let (frame, out_addr) = item;
+        self.codec.encode(frame, &mut self.wr)?;
+        self.out_addr = out_addr;
         self.flushed = false;
         trace!("frame encoded; length={}", self.wr.len());
 
@@ -137,13 +97,16 @@ impl<C: UdpCodec> Sink for UdpFramed<C> {
     }
 }
 
-pub fn new<C: UdpCodec>(socket: UdpSocket, codec: C) -> UdpFramed<C> {
+const INITIAL_RD_CAPACITY: usize = 64 * 1024;
+const INITIAL_WR_CAPACITY: usize = 8 * 1024;
+
+pub fn new<C: Encoder + Decoder>(socket: UdpSocket, codec: C) -> UdpFramed<C> {
     UdpFramed {
         socket: socket,
         codec: codec,
         out_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
-        rd: vec![0; 64 * 1024],
-        wr: Vec::with_capacity(8 * 1024),
+        rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
+        wr: BytesMut::with_capacity(INITIAL_WR_CAPACITY),
         flushed: true,
     }
 }

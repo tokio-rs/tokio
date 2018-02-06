@@ -76,17 +76,55 @@ fn main() {
     }).wait().unwrap();
 }
 
+mod codec {
+    use std::io;
+    use bytes::{BufMut, BytesMut};
+    use tokio_io::codec::{Encoder, Decoder};
+    /// A simple `Codec` implementation that just ships bytes around.
+    ///
+    /// This type is used for "framing" a TCP/UDP stream of bytes but it's really
+    /// just a convenient method for us to work with streams/sinks for now.
+    /// This'll just take any data read and interpret it as a "frame" and
+    /// conversely just shove data into the output location without looking at
+    /// it.
+    pub struct Bytes;
+
+    impl Decoder for Bytes {
+        type Item = BytesMut;
+        type Error = io::Error;
+
+        fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+            if buf.len() > 0 {
+                let len = buf.len();
+                Ok(Some(buf.split_to(len)))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    impl Encoder for Bytes {
+        type Item = Vec<u8>;
+        type Error = io::Error;
+
+        fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> io::Result<()> {
+            buf.put(&data[..]);
+            Ok(())
+        }
+    }
+}
+
 mod tcp {
     use std::io;
     use std::net::SocketAddr;
 
-    use bytes::{BufMut, BytesMut};
+    use bytes::BytesMut;
     use futures::{Future, Stream};
     use futures::future::Executor;
     use futures_cpupool::CpuPool;
     use tokio::net::TcpStream;
     use tokio_io::AsyncRead;
-    use tokio_io::codec::{Encoder, Decoder};
+    use codec::Bytes;
 
     pub fn connect(addr: &SocketAddr,
                    pool: &CpuPool,
@@ -122,43 +160,6 @@ mod tcp {
             stream
         }).flatten_stream())
     }
-
-    /// A simple `Codec` implementation that just ships bytes around.
-    ///
-    /// This type is used for "framing" a TCP stream of bytes but it's really
-    /// just a convenient method for us to work with streams/sinks for now.
-    /// This'll just take any data read and interpret it as a "frame" and
-    /// conversely just shove data into the output location without looking at
-    /// it.
-    struct Bytes;
-
-    impl Decoder for Bytes {
-        type Item = BytesMut;
-        type Error = io::Error;
-
-        fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
-            if buf.len() > 0 {
-                let len = buf.len();
-                Ok(Some(buf.split_to(len)))
-            } else {
-                Ok(None)
-            }
-        }
-
-        fn decode_eof(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
-            self.decode(buf)
-        }
-    }
-
-    impl Encoder for Bytes {
-        type Item = Vec<u8>;
-        type Error = io::Error;
-
-        fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> io::Result<()> {
-            buf.put(&data[..]);
-            Ok(())
-        }
-    }
 }
 
 mod udp {
@@ -169,7 +170,8 @@ mod udp {
     use futures::{Future, Stream};
     use futures::future::Executor;
     use futures_cpupool::CpuPool;
-    use tokio::net::{UdpCodec, UdpSocket};
+    use tokio::net::UdpSocket;
+    use codec::Bytes;
 
     pub fn connect(&addr: &SocketAddr,
                    pool: &CpuPool,
@@ -186,7 +188,7 @@ mod udp {
         let udp = UdpSocket::bind(&addr_to_bind)
             .expect("failed to bind socket");
 
-        // Like above with TCP we use an instance of `UdpCodec` to transform
+        // Like above with TCP we use an instance of `Bytes` codec to transform
         // this UDP socket into a framed sink/stream which operates over
         // discrete values. In this case we're working with *pairs* of socket
         // addresses and byte buffers.
@@ -195,7 +197,7 @@ mod udp {
         // All bytes from `stdin` will go to the `addr` specified in our
         // argument list. Like with TCP this is spawned concurrently
         pool.execute(stdin.map(move |chunk| {
-            (addr, chunk)
+            (chunk, addr)
         }).forward(sink).then(|result| {
             if let Err(e) = result {
                 panic!("failed to write to socket: {}", e)
@@ -205,30 +207,13 @@ mod udp {
 
         // With UDP we could receive data from any source, so filter out
         // anything coming from a different address
-        Box::new(stream.filter_map(move |(src, chunk)| {
+        Box::new(stream.filter_map(move |(chunk, src)| {
             if src == addr {
                 Some(chunk.into())
             } else {
                 None
             }
         }))
-    }
-
-    struct Bytes;
-
-    impl UdpCodec for Bytes {
-        type In = (SocketAddr, Vec<u8>);
-        type Out = (SocketAddr, Vec<u8>);
-        type Error = io::Error;
-
-        fn decode(&mut self, addr: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
-            Ok((*addr, buf.to_vec()))
-        }
-
-        fn encode(&mut self, (addr, buf): Self::Out, into: &mut Vec<u8>) -> io::Result<SocketAddr> {
-            into.extend(buf);
-            Ok(addr)
-        }
     }
 }
 

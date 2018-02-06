@@ -2,12 +2,17 @@ extern crate futures;
 extern crate tokio;
 #[macro_use]
 extern crate tokio_io;
+extern crate bytes;
+extern crate env_logger;
 
 use std::io;
 use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
-use tokio::net::{UdpSocket, UdpCodec};
+
+use tokio::net::UdpSocket;
+use tokio_io::codec::{Encoder, Decoder};
+use bytes::{BytesMut, BufMut};
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -187,58 +192,68 @@ fn send_dgrams() {
     }
 }
 
-#[derive(Debug, Clone)]
-struct Codec {
-    data: &'static [u8],
-    from: SocketAddr,
-    to: SocketAddr,
-}
+pub struct ByteCodec;
 
-impl UdpCodec for Codec {
-    type In = ();
-    type Out = &'static [u8];
+impl Decoder for ByteCodec {
+    type Item = Vec<u8>;
     type Error = io::Error;
 
-    fn decode(&mut self, src: &SocketAddr, buf: &[u8]) -> io::Result<Self::In> {
-        assert_eq!(src, &self.from);
-        assert_eq!(buf, self.data);
-        Ok(())
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Vec<u8>>, io::Error> {
+        let len = buf.len();
+        Ok(Some(buf.split_to(len).to_vec()))
     }
+}
 
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<SocketAddr> {
-        assert_eq!(msg, self.data);
-        buf.extend_from_slice(msg);
-        Ok(self.to)
+impl Encoder for ByteCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
+
+    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
+        buf.reserve(data.len());
+        buf.put(data);
+        Ok(())
     }
 }
 
 #[test]
 fn send_framed() {
+    drop(env_logger::init());
+
     let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
     let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
     let a_addr = t!(a_soc.local_addr());
     let b_addr = t!(b_soc.local_addr());
 
     {
-        let a = a_soc.framed(Codec { data: &b"4567"[..], from: a_addr, to: b_addr});
-        let b = b_soc.framed(Codec { data: &b"4567"[..], from: a_addr, to: b_addr});
+        let a = a_soc.framed(ByteCodec);
+        let b = b_soc.framed(ByteCodec);
 
-        let send = a.send(&b"4567"[..]);
+        let msg = b"4567".to_vec();
+
+        let send = a.send((msg.clone(), b_addr));
         let recv = b.into_future().map_err(|e| e.0);
         let (sendt, received) = t!(send.join(recv).wait());
-        assert_eq!(received.0, Some(()));
+
+        let (data, addr) = received.0.unwrap();
+        assert_eq!(msg, data);
+        assert_eq!(a_addr, addr);
 
         a_soc = sendt.into_inner();
         b_soc = received.1.into_inner();
     }
 
     {
-        let a = a_soc.framed(Codec { data: &b""[..], from: a_addr, to: b_addr});
-        let b = b_soc.framed(Codec { data: &b""[..], from: a_addr, to: b_addr});
+        let a = a_soc.framed(ByteCodec);
+        let b = b_soc.framed(ByteCodec);
 
-        let send = a.send(&b""[..]);
+        let msg = b"".to_vec();
+
+        let send = a.send((msg.clone(), b_addr));
         let recv = b.into_future().map_err(|e| e.0);
         let received = t!(send.join(recv).wait()).1;
-        assert_eq!(received.0, Some(()));
+
+        let (data, addr) = received.0.unwrap();
+        assert_eq!(msg, data);
+        assert_eq!(a_addr, addr);
     }
 }
