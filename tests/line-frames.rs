@@ -10,7 +10,7 @@ use std::net::Shutdown;
 
 use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
-use futures::future::{blocking, Executor};
+use futures::future::Executor;
 use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_io::codec::{Encoder, Decoder};
@@ -68,20 +68,20 @@ fn echo() {
     pool.execute(srv.map_err(|e| panic!("srv error: {}", e))).unwrap();
 
     let client = TcpStream::connect(&addr);
-    let client = blocking(client).wait().unwrap();
-    let (client, _) = blocking(write_all(client, b"a\n")).wait().unwrap();
-    let (client, buf, amt) = blocking(read(client, vec![0; 1024])).wait().unwrap();
+    let client = client.wait().unwrap();
+    let (client, _) = write_all(client, b"a\n").wait().unwrap();
+    let (client, buf, amt) = read(client, vec![0; 1024]).wait().unwrap();
     assert_eq!(amt, 2);
     assert_eq!(&buf[..2], b"a\n");
 
-    let (client, _) = blocking(write_all(client, b"\n")).wait().unwrap();
-    let (client, buf, amt) = blocking(read(client, buf)).wait().unwrap();
+    let (client, _) = write_all(client, b"\n").wait().unwrap();
+    let (client, buf, amt) = read(client, buf).wait().unwrap();
     assert_eq!(amt, 1);
     assert_eq!(&buf[..1], b"\n");
 
-    let (client, _) = blocking(write_all(client, b"b")).wait().unwrap();
+    let (client, _) = write_all(client, b"b").wait().unwrap();
     client.shutdown(Shutdown::Write).unwrap();
-    let (_client, buf, amt) = blocking(read(client, buf)).wait().unwrap();
+    let (_client, buf, amt) = read(client, buf).wait().unwrap();
     assert_eq!(amt, 1);
     assert_eq!(&buf[..1], b"b");
 }

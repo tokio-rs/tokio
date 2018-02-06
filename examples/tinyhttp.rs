@@ -90,7 +90,7 @@ fn worker(rx: mpsc::UnboundedReceiver<net::TcpStream>) {
         })).unwrap();
         Ok(())
     });
-    future::blocking(done).wait().unwrap();
+    done.wait().unwrap();
 }
 
 /// "Server logic" is implemented in this function.

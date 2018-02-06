@@ -26,7 +26,7 @@ use std::net::SocketAddr;
 use std::thread;
 
 use futures::sync::mpsc;
-use futures::{future, Sink, Stream};
+use futures::{Future, Sink, Stream};
 use futures_cpupool::CpuPool;
 
 fn main() {
@@ -71,9 +71,9 @@ fn main() {
     // loop. In this case, though, we know it's ok as the event loop isn't
     // otherwise running anything useful.
     let mut out = io::stdout();
-    future::blocking(stdout.for_each(|chunk| {
+    stdout.for_each(|chunk| {
         out.write_all(&chunk)
-    })).wait().unwrap();
+    }).wait().unwrap();
 }
 
 mod tcp {
@@ -244,7 +244,7 @@ fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
             Ok(n) => n,
         };
         buf.truncate(n);
-        tx = match future::blocking(tx.send(buf)).wait() {
+        tx = match tx.send(buf).wait() {
             Ok(tx) => tx,
             Err(_) => break,
         };

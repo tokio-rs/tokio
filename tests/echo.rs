@@ -8,7 +8,6 @@ use std::net::TcpStream;
 use std::thread;
 
 use futures::Future;
-use futures::future::blocking;
 use futures::stream::Stream;
 use tokio::net::TcpListener;
 use tokio_io::AsyncRead;
@@ -45,7 +44,7 @@ fn echo_server() {
     let halves = client.map(|s| s.split());
     let copied = halves.and_then(|(a, b)| copy(a, b));
 
-    let (amt, _, _) = t!(blocking(copied).wait());
+    let (amt, _, _) = t!(copied.wait());
     t.join().unwrap();
 
     assert_eq!(amt, msg.len() as u64 * 1024);

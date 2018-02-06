@@ -7,7 +7,6 @@ use std::thread;
 use std::io::{Write, Read};
 
 use futures::Future;
-use futures::future::blocking;
 use futures::stream::Stream;
 use tokio_io::io::read_to_end;
 use tokio::net::TcpListener;
@@ -37,7 +36,7 @@ fn limit() {
         read_to_end(a.take(4), Vec::new())
     });
 
-    let (_, data) = t!(blocking(copied).wait());
+    let (_, data) = t!(copied.wait());
     t.join().unwrap();
 
     assert_eq!(data, b"foo ");

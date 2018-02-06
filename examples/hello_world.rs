@@ -18,9 +18,10 @@ extern crate tokio;
 extern crate tokio_io;
 extern crate futures;
 
+use tokio::executor::current_thread;
 use tokio::net::TcpListener;
 use tokio_io::io;
-use futures::{current_thread, Future, Stream};
+use futures::{Future, Stream};
 
 pub fn main() {
     let addr = "127.0.0.1:6142".parse().unwrap();
