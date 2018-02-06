@@ -38,7 +38,7 @@ impl<A> Future for Shutdown<A>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<A, io::Error> {
-        try_nb!(self.a.as_mut().unwrap().shutdown());
+        try_ready!(self.a.as_mut().unwrap().shutdown());
         Ok(Async::Ready(self.a.take().unwrap()))
     }
 }
