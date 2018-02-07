@@ -11,8 +11,19 @@ use bytes::{BytesMut, BufMut};
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
 ///
-/// You can acquire a `UdpFramed` instance by using the `UdpSocket::framed`
-/// adapter.
+/// Raw UDP sockets work with datagrams, but higher-level code usually wants to
+/// batch these into meaningful chunks, called "frames". This method layers
+/// framing on top of this socket by using the `Encoder` and `Decoder` traits to
+/// handle encoding and decoding of messages frames. Note that the incoming and
+/// outgoing frame types may be distinct.
+///
+/// This function returns a *single* object that is both `Stream` and `Sink`;
+/// grouping this into a single object is often useful for layering things which
+/// require both read and write access to the underlying object.
+///
+/// If you want to work more directly with the streams and sink, consider
+/// calling `split` on the `UdpFramed` returned by this method, which will break
+/// them into separate objects, allowing them to interact more easily.
 #[must_use = "sinks do nothing unless polled"]
 #[derive(Debug)]
 pub struct UdpFramed<C> {
@@ -100,18 +111,21 @@ impl<C: Encoder> Sink for UdpFramed<C> {
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
 const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
-pub fn new<C: Encoder + Decoder>(socket: UdpSocket, codec: C) -> UdpFramed<C> {
-    UdpFramed {
-        socket: socket,
-        codec: codec,
-        out_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
-        rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
-        wr: BytesMut::with_capacity(INITIAL_WR_CAPACITY),
-        flushed: true,
-    }
-}
-
 impl<C> UdpFramed<C> {
+    /// Create a new `UdpFramed` backed by the given socket and codec.
+    ///
+    /// See struct level documention for more details.
+    pub fn new(socket: UdpSocket, codec: C) -> UdpFramed<C> {
+        UdpFramed {
+            socket: socket,
+            codec: codec,
+            out_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
+            rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
+            wr: BytesMut::with_capacity(INITIAL_WR_CAPACITY),
+            flushed: true,
+        }
+    }
+
     /// Returns a reference to the underlying I/O stream wrapped by `Framed`.
     ///
     /// # Note

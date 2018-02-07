@@ -170,7 +170,7 @@ mod udp {
     use futures::{Future, Stream};
     use futures::future::Executor;
     use futures_cpupool::CpuPool;
-    use tokio::net::UdpSocket;
+    use tokio::net::{UdpSocket, UdpFramed};
     use codec::Bytes;
 
     pub fn connect(&addr: &SocketAddr,
@@ -192,7 +192,7 @@ mod udp {
         // this UDP socket into a framed sink/stream which operates over
         // discrete values. In this case we're working with *pairs* of socket
         // addresses and byte buffers.
-        let (sink, stream) = udp.framed(Bytes).split();
+        let (sink, stream) = UdpFramed::new(udp, Bytes).split();
 
         // All bytes from `stdin` will go to the `addr` specified in our
         // argument list. Like with TCP this is spawned concurrently

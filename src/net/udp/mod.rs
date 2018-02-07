@@ -14,7 +14,6 @@ pub struct UdpSocket {
 
 mod frame;
 pub use self::frame::UdpFramed;
-use tokio_io::codec::{Decoder, Encoder};
 
 impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
@@ -42,29 +41,6 @@ impl UdpSocket {
                     handle: &Handle) -> io::Result<UdpSocket> {
         let udp = try!(mio::net::UdpSocket::from_socket(socket));
         UdpSocket::new(udp, handle)
-    }
-
-    /// Provides a `Stream` and `Sink` interface for reading and writing to this
-    /// `UdpSocket` object, using the provided codec that must implement
-    /// `Encoder` and `Decoder` traits to read and write the raw data.
-    ///
-    /// Raw UDP sockets work with datagrams, but higher-level code usually
-    /// wants to batch these into meaningful chunks, called "frames". This
-    /// method layers framing on top of this socket by using the `Encoder`
-    /// and `Decoder` traits to handle encoding and decoding of messages
-    /// frames. Note that the incoming and outgoing frame types may be distinct.
-    ///
-    /// This function returns a *single* object that is both `Stream` and
-    /// `Sink`; grouping this into a single object is often useful for layering
-    /// things which require both read and write access to the underlying
-    /// object.
-    ///
-    /// If you want to work more directly with the streams and sink, consider
-    /// calling `split` on the `UdpFramed` returned by this method, which will
-    /// break them into separate objects, allowing them to interact more
-    /// easily.
-    pub fn framed<C: Encoder + Decoder>(self, codec: C) -> UdpFramed<C> {
-        frame::new(self, codec)
     }
 
     /// Returns the local address that this socket is bound to.
