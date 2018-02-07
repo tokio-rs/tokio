@@ -1,3 +1,8 @@
+# 0.1.5 (February 07, 2018)
+
+* Fix bug in `BytesCodec` and `LinesCodec`.
+* Performance improvement to `split`.
+
 # 0.1.4 (November 10, 2017)
 
 * Use `FrameTooBig` as length delimited error type (#70).

@@ -1,20 +1,24 @@
-# tokio
+# Tokio
 
-A work-in-progress rearchitecting of the [tokio-core] crate in line with
-[tokio-rs/tokio-rfcs#3][rfc]
-
-[tokio-core]: https://github.com/tokio-rs/tokio-core
-[rfc]: https://github.com/tokio-rs/tokio-rfcs/pull/3
+A platform for writing fast networking code with Rust.
 
 [![Build Status](https://travis-ci.org/tokio-rs/tokio.svg?branch=new-crate)](https://travis-ci.org/tokio-rs/tokio)
 [![Build status](https://ci.appveyor.com/api/projects/status/uxiinkgipvy6ehrj/branch/new-crate?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio/branch/new-crate)
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio)
+[Website](https://tokio.rs) |
+[Guides](https://tokio.rs/docs/getting-started/hello-world/) |
+[API Docs](https://docs.rs/tokio)
 
-## Usage
+## Overview
 
-This project is a **work in progress**, more information will be added here as
-it progresses.
+Tokio is an event-driven, non-blocking I/O platform for writing asynchronous I/O
+backed applications. It is used for implementing networking clients and servers.
+
+Tokio uses the [`futures`] crate as a foundation to build on, providing
+networking types and other utilities needed for building a production ready
+application.
+
+[`futures`]: https://github.com/rust-lang-nursery/futures-rs
 
 # License
 
