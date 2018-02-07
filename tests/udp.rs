@@ -10,7 +10,7 @@ use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
 
-use tokio::net::UdpSocket;
+use tokio::net::{UdpSocket, UdpFramed};
 use tokio_io::codec::{Encoder, Decoder};
 use bytes::{BytesMut, BufMut};
 
@@ -225,8 +225,8 @@ fn send_framed() {
     let b_addr = t!(b_soc.local_addr());
 
     {
-        let a = a_soc.framed(ByteCodec);
-        let b = b_soc.framed(ByteCodec);
+        let a = UdpFramed::new(a_soc, ByteCodec);
+        let b = UdpFramed::new(b_soc, ByteCodec);
 
         let msg = b"4567".to_vec();
 
@@ -243,8 +243,8 @@ fn send_framed() {
     }
 
     {
-        let a = a_soc.framed(ByteCodec);
-        let b = b_soc.framed(ByteCodec);
+        let a = UdpFramed::new(a_soc, ByteCodec);
+        let b = UdpFramed::new(b_soc, ByteCodec);
 
         let msg = b"".to_vec();
 

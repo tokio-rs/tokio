@@ -14,7 +14,6 @@ pub struct UdpSocket {
 
 mod frame;
 pub use self::frame::UdpFramed;
-use tokio_io::codec::{Decoder, Encoder};
 
 impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to

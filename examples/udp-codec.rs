@@ -17,7 +17,7 @@ use std::net::SocketAddr;
 use futures::{Future, Stream, Sink};
 use futures::future::Executor;
 use futures_cpupool::CpuPool;
-use tokio::net::UdpSocket;
+use tokio::net::{UdpSocket, UdpFramed};
 use tokio_io::codec::BytesCodec;
 
 fn main() {
@@ -34,8 +34,8 @@ fn main() {
 
     // We're parsing each socket with the `LineCodec` defined above, and then we
     // `split` each codec into the sink/stream halves.
-    let (a_sink, a_stream) = a.framed(BytesCodec::new()).split();
-    let (b_sink, b_stream) = b.framed(BytesCodec::new()).split();
+    let (a_sink, a_stream) = UdpFramed::new(a, BytesCodec::new()).split();
+    let (b_sink, b_stream) = UdpFramed::new(b, BytesCodec::new()).split();
 
     // Start off by sending a ping from a to b, afterwards we just print out
     // what they send us and continually send pings
