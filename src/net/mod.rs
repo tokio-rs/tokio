@@ -28,8 +28,7 @@
 //! [`RecvDgram`] and [`SendDgram`] structs respectively.
 //!
 //! For convience it's also possible to convert raw datagrams into higher-level
-//! frames. This done with [`UdpFramed`], created by calling [`framed`] on a
-//! [`UdpSocket`].
+//! frames.
 //!
 //! [`UdpSocket`]: struct.UdpSocket.html
 //! [`RecvDgram`]: struct.RecvDgram.html
