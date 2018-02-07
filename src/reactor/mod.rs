@@ -350,7 +350,7 @@ impl Handle {
     /// after this method has been called. If the reactor is not currently
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
-    pub fn wakeup(&self) {
+    fn wakeup(&self) {
         if let Some(inner) = self.inner() {
             inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
         }
