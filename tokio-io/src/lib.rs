@@ -50,7 +50,6 @@ pub mod codec;
 
 mod allow_std;
 mod copy;
-mod flush;
 mod framed;
 mod framed_read;
 mod framed_write;
