@@ -9,6 +9,7 @@
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
+mod copy;
 mod flush;
 mod read;
 mod read_exact;
@@ -16,7 +17,7 @@ mod read_to_end;
 mod read_until;
 
 pub use allow_std::AllowStdIo;
-pub use copy::{copy, Copy};
+pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
 pub use lines::{lines, Lines};
 pub use self::read::{read, Read};
