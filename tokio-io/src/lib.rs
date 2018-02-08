@@ -56,7 +56,6 @@ mod framed_read;
 mod framed_write;
 mod length_delimited;
 mod lines;
-mod read;
 mod read_exact;
 mod read_to_end;
 mod read_until;
