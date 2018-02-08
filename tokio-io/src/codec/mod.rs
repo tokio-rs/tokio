@@ -10,10 +10,16 @@
 //! [`Stream`]: #
 //! [transports]: #
 
+mod decoder;
+mod encoder;
+
+pub use self::decoder::Decoder;
+pub use self::encoder::Encoder;
+
 pub use codecs::{BytesCodec, LinesCodec};
 pub use framed::{Framed, FramedParts};
-pub use framed_read::{FramedRead, Decoder};
-pub use framed_write::{FramedWrite, Encoder};
+pub use framed_read::FramedRead;
+pub use framed_write::FramedWrite;
 
 pub mod length_delimited {
     //! Frame a stream of bytes based on a length prefix
