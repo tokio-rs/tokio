@@ -11,6 +11,7 @@
 
 mod read;
 mod read_exact;
+mod read_until;
 
 pub use allow_std::AllowStdIo;
 pub use copy::{copy, Copy};
@@ -19,7 +20,7 @@ pub use lines::{lines, Lines};
 pub use self::read::{read, Read};
 pub use self::read_exact::{read_exact, ReadExact};
 pub use read_to_end::{read_to_end, ReadToEnd};
-pub use read_until::{read_until, ReadUntil};
+pub use self::read_until::{read_until, ReadUntil};
 pub use shutdown::{shutdown, Shutdown};
 pub use split::{ReadHalf, WriteHalf};
 pub use window::Window;

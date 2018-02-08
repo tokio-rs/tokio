@@ -57,7 +57,6 @@ mod framed_write;
 mod length_delimited;
 mod lines;
 mod read_to_end;
-mod read_until;
 mod shutdown;
 mod split;
 mod window;
