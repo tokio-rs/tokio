@@ -62,7 +62,8 @@ pub fn main() {
     // implementations, each providing different scheduling characteristics.
     //
     // The `current_thread` executor multiplexes all scheduled tasks on the
-    // current thread. This means that spawned tasks must not implement `Send`.
+    // current thread. This means that spawned tasks are not required to
+    // implement `Send`.
     current_thread::run(|_| {
         // Now, the server task must be spawned.
         //
