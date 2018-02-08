@@ -16,6 +16,7 @@ mod read_exact;
 mod read_to_end;
 mod read_until;
 mod shutdown;
+mod write_all;
 
 pub use allow_std::AllowStdIo;
 pub use self::copy::{copy, Copy};
@@ -28,4 +29,4 @@ pub use self::read_until::{read_until, ReadUntil};
 pub use self::shutdown::{shutdown, Shutdown};
 pub use split::{ReadHalf, WriteHalf};
 pub use window::Window;
-pub use write_all::{write_all, WriteAll};
+pub use self::write_all::{write_all, WriteAll};

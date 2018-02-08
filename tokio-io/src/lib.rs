@@ -56,7 +56,6 @@ mod length_delimited;
 mod lines;
 mod split;
 mod window;
-mod write_all;
 
 use codec::{Decoder, Encoder, Framed};
 use split::{ReadHalf, WriteHalf};
