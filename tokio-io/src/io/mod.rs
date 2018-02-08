@@ -10,13 +10,14 @@
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
 mod read;
+mod read_exact;
 
 pub use allow_std::AllowStdIo;
 pub use copy::{copy, Copy};
 pub use flush::{flush, Flush};
 pub use lines::{lines, Lines};
 pub use self::read::{read, Read};
-pub use read_exact::{read_exact, ReadExact};
+pub use self::read_exact::{read_exact, ReadExact};
 pub use read_to_end::{read_to_end, ReadToEnd};
 pub use read_until::{read_until, ReadUntil};
 pub use shutdown::{shutdown, Shutdown};
