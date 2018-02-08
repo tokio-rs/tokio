@@ -12,11 +12,14 @@
 
 mod decoder;
 mod encoder;
+mod bytes_codec;
+mod lines_codec;
 
 pub use self::decoder::Decoder;
 pub use self::encoder::Encoder;
+pub use self::bytes_codec::BytesCodec;
+pub use self::lines_codec::LinesCodec;
 
-pub use codecs::{BytesCodec, LinesCodec};
 pub use framed::{Framed, FramedParts};
 pub use framed_read::FramedRead;
 pub use framed_write::FramedWrite;
