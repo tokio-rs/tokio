@@ -5,7 +5,7 @@ name = "tokio"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.0"
+version = "0.1.1"
 
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT/Apache-2.0"
