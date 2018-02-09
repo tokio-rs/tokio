@@ -130,15 +130,14 @@ where F: FnOnce(&mut Context) -> R
     })
 }
 
-/// Calls the given closure with a custom sleep strategy.
-///
-/// This function is the same as `run` except that it allows customizing the
-/// sleep strategy.
-pub fn run_with_sleep<S, F, R>(sleep: &mut S, f: F) -> R
+#[deprecated(since = "0.1.1", note = "this was never supposed to be public")]
+#[doc(hidden)]
+pub fn run_with_sleep<S, F, R>(_: &mut S, _: F) -> R
 where F: FnOnce(&mut Context) -> R,
       S: Sleep,
 {
-    TaskRunner::enter(sleep, f)
+    // This could never be called publically because `Sleep` is not public.
+    unimplemented!();
 }
 
 /// Executes a future on the current thread.
