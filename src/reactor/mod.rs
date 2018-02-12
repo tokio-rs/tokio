@@ -4,19 +4,15 @@
 //! all I/O happening in `tokio`. This core reactor (or event loop) is used to
 //! drive I/O resources.
 //!
-//! The [`Handle`] and [`Remote`] structs are refences to the event loop,
-//! created by the [`handle`][handle_method] and [`remote`][remote_method]
-//! respectively, and are used to construct I/O objects. `Remote` is sendable,
-//! while `Handle` is not.
+//! The [`Handle`] struct, created by [`handle`][handle_method], is a reference
+//! to the event loop and can be used when constructing I/O objects.
 //!
 //! Lastly [`PollEvented`] can be used to construct I/O objects that interact
 //! with the event loop, e.g. [`TcpStream`] in the net module.
 //!
 //! [`Reactor`]: struct.Reactor.html
 //! [`Handle`]: struct.Handle.html
-//! [`Remote`]: struct.Remote.html
 //! [handle_method]: struct.Reactor.html#method.handle
-//! [remote_method]: struct.Reactor.html#method.remote
 //! [`PollEvented`]: struct.PollEvented.html
 //! [`TcpStream`]: ../net/struct.TcpStream.html
 
