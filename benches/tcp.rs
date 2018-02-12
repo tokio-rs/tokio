@@ -192,48 +192,43 @@ mod transfer {
 
     static DATA: [u8; 1024] = [0; 1024];
 
-    /*
     fn one_thread(b: &mut Bencher, read_size: usize, write_size: usize) {
         let addr = "127.0.0.1:0".parse().unwrap();
-        let mut core = Reactor::new().unwrap();
-        let handle = core.handle();
-        let listener = TcpListener::bind(&addr).unwrap();
-        let addr = listener.local_addr().unwrap();
 
-        let h2 = handle.clone();
+        b.iter(move || {
+            let listener = TcpListener::bind(&addr).unwrap();
+            let addr = listener.local_addr().unwrap();
 
-        // Spawn a single task that accepts & drops connections
-        handle.spawn(
-            listener.incoming()
-                .map_err(|e| panic!("server err: {:?}", e))
-                .for_each(move |sock| {
+            // Spawn a single future that accepts 1 connection, Drain it and drops
+            let server = listener.incoming()
+                .into_future() // take the first connection
+                .map_err(|(e, _other_incomings)| e)
+                .map(|(connection, _other_incomings)| connection.unwrap())
+                .and_then(|sock| {
                     sock.set_linger(Some(Duration::from_secs(0))).unwrap();
                     let drain = Drain {
                         sock: sock,
                         chunk: read_size,
                     };
+                    drain.map(|_| ()).map_err(|e| panic!("server error: {:?}", e))
+                })
+                .map_err(|e| panic!("server err: {:?}", e));
 
-                    h2.spawn(drain.map_err(|e| panic!("server error: {:?}", e)));
-
-                    Ok(())
-                }));
-
-        b.iter(move || {
             let client = TcpStream::connect(&addr)
-                .and_then(|sock| {
+                .and_then(move |sock| {
                     Transfer {
                         sock: sock,
                         rem: MB,
                         chunk: write_size,
                     }
-                });
+                })
+                .map_err(|e| panic!("client err: {:?}", e));
 
-            core.run(
-                client.map_err(|e| panic!("client err: {:?}", e))
-                ).unwrap();
+            server.join(client).wait().unwrap();
         });
     }
 
+    /*
     fn cross_thread(b: &mut Bencher, read_size: usize, write_size: usize) {
         let (shutdown_tx, shutdown_rx) = sync::oneshot::channel();
         let (remote_tx, remote_rx) = ::std::sync::mpsc::channel();
@@ -308,6 +303,7 @@ mod transfer {
         // Shutdown the reactor
         shutdown_tx.send(()).unwrap();
     }
+    */
 
     mod small_chunks {
         use ::prelude::*;
@@ -317,10 +313,12 @@ mod transfer {
             super::one_thread(b, 32, 32);
         }
 
+        /*
         #[bench]
         fn cross_thread(b: &mut Bencher) {
             super::cross_thread(b, 32, 32);
         }
+        */
     }
 
     mod big_chunks {
@@ -331,10 +329,11 @@ mod transfer {
             super::one_thread(b, 1_024, 1_024);
         }
 
+        /*
         #[bench]
         fn cross_thread(b: &mut Bencher) {
             super::cross_thread(b, 1_024, 1_024);
         }
+        */
     }
-    */
 }
