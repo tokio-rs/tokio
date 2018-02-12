@@ -2,8 +2,7 @@ use std::io as std_io;
 use bytes::BufMut;
 use futures::{Async, Poll};
 
-use io::AsyncWrite;
-use {framed, split};
+use {framed, split, AsyncWrite};
 use codec::{Decoder, Encoder, Framed};
 use split::{ReadHalf, WriteHalf};
 

@@ -47,6 +47,8 @@ pub mod io;
 pub mod codec;
 
 mod allow_std;
+mod async_read;
+mod async_write;
 mod framed;
 mod framed_read;
 mod framed_write;
@@ -55,7 +57,8 @@ mod lines;
 mod split;
 mod window;
 
-pub use io::{AsyncRead, AsyncWrite};
+pub use self::async_read::AsyncRead;
+pub use self::async_write::AsyncWrite;
 
 fn _assert_objects() {
     fn _assert<T>() {}

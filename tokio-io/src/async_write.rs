@@ -3,7 +3,7 @@ use std::io::Write;
 use bytes::Buf;
 use futures::{Async, Poll};
 
-use io::AsyncRead;
+use AsyncRead;
 
 /// A trait for writable objects which operated in an asynchronous and
 /// futures-aware fashion.
