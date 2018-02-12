@@ -49,7 +49,6 @@ pub mod io;
 pub mod codec;
 
 mod allow_std;
-mod codecs;
 mod copy;
 mod flush;
 mod framed;

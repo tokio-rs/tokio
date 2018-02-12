@@ -2,8 +2,9 @@ use std::io::{self, Read, Write};
 use std::fmt;
 
 use {AsyncRead, AsyncWrite};
-use framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2, Decoder};
-use framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2, Encoder};
+use codec::{Decoder, Encoder};
+use framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
+use framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
 
 use futures::{Stream, Sink, StartSend, Poll};
 use bytes::{BytesMut};
