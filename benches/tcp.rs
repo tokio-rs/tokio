@@ -12,6 +12,7 @@ mod prelude {
     pub use futures::*;
     pub use tokio::reactor::Reactor;
     pub use tokio::net::{TcpListener, TcpStream};
+    pub use tokio::executor::current_thread;
     pub use tokio_io::io::read_to_end;
 
     pub use test::{self, Bencher};
@@ -29,33 +30,35 @@ mod connect_churn {
     #[bench]
     fn one_thread(b: &mut Bencher) {
         let addr = "127.0.0.1:0".parse().unwrap();
-        let mut core = Reactor::new().unwrap();
-        let handle = core.handle();
-        let listener = TcpListener::bind(&addr, &handle).unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        // Spawn a single task that accepts & drops connections
-        handle.spawn(
-            listener.incoming()
-                .map_err(|e| panic!("server err: {:?}", e))
-                .for_each(|_| Ok(())));
 
         b.iter(move || {
+            let listener = TcpListener::bind(&addr).unwrap();
+            let addr = listener.local_addr().unwrap();
+
+            // Spawn a single future that accepts & drops connections
+            let serve_incomings = listener.incoming()
+                .map_err(|e| panic!("server err: {:?}", e))
+                .for_each(|_| Ok(()));
+
             let connects = stream::iter((0..NUM).map(|_| {
-                Ok(TcpStream::connect(&addr, &handle)
+                Ok(TcpStream::connect(&addr)
                     .and_then(|sock| {
                         sock.set_linger(Some(Duration::from_secs(0))).unwrap();
                         read_to_end(sock, vec![])
                     }))
             }));
 
-            core.run(
-                connects.buffer_unordered(CONCURRENT)
-                    .map_err(|e| panic!("client err: {:?}", e))
-                    .for_each(|_| Ok(()))).unwrap();
+            let connects_concurrent = connects.buffer_unordered(CONCURRENT)
+                .map_err(|e| panic!("client err: {:?}", e))
+                .for_each(|_| Ok(()));
+
+            serve_incomings.select(connects_concurrent)
+                .map(|_| ()).map_err(|_| ())
+                .wait().unwrap();
         });
     }
 
+    /*
     fn n_workers(n: usize, b: &mut Bencher) {
         let (shutdown_tx, shutdown_rx) = sync::oneshot::channel();
         let (remote_tx, remote_rx) = ::std::sync::mpsc::channel();
@@ -71,7 +74,7 @@ mod connect_churn {
 
             // Bind the TCP listener
             let listener = TcpListener::bind(
-                &"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
+                &"127.0.0.1:0".parse().unwrap()).unwrap();
 
             // Get the address being listened on.
             let addr = listener.local_addr().unwrap();
@@ -111,7 +114,7 @@ mod connect_churn {
                         let (socket_tx, socket_rx) = sync::oneshot::channel();
 
                         remote.spawn(move |handle| {
-                            TcpStream::connect(&addr, &handle)
+                            TcpStream::connect(&addr)
                                 .map_err(|e| panic!("connect err: {:?}", e))
                                 .then(|res| socket_tx.send(res))
                                 .map_err(|_| ())
@@ -153,6 +156,7 @@ mod connect_churn {
     fn multi_threads(b: &mut Bencher) {
         n_workers(4, b);
     }
+    */
 }
 
 mod transfer {
@@ -207,11 +211,12 @@ mod transfer {
 
     static DATA: [u8; 1024] = [0; 1024];
 
+    /*
     fn one_thread(b: &mut Bencher, read_size: usize, write_size: usize) {
         let addr = "127.0.0.1:0".parse().unwrap();
         let mut core = Reactor::new().unwrap();
         let handle = core.handle();
-        let listener = TcpListener::bind(&addr, &handle).unwrap();
+        let listener = TcpListener::bind(&addr).unwrap();
         let addr = listener.local_addr().unwrap();
 
         let h2 = handle.clone();
@@ -220,7 +225,7 @@ mod transfer {
         handle.spawn(
             listener.incoming()
                 .map_err(|e| panic!("server err: {:?}", e))
-                .for_each(move |(sock, _)| {
+                .for_each(move |sock| {
                     sock.set_linger(Some(Duration::from_secs(0))).unwrap();
                     let drain = Drain {
                         sock: sock,
@@ -233,7 +238,7 @@ mod transfer {
                 }));
 
         b.iter(move || {
-            let client = TcpStream::connect(&addr, &handle)
+            let client = TcpStream::connect(&addr)
                 .and_then(|sock| {
                     Transfer {
                         sock: sock,
@@ -262,7 +267,7 @@ mod transfer {
             let remote = handle.remote().clone();
 
             remote_tx.send(remote).unwrap();
-            core.run(shutdown_rx).unwrap();
+            core.run(shutdown_rx).wait();
         });
 
         let remote = remote_rx.recv().unwrap();
@@ -272,7 +277,7 @@ mod transfer {
             let (client_tx, client_rx) = sync::oneshot::channel();
 
             remote.spawn(|handle| {
-                let sock = TcpListener::bind(&"127.0.0.1:0".parse().unwrap(), &handle).unwrap();
+                let sock = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
                 server_tx.send(sock).unwrap();
                 Ok(())
             });
@@ -283,7 +288,7 @@ mod transfer {
                 let addr = server.local_addr().unwrap();
 
                 remote2.spawn(move |handle| {
-                    let fut = TcpStream::connect(&addr, &handle);
+                    let fut = TcpStream::connect(&addr);
                     client_tx.send(fut).ok().unwrap();
                     Ok(())
                 });
@@ -301,7 +306,7 @@ mod transfer {
                 let server = server.incoming().into_future()
                     .map_err(|(e, _)| e)
                     .and_then(move |(sock, _)| {
-                        let sock = sock.unwrap().0;
+                        let sock = sock.unwrap();
                         sock.set_linger(Some(Duration::from_secs(0))).unwrap();
 
                         Drain {
@@ -350,4 +355,5 @@ mod transfer {
             super::cross_thread(b, 1_024, 1_024);
         }
     }
+    */
 }
