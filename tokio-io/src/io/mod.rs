@@ -9,15 +9,24 @@
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
+mod copy;
+mod flush;
+mod read;
+mod read_exact;
+mod read_to_end;
+mod read_until;
+mod shutdown;
+mod write_all;
+
 pub use allow_std::AllowStdIo;
-pub use copy::{copy, Copy};
-pub use flush::{flush, Flush};
+pub use self::copy::{copy, Copy};
+pub use self::flush::{flush, Flush};
 pub use lines::{lines, Lines};
-pub use read::{read, Read};
-pub use read_exact::{read_exact, ReadExact};
-pub use read_to_end::{read_to_end, ReadToEnd};
-pub use read_until::{read_until, ReadUntil};
-pub use shutdown::{shutdown, Shutdown};
+pub use self::read::{read, Read};
+pub use self::read_exact::{read_exact, ReadExact};
+pub use self::read_to_end::{read_to_end, ReadToEnd};
+pub use self::read_until::{read_until, ReadUntil};
+pub use self::shutdown::{shutdown, Shutdown};
 pub use split::{ReadHalf, WriteHalf};
 pub use window::Window;
-pub use write_all::{write_all, WriteAll};
+pub use self::write_all::{write_all, WriteAll};
