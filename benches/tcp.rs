@@ -58,20 +58,12 @@ mod connect_churn {
         });
     }
 
-    /*
     fn n_workers(n: usize, b: &mut Bencher) {
         let (shutdown_tx, shutdown_rx) = sync::oneshot::channel();
-        let (remote_tx, remote_rx) = ::std::sync::mpsc::channel();
+        let (addr_tx, addr_rx) = sync::oneshot::channel();
 
         // Spawn reactor thread
-        thread::spawn(move || {
-            // Create the core
-            let mut core = Reactor::new().unwrap();
-
-            // Reactor handles
-            let handle = core.handle();
-            let remote = handle.remote().clone();
-
+        let server_thread = thread::spawn(move || {
             // Bind the TCP listener
             let listener = TcpListener::bind(
                 &"127.0.0.1:0".parse().unwrap()).unwrap();
@@ -80,20 +72,21 @@ mod connect_churn {
             let addr = listener.local_addr().unwrap();
 
             // Send the remote & address back to the main thread
-            remote_tx.send((remote, addr)).unwrap();
+            addr_tx.send(addr).unwrap();
 
-            // Spawn a single task that accepts & drops connections
-            handle.spawn(
-                listener.incoming()
-                    .map_err(|e| panic!("server err: {:?}", e))
-                    .for_each(|_| Ok(())));
+            // Spawn a single future that accepts & drops connections
+            let serve_incomings = listener.incoming()
+                .map_err(|e| panic!("server err: {:?}", e))
+                .for_each(|_| Ok(()));
 
-            // Run the reactor
-            core.run(shutdown_rx).unwrap();
+            // Run server
+            serve_incomings.select(shutdown_rx)
+                .map(|_| ()).map_err(|_| ())
+                .wait().unwrap();
         });
 
-        // Get the remote info
-        let (remote, addr) = remote_rx.recv().unwrap();
+        // Get the bind addr of the server
+        let addr = addr_rx.wait().unwrap();
 
         b.iter(move || {
             use std::sync::{Barrier, Arc};
@@ -104,24 +97,12 @@ mod connect_churn {
             // Spawn worker threads
             let threads: Vec<_> = (0..n).map(|_| {
                 let barrier = barrier.clone();
-                let remote = remote.clone();
                 let addr = addr.clone();
 
                 thread::spawn(move || {
                     let connects = stream::iter((0..(NUM / n)).map(|_| {
-                        // TODO: Once `Handle` is `Send / Sync`, update this
-
-                        let (socket_tx, socket_rx) = sync::oneshot::channel();
-
-                        remote.spawn(move |handle| {
-                            TcpStream::connect(&addr)
-                                .map_err(|e| panic!("connect err: {:?}", e))
-                                .then(|res| socket_tx.send(res))
-                                .map_err(|_| ())
-                        });
-
-                        Ok(socket_rx
-                            .then(|res| res.unwrap())
+                        Ok(TcpStream::connect(&addr)
+                            .map_err(|e| panic!("connect err: {:?}", e))
                             .and_then(|sock| {
                                 sock.set_linger(Some(Duration::from_secs(0))).unwrap();
                                 read_to_end(sock, vec![])
@@ -143,8 +124,9 @@ mod connect_churn {
             }
         });
 
-        // Shutdown the reactor
+        // Shutdown the server
         shutdown_tx.send(()).unwrap();
+        server_thread.join().unwrap();
     }
 
     #[bench]
@@ -156,7 +138,6 @@ mod connect_churn {
     fn multi_threads(b: &mut Bencher) {
         n_workers(4, b);
     }
-    */
 }
 
 mod transfer {
