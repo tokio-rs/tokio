@@ -228,83 +228,6 @@ mod transfer {
         });
     }
 
-    /*
-    fn cross_thread(b: &mut Bencher, read_size: usize, write_size: usize) {
-        let (shutdown_tx, shutdown_rx) = sync::oneshot::channel();
-        let (remote_tx, remote_rx) = ::std::sync::mpsc::channel();
-
-        // Spawn reactor thread
-        thread::spawn(move || {
-            // Create the core
-            let mut core = Reactor::new().unwrap();
-
-            // Reactor handles
-            let handle = core.handle();
-            let remote = handle.remote().clone();
-
-            remote_tx.send(remote).unwrap();
-            core.run(shutdown_rx).wait();
-        });
-
-        let remote = remote_rx.recv().unwrap();
-
-        b.iter(move || {
-            let (server_tx, server_rx) = sync::oneshot::channel();
-            let (client_tx, client_rx) = sync::oneshot::channel();
-
-            remote.spawn(|handle| {
-                let sock = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-                server_tx.send(sock).unwrap();
-                Ok(())
-            });
-
-            let remote2 = remote.clone();
-
-            server_rx.and_then(move |server| {
-                let addr = server.local_addr().unwrap();
-
-                remote2.spawn(move |handle| {
-                    let fut = TcpStream::connect(&addr);
-                    client_tx.send(fut).ok().unwrap();
-                    Ok(())
-                });
-
-                let client = client_rx
-                    .then(|res| res.unwrap())
-                    .and_then(move |sock| {
-                        Transfer {
-                            sock: sock,
-                            rem: MB,
-                            chunk: write_size,
-                        }
-                    });
-
-                let server = server.incoming().into_future()
-                    .map_err(|(e, _)| e)
-                    .and_then(move |(sock, _)| {
-                        let sock = sock.unwrap();
-                        sock.set_linger(Some(Duration::from_secs(0))).unwrap();
-
-                        Drain {
-                            sock: sock,
-                            chunk: read_size,
-                        }
-                    });
-
-                client
-                    .join(server)
-                    .then(|res| {
-                        let _ = res.unwrap();
-                        Ok(())
-                    })
-            }).wait().unwrap();
-        });
-
-        // Shutdown the reactor
-        shutdown_tx.send(()).unwrap();
-    }
-    */
-
     mod small_chunks {
         use ::prelude::*;
 
@@ -312,13 +235,6 @@ mod transfer {
         fn one_thread(b: &mut Bencher) {
             super::one_thread(b, 32, 32);
         }
-
-        /*
-        #[bench]
-        fn cross_thread(b: &mut Bencher) {
-            super::cross_thread(b, 32, 32);
-        }
-        */
     }
 
     mod big_chunks {
@@ -328,12 +244,5 @@ mod transfer {
         fn one_thread(b: &mut Bencher) {
             super::one_thread(b, 1_024, 1_024);
         }
-
-        /*
-        #[bench]
-        fn cross_thread(b: &mut Bencher) {
-            super::cross_thread(b, 1_024, 1_024);
-        }
-        */
     }
 }
