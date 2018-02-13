@@ -12,7 +12,12 @@ matrix:
   - rust: nightly
 
 script:
-- cargo test --all
+  - |
+    if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
+    then
+        cargo build --benches
+    fi
+  - cargo test --all
 
 deploy:
   provider:  pages
