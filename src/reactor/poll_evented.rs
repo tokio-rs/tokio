@@ -17,6 +17,12 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use reactor::{Handle, Direction};
 
+struct Registration {
+    pub token: usize,
+    pub handle: Handle,
+    pub readiness: usize,
+}
+
 /// A concrete implementation of a stream of readiness notifications for I/O
 /// objects that originates from an event loop.
 ///
@@ -63,9 +69,7 @@ use reactor::{Handle, Direction};
 /// method you want to also use `need_read` to signal blocking and you should
 /// otherwise probably avoid using two tasks on the same `PollEvented`.
 pub struct PollEvented<E> {
-    token: usize,
-    handle: Handle,
-    readiness: usize,
+    registration: Registration,
     io: E,
 }
 
@@ -91,9 +95,11 @@ impl<E> PollEvented<E> {
         };
 
         Ok(PollEvented {
-            token,
-            readiness: 0,
-            handle: handle.clone(),
+            registration: Registration {
+                token: token,
+                readiness: 0,
+                handle: handle.clone()
+            },
             io: io,
         })
     }
@@ -162,19 +168,20 @@ impl<E> PollEvented<E> {
     pub fn poll_ready(&mut self, mask: Ready) -> Async<Ready> {
         let bits = super::ready2usize(mask);
 
-        match self.readiness & bits {
+        match self.registration.readiness & bits {
             0 => {}
             n => return Async::Ready(super::usize2ready(n)),
         }
 
-        let token_readiness = self.handle.inner().map(|inner| {
+        let token_readiness = self.registration.handle.inner().map(|inner| {
             let io_dispatch = inner.io_dispatch.read().unwrap();
-            io_dispatch[self.token].readiness.swap(0, Ordering::SeqCst)
+            let token = self.registration.token;
+            io_dispatch[token].readiness.swap(0, Ordering::SeqCst)
         }).unwrap_or(0);
 
-        self.readiness |= token_readiness;
+        self.registration.readiness |= token_readiness;
 
-        match self.readiness & bits {
+        match self.registration.readiness & bits {
             0 => {
                 if mask.is_writable() {
                     if self.need_write().is_err() {
@@ -224,13 +231,13 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn need_read(&mut self) -> io::Result<()> {
         let bits = super::ready2usize(super::read_ready());
-        self.readiness &= !bits;
+        self.registration.readiness &= !bits;
 
-        let inner = match self.handle.inner() {
+        let inner = match self.registration.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
-        inner.schedule(self.token, Direction::Read);
+        inner.schedule(self.registration.token, Direction::Read);
         Ok(())
     }
 
@@ -264,20 +271,20 @@ impl<E> PollEvented<E> {
     /// task.
     pub fn need_write(&mut self) -> io::Result<()> {
         let bits = super::ready2usize(Ready::writable());
-        self.readiness &= !bits;
+        self.registration.readiness &= !bits;
 
-        let inner = match self.handle.inner() {
+        let inner = match self.registration.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
-        inner.schedule(self.token, Direction::Write);
+        inner.schedule(self.registration.token, Direction::Write);
         Ok(())
     }
 
     /// Returns a reference to the event loop handle that this readiness stream
     /// is associated with.
     pub fn handle(&self) -> &Handle {
-        &self.handle
+        &self.registration.handle
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -290,6 +297,11 @@ impl<E> PollEvented<E> {
     /// stream is wrapping.
     pub fn get_mut(&mut self) -> &mut E {
         &mut self.io
+    }
+
+    /// Consumes the `PollEvented` and returns the underlying I/O object
+    pub fn into_inner(self) -> E {
+        self.io
     }
 
     /// Deregisters this source of events from the reactor core specified.
@@ -378,7 +390,7 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
     }
 }
 
-impl<E> Drop for PollEvented<E> {
+impl Drop for Registration {
     fn drop(&mut self) {
         if let Some(inner) = self.handle.inner() {
             inner.drop_source(self.token);
