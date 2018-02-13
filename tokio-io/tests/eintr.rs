@@ -11,7 +11,7 @@ use futures::{Async, Poll, Future};
 use std::io::{self, Read, Write, Cursor, Error, ErrorKind};
 
 #[test]
-//#[ignore]
+#[ignore]
 fn eintr_async_read() {
     struct R {
         pub call_n: usize // increment each call to `read`
@@ -41,8 +41,8 @@ fn eintr_async_read() {
     assert_eq!(buf[..], b"hello world"[..]);
 }
 
-
 #[test]
+#[ignore]
 fn eintr_async_write() {
     struct W {
         pub buf: BytesMut,
@@ -81,6 +81,7 @@ fn eintr_async_write() {
 }
 
 #[test]
+#[ignore]
 fn eintr_shutdown() {
     #[derive(Debug, PartialEq)]
     struct W {
