@@ -40,7 +40,7 @@ mod connect_churn {
                 .map_err(|e| panic!("server err: {:?}", e))
                 .for_each(|_| Ok(()));
 
-            let connects = stream::iter((0..NUM).map(|_| {
+            let connects = stream::iter_result((0..NUM).map(|_| {
                 Ok(TcpStream::connect(&addr)
                     .and_then(|sock| {
                         sock.set_linger(Some(Duration::from_secs(0))).unwrap();
@@ -100,7 +100,7 @@ mod connect_churn {
                 let addr = addr.clone();
 
                 thread::spawn(move || {
-                    let connects = stream::iter((0..(NUM / n)).map(|_| {
+                    let connects = stream::iter_result((0..(NUM / n)).map(|_| {
                         Ok(TcpStream::connect(&addr)
                             .map_err(|e| panic!("connect err: {:?}", e))
                             .and_then(|sock| {
