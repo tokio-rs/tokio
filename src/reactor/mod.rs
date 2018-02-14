@@ -118,8 +118,8 @@ impl Reactor {
         })
     }
 
-    /// Returns a handle to this event loop which cannot be sent across threads
-    /// but can be used as a proxy to the event loop itself.
+    /// Returns a handle to this event loop which can be sent across threads 
+    /// and can be used as a proxy to the event loop itself.
     ///
     /// Handles are cloneable and clones always refer to the same event loop.
     /// This handle is typically passed into functions that create I/O objects
