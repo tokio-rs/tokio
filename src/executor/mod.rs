@@ -4,5 +4,3 @@
 //! many tasks on a single thread.
 
 pub mod current_thread;
-mod scheduler;
-mod sleep;

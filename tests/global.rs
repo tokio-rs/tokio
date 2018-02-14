@@ -1,5 +1,6 @@
 extern crate futures;
 extern crate tokio;
+extern crate env_logger;
 
 use std::thread;
 
@@ -15,6 +16,8 @@ macro_rules! t {
 
 #[test]
 fn hammer() {
+    let _ = env_logger::init();
+
     let threads = (0..10).map(|_| {
         thread::spawn(|| {
             let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));

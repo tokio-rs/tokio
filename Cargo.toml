@@ -23,7 +23,9 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 members = [
   "./",
+  "tokio-executor",
   "tokio-io",
+  "tokio-threadpool",
 ]
 
 [badges]
@@ -31,12 +33,14 @@ travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "carllerche/tokio" }
 
 [dependencies]
+tokio-io = "0.1"
+tokio-executor = { version = "0.1", path = "tokio-executor" }
+tokio-threadpool = { version = "0.1", path = "tokio-threadpool" }
 bytes = "0.4"
 log = "0.4"
 mio = "0.6.13"
 slab = "0.4"
 iovec = "0.1"
-tokio-io = "0.1"
 futures = "0.1.16"
 
 [dev-dependencies]

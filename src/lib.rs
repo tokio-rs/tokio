@@ -99,6 +99,8 @@ extern crate mio;
 extern crate slab;
 #[macro_use]
 extern crate tokio_io;
+extern crate tokio_executor;
+extern crate tokio_threadpool;
 
 #[macro_use]
 extern crate log;
@@ -106,3 +108,4 @@ extern crate log;
 pub mod executor;
 pub mod net;
 pub mod reactor;
+pub mod runtime;

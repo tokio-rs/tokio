@@ -1,33 +1,47 @@
-use futures::executor::Notify;
+//! Abstraction around parking a thread. This is used by executor
+//! implementations.
 
-use std::fmt;
+use std::marker::PhantomData;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-/// Puts the current thread to sleep.
-pub trait Sleep {
-    /// Wake up handle.
-    type Wakeup: Wakeup;
+/// Parks the current thread
+pub trait Park {
+    /// Unpark handle
+    type Unpark: Unpark;
 
-    /// Get a new `Wakeup` handle.
-    fn wakeup(&self) -> Self::Wakeup;
+    /// Get a new `Unpark` handle.
+    fn unpark(&self) -> Self::Unpark;
 
-    /// Put the current thread to sleep.
-    fn sleep(&mut self);
+    /// Park the current thread
+    fn park(&mut self);
 
-    /// Put the current thread to sleep for at most `duration`.
-    fn sleep_timeout(&mut self, duration: Duration);
+    /// Park the current thread for at most `duration`.
+    fn park_timeout(&mut self, duration: Duration);
 }
 
-/// Wake up a sleeping thread.
-pub trait Wakeup: Clone + Send + 'static {
-    /// Wake up the sleeping thread.
-    fn wakeup(&self);
+/// Unpark a parked thread
+pub trait Unpark: Sync + Send + 'static {
+    /// Unpark up the parked thread.
+    fn unpark(&self);
 }
 
-/// Blocks the current thread
-pub struct BlockThread {
+/// Parks the current thread
+#[derive(Debug)]
+pub struct ParkThread {
+    _anchor: PhantomData<Rc<()>>,
+}
+
+/// Unparks a thread that was parked by `ParkThread`.
+#[derive(Clone, Debug)]
+pub struct UnparkThread {
+    inner: Arc<Inner>,
+}
+
+#[derive(Debug)]
+struct Inner {
     state: AtomicUsize,
     mutex: Mutex<()>,
     condvar: Condvar,
@@ -38,27 +52,64 @@ const NOTIFY: usize = 1;
 const SLEEP: usize = 2;
 
 thread_local! {
-    static CURRENT_THREAD_NOTIFY: Arc<BlockThread> = Arc::new(BlockThread {
+    static CURRENT_PARK_THREAD: Arc<Inner> = Arc::new(Inner {
         state: AtomicUsize::new(IDLE),
         mutex: Mutex::new(()),
         condvar: Condvar::new(),
     });
 }
 
-// ===== impl BlockThread =====
+// ===== impl ParkThread =====
 
-impl BlockThread {
-    pub fn with_current<F, R>(f: F) -> R
-        where F: FnOnce(&Arc<BlockThread>) -> R,
+impl ParkThread {
+    /// Create a new `ParkThread` handle for the current thread.
+    ///
+    /// This type cannot be moved to other threads, so it should be created on
+    /// the thread that the caller intends to park.
+    pub fn new() -> ParkThread {
+        ParkThread {
+            _anchor: PhantomData,
+        }
+    }
+
+    /// Get a reference to the `ParkThread` handle for this thread.
+    fn with_current<F, R>(&self, f: F) -> R
+        where F: FnOnce(&Arc<Inner>) -> R,
     {
-        CURRENT_THREAD_NOTIFY.with(|notify| f(notify))
+        CURRENT_PARK_THREAD.with(|inner| f(inner))
+    }
+}
+
+impl Park for ParkThread {
+    type Unpark = UnparkThread;
+
+    fn unpark(&self) -> Self::Unpark {
+        let inner = self.with_current(|inner| inner.clone());
+        UnparkThread { inner }
     }
 
-    pub fn park(&self) {
-        self.park_timeout(None);
+    fn park(&mut self) {
+        self.with_current(|inner| inner.park(None));
     }
 
-    pub fn park_timeout(&self, dur: Option<Duration>) {
+    fn park_timeout(&mut self, duration: Duration) {
+        self.with_current(|inner| inner.park(Some(duration)));
+    }
+}
+
+// ===== impl UnparkThread =====
+
+impl Unpark for UnparkThread {
+    fn unpark(&self) {
+        self.inner.unpark();
+    }
+}
+
+// ===== impl Inner =====
+
+impl Inner {
+    /// Park the current thread for at most `dur`.
+    fn park(&self, dur: Option<Duration>) {
         // If currently notified, then we skip sleeping. This is checked outside
         // of the lock to avoid acquiring a mutex if not necessary.
         match self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
@@ -131,39 +182,5 @@ impl BlockThread {
 
         // Wakeup the sleeper
         self.condvar.notify_one();
-    }
-}
-
-impl Notify for BlockThread {
-    fn notify(&self, _unpark_id: usize) {
-        self.unpark();
-    }
-}
-
-impl<'a> Sleep for &'a Arc<BlockThread> {
-    type Wakeup = Arc<BlockThread>;
-
-    fn wakeup(&self) -> Self::Wakeup {
-        (*self).clone()
-    }
-
-    fn sleep(&mut self) {
-        self.park();
-    }
-
-    fn sleep_timeout(&mut self, duration: Duration) {
-        self.park_timeout(Some(duration));
-    }
-}
-
-impl Wakeup for Arc<BlockThread> {
-    fn wakeup(&self) {
-        self.unpark();
-    }
-}
-
-impl fmt::Debug for BlockThread {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("BlockThread").finish()
     }
 }
