@@ -1012,7 +1012,7 @@ impl Worker {
                 // Enter an execution context
                 let mut enter = tokio_executor::enter().unwrap();
 
-                tokio_executor::with_default_executor(&mut sender, &mut enter, |enter| {
+                tokio_executor::with_default(&mut sender, &mut enter, |enter| {
                     if let Some(ref callback) = wref.inner.config.around_worker {
                         callback.call(wref, enter);
                     } else {

@@ -61,7 +61,7 @@ pub fn spawn<T>(future: T)
 /// # Panics
 ///
 /// This function panics if there already is a default executor set.
-pub fn with_default_executor<T, F, R>(executor: &mut T, enter: &mut Enter, f: F) -> R
+pub fn with_default<T, F, R>(executor: &mut T, enter: &mut Enter, f: F) -> R
 where T: Executor,
       F: FnOnce(&mut Enter) -> R
 {
@@ -82,7 +82,7 @@ where T: Executor,
 
         // While scary, this is safe. The function takes a
         // `&mut Executor`, which guarantees that the reference lives for the
-        // duration of `with_default_executor`.
+        // duration of `with_default`.
         //
         // Because we are always clearing the TLS value at the end of the
         // function, we can cast the reference to 'static which thread-local

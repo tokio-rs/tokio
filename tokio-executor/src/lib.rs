@@ -10,7 +10,7 @@ mod global;
 pub mod park;
 
 pub use enter::{enter, Enter, EnterError};
-pub use global::{spawn, with_default_executor, DefaultExecutor};
+pub use global::{spawn, with_default, DefaultExecutor};
 
 use futures::Future;
 

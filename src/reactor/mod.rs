@@ -130,7 +130,7 @@ fn _assert_kinds() {
 /// # Panics
 ///
 /// This function panics if there already is a default reactor set.
-pub fn with_default_reactor<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
+pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where F: FnOnce(&mut Enter) -> R
 {
     CURRENT_REACTOR.with(|current| {
@@ -154,6 +154,32 @@ where F: FnOnce(&mut Enter) -> R
 
         f(enter)
     })
+}
+
+/// Set the defaut reactor for the lifetime of the `enter` instance.
+///
+/// # Panics
+///
+/// This function panics if there already is a default reactor set.
+pub fn set_default(handle: &Handle, enter: &mut Enter) {
+    CURRENT_REACTOR.with(|current| {
+        let mut current = current.borrow_mut();
+
+        assert!(current.is_none(), "default Tokio reactor already set for execution context");
+
+        *current = Some(handle.clone());
+    });
+
+    // Unset the default when `enter` is dropped
+    enter.on_exit(|| {
+        CURRENT_REACTOR.with(|current| {
+            let mut current = current.borrow_mut();
+
+            assert!(current.is_some());
+
+            *current = None;
+        });
+    });
 }
 
 impl Reactor {

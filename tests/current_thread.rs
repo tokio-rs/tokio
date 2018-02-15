@@ -31,6 +31,27 @@ fn spawning_from_init_future() {
 }
 
 #[test]
+fn run_seeded() {
+    let cnt = Rc::new(Cell::new(0));
+    let c = cnt.clone();
+
+    let msg = current_thread::run_seeded(lazy(move || {
+        c.set(1 + c.get());
+
+        // Spawn!
+        current_thread::spawn(lazy(move || {
+            c.set(1 + c.get());
+            Ok::<(), ()>(())
+        }));
+
+        Ok::<_, ()>("hello")
+    })).unwrap();
+
+    assert_eq!(2, cnt.get());
+    assert_eq!(msg, "hello");
+}
+
+#[test]
 fn block_waits() {
     let cnt = Rc::new(Cell::new(0));
 
@@ -83,6 +104,29 @@ fn does_not_set_global_executor_by_default() {
     });
 }
 
+#[test]
+fn spawn_from_block_on_future() {
+    let cnt = Rc::new(Cell::new(0));
+
+    let mut current_thread = CurrentThread::new();
+    let mut enter = tokio_executor::enter().unwrap();
+
+    current_thread.block_on(&mut enter, lazy(|| {
+        let cnt = cnt.clone();
+
+        current_thread::spawn(lazy(move || {
+            cnt.set(1 + cnt.get());
+            Ok(())
+        }));
+
+        Ok::<_, ()>(())
+    })).unwrap();
+
+    current_thread.run(&mut enter).unwrap();
+
+    assert_eq!(1, cnt.get());
+}
+
 struct Never(Rc<()>);
 
 impl Future for Never {
@@ -111,9 +155,11 @@ fn outstanding_tasks_are_dropped_when_executor_is_dropped() {
     let mut rc = Rc::new(());
 
     let mut current_thread = CurrentThread::new();
-    current_thread.with_context(|| {
+    let mut enter = tokio_executor::enter().unwrap();
+
+    current_thread.with_context(&mut enter, || {
         current_thread::spawn(Never(rc.clone()));
-    }).unwrap();
+    });
 
     drop(current_thread);
 

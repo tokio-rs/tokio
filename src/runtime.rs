@@ -70,7 +70,7 @@ impl Runtime {
 
         let pool = threadpool::Builder::new()
             .around_worker(move |w, enter| {
-                reactor::with_default_reactor(&handle, enter, |_| {
+                reactor::with_default(&handle, enter, |_| {
                     w.run();
                 });
             })
@@ -94,8 +94,8 @@ impl Runtime {
         let spawn = inner.pool.sender_mut();
         let reactor = inner.reactor.handle();
 
-        tokio_executor::with_default_executor(spawn, &mut enter, |enter| {
-            reactor::with_default_reactor(reactor, enter, |_| {
+        tokio_executor::with_default(spawn, &mut enter, |enter| {
+            reactor::with_default(reactor, enter, |_| {
                 Ok(f())
             })
         })

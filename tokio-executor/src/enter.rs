@@ -1,5 +1,5 @@
 use std::prelude::v1::*;
-use std::cell::{RefCell, Cell};
+use std::cell::Cell;
 use std::fmt;
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
@@ -8,7 +8,7 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 ///
 /// For more details, see [`enter` documentation](fn.enter.html)
 pub struct Enter {
-    on_exit: RefCell<Vec<Box<Callback>>>,
+    on_exit: Vec<Box<Callback>>,
     permanent: bool,
 }
 
@@ -38,7 +38,7 @@ pub fn enter() -> Result<Enter, EnterError> {
             c.set(true);
 
             Ok(Enter {
-                on_exit: RefCell::new(Vec::new()),
+                on_exit: Vec::new(),
                 permanent: false,
             })
         }
@@ -48,8 +48,8 @@ pub fn enter() -> Result<Enter, EnterError> {
 impl Enter {
     /// Register a callback to be invoked if and when the thread
     /// ceased to act as an executor.
-    pub fn on_exit<F>(&self, f: F) where F: FnOnce() + 'static {
-        self.on_exit.borrow_mut().push(Box::new(f));
+    pub fn on_exit<F>(&mut self, f: F) where F: FnOnce() + 'static {
+        self.on_exit.push(Box::new(f));
     }
 
     /// Treat the remainder of execution on this thread as part of an
@@ -72,14 +72,15 @@ impl Drop for Enter {
     fn drop(&mut self) {
         ENTERED.with(|c| {
             assert!(c.get());
+
             if self.permanent {
                 return
             }
 
-            let mut on_exit = self.on_exit.borrow_mut();
-            for callback in on_exit.drain(..) {
+            for callback in self.on_exit.drain(..) {
                 callback.call();
             }
+
             c.set(false);
         });
     }
