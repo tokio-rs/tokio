@@ -12,14 +12,17 @@ pub trait Park {
     /// Unpark handle
     type Unpark: Unpark;
 
+    /// Error returned by `park`
+    type Error;
+
     /// Get a new `Unpark` handle.
     fn unpark(&self) -> Self::Unpark;
 
     /// Park the current thread
-    fn park(&mut self);
+    fn park(&mut self) -> Result<(), Self::Error>;
 
     /// Park the current thread for at most `duration`.
-    fn park_timeout(&mut self, duration: Duration);
+    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error>;
 }
 
 /// Unpark a parked thread
@@ -32,6 +35,12 @@ pub trait Unpark: Sync + Send + 'static {
 #[derive(Debug)]
 pub struct ParkThread {
     _anchor: PhantomData<Rc<()>>,
+}
+
+/// Error returned by `ParkThread`
+#[derive(Debug)]
+pub struct ParkError {
+    _p: (),
 }
 
 /// Unparks a thread that was parked by `ParkThread`.
@@ -82,18 +91,19 @@ impl ParkThread {
 
 impl Park for ParkThread {
     type Unpark = UnparkThread;
+    type Error = ParkError;
 
     fn unpark(&self) -> Self::Unpark {
         let inner = self.with_current(|inner| inner.clone());
         UnparkThread { inner }
     }
 
-    fn park(&mut self) {
-        self.with_current(|inner| inner.park(None));
+    fn park(&mut self) -> Result<(), Self::Error> {
+        self.with_current(|inner| inner.park(None))
     }
 
-    fn park_timeout(&mut self, duration: Duration) {
-        self.with_current(|inner| inner.park(Some(duration)));
+    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
+        self.with_current(|inner| inner.park(Some(duration)))
     }
 }
 
@@ -109,11 +119,11 @@ impl Unpark for UnparkThread {
 
 impl Inner {
     /// Park the current thread for at most `dur`.
-    fn park(&self, dur: Option<Duration>) {
+    fn park(&self, dur: Option<Duration>) -> Result<(), ParkError> {
         // If currently notified, then we skip sleeping. This is checked outside
         // of the lock to avoid acquiring a mutex if not necessary.
         match self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
-            NOTIFY => return,
+            NOTIFY => return Ok(()),
             IDLE => {},
             _ => unreachable!(),
         }
@@ -128,7 +138,7 @@ impl Inner {
                 // Notified before we could sleep, consume the notification and
                 // exit
                 self.state.store(IDLE, Ordering::SeqCst);
-                return;
+                return Ok(());
             }
             IDLE => {},
             _ => unreachable!(),
@@ -146,7 +156,7 @@ impl Inner {
                     if now >= until {
                         // Timed out... exit sleep state
                         self.state.store(IDLE, Ordering::SeqCst);
-                        return;
+                        return Ok(());
                     }
 
                     time = Some((until, until - now));
@@ -157,7 +167,7 @@ impl Inner {
 
             // Transition back to idle, loop otherwise
             if NOTIFY == self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
-                return;
+                return Ok(());
             }
         }
     }

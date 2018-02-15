@@ -17,6 +17,7 @@
 //! [`TcpStream`]: ../net/struct.TcpStream.html
 
 use tokio_executor::Enter;
+use tokio_executor::park::{Park, Unpark};
 
 use std::{fmt, usize};
 use std::io::{self, ErrorKind};
@@ -178,7 +179,7 @@ impl Reactor {
         })
     }
 
-    /// Returns a handle to this event loop which can be sent across threads 
+    /// Returns a handle to this event loop which can be sent across threads
     /// and can be used as a proxy to the event loop itself.
     ///
     /// Handles are cloneable and clones always refer to the same event loop.
@@ -314,6 +315,25 @@ impl Reactor {
     }
 }
 
+impl Park for Reactor {
+    type Unpark = Handle;
+    type Error = io::Error;
+
+    fn unpark(&self) -> Self::Unpark {
+        self.handle()
+    }
+
+    fn park(&mut self) -> io::Result<()> {
+        self.turn(None)?;
+        Ok(())
+    }
+
+    fn park_timeout(&mut self, duration: Duration) -> io::Result<()> {
+        self.turn(Some(duration))?;
+        Ok(())
+    }
+}
+
 impl fmt::Debug for Reactor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Reactor")
@@ -406,6 +426,12 @@ impl Handle {
 
     fn inner(&self) -> Option<Arc<Inner>> {
         self.inner.upgrade()
+    }
+}
+
+impl Unpark for Handle {
+    fn unpark(&self) {
+        self.wakeup();
     }
 }
 

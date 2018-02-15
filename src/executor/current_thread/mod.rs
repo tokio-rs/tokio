@@ -107,7 +107,7 @@ pub struct RunError {
 /// Error returned by the `run_timeout` function.
 #[derive(Debug)]
 pub struct RunTimeoutError {
-    _p: (),
+    timeout: bool,
 }
 
 /// Error returned by the `block_on` function.
@@ -240,7 +240,10 @@ where P: Park,
                 Ok(Async::NotReady) => {}
             }
             self.turn()?;
-            self.park.park();
+
+            if let Err(_) = self.park.park() {
+                return Err(BlockError { inner: None });
+            }
         }
     }
 
@@ -304,17 +307,23 @@ where P: Park,
 
             match time {
                 Some((until, rem)) => {
-                    self.park.park_timeout(rem);
+                    if let Err(_) = self.park.park_timeout(rem) {
+                        return Err(RunTimeoutError::new(false));
+                    }
 
                     let now = Instant::now();
 
                     if now >= until {
-                        return Err(RunTimeoutError { _p: () });
+                        return Err(RunTimeoutError::new(true));
                     }
 
                     time = Some((until, until - now));
                 }
-                None => self.park.park(),
+                None => {
+                    if let Err(_) = self.park.park() {
+                        return Err(RunTimeoutError::new(false));
+                    }
+                }
             }
         }
     }
@@ -532,9 +541,20 @@ unsafe fn hide_lt<'a>(p: *mut (SpawnLocal + 'a)) -> *mut (SpawnLocal + 'static) 
 
 // ===== impl RunTimeoutError =====
 
+impl RunTimeoutError {
+    fn new(timeout: bool) -> Self {
+        RunTimeoutError { timeout }
+    }
+
+    /// Returns `true` if the error was caused by the operation timeing out.
+    pub fn is_timeout(&self) -> bool {
+        self.timeout
+    }
+}
+
 impl From<tokio_executor::EnterError> for RunTimeoutError {
     fn from(_: tokio_executor::EnterError) -> Self {
-        RunTimeoutError { _p: () }
+        RunTimeoutError::new(false)
     }
 }
 
