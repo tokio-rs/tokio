@@ -91,7 +91,8 @@ impl Task {
         mem::transmute(unpark_id)
     }
 
-    /// Execute the task returning `true` if the task needs to be scheduled again.
+    /// Execute the task returning `Run::Schedule` if the task needs to be
+    /// scheduled again.
     pub fn run(&self, unpark: &Arc<Notifier>) -> Run {
         use self::State::*;
 

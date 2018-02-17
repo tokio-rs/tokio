@@ -13,9 +13,9 @@ long as the root computation completes in a timely fashion. In other words,
 Rayon does not provide any guarantees of fairness with regards to how each task
 gets scheduled.
 
-On the other hand, `futures-pool` is a general purpose scheduler and attempts to
-schedule each task fairly. This is the ideal behavior when scheduling a set of
-unrelated tasks.
+On the other hand, `tokio-threadpool` is a general purpose scheduler and
+attempts to schedule each task fairly. This is the ideal behavior when
+scheduling a set of unrelated tasks.
 
 ### Why not futures-cpupool?
 
@@ -45,8 +45,8 @@ pub fn main() {
 
 ## License
 
-`futures-pool` is primarily distributed under the terms of both the MIT license
-and the Apache License (Version 2.0), with portions covered by various BSD-like
-licenses.
+`tokio-threadpool` is primarily distributed under the terms of both the MIT
+license and the Apache License (Version 2.0), with portions covered by various
+BSD-like licenses.
 
 See LICENSE-APACHE, and LICENSE-MIT for details.

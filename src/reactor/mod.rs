@@ -60,7 +60,7 @@ pub struct Reactor {
 ///
 /// A `Handle` is used for associating I/O objects with an event loop
 /// explicitly. Typically though you won't end up using a `Handle` that often
-/// and will instead use and implicitly configured handle for your thread.
+/// and will instead use an implicitly configured handle for your thread.
 #[derive(Clone)]
 pub struct Handle {
     inner: Weak<Inner>,
@@ -380,7 +380,7 @@ impl Handle {
 
         // If the fallback hasn't been previously initialized then let's spin
         // up a helper thread and try to initialize with that. If we can't
-        // actually create a helper thread then we'll just return a "defunkt"
+        // actually create a helper thread then we'll just return a "defunct"
         // handle which will return errors when I/O objects are attempted to be
         // associated.
         if fallback == 0 {
