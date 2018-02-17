@@ -412,20 +412,29 @@ impl fmt::Debug for CurrentThread {
 
 // ===== impl TaskExecutor =====
 
-/// Returns an executor that executes futures on the current thread.
-///
-/// The user of `TaskExecutor` must ensure that when a future is submitted,
-/// that it is done within the context of a call to `run`.
-///
-/// For more details, see the [module level](index.html) documentation.
+#[deprecated(since = "0.1.2", note = "use TaskExecutor::current instead")]
+#[doc(hidden)]
 pub fn task_executor() -> TaskExecutor {
     TaskExecutor {
         _p: ::std::marker::PhantomData,
     }
 }
 
-impl tokio_executor::Executor for TaskExecutor {
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
+impl TaskExecutor {
+    /// Returns an executor that executes futures on the current thread.
+    ///
+    /// The user of `TaskExecutor` must ensure that when a future is submitted,
+    /// that it is done within the context of a call to `run`.
+    ///
+    /// For more details, see the [module level](index.html) documentation.
+    pub fn current() -> TaskExecutor {
+        TaskExecutor {
+            _p: ::std::marker::PhantomData,
+        }
+    }
+
+    /// Spawn a future onto the current `CurrentThread` instance.
+    pub fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>)
         -> Result<(), SpawnError>
     {
         CURRENT.with(|current| {
@@ -439,6 +448,14 @@ impl tokio_executor::Executor for TaskExecutor {
                 }
             }
         })
+    }
+}
+
+impl tokio_executor::Executor for TaskExecutor {
+    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
+        -> Result<(), SpawnError>
+    {
+        self.spawn_local(future)
     }
 
     fn status(&self) -> Result<(), SpawnError> {

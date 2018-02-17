@@ -1,6 +1,6 @@
 //! Tokio runtime
 
-use reactor::{self, Reactor};
+use reactor::{self, Reactor, Handle};
 use reactor::background::{self, Background};
 
 use tokio_executor;
@@ -84,8 +84,13 @@ impl Runtime {
         })
     }
 
+    /// Return a reference to the reactor handle for this runtime instance.
+    pub fn handle(&self) -> &Handle {
+        self.inner.as_ref().unwrap().reactor.handle()
+    }
+
     /// Run the given closure from within the context of the runtime.
-    pub fn with_context<F, R>(&mut self, f: F) -> Result<R, EnterError>
+    fn with_context<F, R>(&mut self, f: F) -> Result<R, EnterError>
     where F: FnOnce() -> R
     {
         let mut enter = tokio_executor::enter()?;
