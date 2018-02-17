@@ -189,6 +189,36 @@ fn run_in_future() {
 }
 
 #[test]
+fn tick_on_infini_future() {
+    let num = Rc::new(Cell::new(0));
+
+    struct Infini {
+        num: Rc<Cell<usize>>,
+    }
+
+    impl Future for Infini {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            self.num.set(1 + self.num.get());
+            task::current().notify();
+            Ok(Async::NotReady)
+        }
+    }
+
+    let mut current_thread = CurrentThread::new();
+    let mut enter = tokio_executor::enter().unwrap();
+
+    current_thread.spawn(Infini {
+        num: num.clone(),
+    });
+
+    current_thread.turn(&mut enter, None).unwrap();
+    assert_eq!(1, num.get());
+}
+
+#[test]
 fn tasks_are_scheduled_fairly() {
     let state = Rc::new(RefCell::new([0, 0]));
 

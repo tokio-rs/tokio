@@ -88,6 +88,10 @@ pub struct TaskExecutor {
     _p: ::std::marker::PhantomData<Rc<()>>,
 }
 
+/// Returned by the `turn` function
+#[derive(Debug)]
+pub struct Turn(());
+
 /// A context yielded to the closure provided to `run`.
 ///
 /// This type probably shouldn't be used. Instead, use `CurrentThread` directly.
@@ -107,6 +111,12 @@ pub struct RunError {
 #[derive(Debug)]
 pub struct RunTimeoutError {
     timeout: bool,
+}
+
+/// Error returned by the `turn` function.
+#[derive(Debug)]
+pub struct TurnError {
+    _p: (),
 }
 
 /// Error returned by the `block_on` function.
@@ -258,7 +268,7 @@ impl<P: Park> CurrentThread<P> {
                 Ok(Async::NotReady) => {}
             }
 
-            self.turn(enter);
+            self.tick(enter);
 
             if let Err(_) = self.park.park() {
                 return Err(BlockError { inner: None });
@@ -295,6 +305,26 @@ impl<P: Park> CurrentThread<P> {
         self.run_timeout2(enter, Some(duration))
     }
 
+    /// Perform a single iteration of the event loop
+    pub fn turn(&mut self, enter: &mut Enter, duration: Option<Duration>)
+        -> Result<Turn, TurnError>
+    {
+        if !self.tick(enter) {
+            let res = match duration {
+                Some(duration) => self.park.park_timeout(duration),
+                None => self.park.park(),
+            };
+
+            if res.is_err() {
+                return Err(TurnError { _p: () });
+            }
+
+            self.tick(enter);
+        }
+
+        Ok(Turn(()))
+    }
+
     fn run_timeout2(&mut self, enter: &mut Enter, dur: Option<Duration>)
         -> Result<(), RunTimeoutError>
     {
@@ -306,7 +336,7 @@ impl<P: Park> CurrentThread<P> {
         let mut time = dur.map(|dur| (Instant::now() + dur, dur));
 
         loop {
-            self.turn(enter);
+            self.tick(enter);
 
             if self.is_idle() {
                 return Ok(());
@@ -335,22 +365,23 @@ impl<P: Park> CurrentThread<P> {
         }
     }
 
-    fn turn(&mut self, enter: &mut Enter) {
+    /// Returns `true` if any futures were processed
+    fn tick(&mut self, enter: &mut Enter) -> bool {
         let num_futures = &mut self.num_futures;
 
         // work the scheduler
-        self.scheduler.turn(|scheduler, scheduled| {
+        self.scheduler.tick(|scheduler, scheduled| {
             let mut borrow = Borrow {
                 scheduler,
                 num_futures,
             };
 
             // A future completed, decrement the future count
-            if  borrow.enter(enter, || scheduled.turn()) {
+            if borrow.enter(enter, || scheduled.tick()) {
                 debug_assert!(*borrow.num_futures > 0);
                 *borrow.num_futures -= 1;
             }
-        });
+        })
     }
 
     fn borrow(&mut self) -> Borrow<P::Unpark> {

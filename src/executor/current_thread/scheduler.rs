@@ -8,9 +8,10 @@ use std::fmt::{self, Debug};
 use std::mem;
 use std::ptr;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst, Acquire, Release, AcqRel};
-use std::sync::atomic::{AtomicPtr, AtomicBool};
+use std::sync::atomic::{AtomicPtr, AtomicBool, AtomicUsize};
 use std::sync::{Arc, Weak};
 use std::usize;
+use std::thread;
 use std::marker::PhantomData;
 
 /// A generic task-aware scheduler.
@@ -63,6 +64,9 @@ struct Inner<U> {
     // Thread unpark handle
     unpark: U,
 
+    // Tick number
+    tick_num: AtomicUsize,
+
     // Head/tail of the readiness queue
     head_readiness: AtomicPtr<Node<U>>,
     tail_readiness: UnsafeCell<*const Node<U>>,
@@ -83,6 +87,9 @@ impl<U: Unpark> executor::Notify for Inner<U> {
 struct Node<U> {
     // The item
     item: UnsafeCell<Option<Task>>,
+
+    // The tick at which this node was notified
+    notified_at: AtomicUsize,
 
     // Next pointer for linked list tracking all active nodes
     next_all: UnsafeCell<*const Node<U>>,
@@ -134,6 +141,7 @@ where U: Unpark,
     pub fn new(unpark: U) -> Self {
         let stub = Arc::new(Node {
             item: UnsafeCell::new(None),
+            notified_at: AtomicUsize::new(0),
             next_all: UnsafeCell::new(ptr::null()),
             prev_all: UnsafeCell::new(ptr::null()),
             next_readiness: AtomicPtr::new(ptr::null_mut()),
@@ -143,6 +151,7 @@ where U: Unpark,
         let stub_ptr = &*stub as *const Node<U>;
         let inner = Arc::new(Inner {
             unpark,
+            tick_num: AtomicUsize::new(0),
             head_readiness: AtomicPtr::new(stub_ptr as *mut _),
             tail_readiness: UnsafeCell::new(stub_ptr),
             stub: stub,
@@ -161,6 +170,7 @@ where U: Unpark,
     pub fn schedule(&mut self, item: Box<Future<Item = (), Error = ()>>) {
         let node = Arc::new(Node {
             item: UnsafeCell::new(Some(Task::new(item))),
+            notified_at: AtomicUsize::new(0),
             next_all: UnsafeCell::new(ptr::null_mut()),
             prev_all: UnsafeCell::new(ptr::null_mut()),
             next_readiness: AtomicPtr::new(ptr::null_mut()),
@@ -180,24 +190,30 @@ where U: Unpark,
         self.inner.enqueue(ptr);
     }
 
-    /// Advance the scheduler state.
+    /// Advance the scheduler state, returning `true` if any futures were
+    /// processed.
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn turn<F>(&mut self, mut f: F)
+    pub fn tick<F>(&mut self, mut f: F) -> bool
     where F: FnMut(&mut Self, &mut Scheduled<U>),
     {
+        let mut ret = false;
+        let tick = self.inner.tick_num.fetch_add(1, SeqCst);
+
         loop {
-            let node = match unsafe { self.inner.dequeue() } {
+            let node = match unsafe { self.inner.dequeue(Some(tick)) } {
                 Dequeue::Empty => {
-                    return;
+                    return ret;
                 }
                 Dequeue::Inconsistent => {
-                    self.inner.unpark.unpark();
-                    return;
+                    thread::yield_now();
+                    continue;
                 }
                 Dequeue::Data(node) => node,
             };
+
+            ret = true;
 
             debug_assert!(node != self.inner.stub());
 
@@ -300,7 +316,7 @@ where U: Unpark,
 
 impl<'a, U: Unpark> Scheduled<'a, U> {
     /// Polls the task, returns `true` if the task has completed.
-    pub fn turn(&mut self) -> bool {
+    pub fn tick(&mut self) -> bool {
         // Tick the future
         let ret = match self.task.0.poll_future_notify(self.notify, 0) {
             Ok(Async::Ready(_)) | Err(_) => true,
@@ -405,7 +421,7 @@ impl<U> Inner<U> {
     ///
     /// Note that this unsafe as it required mutual exclusion (only one thread
     /// can call this) to be guaranteed elsewhere.
-    unsafe fn dequeue(&self) -> Dequeue<U> {
+    unsafe fn dequeue(&self, tick: Option<usize>) -> Dequeue<U> {
         let mut tail = *self.tail_readiness.get();
         let mut next = (*tail).next_readiness.load(Acquire);
 
@@ -417,6 +433,13 @@ impl<U> Inner<U> {
             *self.tail_readiness.get() = next;
             tail = next;
             next = (*next).next_readiness.load(Acquire);
+        }
+
+        if let Some(tick) = tick {
+            // Only dequeue if the node matches the tick num
+            if (*tail).notified_at.load(SeqCst) != tick {
+                return Dequeue::Empty;
+            }
         }
 
         if !next.is_null() {
@@ -457,7 +480,7 @@ impl<U> Drop for Inner<U> {
         // so we're just pulling out nodes and dropping their refcounts.
         unsafe {
             loop {
-                match self.dequeue() {
+                match self.dequeue(None) {
                     Dequeue::Empty => break,
                     Dequeue::Inconsistent => abort("inconsistent in drop"),
                     Dequeue::Data(ptr) => drop(ptr2arc(ptr)),
@@ -635,6 +658,10 @@ impl<U: Unpark> Node<U> {
         // still.
         let prev = me.queued.swap(true, SeqCst);
         if !prev {
+            // Get the current scheduler tick
+            let tick_num = inner.tick_num.load(SeqCst);
+            me.notified_at.store(tick_num, SeqCst);
+
             inner.enqueue(&**me);
             inner.unpark.unpark();
         }
