@@ -409,6 +409,16 @@ impl tokio_executor::Executor for TaskExecutor {
             }
         })
     }
+
+    fn status(&self) -> Result<(), SpawnError> {
+        CURRENT.with(|current| {
+            if current.spawn.get().is_some() {
+                Ok(())
+            } else {
+                Err(SpawnError::shutdown())
+            }
+        })
+    }
 }
 
 impl<F> Executor<F> for TaskExecutor
