@@ -538,27 +538,6 @@ impl Future for Shutdown {
 
 // ===== impl Inner =====
 
-macro_rules! worker_loop {
-    ($probe_var:ident = $init:expr; $len:expr; $body:expr) => {{
-        let mut $probe_var = $init;
-        let start = $probe_var;
-        let len = $len;
-
-        loop {
-            if $probe_var < len {
-                $body
-                $probe_var += 1;
-            } else {
-                $probe_var = 0;
-            }
-
-            if $probe_var == start {
-                break;
-            }
-        }
-    }};
-}
-
 impl Inner {
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
@@ -1167,28 +1146,39 @@ impl Worker {
         use coco::deque::Steal::*;
 
         let len = self.inner.workers.len();
-
+        let mut idx = self.inner.rand_usize() % len;
         let mut found_work = false;
+        let start = idx;
 
-        worker_loop!(idx = len; len; {
-            match self.inner.workers[idx].steal.steal_weak() {
-                Data(task) => {
-                    trace!("stole task");
+        loop {
+            if idx < len {
+                match self.inner.workers[idx].steal.steal_weak() {
+                    Data(task) => {
+                        trace!("stole task");
 
-                    self.run_task(task, notify);
+                        self.run_task(task, notify);
 
-                    trace!("try_steal_task -- signal_work; self={}; from={}",
-                           self.idx, idx);
+                        trace!("try_steal_task -- signal_work; self={}; from={}",
+                               self.idx, idx);
 
-                    // Signal other workers that work is available
-                    self.inner.signal_work(&self.inner);
+                        // Signal other workers that work is available
+                        self.inner.signal_work(&self.inner);
 
-                    return true;
+                        return true;
+                    }
+                    Empty => {}
+                    Inconsistent => found_work = true,
                 }
-                Empty => {}
-                Inconsistent => found_work = true,
+
+                idx += 1;
+            } else {
+                idx = 0;
             }
-        });
+
+            if idx == start {
+                break;
+            }
+        }
 
         found_work
     }
