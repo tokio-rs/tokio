@@ -196,7 +196,9 @@ where F: Future,
 pub fn spawn<F>(future: F)
 where F: Future<Item = (), Error = ()> + 'static
 {
-    task_executor().execute(Box::new(future)).unwrap();
+    TaskExecutor::current()
+        .spawn_local(Box::new(future))
+        .unwrap();
 }
 
 // ===== impl CurrentThread =====
