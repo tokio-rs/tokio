@@ -109,9 +109,8 @@ fn spawn_from_block_on_future() {
     let cnt = Rc::new(Cell::new(0));
 
     let mut current_thread = CurrentThread::new();
-    let mut enter = tokio_executor::enter().unwrap();
 
-    current_thread.block_on(&mut enter, lazy(|| {
+    current_thread.block_on(lazy(|| {
         let cnt = cnt.clone();
 
         current_thread::spawn(lazy(move || {
@@ -122,7 +121,7 @@ fn spawn_from_block_on_future() {
         Ok::<_, ()>(())
     })).unwrap();
 
-    current_thread.run(&mut enter).unwrap();
+    current_thread.run().unwrap();
 
     assert_eq!(1, cnt.get());
 }
@@ -155,11 +154,11 @@ fn outstanding_tasks_are_dropped_when_executor_is_dropped() {
     let mut rc = Rc::new(());
 
     let mut current_thread = CurrentThread::new();
-    let mut enter = tokio_executor::enter().unwrap();
 
-    current_thread.with_context(&mut enter, || {
+    current_thread.block_on(lazy(|| {
         current_thread::spawn(Never(rc.clone()));
-    });
+        Ok::<_, ()>(())
+    })).unwrap();
 
     drop(current_thread);
 
@@ -207,14 +206,13 @@ fn tick_on_infini_future() {
         }
     }
 
-    let mut current_thread = CurrentThread::new();
-    let mut enter = tokio_executor::enter().unwrap();
+    CurrentThread::new()
+        .spawn(Infini {
+            num: num.clone(),
+        })
+        .turn(None)
+        .unwrap();
 
-    current_thread.spawn(Infini {
-        num: num.clone(),
-    });
-
-    current_thread.turn(&mut enter, None).unwrap();
     assert_eq!(1, num.get());
 }
 

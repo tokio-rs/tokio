@@ -41,22 +41,12 @@ struct Inner {
 // ===== impl Runtime =====
 
 /// Start the Tokio runtime.
-pub fn run<F: FnOnce() -> R, R>(f: F) -> R {
-    let mut runtime = Runtime::new().unwrap();
-    let ret = runtime.with_context(f).unwrap();
-
-    runtime.shutdown().wait().unwrap();
-
-    ret
-}
-
-/// Start the Tokio runtime and spawn the provided future.
-pub fn run_seeded<F>(f: F)
+pub fn run<F>(f: F)
 where F: Future<Item = (), Error = ()> + Send + 'static,
 {
     let mut runtime = Runtime::new().unwrap();
     runtime.spawn(f);
-    runtime.shutdown().wait().unwrap();
+    runtime.shutdown_on_idle().wait().unwrap();
 }
 
 impl Runtime {
@@ -89,32 +79,16 @@ impl Runtime {
         self.inner.as_ref().unwrap().reactor.handle()
     }
 
-    /// Run the given closure from within the context of the runtime.
-    fn with_context<F, R>(&mut self, f: F) -> Result<R, EnterError>
-    where F: FnOnce() -> R
-    {
-        let mut enter = tokio_executor::enter()?;
-
-        let inner = self.inner_mut();
-        let spawn = inner.pool.sender_mut();
-        let reactor = inner.reactor.handle();
-
-        tokio_executor::with_default(spawn, &mut enter, |enter| {
-            reactor::with_default(reactor, enter, |_| {
-                Ok(f())
-            })
-        })
-    }
-
     /// Spawn a future into the Tokio runtime.
-    pub fn spawn<F>(&mut self, future: F)
+    pub fn spawn<F>(&mut self, future: F) -> &mut Self
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
         self.inner_mut().pool.sender().spawn(future).unwrap();
+        self
     }
 
     /// Shutdown the runtime
-    pub fn shutdown(mut self) -> Shutdown {
+    pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
 
         let inner = inner.reactor.shutdown_on_idle()
