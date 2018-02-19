@@ -18,13 +18,15 @@
 //! // current_thread::spawn(my_future);
 //!
 //! # pub fn main() {
-//! current_thread::run(|_| {
+//! current_thread::block_on_all(lazy(|| {
 //!     // The execution context is setup, futures may be executed.
 //!     current_thread::spawn(lazy(|| {
 //!         println!("called from the current thread executor");
 //!         Ok(())
 //!     }));
-//! });
+//!
+//!     Ok::<_, ()>(())
+//! }));
 //! # }
 //! ```
 //!
@@ -149,12 +151,8 @@ thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
     spawn: Cell::new(None),
 });
 
-/// Calls the given closure, then block until all futures submitted for
-/// execution complete.
-///
-/// In more detail, this function will block until:
-/// - All executing futures are complete, or
-/// - `cancel_all_spawned` is invoked.
+#[deprecated(since = "0.1.2", note = "use block_on_all instead")]
+#[doc(hidden)]
 pub fn run<F, R>(f: F) -> R
 where F: FnOnce(&mut Context) -> R
 {
@@ -178,7 +176,7 @@ where F: FnOnce(&mut Context) -> R
 }
 
 /// Run the executor seeded with the given future.
-pub fn run_seeded<F>(f: F) -> Result<F::Item, F::Error>
+pub fn block_on_all<F>(f: F) -> Result<F::Item, F::Error>
 where F: Future,
 {
     let mut current_thread = CurrentThread::new();

@@ -2,7 +2,7 @@ extern crate tokio;
 extern crate tokio_executor;
 extern crate futures;
 
-use tokio::executor::current_thread::{self, run, CurrentThread};
+use tokio::executor::current_thread::{self, block_on_all, CurrentThread};
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -10,32 +10,16 @@ use std::thread;
 use std::time::Duration;
 
 use futures::task;
-use futures::future::lazy;
+use futures::future::{self, lazy};
 use futures::prelude::*;
 use futures::sync::oneshot;
 
 #[test]
-fn spawning_from_init_future() {
-    let cnt = Rc::new(Cell::new(0));
-
-    run(|_| {
-        let cnt = cnt.clone();
-
-        current_thread::spawn(lazy(move || {
-            cnt.set(1 + cnt.get());
-            Ok(())
-        }));
-    });
-
-    assert_eq!(1, cnt.get());
-}
-
-#[test]
-fn run_seeded() {
+fn spawn_from_block_on_all() {
     let cnt = Rc::new(Cell::new(0));
     let c = cnt.clone();
 
-    let msg = current_thread::run_seeded(lazy(move || {
+    let msg = current_thread::block_on_all(lazy(move || {
         c.set(1 + c.get());
 
         // Spawn!
@@ -54,24 +38,21 @@ fn run_seeded() {
 #[test]
 fn block_waits() {
     let cnt = Rc::new(Cell::new(0));
+    let cnt2 = cnt.clone();
 
-    run(|_| {
-        let cnt = cnt.clone();
+    let (tx, rx) = oneshot::channel();
 
-        let (tx, rx) = oneshot::channel();
-
-        thread::spawn(|| {
-            thread::sleep(Duration::from_millis(1000));
-            tx.send(()).unwrap();
-        });
-
-        current_thread::spawn(rx.then(move |_| {
-            cnt.set(1 + cnt.get());
-            Ok(())
-        }));
+    thread::spawn(|| {
+        thread::sleep(Duration::from_millis(1000));
+        tx.send(()).unwrap();
     });
 
-    assert_eq!(1, cnt.get());
+    block_on_all(rx.then(move |_| {
+        cnt.set(1 + cnt.get());
+        Ok::<_, ()>(())
+    })).unwrap();
+
+    assert_eq!(1, cnt2.get());
 }
 
 #[test]
@@ -79,29 +60,32 @@ fn spawn_many() {
     const ITER: usize = 200;
 
     let cnt = Rc::new(Cell::new(0));
+    let mut current_thread = CurrentThread::new();
 
-    run(|_| {
-        for _ in 0..ITER {
-            let cnt = cnt.clone();
-            current_thread::spawn(lazy(move || {
-                cnt.set(1 + cnt.get());
-                Ok::<(), ()>(())
-            }));
-        }
-    });
+    for _ in 0..ITER {
+        let cnt = cnt.clone();
+        current_thread.spawn(lazy(move || {
+            cnt.set(1 + cnt.get());
+            Ok::<(), ()>(())
+        }));
+    }
+
+    current_thread.run().unwrap();
 
     assert_eq!(cnt.get(), ITER);
 }
 
 #[test]
 fn does_not_set_global_executor_by_default() {
-    run(|_| {
-        // The execution context is setup, futures may be executed.
-        current_thread::spawn(lazy(|| {
-            println!("called from the current thread executor");
-            Ok(())
-        }));
-    });
+    use tokio_executor::Executor;
+
+    block_on_all(lazy(|| {
+        tokio_executor::DefaultExecutor::current()
+            .spawn(Box::new(lazy(|| ok())))
+            .unwrap_err();
+
+        ok()
+    })).unwrap();
 }
 
 #[test]
@@ -169,22 +153,27 @@ fn outstanding_tasks_are_dropped_when_executor_is_dropped() {
 #[test]
 #[should_panic]
 fn nesting_run() {
-    run(|_| {
-        run(|_| {
-        });
-    });
+    block_on_all(lazy(|| {
+        block_on_all(lazy(|| {
+            ok()
+        })).unwrap();
+
+        ok()
+    })).unwrap();
 }
 
 #[test]
 #[should_panic]
 fn run_in_future() {
-    run(|_| {
+    block_on_all(lazy(|| {
         current_thread::spawn(lazy(|| {
-            run(|_| {
-            });
-            Ok::<(), ()>(())
+            block_on_all(lazy(|| {
+                ok()
+            })).unwrap();
+            ok()
         }));
-    });
+        ok()
+    })).unwrap();
 }
 
 #[test]
@@ -253,7 +242,7 @@ fn tasks_are_scheduled_fairly() {
         }
     }
 
-    run(|_| {
+    block_on_all(lazy(|| {
         current_thread::spawn(Spin {
             state: state.clone(),
             idx: 0,
@@ -263,5 +252,11 @@ fn tasks_are_scheduled_fairly() {
             state: state,
             idx: 1,
         });
-    });
+
+        ok()
+    })).unwrap();
+}
+
+fn ok() -> future::FutureResult<(), ()> {
+    future::ok(())
 }

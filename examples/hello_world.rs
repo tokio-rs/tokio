@@ -55,6 +55,8 @@ pub fn main() {
         println!("accept error = {:?}", err);
     });
 
+    println!("server running on localhost:6142");
+
     // This starts the `current_thread` executor.
     //
     // Executors are responsible for scheduling many asynchronous tasks, driving
@@ -62,21 +64,17 @@ pub fn main() {
     // implementations, each providing different scheduling characteristics.
     //
     // The `current_thread` executor multiplexes all scheduled tasks on the
-    // current thread. This means that spawned tasks are not required to
-    // implement `Send`.
-    current_thread::run(|_| {
-        // Now, the server task must be spawned.
-        //
-        // It's important to note that all futures / tasks are lazy. No work
-        // will happen unless they are spawned onto an executor.
-        current_thread::spawn(server);
-
-        println!("server running on localhost:6142");
-
-        // The `current_thread::run` function will now block until *all* spawned
-        // tasks complete.
-        //
-        // In our example, we have not defined a shutdown strategy, so
-        // this will block until `ctrl-c` is pressed at the terminal.
-    });
+    // current thread. This means that spawned tasks must not implement `Send`.
+    // It's important to note that all futures / tasks are lazy. No work will
+    // happen unless they are spawned onto an executor.
+    //
+    // The executor will start running the `server` task, which, in turn, spawns
+    // new tasks for each incoming connection.
+    //
+    // The `current_thread::block_on_all` function will block until *all*
+    // spawned tasks complete.
+    //
+    // In our example, we have not defined a shutdown strategy, so this will
+    // block until `ctrl-c` is pressed at the terminal.
+    current_thread::block_on_all(server).unwrap();
 }
