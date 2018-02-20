@@ -649,6 +649,32 @@ impl Builder {
         self
     }
 
+    /// Read the length field as a native endian integer
+    ///
+    /// The default setting is big endian.
+    ///
+    /// This configuration option applies to both encoding and decoding.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_io::codec::length_delimited::Builder;
+    ///
+    /// # fn bind_read<T: AsyncRead>(io: T) {
+    /// Builder::new()
+    ///     .native_endian()
+    ///     .new_read(io);
+    /// # }
+    /// ```
+    pub fn native_endian(&mut self) -> &mut Self {
+        if cfg!(target_endian = "big") {
+            self.big_endian()
+        } else {
+            self.little_endian()
+        }
+    }
+
     /// Sets the max frame length
     ///
     /// This configuration option applies to both encoding and decoding. The

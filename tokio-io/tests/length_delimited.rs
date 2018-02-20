@@ -49,6 +49,23 @@ fn read_single_frame_one_packet_little_endian() {
 }
 
 #[test]
+fn read_single_frame_one_packet_native_endian() {
+    let data = if cfg!(target_endian = "big") {
+        b"\x00\x00\x00\x09abcdefghi"
+    } else {
+        b"\x09\x00\x00\x00abcdefghi"
+    };
+    let mut io = Builder::new()
+        .native_endian()
+        .new_read(mock! {
+            Ok(data[..].into()),
+        });
+
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(None));
+}
+
+#[test]
 fn read_single_multi_frame_one_packet() {
     let mut data: Vec<u8> = vec![];
     data.extend_from_slice(b"\x00\x00\x00\x09abcdefghi");
