@@ -79,6 +79,28 @@ pub mod thread_pool {
     //! ensure that work is evenly distributed across threads while minimizing
     //! synchronization between worker threads.
     //!
+    //! # Examples
+    //!
+    //! ```rust
+    //! # extern crate tokio;
+    //! # extern crate futures;
+    //! # use tokio::executor::thread_pool::ThreadPool;
+    //! use futures::future::{Future, lazy};
+    //!
+    //! # pub fn main() {
+    //! // Create a thread pool with default configuration values
+    //! let thread_pool = ThreadPool::new();
+    //!
+    //! thread_pool.spawn(lazy(|| {
+    //!     println!("called from a worker thread");
+    //!     Ok(())
+    //! }));
+    //!
+    //! // Gracefully shutdown the threadpool
+    //! thread_pool.shutdown().wait().unwrap();
+    //! # }
+    //! ```
+    //!
     //! [`ThreadPool`]: struct.ThreadPool.html
     //! [`Runtime`]: ../../runtime/struct.Runtime.html
 

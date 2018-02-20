@@ -53,7 +53,44 @@ pub struct Shutdown {
     inner: ThreadPool,
 }
 
-/// Pool configuration
+/// Builds a thread pool with custom configuration values.
+///
+/// Methods can be chanined in order to set the configuration values. The thread
+/// pool is constructed by calling [`build`].
+///
+/// New instances of `Builder` are obtained via [`Builder::new`].
+///
+/// See function level documentation for details on the various configuration
+/// settings.
+///
+/// [`build`]: #method.build
+/// [`Builder::new`]: #method.new
+///
+/// # Examples
+///
+/// ```
+/// # extern crate tokio_threadpool;
+/// # extern crate futures;
+/// # use tokio_threadpool::Builder;
+/// use futures::future::{Future, lazy};
+/// use std::time::Duration;
+///
+/// # pub fn main() {
+/// // Create a thread pool with default configuration values
+/// let thread_pool = Builder::new()
+///     .pool_size(4)
+///     .keep_alive(Duration::from_secs(30))
+///     .build();
+///
+/// thread_pool.spawn(lazy(|| {
+///     println!("called from a worker thread");
+///     Ok(())
+/// }));
+///
+/// // Gracefully shutdown the threadpool
+/// thread_pool.shutdown().wait().unwrap();
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct Builder {
     /// Thread pool specific configuration values
@@ -346,11 +383,55 @@ impl Builder {
 
 impl ThreadPool {
     /// Create a new `ThreadPool` with default values.
+    ///
+    /// Use [`Builder`] for creating a configured thread pool.
+    ///
+    /// [`Builder`]: struct.Builder.html
     pub fn new() -> ThreadPool {
         Builder::new().build()
     }
 
+    /// Spawn a future onto the thread pool.
+    ///
+    /// This function takes ownership of the future and randomly assigns it to a
+    /// worker thread. The thread will then start executing the future.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::ThreadPool;
+    /// use futures::future::{Future, lazy};
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = ThreadPool::new();
+    ///
+    /// thread_pool.spawn(lazy(|| {
+    ///     println!("called from a worker thread");
+    ///     Ok(())
+    /// }));
+    ///
+    /// // Gracefully shutdown the threadpool
+    /// thread_pool.shutdown().wait().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Use [`Sender::spawn`] for a
+    /// version that returns a `Result` instead of panicking.
+    pub fn spawn<F>(&self, future: F)
+    where F: Future<Item = (), Error = ()> + Send + 'static,
+    {
+        self.sender().spawn(future).unwrap();
+    }
+
     /// Return a reference to the sender handle
+    ///
+    /// The handle is used to spawn futures onto the thread pool. It also
+    /// implements the `Executor` trait.
     pub fn sender(&self) -> &Sender {
         &self.inner
     }
@@ -361,6 +442,15 @@ impl ThreadPool {
     }
 
     /// Shutdown the pool once it becomes idle.
+    ///
+    /// Idle is defined as the completion of all futures that have been spawned
+    /// onto the thread pool. There may still be outstanding handles when the
+    /// thread pool reaches an idle state.
+    ///
+    /// Once the idle state is reached, calling `spawn` on any outstanding
+    /// handle will result in an error. All worker threads are signaled and will
+    /// shutdown. The returned future completes once all worker threads have
+    /// completed the shutdown process.
     pub fn shutdown_on_idle(self) -> Shutdown {
         self.inner().shutdown(false, false);
         Shutdown { inner: self }
@@ -368,8 +458,12 @@ impl ThreadPool {
 
     /// Shutdown the pool
     ///
-    /// This will prevent the thread pool from accepting new tasks but will
-    /// allow any existing tasks to complete.
+    /// This prevents the thread pool from accepting new tasks but will allow
+    /// any existing tasks to complete.
+    ///
+    /// Calling `spawn` on any outstanding handle will result in an error. All
+    /// worker threads are signaled and will shutdown. The returned future
+    /// completes once all worker threads have completed the shutdown process.
     pub fn shutdown(self) -> Shutdown {
         self.inner().shutdown(true, false);
         Shutdown { inner: self }
@@ -379,6 +473,10 @@ impl ThreadPool {
     ///
     /// This will prevent the thread pool from accepting new tasks **and**
     /// abort any tasks that are currently running on the thread pool.
+    ///
+    /// Calling `spawn` on any outstanding handle will result in an error. All
+    /// worker threads are signaled and will shutdown. The returned future
+    /// completes once all worker threads have completed the shutdown process.
     pub fn shutdown_now(self) -> Shutdown {
         self.inner().shutdown(true, true);
         Shutdown { inner: self }
