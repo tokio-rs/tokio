@@ -24,10 +24,21 @@
 //! The pool employes a [work-stealing] strategy for optimizing how tasks get
 //! spread across the available threads.
 //!
-//! This module also provides the [`Executor`] trait (re-exported from
+//! # `Executor` trait.
+//!
+//! This module provides the [`Executor`] trait (re-exported from
 //! [`tokio-executor`]), which describes the API that all executors must
-//! implement as well as a [`spawn`] function, which spawns a future onto the
-//! current default executor for the context (tracked via a thread-local variable).
+//! implement.
+//!
+//! A free [`spawn`] function is provided that allows spawning futures onto the
+//! default executor (tracked via a thread-local variable) without referencing a
+//! handle. It is expected that all executors will set a value for the default
+//! executor. This value will often be set to the executor itself, but it is
+//! possible that the default executor might be set to a different executor.
+//!
+//! For example, the [`current_thread`] executor might set the default executor
+//! to a thread pool instead of itself, allowing futures to spawn new tasks onto
+//! the thread pool when those tasks are `Send`.
 //!
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
 //! [notified]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html#tymethod.notify
