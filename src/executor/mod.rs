@@ -55,6 +55,32 @@ pub mod current_thread;
 pub mod thread_pool {
     //! Maintains a pool of threads across which the set of spawned tasks are
     //! executed.
+    //!
+    //! [`ThreadPool`] is an executor that uses a thread pool for executing
+    //! tasks concurrently across multiple cores. It uses a thread pool that is
+    //! optimized for use cases that involve multiplexing large number of
+    //! independent tasks that perform short(ish) amounts of computation and are
+    //! mainly waiting on I/O, i.e. the Tokio use case.
+    //!
+    //! Usually, users of [`ThreadPool`] will not create pool instances.
+    //! Instead, they will create a [`Runtime`] instance, which comes with a
+    //! pre-configured thread pool.
+    //!
+    //! At the core, [`ThreadPool`] uses a work-stealing based scheduling
+    //! strategy. When spawning a task while *external* to the thread pool
+    //! (i.e., from a thread that is not part of the thread pool), the task is
+    //! randomly assigned to a worker thread. When spawning a task while
+    //! *internal* to the thread pool, the task is assigned to the current
+    //! worker.
+    //!
+    //! Each worker maintains its own queue and first focuses on processing all
+    //! tasks in its queue. When the worker's queue is empty, the worker will
+    //! attempt to *steal* tasks from other worker queues. This strategy helps
+    //! ensure that work is evenly distributed across threads while minimizing
+    //! synchronization between worker threads.
+    //!
+    //! [`ThreadPool`]: struct.ThreadPool.html
+    //! [`Runtime`]: ../../runtime/struct.Runtime.html
 
     pub use tokio_threadpool::{
         Builder,
