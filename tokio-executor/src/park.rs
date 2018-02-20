@@ -48,7 +48,7 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Block the current thread.
 ///
@@ -228,7 +228,7 @@ impl Unpark for UnparkThread {
 
 impl Inner {
     /// Park the current thread for at most `dur`.
-    fn park(&self, dur: Option<Duration>) -> Result<(), ParkError> {
+    fn park(&self, timeout: Option<Duration>) -> Result<(), ParkError> {
         // If currently notified, then we skip sleeping. This is checked outside
         // of the lock to avoid acquiring a mutex if not necessary.
         match self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
@@ -253,32 +253,21 @@ impl Inner {
             _ => unreachable!(),
         }
 
-        // Track (until, remaining)
-        let mut time = dur.map(|dur| (Instant::now() + dur, dur));
+        m = match timeout {
+            Some(timeout) => self.condvar.wait_timeout(m, timeout).unwrap().0,
+            None => self.condvar.wait(m).unwrap(),
+        };
 
-        loop {
-            m = match time {
-                Some((until, rem)) => {
-                    let (guard, _) = self.condvar.wait_timeout(m, rem).unwrap();
-                    let now = Instant::now();
+        // Transition back to idle. If the state has transitione dto `NOTIFY`,
+        // this will consume that notification
+        self.state.store(IDLE, Ordering::SeqCst);
 
-                    if now >= until {
-                        // Timed out... exit sleep state
-                        self.state.store(IDLE, Ordering::SeqCst);
-                        return Ok(());
-                    }
+        // Explicitly drop the mutex guard. There is no real point in doing it
+        // except that I find it helpful to make it explicit where we want the
+        // mutex to unlock.
+        drop(m);
 
-                    time = Some((until, until - now));
-                    guard
-                }
-                None => self.condvar.wait(m).unwrap(),
-            };
-
-            // Transition back to idle, loop otherwise
-            if NOTIFY == self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
-                return Ok(());
-            }
-        }
+        Ok(())
     }
 
     fn unpark(&self) {
