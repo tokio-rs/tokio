@@ -41,7 +41,20 @@ pub struct ThreadPool {
     inner: Sender,
 }
 
-/// Sends work to the pool
+/// Submit futures to the associated thread pool for execution.
+///
+/// A `Sender` instance is a handle to a single thread pool, allowing the owner
+/// of the handle to spawn futures onto the thread pool. New futures are spawned
+/// using [`Sender::spawn`].
+///
+/// The `Sender` handle is *only* used for spawning new futures. It does not
+/// impact the lifecycle of the thread pool in any way.
+///
+/// `Sender` instances are obtained by calling [`ThreadPool::sender`]. The
+/// `Sender` struct implements the `Executor` trait.
+///
+/// [`Sender::spawn`]: #method.spawn
+/// [`ThreadPool::sender`]: struct.ThreadPool.html#method.sender
 #[derive(Debug)]
 pub struct Sender {
     inner: Arc<Inner>,
