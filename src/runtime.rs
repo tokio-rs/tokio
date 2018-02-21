@@ -99,7 +99,6 @@
 use reactor::{self, Reactor, Handle};
 use reactor::background::{self, Background};
 
-use tokio_executor;
 use tokio_threadpool::{self as threadpool, ThreadPool};
 use futures::Poll;
 use futures::future::{Future, Join};
@@ -114,10 +113,6 @@ use std::io;
 pub struct Runtime {
     inner: Option<Inner>,
 }
-
-/// Error returned from `with_context`.
-#[derive(Debug)]
-pub struct EnterError(());
 
 /// A future that resolves when the Tokio `Runtime` is shut down.
 #[derive(Debug)]
@@ -217,13 +212,5 @@ impl Future for Shutdown {
     fn poll(&mut self) -> Poll<(), ()> {
         try_ready!(self.inner.poll());
         Ok(().into())
-    }
-}
-
-// ===== impl EnterError =====
-
-impl From<tokio_executor::EnterError> for EnterError {
-    fn from(_: tokio_executor::EnterError) -> Self {
-        EnterError(())
     }
 }
