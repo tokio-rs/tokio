@@ -97,13 +97,13 @@
 //! [idle]: struct.Runtime.html#method.idle
 
 use reactor::{self, Reactor, Handle};
-use reactor::background::{self, Background};
+use reactor::background::Background;
 
 use tokio_threadpool::{self as threadpool, ThreadPool};
 use futures::Poll;
-use futures::future::{Future, Join};
+use futures::future::Future;
 
-use std::io;
+use std::{fmt, io};
 
 /// Handle to the Tokio runtime.
 ///
@@ -115,9 +115,8 @@ pub struct Runtime {
 }
 
 /// A future that resolves when the Tokio `Runtime` is shut down.
-#[derive(Debug)]
 pub struct Shutdown {
-    inner: Join<background::Shutdown, threadpool::Shutdown>,
+    inner: Box<Future<Item = (), Error = ()> + Send>,
 }
 
 #[derive(Debug)]
@@ -182,8 +181,14 @@ impl Runtime {
     pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
 
-        let inner = inner.reactor.shutdown_on_idle()
-            .join(inner.pool.shutdown_on_idle());
+        let inner = Box::new({
+            let pool = inner.pool;
+            let reactor = inner.reactor;
+
+            pool.shutdown_on_idle().and_then(|_| {
+                reactor.shutdown_on_idle()
+            })
+        });
 
         Shutdown { inner }
     }
@@ -192,8 +197,14 @@ impl Runtime {
     pub fn shutdown_now(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
 
-        let inner = inner.reactor.shutdown_now()
-            .join(inner.pool.shutdown_now());
+        let inner = Box::new({
+            let pool = inner.pool;
+            let reactor = inner.reactor;
+
+            pool.shutdown_now().and_then(|_| {
+                reactor.shutdown_now()
+            })
+        });
 
         Shutdown { inner }
     }
@@ -212,5 +223,13 @@ impl Future for Shutdown {
     fn poll(&mut self) -> Poll<(), ()> {
         try_ready!(self.inner.poll());
         Ok(().into())
+    }
+}
+
+impl fmt::Debug for Shutdown {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Shutdown")
+            .field("inner", &"Box<Future<Item = (), Error = ()>>")
+            .finish()
     }
 }

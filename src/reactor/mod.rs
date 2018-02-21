@@ -133,24 +133,30 @@ fn _assert_kinds() {
 pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where F: FnOnce(&mut Enter) -> R
 {
-    CURRENT_REACTOR.with(|current| {
-        let mut current = current.borrow_mut();
+    // Ensure that the executor is removed from the thread-local context
+    // when leaving the scope. This handles cases that involve panicking.
+    struct Reset;
 
-        assert!(current.is_none(), "default Tokio reactor already set for execution context");
-
-        // Ensure that the executor is removed from the thread-local context
-        // when leaving the scope. This handles cases that involve panicking.
-        struct Reset<'a>(&'a mut Option<Handle>);
-
-        impl<'a> Drop for Reset<'a> {
-            fn drop(&mut self) {
-                *self.0 = None;
-            }
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            CURRENT_REACTOR.with(|current| {
+                let mut current = current.borrow_mut();
+                *current = None;
+            });
         }
+    }
 
-        *current = Some(handle.clone());
+    // This ensures the value for the current reactor gets reset even if there
+    // is a panic.
+    let _r = Reset;
 
-        let _reset = Reset(&mut *current);
+    CURRENT_REACTOR.with(|current| {
+        {
+            let mut current = current.borrow_mut();
+            assert!(current.is_none(), "default Tokio reactor already set \
+                    for execution context");
+            *current = Some(handle.clone());
+        }
 
         f(enter)
     })
@@ -277,7 +283,9 @@ impl Reactor {
 
     /// Returns true if the reactor is currently idle.
     pub(crate) fn is_idle(&self) -> bool {
-        unimplemented!();
+        self.inner.io_dispatch
+            .read().unwrap()
+            .is_empty()
     }
 
     /// Run the reactor in the background
