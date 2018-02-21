@@ -79,6 +79,22 @@ pub mod thread_pool {
     //! ensure that work is evenly distributed across threads while minimizing
     //! synchronization between worker threads.
     //!
+    //! # Usage
+    //!
+    //! Thread pool instances are created using [`ThreadPool::new`] or
+    //! [`Builder::new`]. The first option returns a thread pool with default
+    //! configuration values. The second option allows configuring the thread
+    //! pool before instantiating it.
+    //!
+    //! Once an instance is obtained, futures may be spawned onto it using the
+    //! [`spawn`] function.
+    //!
+    //! A handle to the thread pool is obtained using [`ThreadPool::sender`].
+    //! This handle is **only** able to spawn futures onto the thread pool. It
+    //! is unable to affect the lifecycle of the thread pool in any way. This
+    //! handle can be passed into functions or stored in structs as a way to
+    //! grant the capability of spawning futures.
+    //!
     //! # Examples
     //!
     //! ```rust
@@ -102,6 +118,10 @@ pub mod thread_pool {
     //! ```
     //!
     //! [`ThreadPool`]: struct.ThreadPool.html
+    //! [`ThreadPool::new`]: struct.ThreadPool.html#method.new
+    //! [`ThreadPool::sender`]: struct.ThreadPool.html#method.sender
+    //! [`spawn`]: struct.ThreadPool.html#method.spawn
+    //! [`Builder::new`]: struct.Builder.html#method.new
     //! [`Runtime`]: ../../runtime/struct.Runtime.html
 
     pub use tokio_threadpool::{
