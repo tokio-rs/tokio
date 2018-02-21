@@ -1,0 +1,26 @@
+[package]
+name = "tokio-threadpool"
+version = "0.1.0"
+documentation = "https://docs.rs/tokio-threadpool"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://github.com/tokio-rs/tokio"
+license = "MIT/Apache-2.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+description = """
+A Future aware thread pool based on work stealing.
+"""
+keywords = ["futures", "tokio"]
+categories = ["concurrency", "asynchronous"]
+
+[dependencies]
+tokio-executor = { version = "0.1", path = "../tokio-executor" }
+futures = "0.1"
+coco = "0.3"
+num_cpus = "1.2"
+rand = "0.3"
+log = "0.3"
+
+[dev-dependencies]
+tokio-timer = "0.1"
+env_logger = "0.4"
+futures-cpupool = "0.1.7"

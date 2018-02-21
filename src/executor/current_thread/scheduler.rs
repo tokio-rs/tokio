@@ -1,45 +1,35 @@
-//! An unbounded set of futures.
+use tokio_executor::park::Unpark;
 
-use super::sleep::Wakeup;
-
-use futures::Async;
-use futures::executor::{self, UnsafeNotify, NotifyHandle};
+use futures::{Future, Async};
+use futures::executor::{self, Spawn, UnsafeNotify, NotifyHandle};
 
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
-use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst, Acquire, Release, AcqRel};
-use std::sync::atomic::{AtomicPtr, AtomicBool};
+use std::sync::atomic::{AtomicPtr, AtomicBool, AtomicUsize};
 use std::sync::{Arc, Weak};
 use std::usize;
+use std::thread;
+use std::marker::PhantomData;
 
 /// A generic task-aware scheduler.
 ///
 /// This is used both by `FuturesUnordered` and the current-thread executor.
-pub struct Scheduler<T, W> {
-    inner: Arc<Inner<T, W>>,
-    nodes: List<T, W>,
+pub struct Scheduler<U> {
+    inner: Arc<Inner<U>>,
+    nodes: List<U>,
 }
 
-/// Schedule new futures
-pub trait Schedule<T> {
-    /// Schedule a new future.
-    fn schedule(&mut self, item: T);
-}
-
-pub struct Notify<'a, T: 'a, W: 'a>(&'a Arc<Node<T, W>>);
+pub struct Notify<'a, U: 'a>(&'a Arc<Node<U>>);
 
 // A linked-list of nodes
-struct List<T, W> {
+struct List<U> {
     len: usize,
-    head: *const Node<T, W>,
-    tail: *const Node<T, W>,
+    head: *const Node<U>,
+    tail: *const Node<U>,
 }
-
-unsafe impl<T: Send, W: Wakeup> Send for Scheduler<T, W> {}
-unsafe impl<T: Sync, W: Wakeup> Sync for Scheduler<T, W> {}
 
 // Scheduler is implemented using two linked lists. The first linked list tracks
 // all items managed by a `Scheduler`. This list is stored on the `Scheduler`
@@ -70,45 +60,51 @@ unsafe impl<T: Sync, W: Wakeup> Sync for Scheduler<T, W> {}
 // decremented. Once the node is popped from the mpsc channel, then the final
 // arc reference count can be decremented, thus freeing the node.
 
-#[allow(missing_debug_implementations)]
-struct Inner<T, W> {
-    // The task using `Scheduler`.
-    wakeup: W,
+struct Inner<U> {
+    // Thread unpark handle
+    unpark: U,
+
+    // Tick number
+    tick_num: AtomicUsize,
 
     // Head/tail of the readiness queue
-    head_readiness: AtomicPtr<Node<T, W>>,
-    tail_readiness: UnsafeCell<*const Node<T, W>>,
+    head_readiness: AtomicPtr<Node<U>>,
+    tail_readiness: UnsafeCell<*const Node<U>>,
 
     // Used as part of the MPSC queue algorithm
-    stub: Arc<Node<T, W>>,
+    stub: Arc<Node<U>>,
 }
 
-struct Node<T, W> {
+unsafe impl<U: Sync + Send> Send for Inner<U> {}
+unsafe impl<U: Sync + Send> Sync for Inner<U> {}
+
+impl<U: Unpark> executor::Notify for Inner<U> {
+    fn notify(&self, _: usize) {
+        self.unpark.unpark();
+    }
+}
+
+struct Node<U> {
     // The item
-    item: UnsafeCell<Option<T>>,
+    item: UnsafeCell<Option<Task>>,
+
+    // The tick at which this node was notified
+    notified_at: AtomicUsize,
 
     // Next pointer for linked list tracking all active nodes
-    next_all: UnsafeCell<*const Node<T, W>>,
+    next_all: UnsafeCell<*const Node<U>>,
 
     // Previous node in linked list tracking all active nodes
-    prev_all: UnsafeCell<*const Node<T, W>>,
+    prev_all: UnsafeCell<*const Node<U>>,
 
     // Next pointer in readiness queue
-    next_readiness: AtomicPtr<Node<T, W>>,
+    next_readiness: AtomicPtr<Node<U>>,
 
     // Whether or not this node is currently in the mpsc queue.
     queued: AtomicBool,
 
     // Queue that we'll be enqueued to when notified
-    queue: Weak<Inner<T, W>>,
-}
-
-/// Returned by the `Scheduler::tick` function, allowing the caller to decide
-/// what action to take next.
-pub enum Tick<T> {
-    Data(T),
-    Empty,
-    Inconsistent,
+    queue: Weak<Inner<U>>,
 }
 
 /// Returned by `Inner::dequeue`, representing either a dequeue success (with
@@ -119,31 +115,43 @@ pub enum Tick<T> {
 /// the future and the caller should try again soon.
 ///
 /// [1024cores]: http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue
-enum Dequeue<T, W> {
-    Data(*const Node<T, W>),
+enum Dequeue<U> {
+    Data(*const Node<U>),
     Empty,
     Inconsistent,
 }
 
-impl<T, W> Scheduler<T, W>
-where W: Wakeup,
+/// Wraps a spawned boxed future
+struct Task(Spawn<Box<Future<Item = (), Error = ()>>>);
+
+/// A task that is scheduled. `turn` must be called
+pub struct Scheduled<'a, U: 'a> {
+    task: &'a mut Task,
+    notify: &'a Notify<'a, U>,
+    done: &'a mut bool,
+}
+
+impl<U> Scheduler<U>
+where U: Unpark,
 {
     /// Constructs a new, empty `Scheduler`
     ///
     /// The returned `Scheduler` does not contain any items and, in this
     /// state, `Scheduler::poll` will return `Ok(Async::Ready(None))`.
-    pub fn new(wakeup: W) -> Self {
+    pub fn new(unpark: U) -> Self {
         let stub = Arc::new(Node {
             item: UnsafeCell::new(None),
+            notified_at: AtomicUsize::new(0),
             next_all: UnsafeCell::new(ptr::null()),
             prev_all: UnsafeCell::new(ptr::null()),
             next_readiness: AtomicPtr::new(ptr::null_mut()),
             queued: AtomicBool::new(true),
             queue: Weak::new(),
         });
-        let stub_ptr = &*stub as *const Node<T, W>;
+        let stub_ptr = &*stub as *const Node<U>;
         let inner = Arc::new(Inner {
-            wakeup: wakeup,
+            unpark,
+            tick_num: AtomicUsize::new(0),
             head_readiness: AtomicPtr::new(stub_ptr as *mut _),
             tail_readiness: UnsafeCell::new(stub_ptr),
             stub: stub,
@@ -154,26 +162,58 @@ where W: Wakeup,
             nodes: List::new(),
         }
     }
-}
 
-impl<T, W: Wakeup> Scheduler<T, W> {
-    /// Advance the scheduler state.
+    pub fn notify(&self) -> NotifyHandle {
+        self.inner.clone().into()
+    }
+
+    pub fn schedule(&mut self, item: Box<Future<Item = (), Error = ()>>) {
+        let node = Arc::new(Node {
+            item: UnsafeCell::new(Some(Task::new(item))),
+            notified_at: AtomicUsize::new(0),
+            next_all: UnsafeCell::new(ptr::null_mut()),
+            prev_all: UnsafeCell::new(ptr::null_mut()),
+            next_readiness: AtomicPtr::new(ptr::null_mut()),
+            queued: AtomicBool::new(true),
+            queue: Arc::downgrade(&self.inner),
+        });
+
+        // Right now our node has a strong reference count of 1. We transfer
+        // ownership of this reference count to our internal linked list
+        // and we'll reclaim ownership through the `unlink` function below.
+        let ptr = self.nodes.push_back(node);
+
+        // We'll need to get the item "into the system" to start tracking it,
+        // e.g. getting its unpark notifications going to us tracking which
+        // items are ready. To do that we unconditionally enqueue it for
+        // polling here.
+        self.inner.enqueue(ptr);
+    }
+
+    /// Advance the scheduler state, returning `true` if any futures were
+    /// processed.
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick<F, R>(&mut self, mut f: F) -> Tick<R>
-    where F: FnMut(&mut Self, &mut T, &Notify<T, W>) -> Async<R>
+    pub fn tick<F>(&mut self, mut f: F) -> bool
+    where F: FnMut(&mut Self, &mut Scheduled<U>),
     {
+        let mut ret = false;
+        let tick = self.inner.tick_num.fetch_add(1, SeqCst);
+
         loop {
-            let node = match unsafe { self.inner.dequeue() } {
+            let node = match unsafe { self.inner.dequeue(Some(tick)) } {
                 Dequeue::Empty => {
-                    return Tick::Empty;
+                    return ret;
                 }
                 Dequeue::Inconsistent => {
-                    return Tick::Inconsistent;
+                    thread::yield_now();
+                    continue;
                 }
                 Dequeue::Data(node) => node,
             };
+
+            ret = true;
 
             debug_assert!(node != self.inner.stub());
 
@@ -203,12 +243,12 @@ impl<T, W: Wakeup> Scheduler<T, W> {
                 //   assume is is complete (will return Ready or panic), in
                 //   which case we'll want to discard it regardless.
                 //
-                struct Bomb<'a, T: 'a, W: 'a> {
-                    queue: &'a mut Scheduler<T, W>,
-                    node: Option<Arc<Node<T, W>>>,
+                struct Bomb<'a, U: 'a> {
+                    queue: &'a mut Scheduler<U>,
+                    node: Option<Arc<Node<U>>>,
                 }
 
-                impl<'a, T, W> Drop for Bomb<'a, T, W> {
+                impl<'a, U> Drop for Bomb<'a, U> {
                     fn drop(&mut self) {
                         if let Some(node) = self.node.take() {
                             release_node(node);
@@ -221,10 +261,12 @@ impl<T, W: Wakeup> Scheduler<T, W> {
                     queue: self,
                 };
 
+                let mut done = false;
+
                 // Now that the bomb holds the node, create a new scope. This
                 // scope ensures that the borrow will go out of scope before we
                 // mutate the node pointer in `bomb` again
-                let res = {
+                {
                     let node = bomb.node.as_ref().unwrap();
 
                     // Get a reference to the inner future. We already ensured
@@ -241,65 +283,65 @@ impl<T, W: Wakeup> Scheduler<T, W> {
                     // Poll the underlying item with the appropriate `notify`
                     // implementation. This is where a large bit of the unsafety
                     // starts to stem from internally. The `notify` instance itself
-                    // is basically just our `Arc<Node<T>>` and tracks the mpsc
+                    // is basically just our `Arc<Node>` and tracks the mpsc
                     // queue of ready items.
                     //
-                    // Critically though `Node<T>` won't actually access `T`, the
+                    // Critically though `Node` won't actually access `Task`, the
                     // item, while it's floating around inside of `Task`
                     // instances. These structs will basically just use `T` to size
                     // the internal allocation, appropriately accessing fields and
                     // deallocating the node if need be.
                     let queue = &mut *bomb.queue;
                     let notify = Notify(bomb.node.as_ref().unwrap());
-                    f(queue, item, &notify)
-                };
 
-                let ret = match res {
-                    Async::NotReady => {
-                        // The future is not done, push it back into the "all
-                        // node" list.
-                        let node = bomb.node.take().unwrap();
-                        bomb.queue.nodes.push_back(node);
-                        continue;
-                    }
-                    Async::Ready(v) => {
-                        // `bomb` will take care of unlinking and releasing the
-                        // node.
-                        Tick::Data(v)
-                    }
-                };
+                    let mut scheduled = Scheduled {
+                        task: item,
+                        notify: &notify,
+                        done: &mut done,
+                    };
 
-                return ret
+                    f(queue, &mut scheduled);
+                }
+
+                if !done {
+                    // The future is not done, push it back into the "all
+                    // node" list.
+                    let node = bomb.node.take().unwrap();
+                    bomb.queue.nodes.push_back(node);
+                }
             }
         }
     }
 }
 
-impl<T, W: Wakeup> Schedule<T> for Scheduler<T, W> {
-    fn schedule(&mut self, item: T) {
-        let node = Arc::new(Node {
-            item: UnsafeCell::new(Some(item)),
-            next_all: UnsafeCell::new(ptr::null_mut()),
-            prev_all: UnsafeCell::new(ptr::null_mut()),
-            next_readiness: AtomicPtr::new(ptr::null_mut()),
-            queued: AtomicBool::new(true),
-            queue: Arc::downgrade(&self.inner),
-        });
+impl<'a, U: Unpark> Scheduled<'a, U> {
+    /// Polls the task, returns `true` if the task has completed.
+    pub fn tick(&mut self) -> bool {
+        // Tick the future
+        let ret = match self.task.0.poll_future_notify(self.notify, 0) {
+            Ok(Async::Ready(_)) | Err(_) => true,
+            Ok(Async::NotReady) => false,
+        };
 
-        // Right now our node has a strong reference count of 1. We transfer
-        // ownership of this reference count to our internal linked list
-        // and we'll reclaim ownership through the `unlink` function below.
-        let ptr = self.nodes.push_back(node);
-
-        // We'll need to get the item "into the system" to start tracking it,
-        // e.g. getting its unpark notifications going to us tracking which
-        // items are ready. To do that we unconditionally enqueue it for
-        // polling here.
-        self.inner.enqueue(ptr);
+        *self.done = ret;
+        ret
     }
 }
 
-fn release_node<T, W>(node: Arc<Node<T, W>>) {
+impl Task {
+    pub fn new(future: Box<Future<Item = (), Error = ()> + 'static>) -> Self {
+        Task(executor::spawn(future))
+    }
+}
+
+impl fmt::Debug for Task {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Task")
+            .finish()
+    }
+}
+
+fn release_node<U>(node: Arc<Node<U>>) {
     // The item is done, try to reset the queued flag. This will prevent
     // `notify` from doing any work in the item
     let prev = node.queued.swap(true, SeqCst);
@@ -327,17 +369,17 @@ fn release_node<T, W>(node: Arc<Node<T, W>>) {
     }
 }
 
-impl<T: Debug, W: Debug> Debug for Scheduler<T, W> {
+impl<U> Debug for Scheduler<U> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Scheduler {{ ... }}")
     }
 }
 
-impl<T, W> Drop for Scheduler<T, W> {
+impl<U> Drop for Scheduler<U> {
     fn drop(&mut self) {
         // When a `Scheduler` is dropped we want to drop all items associated
         // with it. At the same time though there may be tons of `Task` handles
-        // flying around which contain `Node<T>` references inside them. We'll
+        // flying around which contain `Node` references inside them. We'll
         // let those naturally get deallocated when the `Task` itself goes out
         // of scope or gets notified.
         while let Some(node) = self.nodes.pop_front() {
@@ -348,7 +390,7 @@ impl<T, W> Drop for Scheduler<T, W> {
         // mpsc queue. None of those nodes, however, have items associated
         // with them so they're safe to destroy on any thread. At this point
         // the `Scheduler` struct, the owner of the one strong reference
-        // to `Inner<T>` will drop the strong reference. At that point
+        // to `Inner` will drop the strong reference. At that point
         // whichever thread releases the strong refcount last (be it this
         // thread or some other thread as part of an `upgrade`) will clear out
         // the mpsc queue and free all remaining nodes.
@@ -359,9 +401,9 @@ impl<T, W> Drop for Scheduler<T, W> {
     }
 }
 
-impl<T, W> Inner<T, W> {
+impl<U> Inner<U> {
     /// The enqueue function from the 1024cores intrusive MPSC queue algorithm.
-    fn enqueue(&self, node: *const Node<T, W>) {
+    fn enqueue(&self, node: *const Node<U>) {
         unsafe {
             debug_assert!((*node).queued.load(Relaxed));
 
@@ -379,7 +421,7 @@ impl<T, W> Inner<T, W> {
     ///
     /// Note that this unsafe as it required mutual exclusion (only one thread
     /// can call this) to be guaranteed elsewhere.
-    unsafe fn dequeue(&self) -> Dequeue<T, W> {
+    unsafe fn dequeue(&self, tick: Option<usize>) -> Dequeue<U> {
         let mut tail = *self.tail_readiness.get();
         let mut next = (*tail).next_readiness.load(Acquire);
 
@@ -391,6 +433,13 @@ impl<T, W> Inner<T, W> {
             *self.tail_readiness.get() = next;
             tail = next;
             next = (*next).next_readiness.load(Acquire);
+        }
+
+        if let Some(tick) = tick {
+            // Only dequeue if the node matches the tick num
+            if (*tail).notified_at.load(SeqCst) != tick {
+                return Dequeue::Empty;
+            }
         }
 
         if !next.is_null() {
@@ -415,14 +464,14 @@ impl<T, W> Inner<T, W> {
         Dequeue::Inconsistent
     }
 
-    fn stub(&self) -> *const Node<T, W> {
+    fn stub(&self) -> *const Node<U> {
         &*self.stub
     }
 }
 
-impl<T, W> Drop for Inner<T, W> {
+impl<U> Drop for Inner<U> {
     fn drop(&mut self) {
-        // Once we're in the destructor for `Inner<T, W>` we need to clear out the
+        // Once we're in the destructor for `Inner` we need to clear out the
         // mpsc queue of nodes if there's anything left in there.
         //
         // Note that each node has a strong reference count associated with it
@@ -431,7 +480,7 @@ impl<T, W> Drop for Inner<T, W> {
         // so we're just pulling out nodes and dropping their refcounts.
         unsafe {
             loop {
-                match self.dequeue() {
+                match self.dequeue(None) {
                     Dequeue::Empty => break,
                     Dequeue::Inconsistent => abort("inconsistent in drop"),
                     Dequeue::Data(ptr) => drop(ptr2arc(ptr)),
@@ -441,7 +490,7 @@ impl<T, W> Drop for Inner<T, W> {
     }
 }
 
-impl<T, W> List<T, W> {
+impl<U> List<U> {
     fn new() -> Self {
         List {
             len: 0,
@@ -451,7 +500,7 @@ impl<T, W> List<T, W> {
     }
 
     /// Prepends an element to the back of the list
-    fn push_back(&mut self, node: Arc<Node<T, W>>) -> *const Node<T, W> {
+    fn push_back(&mut self, node: Arc<Node<U>>) -> *const Node<U> {
         let ptr = arc2ptr(node);
 
         unsafe {
@@ -475,7 +524,7 @@ impl<T, W> List<T, W> {
     }
 
     /// Pop an element from the front of the list
-    fn pop_front(&mut self) -> Option<Arc<Node<T, W>>> {
+    fn pop_front(&mut self) -> Option<Arc<Node<U>>> {
         if self.head.is_null() {
             // The list is empty
             return None;
@@ -502,7 +551,7 @@ impl<T, W> List<T, W> {
     }
 
     /// Remove a specific node
-    unsafe fn remove(&mut self, node: *const Node<T, W>) -> Arc<Node<T, W>> {
+    unsafe fn remove(&mut self, node: *const Node<U>) -> Arc<Node<U>> {
         let node = ptr2arc(node);
         let next = *node.next_all.get();
         let prev = *node.prev_all.get();
@@ -527,69 +576,67 @@ impl<T, W> List<T, W> {
     }
 }
 
-impl<'a, T, W> Clone for Notify<'a, T, W> {
+impl<'a, U> Clone for Notify<'a, U> {
     fn clone(&self) -> Self {
         Notify(self.0)
     }
 }
 
-impl<'a, T: fmt::Debug, W: fmt::Debug> fmt::Debug for Notify<'a, T, W> {
+impl<'a, U> fmt::Debug for Notify<'a, U> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Notiy").finish()
     }
 }
 
-impl<'a, T, W: Wakeup> From<Notify<'a, T, W>> for NotifyHandle {
-    fn from(handle: Notify<'a, T, W>) -> NotifyHandle {
+impl<'a, U: Unpark> From<Notify<'a, U>> for NotifyHandle {
+    fn from(handle: Notify<'a, U>) -> NotifyHandle {
         unsafe {
             let ptr = handle.0.clone();
-            let ptr = mem::transmute::<Arc<Node<T, W>>, *mut ArcNode<T, W>>(ptr);
+            let ptr = mem::transmute::<Arc<Node<U>>, *mut ArcNode<U>>(ptr);
             NotifyHandle::new(hide_lt(ptr))
         }
     }
 }
 
-struct ArcNode<T, W>(PhantomData<(T, W)>);
+struct ArcNode<U>(PhantomData<U>);
 
-// We should never touch `T` on any thread other than the one owning
+// We should never touch `Task` on any thread other than the one owning
 // `Scheduler`, so this should be a safe operation.
-//
-// `W` already requires `Sync + Send`
-unsafe impl<T, W: Wakeup> Send for ArcNode<T, W> {}
-unsafe impl<T, W: Wakeup> Sync for ArcNode<T, W> {}
+unsafe impl<U: Sync + Send> Send for ArcNode<U> {}
+unsafe impl<U: Sync + Send> Sync for ArcNode<U> {}
 
-impl<T, W: Wakeup> executor::Notify for ArcNode<T, W> {
+impl<U: Unpark> executor::Notify for ArcNode<U> {
     fn notify(&self, _id: usize) {
         unsafe {
-            let me: *const ArcNode<T, W> = self;
-            let me: *const *const ArcNode<T, W> = &me;
-            let me = me as *const Arc<Node<T, W>>;
+            let me: *const ArcNode<U> = self;
+            let me: *const *const ArcNode<U> = &me;
+            let me = me as *const Arc<Node<U>>;
             Node::notify(&*me)
         }
     }
 }
 
-unsafe impl<T, W: Wakeup> UnsafeNotify for ArcNode<T, W> {
+unsafe impl<U: Unpark> UnsafeNotify for ArcNode<U> {
     unsafe fn clone_raw(&self) -> NotifyHandle {
-        let me: *const ArcNode<T, W> = self;
-        let me: *const *const ArcNode<T, W> = &me;
-        let me = &*(me as *const Arc<Node<T, W>>);
+        let me: *const ArcNode<U> = self;
+        let me: *const *const ArcNode<U> = &me;
+        let me = &*(me as *const Arc<Node<U>>);
         Notify(me).into()
     }
 
     unsafe fn drop_raw(&self) {
-        let mut me: *const ArcNode<T, W> = self;
-        let me = &mut me as *mut *const ArcNode<T, W> as *mut Arc<Node<T, W>>;
+        let mut me: *const ArcNode<U> = self;
+        let me = &mut me as *mut *const ArcNode<U> as *mut Arc<Node<U>>;
         ptr::drop_in_place(me);
     }
 }
 
-unsafe fn hide_lt<T, W: Wakeup>(p: *mut ArcNode<T, W>) -> *mut UnsafeNotify {
+unsafe fn hide_lt<U: Unpark>(p: *mut ArcNode<U>) -> *mut UnsafeNotify {
     mem::transmute(p as *mut UnsafeNotify)
 }
 
-impl<T, W: Wakeup> Node<T, W> {
-    fn notify(me: &Arc<Node<T, W>>) {
+impl<U: Unpark> Node<U> {
+    fn notify(me: &Arc<Node<U>>) {
         let inner = match me.queue.upgrade() {
             Some(inner) => inner,
             None => return,
@@ -611,15 +658,19 @@ impl<T, W: Wakeup> Node<T, W> {
         // still.
         let prev = me.queued.swap(true, SeqCst);
         if !prev {
+            // Get the current scheduler tick
+            let tick_num = inner.tick_num.load(SeqCst);
+            me.notified_at.store(tick_num, SeqCst);
+
             inner.enqueue(&**me);
-            inner.wakeup.wakeup();
+            inner.unpark.unpark();
         }
     }
 }
 
-impl<T, W> Drop for Node<T, W> {
+impl<U> Drop for Node<U> {
     fn drop(&mut self) {
-        // Currently a `Node<T>` is sent across all threads for any lifetime,
+        // Currently a `Node` is sent across all threads for any lifetime,
         // regardless of `T`. This means that for memory safety we can't
         // actually touch `T` at any time except when we have a reference to the
         // `Scheduler` itself.

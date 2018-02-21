@@ -1,0 +1,16 @@
+[package]
+name = "tokio-executor"
+version = "0.1.0"
+documentation = "https://docs.rs/tokio-executor"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://github.com/tokio-rs/tokio"
+license = "MIT/Apache-2.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+description = """
+Future execution primitives
+"""
+keywords = ["futures", "tokio"]
+categories = ["concurrency", "asynchronous"]
+
+[dependencies]
+futures = "0.1"

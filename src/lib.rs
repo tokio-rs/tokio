@@ -39,50 +39,45 @@
 //!
 //! ```no_run
 //! extern crate futures;
-//! extern crate futures_cpupool;
 //! extern crate tokio;
 //! extern crate tokio_io;
 //!
 //! use futures::prelude::*;
-//! use futures::future::Executor;
-//! use futures_cpupool::CpuPool;
 //! use tokio_io::AsyncRead;
 //! use tokio_io::io::copy;
 //! use tokio::net::TcpListener;
 //!
 //! fn main() {
-//!     let pool = CpuPool::new_num_cpus();
-//!
 //!     // Bind the server's socket.
 //!     let addr = "127.0.0.1:12345".parse().unwrap();
 //!     let listener = TcpListener::bind(&addr)
 //!         .expect("unable to bind TCP listener");
 //!
 //!     // Pull out a stream of sockets for incoming connections
-//!     let server = listener.incoming().for_each(|sock| {
-//!         // Split up the reading and writing parts of the
-//!         // socket.
-//!         let (reader, writer) = sock.split();
+//!     let server = listener.incoming()
+//!         .map_err(|e| println!("accept failed = {:?}", e))
+//!         .for_each(|sock| {
+//!             // Split up the reading and writing parts of the
+//!             // socket.
+//!             let (reader, writer) = sock.split();
 //!
-//!         // A future that echos the data and returns how
-//!         // many bytes were copied...
-//!         let bytes_copied = copy(reader, writer);
+//!             // A future that echos the data and returns how
+//!             // many bytes were copied...
+//!             let bytes_copied = copy(reader, writer);
 //!
-//!         // ... after which we'll print what happened.
-//!         let handle_conn = bytes_copied.map(|amt| {
-//!             println!("wrote {:?} bytes", amt)
-//!         }).map_err(|err| {
-//!             eprintln!("IO error {:?}", err)
+//!             // ... after which we'll print what happened.
+//!             let handle_conn = bytes_copied.map(|amt| {
+//!                 println!("wrote {:?} bytes", amt)
+//!             }).map_err(|err| {
+//!                 eprintln!("IO error {:?}", err)
+//!             });
+//!
+//!             // Spawn the future as a concurrent task.
+//!             tokio::spawn(handle_conn)
 //!         });
 //!
-//!         // Spawn the future as a concurrent task.
-//!         pool.execute(handle_conn).unwrap();
-//!
-//!         Ok(())
-//!     });
-//!
-//!     // Spin up the server on this thread
-//!     server.wait().unwrap();
+//!     // Start the Tokio runtime
+//!     tokio::run(server);
 //! }
 //! ```
 
@@ -99,6 +94,8 @@ extern crate mio;
 extern crate slab;
 #[macro_use]
 extern crate tokio_io;
+extern crate tokio_executor;
+extern crate tokio_threadpool;
 
 #[macro_use]
 extern crate log;
@@ -106,3 +103,7 @@ extern crate log;
 pub mod executor;
 pub mod net;
 pub mod reactor;
+pub mod runtime;
+
+pub use executor::spawn;
+pub use runtime::run;

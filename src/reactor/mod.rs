@@ -16,9 +16,13 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [`TcpStream`]: ../net/struct.TcpStream.html
 
+use tokio_executor::Enter;
+use tokio_executor::park::{Park, Unpark};
+
 use std::{fmt, usize};
 use std::io::{self, ErrorKind};
 use std::mem;
+use std::cell::RefCell;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, Weak, RwLock};
@@ -30,7 +34,8 @@ use mio;
 use mio::event::Evented;
 use slab::Slab;
 
-mod global;
+pub(crate) mod background;
+use self::background::Background;
 
 mod poll_evented;
 pub use self::poll_evented::PollEvented;
@@ -51,6 +56,33 @@ pub struct Reactor {
     _wakeup_registration: mio::Registration,
 }
 
+/// A handle to an event loop.
+///
+/// A `Handle` is used for associating I/O objects with an event loop
+/// explicitly. Typically though you won't end up using a `Handle` that often
+/// and will instead use an implicitly configured handle for your thread.
+#[derive(Clone)]
+pub struct Handle {
+    inner: Weak<Inner>,
+}
+
+/// Return value from the `turn` method on `Reactor`.
+///
+/// Currently this value doesn't actually provide any functionality, but it may
+/// in the future give insight into what happened during `turn`.
+#[derive(Debug)]
+pub struct Turn {
+    _priv: (),
+}
+
+/// Error returned from `Handle::set_fallback`.
+#[derive(Clone, Debug)]
+pub struct SetFallbackError(());
+
+#[deprecated(since = "0.1.2", note = "use SetFallbackError instead")]
+#[doc(hidden)]
+pub type SetDefaultError = SetFallbackError;
+
 struct Inner {
     /// The underlying system event queue.
     io: mio::Poll,
@@ -60,16 +92,6 @@ struct Inner {
 
     /// Used to wake up the reactor from a call to `turn`
     wakeup: mio::SetReadiness
-}
-
-/// A handle to an event loop.
-///
-/// A `Handle` is used for associating I/O objects with an event loop
-/// explicitly. Typically though you won't end up using a `Handle` that often
-/// and will instead use and implicitly configured handle for your thread.
-#[derive(Clone)]
-pub struct Handle {
-    inner: Weak<Inner>,
 }
 
 struct ScheduledIo {
@@ -83,6 +105,12 @@ enum Direction {
     Write,
 }
 
+/// The global fallback reactor.
+static HANDLE_FALLBACK: AtomicUsize = ATOMIC_USIZE_INIT;
+
+/// Tracks the reactor for the current execution context.
+thread_local!(static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None));
+
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_START: usize = 1;
 
@@ -93,6 +121,45 @@ fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
 
     _assert::<Handle>();
+}
+
+// ===== impl Reactor =====
+
+/// Set the default reactor for the duration of the closure
+///
+/// # Panics
+///
+/// This function panics if there already is a default reactor set.
+pub(crate) fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
+where F: FnOnce(&mut Enter) -> R
+{
+    // Ensure that the executor is removed from the thread-local context
+    // when leaving the scope. This handles cases that involve panicking.
+    struct Reset;
+
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            CURRENT_REACTOR.with(|current| {
+                let mut current = current.borrow_mut();
+                *current = None;
+            });
+        }
+    }
+
+    // This ensures the value for the current reactor gets reset even if there
+    // is a panic.
+    let _r = Reset;
+
+    CURRENT_REACTOR.with(|current| {
+        {
+            let mut current = current.borrow_mut();
+            assert!(current.is_none(), "default Tokio reactor already set \
+                    for execution context");
+            *current = Some(handle.clone());
+        }
+
+        f(enter)
+    })
 }
 
 impl Reactor {
@@ -118,7 +185,7 @@ impl Reactor {
         })
     }
 
-    /// Returns a handle to this event loop which can be sent across threads 
+    /// Returns a handle to this event loop which can be sent across threads
     /// and can be used as a proxy to the event loop itself.
     ///
     /// Handles are cloneable and clones always refer to the same event loop.
@@ -153,7 +220,7 @@ impl Reactor {
     /// Additionally if the global reactor thread has already been initialized
     /// then this function will also return an error. (aka if `Handle::default`
     /// has been called previously in this program).
-    pub fn set_fallback(&self) -> Result<(), SetDefaultError> {
+    pub fn set_fallback(&self) -> Result<(), SetFallbackError> {
         set_fallback(self.handle())
     }
 
@@ -186,6 +253,18 @@ impl Reactor {
     pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<Turn> {
         self.poll(max_wait)?;
         Ok(Turn { _priv: () })
+    }
+
+    /// Returns true if the reactor is currently idle.
+    pub(crate) fn is_idle(&self) -> bool {
+        self.inner.io_dispatch
+            .read().unwrap()
+            .is_empty()
+    }
+
+    /// Run the reactor in the background
+    pub(crate) fn background(self) -> io::Result<Background> {
+        Background::new(self)
     }
 
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
@@ -244,13 +323,23 @@ impl Reactor {
     }
 }
 
-/// Return value from the `turn` method on `Reactor`.
-///
-/// Currently this value doesn't actually provide any functionality, but it may
-/// in the future give insight into what happened during `turn`.
-#[derive(Debug)]
-pub struct Turn {
-    _priv: (),
+impl Park for Reactor {
+    type Unpark = Handle;
+    type Error = io::Error;
+
+    fn unpark(&self) -> Self::Unpark {
+        self.handle()
+    }
+
+    fn park(&mut self) -> io::Result<()> {
+        self.turn(None)?;
+        Ok(())
+    }
+
+    fn park_timeout(&mut self, duration: Duration) -> io::Result<()> {
+        self.turn(Some(duration))?;
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Reactor {
@@ -259,18 +348,132 @@ impl fmt::Debug for Reactor {
     }
 }
 
-impl Drop for Inner {
-    fn drop(&mut self) {
-        // When a reactor is dropped it needs to wake up all blocked tasks as
-        // they'll never receive a notification, and all connected I/O objects
-        // will start returning errors pretty quickly.
-        let io = self.io_dispatch.read().unwrap();
-        for (_, io) in io.iter() {
-            io.writer.notify();
-            io.reader.notify();
+// ===== impl Handle =====
+
+impl Handle {
+    /// Returns a handle to the current reactor.
+    pub fn current() -> Handle {
+        Handle::default()
+    }
+
+    /// Returns a handle to the fallback reactor.
+    fn fallback() -> Handle {
+        let mut fallback = HANDLE_FALLBACK.load(SeqCst);
+
+        // If the fallback hasn't been previously initialized then let's spin
+        // up a helper thread and try to initialize with that. If we can't
+        // actually create a helper thread then we'll just return a "defunct"
+        // handle which will return errors when I/O objects are attempted to be
+        // associated.
+        if fallback == 0 {
+            let reactor = match Reactor::new() {
+                Ok(reactor) => reactor,
+                Err(_) => return Handle { inner: Weak::new() },
+            };
+
+            // If we successfully set ourselves as the actual fallback then we
+            // want to `forget` the helper thread to ensure that it persists
+            // globally. If we fail to set ourselves as the fallback that means
+            // that someone was racing with this call to `Handle::default`.
+            // They ended up winning so we'll destroy our helper thread (which
+            // shuts down the thread) and reload the fallback.
+            if set_fallback(reactor.handle().clone()).is_ok() {
+                let ret = reactor.handle().clone();
+
+                match reactor.background() {
+                    Ok(bg) => bg.forget(),
+                    // The global handle is fubar, but y'all probably got bigger
+                    // problems if a thread can't spawn.
+                    Err(_) => {}
+                }
+
+                return ret
+            }
+
+            fallback = HANDLE_FALLBACK.load(SeqCst);
+        }
+
+        // At this point our fallback handle global was configured so we use
+        // its value to reify a handle, clone it, and then forget our reified
+        // handle as we don't actually have an owning reference to it.
+        assert!(fallback != 0);
+
+        unsafe {
+            let handle = Handle::from_usize(fallback);
+            let ret = handle.clone();
+            drop(handle.into_usize());
+            return ret
+        }
+    }
+
+    /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
+    /// makes the next call to `turn` return immediately.
+    ///
+    /// This method is intended to be used in situations where a notification
+    /// needs to otherwise be sent to the main reactor. If the reactor is
+    /// currently blocked inside of `turn` then it will wake up and soon return
+    /// after this method has been called. If the reactor is not currently
+    /// blocked in `turn`, then the next call to `turn` will not block and
+    /// return immediately.
+    fn wakeup(&self) {
+        if let Some(inner) = self.inner() {
+            inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
+        }
+    }
+
+    fn into_usize(self) -> usize {
+        unsafe {
+            mem::transmute::<Weak<Inner>, usize>(self.inner)
+        }
+    }
+
+    unsafe fn from_usize(val: usize) -> Handle {
+        let inner = mem::transmute::<usize, Weak<Inner>>(val);;
+        Handle { inner }
+    }
+
+    fn inner(&self) -> Option<Arc<Inner>> {
+        self.inner.upgrade()
+    }
+}
+
+impl Unpark for Handle {
+    fn unpark(&self) {
+        self.wakeup();
+    }
+}
+
+impl Default for Handle {
+    fn default() -> Handle {
+        CURRENT_REACTOR.with(|current| {
+            match *current.borrow() {
+                Some(ref handle) => handle.clone(),
+                None => Handle::fallback(),
+            }
+        })
+    }
+}
+
+impl fmt::Debug for Handle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Handle")
+    }
+}
+
+fn set_fallback(handle: Handle) -> Result<(), SetFallbackError> {
+    unsafe {
+        let val = handle.into_usize();
+        match HANDLE_FALLBACK.compare_exchange(0, val, SeqCst, SeqCst) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                drop(Handle::from_usize(val));
+                Err(SetFallbackError(()))
+            }
         }
     }
 }
+
+// ===== impl Inner =====
 
 impl Inner {
     /// Register an I/O resource with the reactor.
@@ -330,104 +533,20 @@ impl Inner {
     }
 }
 
-static HANDLE_FALLBACK: AtomicUsize = ATOMIC_USIZE_INIT;
-
-/// Error returned from `Handle::set_fallback`.
-#[derive(Clone, Debug)]
-pub struct SetDefaultError(());
-
-impl Handle {
-    /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
-    /// makes the next call to `turn` return immediately.
-    ///
-    /// This method is intended to be used in situations where a notification
-    /// needs to otherwise be sent to the main reactor. If the reactor is
-    /// currently blocked inside of `turn` then it will wake up and soon return
-    /// after this method has been called. If the reactor is not currently
-    /// blocked in `turn`, then the next call to `turn` will not block and
-    /// return immediately.
-    fn wakeup(&self) {
-        if let Some(inner) = self.inner() {
-            inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
-        }
-    }
-
-    fn into_usize(self) -> usize {
-        unsafe {
-            mem::transmute::<Weak<Inner>, usize>(self.inner)
-        }
-    }
-
-    unsafe fn from_usize(val: usize) -> Handle {
-        let inner = mem::transmute::<usize, Weak<Inner>>(val);;
-        Handle { inner }
-    }
-
-    fn inner(&self) -> Option<Arc<Inner>> {
-        self.inner.upgrade()
-    }
-}
-
-impl Default for Handle {
-    fn default() -> Handle {
-        let mut fallback = HANDLE_FALLBACK.load(SeqCst);
-
-        // If the fallback hasn't been previously initialized then let's spin
-        // up a helper thread and try to initialize with that. If we can't
-        // actually create a helper thread then we'll just return a "defunkt"
-        // handle which will return errors when I/O objects are attempted to be
-        // associated.
-        if fallback == 0 {
-            let helper = match global::HelperThread::new() {
-                Ok(helper) => helper,
-                Err(_) => return Handle { inner: Weak::new() },
-            };
-
-            // If we successfully set ourselves as the actual fallback then we
-            // want to `forget` the helper thread to ensure that it persists
-            // globally. If we fail to set ourselves as the fallback that means
-            // that someone was racing with this call to `Handle::default`.
-            // They ended up winning so we'll destroy our helper thread (which
-            // shuts down the thread) and reload the fallback.
-            if set_fallback(helper.handle().clone()).is_ok() {
-                let ret = helper.handle().clone();
-                helper.forget();
-                return ret
-            }
-            fallback = HANDLE_FALLBACK.load(SeqCst);
-        }
-
-        // At this point our fallback handle global was configured so we use
-        // its value to reify a handle, clone it, and then forget our reified
-        // handle as we don't actually have an owning reference to it.
-        assert!(fallback != 0);
-        unsafe {
-            let handle = Handle::from_usize(fallback);
-            let ret = handle.clone();
-            drop(handle.into_usize());
-            return ret
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // When a reactor is dropped it needs to wake up all blocked tasks as
+        // they'll never receive a notification, and all connected I/O objects
+        // will start returning errors pretty quickly.
+        let io = self.io_dispatch.read().unwrap();
+        for (_, io) in io.iter() {
+            io.writer.notify();
+            io.reader.notify();
         }
     }
 }
 
-impl fmt::Debug for Handle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Handle")
-    }
-}
-
-fn set_fallback(handle: Handle) -> Result<(), SetDefaultError> {
-    unsafe {
-        let val = handle.into_usize();
-        match HANDLE_FALLBACK.compare_exchange(0, val, SeqCst, SeqCst) {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                drop(Handle::from_usize(val));
-                Err(SetDefaultError(()))
-            }
-        }
-    }
-}
+// ===== misc =====
 
 fn read_ready() -> mio::Ready {
     mio::Ready::readable() | platform::hup()
