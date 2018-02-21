@@ -54,6 +54,13 @@
 //! # pub fn main() {}
 //! ```
 //!
+//! In this function, the `run` function blocks until the runtime becomes idle.
+//! See [`shutdown_on_idle`][idle] for more shutdown details.
+//!
+//! From within the context of the runtime, additional tasks are spawned using
+//! the [`tokio::spawn`] function. Futures spawned using this function will be
+//! executed on the same thread pool used by the [`Runtime`].
+//!
 //! A [`Runtime`] instance can also be used directly.
 //!
 //! ```rust
@@ -94,7 +101,8 @@
 //! [`Runtime`]: struct.Runtime.html
 //! [`ThreadPool`]: ../executor/thread_pool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
-//! [idle]: struct.Runtime.html#method.idle
+//! [idle]: struct.Runtime.html#method.shutdown_on_idle
+//! [`tokio::spawn`]: ../executor/fn.spawn.html
 
 use reactor::{self, Reactor, Handle};
 use reactor::background::Background;
@@ -109,6 +117,10 @@ use std::{fmt, io};
 ///
 /// The Tokio runtime includes a reactor as well as an executor for running
 /// tasks.
+///
+/// See [module level][mod] documentation for more details.
+///
+/// [mod]: index.html
 #[derive(Debug)]
 pub struct Runtime {
     inner: Option<Inner>,
@@ -130,17 +142,65 @@ struct Inner {
 
 // ===== impl Runtime =====
 
-/// Start the Tokio runtime.
-pub fn run<F>(f: F)
+/// Start the Tokio runtime using the supplied future to bootstrap execution.
+///
+/// This function is used to bootstrap the execution of a Tokio application. It
+/// does the following:
+///
+/// * Start the Tokio runtime using a default configuration.
+/// * Spawn the given future onto the thread pool.
+/// * Block the çurrent thread until the runtime shuts down.
+///
+/// Note that the function will not return immediately once `future` has
+/// completed. Instead it waits for the entire runtime to become idle.
+///
+/// See [module level][mod] documentation for more details.
+///
+/// # Examples
+///
+/// ```rust
+/// # extern crate tokio;
+/// # extern crate futures;
+/// # use futures::{Future, Stream};
+/// use tokio::net::TcpListener;
+///
+/// # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # unimplemented!();
+/// # }
+/// # fn dox() {
+/// # let addr = "127.0.0.1:8080".parse().unwrap();
+/// let listener = TcpListener::bind(&addr).unwrap();
+///
+/// let server = listener.incoming()
+///     .map_err(|e| println!("error = {:?}", e))
+///     .for_each(|socket| {
+///         tokio::spawn(process(socket))
+///     });
+///
+/// tokio::run(server);
+/// # }
+/// # pub fn main() {}
+/// ```
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+///
+/// [mod]: ../index.html
+pub fn run<F>(future: F)
 where F: Future<Item = (), Error = ()> + Send + 'static,
 {
     let mut runtime = Runtime::new().unwrap();
-    runtime.spawn(f);
+    runtime.spawn(future);
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
 impl Runtime {
-    /// Create a new runtime
+    /// Create a new runtime instance with default configuration values.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         // Spawn a reactor on a background thread.
         let reactor = Reactor::new()?.background()?;
@@ -169,7 +229,41 @@ impl Runtime {
         self.inner.as_ref().unwrap().reactor.handle()
     }
 
-    /// Spawn a future into the Tokio runtime.
+    /// Spawn a future onto the Tokio runtime.
+    ///
+    /// This spawns the given future onto the runtime's executor, usually a
+    /// thread pool. The thread pool is then responsible for polling the future
+    /// until it completes.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use futures::{future, Future, Stream};
+    /// use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// // Create the runtime
+    /// let mut rt = Runtime::new().unwrap();
+    ///
+    /// // Spawn a future onto the runtime
+    /// rt.spawn(future::lazy(|| {
+    ///     println!("now running on a worker thread");
+    ///     Ok(())
+    /// }));
+    /// # }
+    /// # pub fn main() {}
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Failure occurs if the executor
+    /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
@@ -177,7 +271,22 @@ impl Runtime {
         self
     }
 
-    /// Shutdown the runtime
+    /// Signals the runtime to shutdown once it becomes idle.
+    ///
+    /// Returns a future that completes once the shutdown operation has
+    /// completed.
+    ///
+    /// This function can be used to perform a graceful shutdown of the runtime.
+    ///
+    /// The runtime enters an idle state once **all** of the following occur.
+    ///
+    /// * The thread pool has no tasks to execute, i.e., all tasks that were
+    ///   spawned have completed.
+    /// * The reactor is not managing any I/O resources.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
     pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
 
@@ -193,7 +302,25 @@ impl Runtime {
         Shutdown { inner }
     }
 
-    /// Shutdown the runtime immediately
+    /// Signals the runtime to shutdown immediately.
+    ///
+    /// Returns a future that completes once the shutdown operation has
+    /// completed.
+    ///
+    /// This function will forcibly shutdown the runtime, causing any
+    /// in-progress work to become canceled. The shutdown steps are:
+    ///
+    /// * Drain any scheduled work queues.
+    /// * Drop any futures that have not yet completed.
+    /// * Drop the reactor.
+    ///
+    /// Once the reactor has dropped, any outstanding I/O resources bound to
+    /// that reactor will no longer function. Calling any method on them will
+    /// result in an error.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
     pub fn shutdown_now(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
 

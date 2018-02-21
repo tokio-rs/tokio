@@ -102,6 +102,8 @@
 //! [`CurrentThread`]: struct.CurrentThread.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
 
+#![allow(deprecated)]
+
 mod scheduler;
 use self::scheduler::Scheduler;
 
@@ -152,9 +154,8 @@ pub struct Entered<'a, P: Park + 'a> {
     enter: &'a mut Enter,
 }
 
-/// A context yielded to the closure provided to `run`.
-///
-/// This type probably shouldn't be used. Instead, use `CurrentThread` directly.
+#[deprecated(since = "0.1.2", note = "use block_on_all instead")]
+#[doc(hidden)]
 #[derive(Debug)]
 pub struct Context<'a> {
     cancel: Cell<bool>,
@@ -206,6 +207,7 @@ thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
 
 #[deprecated(since = "0.1.2", note = "use block_on_all instead")]
 #[doc(hidden)]
+#[allow(deprecated)]
 pub fn run<F, R>(f: F) -> R
 where F: FnOnce(&mut Context) -> R
 {
@@ -228,13 +230,27 @@ where F: FnOnce(&mut Context) -> R
     ret
 }
 
-/// Run the executor seeded with the given future.
-pub fn block_on_all<F>(f: F) -> Result<F::Item, F::Error>
+/// Run the executor bootstrapping the execution with the provided future.
+///
+/// This creates a new [`CurrentThread`] executor, spawns the provided future,
+/// and blocks the current thread until the provided future and **all**
+/// subsequently spawned futures complete. In other words:
+///
+/// * If the provided boostrap future does **not** spawn any additional tasks,
+///   `block_on_all` returns once `future` completes.
+/// * If the provided bootstrap future **does** spawn additional tasks, then
+///   `block_on_all` returns once **all** spawned futures complete.
+///
+/// See [module level][mod] documentation for more details.
+///
+/// [`CurrentThread`]: struct.CurrentThread.html
+/// [mod]: index.html
+pub fn block_on_all<F>(future: F) -> Result<F::Item, F::Error>
 where F: Future,
 {
     let mut current_thread = CurrentThread::new();
 
-    let ret = current_thread.block_on(f);
+    let ret = current_thread.block_on(future);
     current_thread.run().unwrap();
 
     ret.map_err(|e| e.into_inner().expect("unexpected execution error"))
@@ -244,10 +260,15 @@ where F: Future,
 ///
 /// The provided future must complete or be canceled before `run` will return.
 ///
+/// Unlike [`tokio::spawn`], this function will always spawn on a
+/// `CurrentThread` executor and is able to spawn futures that are not `Send`.
+///
 /// # Panics
 ///
 /// This function can only be invoked from the context of a `run` call; any
 /// other use will result in a panic.
+///
+/// [`tokio::spawn`]: ../fn.spawn.html
 pub fn spawn<F>(future: F)
 where F: Future<Item = (), Error = ()> + 'static
 {
