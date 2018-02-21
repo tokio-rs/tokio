@@ -332,7 +332,7 @@ impl Builder {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .pool_size(4)
-    ///     .keep_alive(Duration::from_secs(30))
+    ///     .keep_alive(Some(Duration::from_secs(30)))
     ///     .build();
     /// # }
     /// ```
@@ -481,7 +481,7 @@ impl Builder {
     /// # pub fn main() {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
-    ///     .around_worker(|worker| {
+    ///     .around_worker(|worker, _| {
     ///         println!("worker is starting up");
     ///         worker.run();
     ///         println!("worker is shutting down");

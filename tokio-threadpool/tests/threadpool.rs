@@ -147,7 +147,7 @@ fn thread_shutdown_timeout() {
     let t = Mutex::new(shutdown_tx);
 
     let pool = Builder::new()
-        .keep_alive(Duration::from_millis(200))
+        .keep_alive(Some(Duration::from_millis(200)))
         .around_worker(move |w, _| {
             w.run();
             // There could be multiple threads here

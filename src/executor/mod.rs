@@ -132,4 +132,76 @@ pub mod thread_pool {
     };
 }
 
-pub use tokio_executor::{Executor, DefaultExecutor, SpawnError, spawn};
+pub use tokio_executor::{Executor, DefaultExecutor, SpawnError};
+
+use futures::{Future, Poll, Async};
+
+/// Future, returned by `spawn`, that completes once the future is spawned.
+///
+/// See [`spawn`] for more details.
+///
+/// [`spawn`]: fn.spawn.html
+#[derive(Debug)]
+#[must_use = "Spawn does nothing unless polled"]
+pub struct Spawn<F>(Option<F>);
+
+/// Spawns a future on the default executor.
+///
+/// In order for a future to do work, it must be spawned on an executor. The
+/// `spawn` function is the easiest way to do this. It spawns a future on the
+/// [default executor] for the current execution context (tracked using a
+/// thread-local variable).
+///
+/// The default executor is **usually** a thread pool.
+///
+/// Note that the function doesn't immediately spawn the future. Instead, it
+/// returns `Spawn`, which itself is a future that completes once the spawn has
+/// succeeded.
+///
+/// # Examples
+///
+/// In this example, a server is started and `spawn` is used to start a new task
+/// that processes each received connection.
+///
+/// ```rust
+/// # extern crate tokio;
+/// # extern crate futures;
+/// # use futures::{Future, Stream};
+/// use tokio::net::TcpListener;
+///
+/// # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # unimplemented!();
+/// # }
+/// # fn dox() {
+/// # let addr = "127.0.0.1:8080".parse().unwrap();
+/// let listener = TcpListener::bind(&addr).unwrap();
+///
+/// let server = listener.incoming()
+///     .map_err(|e| println!("error = {:?}", e))
+///     .for_each(|socket| {
+///         tokio::spawn(process(socket))
+///     });
+///
+/// tokio::run(server);
+/// # }
+/// # pub fn main() {}
+/// ```
+///
+/// [default executor]: struct.DefaultExecutor.html
+pub fn spawn<F>(f: F) -> Spawn<F>
+where F: Future<Item = (), Error = ()> + 'static + Send
+{
+    Spawn(Some(f))
+}
+
+impl<F> Future for Spawn<F>
+where F: Future<Item = (), Error = ()> + Send + 'static
+{
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<(), ()> {
+        ::tokio_executor::spawn(self.0.take().unwrap());
+        Ok(Async::Ready(()))
+    }
+}

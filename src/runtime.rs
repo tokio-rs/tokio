@@ -43,11 +43,11 @@
 //! # let addr = "127.0.0.1:8080".parse().unwrap();
 //! let listener = TcpListener::bind(&addr).unwrap();
 //!
-//! let server = listener.incoming().for_each(|socket| {
-//!     tokio::spawn(process(socket))
-//! }).map_err(|e| {
-//!     println!("error = {:?}", e);
-//! });
+//! let server = listener.incoming()
+//!     .map_err(|e| println!("error = {:?}", e))
+//!     .for_each(|socket| {
+//!         tokio::spawn(process(socket))
+//!     });
 //!
 //! tokio::run(server);
 //! # }
@@ -70,21 +70,21 @@
 //! # let addr = "127.0.0.1:8080".parse().unwrap();
 //! let listener = TcpListener::bind(&addr).unwrap();
 //!
-//! let server = listener.incoming().for_each(|socket| {
-//!     tokio::spawn(process(socket))
-//! }).map_err(|e| {
-//!     println!("error = {:?}", e);
-//! });
+//! let server = listener.incoming()
+//!     .map_err(|e| println!("error = {:?}", e))
+//!     .for_each(|socket| {
+//!         tokio::spawn(process(socket))
+//!     });
 //!
 //! // Create the runtime
-//! Runtime::new()
-//!     // Spawn the server task
-//!     .spawn(server)
-//!     // Wait until the runtime becomes idle and shut it down.
-//!     .shutdown_on_idle()
-//!     .wait().unwrap();
+//! let mut rt = Runtime::new().unwrap();
 //!
-//! tokio::run(server);
+//! // Spawn the server task
+//! rt.spawn(server);
+//!
+//! // Wait until the runtime becomes idle and shut it down.
+//! rt.shutdown_on_idle()
+//!     .wait().unwrap();
 //! # }
 //! # pub fn main() {}
 //! ```

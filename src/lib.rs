@@ -110,4 +110,5 @@ pub mod net;
 pub mod reactor;
 pub mod runtime;
 
+pub use executor::spawn;
 pub use runtime::run;
