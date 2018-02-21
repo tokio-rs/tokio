@@ -48,6 +48,16 @@ pub struct Sender {
 }
 
 /// Future that resolves when the thread pool is shutdown.
+///
+/// A `ThreadPool` is shutdown once all the worker have drained their queues and
+/// shutdown their threads.
+///
+/// `Shutdown` is returned by [`shutdown`], [`shutdown_on_idle`], and
+/// [`shutdown_now`].
+///
+/// [`shutdown`]: struct.ThreadPool.html#method.shutdown
+/// [`shutdown_on_idle`]: struct.ThreadPool.html#method.shutdown_on_idle
+/// [`shutdown_now`]: struct.ThreadPool.html#method.shutdown_now
 #[derive(Debug)]
 pub struct Shutdown {
     inner: ThreadPool,
@@ -79,7 +89,7 @@ pub struct Shutdown {
 /// // Create a thread pool with default configuration values
 /// let thread_pool = Builder::new()
 ///     .pool_size(4)
-///     .keep_alive(Duration::from_secs(30))
+///     .keep_alive(Some(Duration::from_secs(30)))
 ///     .build();
 ///
 /// thread_pool.spawn(lazy(|| {
@@ -292,7 +302,27 @@ thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const
 // ===== impl Builder =====
 
 impl Builder {
-    /// Returns a builder with default values
+    /// Returns a new thread pool builder initialized with default configuration
+    /// values.
+    ///
+    /// Configuration methods can be chained on the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    /// use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .pool_size(4)
+    ///     .keep_alive(Duration::from_secs(30))
+    ///     .build();
+    /// # }
+    /// ```
     pub fn new() -> Builder {
         let num_cpus = num_cpus::get();
 
@@ -307,17 +337,63 @@ impl Builder {
         }
     }
 
-    /// Set the scheduler's pool size
+    /// Set the maximum number of worker threads for the thread pool instance.
+    ///
+    /// This must be a number between 1 and 32,768 though it is advised to keep
+    /// this value on the smaller side.
+    ///
+    /// The default value is the number of cores available to the system.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .pool_size(4)
+    ///     .build();
+    /// # }
+    /// ```
     pub fn pool_size(&mut self, val: usize) -> &mut Self {
         assert!(val >= 1, "at least one thread required");
+        assert!(val <= MAX_WORKERS, "max value is {}", 32768);
 
         self.pool_size = val;
         self
     }
 
-    /// Set the thread keep alive duration
-    pub fn keep_alive(&mut self, val: Duration) -> &mut Self {
-        self.config.keep_alive = Some(val);
+    /// Set the worker thread keep alive duration
+    ///
+    /// If set, a worker thread will wait for up to the specified duration for
+    /// work, at which point the thread will shutdown. When work becomes
+    /// available, a new thread will eventually be spawned to replace the one
+    /// that shut down.
+    ///
+    /// When the value is `None`, the thread will wait for work forever.
+    ///
+    /// The default value is `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    /// use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .keep_alive(Some(Duration::from_secs(30)))
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn keep_alive(&mut self, val: Option<Duration>) -> &mut Self {
+        self.config.keep_alive = val;
         self
     }
 
@@ -326,12 +402,51 @@ impl Builder {
     /// Thread name prefix is used for generating thread names. For example, if
     /// prefix is `my-pool-`, then threads in the pool will get names like
     /// `my-pool-1` etc.
+    ///
+    /// If this configuration is not set, then the thread will use the system
+    /// default naming scheme.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .name_prefix("my-pool-")
+    ///     .build();
+    /// # }
+    /// ```
     pub fn name_prefix<S: Into<String>>(&mut self, val: S) -> &mut Self {
         self.config.name_prefix = Some(val.into());
         self
     }
 
-    /// Set the stack size of threads spawned by the scheduler
+    /// Set the stack size (in bytes) for worker threads.
+    ///
+    /// The actual stack size may be greater than this value if the platform
+    /// specifies minimal stack size.
+    ///
+    /// The default stack size for spawned threads is 2 MiB, though this
+    /// particular stack size is subject to change in the future.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .stack_size(32 * 1024)
+    ///     .build();
+    /// # }
+    /// ```
     pub fn stack_size(&mut self, val: usize) -> &mut Self {
         self.config.stack_size = Some(val);
         self
@@ -340,7 +455,27 @@ impl Builder {
     /// Execute function `f` on each worker thread.
     ///
     /// This function is provided a handle to the worker and is expected to call
-    /// `Worker::run`.
+    /// `Worker::run`, otherwise the worker thread will shutdown without doing
+    /// any work.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .around_worker(|worker| {
+    ///         println!("worker is starting up");
+    ///         worker.run();
+    ///         println!("worker is shutting down");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
     pub fn around_worker<F>(&mut self, f: F) -> &mut Self
         where F: Fn(&Worker, &mut Enter) + Send + Sync + 'static
     {
@@ -348,7 +483,23 @@ impl Builder {
         self
     }
 
-    /// Build and return the configured thread pool
+    /// Create the configured `ThreadPool`.
+    ///
+    /// The returned `ThreadPool` instance is ready to spawn tasks.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .build();
+    /// # }
+    /// ```
     pub fn build(&self) -> ThreadPool {
         let mut workers = vec![];
 
@@ -491,6 +642,54 @@ impl ThreadPool {
 
 impl Sender {
     /// Spawn a future onto the thread pool
+    ///
+    /// This function takes ownership of the future and spawns it onto the
+    /// thread pool, assigning it to a worker thread. The exact strategy used to
+    /// assign a future to a worker depends on if the caller is already on a
+    /// worker thread or external to the thread pool.
+    ///
+    /// If the caller is currently on the thread pool, the spawned future will
+    /// be assigned to the same worker that the caller is on. If the caller is
+    /// external to the thread pool, the future will be assigned to a random
+    /// worker.
+    ///
+    /// If `spawn` returns `Ok`, this does not mean that the future will be
+    /// executed. The thread pool can be forcibly shutdown between the time
+    /// `spawn` is called and the future has a chance to execute.
+    ///
+    /// If `spawn` returns `Err`, then the future failed to be spawned. There
+    /// are two possible causes:
+    ///
+    /// * The thread pool is at capacity and is unable to spawn a new future.
+    ///   This is a temporary failure. At some point in the future, the thread
+    ///   pool might be able to spawn new futures.
+    /// * The thread pool is shutdown. This is a permanent failure indicating
+    ///   that the handle will never be able to spawn new futures.
+    ///
+    /// The status of the thread pool can be queried before calling `spawn`
+    /// using the `status` function (part of the `Executor` trait).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::ThreadPool;
+    /// use futures::future::{Future, lazy};
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = ThreadPool::new();
+    ///
+    /// thread_pool.sender().spawn(lazy(|| {
+    ///     println!("called from a worker thread");
+    ///     Ok(())
+    /// })).unwrap();
+    ///
+    /// // Gracefully shutdown the threadpool
+    /// thread_pool.shutdown().wait().unwrap();
+    /// # }
+    /// ```
     pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
