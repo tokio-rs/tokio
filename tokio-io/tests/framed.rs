@@ -53,10 +53,11 @@ impl AsyncRead for DontReadIntoThis {}
 fn can_read_from_existing_buf() {
     let parts = FramedParts {
         inner: DontReadIntoThis,
+        codec: U32Codec,
         readbuf: vec![0, 0, 0, 42].into(),
         writebuf: BytesMut::with_capacity(0),
     };
-    let framed = Framed::from_parts(parts, U32Codec);
+    let framed = Framed::from_parts(parts);
 
     let num = framed
         .into_future()
@@ -73,10 +74,11 @@ fn can_read_from_existing_buf() {
 fn external_buf_grows_to_init() {
     let parts = FramedParts {
         inner: DontReadIntoThis,
+        codec: U32Codec,
         readbuf: vec![0, 0, 0, 42].into(),
         writebuf: BytesMut::with_capacity(0),
     };
-    let framed = Framed::from_parts(parts, U32Codec);
+    let framed = Framed::from_parts(parts);
     let FramedParts { readbuf, .. } = framed.into_parts();
 
     assert_eq!(readbuf.capacity(), INITIAL_CAPACITY);
@@ -86,10 +88,11 @@ fn external_buf_grows_to_init() {
 fn external_buf_does_not_shrink() {
     let parts = FramedParts {
         inner: DontReadIntoThis,
+        codec: U32Codec,
         readbuf: vec![0; INITIAL_CAPACITY * 2].into(),
         writebuf: BytesMut::with_capacity(0),
     };
-    let framed = Framed::from_parts(parts, U32Codec);
+    let framed = Framed::from_parts(parts);
     let FramedParts { readbuf, .. } = framed.into_parts();
 
     assert_eq!(readbuf.capacity(), INITIAL_CAPACITY * 2);
