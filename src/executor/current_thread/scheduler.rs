@@ -168,9 +168,12 @@ where U: Unpark,
     }
 
     pub fn schedule(&mut self, item: Box<Future<Item = (), Error = ()>>) {
+        // Get the current scheduler tick
+        let tick_num = self.inner.tick_num.load(SeqCst);
+
         let node = Arc::new(Node {
             item: UnsafeCell::new(Some(Task::new(item))),
-            notified_at: AtomicUsize::new(0),
+            notified_at: AtomicUsize::new(tick_num),
             next_all: UnsafeCell::new(ptr::null_mut()),
             prev_all: UnsafeCell::new(ptr::null_mut()),
             next_readiness: AtomicPtr::new(ptr::null_mut()),

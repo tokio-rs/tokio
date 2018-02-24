@@ -257,6 +257,42 @@ fn tasks_are_scheduled_fairly() {
     })).unwrap();
 }
 
+#[test]
+fn spawn_and_tick() {
+    let cnt = Rc::new(Cell::new(0));
+    let c = cnt.clone();
+
+    let mut current_thread = CurrentThread::new();
+
+    // Spawn a basic task to get the executor to turn
+    current_thread.spawn(lazy(move || {
+        Ok(())
+    }));
+
+    // Turn once...
+    current_thread.turn(None).unwrap();
+
+    current_thread.spawn(lazy(move || {
+        c.set(1 + c.get());
+
+        // Spawn!
+        current_thread::spawn(lazy(move || {
+            c.set(1 + c.get());
+            Ok::<(), ()>(())
+        }));
+
+        Ok(())
+    }));
+
+    // This does not run the newly spawned thread
+    current_thread.turn(None).unwrap();
+    assert_eq!(1, cnt.get());
+
+    // This runs the newly spawned thread
+    current_thread.turn(None).unwrap();
+    assert_eq!(2, cnt.get());
+}
+
 fn ok() -> future::FutureResult<(), ()> {
     future::ok(())
 }

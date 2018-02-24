@@ -466,6 +466,11 @@ impl<'a, P: Park> Entered<'a, P> {
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
+        if self.executor.is_idle() {
+            // Nothing to do
+            return Ok(Turn(()));
+        }
+
         if !self.tick() {
             let res = match duration {
                 Some(duration) => self.executor.park.park_timeout(duration),
