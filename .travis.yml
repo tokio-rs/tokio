@@ -29,6 +29,7 @@ deploy:
     branch: master
     repo: tokio-rs/tokio
     rust: stable
+    os: linux
 
 env:
   global:
