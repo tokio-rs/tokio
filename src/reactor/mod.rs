@@ -582,9 +582,14 @@ mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    #[cfg(target_os = "dragonfly")]
     pub fn all() -> Ready {
-        hup() | UnixReady::aio().into()
+        hup() | UnixReady::aio()
+    }
+
+    #[cfg(target_os = "freebsd")]
+    pub fn all() -> Ready {
+        hup() | UnixReady::aio() | UnixReady::lio()
     }
 
     #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
@@ -599,14 +604,25 @@ mod platform {
     const HUP: usize = 1 << 2;
     const ERROR: usize = 1 << 3;
     const AIO: usize = 1 << 4;
+    const LIO: usize = 1 << 5;
 
     #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
     fn is_aio(ready: &Ready) -> bool {
-        ready.is_aio()
+        UnixReady::from(*ready).is_aio()
     }
 
     #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
     fn is_aio(_ready: &Ready) -> bool {
+        false
+    }
+
+    #[cfg(target_os = "freebsd")]
+    fn is_lio(ready: &Ready) -> bool {
+        UnixReady::from(*ready).is_lio()
+    }
+
+    #[cfg(not(target_os = "freebsd"))]
+    fn is_lio(_ready: &Ready) -> bool {
         false
     }
 
@@ -615,6 +631,9 @@ mod platform {
         let mut bits = 0;
         if is_aio(&ready) {
             bits |= AIO;
+        }
+        if is_lio(&ready) {
+            bits |= LIO;
         }
         if ready.is_error() {
             bits |= ERROR;
@@ -637,10 +656,23 @@ mod platform {
         // aio not available here → empty
     }
 
+    #[cfg(target_os = "freebsd")]
+    fn usize2ready_lio(ready: &mut UnixReady) {
+        ready.insert(UnixReady::lio());
+    }
+
+    #[cfg(not(target_os = "freebsd"))]
+    fn usize2ready_lio(_ready: &mut UnixReady) {
+        // lio not available here → empty
+    }
+
     pub fn usize2ready(bits: usize) -> Ready {
         let mut ready = UnixReady::from(Ready::empty());
         if bits & AIO != 0 {
             usize2ready_aio(&mut ready);
+        }
+        if bits & LIO != 0 {
+            usize2ready_lio(&mut ready);
         }
         if bits & HUP != 0 {
             ready.insert(UnixReady::hup());
