@@ -29,7 +29,7 @@ deploy:
     branch: master
     repo: tokio-rs/tokio
     rust: stable
-    os: linux
+    condition: $TRAVIS_OS_NAME = linux
 
 env:
   global:
