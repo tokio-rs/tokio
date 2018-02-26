@@ -258,7 +258,7 @@ fn tasks_are_scheduled_fairly() {
 }
 
 #[test]
-fn spawn_and_tick() {
+fn spawn_and_turn() {
     let cnt = Rc::new(Cell::new(0));
     let c = cnt.clone();
 
@@ -291,6 +291,52 @@ fn spawn_and_tick() {
     // This runs the newly spawned thread
     current_thread.turn(None).unwrap();
     assert_eq!(2, cnt.get());
+}
+
+#[test]
+fn hammer_turn() {
+    use futures::sync::mpsc;
+
+    const ITER: usize = 100;
+    const N: usize = 100;
+    const THREADS: usize = 4;
+
+    for _ in 0..ITER {
+        let mut ths = vec![];
+
+        // Add some jitter
+        for _ in 0..THREADS {
+            let th = thread::spawn(|| {
+                let mut current_thread = CurrentThread::new();
+
+                let (tx, rx) = mpsc::unbounded();
+
+                current_thread.spawn({
+                    rx.for_each(|_| {
+                        Ok(())
+                    })
+                    .map_err(|e| panic!("err={:?}", e))
+                });
+
+                thread::spawn(move || {
+                    for _ in 0..N {
+                        tx.unbounded_send(()).unwrap();
+                        thread::yield_now();
+                    }
+                });
+
+                while !current_thread.is_idle() {
+                    current_thread.turn(None).unwrap();
+                }
+            });
+
+            ths.push(th);
+        }
+
+        for th in ths {
+            th.join().unwrap();
+        }
+    }
 }
 
 fn ok() -> future::FutureResult<(), ()> {
