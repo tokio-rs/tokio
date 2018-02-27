@@ -4,9 +4,10 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 
+use atomic_task::AtomicTask;
+
 use reactor::{Reactor, Handle};
 use futures::{Future, Async, Poll};
-use futures::task::AtomicTask;
 
 /// Handle to the reactor running on a background thread.
 #[derive(Debug)]
@@ -116,6 +117,8 @@ impl Drop for Background {
             Some(i) => i,
             None => return,
         };
+
+        inner.shutdown_now();
 
         let shutdown = Shutdown { inner };
         let _ = shutdown.wait();

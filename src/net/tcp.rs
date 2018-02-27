@@ -11,14 +11,14 @@ use iovec::IoVec;
 use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::{Handle, PollEvented};
+use reactor::{Handle, PollEvented2};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
 /// This object can be converted into a stream of incoming connections for
 /// various forms of processing.
 pub struct TcpListener {
-    io: PollEvented<mio::net::TcpListener>,
+    io: PollEvented2<mio::net::TcpListener>,
 }
 
 /// Stream returned by the `TcpListener::incoming` function representing the
@@ -35,8 +35,8 @@ impl TcpListener {
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
-        let l = try!(mio::net::TcpListener::bind(addr));
-        TcpListener::new(l, &Handle::default())
+        let l = mio::net::TcpListener::bind(addr)?;
+        Ok(TcpListener::new(l))
     }
 
     /// Attempt to accept a connection and create a new connected `TcpStream` if
@@ -58,9 +58,13 @@ impl TcpListener {
     /// future's task. It's recommended to only call this from the
     /// implementation of a `Future::poll`, if necessary.
     pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        let (stream, addr) = self.accept_std()?;
-        let stream = TcpStream::from_std(stream, self.io.handle())?;
-        Ok((stream, addr))
+        let (io, addr) = self.accept_std()?;
+
+        let io = mio::net::TcpStream::from_stream(io)?;
+        let io = PollEvented2::new(io);
+        let io = TcpStream { io };
+
+        Ok((io, addr))
     }
 
     /// Attempt to accept a connection and create a new connected `TcpStream` if
@@ -76,7 +80,7 @@ impl TcpListener {
     /// This function will panic for the same reasons as `accept`, notably if
     /// called outside the context of a future.
     pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        if let Async::NotReady = self.io.poll_read() {
+        if let Async::NotReady = self.io.poll_read_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -118,16 +122,17 @@ impl TcpListener {
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
-    pub fn from_std(listener: net::TcpListener,
-                    handle: &Handle) -> io::Result<TcpListener> {
-        let l = mio::net::TcpListener::from_std(listener)?;
-        TcpListener::new(l, handle)
+    pub fn from_std(listener: net::TcpListener, handle: &Handle)
+        -> io::Result<TcpListener>
+    {
+        let io = mio::net::TcpListener::from_std(listener)?;
+        let io = PollEvented2::new_with_handle(io, handle)?;
+        Ok(TcpListener { io })
     }
 
-    fn new(listener: mio::net::TcpListener, handle: &Handle)
-           -> io::Result<TcpListener> {
-        let io = try!(PollEvented::new(listener, handle));
-        Ok(TcpListener { io: io })
+    fn new(listener: mio::net::TcpListener) -> TcpListener {
+        let io = PollEvented2::new(listener);
+        TcpListener { io }
     }
 
     /// Returns the local address that this listener is bound to.
@@ -190,7 +195,7 @@ impl Stream for Incoming {
 /// [accepting]: struct.TcpListener.html#method.accept
 /// [listener]: struct.TcpListener.html
 pub struct TcpStream {
-    io: PollEvented<mio::net::TcpStream>,
+    io: PollEvented2<mio::net::TcpStream>,
 }
 
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
@@ -217,19 +222,19 @@ impl TcpStream {
     /// stream has successfully connected, or it wil return an error if one
     /// occurs.
     pub fn connect(addr: &SocketAddr) -> ConnectFuture {
+        use self::ConnectFutureState::*;
+
         let inner = match mio::net::TcpStream::connect(addr) {
-            Ok(tcp) => TcpStream::new(tcp, &Handle::default()),
-            Err(e) => ConnectFutureState::Error(e),
+            Ok(tcp) => Waiting(TcpStream::new(tcp)),
+            Err(e) => Error(e),
         };
-        ConnectFuture { inner: inner }
+
+        ConnectFuture { inner }
     }
 
-    fn new(connected_stream: mio::net::TcpStream, handle: &Handle)
-           -> ConnectFutureState {
-        match PollEvented::new(connected_stream, handle) {
-            Ok(io) => ConnectFutureState::Waiting(TcpStream { io: io }),
-            Err(e) => ConnectFutureState::Error(e),
-        }
+    fn new(connected: mio::net::TcpStream) -> TcpStream {
+        let io = PollEvented2::new(connected);
+        TcpStream { io }
     }
 
     /// Create a new `TcpStream` from a `net::TcpStream`.
@@ -241,10 +246,10 @@ impl TcpStream {
     pub fn from_std(stream: net::TcpStream, handle: &Handle)
         -> io::Result<TcpStream>
     {
-        let inner = mio::net::TcpStream::from_stream(stream)?;
-        Ok(TcpStream {
-            io: try!(PollEvented::new(inner, handle)),
-        })
+        let io = mio::net::TcpStream::from_stream(stream)?;
+        let io = PollEvented2::new_with_handle(io, handle)?;
+
+        Ok(TcpStream { io })
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -270,10 +275,16 @@ impl TcpStream {
                        handle: &Handle)
         -> ConnectFuture
     {
-        let inner = match mio::net::TcpStream::connect_stream(stream, addr) {
-            Ok(tcp) => TcpStream::new(tcp, handle),
-            Err(e) => ConnectFutureState::Error(e),
+        use self::ConnectFutureState::*;
+
+        let io = mio::net::TcpStream::connect_stream(stream, addr)
+            .and_then(|io| PollEvented2::new_with_handle(io, handle));
+
+        let inner = match io {
+            Ok(io) => Waiting(TcpStream { io }),
+            Err(e) => Error(e),
         };
+
         ConnectFuture { inner: inner }
     }
 
@@ -294,7 +305,7 @@ impl TcpStream {
     /// Successive calls return the same data. This is accomplished by passing
     /// `MSG_PEEK` as a flag to the underlying recv system call.
     pub fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_read() {
+        if let Async::NotReady = self.io.poll_read_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -440,6 +451,8 @@ impl TcpStream {
     }
 }
 
+// ===== impl Read / Write =====
+
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.io.read(buf)
@@ -461,7 +474,45 @@ impl AsyncRead for TcpStream {
     }
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_read() {
+        <&TcpStream>::read_buf(&mut &*self, buf)
+    }
+}
+
+impl AsyncWrite for TcpStream {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        <&TcpStream>::shutdown(&mut &*self)
+    }
+
+    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        <&TcpStream>::write_buf(&mut &*self, buf)
+    }
+}
+
+// ===== impl Read / Write for &'a =====
+
+impl<'a> Read for &'a TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&self.io).read(buf)
+    }
+}
+
+impl<'a> Write for &'a TcpStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (&self.io).write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&self.io).flush()
+    }
+}
+
+impl<'a> AsyncRead for &'a TcpStream {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        false
+    }
+
+    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        if let Async::NotReady = self.io.poll_read_ready()? {
             return Ok(Async::NotReady)
         }
 
@@ -509,13 +560,13 @@ impl AsyncRead for TcpStream {
     }
 }
 
-impl AsyncWrite for TcpStream {
+impl<'a> AsyncWrite for &'a TcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_write() {
+        if let Async::NotReady = self.io.poll_write_ready()? {
             return Ok(Async::NotReady)
         }
 
@@ -582,9 +633,10 @@ impl Future for ConnectFutureState {
             // actually hit an error or not.
             //
             // If all that succeeded then we ship everything on up.
-            if let Async::NotReady = stream.io.poll_write() {
+            if let Async::NotReady = stream.io.poll_write_ready()? {
                 return Ok(Async::NotReady)
             }
+
             if let Some(e) = try!(stream.io.get_ref().take_error()) {
                 return Err(e)
             }

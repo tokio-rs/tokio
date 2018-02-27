@@ -19,6 +19,8 @@
 use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
 
+use atomic_task::AtomicTask;
+
 use std::{fmt, usize};
 use std::io::{self, ErrorKind};
 use std::mem;
@@ -29,16 +31,23 @@ use std::sync::{Arc, Weak, RwLock};
 use std::time::{Duration, Instant};
 
 use log::Level;
-use futures::task::AtomicTask;
 use mio;
 use mio::event::Evented;
 use slab::Slab;
+use futures::task::Task;
 
 pub(crate) mod background;
 use self::background::Background;
 
 mod poll_evented;
+#[allow(deprecated)]
 pub use self::poll_evented::PollEvented;
+
+mod registration;
+pub use self::registration::Registration;
+
+mod poll_evented2;
+pub use self::poll_evented2::PollEvented as PollEvented2;
 
 /// The core reactor, or event loop.
 ///
@@ -100,7 +109,8 @@ struct ScheduledIo {
     writer: AtomicTask,
 }
 
-enum Direction {
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+pub(crate) enum Direction {
     Read,
     Write,
 }
@@ -358,11 +368,24 @@ impl fmt::Debug for Reactor {
 impl Handle {
     /// Returns a handle to the current reactor.
     pub fn current() -> Handle {
-        Handle::default()
+        Handle::try_current()
+            .unwrap_or(Handle { inner: Weak::new() })
+    }
+
+    /// Try to get a handle to the current reactor.
+    ///
+    /// Returns `Err` if no handle is found.
+    pub(crate) fn try_current() -> io::Result<Handle> {
+        CURRENT_REACTOR.with(|current| {
+            match *current.borrow() {
+                Some(ref handle) => Ok(handle.clone()),
+                None => Handle::fallback(),
+            }
+        })
     }
 
     /// Returns a handle to the fallback reactor.
-    fn fallback() -> Handle {
+    fn fallback() -> io::Result<Handle> {
         let mut fallback = HANDLE_FALLBACK.load(SeqCst);
 
         // If the fallback hasn't been previously initialized then let's spin
@@ -373,7 +396,8 @@ impl Handle {
         if fallback == 0 {
             let reactor = match Reactor::new() {
                 Ok(reactor) => reactor,
-                Err(_) => return Handle { inner: Weak::new() },
+                Err(_) => return Err(io::Error::new(io::ErrorKind::Other,
+                                                    "failed to create reactor")),
             };
 
             // If we successfully set ourselves as the actual fallback then we
@@ -392,7 +416,7 @@ impl Handle {
                     Err(_) => {}
                 }
 
-                return ret
+                return Ok(ret);
             }
 
             fallback = HANDLE_FALLBACK.load(SeqCst);
@@ -403,12 +427,14 @@ impl Handle {
         // handle as we don't actually have an owning reference to it.
         assert!(fallback != 0);
 
-        unsafe {
+        let ret = unsafe {
             let handle = Handle::from_usize(fallback);
             let ret = handle.clone();
             drop(handle.into_usize());
-            return ret
-        }
+            ret
+        };
+
+        Ok(ret)
     }
 
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
@@ -450,12 +476,7 @@ impl Unpark for Handle {
 
 impl Default for Handle {
     fn default() -> Handle {
-        CURRENT_REACTOR.with(|current| {
-            match *current.borrow() {
-                Some(ref handle) => handle.clone(),
-                None => Handle::fallback(),
-            }
-        })
+        Handle::current()
     }
 }
 
@@ -490,7 +511,8 @@ impl Inner {
         let mut io_dispatch = self.io_dispatch.write().unwrap();
 
         if io_dispatch.len() == MAX_SOURCES {
-            return Err(io::Error::new(io::ErrorKind::Other, "reactor at max registered I/O resources"));
+            return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
+                                      registered I/O resources"));
         }
 
         // Acquire a write lock
@@ -520,7 +542,7 @@ impl Inner {
     }
 
     /// Registers interest in the I/O resource associated with `token`.
-    fn schedule(&self, token: usize, dir: Direction) {
+    fn register(&self, token: usize, dir: Direction, t: Task) {
         debug!("scheduling direction for: {}", token);
         let io_dispatch = self.io_dispatch.read().unwrap();
         let sched = io_dispatch.get(token).unwrap();
@@ -530,7 +552,7 @@ impl Inner {
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
-        task.register();
+        task.register_task(t);
 
         if sched.readiness.load(SeqCst) & ready2usize(ready) != 0 {
             task.notify();
@@ -551,14 +573,33 @@ impl Drop for Inner {
     }
 }
 
+impl Direction {
+    fn ready(&self) -> mio::Ready {
+        match *self {
+            Direction::Read => read_ready(),
+            Direction::Write => write_ready(),
+        }
+    }
+
+    fn mask(&self) -> usize {
+        ready2usize(self.ready())
+    }
+}
+
 // ===== misc =====
+
+const READ: usize = 1 << 0;
+const WRITE: usize = 1 << 1;
 
 fn read_ready() -> mio::Ready {
     mio::Ready::readable() | platform::hup()
 }
 
-const READ: usize = 1 << 0;
-const WRITE: usize = 1 << 1;
+fn write_ready() -> mio::Ready {
+    mio::Ready::writable()
+}
+
+// === legacy
 
 fn ready2usize(ready: mio::Ready) -> usize {
     let mut bits = 0;
