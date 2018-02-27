@@ -2,8 +2,13 @@
 
 A platform for writing fast networking code with Rust.
 
-[![Build Status](https://travis-ci.org/tokio-rs/tokio.svg?branch=new-crate)](https://travis-ci.org/tokio-rs/tokio)
-[![Build status](https://ci.appveyor.com/api/projects/status/uxiinkgipvy6ehrj/branch/new-crate?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio/branch/new-crate)
+[![Travis Build Status][travis-badge]][travis-url]
+[![Appveyor Build Status][appveyor-badge]][appveyor-url]
+
+[travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
+[travis-url]: https://travis-ci.org/tokio-rs/tokio
+[appveyor-badge]: https://ci.appveyor.com/api/projects/status/github/carllerche/tokio?svg=true&branch=master
+[appveyor-url]: https://ci.appveyor.com/project/carllerche/tokio/branch/master
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/getting-started/hello-world/) |
