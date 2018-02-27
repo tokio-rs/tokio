@@ -107,9 +107,9 @@
 use reactor::{self, Reactor, Handle};
 use reactor::background::Background;
 
-use tokio_threadpool::{self as threadpool, ThreadPool};
+use tokio_threadpool::{self as threadpool, ThreadPool, Sender};
 use futures::Poll;
-use futures::future::Future;
+use futures::future::{self, Future};
 
 use std::{fmt, io};
 
@@ -124,6 +124,17 @@ use std::{fmt, io};
 #[derive(Debug)]
 pub struct Runtime {
     inner: Option<Inner>,
+}
+
+/// Executes futures on the runtime
+///
+/// All futures spawned using this executor will be submitted to the associated
+/// Runtime's executor. This executor is usually a thread pool.
+///
+/// For more details, see the [module level](index.html) documentation.
+#[derive(Debug, Clone)]
+pub struct TaskExecutor {
+    inner: Sender,
 }
 
 /// A future that resolves when the Tokio `Runtime` is shut down.
@@ -226,7 +237,13 @@ impl Runtime {
 
     /// Return a reference to the reactor handle for this runtime instance.
     pub fn handle(&self) -> &Handle {
-        self.inner.as_ref().unwrap().reactor.handle()
+        self.inner().reactor.handle()
+    }
+
+    /// Return a handle to the runtime's executor.
+    pub fn executor(&self) -> TaskExecutor {
+        let inner = self.inner().pool.sender().clone();
+        TaskExecutor { inner }
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -336,8 +353,30 @@ impl Runtime {
         Shutdown { inner }
     }
 
+    fn inner(&self) -> &Inner {
+        self.inner.as_ref().unwrap()
+    }
+
     fn inner_mut(&mut self) -> &mut Inner {
         self.inner.as_mut().unwrap()
+    }
+}
+
+// ===== impl TaskExecutor =====
+
+impl<T> future::Executor<T> for TaskExecutor
+where T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
+        self.inner.execute(future)
+    }
+}
+
+impl ::executor::Executor for TaskExecutor {
+    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
+        -> Result<(), ::executor::SpawnError>
+    {
+        self.inner.spawn(future)
     }
 }
 
