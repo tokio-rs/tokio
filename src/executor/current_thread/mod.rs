@@ -529,22 +529,9 @@ impl<'a, P: Park> Entered<'a, P> {
 
     /// Returns `true` if any futures were processed
     fn tick(&mut self) -> bool {
-        let num_futures = &mut self.executor.num_futures;
-        let enter = &mut *self.enter;
-
-        // work the scheduler
-        self.executor.scheduler.tick(|scheduler, scheduled| {
-            let mut borrow = Borrow {
-                scheduler,
-                num_futures,
-            };
-
-            // A future completed, decrement the future count
-            if borrow.enter(enter, || scheduled.tick()) {
-                debug_assert!(*borrow.num_futures > 0);
-                *borrow.num_futures -= 1;
-            }
-        })
+        self.executor.scheduler.tick(
+            &mut *self.enter,
+            &mut self.executor.num_futures)
     }
 }
 
