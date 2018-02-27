@@ -4,6 +4,7 @@ extern crate futures;
 
 use tokio::executor::current_thread::{self, block_on_all, CurrentThread};
 
+use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::thread;
@@ -291,6 +292,48 @@ fn spawn_and_turn() {
     // This runs the newly spawned thread
     current_thread.turn(None).unwrap();
     assert_eq!(2, cnt.get());
+}
+
+#[test]
+fn spawn_in_drop() {
+    let mut current_thread = CurrentThread::new();
+
+    let (tx, rx) = oneshot::channel();
+
+    struct OnDrop<F: FnOnce()>(Option<F>);
+
+    impl<F: FnOnce()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            (self.0.take().unwrap())();
+        }
+    }
+
+    struct MyFuture {
+        _data: Box<Any>,
+    }
+
+    impl Future for MyFuture {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            Ok(().into())
+        }
+    }
+
+    current_thread.spawn({
+        MyFuture {
+            _data: Box::new(OnDrop(Some(move || {
+                current_thread::spawn(lazy(move || {
+                    tx.send(()).unwrap();
+                    Ok(())
+                }));
+            }))),
+        }
+    });
+
+    current_thread.block_on(rx).unwrap();
+    current_thread.run().unwrap();
 }
 
 #[test]

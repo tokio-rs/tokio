@@ -1,3 +1,5 @@
+use super::Borrow;
+use tokio_executor::Enter;
 use tokio_executor::park::Unpark;
 
 use futures::{Future, Async};
@@ -118,6 +120,7 @@ struct Node<U> {
 enum Dequeue<U> {
     Data(*const Node<U>),
     Empty,
+    Yield,
     Inconsistent,
 }
 
@@ -198,8 +201,7 @@ where U: Unpark,
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick<F>(&mut self, mut f: F) -> bool
-    where F: FnMut(&mut Self, &mut Scheduled<U>),
+    pub fn tick(&mut self, enter: &mut Enter, num_futures: &mut usize) -> bool
     {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst)
@@ -208,6 +210,10 @@ where U: Unpark,
         loop {
             let node = match unsafe { self.inner.dequeue(Some(tick)) } {
                 Dequeue::Empty => {
+                    return ret;
+                }
+                Dequeue::Yield => {
+                    self.inner.unpark.unpark();
                     return ret;
                 }
                 Dequeue::Inconsistent => {
@@ -247,22 +253,31 @@ where U: Unpark,
                 //   assume is is complete (will return Ready or panic), in
                 //   which case we'll want to discard it regardless.
                 //
-                struct Bomb<'a, U: 'a> {
-                    queue: &'a mut Scheduler<U>,
+                struct Bomb<'a, U: Unpark + 'a> {
+                    borrow: &'a mut Borrow<'a, U>,
+                    enter: &'a mut Enter,
                     node: Option<Arc<Node<U>>>,
                 }
 
-                impl<'a, U> Drop for Bomb<'a, U> {
+                impl<'a, U: Unpark> Drop for Bomb<'a, U> {
                     fn drop(&mut self) {
                         if let Some(node) = self.node.take() {
-                            release_node(node);
+                            self.borrow.enter(self.enter, || release_node(node))
                         }
                     }
                 }
 
+                let node = self.nodes.remove(node);
+
+                let mut borrow = Borrow {
+                    scheduler: self,
+                    num_futures,
+                };
+
                 let mut bomb = Bomb {
-                    node: Some(self.nodes.remove(node)),
-                    queue: self,
+                    node: Some(node),
+                    enter: enter,
+                    borrow: &mut borrow,
                 };
 
                 let mut done = false;
@@ -295,7 +310,8 @@ where U: Unpark,
                     // instances. These structs will basically just use `T` to size
                     // the internal allocation, appropriately accessing fields and
                     // deallocating the node if need be.
-                    let queue = &mut *bomb.queue;
+                    let borrow = &mut *bomb.borrow;
+                    let enter = &mut *bomb.enter;
                     let notify = Notify(bomb.node.as_ref().unwrap());
 
                     let mut scheduled = Scheduled {
@@ -304,14 +320,16 @@ where U: Unpark,
                         done: &mut done,
                     };
 
-                    f(queue, &mut scheduled);
+                    if borrow.enter(enter, || scheduled.tick()) {
+                        *borrow.num_futures -= 1;
+                    }
                 }
 
                 if !done {
                     // The future is not done, push it back into the "all
                     // node" list.
                     let node = bomb.node.take().unwrap();
-                    bomb.queue.nodes.push_back(node);
+                    bomb.borrow.scheduler.nodes.push_back(node);
                 }
             }
         }
@@ -452,7 +470,7 @@ impl<U> Inner<U> {
                 //
                 // If, for some reason, this is not enough, calling `unpark`
                 // here will resolve the issue.
-                return Dequeue::Empty;
+                return Dequeue::Yield;
             }
         }
 
@@ -496,6 +514,7 @@ impl<U> Drop for Inner<U> {
             loop {
                 match self.dequeue(None) {
                     Dequeue::Empty => break,
+                    Dequeue::Yield => unreachable!(),
                     Dequeue::Inconsistent => abort("inconsistent in drop"),
                     Dequeue::Data(ptr) => drop(ptr2arc(ptr)),
                 }
