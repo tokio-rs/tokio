@@ -202,7 +202,8 @@ where U: Unpark,
     where F: FnMut(&mut Self, &mut Scheduled<U>),
     {
         let mut ret = false;
-        let tick = self.inner.tick_num.fetch_add(1, SeqCst);
+        let tick = self.inner.tick_num.fetch_add(1, SeqCst)
+            .wrapping_add(1);
 
         loop {
             let node = match unsafe { self.inner.dequeue(Some(tick)) } {
@@ -439,8 +440,18 @@ impl<U> Inner<U> {
         }
 
         if let Some(tick) = tick {
-            // Only dequeue if the node matches the tick num
-            if (*tail).notified_at.load(SeqCst) != tick {
+            let actual = (*tail).notified_at.load(SeqCst);
+
+            // Only dequeue if the node was not scheduled during the current
+            // tick.
+            if actual == tick {
+                // Only doing the check above **should** be enough in
+                // practice. However, technically there is a potential for
+                // deadlocking if there are `usize::MAX` ticks while the thread
+                // scheduling the task is frozen.
+                //
+                // If, for some reason, this is not enough, calling `unpark`
+                // here will resolve the issue.
                 return Dequeue::Empty;
             }
         }

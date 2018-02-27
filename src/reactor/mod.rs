@@ -256,7 +256,10 @@ impl Reactor {
     }
 
     /// Returns true if the reactor is currently idle.
-    pub(crate) fn is_idle(&self) -> bool {
+    ///
+    /// Idle is defined as all tasks that have been spawned have completed,
+    /// either successfully or with an error.
+    pub fn is_idle(&self) -> bool {
         self.inner.io_dispatch
             .read().unwrap()
             .is_empty()
@@ -313,9 +316,11 @@ impl Reactor {
 
         if let Some(io) = io_dispatch.get(token) {
             io.readiness.fetch_or(ready2usize(ready), Relaxed);
+
             if ready.is_writable() {
                 io.writer.notify();
             }
+
             if !(ready & (!mio::Ready::writable())).is_empty() {
                 io.reader.notify();
             }
