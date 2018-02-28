@@ -355,10 +355,18 @@ fn hammer_turn() {
                 let (tx, rx) = mpsc::unbounded();
 
                 current_thread.spawn({
-                    rx.for_each(|_| {
+                    let cnt = Rc::new(Cell::new(0));
+                    let c = cnt.clone();
+
+                    rx.for_each(move |_| {
+                        c.set(1 + c.get());
                         Ok(())
                     })
                     .map_err(|e| panic!("err={:?}", e))
+                    .map(move |v| {
+                        assert_eq!(N, cnt.get());
+                        v
+                    })
                 });
 
                 thread::spawn(move || {
