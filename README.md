@@ -7,7 +7,7 @@ A platform for writing fast networking code with Rust.
 
 [travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
 [travis-url]: https://travis-ci.org/tokio-rs/tokio
-[appveyor-badge]: https://ci.appveyor.com/api/projects/status/github/carllerche/tokio?svg=true&branch=master
+[appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7?svg=true
 [appveyor-url]: https://ci.appveyor.com/project/carllerche/tokio/branch/master
 
 [Website](https://tokio.rs) |
