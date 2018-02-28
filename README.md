@@ -1,6 +1,16 @@
 # Tokio
 
-A platform for writing fast networking code with Rust.
+A runtime for writing reliable, asynchronous, and slim applications with
+the Rust programming langauge. It is:
+
+* **Fast**: Tokio's zero-cost abstractions give you bare-metal
+  performance.
+
+* **Reliable**: Tokio leverages Rust's ownership, type system, and
+  concurrency model to reduce bugs and ensure thread safety.
+
+* **Scalable**: Tokio has a minimal footprint, and handles backpressure
+  and cancellation naturally.
 
 [![Travis Build Status][travis-badge]][travis-url]
 [![Appveyor Build Status][appveyor-badge]][appveyor-url]
@@ -16,14 +26,21 @@ A platform for writing fast networking code with Rust.
 
 ## Overview
 
-Tokio is an event-driven, non-blocking I/O platform for writing asynchronous I/O
-backed applications. It is used for implementing networking clients and servers.
+Tokio is an event-driven, non-blocking I/O platform for writing
+asynchronous applications with the Rust programming language. At a high
+level, it provides a few major components:
 
-Tokio uses the [`futures`] crate as a foundation to build on, providing
-networking types and other utilities needed for building a production ready
-application.
+* A multi threaded, work-stealing based task [scheduler].
+* A [reactor] backed by the operating system's event queue (epoll, kqueue,
+  IOCP, etc...).
+* Asynchronous [TCP and UDP][net] sockets.
 
-[`futures`]: https://github.com/rust-lang-nursery/futures-rs
+These components provide the runtime components necessary for building
+an asynchronous application.
+
+[net]: https://docs.rs/tokio/0.1/tokio/net/index.html
+[reactor]: https://docs.rs/tokio/0.1.1/tokio/reactor/index.html
+[scheduler]: https://tokio-rs.github.io/tokio/tokio/runtime/index.html
 
 # License
 
