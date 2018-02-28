@@ -5,11 +5,11 @@ use std::fmt;
 use futures::{Async, Future, Poll};
 use mio;
 
-use reactor::{Handle, PollEvented};
+use reactor::{Handle, PollEvented2};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    io: PollEvented<mio::net::UdpSocket>,
+    io: PollEvented2<mio::net::UdpSocket>,
 }
 
 mod frame;
@@ -19,13 +19,13 @@ impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
     /// the `addr` provided.
     pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
-        let udp = try!(mio::net::UdpSocket::bind(addr));
-        UdpSocket::new(udp, &Handle::default())
+        mio::net::UdpSocket::bind(addr)
+            .map(UdpSocket::new)
     }
 
-    fn new(socket: mio::net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
-        let io = try!(PollEvented::new(socket, handle));
-        Ok(UdpSocket { io: io })
+    fn new(socket: mio::net::UdpSocket) -> UdpSocket {
+        let io = PollEvented2::new(socket);
+        UdpSocket { io: io }
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.
@@ -39,8 +39,9 @@ impl UdpSocket {
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_std(socket: net::UdpSocket,
                     handle: &Handle) -> io::Result<UdpSocket> {
-        let udp = try!(mio::net::UdpSocket::from_socket(socket));
-        UdpSocket::new(udp, handle)
+        let io = mio::net::UdpSocket::from_socket(socket)?;
+        let io = PollEvented2::new_with_handle(io, handle)?;
+        Ok(UdpSocket { io })
     }
 
     /// Returns the local address that this socket is bound to.
@@ -63,7 +64,7 @@ impl UdpSocket {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_write() {
+        if let Async::NotReady = self.io.poll_write_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -86,7 +87,7 @@ impl UdpSocket {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_read() {
+        if let Async::NotReady = self.io.poll_read_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -112,7 +113,7 @@ impl UdpSocket {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_write() {
+        if let Async::NotReady = self.io.poll_write_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -155,7 +156,7 @@ impl UdpSocket {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        if let Async::NotReady = self.io.poll_read() {
+        if let Async::NotReady = self.io.poll_read_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 

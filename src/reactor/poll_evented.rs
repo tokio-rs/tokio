@@ -6,11 +6,13 @@
 //! acquisition of a token, and tracking of the readiness state on the
 //! underlying I/O primitive.
 
+#![allow(deprecated)]
+
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::sync::atomic::Ordering;
 
-use futures::{Async, Poll};
+use futures::{task, Async, Poll};
 use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -68,6 +70,8 @@ struct Registration {
 /// Essentially a good rule of thumb is that if you're using the `poll_ready`
 /// method you want to also use `need_read` to signal blocking and you should
 /// otherwise probably avoid using two tasks on the same `PollEvented`.
+#[deprecated(since = "0.1.2", note = "PollEvented2 instead")]
+#[doc(hidden)]
 pub struct PollEvented<E> {
     registration: Registration,
     io: E,
@@ -233,12 +237,7 @@ impl<E> PollEvented<E> {
         let bits = super::ready2usize(super::read_ready());
         self.registration.readiness &= !bits;
 
-        let inner = match self.registration.handle.inner() {
-            Some(inner) => inner,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
-        };
-        inner.schedule(self.registration.token, Direction::Read);
-        Ok(())
+        self.register(Direction::Read)
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -273,12 +272,7 @@ impl<E> PollEvented<E> {
         let bits = super::ready2usize(Ready::writable());
         self.registration.readiness &= !bits;
 
-        let inner = match self.registration.handle.inner() {
-            Some(inner) => inner,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
-        };
-        inner.schedule(self.registration.token, Direction::Write);
-        Ok(())
+        self.register(Direction::Write)
     }
 
     /// Returns a reference to the event loop handle that this readiness stream
@@ -325,6 +319,16 @@ impl<E> PollEvented<E> {
         };
 
         inner.deregister_source(&self.io)
+    }
+
+    fn register(&self, dir: Direction) -> io::Result<()> {
+        let inner = match self.registration.handle.inner() {
+            Some(inner) => inner,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
+        };
+
+        inner.register(self.registration.token, dir, task::current());
+        Ok(())
     }
 }
 
