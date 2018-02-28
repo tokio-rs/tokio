@@ -38,15 +38,15 @@ fn spawn_from_block_on_all() {
 
 #[test]
 fn block_waits() {
-    let cnt = Rc::new(Cell::new(0));
-    let cnt2 = cnt.clone();
-
     let (tx, rx) = oneshot::channel();
 
     thread::spawn(|| {
         thread::sleep(Duration::from_millis(1000));
         tx.send(()).unwrap();
     });
+
+    let cnt = Rc::new(Cell::new(0));
+    let cnt2 = cnt.clone();
 
     block_on_all(rx.then(move |_| {
         cnt.set(1 + cnt.get());
@@ -300,28 +300,28 @@ fn spawn_in_drop() {
 
     let (tx, rx) = oneshot::channel();
 
-    struct OnDrop<F: FnOnce()>(Option<F>);
-
-    impl<F: FnOnce()> Drop for OnDrop<F> {
-        fn drop(&mut self) {
-            (self.0.take().unwrap())();
-        }
-    }
-
-    struct MyFuture {
-        _data: Box<Any>,
-    }
-
-    impl Future for MyFuture {
-        type Item = ();
-        type Error = ();
-
-        fn poll(&mut self) -> Poll<(), ()> {
-            Ok(().into())
-        }
-    }
-
     current_thread.spawn({
+        struct OnDrop<F: FnOnce()>(Option<F>);
+
+        impl<F: FnOnce()> Drop for OnDrop<F> {
+            fn drop(&mut self) {
+                (self.0.take().unwrap())();
+            }
+        }
+
+        struct MyFuture {
+            _data: Box<Any>,
+        }
+
+        impl Future for MyFuture {
+            type Item = ();
+            type Error = ();
+
+            fn poll(&mut self) -> Poll<(), ()> {
+                Ok(().into())
+            }
+        }
+
         MyFuture {
             _data: Box::new(OnDrop(Some(move || {
                 current_thread::spawn(lazy(move || {
@@ -355,10 +355,18 @@ fn hammer_turn() {
                 let (tx, rx) = mpsc::unbounded();
 
                 current_thread.spawn({
-                    rx.for_each(|_| {
+                    let cnt = Rc::new(Cell::new(0));
+                    let c = cnt.clone();
+
+                    rx.for_each(move |_| {
+                        c.set(1 + c.get());
                         Ok(())
                     })
                     .map_err(|e| panic!("err={:?}", e))
+                    .map(move |v| {
+                        assert_eq!(N, cnt.get());
+                        v
+                    })
                 });
 
                 thread::spawn(move || {
