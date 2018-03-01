@@ -1,50 +1,31 @@
-//! `Future`-powered I/O at the core of Tokio
+//! A runtime for writing reliable, asynchronous, and slim applications.
 //!
-//! This crate uses the [`futures`] crate to provide an event loop ("reactor
-//! core") which can be used to drive I/O like TCP and UDP. All asynchronous I/O
-//! is powered by the [`mio`] crate.
+//! Tokio is an event-driven, non-blocking I/O platform for writing asynchronous
+//! applications with the Rust programming language. At a high level, it
+//! provides a few major components:
 //!
-//! [`futures`]: ../futures/index.html
-//! [`mio`]: ../mio/index.html
+//! * A multi threaded, work-stealing based task [scheduler][runtime].
+//! * A [reactor][reactor] backed by the operating system's event queue (epoll, kqueue,
+//!   IOCP, etc...).
+//! * Asynchronous [TCP and UDP][net] sockets.
 //!
-//! The concrete types provided in this crate are relatively bare bones but are
-//! intended to be the essential foundation for further projects needing an
-//! event loop. In this crate you'll find:
+//! Tokio is built using futures (provided by the [futures] crate) as the
+//! abstraction for managing the complexity of asynchronous programming.
 //!
-//! * TCP, both streams and listeners.
-//! * UDP sockets.
-//! * An event loop to run futures.
+//! Guide level documentation is found on the [website].
 //!
-//! More functionality is likely to be added over time, but otherwise the crate
-//! is intended to be flexible, with the [`PollEvented`] type accepting any
-//! type that implements [`mio::Evented`]. For example, the [`tokio-uds`] crate
-//! uses [`PollEvented`] to provide support for Unix domain sockets.
-//!
-//! [`PollEvented`]: ./reactor/struct.PollEvented.html
-//! [`mio::Evented`]: ../mio/event/trait.Evented.html
-//! [`tokio-uds`]: https://crates.io/crates/tokio-uds
-//!
-//! Some other important tasks covered by this crate are:
-//!
-//! * All I/O is futures-aware. If any action in this crate returns "not ready"
-//!   or "would block", then the current future task is scheduled to receive a
-//!   notification when it would otherwise make progress.
-//!
-//! You can find more extensive documentation in terms of tutorials at
-//! [https://tokio.rs](https://tokio.rs).
+//! [website]: https://tokio.rs/docs/getting-started/hello-world/
+//! [futures]: http://docs.rs/futures
 //!
 //! # Examples
 //!
 //! A simple TCP echo server:
 //!
 //! ```no_run
-//! extern crate futures;
 //! extern crate tokio;
-//! extern crate tokio_io;
 //!
-//! use futures::prelude::*;
-//! use tokio_io::AsyncRead;
-//! use tokio_io::io::copy;
+//! use tokio::prelude::*;
+//! use tokio::io::copy;
 //! use tokio::net::TcpListener;
 //!
 //! fn main() {
@@ -55,7 +36,7 @@
 //!
 //!     // Pull out a stream of sockets for incoming connections
 //!     let server = listener.incoming()
-//!         .map_err(|e| println!("accept failed = {:?}", e))
+//!         .map_err(|e| eprintln!("accept failed = {:?}", e))
 //!         .for_each(|sock| {
 //!             // Split up the reading and writing parts of the
 //!             // socket.
@@ -82,9 +63,7 @@
 //! ```
 
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.1")]
-#![deny(missing_docs)]
-#![deny(warnings)]
-#![warn(missing_debug_implementations)]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;
 #[macro_use]
@@ -109,3 +88,104 @@ pub use executor::spawn;
 pub use runtime::run;
 
 mod atomic_task;
+
+pub mod io {
+    //! Asynchronous I/O.
+    //!
+    //! This module is the asynchronous version of `std::io`. Primarily, it
+    //! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which extend the
+    //! `Read` and `Write` traits of the standard library.
+    //!
+    //! [`AsyncRead`] and [`AsyncWrite`] must only be implemented for
+    //! non-blocking I/O types that integrate with the futures type system. In
+    //! other words, these types must never block the thread, and instead the
+    //! current task is notified when the I/O resource is ready.
+    //!
+    //! Utilities functions are provided for working with [`AsyncRead`] /
+    //! [`AsyncWrite`] types. For example, [`copy`] asynchronously copies all
+    //! data from a source to a destination.
+    //!
+    //! Additionally, [`Read`], [`Write`], [`Error`], [`ErrorKind`], and
+    //! [`Result`] are re-exported from `std::io` for ease of use.
+    //!
+    //! [`AsyncRead`]: trait.AsyncRead.html
+    //! [`AsyncWrite`]: trait.AsyncWrite.html
+    //! [`copy`]: fn.copy.html
+    //! [`Read`]: trait.Read.html
+    //! [`Write`]: trait.Write.html
+    //! [`Error`]: struct.Error.html
+    //! [`ErrorKind`]: enum.ErrorKind.html
+    //! [`Result`]: type.Result.html
+
+    pub use tokio_io::{
+        AsyncRead,
+        AsyncWrite,
+    };
+
+    // Utils
+    pub use tokio_io::io::{
+        copy,
+        Copy,
+        flush,
+        Flush,
+        lines,
+        Lines,
+        read_exact,
+        ReadExact,
+        read_to_end,
+        ReadToEnd,
+        read_until,
+        ReadUntil,
+        shutdown,
+        Shutdown,
+        write_all,
+        WriteAll,
+    };
+
+    // Re-export io::Error so that users don't have to deal
+    // with conflicts when `use`ing `futures::io` and `std::io`.
+    pub use ::std::io::{
+        Error,
+        ErrorKind,
+        Result,
+        Read,
+        Write,
+    };
+}
+
+pub mod prelude {
+    //! A "prelude" for users of the `tokio` crate.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the standard
+    //! library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use tokio::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+    pub use tokio_io::{
+        AsyncRead,
+        AsyncWrite,
+    };
+
+    pub use ::std::io::{
+        Read,
+        Write,
+    };
+
+    pub use futures::{
+        Future,
+        future,
+        Stream,
+        stream,
+        Sink,
+        IntoFuture,
+        Async,
+        AsyncSink,
+        Poll,
+        task,
+    };
+}

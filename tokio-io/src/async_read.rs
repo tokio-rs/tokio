@@ -6,23 +6,25 @@ use {framed, split, AsyncWrite};
 use codec::{Decoder, Encoder, Framed};
 use split::{ReadHalf, WriteHalf};
 
-/// A trait for readable objects which operated in an asynchronous and
-/// futures-aware fashion.
+/// Read bytes asynchronously.
 ///
-/// This trait inherits from `io::Read` and indicates as a marker that an I/O
-/// object is **nonblocking**, meaning that it will return an error instead of
-/// blocking when bytes are unavailable, but the stream hasn't reached EOF.
-/// Specifically this means that the `read` function for types that implement
-/// this trait can have a few return values:
+/// This trait inherits from `std::io::Read` and indicates that an I/O object is
+/// **non-blocking**. All non-blocking I/O objects must return an error when
+/// bytes are unavailable instead of blocking the current thread.
+///
+/// Specifically, this means that the `read` function will return one of the
+/// following:
 ///
 /// * `Ok(n)` means that `n` bytes of data was immediately read and placed into
 ///   the output buffer, where `n` == 0 implies that EOF has been reached.
+///
 /// * `Err(e) if e.kind() == ErrorKind::WouldBlock` means that no data was read
 ///   into the buffer provided. The I/O object is not currently readable but may
 ///   become readable in the future. Most importantly, **the current future's
 ///   task is scheduled to get unparked when the object is readable**. This
 ///   means that like `Future::poll` you'll receive a notification when the I/O
 ///   object is readable again.
+///
 /// * `Err(e)` for other errors are standard I/O errors coming from the
 ///   underlying object.
 ///
