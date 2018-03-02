@@ -6,7 +6,7 @@
 //! acquisition of a token, and tracking of the readiness state on the
 //! underlying I/O primitive.
 
-#![allow(deprecated)]
+#![allow(deprecated, warnings)]
 
 use std::fmt;
 use std::io::{self, Read, Write};
