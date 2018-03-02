@@ -16,7 +16,7 @@ use std::time::Duration;
 use mio::event::Evented;
 use mio::unix::{UnixReady, EventedFd};
 use mio::{PollOpt, Ready, Token};
-use tokio::reactor::{Handle, PollEvented};
+use tokio::reactor::{Handle, PollEvented2};
 use tokio_io::io::read_to_end;
 use futures::Future;
 
@@ -78,7 +78,7 @@ fn hup() {
             thread::sleep(Duration::from_millis(100));
         });
 
-        let source = PollEvented::new(MyFile::new(read), &handle).unwrap();
+        let source = PollEvented2::new_with_handle(MyFile::new(read), &handle).unwrap();
 
         let reader = read_to_end(source, Vec::new());
         let (_, content) = t!(reader.wait());
