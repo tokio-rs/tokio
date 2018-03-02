@@ -134,16 +134,23 @@ pub mod thread_pool {
 
 pub use tokio_executor::{Executor, DefaultExecutor, SpawnError};
 
-use futures::{Future, Poll, Async};
+use futures::{Future, IntoFuture};
+use futures::future::{self, FutureResult};
 
-/// Future, returned by `spawn`, that completes once the future is spawned.
+/// Return value from the `spawn` function.
+///
+/// Currently this value doesn't actually provide any functionality. However, it
+/// provides a way to add functionality later without breaking backwards
+/// compatibility.
+///
+/// This also implements `IntoFuture` so that it can be used as the return value
+/// in a `for_each` loop.
 ///
 /// See [`spawn`] for more details.
 ///
 /// [`spawn`]: fn.spawn.html
 #[derive(Debug)]
-#[must_use = "Spawn does nothing unless polled"]
-pub struct Spawn<F>(Option<F>);
+pub struct Spawn(());
 
 /// Spawns a future on the default executor.
 ///
@@ -153,10 +160,6 @@ pub struct Spawn<F>(Option<F>);
 /// thread-local variable).
 ///
 /// The default executor is **usually** a thread pool.
-///
-/// Note that the function doesn't immediately spawn the future. Instead, it
-/// returns `Spawn`, which itself is a future that completes once the spawn has
-/// succeeded.
 ///
 /// # Examples
 ///
@@ -188,20 +191,27 @@ pub struct Spawn<F>(Option<F>);
 /// ```
 ///
 /// [default executor]: struct.DefaultExecutor.html
-pub fn spawn<F>(f: F) -> Spawn<F>
+///
+/// # Panics
+///
+/// This function will panic if the default executor is not set or if spawning
+/// onto the default executor returns an error. To avoid the panic, use
+/// [`DefaultExecutor`].
+///
+/// [`DefaultExecutor`]: #
+pub fn spawn<F>(f: F) -> Spawn
 where F: Future<Item = (), Error = ()> + 'static + Send
 {
-    Spawn(Some(f))
+    ::tokio_executor::spawn(f);
+    Spawn(())
 }
 
-impl<F> Future for Spawn<F>
-where F: Future<Item = (), Error = ()> + Send + 'static
-{
+impl IntoFuture for Spawn {
+    type Future = FutureResult<(), ()>;
     type Item = ();
     type Error = ();
 
-    fn poll(&mut self) -> Poll<(), ()> {
-        ::tokio_executor::spawn(self.0.take().unwrap());
-        Ok(Async::Ready(()))
+    fn into_future(self) -> Self::Future {
+        future::ok(())
     }
 }

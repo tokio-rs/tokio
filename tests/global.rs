@@ -81,7 +81,7 @@ fn hammer_split() {
 
     let mut rt = Runtime::new().unwrap();
 
-    fn split(socket: TcpStream) -> Box<Future<Item = (), Error = ()> + Send> {
+    fn split(socket: TcpStream) {
         let socket = Arc::new(socket);
         let rd = Rd(socket.clone());
         let wr = Wr(socket);
@@ -94,25 +94,25 @@ fn hammer_split() {
             .map(|_| ())
             .map_err(|e| panic!("write error = {:?}", e));
 
-        Box::new({
-            tokio::spawn(rd)
-                .join(tokio::spawn(wr))
-                .map(|_| ())
-        })
+        tokio::spawn(rd);
+        tokio::spawn(wr);
     }
 
     rt.spawn({
         srv.incoming()
             .map_err(|e| panic!("accept error = {:?}", e))
             .take(N as u64)
-            .for_each(|socket| split(socket))
+            .for_each(|socket| {
+                split(socket);
+                Ok(())
+            })
     });
 
     for _ in 0..N {
         rt.spawn({
             TcpStream::connect(&addr)
                 .map_err(|e| panic!("connect error = {:?}", e))
-                .and_then(|socket| split(socket))
+                .map(|socket| split(socket))
         });
     }
 
