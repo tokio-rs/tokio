@@ -15,13 +15,10 @@
 #![deny(warnings)]
 
 extern crate tokio;
-extern crate tokio_io;
-extern crate futures;
 
-use tokio::executor::current_thread;
+use tokio::io;
 use tokio::net::TcpListener;
-use tokio_io::io;
-use futures::{Future, Stream};
+use tokio::prelude::*;
 
 pub fn main() {
     let addr = "127.0.0.1:6142".parse().unwrap();
@@ -43,7 +40,7 @@ pub fn main() {
             });
 
         // Spawn a new task that processes the socket:
-        current_thread::spawn(connection);
+        tokio::spawn(connection);
 
         Ok(())
     })
@@ -76,5 +73,5 @@ pub fn main() {
     //
     // In our example, we have not defined a shutdown strategy, so this will
     // block until `ctrl-c` is pressed at the terminal.
-    current_thread::block_on_all(server).unwrap();
+    tokio::run(server);
 }

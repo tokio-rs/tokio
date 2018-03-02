@@ -1,29 +1,25 @@
-//! This is a basic example of leveraging `BytesCodec` to create a simple UDP
-//! client and server which speak a custom protocol.
+//! This example leverages `BytesCodec` to create a UDP client and server which
+//! speak a custom protocol.
 //!
 //! Here we're using the codec from tokio-io to convert a UDP socket to a stream of
 //! client messages. These messages are then processed and returned back as a
 //! new message with a new destination. Overall, we then use this to construct a
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
+#![deny(warnings)]
+
 extern crate tokio;
 extern crate tokio_io;
 extern crate env_logger;
-extern crate futures;
-extern crate futures_cpupool;
 
 use std::net::SocketAddr;
 
-use futures::{Future, Stream, Sink};
-use futures::future::Executor;
-use futures_cpupool::CpuPool;
+use tokio::prelude::*;
 use tokio::net::{UdpSocket, UdpFramed};
 use tokio_io::codec::BytesCodec;
 
 fn main() {
-    drop(env_logger::init());
-
-    let pool = CpuPool::new(1);
+    let _ = env_logger::init();
 
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
@@ -59,6 +55,9 @@ fn main() {
     let b = b_sink.send_all(b_stream);
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
-    pool.execute(b.then(|_| Ok(()))).unwrap();
-    drop(a.wait());
+    tokio::run({
+        b.join(a)
+            .map(|_| ())
+            .map_err(|e| println!("error = {:?}", e))
+    });
 }
