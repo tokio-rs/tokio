@@ -1,5 +1,4 @@
 use std::io as std_io;
-use std::io::Write;
 use bytes::Buf;
 use futures::{Async, Poll};
 
@@ -35,6 +34,43 @@ use AsyncRead;
 /// current task is ready to receive a notification when flushing can make more
 /// progress, and otherwise normal errors can happen as well.
 pub trait AsyncWrite: std_io::Write {
+    /// Attempt to write bytes from `buf` into the object.
+    ///
+    /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
+    ///
+    /// If the object is not ready for writing, the method returns
+    /// `Ok(Async::Pending)` and arranges for the current task (via
+    /// `cx.waker()`) to receive a notification when the object becomes
+    /// readable or is closed.
+    fn poll_write(&mut self, buf: &[u8]) -> Poll<usize, std_io::Error> {
+        match self.write(buf) {
+            Ok(t) => Ok(Async::Ready(t)),
+            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => {
+                return Ok(Async::NotReady)
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+
+    /// Attempt to flush the object, ensuring that any buffered data reach
+    /// their destination.
+    ///
+    /// On success, returns `Ok(Async::Ready(()))`.
+    ///
+    /// If flushing cannot immediately complete, this method returns
+    /// `Ok(Async::Pending)` and arranges for the current task (via
+    /// `cx.waker()`) to receive a notification when the object can make
+    /// progress towards flushing.
+    fn poll_flush(&mut self) -> Poll<(), std_io::Error> {
+        match self.flush() {
+            Ok(t) => Ok(Async::Ready(t)),
+            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => {
+                return Ok(Async::NotReady)
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+
     /// Initiates or attempts to shut down this writer, returning success when
     /// the I/O connection has completely shut down.
     ///
@@ -106,7 +142,7 @@ pub trait AsyncWrite: std_io::Write {
             return Ok(Async::Ready(0));
         }
 
-        let n = try_nb!(self.write(buf.bytes()));
+        let n = try_ready!(self.poll_write(buf.bytes()));
         buf.advance(n);
         Ok(Async::Ready(n))
     }
@@ -150,7 +186,7 @@ impl<T, U> AsyncRead for std_io::Chain<T, U>
 
 impl<T: AsyncWrite> AsyncWrite for std_io::BufWriter<T> {
     fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        try_nb!(self.flush());
+        try_ready!(self.poll_flush());
         self.get_mut().shutdown()
     }
 }

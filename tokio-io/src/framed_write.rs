@@ -184,7 +184,7 @@ impl<T> Sink for FramedWrite2<T>
         while !self.buffer.is_empty() {
             trace!("writing; remaining={}", self.buffer.len());
 
-            let n = try_nb!(self.inner.write(&self.buffer));
+            let n = try_ready!(self.inner.poll_write(&self.buffer));
 
             if n == 0 {
                 return Err(io::Error::new(io::ErrorKind::WriteZero, "failed to
@@ -197,7 +197,7 @@ impl<T> Sink for FramedWrite2<T>
         }
 
         // Try flushing the underlying IO
-        try_nb!(self.inner.flush());
+        try_ready!(self.inner.poll_flush());
 
         trace!("framed transport flushed");
         return Ok(Async::Ready(()));
