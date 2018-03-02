@@ -5,22 +5,24 @@ use futures::{Async, Poll};
 
 use AsyncRead;
 
-/// A trait for writable objects which operated in an asynchronous and
-/// futures-aware fashion.
+/// Writes bytes asynchronously.
 ///
-/// This trait inherits from `io::Write` and indicates that an I/O object is
-/// **nonblocking**, meaning that it will return an error instead of blocking
-/// when bytes cannot currently be written, but hasn't closed. Specifically
-/// this means that the `write` function for types that implement this trait
-/// can have a few return values:
+/// The trait inherits from `std::io::Write` and indicates that an I/O object is
+/// **nonblocking**. All non-blocking I/O objects must return an error when
+/// bytes cannot be written instead of blocking the current thread.
+///
+/// Specifically, this means that the `write` function will return one of the
+/// following:
 ///
 /// * `Ok(n)` means that `n` bytes of data was immediately written .
+///
 /// * `Err(e) if e.kind() == ErrorKind::WouldBlock` means that no data was
 ///   written from the buffer provided. The I/O object is not currently
 ///   writable but may become writable in the future. Most importantly, **the
 ///   current future's task is scheduled to get unparked when the object is
 ///   readable**. This means that like `Future::poll` you'll receive a
 ///   notification when the I/O object is writable again.
+///
 /// * `Err(e)` for other errors are standard I/O errors coming from the
 ///   underlying object.
 ///

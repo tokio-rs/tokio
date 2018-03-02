@@ -9,17 +9,37 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 
-/// Handle to a reactor registration.
+/// Associates an I/O resource with the reactor instance that drives it.
 ///
 /// A registration represents an I/O resource registered with a Reactor such
-/// that it will receive task notifications on readiness.
+/// that it will receive task notifications on readiness. This is the lowest
+/// level API for integrating with a reactor.
 ///
-/// The registration is lazily made and supports concurrent operations. This
-/// allows a `Registration` instance to be created without the reactor handle
-/// that will eventually be used to drive the resource.
+/// The association between an I/O resource is made by calling [`register`].
+/// Once the association is established, it remains established until the
+/// registration instance is dropped. Subsequent calls to [`register`] are
+/// no-ops.
 ///
-/// The difficulty is due to the fact that a single registration drives two
-/// separate tasks -- A read half and a write half.
+/// A registration instance represents two separate readiness streams. One for
+/// the read readiness and one for write readiness. These streams are
+/// independent and can be consumed from separate tasks.
+///
+/// **Note**: while `Registration` is `Sync`, the caller must ensure that there
+/// are at most two tasks that use a registration instance concurrently. One
+/// task for [`poll_read_ready`] and one task for [`poll_write_ready`]. While
+/// violating this requirement is "safe" from a Rust memory safety point of
+/// view, it will result in unexpected behavior in the form of lost
+/// notifications and tasks hanging.
+///
+/// ## Platform-specific events
+///
+/// `Registration` also allows receiving platform-specific `mio::Ready` events.
+/// These events are included as part of the read readiness event stream. The
+/// write readiness event stream is only for `Ready::writable()` events.
+///
+/// [`register`]: #method.register
+/// [`poll_read_ready`]: #method.poll_read_ready`]
+/// [`poll_write_ready`]: #method.poll_write_ready`]
 #[derive(Debug)]
 pub struct Registration {
     /// Stores the handle. Once set, the value is not changed.
@@ -187,7 +207,36 @@ impl Registration {
         }
     }
 
-    /// Poll for changes in the I/O resource's read readiness.
+    /// Poll for events on the I/O resource's read readiness stream.
+    ///
+    /// If the I/O resource receives a new read readiness event since the last
+    /// call to `poll_read_ready`, it is returned. If it has not, the current
+    /// task is notified once a new event is received.
+    ///
+    /// Events are [edge-triggered].
+    ///
+    /// Ensure that [`register`] has been called first.
+    ///
+    /// # Return value
+    ///
+    /// There are several possible return values:
+    ///
+    /// * `Ok(Async::Ready(readiness))` means that the I/O resource has received
+    ///   a new readiness event. The readiness value is included.
+    ///
+    /// * `Ok(NotReady)` means that no new readiness events have been received
+    ///   since the last call to `poll_read_ready`.
+    ///
+    /// * `Err(err)` means that the registration has encountered an error. This
+    ///   error either represents a permanent internal error **or** the fact
+    ///   that [`register`] was not called first.
+    ///
+    /// [`register`]: #method.register
+    /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.poll_ready(Direction::Read, true)
             .map(|v| match v {
@@ -196,16 +245,48 @@ impl Registration {
             })
     }
 
-    /// Try taking the I/O resource's read readiness.
+    /// Consume any pending read readiness event.
     ///
-    /// Unlike `poll_read_ready`, this does not register the current task for
-    /// notification.
+    /// This function is identical to [`poll_read_ready`] **except** that it
+    /// will not notify the current task when a new event is received. As such,
+    /// it is safe to call this function from outside of a task context.
+    ///
+    /// [`poll_read_ready`]: #method.poll_read_ready
     pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
         self.poll_ready(Direction::Read, false)
 
     }
 
-    /// Poll for changes in the I/O resource's write readiness.
+    /// Poll for events on the I/O resource's write readiness stream.
+    ///
+    /// If the I/O resource receives a new write readiness event since the last
+    /// call to `poll_write_ready`, it is returned. If it has not, the current
+    /// task is notified once a new event is received.
+    ///
+    /// Events are [edge-triggered].
+    ///
+    /// Ensure that [`register`] has been called first.
+    ///
+    /// # Return value
+    ///
+    /// There are several possible return values:
+    ///
+    /// * `Ok(Async::Ready(readiness))` means that the I/O resource has received
+    ///   a new readiness event. The readiness value is included.
+    ///
+    /// * `Ok(NotReady)` means that no new readiness events have been received
+    ///   since the last call to `poll_write_ready`.
+    ///
+    /// * `Err(err)` means that the registration has encountered an error. This
+    ///   error either represents a permanent internal error **or** the fact
+    ///   that [`register`] was not called first.
+    ///
+    /// [`register`]: #method.register
+    /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.poll_ready(Direction::Write, true)
             .map(|v| match v {
@@ -214,10 +295,13 @@ impl Registration {
             })
     }
 
-    /// Try taking the I/O resource's write readiness.
+    /// Consume any pending write readiness event.
     ///
-    /// Unlike `poll_write_ready`, this does not register the current task for
-    /// notification.
+    /// This function is identical to [`poll_write_ready`] **except** that it
+    /// will not notify the current task when a new event is received. As such,
+    /// it is safe to call this function from outside of a task context.
+    ///
+    /// [`poll_write_ready`]: #method.poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
         self.poll_ready(Direction::Write, false)
     }

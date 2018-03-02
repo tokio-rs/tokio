@@ -33,7 +33,7 @@ travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "carllerche/tokio" }
 
 [dependencies]
-tokio-io = "0.1"
+tokio-io = { version = "0.1", path = "tokio-io" }
 tokio-executor = { version = "0.1", path = "tokio-executor" }
 tokio-threadpool = { version = "0.1", path = "tokio-threadpool" }
 bytes = "0.4"
@@ -55,3 +55,6 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 time = "0.1"
+
+[patch.crates-io]
+tokio-io = { path = "tokio-io" }

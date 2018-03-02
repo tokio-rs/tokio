@@ -1,12 +1,3 @@
-//!
-//! Readiness tracking streams, backing I/O objects.
-//!
-//! This module contains the core type which is used to back all I/O on object
-//! in `tokio-core`. The `PollEvented` type is the implementation detail of
-//! all I/O. Each `PollEvented` manages registration with a reactor,
-//! acquisition of a token, and tracking of the readiness state on the
-//! underlying I/O primitive.
-
 #![allow(warnings)]
 
 use reactor::Handle;
@@ -22,51 +13,78 @@ use std::io::{self, Read, Write};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
-/// A concrete implementation of a stream of readiness notifications for I/O
-/// objects that originates from an event loop.
+/// Associates an I/O resource that implements the [`std::Read`] and / or
+/// [`std::Write`] traits with the reactor that drives it.
 ///
-/// Created by the `PollEvented::new` method, each `PollEvented` is
-/// associated with a specific event loop and source of events that will be
-/// registered with an event loop.
+/// `PollEvented2` uses [`Registration`] internally to take a type that
+/// implements [`mio::Evented`] as well as [`std::Read`] and or [`std::Write`]
+/// and associate it with a reactor that will drive it.
 ///
-/// An instance of `PollEvented` is essentially the bridge between the `mio`
-/// world and the `tokio-core` world, providing abstractions to receive
-/// notifications about changes to an object's `mio::Ready` state.
+/// Once the [`mio::Evented`] type is wrapped by `PollEvented2`, it can be
+/// used from within the future's execution model. As such, the `PollEvented2`
+/// type provides [`AsyncRead`] and [`AsyncWrite`] implementations using the
+/// underlying I/O resource as well as readiness events provided by the reactor.
 ///
-/// Each readiness stream has a number of methods to test whether the underlying
-/// object is readable or writable. Once the methods return that an object is
-/// readable/writable, then it will continue to do so until the `need_read` or
-/// `need_write` methods are called.
+/// **Note**: While `PollEvented` is `Sync` (if the underlying I/O type is
+/// `Sync`), the caller must ensure that there are at most two tasks that use a
+/// `PollEvented` instance concurrenty. One for reading and one for writing.
+/// While violating this requirement is "safe" from a Rust memory model point of
+/// view, it will result in unexpected behavior in the form of lost
+/// notifications and tasks hanging.
 ///
-/// That is, this object is typically wrapped in another form of I/O object.
-/// It's the responsibility of the wrapper to inform the readiness stream when a
-/// "would block" I/O event is seen. The readiness stream will then take care of
-/// any scheduling necessary to get notified when the event is ready again.
+/// ## Readiness events
 ///
-/// You can find more information about creating a custom I/O object [online].
+/// Besides just providing [`AsyncRead`] and [`AsyncWrite`] implementations,
+/// this type also supports access to the underlying readiness event stream.
+/// While similar in function to what [`Registration`] provides, the semantics
+/// are a bit different.
 ///
-/// [online]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/#custom-io
+/// Two functions are provided to access the readiness events:
+/// [`poll_read_ready`] and [`poll_write_ready`]. These functions return the
+/// current readiness state of the `PollEvented` instance. If
+/// [`poll_read_ready`] indicates read readiness, immediately calling
+/// [`poll_read_ready`] again will also indicate read readiness.
 ///
-/// ## Readiness to read/write
+/// When the operation is attempted and is unable to succeed due to the I/O
+/// resource not being ready, the caller must call [`need_read`] or
+/// [`need_write`]. This clears the readiness state until a new readiness event
+/// is received.
 ///
-/// A `PollEvented` allows listening and waiting for an arbitrary `mio::Ready`
-/// instance, including the platform-specific contents of `mio::Ready`. At most
-/// two future tasks, however, can be waiting on a `PollEvented`. The
-/// `need_read` and `need_write` methods can block two separate tasks, one on
-/// reading and one on writing. Not all I/O events correspond to read/write,
-/// however!
+/// This allows the caller to implement additional funcitons. For example,
+/// [`TcpListener`] implements accept by using [`poll_read_ready`] and
+/// [`need_read`].
 ///
-/// To account for this a `PollEvented` gets a little interesting when working
-/// with an arbitrary instance of `mio::Ready` that may not map precisely to
-/// "write" and "read" tasks. Currently it is defined that instances of
-/// `mio::Ready` that do *not* return true from `is_writable` are all notified
-/// through `need_read`, or the read task.
+/// ```rust,ignore
+/// pub fn accept(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
+///     if let Async::NotReady = self.poll_evented.poll_read_ready()? {
+///         return Err(io::ErrorKind::WouldBlock.into())
+///     }
 ///
-/// In other words, `poll_ready` with the `mio::UnixReady::hup` event will block
-/// the read task of this `PollEvented` if the `hup` event isn't available.
-/// Essentially a good rule of thumb is that if you're using the `poll_ready`
-/// method you want to also use `need_read` to signal blocking and you should
-/// otherwise probably avoid using two tasks on the same `PollEvented`.
+///     match self.poll_evented.get_ref().accept_std() {
+///         Ok(pair) => Ok(pair),
+///         Err(e) => {
+///             if e.kind() == io::ErrorKind::WouldBlock {
+///                 self.poll_evented.need_read()?;
+///             }
+///             Err(e)
+///         }
+///     }
+/// }
+/// ```
+///
+/// ## Platform-specific events
+///
+/// `PollEvented2` also allows receiving platform-specific `mio::Ready` events.
+/// These events are included as part of the read readiness event stream. The
+/// write readiness event stream is only for `Ready::writable()` events.
+///
+/// [`std::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+/// [`std::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+/// [`AsyncRead`]: ../io/trait.AsyncRead.html
+/// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
+/// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
+/// [`Registration`]: struct.Registration.html
+/// [`TcpListener`]: ../net/struct.TcpListener.html
 pub struct PollEvented<E> {
     io: E,
     inner: Inner,
@@ -106,18 +124,19 @@ where E: Evented
         Ok(ret)
     }
 
-    /// Tests to see if this source is ready to be read from or not.
+    /// Check the I/O resource's read readiness state.
     ///
-    /// If this stream is not ready for a read then `Async::NotReady` will be
-    /// returned and the current task will be scheduled to receive a
-    /// notification when the stream is readable again. In other words, this
-    /// method is only safe to call from within the context of a future's task,
-    /// typically done in a `Future::poll` method.
+    /// If the resource is not ready for a read then `Async::NotReady` is
+    /// returned and the current task is notified once a new event is received.
+    ///
+    /// The I/O resource will remain in a read-ready state until readiness is
+    /// cleared by calling [`need_read`].
+    ///
+    /// [`need_read`]: #method.need_read
     ///
     /// # Panics
     ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
+    /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.register()?;
 
@@ -143,29 +162,18 @@ where E: Evented
         Ok(ready.into())
     }
 
-    /// Indicates to this source of events that the corresponding I/O object is
-    /// no longer readable, but it needs to be.
+    /// Resets the I/O resource's read readiness state and registers the current
+    /// task to be notified once a read readiness event is received.
     ///
-    /// This function, like `poll_read`, is only safe to call from the context
-    /// of a future's task (typically in a `Future::poll` implementation). It
-    /// informs this readiness stream that the underlying object is no longer
-    /// readable, typically because a "would block" error was seen.
+    /// After calling this function, `poll_read_ready` will return `NotReady`
+    /// until a new read readiness event has been received.
     ///
-    /// *All* readiness bits associated with this stream except the writable bit
-    /// will be reset when this method is called. The current task is then
-    /// scheduled to receive a notification whenever anything changes other than
-    /// the writable bit. Note that this typically just means the readable bit
-    /// is used here, but if you're using a custom I/O object for events like
-    /// hup/error this may also be relevant.
-    ///
-    /// Note that it is also only valid to call this method if `poll_read`
-    /// previously indicated that the object is readable. That is, this function
-    /// must always be paired with calls to `poll_read` previously.
+    /// This function clears **all** readiness state **except** write readiness.
+    /// This includes any platform-specific readiness bits.
     ///
     /// # Panics
     ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
+    /// This function will panic if called from outside of a task context.
     pub fn need_read(&self) -> io::Result<()> {
         self.inner.read_readiness.store(0, Relaxed);
 
@@ -177,18 +185,19 @@ where E: Evented
         Ok(())
     }
 
-    /// Tests to see if this source is ready to be written to or not.
+    /// Check the I/O resource's write readiness state.
     ///
-    /// If this stream is not ready for a write then `Async::NotReady` will be
-    /// returned and the current task will be scheduled to receive a
-    /// notification when the stream is writable again. In other words, this
-    /// method is only safe to call from within the context of a future's task,
-    /// typically done in a `Future::poll` method.
+    /// If the resource is not ready for a write then `Async::NotReady` is
+    /// returned and the current task is notified once a new event is received.
+    ///
+    /// The I/O resource will remain in a write-ready state until readiness is
+    /// cleared by calling [`need_write`].
+    ///
+    /// [`need_write`]: #method.need_write
     ///
     /// # Panics
     ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
+    /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.register()?;
 
@@ -213,28 +222,15 @@ where E: Evented
         Ok(ready.into())
     }
 
-    /// Indicates to this source of events that the corresponding I/O object is
-    /// no longer writable, but it needs to be.
+    /// Resets the I/O resource's write readiness state and registers the current
+    /// task to be notified once a write readiness event is received.
     ///
-    /// This function, like `poll_write_ready`, is only safe to call from the
-    /// context of a future's task (typically in a `Future::poll`
-    /// implementation). It informs this readiness stream that the underlying
-    /// object is no longer writable, typically because a "would block" error
-    /// was seen.
-    ///
-    /// The flag indicating that this stream is writable is unset and the
-    /// current task is scheduled to receive a notification when the stream is
-    /// then again writable.
-    ///
-    /// Note that it is also only valid to call this method if
-    /// `poll_write_ready` previously indicated that the object is writable.
-    /// That is, this function must always be paired with calls to `poll_write`
-    /// previously.
+    /// After calling this function, `poll_write_ready` will return `NotReady`
+    /// until a new read readiness event has been received.
     ///
     /// # Panics
     ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
+    /// This function will panic if called from outside of a task context.
     pub fn need_write(&self) -> io::Result<()> {
         self.inner.write_readiness.store(0, Relaxed);
 
