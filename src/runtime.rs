@@ -104,8 +104,7 @@
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 
-use reactor::{self, Reactor, Handle};
-use reactor::background::Background;
+use reactor::{Reactor, Handle, Background};
 
 use tokio_threadpool::{self as threadpool, ThreadPool, Sender};
 use futures::Poll;
@@ -221,7 +220,7 @@ impl Runtime {
 
         let pool = threadpool::Builder::new()
             .around_worker(move |w, enter| {
-                reactor::with_default(&handle, enter, |_| {
+                ::tokio_reactor::with_default(&handle, enter, |_| {
                     w.run();
                 });
             })

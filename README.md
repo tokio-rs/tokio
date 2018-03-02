@@ -87,7 +87,30 @@ fn main() {
 }
 ```
 
-# License
+## Project layout
+
+The `tokio` crate, found at the root, is primarily intended for use by
+application developers.  Library authors should depend on the sub crates, which
+have greater guarantees of stability.
+
+The crates included as part of Tokio are:
+
+* [`tokio-executor`]: Task execution related traits and utilities.
+
+* [`tokio-io`]: Asynchronous I/O related traits and utilities.
+
+* [`tokio-reactor`]: Event loop that drives I/O resources (like TCP and UDP
+  sockets).
+
+* [`tokio-threadpool`]: Schedules the execution of futures across a pool of
+  threads.
+
+[`tokio-executor`]: tokio-executor
+[`tokio-io`]: tokio-io
+[`tokio-reactor`]: tokio-reactor
+[`tokio-threadpool`]: tokio-threadpool
+
+## License
 
 This project is licensed under either of
 

@@ -74,6 +74,7 @@ extern crate slab;
 #[macro_use]
 extern crate tokio_io;
 extern crate tokio_executor;
+extern crate tokio_reactor;
 extern crate tokio_threadpool;
 
 #[macro_use]
@@ -86,8 +87,6 @@ pub mod runtime;
 
 pub use executor::spawn;
 pub use runtime::run;
-
-mod atomic_task;
 
 pub mod io {
     //! Asynchronous I/O.

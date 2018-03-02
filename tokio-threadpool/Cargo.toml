@@ -7,7 +7,7 @@ homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT/Apache-2.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 description = """
-A Future aware thread pool based on work stealing.
+A task scheduler backed by a work-stealing thread pool.
 """
 keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
