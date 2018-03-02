@@ -6,75 +6,36 @@
 //! acquisition of a token, and tracking of the readiness state on the
 //! underlying I/O primitive.
 
-#![allow(deprecated)]
+#![allow(deprecated, warnings)]
 
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 
 use futures::{task, Async, Poll};
 use mio::event::Evented;
 use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use reactor::{Handle, Direction};
+use reactor::{Handle, Registration};
 
-struct Registration {
-    pub token: usize,
-    pub handle: Handle,
-    pub readiness: usize,
-}
-
-/// A concrete implementation of a stream of readiness notifications for I/O
-/// objects that originates from an event loop.
-///
-/// Created by the `PollEvented::new` method, each `PollEvented` is
-/// associated with a specific event loop and source of events that will be
-/// registered with an event loop.
-///
-/// An instance of `PollEvented` is essentially the bridge between the `mio`
-/// world and the `tokio-core` world, providing abstractions to receive
-/// notifications about changes to an object's `mio::Ready` state.
-///
-/// Each readiness stream has a number of methods to test whether the underlying
-/// object is readable or writable. Once the methods return that an object is
-/// readable/writable, then it will continue to do so until the `need_read` or
-/// `need_write` methods are called.
-///
-/// That is, this object is typically wrapped in another form of I/O object.
-/// It's the responsibility of the wrapper to inform the readiness stream when a
-/// "would block" I/O event is seen. The readiness stream will then take care of
-/// any scheduling necessary to get notified when the event is ready again.
-///
-/// You can find more information about creating a custom I/O object [online].
-///
-/// [online]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/#custom-io
-///
-/// ## Readiness to read/write
-///
-/// A `PollEvented` allows listening and waiting for an arbitrary `mio::Ready`
-/// instance, including the platform-specific contents of `mio::Ready`. At most
-/// two future tasks, however, can be waiting on a `PollEvented`. The
-/// `need_read` and `need_write` methods can block two separate tasks, one on
-/// reading and one on writing. Not all I/O events correspond to read/write,
-/// however!
-///
-/// To account for this a `PollEvented` gets a little interesting when working
-/// with an arbitrary instance of `mio::Ready` that may not map precisely to
-/// "write" and "read" tasks. Currently it is defined that instances of
-/// `mio::Ready` that do *not* return true from `is_writable` are all notified
-/// through `need_read`, or the read task.
-///
-/// In other words, `poll_ready` with the `mio::UnixReady::hup` event will block
-/// the read task of this `PollEvented` if the `hup` event isn't available.
-/// Essentially a good rule of thumb is that if you're using the `poll_ready`
-/// method you want to also use `need_read` to signal blocking and you should
-/// otherwise probably avoid using two tasks on the same `PollEvented`.
 #[deprecated(since = "0.1.2", note = "PollEvented2 instead")]
 #[doc(hidden)]
 pub struct PollEvented<E> {
-    registration: Registration,
     io: E,
+    inner: Inner,
+    handle: Handle,
+}
+
+struct Inner {
+    registration: Registration,
+
+    /// Currently visible read readiness
+    read_readiness: AtomicUsize,
+
+    /// Currently visible write readiness
+    write_readiness: AtomicUsize,
 }
 
 impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
@@ -91,20 +52,17 @@ impl<E> PollEvented<E> {
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>>
         where E: Evented,
     {
-        let token = match handle.inner() {
-            Some(inner) => inner.add_source(&io)?,
-            None => {
-                return Err(io::Error::new(io::ErrorKind::Other, "event loop gone"))
-            }
-        };
+        let registration = Registration::new();
+        registration.register(&io)?;
 
         Ok(PollEvented {
-            registration: Registration {
-                token: token,
-                readiness: 0,
-                handle: handle.clone()
-            },
             io: io,
+            inner: Inner {
+                registration,
+                read_readiness: AtomicUsize::new(0),
+                write_readiness: AtomicUsize::new(0),
+            },
+            handle: handle.clone(),
         })
     }
 
@@ -123,8 +81,37 @@ impl<E> PollEvented<E> {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn poll_read(&mut self) -> Async<()> {
-        self.poll_ready(super::read_ready())
-            .map(|_| ())
+        if self.poll_read2().is_ready() {
+            return ().into();
+        }
+
+        Async::NotReady
+    }
+
+    fn poll_read2(&self) -> Async<Ready> {
+        // Load the cached readiness
+        match self.inner.read_readiness.load(Relaxed) {
+            0 => {}
+            mut n => {
+                // Check what's new with the reactor.
+                if let Some(ready) = self.inner.registration.take_read_ready().unwrap() {
+                    n |= ready2usize(ready);
+                    self.inner.read_readiness.store(n, Relaxed);
+                }
+
+                return usize2ready(n).into();
+            }
+        }
+
+        let ready = match self.inner.registration.poll_read_ready().unwrap() {
+            Async::Ready(r) => r,
+            _ => return Async::NotReady,
+        };
+
+        // Cache the value
+        self.inner.read_readiness.store(ready2usize(ready), Relaxed);
+
+        ready.into()
     }
 
     /// Tests to see if this source is ready to be written to or not.
@@ -142,8 +129,28 @@ impl<E> PollEvented<E> {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn poll_write(&mut self) -> Async<()> {
-        self.poll_ready(Ready::writable())
-            .map(|_| ())
+        match self.inner.write_readiness.load(Relaxed) {
+            0 => {}
+            mut n => {
+                // Check what's new with the reactor.
+                if let Some(ready) = self.inner.registration.take_write_ready().unwrap() {
+                    n |= ready2usize(ready);
+                    self.inner.write_readiness.store(n, Relaxed);
+                }
+
+                return ().into();
+            }
+        }
+
+        let ready = match self.inner.registration.poll_write_ready().unwrap() {
+            Async::Ready(r) => r,
+            _ => return Async::NotReady,
+        };
+
+        // Cache the value
+        self.inner.write_readiness.store(ready2usize(ready), Relaxed);
+
+        ().into()
     }
 
     /// Test to see whether this source fulfills any condition listed in `mask`
@@ -170,35 +177,38 @@ impl<E> PollEvented<E> {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn poll_ready(&mut self, mask: Ready) -> Async<Ready> {
-        let bits = super::ready2usize(mask);
+        let mut ret = Ready::empty();
 
-        match self.registration.readiness & bits {
-            0 => {}
-            n => return Async::Ready(super::usize2ready(n)),
+        if mask.is_empty() {
+            return ret.into();
         }
 
-        let token_readiness = self.registration.handle.inner().map(|inner| {
-            let io_dispatch = inner.io_dispatch.read().unwrap();
-            let token = self.registration.token;
-            io_dispatch[token].readiness.swap(0, Ordering::SeqCst)
-        }).unwrap_or(0);
-
-        self.registration.readiness |= token_readiness;
-
-        match self.registration.readiness & bits {
-            0 => {
-                if mask.is_writable() {
-                    if self.need_write().is_err() {
-                        return Async::Ready(mask)
-                    }
-                } else {
-                    if self.need_read().is_err() {
-                        return Async::Ready(mask)
-                    }
-                }
-                Async::NotReady
+        if mask.is_writable() {
+            if self.poll_write().is_ready() {
+                ret = Ready::writable();
             }
-            n => Async::Ready(super::usize2ready(n)),
+        }
+
+        let mask = mask - Ready::writable();
+
+        if !mask.is_empty() {
+            if let Async::Ready(v) = self.poll_read2() {
+                ret |= v & mask;
+            }
+        }
+
+        if ret.is_empty() {
+            if mask.is_writable() {
+                let _ = self.need_write();
+            }
+
+            if mask.is_readable() {
+                let _ = self.need_read();
+            }
+
+            Async::NotReady
+        } else {
+            ret.into()
         }
     }
 
@@ -234,10 +244,14 @@ impl<E> PollEvented<E> {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn need_read(&mut self) -> io::Result<()> {
-        let bits = super::ready2usize(super::read_ready());
-        self.registration.readiness &= !bits;
+        self.inner.read_readiness.store(0, Relaxed);
 
-        self.register(Direction::Read)
+        if self.poll_read().is_ready() {
+            // Notify the current task
+            task::current().notify();
+        }
+
+        Ok(())
     }
 
     /// Indicates to this source of events that the corresponding I/O object is
@@ -269,16 +283,20 @@ impl<E> PollEvented<E> {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn need_write(&mut self) -> io::Result<()> {
-        let bits = super::ready2usize(Ready::writable());
-        self.registration.readiness &= !bits;
+        self.inner.write_readiness.store(0, Relaxed);
 
-        self.register(Direction::Write)
+        if self.poll_write().is_ready() {
+            // Notify the current task
+            task::current().notify();
+        }
+
+        Ok(())
     }
 
     /// Returns a reference to the event loop handle that this readiness stream
     /// is associated with.
     pub fn handle(&self) -> &Handle {
-        &self.registration.handle
+        &self.handle
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -313,21 +331,8 @@ impl<E> PollEvented<E> {
     pub fn deregister(&self) -> io::Result<()>
         where E: Evented,
     {
-        let inner = match self.handle().inner() {
-            Some(inner) => inner,
-            None => return Ok(()),
-        };
-
-        inner.deregister_source(&self.io)
-    }
-
-    fn register(&self, dir: Direction) -> io::Result<()> {
-        let inner = match self.registration.handle.inner() {
-            Some(inner) => inner,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
-        };
-
-        inner.register(self.registration.token, dir, task::current());
+        // Nothing has to happen here anymore as I/O objects are explicitly
+        // deregistered before dropped.
         Ok(())
     }
 }
@@ -394,10 +399,147 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
     }
 }
 
-impl Drop for Registration {
-    fn drop(&mut self) {
-        if let Some(inner) = self.handle.inner() {
-            inner.drop_source(self.token);
+const READ: usize = 1 << 0;
+const WRITE: usize = 1 << 1;
+
+fn ready2usize(ready: Ready) -> usize {
+    let mut bits = 0;
+    if ready.is_readable() {
+        bits |= READ;
+    }
+    if ready.is_writable() {
+        bits |= WRITE;
+    }
+    bits | platform::ready2usize(ready)
+}
+
+fn usize2ready(bits: usize) -> Ready {
+    let mut ready = Ready::empty();
+    if bits & READ != 0 {
+        ready.insert(Ready::readable());
+    }
+    if bits & WRITE != 0 {
+        ready.insert(Ready::writable());
+    }
+    ready | platform::usize2ready(bits)
+}
+
+#[cfg(all(unix, not(target_os = "fuchsia")))]
+mod platform {
+    use mio::Ready;
+    use mio::unix::UnixReady;
+
+    #[cfg(target_os = "dragonfly")]
+    pub fn all() -> Ready {
+        hup() | UnixReady::aio()
+    }
+
+    #[cfg(target_os = "freebsd")]
+    pub fn all() -> Ready {
+        hup() | UnixReady::aio() | UnixReady::lio()
+    }
+
+    const HUP: usize = 1 << 2;
+    const ERROR: usize = 1 << 3;
+    const AIO: usize = 1 << 4;
+    const LIO: usize = 1 << 5;
+
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    fn is_aio(ready: &Ready) -> bool {
+        UnixReady::from(*ready).is_aio()
+    }
+
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
+    fn is_aio(_ready: &Ready) -> bool {
+        false
+    }
+
+    #[cfg(target_os = "freebsd")]
+    fn is_lio(ready: &Ready) -> bool {
+        UnixReady::from(*ready).is_lio()
+    }
+
+    #[cfg(not(target_os = "freebsd"))]
+    fn is_lio(_ready: &Ready) -> bool {
+        false
+    }
+
+    pub fn ready2usize(ready: Ready) -> usize {
+        let ready = UnixReady::from(ready);
+        let mut bits = 0;
+        if is_aio(&ready) {
+            bits |= AIO;
         }
+        if is_lio(&ready) {
+            bits |= LIO;
+        }
+        if ready.is_error() {
+            bits |= ERROR;
+        }
+        if ready.is_hup() {
+            bits |= HUP;
+        }
+        bits
+    }
+
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
+              target_os = "macos"))]
+    fn usize2ready_aio(ready: &mut UnixReady) {
+        ready.insert(UnixReady::aio());
+    }
+
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    fn usize2ready_aio(_ready: &mut UnixReady) {
+        // aio not available here → empty
+    }
+
+    #[cfg(target_os = "freebsd")]
+    fn usize2ready_lio(ready: &mut UnixReady) {
+        ready.insert(UnixReady::lio());
+    }
+
+    #[cfg(not(target_os = "freebsd"))]
+    fn usize2ready_lio(_ready: &mut UnixReady) {
+        // lio not available here → empty
+    }
+
+    pub fn usize2ready(bits: usize) -> Ready {
+        let mut ready = UnixReady::from(Ready::empty());
+        if bits & AIO != 0 {
+            usize2ready_aio(&mut ready);
+        }
+        if bits & LIO != 0 {
+            usize2ready_lio(&mut ready);
+        }
+        if bits & HUP != 0 {
+            ready.insert(UnixReady::hup());
+        }
+        if bits & ERROR != 0 {
+            ready.insert(UnixReady::error());
+        }
+        ready.into()
+    }
+}
+
+#[cfg(any(windows, target_os = "fuchsia"))]
+mod platform {
+    use mio::Ready;
+
+    pub fn all() -> Ready {
+        // No platform-specific Readinesses for Windows
+        Ready::empty()
+    }
+
+    pub fn hup() -> Ready {
+        Ready::empty()
+    }
+
+    pub fn ready2usize(_r: Ready) -> usize {
+        0
+    }
+
+    pub fn usize2ready(_r: usize) -> Ready {
+        Ready::empty()
     }
 }

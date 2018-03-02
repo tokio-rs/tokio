@@ -1,7 +1,4 @@
-#![allow(warnings)]
-
-use reactor::Handle;
-use reactor::registration::Registration;
+use {Handle, Registration};
 
 use futures::{task, Async, Poll};
 use mio;
@@ -16,12 +13,12 @@ use std::sync::atomic::Ordering::Relaxed;
 /// Associates an I/O resource that implements the [`std::Read`] and / or
 /// [`std::Write`] traits with the reactor that drives it.
 ///
-/// `PollEvented2` uses [`Registration`] internally to take a type that
+/// `PollEvented` uses [`Registration`] internally to take a type that
 /// implements [`mio::Evented`] as well as [`std::Read`] and or [`std::Write`]
 /// and associate it with a reactor that will drive it.
 ///
-/// Once the [`mio::Evented`] type is wrapped by `PollEvented2`, it can be
-/// used from within the future's execution model. As such, the `PollEvented2`
+/// Once the [`mio::Evented`] type is wrapped by `PollEvented`, it can be
+/// used from within the future's execution model. As such, the `PollEvented`
 /// type provides [`AsyncRead`] and [`AsyncWrite`] implementations using the
 /// underlying I/O resource as well as readiness events provided by the reactor.
 ///
@@ -74,7 +71,7 @@ use std::sync::atomic::Ordering::Relaxed;
 ///
 /// ## Platform-specific events
 ///
-/// `PollEvented2` also allows receiving platform-specific `mio::Ready` events.
+/// `PollEvented` also allows receiving platform-specific `mio::Ready` events.
 /// These events are included as part of the read readiness event stream. The
 /// write readiness event stream is only for `Ready::writable()` events.
 ///

@@ -6,9 +6,9 @@ name = "tokio"
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.1"
-
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT/Apache-2.0"
+readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 documentation = "https://docs.rs/tokio/0.1"
@@ -16,7 +16,7 @@ description = """
 An event-driven, non-blocking I/O platform for writing asynchronous I/O
 backed applications.
 """
-categories = ["asynchronous"]
+categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
 
 [workspace]
@@ -25,6 +25,7 @@ members = [
   "./",
   "tokio-executor",
   "tokio-io",
+  "tokio-reactor",
   "tokio-threadpool",
 ]
 
@@ -35,6 +36,7 @@ appveyor = { repository = "carllerche/tokio" }
 [dependencies]
 tokio-io = { version = "0.1", path = "tokio-io" }
 tokio-executor = { version = "0.1", path = "tokio-executor" }
+tokio-reactor = { version = "0.1", path = "tokio-reactor" }
 tokio-threadpool = { version = "0.1", path = "tokio-threadpool" }
 bytes = "0.4"
 log = "0.4"

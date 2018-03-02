@@ -1,15 +1,19 @@
+use {Reactor, Handle};
+use atomic_task::AtomicTask;
+
+use futures::{Future, Async, Poll};
+
 use std::io;
 use std::thread;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 
-use atomic_task::AtomicTask;
-
-use reactor::{Reactor, Handle};
-use futures::{Future, Async, Poll};
-
 /// Handle to the reactor running on a background thread.
+///
+/// Instances are created by calling [`Reactor::background`].
+///
+/// [`Reactor::background`]: struct.Reactor.html#method.background
 #[derive(Debug)]
 pub struct Background {
     /// When `None`, the reactor thread will run until the process terminates.
@@ -54,7 +58,7 @@ const SHUTDOWN: usize = 3;
 
 impl Background {
     /// Launch a reactor in the background and return a handle to the thread.
-    pub fn new(reactor: Reactor) -> io::Result<Background> {
+    pub(crate) fn new(reactor: Reactor) -> io::Result<Background> {
         // Grab a handle to the reactor
         let handle = reactor.handle().clone();
 

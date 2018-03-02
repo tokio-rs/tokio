@@ -1,4 +1,4 @@
-use reactor::{Handle, Direction};
+use {Handle, Direction};
 
 use futures::{Async, Poll};
 use futures::task::{self, Task};
