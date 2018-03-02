@@ -67,6 +67,24 @@ pub trait AsyncRead: std_io::Read {
         true
     }
 
+    /// Attempt to read from the `AsyncRead` into `buf`.
+    ///
+    /// On success, returns `Ok(Async::Ready(num_bytes_read))`.
+    ///
+    /// If no data is available for reading, the method returns
+    /// `Ok(Async::Pending)` and arranges for the current task (via
+    /// `cx.waker()`) to receive a notification when the object becomes
+    /// readable or is closed.
+    fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, std_io::Error> {
+        match self.read(buf) {
+            Ok(t) => Ok(Async::Ready(t)),
+            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => {
+                return Ok(Async::NotReady)
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+
     /// Pull some bytes from this source into the specified `Buf`, returning
     /// how many bytes were read.
     ///
@@ -86,7 +104,7 @@ pub trait AsyncRead: std_io::Read {
 
                 self.prepare_uninitialized_buffer(b);
 
-                try_nb!(self.read(b))
+                try_ready!(self.poll_read(b))
             };
 
             buf.advance_mut(n);

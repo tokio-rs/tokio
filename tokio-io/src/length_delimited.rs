@@ -511,7 +511,7 @@ impl<T: AsyncWrite, B: IntoBuf> Sink for FramedWrite<T, B> {
         try_ready!(self.do_write());
 
         // Try flushing the underlying IO
-        try_nb!(self.inner.flush());
+        try_ready!(self.inner.poll_flush());
 
         return Ok(Async::Ready(()));
     }

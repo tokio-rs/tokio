@@ -60,7 +60,7 @@ impl<R, W> Future for Copy<R, W>
             // continue.
             if self.pos == self.cap && !self.read_done {
                 let reader = self.reader.as_mut().unwrap();
-                let n = try_nb!(reader.read(&mut self.buf));
+                let n = try_ready!(reader.poll_read(&mut self.buf));
                 if n == 0 {
                     self.read_done = true;
                 } else {
@@ -72,7 +72,7 @@ impl<R, W> Future for Copy<R, W>
             // If our buffer has some data, let's write it out!
             while self.pos < self.cap {
                 let writer = self.writer.as_mut().unwrap();
-                let i = try_nb!(writer.write(&self.buf[self.pos..self.cap]));
+                let i = try_ready!(writer.poll_write(&self.buf[self.pos..self.cap]));
                 if i == 0 {
                     return Err(io::Error::new(io::ErrorKind::WriteZero,
                                               "write zero byte into writer"));
@@ -86,7 +86,7 @@ impl<R, W> Future for Copy<R, W>
             // data and finish the transfer.
             // done with the entire transfer.
             if self.pos == self.cap && self.read_done {
-                try_nb!(self.writer.as_mut().unwrap().flush());
+                try_ready!(self.writer.as_mut().unwrap().poll_flush());
                 let reader = self.reader.take().unwrap();
                 let writer = self.writer.take().unwrap();
                 return Ok((self.amt, reader, writer).into())

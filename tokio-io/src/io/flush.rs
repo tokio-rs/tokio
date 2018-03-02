@@ -37,7 +37,7 @@ impl<A> Future for Flush<A>
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<A, io::Error> {
-        try_nb!(self.a.as_mut().unwrap().flush());
+        try_ready!(self.a.as_mut().unwrap().poll_flush());
         Ok(Async::Ready(self.a.take().unwrap()))
     }
 }
