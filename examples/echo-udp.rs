@@ -10,9 +10,9 @@
 //!
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 
+#[macro_use]
 extern crate futures;
 extern crate tokio;
-#[macro_use]
 extern crate tokio_io;
 
 use std::{env, io};
@@ -37,14 +37,14 @@ impl Future for Server {
             // If so then we try to send it back to the original source, waiting
             // until it's writable and we're able to do so.
             if let Some((size, peer)) = self.to_send {
-                let amt = try_nb!(self.socket.send_to(&self.buf[..size], &peer));
+                let amt = try_ready!(self.socket.poll_send_to(&self.buf[..size], &peer));
                 println!("Echoed {}/{} bytes to {}", amt, size, peer);
                 self.to_send = None;
             }
 
             // If we're here then `to_send` is `None`, so we take a look for the
             // next message we're going to echo back.
-            self.to_send = Some(try_nb!(self.socket.recv_from(&mut self.buf)));
+            self.to_send = Some(try_ready!(self.socket.poll_recv_from(&mut self.buf)));
         }
     }
 }

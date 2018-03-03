@@ -56,75 +56,127 @@ impl UdpSocket {
         self.io.get_ref().connect(*addr)
     }
 
-    /// Sends data on the socket to the address previously bound via connect().
-    /// On success, returns the number of bytes written.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
+    #[deprecated(since = "0.1.2", note = "use poll_send instead")]
+    #[doc(hidden)]
     pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_write_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
-
-        match self.io.get_ref().send(buf) {
-            Ok(n) => Ok(n),
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write()?;
-                }
-                Err(e)
-            }
+        match self.poll_send(buf)? {
+            Async::Ready(n) => Ok(n),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
         }
     }
 
-    /// Receives data from the socket previously bound with connect().
-    /// On success, returns the number of bytes read.
+    /// Sends data on the socket to the remote address to which it is connected.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. This
+    /// method will fail if the socket is not connected.
+    ///
+    /// [`connect`]: #method.connect
+    ///
+    /// # Return
+    ///
+    /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
+    ///
+    /// If the socket is not ready for writing, the method returns
+    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// notification when the socket becomes writable.
     ///
     /// # Panics
     ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_read_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
+    /// This function will panic if called from outside of a task context.
+    pub fn poll_send(&mut self, buf: &[u8]) -> Poll<usize, io::Error> {
+        try_ready!(self.io.poll_write_ready());
+
+        match self.io.get_ref().send(buf) {
+            Ok(n) => Ok(n.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_write()?;
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
         }
+    }
+
+    #[deprecated(since = "0.1.2", note = "use poll_recv instead")]
+    #[doc(hidden)]
+    pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self.poll_recv(buf)? {
+            Async::Ready(n) => Ok(n),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
+        }
+    }
+
+    /// Receives a single datagram message on the socket from the remote address to
+    /// which it is connected. On success, returns the number of bytes read.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. This
+    /// method will fail if the socket is not connected.
+    ///
+    /// [`connect`]: #method.connect
+    ///
+    /// # Return
+    ///
+    /// On success, returns `Ok(Async::Ready(num_bytes_read))`.
+    ///
+    /// If no data is available for reading, the method returns
+    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// notification when the socket becomes receivable or is closed.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from outside of a task context.
+    pub fn poll_recv(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
+        try_ready!(self.io.poll_read_ready());
 
         match self.io.get_ref().recv(buf) {
-            Ok(n) => Ok(n),
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read()?;
-                }
-                Err(e)
+            Ok(n) => Ok(n.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_read()?;
+                Ok(Async::NotReady)
             }
+            Err(e) => Err(e),
+        }
+    }
+
+    #[deprecated(since = "0.1.2", note = "use poll_send_to instead")]
+    #[doc(hidden)]
+    pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+        match self.poll_send_to(buf, target)? {
+            Async::Ready(n) => Ok(n),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
         }
     }
 
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
-    /// Address type can be any implementer of `ToSocketAddrs` trait. See its
-    /// documentation for concrete examples.
+    /// This will return an error when the IP version of the local socket
+    /// does not match that of `target`.
+    ///
+    /// # Return
+    ///
+    /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
+    ///
+    /// If the socket is not ready for writing, the method returns
+    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// notification when the socket becomes writable.
     ///
     /// # Panics
     ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
-    pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_write_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
+    /// This function will panic if called from outside of a task context.
+    pub fn poll_send_to(&mut self, buf: &[u8], target: &SocketAddr) -> Poll<usize, io::Error> {
+        try_ready!(self.io.poll_write_ready());
 
         match self.io.get_ref().send_to(buf, target) {
-            Ok(n) => Ok(n),
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write()?;
-                }
-                Err(e)
+            Ok(n) => Ok(n.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_write()?;
+                Ok(Async::NotReady)
             }
+            Err(e) => Err(e),
         }
     }
 
@@ -148,6 +200,15 @@ impl UdpSocket {
         SendDgram::new(self, buf, *addr)
     }
 
+    #[deprecated(since = "0.1.2", note = "use poll_recv_from instead")]
+    #[doc(hidden)]
+    pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        match self.poll_recv_from(buf)? {
+            Async::Ready(ret) => Ok(ret),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
+        }
+    }
+
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
     ///
@@ -155,19 +216,16 @@ impl UdpSocket {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        if let Async::NotReady = self.io.poll_read_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
+    pub fn poll_recv_from(&mut self, buf: &mut [u8]) -> Poll<(usize, SocketAddr), io::Error> {
+        try_ready!(self.io.poll_read_ready());
 
         match self.io.get_ref().recv_from(buf) {
-            Ok(n) => Ok(n),
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read()?;
-                }
-                Err(e)
+            Ok(n) => Ok(n.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_read()?;
+                Ok(Async::NotReady)
             }
+            Err(e) => Err(e),
         }
     }
 
@@ -384,7 +442,7 @@ impl<T> Future for SendDgram<T>
         {
             let ref mut inner =
                 self.state.as_mut().expect("SendDgram polled after completion");
-            let n = try_nb!(inner.socket.send_to(inner.buffer.as_ref(), &inner.addr));
+            let n = try_ready!(inner.socket.poll_send_to(inner.buffer.as_ref(), &inner.addr));
             if n != inner.buffer.as_ref().len() {
                 return Err(incomplete_write("failed to send entire message \
                                              in datagram"))
@@ -436,7 +494,7 @@ impl<T> Future for RecvDgram<T>
             let ref mut inner =
                 self.state.as_mut().expect("RecvDgram polled after completion");
 
-            try_nb!(inner.socket.recv_from(inner.buffer.as_mut()))
+            try_ready!(inner.socket.poll_recv_from(inner.buffer.as_mut()))
         };
 
         let inner = self.state.take().unwrap();
