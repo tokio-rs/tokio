@@ -71,7 +71,6 @@ extern crate futures;
 extern crate iovec;
 extern crate mio;
 extern crate slab;
-#[macro_use]
 extern crate tokio_io;
 extern crate tokio_executor;
 extern crate tokio_reactor;

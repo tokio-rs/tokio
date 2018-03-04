@@ -39,32 +39,50 @@ impl TcpListener {
         Ok(TcpListener::new(l))
     }
 
+    #[deprecated(since = "0.1.2", note = "use poll_accept instead")]
+    #[doc(hidden)]
+    pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
+        match self.poll_accept()? {
+            Async::Ready(ret) => Ok(ret),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
+        }
+    }
+
     /// Attempt to accept a connection and create a new connected `TcpStream` if
     /// successful.
-    ///
-    /// This function will attempt an accept operation, but will not block
-    /// waiting for it to complete. If the operation would block then a "would
-    /// block" error is returned. Additionally, if this method would block, it
-    /// registers the current task to receive a notification when it would
-    /// otherwise not block.
     ///
     /// Note that typically for simple usage it's easier to treat incoming
     /// connections as a `Stream` of `TcpStream`s with the `incoming` method
     /// below.
     ///
+    /// # Return
+    ///
+    /// On success, returns `Ok(Async::Ready((socket, addr)))`.
+    ///
+    /// If the listener is not ready to accept, the method returns
+    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// notification when the listener becomes ready to accept.
+    ///
     /// # Panics
     ///
-    /// This function will panic if it is called outside the context of a
-    /// future's task. It's recommended to only call this from the
-    /// implementation of a `Future::poll`, if necessary.
-    pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        let (io, addr) = self.accept_std()?;
+    /// This function will panic if called from outside of a task context.
+    pub fn poll_accept(&mut self) -> Poll<(TcpStream, SocketAddr), io::Error> {
+        let (io, addr) = try_ready!(self.poll_accept_std());
 
         let io = mio::net::TcpStream::from_stream(io)?;
         let io = PollEvented2::new(io);
         let io = TcpStream { io };
 
-        Ok((io, addr))
+        Ok((io, addr).into())
+    }
+
+    #[deprecated(since = "0.1.2", note = "use poll_accept_std instead")]
+    #[doc(hidden)]
+    pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
+        match self.poll_accept_std()? {
+            Async::Ready(ret) => Ok(ret),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
+        }
     }
 
     /// Attempt to accept a connection and create a new connected `TcpStream` if
@@ -75,23 +93,27 @@ impl TcpListener {
     /// can then allow for the TCP stream to be assoiated with a different
     /// reactor than the one this `TcpListener` is associated with.
     ///
+    /// # Return
+    ///
+    /// On success, returns `Ok(Async::Ready((socket, addr)))`.
+    ///
+    /// If the listener is not ready to accept, the method returns
+    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// notification when the listener becomes ready to accept.
+    ///
     /// # Panics
     ///
-    /// This function will panic for the same reasons as `accept`, notably if
-    /// called outside the context of a future.
-    pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        if let Async::NotReady = self.io.poll_read_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
+    /// This function will panic if called from outside of a task context.
+    pub fn poll_accept_std(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
+        try_ready!(self.io.poll_read_ready());
 
         match self.io.get_ref().accept_std() {
-            Ok(pair) => Ok(pair),
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_read()?;
-                }
-                Err(e)
+            Ok(pair) => Ok(pair.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.need_read()?;
+                Ok(Async::NotReady)
             }
+            Err(e) => Err(e),
         }
     }
 
@@ -181,7 +203,7 @@ impl Stream for Incoming {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-        let (socket, _) = try_nb!(self.inner.accept());
+        let (socket, _) = try_ready!(self.inner.poll_accept());
         Ok(Async::Ready(Some(socket)))
     }
 }
@@ -298,22 +320,41 @@ impl TcpStream {
         self.io.get_ref().peer_addr()
     }
 
+    #[deprecated(since = "0.1.2", note = "use poll_peek instead")]
+    #[doc(hidden)]
+    pub fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self.poll_peek(buf)? {
+            Async::Ready(n) => Ok(n),
+            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
+        }
+    }
+
     /// Receives data on the socket from the remote address to which it is
     /// connected, without removing that data from the queue. On success,
     /// returns the number of bytes peeked.
     ///
     /// Successive calls return the same data. This is accomplished by passing
     /// `MSG_PEEK` as a flag to the underlying recv system call.
-    pub fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.io.poll_read_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
-        }
+    ///
+    /// # Return
+    ///
+    /// On success, returns `Ok(Async::Ready(num_bytes_read))`.
+    ///
+    /// If no data is available for reading, the method returns
+    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// notification when the socket becomes readable or is closed.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from outside of a task context.
+    pub fn poll_peek(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
+        try_ready!(self.io.poll_read_ready());
 
         match self.io.get_ref().peek(buf) {
-            Ok(v) => Ok(v),
+            Ok(ret) => Ok(ret.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.need_read()?;
-                Err(io::ErrorKind::WouldBlock.into())
+                Ok(Async::NotReady)
             }
             Err(e) => Err(e),
         }

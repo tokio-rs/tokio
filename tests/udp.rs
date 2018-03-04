@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 extern crate futures;
 extern crate tokio;
 #[macro_use]

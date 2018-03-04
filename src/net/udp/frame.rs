@@ -44,7 +44,7 @@ impl<C: Decoder> Stream for UdpFramed<C> {
 
         let (n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
-            let (n, addr) = try_nb!(self.socket.recv_from(self.rd.bytes_mut()));
+            let (n, addr) = try_ready!(self.socket.poll_recv_from(self.rd.bytes_mut()));
             self.rd.advance_mut(n);
             (n, addr)
         };
@@ -87,7 +87,7 @@ impl<C: Encoder> Sink for UdpFramed<C> {
         }
 
         trace!("flushing frame; length={}", self.wr.len());
-        let n = try_nb!(self.socket.send_to(&self.wr, &self.out_addr));
+        let n = try_ready!(self.socket.poll_send_to(&self.wr, &self.out_addr));
         trace!("written {}", n);
 
         let wrote_all = n == self.wr.len();
