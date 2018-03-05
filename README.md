@@ -1,7 +1,7 @@
 # Tokio
 
 A runtime for writing reliable, asynchronous, and slim applications with
-the Rust programming langauge. It is:
+the Rust programming language. It is:
 
 * **Fast**: Tokio's zero-cost abstractions give you bare-metal
   performance.
@@ -30,7 +30,7 @@ Tokio is an event-driven, non-blocking I/O platform for writing
 asynchronous applications with the Rust programming language. At a high
 level, it provides a few major components:
 
-* A multi threaded, work-stealing based task [scheduler].
+* A multithreaded, work-stealing based task [scheduler].
 * A [reactor] backed by the operating system's event queue (epoll, kqueue,
   IOCP, etc...).
 * Asynchronous [TCP and UDP][net] sockets.
