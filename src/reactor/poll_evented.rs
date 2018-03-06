@@ -10,6 +10,7 @@
 
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
@@ -29,7 +30,7 @@ pub struct PollEvented<E> {
 }
 
 struct Inner {
-    registration: Registration,
+    registration: Mutex<Registration>,
 
     /// Currently visible read readiness
     read_readiness: AtomicUsize,
@@ -58,7 +59,7 @@ impl<E> PollEvented<E> {
         Ok(PollEvented {
             io: io,
             inner: Inner {
-                registration,
+                registration: Mutex::new(registration),
                 read_readiness: AtomicUsize::new(0),
                 write_readiness: AtomicUsize::new(0),
             },
@@ -89,12 +90,14 @@ impl<E> PollEvented<E> {
     }
 
     fn poll_read2(&self) -> Async<Ready> {
+        let r = self.inner.registration.lock().unwrap();
+
         // Load the cached readiness
         match self.inner.read_readiness.load(Relaxed) {
             0 => {}
             mut n => {
                 // Check what's new with the reactor.
-                if let Some(ready) = self.inner.registration.take_read_ready().unwrap() {
+                if let Some(ready) = r.take_read_ready().unwrap() {
                     n |= ready2usize(ready);
                     self.inner.read_readiness.store(n, Relaxed);
                 }
@@ -103,7 +106,7 @@ impl<E> PollEvented<E> {
             }
         }
 
-        let ready = match self.inner.registration.poll_read_ready().unwrap() {
+        let ready = match r.poll_read_ready().unwrap() {
             Async::Ready(r) => r,
             _ => return Async::NotReady,
         };
@@ -129,11 +132,13 @@ impl<E> PollEvented<E> {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn poll_write(&mut self) -> Async<()> {
+        let r = self.inner.registration.lock().unwrap();
+
         match self.inner.write_readiness.load(Relaxed) {
             0 => {}
             mut n => {
                 // Check what's new with the reactor.
-                if let Some(ready) = self.inner.registration.take_write_ready().unwrap() {
+                if let Some(ready) = r.take_write_ready().unwrap() {
                     n |= ready2usize(ready);
                     self.inner.write_readiness.store(n, Relaxed);
                 }
@@ -142,7 +147,7 @@ impl<E> PollEvented<E> {
             }
         }
 
-        let ready = match self.inner.registration.poll_write_ready().unwrap() {
+        let ready = match r.poll_write_ready().unwrap() {
             Async::Ready(r) => r,
             _ => return Async::NotReady,
         };
@@ -331,9 +336,8 @@ impl<E> PollEvented<E> {
     pub fn deregister(&self) -> io::Result<()>
         where E: Evented,
     {
-        // Nothing has to happen here anymore as I/O objects are explicitly
-        // deregistered before dropped.
-        Ok(())
+        self.inner.registration.lock().unwrap()
+            .deregister(&self.io)
     }
 }
 

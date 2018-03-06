@@ -559,6 +559,11 @@ impl Inner {
         Ok(key)
     }
 
+    /// Deregisters an I/O resource from the reactor.
+    fn deregister_source(&self, source: &Evented) -> io::Result<()> {
+        self.io.deregister(source)
+    }
+
     fn drop_source(&self, token: usize) {
         debug!("dropping I/O source: {}", token);
         self.io_dispatch.write().unwrap().remove(token);

@@ -104,6 +104,8 @@ impl Registration {
     /// the first call will establish the registration. Subsequent calls will be
     /// no-ops.
     ///
+    /// # Return
+    ///
     /// If the registration happened successfully, `Ok(true)` is returned.
     ///
     /// If an I/O resource has previously been successfully registered,
@@ -114,6 +116,35 @@ impl Registration {
     where T: Evented,
     {
         self.register2(io, || Handle::try_current())
+    }
+
+    /// Deregister the I/O resource from the reactor it is associatd with.
+    ///
+    /// This function must be called before the I/O resource associated with the
+    /// registration is dropped.
+    ///
+    /// Note that deregistering does not guarantee that the I/O resource can be
+    /// registered with a different reactor. Some I/O resource types can only be
+    /// associated with a single reactor instance for their lifetime.
+    ///
+    /// # Return
+    ///
+    /// If the deregistration was successful, `Ok` is returned. Any calls to
+    /// `Reactor::turn` that happen after a successful call to `deregister` will
+    /// no longer result in notifications getting sent for this registration.
+    ///
+    /// `Err` is returned if an error is encountered.
+    pub fn deregister<T>(&mut self, io: &T) -> io::Result<()>
+    where T: Evented,
+    {
+        // The state does not need to be checked and coordination is not
+        // necessary as this function takes `&mut self`. This guarantees a
+        // single thread is accessing the instance.
+        if let Some(inner) = unsafe { (*self.inner.get()).as_ref() } {
+            inner.deregister(io)?;
+        }
+
+        Ok(())
     }
 
     /// Register the I/O resource with the specified reactor.
@@ -422,6 +453,19 @@ impl Inner {
         };
 
         inner.register(self.token, direction, task);
+    }
+
+    fn deregister<E: Evented>(&self, io: &E) -> io::Result<()> {
+        if self.token == ERROR {
+            return Err(io::Error::new(io::ErrorKind::Other, "failed to associate with reactor"));
+        }
+
+        let inner = match self.handle.inner() {
+            Some(inner) => inner,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
+        };
+
+        inner.deregister_source(io)
     }
 
     fn poll_ready(&self, direction: Direction, notify: bool)

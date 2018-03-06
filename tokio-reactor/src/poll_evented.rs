@@ -82,8 +82,8 @@ use std::sync::atomic::Ordering::Relaxed;
 /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
 /// [`Registration`]: struct.Registration.html
 /// [`TcpListener`]: ../net/struct.TcpListener.html
-pub struct PollEvented<E> {
-    io: E,
+pub struct PollEvented<E: Evented> {
+    io: Option<E>,
     inner: Inner,
 }
 
@@ -105,7 +105,7 @@ where E: Evented
     /// Creates a new `PollEvented` associated with the default reactor.
     pub fn new(io: E) -> PollEvented<E> {
         PollEvented {
-            io: io,
+            io: Some(io),
             inner: Inner {
                 registration: Registration::new(),
                 read_readiness: AtomicUsize::new(0),
@@ -117,8 +117,34 @@ where E: Evented
     /// Creates a new `PollEvented` associated with the specified reactor.
     pub fn new_with_handle(io: E, handle: &Handle) -> io::Result<Self> {
         let ret = PollEvented::new(io);
-        ret.inner.registration.register_with(&ret.io, handle)?;
+        ret.inner.registration.register_with(ret.io.as_ref().unwrap(), handle)?;
         Ok(ret)
+    }
+
+    /// Returns a shared reference to the underlying I/O object this readiness
+    /// stream is wrapping.
+    pub fn get_ref(&self) -> &E {
+        self.io.as_ref().unwrap()
+    }
+
+    /// Returns a mutable reference to the underlying I/O object this readiness
+    /// stream is wrapping.
+    pub fn get_mut(&mut self) -> &mut E {
+        self.io.as_mut().unwrap()
+    }
+
+    /// Consumes self, returning the inner I/O object
+    ///
+    /// This function will deregister the I/O resource from the reactor before
+    /// returning. If the deregistration operation fails, an error is returned.
+    ///
+    /// Note that deregistering does not guarantee that the I/O resource can be
+    /// registered with a different reactor. Some I/O resource types can only be
+    /// associated with a single reactor instance for their lifetime.
+    pub fn into_inner(mut self) -> io::Result<E> {
+        let io = self.io.take().unwrap();
+        self.inner.registration.deregister(&io)?;
+        Ok(io)
     }
 
     /// Check the I/O resource's read readiness state.
@@ -241,27 +267,8 @@ where E: Evented
 
     /// Ensure that the I/O resource is registered with the reactor.
     fn register(&self) -> io::Result<()> {
-        self.inner.registration.register(&self.io)?;
+        self.inner.registration.register(self.io.as_ref().unwrap())?;
         Ok(())
-    }
-}
-
-impl<E> PollEvented<E> {
-    /// Returns a shared reference to the underlying I/O object this readiness
-    /// stream is wrapping.
-    pub fn get_ref(&self) -> &E {
-        &self.io
-    }
-
-    /// Returns a mutable reference to the underlying I/O object this readiness
-    /// stream is wrapping.
-    pub fn get_mut(&mut self) -> &mut E {
-        &mut self.io
-    }
-
-    /// Consumes self, returning the inner I/O object
-    pub fn into_inner(self) -> E {
-        self.io
     }
 }
 
@@ -403,10 +410,19 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 }
 
 
-impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
+impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PollEvented")
          .field("io", &self.io)
          .finish()
+    }
+}
+
+impl<E: Evented> Drop for PollEvented<E> {
+    fn drop(&mut self) {
+        if let Some(io) = self.io.as_ref() {
+            // Ignore errors
+            let _ = self.inner.registration.deregister(io);
+        }
     }
 }
