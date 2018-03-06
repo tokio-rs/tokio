@@ -15,7 +15,7 @@ script:
   - |
     if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
     then
-        cargo build --benches
+        cargo build --benches --all
     fi
   - cargo test --all
 
