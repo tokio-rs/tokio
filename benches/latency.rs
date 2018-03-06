@@ -1,10 +1,10 @@
 #![feature(test)]
+#![deny(warnings)]
 
 extern crate test;
+#[macro_use]
 extern crate futures;
 extern crate tokio;
-#[macro_use]
-extern crate tokio_io;
 
 use std::io;
 use std::net::SocketAddr;
@@ -40,10 +40,10 @@ impl Future for EchoServer {
     fn poll(&mut self) -> Poll<(), io::Error> {
         loop {
             if let Some(&(size, peer)) = self.to_send.as_ref() {
-                try_nb!(self.socket.send_to(&self.buf[..size], &peer));
+                try_ready!(self.socket.poll_send_to(&self.buf[..size], &peer));
                 self.to_send = None;
             }
-            self.to_send = Some(try_nb!(self.socket.recv_from(&mut self.buf)));
+            self.to_send = Some(try_ready!(self.socket.poll_recv_from(&mut self.buf)));
         }
     }
 }

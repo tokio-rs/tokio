@@ -1,6 +1,7 @@
 // Measure cost of different operations
 // to get a sense of performance tradeoffs
 #![feature(test)]
+#![deny(warnings)]
 
 extern crate test;
 extern crate mio;

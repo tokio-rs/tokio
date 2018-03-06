@@ -1,7 +1,8 @@
 #![feature(test)]
+#![deny(warnings)]
 
+extern crate tokio_threadpool;
 extern crate futures;
-extern crate futures_pool;
 extern crate futures_cpupool;
 extern crate num_cpus;
 extern crate test;
@@ -9,31 +10,31 @@ extern crate test;
 const ITER: usize = 20_000;
 
 mod us {
-    use futures::future::{self, Executor};
-    use futures_pool::*;
+    use tokio_threadpool::*;
+    use futures::future;
     use test;
     use std::sync::mpsc;
 
     #[bench]
     fn chained_spawn(b: &mut test::Bencher) {
-        let (sched_tx, _scheduler) = Pool::new();
+        let threadpool = ThreadPool::new();
 
-        fn spawn(sched_tx: Sender, res_tx: mpsc::Sender<()>, n: usize) {
+        fn spawn(pool_tx: Sender, res_tx: mpsc::Sender<()>, n: usize) {
             if n == 0 {
                 res_tx.send(()).unwrap();
             } else {
-                let sched_tx2 = sched_tx.clone();
-                sched_tx.execute(future::lazy(move || {
-                    spawn(sched_tx2, res_tx, n - 1);
+                let pool_tx2 = pool_tx.clone();
+                pool_tx.spawn(future::lazy(move || {
+                    spawn(pool_tx2, res_tx, n - 1);
                     Ok(())
-                })).ok().unwrap();
+                })).unwrap();
             }
         }
 
         b.iter(move || {
             let (res_tx, res_rx) = mpsc::channel();
 
-            spawn(sched_tx.clone(), res_tx, super::ITER);
+            spawn(threadpool.sender().clone(), res_tx, super::ITER);
             res_rx.recv().unwrap();
         });
     }
