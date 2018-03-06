@@ -4,7 +4,7 @@
 
 extern crate tokio_executor;
 extern crate futures;
-extern crate coco;
+extern crate crossbeam_deque as deque;
 extern crate num_cpus;
 extern crate rand;
 
@@ -15,7 +15,6 @@ mod task;
 
 use tokio_executor::{Enter, SpawnError};
 
-use coco::deque;
 use task::Task;
 
 use futures::{future, Future, Poll, Async};
@@ -246,7 +245,7 @@ struct WorkerEntry {
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    deque: deque::Worker<Task>,
+    deque: deque::Deque<Task>,
 
     // Stealer half of deque
     steal: deque::Stealer<Task>,
@@ -1435,16 +1434,16 @@ impl Worker {
     /// Returns `true` if work was found.
     #[inline]
     fn try_run_task(&self, notify: &Arc<Notifier>) -> bool {
-        use coco::deque::Steal::*;
+        use deque::Steal::*;
 
         // Poll the internal queue for a task to run
-        match self.entry().deque.steal_weak() {
+        match self.entry().deque.steal() {
             Data(task) => {
                 self.run_task(task, notify);
                 true
             }
             Empty => false,
-            Inconsistent => true,
+            Retry => true,
         }
     }
 
@@ -1453,7 +1452,7 @@ impl Worker {
     /// Returns `true` if work was found
     #[inline]
     fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
-        use coco::deque::Steal::*;
+        use deque::Steal::*;
 
         let len = self.inner.workers.len();
         let mut idx = self.inner.rand_usize() % len;
@@ -1462,7 +1461,7 @@ impl Worker {
 
         loop {
             if idx < len {
-                match self.inner.workers[idx].steal.steal_weak() {
+                match self.inner.workers[idx].steal.steal() {
                     Data(task) => {
                         trace!("stole task");
 
@@ -1477,7 +1476,7 @@ impl Worker {
                         return true;
                     }
                     Empty => {}
-                    Inconsistent => found_work = true,
+                    Retry => found_work = true,
                 }
 
                 idx += 1;
@@ -1923,7 +1922,8 @@ impl fmt::Debug for SleepStack {
 
 impl WorkerEntry {
     fn new() -> Self {
-        let (w, s) = deque::new();
+        let w = deque::Deque::new();
+        let s = w.stealer();
 
         WorkerEntry {
             state: AtomicUsize::new(WorkerState::default().into()),
