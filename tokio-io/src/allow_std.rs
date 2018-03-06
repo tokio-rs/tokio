@@ -2,9 +2,9 @@ use {AsyncRead, AsyncWrite};
 use futures::{Async, Poll};
 use std::{fmt, io};
 
-/// A simple wrapper type which allows types which implement only
-/// implement `std::io::Read` or `std::io::Write`
-/// to be used in contexts which expect an `AsyncRead` or `AsyncWrite`.
+/// A simple wrapper type which allows types that only implement
+/// `std::io::Read` or `std::io::Write` to be used in contexts which expect
+/// an `AsyncRead` or `AsyncWrite`.
 ///
 /// If these types issue an error with the kind `io::ErrorKind::WouldBlock`,
 /// it is expected that they will notify the current task on readiness.
