@@ -136,6 +136,63 @@ fn force_shutdown_drops_futures() {
 }
 
 #[test]
+fn drop_threadpool_drops_futures() {
+    let _ = ::env_logger::init();
+
+    for _ in 0..1_000 {
+        let num_inc = Arc::new(AtomicUsize::new(0));
+        let num_dec = Arc::new(AtomicUsize::new(0));
+        let num_drop = Arc::new(AtomicUsize::new(0));
+
+        struct Never(Arc<AtomicUsize>);
+
+        impl Future for Never {
+            type Item = ();
+            type Error = ();
+
+            fn poll(&mut self) -> Poll<(), ()> {
+                Ok(Async::NotReady)
+            }
+        }
+
+        impl Drop for Never {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Relaxed);
+            }
+        }
+
+        let a = num_inc.clone();
+        let b = num_dec.clone();
+
+        let mut pool = Builder::new()
+            .around_worker(move |w, _| {
+                a.fetch_add(1, Relaxed);
+                w.run();
+                b.fetch_add(1, Relaxed);
+            })
+            .build();
+        let mut tx = pool.sender().clone();
+
+        tx.spawn(Never(num_drop.clone())).unwrap();
+
+        // Wait for the pool to shutdown
+        drop(pool);
+
+        // Assert that only a single thread was spawned.
+        let a = num_inc.load(Relaxed);
+        assert!(a >= 1);
+
+        // Assert that all threads shutdown
+        let b = num_dec.load(Relaxed);
+        assert_eq!(a, b);
+
+        // Assert that the future was dropped
+        let c = num_drop.load(Relaxed);
+        assert_eq!(c, 1);
+    }
+}
+
+#[test]
 fn thread_shutdown_timeout() {
     use std::sync::Mutex;
 
