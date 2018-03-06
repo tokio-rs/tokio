@@ -10,15 +10,16 @@
 //!
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 
+#![deny(warnings)]
+
 #[macro_use]
 extern crate futures;
 extern crate tokio;
-extern crate tokio_io;
 
 use std::{env, io};
 use std::net::SocketAddr;
 
-use futures::{Future, Poll};
+use tokio::prelude::*;
 use tokio::net::UdpSocket;
 
 struct Server {
@@ -56,11 +57,17 @@ fn main() {
     let socket = UdpSocket::bind(&addr).unwrap();
     println!("Listening on: {}", socket.local_addr().unwrap());
 
-    // Next we'll create a future to spawn (the one we defined above) and then
-    // we'll block our current thread waiting on the result of the future
-    Server {
+    let server = Server {
         socket: socket,
         buf: vec![0; 1024],
         to_send: None,
-    }.wait().unwrap();
+    };
+
+    // This starts the server task.
+    //
+    // `map_err` handles the error by logging it and maps the future to a type
+    // that can be spawned.
+    //
+    // `tokio::run` spanws the task on the Tokio runtime and starts running.
+    tokio::run(server.map_err(|e| println!("server error = {:?}", e)));
 }
