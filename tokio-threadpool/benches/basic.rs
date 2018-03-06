@@ -1,7 +1,8 @@
 #![feature(test)]
+#![deny(warnings)]
 
+extern crate tokio_threadpool;
 extern crate futures;
-extern crate futures_pool;
 extern crate futures_cpupool;
 extern crate num_cpus;
 extern crate test;
@@ -10,10 +11,9 @@ const NUM_SPAWN: usize = 10_000;
 const NUM_YIELD: usize = 1_000;
 const TASKS_PER_CPU: usize = 50;
 
-mod us {
-    use futures::{task, Async};
-    use futures::future::{self, Executor};
-    use futures_pool::*;
+mod threadpool {
+    use futures::{future, task, Async};
+    use tokio_threadpool::*;
     use num_cpus;
     use test;
     use std::sync::{mpsc, Arc};
@@ -22,7 +22,7 @@ mod us {
 
     #[bench]
     fn spawn_many(b: &mut test::Bencher) {
-        let (sched_tx, _scheduler) = Pool::new();
+        let threadpool = ThreadPool::new();
 
         let (tx, rx) = mpsc::sync_channel(10);
         let rem = Arc::new(AtomicUsize::new(0));
@@ -34,13 +34,13 @@ mod us {
                 let tx = tx.clone();
                 let rem = rem.clone();
 
-                sched_tx.execute(future::lazy(move || {
+                threadpool.spawn(future::lazy(move || {
                     if 1 == rem.fetch_sub(1, SeqCst) {
                         tx.send(()).unwrap();
                     }
 
                     Ok(())
-                })).ok().unwrap();
+                }));
             }
 
             let _ = rx.recv().unwrap();
@@ -49,7 +49,7 @@ mod us {
 
     #[bench]
     fn yield_many(b: &mut test::Bencher) {
-        let (sched_tx, _scheduler) = Pool::new();
+        let threadpool = ThreadPool::new();
         let tasks = super::TASKS_PER_CPU * num_cpus::get();
 
         let (tx, rx) = mpsc::sync_channel(tasks);
@@ -59,7 +59,7 @@ mod us {
                 let mut rem = super::NUM_YIELD;
                 let tx = tx.clone();
 
-                sched_tx.execute(future::poll_fn(move || {
+                threadpool.spawn(future::poll_fn(move || {
                     rem -= 1;
 
                     if rem == 0 {
@@ -72,7 +72,7 @@ mod us {
                         // Not ready
                         Ok(Async::NotReady)
                     }
-                })).ok().unwrap();
+                }));
             }
 
             for _ in 0..tasks {
