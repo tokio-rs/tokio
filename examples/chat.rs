@@ -266,11 +266,7 @@ impl Lines {
     fn poll_flush(&mut self) -> Poll<(), io::Error> {
         // As long as there is buffered data to write, try to write it.
         while !self.wr.is_empty() {
-            // `try_nb` is kind of like `try_ready`, but for operations that
-            // return `io::Result` instead of `Async`.
-            //
-            // In the case of `io::Result`, an error of `WouldBlock` is
-            // equivalent to `Async::NotReady.
+            // Try to read some bytes from the socket
             let n = try_ready!(self.socket.poll_write(&self.wr));
 
             // As long as the wr is not empty, a successful write should
@@ -402,7 +398,7 @@ fn process(socket: TcpStream, state: Arc<Mutex<Shared>>) {
             println!("connection error = {:?}", e);
         });
 
-    // Return the connection processing task
+    // Spawn the task. Internally, this submits the task to a thread pool.
     tokio::spawn(connection);
 }
 
@@ -438,22 +434,15 @@ pub fn main() {
 
     println!("server running on localhost:6142");
 
-    // This starts the `current_thread` executor.
+    // Start the Tokio runtime.
     //
-    // Executors are responsible for scheduling many asynchronous tasks, driving
-    // them to completion. There are a number of different executor
-    // implementations, each providing different scheduling characteristics.
+    // The Tokio is a pre-configured "out of the box" runtime for building
+    // asynchronous applications. It includes both a reactor and a task
+    // scheduler. This means applications are multithreaded by default.
     //
-    // The `current_thread` executor multiplexes all scheduled tasks on the
-    // current thread. This means that spawned tasks must not implement `Send`.
-    // It's important to note that all futures / tasks are lazy. No work will
-    // happen unless they are spawned onto an executor.
-    //
-    // The executor will start running the `server` task, which, in turn, spawns
-    // new tasks for each incoming connection.
-    //
-    // The `current_thread::block_on_all` function will block until *all*
-    // spawned tasks complete.
+    // This function blocks until the runtime reaches an idle state. Idle is
+    // defined as all spawned tasks have completed and all I/O resources (TCP
+    // sockets in our case) have been dropped.
     //
     // In our example, we have not defined a shutdown strategy, so this will
     // block until `ctrl-c` is pressed at the terminal.
