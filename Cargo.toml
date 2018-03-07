@@ -45,6 +45,7 @@ mio = "0.6.14"
 slab = "0.4"
 iovec = "0.1"
 futures = "0.1.18"
+futures2 = { version = "0.1", path = "futures2", optional = true }
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
@@ -63,5 +64,5 @@ time = "0.1"
 tokio-io = { path = "tokio-io" }
 
 [features]
-futures-0-2 = ["tokio-reactor/futures-0-2"]
-default = []
+futures-0-2 = ["futures2", "tokio-reactor/futures-0-2", "tokio-threadpool/futures-0-2"]
+default = ["futures-0-2"]

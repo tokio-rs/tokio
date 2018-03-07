@@ -12,6 +12,9 @@ extern crate rand;
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "futures-0-2")]
+extern crate futures2;
+
 mod task;
 
 use tokio_executor::{Enter, SpawnError};
@@ -178,6 +181,12 @@ struct Callback {
 #[derive(Debug)]
 struct Notifier {
     inner: Weak<Inner>,
+}
+
+#[cfg(feature = "futures-0-2")]
+struct Futures2Wake {
+    notifier: Arc<Notifier>,
+    id: usize,
 }
 
 /// ThreadPool state.
@@ -827,6 +836,35 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
     }
 }
 
+#[cfg(feature = "futures-0-2")]
+type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
+
+#[cfg(feature = "futures-0-2")]
+impl futures2::executor::Executor for Sender {
+    fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
+        self.prepare_for_spawn()
+            // TODO: get rid of this once the futures crate adds more error types
+            .map_err(|_| futures2::executor::SpawnError::shutdown())?;
+
+        // At this point, the pool has accepted the future, so schedule it for
+        // execution.
+
+        // Create a new task for the future
+        let task = Task::new2(f, |_| panic!());
+
+        self.inner.submit(task, &self.inner);
+
+        Ok(())
+    }
+
+    fn status(&self) -> Result<(), futures2::executor::SpawnError> {
+        tokio_executor::Executor::status(self)
+        // TODO: get rid of this once the futures crate adds more error types
+            .map_err(|_| futures2::executor::SpawnError::shutdown())
+    }
+}
+
+
 impl Clone for Sender {
     #[inline]
     fn clone(&self) -> Sender {
@@ -1272,6 +1310,13 @@ impl Notify for Notifier {
     }
 }
 
+#[cfg(feature = "futures-0-2")]
+impl futures2::task::Wake for Futures2Wake {
+    fn wake(arc_self: &Arc<Futures2Wake>) {
+        arc_self.notifier.notify(arc_self.id)
+    }
+}
+
 unsafe impl Send for Inner {}
 unsafe impl Sync for Inner {}
 
@@ -1315,6 +1360,9 @@ impl Worker {
                 // Enter an execution context
                 let mut enter = tokio_executor::enter().unwrap();
 
+                #[cfg(feature = "futures-0-2")]
+                let _enter2 = futures2::executor::enter();
+
                 tokio_executor::with_default(&mut sender, &mut enter, |enter| {
                     if let Some(ref callback) = wref.inner.config.around_worker {
                         callback.call(wref, enter);
@@ -1346,6 +1394,7 @@ impl Worker {
         let notify = Arc::new(Notifier {
             inner: Arc::downgrade(&self.inner),
         });
+        let mut sender = Sender { inner: self.inner.clone() };
 
         let mut first = true;
         let mut spin_cnt = 0;
@@ -1358,14 +1407,14 @@ impl Worker {
             let consistent = self.drain_inbound();
 
             // Run the next available task
-            if self.try_run_task(&notify) {
+            if self.try_run_task(&notify, &mut sender) {
                 spin_cnt = 0;
                 // As long as there is work, keep looping.
                 continue;
             }
 
             // No work in this worker's queue, it is time to try stealing.
-            if self.try_steal_task(&notify) {
+            if self.try_steal_task(&notify, &mut sender) {
                 spin_cnt = 0;
                 continue;
             }
@@ -1448,13 +1497,13 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     #[inline]
-    fn try_run_task(&self, notify: &Arc<Notifier>) -> bool {
+    fn try_run_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
         use deque::Steal::*;
 
         // Poll the internal queue for a task to run
         match self.entry().deque.steal() {
             Data(task) => {
-                self.run_task(task, notify);
+                self.run_task(task, notify, sender);
                 true
             }
             Empty => false,
@@ -1466,7 +1515,7 @@ impl Worker {
     ///
     /// Returns `true` if work was found
     #[inline]
-    fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
+    fn try_steal_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
         use deque::Steal::*;
 
         let len = self.inner.workers.len();
@@ -1480,7 +1529,7 @@ impl Worker {
                     Data(task) => {
                         trace!("stole task");
 
-                        self.run_task(task, notify);
+                        self.run_task(task, notify, sender);
 
                         trace!("try_steal_task -- signal_work; self={}; from={}",
                                self.idx, idx);
@@ -1507,10 +1556,10 @@ impl Worker {
         found_work
     }
 
-    fn run_task(&self, task: Task, notify: &Arc<Notifier>) {
+    fn run_task(&self, task: Task, notify: &Arc<Notifier>, sender: &mut Sender) {
         use task::Run::*;
 
-        match task.run(notify) {
+        match task.run(notify, sender) {
             Idle => {}
             Schedule => {
                 self.entry().push_internal(task);

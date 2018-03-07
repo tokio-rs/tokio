@@ -79,6 +79,9 @@ extern crate tokio_threadpool;
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "futures-0-2")]
+extern crate futures2;
+
 pub mod executor;
 pub mod net;
 pub mod reactor;

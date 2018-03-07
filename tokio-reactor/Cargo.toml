@@ -28,4 +28,4 @@ futures2 = { version = "0.1", path = "../futures2", optional = true }
 
 [features]
 futures-0-2 = ["futures2"]
-default = []
+default = ["futures-0-2"]
