@@ -244,7 +244,9 @@ impl Registration {
     /// call to `poll_read_ready`, it is returned. If it has not, the current
     /// task is notified once a new event is received.
     ///
-    /// Events are [edge-triggered].
+    /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
+    /// the function will always return `Ready(HUP)`. This should be treated as
+    /// the end of the readiness stream.
     ///
     /// Ensure that [`register`] has been called first.
     ///
@@ -294,7 +296,9 @@ impl Registration {
     /// call to `poll_write_ready`, it is returned. If it has not, the current
     /// task is notified once a new event is received.
     ///
-    /// Events are [edge-triggered].
+    /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
+    /// the function will always return `Ready(HUP)`. This should be treated as
+    /// the end of the readiness stream.
     ///
     /// Ensure that [`register`] has been called first.
     ///

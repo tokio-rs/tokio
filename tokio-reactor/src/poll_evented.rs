@@ -104,6 +104,7 @@ macro_rules! poll_ready {
 
         // Load cached & encoded readiness.
         let mut cached = $me.inner.$cache.load(Relaxed);
+        let mask = $mask | ::platform::hup();
 
         // See if the current readiness matches any bits.
         let mut ret = mio::Ready::from_usize(cached) & $mask;
@@ -119,7 +120,7 @@ macro_rules! poll_ready {
                 // Update the cache store
                 $me.inner.$cache.store(cached, Relaxed);
 
-                ret |= ready & $mask;
+                ret |= ready & mask;
 
                 if !ret.is_empty() {
                     return Ok(ret.into());
@@ -190,7 +191,8 @@ where E: Evented
     ///
     /// The mask argument allows specifying what readiness to notify on. This
     /// can be any value, including platform specific readiness, **except**
-    /// `writable`.
+    /// `writable`. HUP is always implicitly included on platforms that support
+    /// it.
     ///
     /// If the resource is not ready for a read then `Async::NotReady` is
     /// returned and the current task is notified once a new event is received.
@@ -243,9 +245,8 @@ where E: Evented
 
     /// Check the I/O resource's write readiness state.
     ///
-    /// The mask argument allows specifying what readiness to notify on. The
-    /// options are either `writable` or `hup` (on platforms that support `hup`
-    /// notification).
+    /// This always checks for writable readiness and also checks for HUP
+    /// readiness on platforms that support it.
     ///
     /// If the resource is not ready for a write then `Async::NotReady` is
     /// returned and the current task is notified once a new event is received.
@@ -261,11 +262,12 @@ where E: Evented
     ///
     /// * `ready` contains bits besides `writable` and `hup`.
     /// * called from outside of a task context.
-    pub fn poll_write_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
-        assert!(mask & (mio::Ready::writable() | ::platform::hup()) == mask,
-                "can only poll for writable or hup readiness");
-
-        poll_ready!(self, mask, write_readiness, poll_write_ready, take_write_ready)
+    pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
+        poll_ready!(self,
+                    mio::Ready::writable(),
+                    write_readiness,
+                    poll_write_ready,
+                    take_write_ready)
     }
 
     /// Resets the I/O resource's write readiness state and registers the current
@@ -285,7 +287,7 @@ where E: Evented
 
         self.inner.read_readiness.fetch_and(!ready.as_usize(), Relaxed);
 
-        if self.poll_write_ready(ready)?.is_ready() {
+        if self.poll_write_ready()?.is_ready() {
             // Notify the current task
             task::current().notify();
         }
@@ -324,7 +326,7 @@ impl<E> Write for PollEvented<E>
 where E: Evented + Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_write_ready(mio::Ready::writable())? {
+        if let Async::NotReady = self.poll_write_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -338,7 +340,7 @@ where E: Evented + Write,
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        if let Async::NotReady = self.poll_write_ready(mio::Ready::writable())? {
+        if let Async::NotReady = self.poll_write_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -389,7 +391,7 @@ impl<'a, E> Write for &'a PollEvented<E>
 where E: Evented, &'a E: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_write_ready(mio::Ready::writable())? {
+        if let Async::NotReady = self.poll_write_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
@@ -403,7 +405,7 @@ where E: Evented, &'a E: Write,
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        if let Async::NotReady = self.poll_write_ready(mio::Ready::writable())? {
+        if let Async::NotReady = self.poll_write_ready()? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 

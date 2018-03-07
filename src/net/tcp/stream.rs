@@ -118,7 +118,8 @@ impl TcpStream {
     ///
     /// The mask argument allows specifying what readiness to notify on. This
     /// can be any value, including platform specific readiness, **except**
-    /// `writable`.
+    /// `writable`. HUP is always implicitly included on platforms that support
+    /// it.
     ///
     /// If the resource is not ready for a read then `Async::NotReady` is
     /// returned and the current task is notified once a new event is received.
@@ -138,9 +139,8 @@ impl TcpStream {
 
     /// Check the TCP stream's write readiness state.
     ///
-    /// The mask argument allows specifying what readiness to notify on. The
-    /// options are either `writable` or `hup` (on platforms that support `hup`
-    /// notification).
+    /// This always checks for writable readiness and also checks for HUP
+    /// readiness on platforms that support it.
     ///
     /// If the resource is not ready for a write then `Async::NotReady` is
     /// returned and the current task is notified once a new event is received.
@@ -154,8 +154,8 @@ impl TcpStream {
     ///
     /// * `ready` contains bits besides `writable` and `hup`.
     /// * called from outside of a task context.
-    pub fn poll_write_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
-        self.io.poll_write_ready(mask)
+    pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
+        self.io.poll_write_ready()
     }
 
     /// Returns the local address that this stream is bound to.
@@ -455,7 +455,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_write_ready(mio::Ready::writable())? {
+        if let Async::NotReady = self.io.poll_write_ready()? {
             return Ok(Async::NotReady)
         }
 
@@ -523,7 +523,7 @@ impl Future for ConnectFutureState {
             // actually hit an error or not.
             //
             // If all that succeeded then we ship everything on up.
-            if let Async::NotReady = stream.io.poll_write_ready(mio::Ready::writable())? {
+            if let Async::NotReady = stream.io.poll_write_ready()? {
                 return Ok(Async::NotReady)
             }
 
