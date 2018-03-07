@@ -34,10 +34,14 @@ use std::time::{Instant, Duration};
 
 /// Work-stealing based thread pool for executing futures.
 ///
+/// If a `ThreadPool` instance is dropped without explicitly being shutdown,
+/// `shutdown_now` is called implicitly, forcing all tasks that have not yet
+/// completed to be dropped.
+///
 /// Create `ThreadPool` instances using `Builder`.
 #[derive(Debug)]
 pub struct ThreadPool {
-    inner: Sender,
+    inner: Option<Sender>,
 }
 
 /// Submit futures to the associated thread pool for execution.
@@ -72,7 +76,7 @@ pub struct Sender {
 /// [`shutdown_now`]: struct.ThreadPool.html#method.shutdown_now
 #[derive(Debug)]
 pub struct Shutdown {
-    inner: ThreadPool,
+    inner: Sender,
 }
 
 /// Builds a thread pool with custom configuration values.
@@ -536,7 +540,7 @@ impl Builder {
             inner.push_sleeper(i).unwrap();
         }
 
-        let inner = Sender { inner };
+        let inner = Some(Sender { inner });
 
         ThreadPool { inner }
     }
@@ -596,12 +600,12 @@ impl ThreadPool {
     /// The handle is used to spawn futures onto the thread pool. It also
     /// implements the `Executor` trait.
     pub fn sender(&self) -> &Sender {
-        &self.inner
+        self.inner.as_ref().unwrap()
     }
 
     /// Return a mutable reference to the sender handle
     pub fn sender_mut(&mut self) -> &mut Sender {
-        &mut self.inner
+        self.inner.as_mut().unwrap()
     }
 
     /// Shutdown the pool once it becomes idle.
@@ -614,9 +618,9 @@ impl ThreadPool {
     /// handle will result in an error. All worker threads are signaled and will
     /// shutdown. The returned future completes once all worker threads have
     /// completed the shutdown process.
-    pub fn shutdown_on_idle(self) -> Shutdown {
+    pub fn shutdown_on_idle(mut self) -> Shutdown {
         self.inner().shutdown(false, false);
-        Shutdown { inner: self }
+        Shutdown { inner: self.inner.take().unwrap() }
     }
 
     /// Shutdown the pool
@@ -627,9 +631,9 @@ impl ThreadPool {
     /// Calling `spawn` on any outstanding handle will result in an error. All
     /// worker threads are signaled and will shutdown. The returned future
     /// completes once all worker threads have completed the shutdown process.
-    pub fn shutdown(self) -> Shutdown {
+    pub fn shutdown(mut self) -> Shutdown {
         self.inner().shutdown(true, false);
-        Shutdown { inner: self }
+        Shutdown { inner: self.inner.take().unwrap() }
     }
 
     /// Shutdown the pool immediately
@@ -640,13 +644,23 @@ impl ThreadPool {
     /// Calling `spawn` on any outstanding handle will result in an error. All
     /// worker threads are signaled and will shutdown. The returned future
     /// completes once all worker threads have completed the shutdown process.
-    pub fn shutdown_now(self) -> Shutdown {
+    pub fn shutdown_now(mut self) -> Shutdown {
         self.inner().shutdown(true, true);
-        Shutdown { inner: self }
+        Shutdown { inner: self.inner.take().unwrap() }
     }
 
     fn inner(&self) -> &Inner {
-        &*self.inner.inner
+        &*self.inner.as_ref().unwrap().inner
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        if let Some(sender) = self.inner.take() {
+            sender.inner.shutdown(true, true);
+            let shutdown = Shutdown { inner: sender };
+            let _ = shutdown.wait();
+        }
     }
 }
 
@@ -824,7 +838,7 @@ impl Clone for Sender {
 
 impl Shutdown {
     fn inner(&self) -> &Inner {
-        self.inner.inner()
+        &*self.inner.inner
     }
 }
 
