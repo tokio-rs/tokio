@@ -114,6 +114,11 @@ impl TcpStream {
         ConnectFuture { inner: inner }
     }
 
+    /// TODO: Dox
+    pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
+        self.io.poll_read_ready(mask)
+    }
+
     /// Returns the local address that this stream is bound to.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
@@ -152,12 +157,12 @@ impl TcpStream {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_peek(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_read_ready());
+        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().peek(buf) {
             Ok(ret) => Ok(ret.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read()?;
+                self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -357,7 +362,7 @@ impl<'a> AsyncRead for &'a TcpStream {
     }
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_read_ready()? {
+        if let Async::NotReady = self.io.poll_read_ready(mio::Ready::readable())? {
             return Ok(Async::NotReady)
         }
 
@@ -397,7 +402,7 @@ impl<'a> AsyncRead for &'a TcpStream {
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read()?;
+                self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),

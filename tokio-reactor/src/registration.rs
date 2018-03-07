@@ -480,7 +480,7 @@ impl Inner {
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
 
-        let mask = direction.mask();
+        let mask = direction.mask().as_usize();
 
         let io_dispatch = inner.io_dispatch.read().unwrap();
         let sched = &io_dispatch[self.token];
@@ -501,7 +501,7 @@ impl Inner {
         if ready == 0 {
             Ok(None)
         } else {
-            Ok(Some(super::usize2ready(ready)))
+            Ok(Some(mio::Ready::from_usize(ready)))
         }
     }
 }

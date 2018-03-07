@@ -160,32 +160,45 @@ where E: Evented
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
+    pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
         self.register()?;
 
-        // Load the cached readiness
-        match self.inner.read_readiness.load(Relaxed) {
-            0 => {}
-            mut n => {
-                // Check what's new with the reactor.
-                if let Some(ready) = self.inner.registration.take_read_ready()? {
-                    n |= super::ready2usize(ready);
-                    self.inner.read_readiness.store(n, Relaxed);
+        // Load cached & encoded readiness.
+        let mut cached = self.inner.read_readiness.load(Relaxed);
+
+        // See if the current readiness matches any bits.
+        let mut ret = mio::Ready::from_usize(cached) & mask;
+
+        if ret.is_empty() {
+            // Readiness does not match, consume the registration's readiness
+            // stream. This happens in a loop to ensure that the stream gets
+            // drained.
+            loop {
+                let ready = try_ready!(self.inner.registration.poll_read_ready());
+                cached |= ready.as_usize();
+
+                // Update the cache store
+                self.inner.read_readiness.store(cached, Relaxed);
+
+                ret |= ready & mask;
+
+                if !ret.is_empty() {
+                    return Ok(ret.into());
                 }
-
-                return Ok(super::usize2ready(n).into());
             }
+        } else {
+            // Check what's new with the registration stream. This will not
+            // request to be notified
+            if let Some(ready) = self.inner.registration.take_read_ready()? {
+                cached |= ready.as_usize();
+                self.inner.read_readiness.store(cached, Relaxed);
+            }
+
+            Ok(mio::Ready::from_usize(cached).into())
         }
-
-        let ready = try_ready!(self.inner.registration.poll_read_ready());
-
-        // Cache the value
-        self.inner.read_readiness.store(super::ready2usize(ready), Relaxed);
-
-        Ok(ready.into())
     }
 
-    /// Resets the I/O resource's read readiness state and registers the current
+    /// Clears the I/O resource's read readiness state and registers the current
     /// task to be notified once a read readiness event is received.
     ///
     /// After calling this function, `poll_read_ready` will return `NotReady`
@@ -196,11 +209,20 @@ where E: Evented
     ///
     /// # Panics
     ///
-    /// This function will panic if called from outside of a task context.
-    pub fn need_read(&self) -> io::Result<()> {
-        self.inner.read_readiness.store(0, Relaxed);
+    /// This function panics if:
+    ///
+    /// * `ready` includes writable
+    /// * called from outside of a task context.
+    pub fn clear_read_ready(&self, ready: mio::Ready) -> io::Result<()> {
+        // Cannot clear write readiness
+        assert!(!ready.is_writable(), "cannot clear write readiness");
+        assert!(!::platform::is_hup(&ready), "cannot clear HUP readiness");
 
-        if self.poll_read_ready()?.is_ready() {
+        let mask = ready.as_usize();
+
+        self.inner.read_readiness.fetch_and(!mask, Relaxed);
+
+        if self.poll_read_ready(ready)?.is_ready() {
             // Notify the current task
             task::current().notify();
         }
@@ -229,18 +251,18 @@ where E: Evented
             mut n => {
                 // Check what's new with the reactor.
                 if let Some(ready) = self.inner.registration.take_write_ready()? {
-                    n |= super::ready2usize(ready);
+                    n |= ready.as_usize();
                     self.inner.write_readiness.store(n, Relaxed);
                 }
 
-                return Ok(super::usize2ready(n).into());
+                return Ok(mio::Ready::from_usize(n).into());
             }
         }
 
         let ready = try_ready!(self.inner.registration.poll_write_ready());
 
         // Cache the value
-        self.inner.write_readiness.store(super::ready2usize(ready), Relaxed);
+        self.inner.write_readiness.store(ready.as_usize(), Relaxed);
 
         Ok(ready.into())
     }
@@ -278,14 +300,14 @@ impl<E> Read for PollEvented<E>
 where E: Evented + Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_read_ready()? {
+        if let Async::NotReady = self.poll_read_ready(mio::Ready::readable())? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
         let r = self.get_mut().read(buf);
 
         if is_wouldblock(&r) {
-            self.need_read()?;
+            self.clear_read_ready(mio::Ready::readable())?;
         }
 
         return r
@@ -343,14 +365,14 @@ impl<'a, E> Read for &'a PollEvented<E>
 where E: Evented, &'a E: Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Async::NotReady = self.poll_read_ready()? {
+        if let Async::NotReady = self.poll_read_ready(mio::Ready::readable())? {
             return Err(io::ErrorKind::WouldBlock.into())
         }
 
         let r = self.get_ref().read(buf);
 
         if is_wouldblock(&r) {
-            self.need_read()?;
+            self.clear_read_ready(mio::Ready::readable())?;
         }
 
         return r
