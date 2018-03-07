@@ -27,6 +27,7 @@ members = [
   "tokio-io",
   "tokio-reactor",
   "tokio-threadpool",
+  "futures2",
 ]
 
 [badges]
@@ -60,3 +61,7 @@ time = "0.1"
 
 [patch.crates-io]
 tokio-io = { path = "tokio-io" }
+
+[features]
+futures-0-2 = ["tokio-reactor/futures-0-2"]
+default = []
