@@ -486,6 +486,14 @@ impl Inner {
         let io_dispatch = inner.io_dispatch.read().unwrap();
         let sched = &io_dispatch[self.token];
 
+        // This consumes the current readiness state **except** for HUP. HUP is
+        // excluded because a) it is a final state and never transitions out of
+        // HUP and b) both the read AND the write directions need to be able to
+        // observe this state.
+        //
+        // If HUP were to be cleared when `direction` is `Read`, then when
+        // `poll_ready` is called again with a _`direction` of `Write`, the HUP
+        // state would not be visible.
         let mut ready = mask & mio::Ready::from_usize(
             sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
