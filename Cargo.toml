@@ -60,3 +60,4 @@ time = "0.1"
 
 [patch.crates-io]
 tokio-io = { path = "tokio-io" }
+mio = { git = "https://github.com/carllerche/mio" }

@@ -83,12 +83,12 @@ impl UdpSocket {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_send(&mut self, buf: &[u8]) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_write_ready());
+        try_ready!(self.io.poll_write_ready(mio::Ready::writable()));
 
         match self.io.get_ref().send(buf) {
             Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write()?;
+                self.io.clear_write_ready()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -167,12 +167,12 @@ impl UdpSocket {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_send_to(&mut self, buf: &[u8], target: &SocketAddr) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_write_ready());
+        try_ready!(self.io.poll_write_ready(mio::Ready::writable()));
 
         match self.io.get_ref().send_to(buf, target) {
             Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write()?;
+                self.io.clear_write_ready()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),

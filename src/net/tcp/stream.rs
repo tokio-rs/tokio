@@ -416,7 +416,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_write_ready()? {
+        if let Async::NotReady = self.io.poll_write_ready(mio::Ready::writable())? {
             return Ok(Async::NotReady)
         }
 
@@ -436,7 +436,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write()?;
+                self.io.clear_write_ready()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -484,7 +484,7 @@ impl Future for ConnectFutureState {
             // actually hit an error or not.
             //
             // If all that succeeded then we ship everything on up.
-            if let Async::NotReady = stream.io.poll_write_ready()? {
+            if let Async::NotReady = stream.io.poll_write_ready(mio::Ready::writable())? {
                 return Ok(Async::NotReady)
             }
 
