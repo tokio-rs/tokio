@@ -188,6 +188,10 @@ where E: Evented
 
     /// Check the I/O resource's read readiness state.
     ///
+    /// The mask argument allows specifying what readiness to notify on. This
+    /// can be any value, including platform specific readiness, **except**
+    /// `writable`.
+    ///
     /// If the resource is not ready for a read then `Async::NotReady` is
     /// returned and the current task is notified once a new event is received.
     ///
@@ -198,8 +202,12 @@ where E: Evented
     ///
     /// # Panics
     ///
-    /// This function will panic if called from outside of a task context.
+    /// This function panics if:
+    ///
+    /// * `ready` includes writable.
+    /// * called from outside of a task context.
     pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
+        assert!(!mask.is_writable(), "cannot poll for write readiness");
         poll_ready!(self, mask, read_readiness, poll_read_ready, take_read_ready)
     }
 
@@ -209,8 +217,8 @@ where E: Evented
     /// After calling this function, `poll_read_ready` will return `NotReady`
     /// until a new read readiness event has been received.
     ///
-    /// This function clears **all** readiness state **except** write readiness.
-    /// This includes any platform-specific readiness bits.
+    /// The `mask` argument specifies the readiness bits to clear. This may not
+    /// include `writable` or `hup`.
     ///
     /// # Panics
     ///
@@ -249,8 +257,14 @@ where E: Evented
     ///
     /// # Panics
     ///
-    /// This function will panic if called from outside of a task context.
+    /// This function panics if:
+    ///
+    /// * `ready` contains bits besides `writable` and `hup`.
+    /// * called from outside of a task context.
     pub fn poll_write_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
+        assert!(mask & (mio::Ready::writable() | ::platform::hup()) == mask,
+                "can only poll for writable or hup readiness");
+
         poll_ready!(self, mask, write_readiness, poll_write_ready, take_write_ready)
     }
 

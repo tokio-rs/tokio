@@ -354,7 +354,7 @@ impl Reactor {
         if let Some(io) = io_dispatch.get(token) {
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
-            if ready.is_writable() {
+            if ready.is_writable() || platform::is_hup(&ready) {
                 io.writer.notify();
             }
 

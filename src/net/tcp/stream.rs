@@ -114,9 +114,48 @@ impl TcpStream {
         ConnectFuture { inner: inner }
     }
 
-    /// TODO: Dox
+    /// Check the TCP stream's read readiness state.
+    ///
+    /// The mask argument allows specifying what readiness to notify on. This
+    /// can be any value, including platform specific readiness, **except**
+    /// `writable`.
+    ///
+    /// If the resource is not ready for a read then `Async::NotReady` is
+    /// returned and the current task is notified once a new event is received.
+    ///
+    /// The stream will remain in a read-ready state until calls to `poll_read`
+    /// return `NotReady`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if:
+    ///
+    /// * `ready` includes writable.
+    /// * called from outside of a task context.
     pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
         self.io.poll_read_ready(mask)
+    }
+
+    /// Check the TCP stream's write readiness state.
+    ///
+    /// The mask argument allows specifying what readiness to notify on. The
+    /// options are either `writable` or `hup` (on platforms that support `hup`
+    /// notification).
+    ///
+    /// If the resource is not ready for a write then `Async::NotReady` is
+    /// returned and the current task is notified once a new event is received.
+    ///
+    /// The I/O resource will remain in a write-ready state until calls to
+    /// `poll_write` return `NotReady`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if:
+    ///
+    /// * `ready` contains bits besides `writable` and `hup`.
+    /// * called from outside of a task context.
+    pub fn poll_write_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
+        self.io.poll_write_ready(mask)
     }
 
     /// Returns the local address that this stream is bound to.

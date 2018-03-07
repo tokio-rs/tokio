@@ -111,6 +111,11 @@ mod unix {
             stream.poll_read_ready(UnixReady::hup().into())
         }).wait().unwrap();
 
+        // Same for write half
+        future::poll_fn(|| {
+            stream.poll_write_ready(UnixReady::hup().into())
+        }).wait().unwrap();
+
         let mut buf = vec![0; 11];
 
         // Read the data

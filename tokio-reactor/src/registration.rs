@@ -480,14 +480,16 @@ impl Inner {
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
         };
 
-        let mask = direction.mask().as_usize();
+        let mask = direction.mask();
+        let mask_no_hup = (mask - ::platform::hup()).as_usize();
 
         let io_dispatch = inner.io_dispatch.read().unwrap();
         let sched = &io_dispatch[self.token];
 
-        let mut ready = mask & sched.readiness.fetch_and(!mask, SeqCst);
+        let mut ready = mask & mio::Ready::from_usize(
+            sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
-        if ready == 0 && notify {
+        if ready.is_empty() && notify {
             // Update the task info
             match direction {
                 Direction::Read => sched.reader.register(),
@@ -495,13 +497,14 @@ impl Inner {
             }
 
             // Try again
-            ready = mask & sched.readiness.fetch_and(!mask, SeqCst);
+            ready = mask & mio::Ready::from_usize(
+                sched.readiness.fetch_and(!mask_no_hup, SeqCst));
         }
 
-        if ready == 0 {
+        if ready.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(mio::Ready::from_usize(ready)))
+            Ok(Some(ready))
         }
     }
 }
