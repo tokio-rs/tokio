@@ -633,7 +633,7 @@ mod platform {
         Ready::empty()
     }
 
-    pub fn is_hup(ready: &Ready) -> bool {
+    pub fn is_hup(_: &Ready) -> bool {
         false
     }
 }
