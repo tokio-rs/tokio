@@ -113,7 +113,7 @@ mod unix {
 
         // Same for write half
         future::poll_fn(|| {
-            stream.poll_write_ready(UnixReady::hup().into())
+            stream.poll_write_ready()
         }).wait().unwrap();
 
         let mut buf = vec![0; 11];
