@@ -1,3 +1,8 @@
+# 0.1.6 (March 09, 2018)
+
+* Add native endian builder fn to length_delimited (#144)
+* Add AsyncRead::poll_read, AsyncWrite::poll_write (#170)
+
 # 0.1.5 (February 07, 2018)
 
 * Fix bug in `BytesCodec` and `LinesCodec`.

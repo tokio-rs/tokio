@@ -1,6 +1,11 @@
 [package]
 name = "tokio-io"
-version = "0.1.5"
+
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Create "v0.1.x" git tag.
+version = "0.1.6"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tokio-rs/tokio-io"
@@ -13,5 +18,5 @@ categories = ["asynchronous"]
 
 [dependencies]
 bytes = "0.4"
-futures = "0.1.11"
+futures = "0.1.18"
 log = "0.4"
