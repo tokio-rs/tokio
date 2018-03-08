@@ -40,7 +40,7 @@ tokio-reactor = { version = "0.1", path = "tokio-reactor" }
 tokio-threadpool = { version = "0.1", path = "tokio-threadpool" }
 bytes = "0.4"
 log = "0.4"
-mio = "0.6.13"
+mio = "0.6.14"
 slab = "0.4"
 iovec = "0.1"
 futures = "0.1.16"
@@ -60,4 +60,3 @@ time = "0.1"
 
 [patch.crates-io]
 tokio-io = { path = "tokio-io" }
-mio = { git = "https://github.com/carllerche/mio" }
