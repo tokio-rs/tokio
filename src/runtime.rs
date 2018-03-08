@@ -157,8 +157,6 @@ struct Inner {
 
 /// Start the Tokio runtime using the supplied future to bootstrap execution.
 ///
-/// To do so with a futures 0.2-style future, use `run2`
-///
 /// This function is used to bootstrap the execution of a Tokio application. It
 /// does the following:
 ///
@@ -263,8 +261,6 @@ impl Runtime {
     }
 
     /// Spawn a future onto the Tokio runtime.
-    ///
-    /// Use `spawn2` to spawn a futures 0.2-style future.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future

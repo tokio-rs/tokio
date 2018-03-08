@@ -35,6 +35,9 @@
 
 extern crate futures;
 
+#[cfg(feature = "unstable-futures")]
+extern crate futures2;
+
 mod enter;
 mod global;
 pub mod park;

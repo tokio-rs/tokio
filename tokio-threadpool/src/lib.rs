@@ -1360,9 +1360,6 @@ impl Worker {
                 // Enter an execution context
                 let mut enter = tokio_executor::enter().unwrap();
 
-                #[cfg(feature = "unstable-futures")]
-                let _enter2 = futures2::executor::enter();
-
                 tokio_executor::with_default(&mut sender, &mut enter, |enter| {
                     if let Some(ref callback) = wref.inner.config.around_worker {
                         callback.call(wref, enter);

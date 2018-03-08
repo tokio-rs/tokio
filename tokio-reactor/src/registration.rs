@@ -366,7 +366,7 @@ impl Registration {
     ///
     /// [`poll_write_ready`]: #method.poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Write, false, || panic!())
+        self.poll_ready(Direction::Write, false, || unreachable!())
     }
 
     fn poll_ready<F>(&self, direction: Direction, notify: bool, task: F)
