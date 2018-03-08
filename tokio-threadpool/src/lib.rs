@@ -850,7 +850,12 @@ impl futures2::executor::Executor for Sender {
         // execution.
 
         // Create a new task for the future
-        let task = Task::new2(f, |_| panic!());
+        let task = Task::new2(f, |id| Arc::new(Futures2Wake {
+            id,
+            notifier: Arc::new(Notifier {
+                inner: Arc::downgrade(&self.inner),
+            })
+        }).into());
 
         self.inner.submit(task, &self.inner);
 
