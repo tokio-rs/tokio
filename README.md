@@ -12,9 +12,14 @@ the Rust programming language. It is:
 * **Scalable**: Tokio has a minimal footprint, and handles backpressure
   and cancellation naturally.
 
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]](./LICENSE-MIT)
 [![Travis Build Status][travis-badge]][travis-url]
 [![Appveyor Build Status][appveyor-badge]][appveyor-url]
 
+[crates-badge]: https://img.shields.io/crates/v/tokio.svg
+[crates-url]: https://crates.io/crates/tokio
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg)
 [travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
 [travis-url]: https://travis-ci.org/tokio-rs/tokio
 [appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7/branch/master?svg=true
