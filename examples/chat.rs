@@ -172,8 +172,20 @@ impl Future for Peer {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(), io::Error> {
+        // Tokio (and futures) use cooperative scheduling without any
+        // preemption. If a task never yields execution back to the executor,
+        // then other tasks may be starved.
+        //
+        // To deal with this, robust applications should not have any unbounded
+        // loops. In this example, we will read at most `LINES_PER_TICK` lines
+        // from the client on each tick.
+        //
+        // If the limit is hit, the current task is notified, informing the
+        // executor to schedule the task again asap.
+        const LINES_PER_TICK: usize = 10;
+
         // Receive all messages from peers.
-        loop {
+        for i in 0..LINES_PER_TICK {
             // Polling an `UnboundedReceiver` cannot fail, so `unwrap` here is
             // safe.
             match self.rx.poll().unwrap() {
@@ -181,6 +193,14 @@ impl Future for Peer {
                     // Buffer the line. Once all lines are buffered, they will
                     // be flushed to the socket (right below).
                     self.lines.buffer(&v);
+
+                    // If this is the last iteration, the loop will break even
+                    // though there could still be lines to read. Because we did
+                    // not reach `Async::NotReady`, we have to notify ourselves
+                    // in order to tell the executor to schedule the task again.
+                    if i+1 == LINES_PER_TICK {
+                        task::current().notify();
+                    }
                 }
                 _ => break,
             }
@@ -256,6 +276,10 @@ impl Lines {
     /// This writes the line to an internal buffer. Calls to `poll_flush` will
     /// attempt to flush this buffer to the socket.
     fn buffer(&mut self, line: &[u8]) {
+        // Ensure the buffer has capacity. Ideally this would not be unbounded,
+        // but to keep the example simple, we will not limit this.
+        self.wr.reserve(line.len());
+
         // Push the line onto the end of the write buffer.
         //
         // The `put` function is from the `BufMut` trait.
