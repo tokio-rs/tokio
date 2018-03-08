@@ -112,6 +112,9 @@ use futures::future::{self, Future};
 
 use std::{fmt, io};
 
+#[cfg(feature = "futures-0-2")]
+use futures2;
+
 /// Handle to the Tokio runtime.
 ///
 /// The Tokio runtime includes a reactor as well as an executor for running
@@ -153,6 +156,8 @@ struct Inner {
 // ===== impl Runtime =====
 
 /// Start the Tokio runtime using the supplied future to bootstrap execution.
+///
+/// To do so with a futures 0.2-style future, use `run2`
 ///
 /// This function is used to bootstrap the execution of a Tokio application. It
 /// does the following:
@@ -205,6 +210,18 @@ where F: Future<Item = (), Error = ()> + Send + 'static,
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
+/// Start the Tokio runtime using the supplied future to bootstrap execution.
+///
+/// Identical to `run` but works with futures 0.2-style futures.
+#[cfg(feature = "futures-0-2")]
+pub fn run2<F>(future: F)
+    where F: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
+{
+    let mut runtime = Runtime::new().unwrap();
+    runtime.spawn2(future);
+    runtime.shutdown_on_idle().wait().unwrap();
+}
+
 impl Runtime {
     /// Create a new runtime instance with default configuration values.
     ///
@@ -247,6 +264,8 @@ impl Runtime {
 
     /// Spawn a future onto the Tokio runtime.
     ///
+    /// Use `spawn2` to spawn a futures 0.2-style future.
+    ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
@@ -284,6 +303,19 @@ impl Runtime {
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
         self.inner_mut().pool.sender().spawn(future).unwrap();
+        self
+    }
+
+    /// Spawn a futures 0.2-style future onto the Tokio runtime.
+    ///
+    /// Otherwise identical to `spawn`
+    #[cfg(feature = "futures-0-2")]
+    pub fn spawn2<F>(&mut self, future: F) -> &mut Self
+        where F: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
+    {
+        futures2::executor::Executor::spawn(
+            self.inner_mut().pool.sender_mut(), Box::new(future)
+        ).unwrap();
         self
     }
 
@@ -421,6 +453,21 @@ impl ::executor::Executor for TaskExecutor {
         self.inner.spawn(future)
     }
 }
+
+#[cfg(feature = "futures-0-2")]
+type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
+
+#[cfg(feature = "futures-0-2")]
+impl futures2::executor::Executor for TaskExecutor {
+    fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
+        futures2::executor::Executor::spawn(&mut self.inner, f)
+    }
+
+    fn status(&self) -> Result<(), futures2::executor::SpawnError> {
+        futures2::executor::Executor::status(&self.inner)
+    }
+}
+
 
 // ===== impl Shutdown =====
 
