@@ -17,12 +17,16 @@ the Rust programming language. It is:
 
 [travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
 [travis-url]: https://travis-ci.org/tokio-rs/tokio
-[appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7?svg=true
+[appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7/branch/master?svg=true
 [appveyor-url]: https://ci.appveyor.com/project/carllerche/tokio/branch/master
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/getting-started/hello-world/) |
 [API Docs](https://docs.rs/tokio)
+
+The API docs for the master branch are published [here][master-dox].
+
+[master-dox]: https://tokio-rs.github.io/tokio/tokio/
 
 ## Overview
 
@@ -86,6 +90,8 @@ fn main() {
     tokio::run(server);
 }
 ```
+
+More examples can be found [here](examples).
 
 ## Project layout
 
