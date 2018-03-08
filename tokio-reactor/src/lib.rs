@@ -352,9 +352,9 @@ impl Reactor {
         let io_dispatch = self.inner.io_dispatch.read().unwrap();
 
         if let Some(io) = io_dispatch.get(token) {
-            io.readiness.fetch_or(ready2usize(ready), Relaxed);
+            io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
-            if ready.is_writable() {
+            if ready.is_writable() || platform::is_hup(&ready) {
                 io.writer.notify();
             }
 
@@ -551,9 +551,7 @@ impl Inner {
 
         try!(self.io.register(source,
                               mio::Token(TOKEN_START + key),
-                              mio::Ready::readable() |
-                                mio::Ready::writable() |
-                                platform::all(),
+                              mio::Ready::all(),
                               mio::PollOpt::edge()));
 
         Ok(key)
@@ -582,7 +580,7 @@ impl Inner {
 
         task.register_task(t);
 
-        if sched.readiness.load(SeqCst) & ready2usize(ready) != 0 {
+        if sched.readiness.load(SeqCst) & ready.as_usize() != 0 {
             task.notify();
         }
     }
@@ -602,53 +600,15 @@ impl Drop for Inner {
 }
 
 impl Direction {
-    fn ready(&self) -> mio::Ready {
+    fn mask(&self) -> mio::Ready {
         match *self {
-            Direction::Read => read_ready(),
-            Direction::Write => write_ready(),
+            Direction::Read => {
+                // Everything except writable is signaled through read.
+                mio::Ready::all() - mio::Ready::writable()
+            }
+            Direction::Write => mio::Ready::writable() | platform::hup(),
         }
     }
-
-    fn mask(&self) -> usize {
-        ready2usize(self.ready())
-    }
-}
-
-// ===== misc =====
-
-const READ: usize = 1 << 0;
-const WRITE: usize = 1 << 1;
-
-fn read_ready() -> mio::Ready {
-    mio::Ready::readable() | platform::hup()
-}
-
-fn write_ready() -> mio::Ready {
-    mio::Ready::writable()
-}
-
-// === legacy
-
-fn ready2usize(ready: mio::Ready) -> usize {
-    let mut bits = 0;
-    if ready.is_readable() {
-        bits |= READ;
-    }
-    if ready.is_writable() {
-        bits |= WRITE;
-    }
-    bits | platform::ready2usize(ready)
-}
-
-fn usize2ready(bits: usize) -> mio::Ready {
-    let mut ready = mio::Ready::empty();
-    if bits & READ != 0 {
-        ready.insert(mio::Ready::readable());
-    }
-    if bits & WRITE != 0 {
-        ready.insert(mio::Ready::writable());
-    }
-    ready | platform::usize2ready(bits)
 }
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
@@ -656,105 +616,12 @@ mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
 
-    #[cfg(target_os = "dragonfly")]
-    pub fn all() -> Ready {
-        hup() | UnixReady::aio()
-    }
-
-    #[cfg(target_os = "freebsd")]
-    pub fn all() -> Ready {
-        hup() | UnixReady::aio() | UnixReady::lio()
-    }
-
-    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
-    pub fn all() -> Ready {
-        hup()
-    }
-
     pub fn hup() -> Ready {
         UnixReady::hup().into()
     }
 
-    const HUP: usize = 1 << 2;
-    const ERROR: usize = 1 << 3;
-    const AIO: usize = 1 << 4;
-    const LIO: usize = 1 << 5;
-
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
-    fn is_aio(ready: &Ready) -> bool {
-        UnixReady::from(*ready).is_aio()
-    }
-
-    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
-    fn is_aio(_ready: &Ready) -> bool {
-        false
-    }
-
-    #[cfg(target_os = "freebsd")]
-    fn is_lio(ready: &Ready) -> bool {
-        UnixReady::from(*ready).is_lio()
-    }
-
-    #[cfg(not(target_os = "freebsd"))]
-    fn is_lio(_ready: &Ready) -> bool {
-        false
-    }
-
-    pub fn ready2usize(ready: Ready) -> usize {
-        let ready = UnixReady::from(ready);
-        let mut bits = 0;
-        if is_aio(&ready) {
-            bits |= AIO;
-        }
-        if is_lio(&ready) {
-            bits |= LIO;
-        }
-        if ready.is_error() {
-            bits |= ERROR;
-        }
-        if ready.is_hup() {
-            bits |= HUP;
-        }
-        bits
-    }
-
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
-              target_os = "macos"))]
-    fn usize2ready_aio(ready: &mut UnixReady) {
-        ready.insert(UnixReady::aio());
-    }
-
-    #[cfg(not(any(target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
-    fn usize2ready_aio(_ready: &mut UnixReady) {
-        // aio not available here → empty
-    }
-
-    #[cfg(target_os = "freebsd")]
-    fn usize2ready_lio(ready: &mut UnixReady) {
-        ready.insert(UnixReady::lio());
-    }
-
-    #[cfg(not(target_os = "freebsd"))]
-    fn usize2ready_lio(_ready: &mut UnixReady) {
-        // lio not available here → empty
-    }
-
-    pub fn usize2ready(bits: usize) -> Ready {
-        let mut ready = UnixReady::from(Ready::empty());
-        if bits & AIO != 0 {
-            usize2ready_aio(&mut ready);
-        }
-        if bits & LIO != 0 {
-            usize2ready_lio(&mut ready);
-        }
-        if bits & HUP != 0 {
-            ready.insert(UnixReady::hup());
-        }
-        if bits & ERROR != 0 {
-            ready.insert(UnixReady::error());
-        }
-        ready.into()
+    pub fn is_hup(ready: &Ready) -> bool {
+        UnixReady::from(*ready).is_hup()
     }
 }
 
@@ -762,20 +629,11 @@ mod platform {
 mod platform {
     use mio::Ready;
 
-    pub fn all() -> Ready {
-        // No platform-specific Readinesses for Windows
-        Ready::empty()
-    }
-
     pub fn hup() -> Ready {
         Ready::empty()
     }
 
-    pub fn ready2usize(_r: Ready) -> usize {
-        0
-    }
-
-    pub fn usize2ready(_r: usize) -> Ready {
-        Ready::empty()
+    pub fn is_hup(_: &Ready) -> bool {
+        false
     }
 }

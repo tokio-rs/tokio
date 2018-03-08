@@ -244,7 +244,9 @@ impl Registration {
     /// call to `poll_read_ready`, it is returned. If it has not, the current
     /// task is notified once a new event is received.
     ///
-    /// Events are [edge-triggered].
+    /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
+    /// the function will always return `Ready(HUP)`. This should be treated as
+    /// the end of the readiness stream.
     ///
     /// Ensure that [`register`] has been called first.
     ///
@@ -294,7 +296,9 @@ impl Registration {
     /// call to `poll_write_ready`, it is returned. If it has not, the current
     /// task is notified once a new event is received.
     ///
-    /// Events are [edge-triggered].
+    /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
+    /// the function will always return `Ready(HUP)`. This should be treated as
+    /// the end of the readiness stream.
     ///
     /// Ensure that [`register`] has been called first.
     ///
@@ -481,13 +485,23 @@ impl Inner {
         };
 
         let mask = direction.mask();
+        let mask_no_hup = (mask - ::platform::hup()).as_usize();
 
         let io_dispatch = inner.io_dispatch.read().unwrap();
         let sched = &io_dispatch[self.token];
 
-        let mut ready = mask & sched.readiness.fetch_and(!mask, SeqCst);
+        // This consumes the current readiness state **except** for HUP. HUP is
+        // excluded because a) it is a final state and never transitions out of
+        // HUP and b) both the read AND the write directions need to be able to
+        // observe this state.
+        //
+        // If HUP were to be cleared when `direction` is `Read`, then when
+        // `poll_ready` is called again with a _`direction` of `Write`, the HUP
+        // state would not be visible.
+        let mut ready = mask & mio::Ready::from_usize(
+            sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
-        if ready == 0 && notify {
+        if ready.is_empty() && notify {
             // Update the task info
             match direction {
                 Direction::Read => sched.reader.register(),
@@ -495,13 +509,14 @@ impl Inner {
             }
 
             // Try again
-            ready = mask & sched.readiness.fetch_and(!mask, SeqCst);
+            ready = mask & mio::Ready::from_usize(
+                sched.readiness.fetch_and(!mask_no_hup, SeqCst));
         }
 
-        if ready == 0 {
+        if ready.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(super::usize2ready(ready)))
+            Ok(Some(ready))
         }
     }
 }

@@ -93,12 +93,12 @@ impl TcpListener {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_accept_std(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
-        try_ready!(self.io.poll_read_ready());
+        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().accept_std() {
             Ok(pair) => Ok(pair.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read()?;
+                self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),

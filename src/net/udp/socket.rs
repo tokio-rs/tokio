@@ -88,7 +88,7 @@ impl UdpSocket {
         match self.io.get_ref().send(buf) {
             Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write()?;
+                self.io.clear_write_ready()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -128,12 +128,12 @@ impl UdpSocket {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_recv(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_read_ready());
+        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().recv(buf) {
             Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read()?;
+                self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -172,7 +172,7 @@ impl UdpSocket {
         match self.io.get_ref().send_to(buf, target) {
             Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_write()?;
+                self.io.clear_write_ready()?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),
@@ -216,12 +216,12 @@ impl UdpSocket {
     /// This function will panic if called outside the context of a future's
     /// task.
     pub fn poll_recv_from(&mut self, buf: &mut [u8]) -> Poll<(usize, SocketAddr), io::Error> {
-        try_ready!(self.io.poll_read_ready());
+        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().recv_from(buf) {
             Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.need_read()?;
+                self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
             }
             Err(e) => Err(e),

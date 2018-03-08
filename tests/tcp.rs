@@ -1,14 +1,14 @@
 extern crate env_logger;
-extern crate futures;
 extern crate tokio;
+extern crate mio;
+extern crate futures;
 
-use std::net;
+use std::{net, thread};
 use std::sync::mpsc::channel;
-use std::thread;
 
-use futures::Future;
-use futures::stream::Stream;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::prelude::*;
+
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -78,4 +78,53 @@ fn accept2() {
     let (mine, _remaining) = t!(client.wait());
     mine.unwrap();
     t.join().unwrap();
+}
+
+#[cfg(unix)]
+mod unix {
+    use tokio::net::TcpStream;
+    use tokio::prelude::*;
+
+    use env_logger;
+    use futures::future;
+    use mio::unix::UnixReady;
+
+    use std::{net, thread};
+    use std::time::Duration;
+
+    #[test]
+    fn poll_hup() {
+        drop(env_logger::init());
+
+        let srv = t!(net::TcpListener::bind("127.0.0.1:0"));
+        let addr = t!(srv.local_addr());
+        let t = thread::spawn(move || {
+            let mut client = t!(srv.accept()).0;
+            client.write(b"hello world").unwrap();
+            thread::sleep(Duration::from_millis(200));
+        });
+
+        let mut stream = t!(TcpStream::connect(&addr).wait());
+
+        // Poll for HUP before reading.
+        future::poll_fn(|| {
+            stream.poll_read_ready(UnixReady::hup().into())
+        }).wait().unwrap();
+
+        // Same for write half
+        future::poll_fn(|| {
+            stream.poll_write_ready()
+        }).wait().unwrap();
+
+        let mut buf = vec![0; 11];
+
+        // Read the data
+        future::poll_fn(|| {
+            stream.poll_read(&mut buf)
+        }).wait().unwrap();
+
+        assert_eq!(b"hello world", &buf[..]);
+
+        t.join().unwrap();
+    }
 }
