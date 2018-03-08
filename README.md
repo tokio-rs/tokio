@@ -19,7 +19,7 @@ the Rust programming language. It is:
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
-[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg)
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [mit-url]: LICENSE-MIT
 [travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
 [travis-url]: https://travis-ci.org/tokio-rs/tokio
