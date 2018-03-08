@@ -159,12 +159,12 @@ struct Inner {
 ///
 /// * Start the Tokio runtime using a default configuration.
 /// * Spawn the given future onto the thread pool.
-/// * Block the çurrent thread until the runtime shuts down.
+/// * Block the current thread until the runtime shuts down.
 ///
 /// Note that the function will not return immediately once `future` has
 /// completed. Instead it waits for the entire runtime to become idle.
 ///
-/// See [module level][mod] documentation for more details.
+/// See the [module level][mod] documentation for more details.
 ///
 /// # Examples
 ///
