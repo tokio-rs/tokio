@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 use futures2;
 
 pub(crate) struct Task {
@@ -39,13 +39,13 @@ pub(crate) enum Run {
 
 type BoxFuture = Box<Future<Item = (), Error = ()> + Send + 'static>;
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 type BoxFuture2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
 
 enum TaskFuture {
     Futures1(Spawn<BoxFuture>),
 
-    #[cfg(feature = "futures-0-2")]
+    #[cfg(feature = "unstable-futures")]
     Futures2 {
         tls: futures2::task::LocalMap,
         waker: futures2::task::Waker,
@@ -100,7 +100,7 @@ impl Task {
     }
 
     /// Create a new task handle for a futures 0.2 future
-    #[cfg(feature = "futures-0-2")]
+    #[cfg(feature = "unstable-futures")]
     pub fn new2<F>(fut: BoxFuture2, make_waker: F) -> Task
         where F: FnOnce(usize) -> futures2::task::Waker
     {
@@ -499,7 +499,7 @@ impl TaskFuture {
         match *self {
             TaskFuture::Futures1(ref mut fut) => fut.poll_future_notify(unpark, id),
 
-            #[cfg(feature = "futures-0-2")]
+            #[cfg(feature = "unstable-futures")]
             TaskFuture::Futures2 { ref mut fut, ref waker, ref mut tls } => {
                 let mut cx = futures2::task::Context::new(tls, waker, exec);
                 match fut.poll(&mut cx).unwrap() {

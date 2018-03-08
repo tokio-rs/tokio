@@ -64,5 +64,5 @@ time = "0.1"
 tokio-io = { path = "tokio-io" }
 
 [features]
-futures-0-2 = ["futures2", "tokio-reactor/futures-0-2", "tokio-threadpool/futures-0-2"]
-default = ["futures-0-2"]
+unstable-futures = ["futures2", "tokio-reactor/unstable-futures", "tokio-threadpool/unstable-futures"]
+default = []

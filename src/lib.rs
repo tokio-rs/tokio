@@ -79,7 +79,7 @@ extern crate tokio_threadpool;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
 pub mod executor;

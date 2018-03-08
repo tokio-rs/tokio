@@ -112,7 +112,7 @@ use futures::future::{self, Future};
 
 use std::{fmt, io};
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 use futures2;
 
 /// Handle to the Tokio runtime.
@@ -213,7 +213,7 @@ where F: Future<Item = (), Error = ()> + Send + 'static,
 /// Start the Tokio runtime using the supplied future to bootstrap execution.
 ///
 /// Identical to `run` but works with futures 0.2-style futures.
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 pub fn run2<F>(future: F)
     where F: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
 {
@@ -309,7 +309,7 @@ impl Runtime {
     /// Spawn a futures 0.2-style future onto the Tokio runtime.
     ///
     /// Otherwise identical to `spawn`
-    #[cfg(feature = "futures-0-2")]
+    #[cfg(feature = "unstable-futures")]
     pub fn spawn2<F>(&mut self, future: F) -> &mut Self
         where F: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
     {
@@ -454,10 +454,10 @@ impl ::executor::Executor for TaskExecutor {
     }
 }
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 impl futures2::executor::Executor for TaskExecutor {
     fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
         futures2::executor::Executor::spawn(&mut self.inner, f)

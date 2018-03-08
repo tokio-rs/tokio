@@ -12,7 +12,7 @@ extern crate rand;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
 mod task;
@@ -183,7 +183,7 @@ struct Notifier {
     inner: Weak<Inner>,
 }
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 struct Futures2Wake {
     notifier: Arc<Notifier>,
     id: usize,
@@ -836,10 +836,10 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
     }
 }
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 impl futures2::executor::Executor for Sender {
     fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
         self.prepare_for_spawn()
@@ -1310,7 +1310,7 @@ impl Notify for Notifier {
     }
 }
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 impl futures2::task::Wake for Futures2Wake {
     fn wake(arc_self: &Arc<Futures2Wake>) {
         arc_self.notifier.notify(arc_self.id)
@@ -1360,7 +1360,7 @@ impl Worker {
                 // Enter an execution context
                 let mut enter = tokio_executor::enter().unwrap();
 
-                #[cfg(feature = "futures-0-2")]
+                #[cfg(feature = "unstable-futures")]
                 let _enter2 = futures2::executor::enter();
 
                 tokio_executor::with_default(&mut sender, &mut enter, |enter| {

@@ -39,7 +39,7 @@ extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
 pub(crate) mod background;
@@ -161,7 +161,7 @@ fn _assert_kinds() {
 #[derive(Debug, Clone)]
 pub(crate) enum Task {
     Futures1(futures::task::Task),
-    #[cfg(feature = "futures-0-2")]
+    #[cfg(feature = "unstable-futures")]
     Futures2(futures2::task::Waker),
 }
 
@@ -626,7 +626,7 @@ impl Task {
         match *self {
             Task::Futures1(ref task) => task.notify(),
 
-            #[cfg(feature = "futures-0-2")]
+            #[cfg(feature = "unstable-futures")]
             Task::Futures2(ref waker) => waker.wake(),
         }
     }

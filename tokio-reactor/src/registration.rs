@@ -3,7 +3,7 @@ use {Handle, Direction, Task};
 use futures::{Async, Poll, task};
 use mio::{self, Evented};
 
-#[cfg(feature = "futures-0-2")]
+#[cfg(feature = "unstable-futures")]
 use futures2;
 
 use std::{io, mem, usize};
@@ -281,7 +281,7 @@ impl Registration {
     }
 
     /// Like `poll_ready_ready`, but compatible with futures 0.2
-    #[cfg(feature = "futures-0-2")]
+    #[cfg(feature = "unstable-futures")]
     pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context)
         -> futures2::Poll<mio::Ready, io::Error>
     {
@@ -346,7 +346,7 @@ impl Registration {
     }
 
     /// Like `poll_write_ready`, but compatible with futures 0.2
-    #[cfg(feature = "futures-0-2")]
+    #[cfg(feature = "unstable-futures")]
     pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
                             -> futures2::Poll<mio::Ready, io::Error>
     {
