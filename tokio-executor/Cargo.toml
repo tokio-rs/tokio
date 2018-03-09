@@ -13,4 +13,4 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-futures = "0.1"
+futures = "0.1.18"

@@ -13,8 +13,8 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-tokio-executor = { version = "0.1", path = "../tokio-executor" }
-futures = "0.1"
+tokio-executor = { version = "0.1.0", path = "../tokio-executor" }
+futures = "0.1.18"
 crossbeam-deque = "0.3"
 num_cpus = "1.2"
 rand = "0.3"
