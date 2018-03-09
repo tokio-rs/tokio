@@ -44,7 +44,7 @@ A high level description of each example is:
   spawning tasks, and finally framing a TCP connection to discrete
   request/response objects.
 
-* [`tinydb`](tinyhttp.rs) - an in-memory database which shows sharing state
+* [`tinydb`](tinydb.rs) - an in-memory database which shows sharing state
   between all connected clients, notably the key/value store of this database.
 
 If you've got an example you'd like to see here, please feel free to open an
