@@ -1,3 +1,7 @@
+# 0.1.3 (March 09, 2018)
+
+* Fix `CurrentThread::turn` to block on idle (#212).
+
 # 0.1.2 (March 09, 2018)
 
 * Introduce Tokio Runtime (#141)
