@@ -339,17 +339,7 @@ impl Runtime {
     /// [mod]: index.html
     pub fn shutdown_now(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
-
-        let inner = Box::new({
-            let pool = inner.pool;
-            let reactor = inner.reactor;
-
-            pool.shutdown_now().and_then(|_| {
-                reactor.shutdown_now()
-            })
-        });
-
-        Shutdown { inner }
+        Shutdown::shutdown_now(inner)
     }
 
     fn inner(&self) -> &Inner {
@@ -358,6 +348,15 @@ impl Runtime {
 
     fn inner_mut(&mut self) -> &mut Inner {
         self.inner.as_mut().unwrap()
+    }
+}
+
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            let shutdown = Shutdown::shutdown_now(inner);
+            let _ = shutdown.wait();
+        }
     }
 }
 
@@ -424,6 +423,24 @@ impl ::executor::Executor for TaskExecutor {
 }
 
 // ===== impl Shutdown =====
+
+impl Shutdown {
+    fn shutdown_now(inner: Inner) -> Self {
+        let inner = Box::new({
+            let pool = inner.pool;
+            let reactor = inner.reactor;
+
+            pool.shutdown_now().and_then(|_| {
+                reactor.shutdown_now()
+                    .then(|_| {
+                        Ok(())
+                    })
+            })
+        });
+
+        Shutdown { inner }
+    }
+}
 
 impl Future for Shutdown {
     type Item = ();
