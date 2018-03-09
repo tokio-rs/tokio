@@ -184,7 +184,12 @@ struct EventedReceiver;
 impl Evented for EventedReceiver {
     fn register(&self, poll: &MioPoll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
         let fd = globals().receiver.as_raw_fd();
-        EventedFd(&fd).register(poll, token, events, opts)
+        match EventedFd(&fd).register(poll, token, events, opts) {
+            Ok(()) => Ok(()),
+            // Due to tokio-rs/tokio-core#307
+            Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+            Err(e) => Err(e),
+        }
     }
     fn reregister(&self, poll: &MioPoll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
         let fd = globals().receiver.as_raw_fd();
