@@ -353,7 +353,9 @@ impl<P: Park> CurrentThread<P> {
         self.enter(&mut enter).run_timeout(duration)
     }
 
-    /// Perform a single iteration of the event loop
+    /// Perform a single iteration of the event loop.
+    ///
+    /// This function blocks the current thread even if the executor is idle.
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
@@ -462,15 +464,12 @@ impl<'a, P: Park> Entered<'a, P> {
         self.run_timeout2(Some(duration))
     }
 
-    /// Perform a single iteration of the event loop
+    /// Perform a single iteration of the event loop.
+    ///
+    /// This function blocks the current thread even if the executor is idle.
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
-        if self.executor.is_idle() {
-            // Nothing to do
-            return Ok(Turn(()));
-        }
-
         if !self.tick() {
             let res = match duration {
                 Some(duration) => self.executor.park.park_timeout(duration),
