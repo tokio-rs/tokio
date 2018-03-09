@@ -4,7 +4,7 @@ version = "0.1.0"
 documentation = "https://docs.rs/tokio-threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-license = "MIT/Apache-2.0"
+license = "MIT"
 authors = ["Carl Lerche <me@carllerche.com>"]
 description = """
 A task scheduler backed by a work-stealing thread pool.
