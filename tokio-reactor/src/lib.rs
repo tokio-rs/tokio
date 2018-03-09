@@ -658,3 +658,19 @@ mod platform {
         false
     }
 }
+
+#[cfg(feature = "unstable-futures")]
+fn lift_async<T>(old: futures::Async<T>) -> futures2::Async<T> {
+    match old {
+        futures::Async::Ready(x) => futures2::Async::Ready(x),
+        futures::Async::NotReady => futures2::Async::Pending,
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
+    match new {
+        futures2::Async::Ready(x) => futures::Async::Ready(x),
+        futures2::Async::Pending => futures::Async::NotReady,
+    }
+}
