@@ -7,7 +7,7 @@ name = "tokio-reactor"
 # - Create "v0.1.x" git tag.
 version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
-license = "MIT/Apache-2.0"
+license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
