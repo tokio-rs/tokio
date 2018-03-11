@@ -435,12 +435,12 @@ mod platform {
 
     #[cfg(target_os = "dragonfly")]
     pub fn all() -> Ready {
-        hup() | UnixReady::aio()
+        *UnixReady::hup() | UnixReady::aio()
     }
 
     #[cfg(target_os = "freebsd")]
     pub fn all() -> Ready {
-        hup() | UnixReady::aio() | UnixReady::lio()
+        *UnixReady::hup() | UnixReady::aio() | UnixReady::lio()
     }
 
     const HUP: usize = 1 << 2;
