@@ -1,8 +1,8 @@
 extern crate env_logger;
 extern crate futures;
-extern crate futures_cpupool;
 extern crate tokio;
 extern crate tokio_io;
+extern crate tokio_threadpool;
 extern crate bytes;
 
 use std::io;
@@ -10,12 +10,11 @@ use std::net::Shutdown;
 
 use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
-use futures::future::Executor;
-use futures_cpupool::CpuPool;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_io::io::{write_all, read};
 use tokio_io::AsyncRead;
+use tokio_threadpool::Builder;
 
 pub struct LineCodec;
 
@@ -54,18 +53,20 @@ impl Encoder for LineCodec {
 fn echo() {
     drop(env_logger::init());
 
-    let pool = CpuPool::new(1);
+    let pool = Builder::new()
+        .pool_size(1)
+        .build();
 
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = listener.local_addr().unwrap();
-    let pool_inner = pool.clone();
+    let sender = pool.sender().clone();
     let srv = listener.incoming().for_each(move |socket| {
         let (sink, stream) = socket.framed(LineCodec).split();
-        pool_inner.execute(sink.send_all(stream).map(|_| ()).map_err(|_| ())).unwrap();
+        sender.spawn(sink.send_all(stream).map(|_| ()).map_err(|_| ())).unwrap();
         Ok(())
     });
 
-    pool.execute(srv.map_err(|e| panic!("srv error: {}", e))).unwrap();
+    pool.sender().spawn(srv.map_err(|e| panic!("srv error: {}", e))).unwrap();
 
     let client = TcpStream::connect(&addr);
     let client = client.wait().unwrap();
