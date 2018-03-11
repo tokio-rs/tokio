@@ -87,7 +87,7 @@ mod threadpool {
 // benchmark quickly but results in poor runtime characteristics for a thread
 // pool.
 //
-// See alexcrichton/futures-rs#617
+// See rust-lang-nursery/futures-rs#617
 //
 mod cpupool {
     use futures::{task, Async};
