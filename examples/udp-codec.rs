@@ -28,7 +28,7 @@ fn main() {
     let b = UdpSocket::bind(&addr).unwrap();
     let b_addr = b.local_addr().unwrap();
 
-    // We're parsing each socket with the `LineCodec` defined above, and then we
+    // We're parsing each socket with the `BytesCodec` included in `tokio_io`, and then we
     // `split` each codec into the sink/stream halves.
     let (a_sink, a_stream) = UdpFramed::new(a, BytesCodec::new()).split();
     let (b_sink, b_stream) = UdpFramed::new(b, BytesCodec::new()).split();
