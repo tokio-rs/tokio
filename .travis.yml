@@ -6,7 +6,6 @@ matrix:
   include:
   - rust: 1.21.0
   - rust: stable
-    before_deploy: cargo doc --all --no-deps
   - os: osx
   - rust: beta
   - rust: nightly
@@ -30,6 +29,9 @@ script:
         cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
         cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
     fi
+
+before_deploy:
+  - cargo doc --all --no-deps
 
 deploy:
   provider:  pages
