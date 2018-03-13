@@ -3,7 +3,7 @@ use Notifier;
 use futures::{future, Future, Async};
 use futures::executor::{self, Spawn};
 
-use std::{fmt, mem, ptr};
+use std::{fmt, mem, panic, ptr};
 use std::cell::Cell;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, AtomicPtr};
@@ -110,11 +110,38 @@ impl Task {
 
         trace!("Task::run; state={:?}", State::from(self.inner().state.load(Relaxed)));
 
-        let res = self.inner_mut().future.as_mut().unwrap()
-            .poll_future_notify(unpark, self.ptr as usize);
+        let fut = &mut self.inner_mut().future;
+
+        // This block deals with the future panicking while being polled.
+        //
+        // If the future panics, then the drop handler must be called such that
+        // `thread::panicking() -> true`. To do this, the future is dropped from
+        // within the catch_unwind block.
+        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
+
+            impl<'a> Drop for Guard<'a> {
+                fn drop(&mut self) {
+                    // This drops the future
+                    if self.1 {
+                        let _ = self.0.take();
+                    }
+                }
+            }
+
+            let mut g = Guard(fut, true);
+
+            let ret = g.0.as_mut().unwrap()
+                .poll_future_notify(unpark, self.ptr as usize);
+
+
+            g.1 = false;
+
+            ret
+        }));
 
         match res {
-            Ok(Async::Ready(_)) | Err(_) => {
+            Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
                 trace!("    -> task complete");
 
                 // Drop the future
@@ -125,7 +152,7 @@ impl Task {
 
                 Run::Complete
             }
-            _ => {
+            Ok(Ok(Async::NotReady)) => {
                 trace!("    -> not ready");
 
                 // Attempt to transition from Running -> Idle, if successful,

@@ -386,3 +386,29 @@ fn busy_threadpool_is_not_idle() {
 
     idle.wait().unwrap();
 }
+
+#[test]
+fn panic_in_task() {
+    let pool = ThreadPool::new();
+
+    struct Boom;
+
+    impl Future for Boom {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            panic!();
+        }
+    }
+
+    impl Drop for Boom {
+        fn drop(&mut self) {
+            assert!(::std::thread::panicking());
+        }
+    }
+
+    pool.spawn(Boom);
+
+    pool.shutdown_on_idle().wait().unwrap();
+}
