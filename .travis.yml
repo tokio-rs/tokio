@@ -10,6 +10,7 @@ matrix:
   - os: osx
   - rust: beta
   - rust: nightly
+  - env: TARGET=x86_64-unknown-freebsd
 
 script:
   - |
@@ -17,7 +18,15 @@ script:
     then
         cargo build --benches --all
     fi
-  - cargo test --all
+  - |
+    if [[ "$TARGET" ]]
+    then
+        rustup target add $TARGET
+        cargo check --all --target $TARGET
+        cargo check --tests --all --target $TARGET
+    else
+        cargo test --all
+    fi
 
 deploy:
   provider:  pages
