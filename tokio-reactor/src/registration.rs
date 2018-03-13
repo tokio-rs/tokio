@@ -1,8 +1,10 @@
-use {Handle, Direction};
+use {Handle, Direction, Task};
 
-use futures::{Async, Poll};
-use futures::task::{self, Task};
+use futures::{Async, Poll, task};
 use mio::{self, Evented};
+
+#[cfg(feature = "unstable-futures")]
+use futures2;
 
 use std::{io, mem, usize};
 use std::cell::UnsafeCell;
@@ -271,10 +273,23 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Read, true)
+        self.poll_ready(Direction::Read, true, || Task::Futures1(task::current()))
             .map(|v| match v {
                 Some(v) => Async::Ready(v),
                 _ => Async::NotReady,
+            })
+    }
+
+    /// Like `poll_ready_ready`, but compatible with futures 0.2
+    #[cfg(feature = "unstable-futures")]
+    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context)
+        -> futures2::Poll<mio::Ready, io::Error>
+    {
+        use futures2::Async as Async2;
+        self.poll_ready(Direction::Read, true, || Task::Futures2(cx.waker().clone()))
+            .map(|v| match v {
+                Some(v) => Async2::Ready(v),
+                _ => Async2::Pending,
             })
     }
 
@@ -286,7 +301,7 @@ impl Registration {
     ///
     /// [`poll_read_ready`]: #method.poll_read_ready
     pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Read, false)
+        self.poll_ready(Direction::Read, false, || panic!())
 
     }
 
@@ -323,10 +338,23 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Write, true)
+        self.poll_ready(Direction::Write, true, || Task::Futures1(task::current()))
             .map(|v| match v {
                 Some(v) => Async::Ready(v),
                 _ => Async::NotReady,
+            })
+    }
+
+    /// Like `poll_write_ready`, but compatible with futures 0.2
+    #[cfg(feature = "unstable-futures")]
+    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
+                            -> futures2::Poll<mio::Ready, io::Error>
+    {
+        use futures2::Async as Async2;
+        self.poll_ready(Direction::Write, true, || Task::Futures2(cx.waker().clone()))
+            .map(|v| match v {
+                Some(v) => Async2::Ready(v),
+                _ => Async2::Pending,
             })
     }
 
@@ -338,11 +366,12 @@ impl Registration {
     ///
     /// [`poll_write_ready`]: #method.poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Write, false)
+        self.poll_ready(Direction::Write, false, || unreachable!())
     }
 
-    fn poll_ready(&self, direction: Direction, notify: bool)
+    fn poll_ready<F>(&self, direction: Direction, notify: bool, task: F)
         -> io::Result<Option<mio::Ready>>
+        where F: Fn() -> Task
     {
         let mut state = self.state.load(SeqCst);
 
@@ -357,7 +386,7 @@ impl Registration {
                 }
                 READY => {
                     let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
-                    return inner.poll_ready(direction, notify);
+                    return inner.poll_ready(direction, notify, task);
                 }
                 _ => {
                     if !notify {
@@ -371,7 +400,7 @@ impl Registration {
                     let mut n = node.take().unwrap_or_else(|| {
                         Box::new(Node {
                             direction,
-                            task: task::current(),
+                            task: task(),
                             next: None,
                         })
                     });
@@ -472,8 +501,9 @@ impl Inner {
         inner.deregister_source(io)
     }
 
-    fn poll_ready(&self, direction: Direction, notify: bool)
+    fn poll_ready<F>(&self, direction: Direction, notify: bool, task: F)
         -> io::Result<Option<mio::Ready>>
+        where F: FnOnce() -> Task
     {
         if self.token == ERROR {
             return Err(io::Error::new(io::ErrorKind::Other, "failed to associate with reactor"));
@@ -504,8 +534,8 @@ impl Inner {
         if ready.is_empty() && notify {
             // Update the task info
             match direction {
-                Direction::Read => sched.reader.register(),
-                Direction::Write => sched.writer.register(),
+                Direction::Read => sched.reader.register(task()),
+                Direction::Write => sched.writer.register(task()),
             }
 
             // Try again

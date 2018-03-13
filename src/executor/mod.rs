@@ -49,7 +49,6 @@
 //! [`Executor`]: #
 //! [`spawn`]: #
 
-
 pub mod current_thread;
 
 pub mod thread_pool {

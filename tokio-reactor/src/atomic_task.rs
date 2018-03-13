@@ -1,9 +1,9 @@
-use futures::task::{self, Task};
-
 use std::fmt;
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Release};
+
+use Task;
 
 /// A synchronization primitive for task notification.
 ///
@@ -69,11 +69,6 @@ impl AtomicTask {
         }
     }
 
-    /// Registers the **current** task to be notified on calls to `notify`.
-    pub fn register(&self) {
-        self.register_task(task::current());
-    }
-
     /// Registers the task to be notified on calls to `notify`.
     ///
     /// The new task will take place of any previous tasks that were registered
@@ -89,7 +84,7 @@ impl AtomicTask {
     /// idea. Concurrent calls to `register` will attempt to register different
     /// tasks to be notified. One of the callers will win and have its task set,
     /// but there is no guarantee as to which caller will succeed.
-    pub fn register_task(&self, task: Task) {
+    pub(crate) fn register(&self, task: Task) {
         match self.state.compare_and_swap(WAITING, LOCKED_WRITE, Acquire) {
             WAITING => {
                 unsafe {

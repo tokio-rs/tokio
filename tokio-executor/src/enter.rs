@@ -2,6 +2,9 @@ use std::prelude::v1::*;
 use std::cell::Cell;
 use std::fmt;
 
+#[cfg(feature = "unstable-futures")]
+use futures2;
+
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
 /// Represents an executor context.
@@ -10,6 +13,9 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 pub struct Enter {
     on_exit: Vec<Box<Callback>>,
     permanent: bool,
+
+    #[cfg(feature = "unstable-futures")]
+    _enter2: futures2::executor::Enter,
 }
 
 /// An error returned by `enter` if an execution scope has already been
@@ -40,6 +46,9 @@ pub fn enter() -> Result<Enter, EnterError> {
             Ok(Enter {
                 on_exit: Vec::new(),
                 permanent: false,
+
+                #[cfg(feature = "unstable-futures")]
+                _enter2: futures2::executor::enter().unwrap(),
             })
         }
     })

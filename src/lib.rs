@@ -79,6 +79,9 @@ extern crate tokio_threadpool;
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "unstable-futures")]
+extern crate futures2;
+
 pub mod executor;
 pub mod net;
 pub mod reactor;
@@ -186,4 +189,20 @@ pub mod prelude {
         Poll,
         task,
     };
+}
+
+#[cfg(feature = "unstable-futures")]
+fn lift_async<T>(old: futures::Async<T>) -> futures2::Async<T> {
+    match old {
+        futures::Async::Ready(x) => futures2::Async::Ready(x),
+        futures::Async::NotReady => futures2::Async::Pending,
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
+    match new {
+        futures2::Async::Ready(x) => futures::Async::Ready(x),
+        futures2::Async::Pending => futures::Async::NotReady,
+    }
 }

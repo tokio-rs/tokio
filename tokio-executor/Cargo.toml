@@ -14,3 +14,8 @@ categories = ["concurrency", "asynchronous"]
 
 [dependencies]
 futures = "0.1.18"
+futures2 = { version = "0.1", path = "../futures2", optional = true }
+
+[features]
+unstable-futures = ["futures2"]
+default = []

@@ -12,6 +12,9 @@ extern crate rand;
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "unstable-futures")]
+extern crate futures2;
+
 mod task;
 
 use tokio_executor::{Enter, SpawnError};
@@ -32,6 +35,14 @@ use std::sync::{Arc, Weak, Mutex, Condvar};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
 use std::time::{Instant, Duration};
+
+#[derive(Debug)]
+struct ShutdownTask {
+    task1: AtomicTask,
+
+    #[cfg(feature = "unstable-futures")]
+    task2: futures2::task::AtomicWaker,
+}
 
 /// Work-stealing based thread pool for executing futures.
 ///
@@ -160,7 +171,7 @@ struct Inner {
     workers: Box<[WorkerEntry]>,
 
     // Task notified when the worker shuts down
-    shutdown_task: AtomicTask,
+    shutdown_task: ShutdownTask,
 
     // Configuration
     config: Config,
@@ -178,6 +189,12 @@ struct Callback {
 #[derive(Debug)]
 struct Notifier {
     inner: Weak<Inner>,
+}
+
+#[cfg(feature = "unstable-futures")]
+struct Futures2Wake {
+    notifier: Arc<Notifier>,
+    id: usize,
 }
 
 /// ThreadPool state.
@@ -532,7 +549,11 @@ impl Builder {
             num_workers: AtomicUsize::new(self.pool_size),
             next_thread_id: AtomicUsize::new(0),
             workers: workers.into_boxed_slice(),
-            shutdown_task: AtomicTask::new(),
+            shutdown_task: ShutdownTask {
+                task1: AtomicTask::new(),
+                #[cfg(feature = "unstable-futures")]
+                task2: futures2::task::AtomicWaker::new(),
+            },
             config: self.config.clone(),
         });
 
@@ -772,6 +793,11 @@ impl tokio_executor::Executor for Sender {
         let mut s = &*self;
         tokio_executor::Executor::spawn(&mut s, future)
     }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
+        futures2::executor::Executor::spawn(self, f)
+    }
 }
 
 impl<'a> tokio_executor::Executor for &'a Sender {
@@ -806,6 +832,11 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 
         Ok(())
     }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
+        futures2::executor::Executor::spawn(self, f)
+    }
 }
 
 impl<T> future::Executor<T> for Sender
@@ -827,11 +858,68 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
     }
 }
 
+#[cfg(feature = "unstable-futures")]
+type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
+
+#[cfg(feature = "unstable-futures")]
+impl futures2::executor::Executor for Sender {
+    fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
+        let mut s = &*self;
+        futures2::executor::Executor::spawn(&mut s, f)
+    }
+
+    fn status(&self) -> Result<(), futures2::executor::SpawnError> {
+        let s = &*self;
+        futures2::executor::Executor::status(&s)
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+impl<'a> futures2::executor::Executor for &'a Sender {
+    fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
+        self.prepare_for_spawn()
+            // TODO: get rid of this once the futures crate adds more error types
+            .map_err(|_| futures2::executor::SpawnError::shutdown())?;
+
+        // At this point, the pool has accepted the future, so schedule it for
+        // execution.
+
+        // Create a new task for the future
+        let task = Task::new2(f, |id| into_waker(Arc::new(Futures2Wake::new(id, &self.inner))));
+
+        self.inner.submit(task, &self.inner);
+
+        Ok(())
+    }
+
+    fn status(&self) -> Result<(), futures2::executor::SpawnError> {
+        tokio_executor::Executor::status(self)
+        // TODO: get rid of this once the futures crate adds more error types
+            .map_err(|_| futures2::executor::SpawnError::shutdown())
+    }
+}
+
+
 impl Clone for Sender {
     #[inline]
     fn clone(&self) -> Sender {
         let inner = self.inner.clone();
         Sender { inner }
+    }
+}
+
+// ===== impl ShutdownTask =====
+
+impl ShutdownTask {
+    #[cfg(not(feature = "unstable-futures"))]
+    fn notify(&self) {
+        self.task1.notify();
+    }
+
+    #[cfg(feature = "unstable-futures")]
+    fn notify(&self) {
+        self.task1.notify();
+        self.task2.wake();
     }
 }
 
@@ -850,10 +938,28 @@ impl Future for Shutdown {
     fn poll(&mut self) -> Poll<(), ()> {
         trace!("Shutdown::poll");
 
-        self.inner().shutdown_task.register();
+        self.inner().shutdown_task.task1.register();
 
         if 0 != self.inner().num_workers.load(Acquire) {
             return Ok(Async::NotReady);
+        }
+
+        Ok(().into())
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+impl futures2::Future for Shutdown {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), ()> {
+        trace!("Shutdown::poll");
+
+        self.inner().shutdown_task.task2.register(cx.waker());
+
+        if 0 != self.inner().num_workers.load(Acquire) {
+            return Ok(futures2::Async::Pending);
         }
 
         Ok(().into())
@@ -1346,6 +1452,7 @@ impl Worker {
         let notify = Arc::new(Notifier {
             inner: Arc::downgrade(&self.inner),
         });
+        let mut sender = Sender { inner: self.inner.clone() };
 
         let mut first = true;
         let mut spin_cnt = 0;
@@ -1358,14 +1465,14 @@ impl Worker {
             let consistent = self.drain_inbound();
 
             // Run the next available task
-            if self.try_run_task(&notify) {
+            if self.try_run_task(&notify, &mut sender) {
                 spin_cnt = 0;
                 // As long as there is work, keep looping.
                 continue;
             }
 
             // No work in this worker's queue, it is time to try stealing.
-            if self.try_steal_task(&notify) {
+            if self.try_steal_task(&notify, &mut sender) {
                 spin_cnt = 0;
                 continue;
             }
@@ -1448,13 +1555,13 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     #[inline]
-    fn try_run_task(&self, notify: &Arc<Notifier>) -> bool {
+    fn try_run_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
         use deque::Steal::*;
 
         // Poll the internal queue for a task to run
         match self.entry().deque.steal() {
             Data(task) => {
-                self.run_task(task, notify);
+                self.run_task(task, notify, sender);
                 true
             }
             Empty => false,
@@ -1466,7 +1573,7 @@ impl Worker {
     ///
     /// Returns `true` if work was found
     #[inline]
-    fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
+    fn try_steal_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
         use deque::Steal::*;
 
         let len = self.inner.workers.len();
@@ -1480,7 +1587,7 @@ impl Worker {
                     Data(task) => {
                         trace!("stole task");
 
-                        self.run_task(task, notify);
+                        self.run_task(task, notify, sender);
 
                         trace!("try_steal_task -- signal_work; self={}; from={}",
                                self.idx, idx);
@@ -1507,10 +1614,10 @@ impl Worker {
         found_work
     }
 
-    fn run_task(&self, task: Task, notify: &Arc<Notifier>) {
+    fn run_task(&self, task: Task, notify: &Arc<Notifier>, sender: &mut Sender) {
         use task::Run::*;
 
-        match task.run(notify) {
+        match task.run(notify, sender) {
             Idle => {}
             Schedule => {
                 self.entry().push_internal(task);
@@ -2109,5 +2216,58 @@ impl Callback {
 impl fmt::Debug for Callback {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Fn")
+    }
+}
+
+// ===== impl Futures2Wake =====
+
+#[cfg(feature = "unstable-futures")]
+impl Futures2Wake {
+    fn new(id: usize, inner: &Arc<Inner>) -> Futures2Wake {
+        let notifier = Arc::new(Notifier {
+            inner: Arc::downgrade(inner),
+        });
+        Futures2Wake { id, notifier }
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+impl Drop for Futures2Wake {
+    fn drop(&mut self) {
+        self.notifier.drop_id(self.id)
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+struct ArcWrapped(PhantomData<Futures2Wake>);
+
+#[cfg(feature = "unstable-futures")]
+unsafe impl futures2::task::UnsafeWake for ArcWrapped {
+    unsafe fn clone_raw(&self) -> futures2::task::Waker {
+        let me: *const ArcWrapped = self;
+        let arc = (*(&me as *const *const ArcWrapped as *const Arc<Futures2Wake>)).clone();
+        arc.notifier.clone_id(arc.id);
+        into_waker(arc)
+    }
+
+    unsafe fn drop_raw(&self) {
+        let mut me: *const ArcWrapped = self;
+        let me = &mut me as *mut *const ArcWrapped as *mut Arc<Futures2Wake>;
+        (*me).notifier.drop_id((*me).id);
+        ::std::ptr::drop_in_place(me);
+    }
+
+    unsafe fn wake(&self) {
+        let me: *const ArcWrapped = self;
+        let me = &me as *const *const ArcWrapped as *const Arc<Futures2Wake>;
+        (*me).notifier.notify((*me).id)
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+fn into_waker(rc: Arc<Futures2Wake>) -> futures2::task::Waker {
+    unsafe {
+        let ptr = mem::transmute::<Arc<Futures2Wake>, *mut ArcWrapped>(rc);
+        futures2::task::Waker::new(ptr)
     }
 }

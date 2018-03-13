@@ -1,6 +1,6 @@
-use Notifier;
+use {Notifier, Sender};
 
-use futures::{future, Future, Async};
+use futures::{self, future, Future, Async};
 use futures::executor::{self, Spawn};
 
 use std::{fmt, mem, panic, ptr};
@@ -8,6 +8,9 @@ use std::cell::Cell;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
+
+#[cfg(feature = "unstable-futures")]
+use futures2;
 
 pub(crate) struct Task {
     ptr: *mut Inner,
@@ -34,6 +37,22 @@ pub(crate) enum Run {
     Complete,
 }
 
+type BoxFuture = Box<Future<Item = (), Error = ()> + Send + 'static>;
+
+#[cfg(feature = "unstable-futures")]
+type BoxFuture2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
+
+enum TaskFuture {
+    Futures1(Spawn<BoxFuture>),
+
+    #[cfg(feature = "unstable-futures")]
+    Futures2 {
+        tls: futures2::task::LocalMap,
+        waker: futures2::task::Waker,
+        fut: BoxFuture2,
+    }
+}
+
 struct Inner {
     // Next pointer in the queue that submits tasks to a worker.
     next: AtomicPtr<Inner>,
@@ -47,7 +66,7 @@ struct Inner {
     // Store the future at the head of the struct
     //
     // The future is dropped immediately when it transitions to Complete
-    future: Option<Spawn<BoxFuture>>,
+    future: Option<TaskFuture>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -64,19 +83,37 @@ enum State {
     Complete,
 }
 
-type BoxFuture = Box<Future<Item = (), Error = ()> + Send + 'static>;
-
 // ===== impl Task =====
 
 impl Task {
     /// Create a new task handle
     pub fn new(future: BoxFuture) -> Task {
+        let task_fut = TaskFuture::Futures1(executor::spawn(future));
         let inner = Box::new(Inner {
             next: AtomicPtr::new(ptr::null_mut()),
             state: AtomicUsize::new(State::new().into()),
             ref_count: AtomicUsize::new(1),
-            future: Some(executor::spawn(future)),
+            future: Some(task_fut),
         });
+
+        Task { ptr: Box::into_raw(inner) }
+    }
+
+    /// Create a new task handle for a futures 0.2 future
+    #[cfg(feature = "unstable-futures")]
+    pub fn new2<F>(fut: BoxFuture2, make_waker: F) -> Task
+        where F: FnOnce(usize) -> futures2::task::Waker
+    {
+        let mut inner = Box::new(Inner {
+            next: AtomicPtr::new(ptr::null_mut()),
+            state: AtomicUsize::new(State::new().into()),
+            ref_count: AtomicUsize::new(1),
+            future: None,
+        });
+
+        let waker = make_waker((&*inner) as *const _ as usize);
+        let tls = futures2::task::LocalMap::new();
+        inner.future = Some(TaskFuture::Futures2 { waker, tls, fut });
 
         Task { ptr: Box::into_raw(inner) }
     }
@@ -93,7 +130,7 @@ impl Task {
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
-    pub fn run(&self, unpark: &Arc<Notifier>) -> Run {
+    pub fn run(&self, unpark: &Arc<Notifier>, exec: &mut Sender) -> Run {
         use self::State::*;
 
         // Transition task to running state. At this point, the task must be
@@ -118,7 +155,7 @@ impl Task {
         // `thread::panicking() -> true`. To do this, the future is dropped from
         // within the catch_unwind block.
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
+            struct Guard<'a>(&'a mut Option<TaskFuture>, bool);
 
             impl<'a> Drop for Guard<'a> {
                 fn drop(&mut self) {
@@ -132,7 +169,7 @@ impl Task {
             let mut g = Guard(fut, true);
 
             let ret = g.0.as_mut().unwrap()
-                .poll_future_notify(unpark, self.ptr as usize);
+                .poll(unpark, self.ptr as usize, exec);
 
 
             g.1 = false;
@@ -302,7 +339,7 @@ impl Inner {
             next: AtomicPtr::new(ptr::null_mut()),
             state: AtomicUsize::new(State::stub().into()),
             ref_count: AtomicUsize::new(0),
-            future: Some(executor::spawn(Box::new(future::empty()))),
+            future: Some(TaskFuture::Futures1(executor::spawn(Box::new(future::empty())))),
         }
     }
 
@@ -451,6 +488,26 @@ impl From<State> for usize {
             Notified => 2,
             Scheduled => 3,
             Complete => 4,
+        }
+    }
+}
+
+// ===== impl TaskFuture =====
+
+impl TaskFuture {
+    #[allow(unused_variables)]
+    fn poll(&mut self, unpark: &Arc<Notifier>, id: usize, exec: &mut Sender) -> futures::Poll<(), ()> {
+        match *self {
+            TaskFuture::Futures1(ref mut fut) => fut.poll_future_notify(unpark, id),
+
+            #[cfg(feature = "unstable-futures")]
+            TaskFuture::Futures2 { ref mut fut, ref waker, ref mut tls } => {
+                let mut cx = futures2::task::Context::new(tls, waker, exec);
+                match fut.poll(&mut cx).unwrap() {
+                    futures2::Async::Pending => Ok(Async::NotReady),
+                    futures2::Async::Ready(x) => Ok(Async::Ready(x)),
+                }
+            }
         }
     }
 }

@@ -1,0 +1,11 @@
+[package]
+name = "futures2"
+
+version = "0.1.0"
+authors = ["Aaron Turon <aturon@mozilla.com>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+
+[dependencies]
+futures = "0.2.0-alpha"

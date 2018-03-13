@@ -35,12 +35,18 @@
 
 extern crate futures;
 
+#[cfg(feature = "unstable-futures")]
+extern crate futures2;
+
 mod enter;
 mod global;
 pub mod park;
 
 pub use enter::{enter, Enter, EnterError};
 pub use global::{spawn, with_default, DefaultExecutor};
+
+#[cfg(feature = "unstable-futures")]
+pub use global::spawn2;
 
 use futures::Future;
 
@@ -129,7 +135,12 @@ pub trait Executor {
     /// # fn main() {}
     /// ```
     fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), SpawnError>;
+             -> Result<(), SpawnError>;
+
+    /// Like `spawn`, but compatible with futures 0.2
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
+             -> Result<(), futures2::executor::SpawnError>;
 
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///

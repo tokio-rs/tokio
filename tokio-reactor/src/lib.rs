@@ -39,6 +39,9 @@ extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
 
+#[cfg(feature = "unstable-futures")]
+extern crate futures2;
+
 pub(crate) mod background;
 mod atomic_task;
 mod poll_evented;
@@ -69,7 +72,6 @@ use std::time::{Duration, Instant};
 use log::Level;
 use mio::event::Evented;
 use slab::Slab;
-use futures::task::Task;
 
 /// The core reactor, or event loop.
 ///
@@ -153,6 +155,14 @@ fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
 
     _assert::<Handle>();
+}
+
+/// A wakeup handle for a task, which may be either a futures 0.1 or 0.2 task
+#[derive(Debug, Clone)]
+pub(crate) enum Task {
+    Futures1(futures::task::Task),
+    #[cfg(feature = "unstable-futures")]
+    Futures2(futures2::task::Waker),
 }
 
 // ===== impl Reactor =====
@@ -578,7 +588,7 @@ impl Inner {
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
-        task.register_task(t);
+        task.register(t);
 
         if sched.readiness.load(SeqCst) & ready.as_usize() != 0 {
             task.notify();
@@ -611,6 +621,17 @@ impl Direction {
     }
 }
 
+impl Task {
+    fn notify(&self) {
+        match *self {
+            Task::Futures1(ref task) => task.notify(),
+
+            #[cfg(feature = "unstable-futures")]
+            Task::Futures2(ref waker) => waker.wake(),
+        }
+    }
+}
+
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 mod platform {
     use mio::Ready;
@@ -635,5 +656,21 @@ mod platform {
 
     pub fn is_hup(_: &Ready) -> bool {
         false
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+fn lift_async<T>(old: futures::Async<T>) -> futures2::Async<T> {
+    match old {
+        futures::Async::Ready(x) => futures2::Async::Ready(x),
+        futures::Async::NotReady => futures2::Async::Pending,
+    }
+}
+
+#[cfg(feature = "unstable-futures")]
+fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
+    match new {
+        futures2::Async::Ready(x) => futures::Async::Ready(x),
+        futures2::Async::Pending => futures::Async::NotReady,
     }
 }
