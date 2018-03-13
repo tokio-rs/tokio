@@ -286,7 +286,7 @@ impl Registration {
         -> futures2::Poll<mio::Ready, io::Error>
     {
         use futures2::Async as Async2;
-        self.poll_ready(Direction::Read, true, || Task::Futures2(cx.waker()))
+        self.poll_ready(Direction::Read, true, || Task::Futures2(cx.waker().clone()))
             .map(|v| match v {
                 Some(v) => Async2::Ready(v),
                 _ => Async2::Pending,
@@ -351,7 +351,7 @@ impl Registration {
                             -> futures2::Poll<mio::Ready, io::Error>
     {
         use futures2::Async as Async2;
-        self.poll_ready(Direction::Write, true, || Task::Futures2(cx.waker()))
+        self.poll_ready(Direction::Write, true, || Task::Futures2(cx.waker().clone()))
             .map(|v| match v {
                 Some(v) => Async2::Ready(v),
                 _ => Async2::Pending,

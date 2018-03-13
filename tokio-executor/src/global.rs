@@ -6,6 +6,9 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
+#[cfg(feature = "unstable-futures")]
+use futures2;
+
 /// Executes futures on the default executor for the current execution context.
 ///
 /// `DefaultExecutor` implements `Executor` and can be used to spawn futures
@@ -59,6 +62,23 @@ impl super::Executor for DefaultExecutor {
             }
         })
     }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
+             -> Result<(), futures2::executor::SpawnError>
+    {
+        EXECUTOR.with(|current_executor| {
+            match current_executor.get() {
+                Some(executor) => {
+                    let executor = unsafe { &mut *executor };
+                    executor.spawn2(future)
+                }
+                None => {
+                    Err(futures2::executor::SpawnError::shutdown())
+                }
+            }
+        })
+    }
 }
 
 // ===== global spawn fns =====
@@ -106,6 +126,15 @@ pub fn spawn<T>(future: T)
     where T: Future<Item = (), Error = ()> + Send + 'static,
 {
     DefaultExecutor::current().spawn(Box::new(future))
+        .unwrap()
+}
+
+/// Like `spawn` but compatible with futures 0.2
+#[cfg(feature = "unstable-futures")]
+pub fn spawn2<T>(future: T)
+    where T: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
+{
+    DefaultExecutor::current().spawn2(Box::new(future))
         .unwrap()
 }
 

@@ -1,3 +1,5 @@
+#![cfg(not(feature = "unstable-futures"))]
+
 extern crate tokio;
 extern crate tokio_executor;
 extern crate futures;

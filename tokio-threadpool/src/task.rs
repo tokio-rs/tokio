@@ -495,6 +495,7 @@ impl From<State> for usize {
 // ===== impl TaskFuture =====
 
 impl TaskFuture {
+    #[allow(unused_variables)]
     fn poll(&mut self, unpark: &Arc<Notifier>, id: usize, exec: &mut Sender) -> futures::Poll<(), ()> {
         match *self {
             TaskFuture::Futures1(ref mut fut) => fut.poll_future_notify(unpark, id),

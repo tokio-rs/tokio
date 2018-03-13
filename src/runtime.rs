@@ -448,6 +448,13 @@ impl ::executor::Executor for TaskExecutor {
     {
         self.inner.spawn(future)
     }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
+        -> Result<(), futures2::executor::SpawnError>
+    {
+        self.inner.spawn2(future)
+    }
 }
 
 #[cfg(feature = "unstable-futures")]

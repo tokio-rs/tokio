@@ -220,6 +220,7 @@ where E: Evented
     }
 
     /// Like `poll_read_ready` but compatible with futures 0.2.
+    #[cfg(feature = "unstable-futures")]
     pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context, mask: mio::Ready)
         -> futures2::Poll<mio::Ready, io::Error>
     {
@@ -310,6 +311,7 @@ where E: Evented
     }
 
     /// Like `poll_write_ready` but compatible with futures 0.2.
+    #[cfg(feature = "unstable-futures")]
     pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
         -> futures2::Poll<mio::Ready, io::Error>
     {
@@ -350,6 +352,7 @@ where E: Evented
     }
 
     /// Like `clear_write_ready`, but compatible with futures 0.2.
+    #[cfg(feature = "unstable-futures")]
     pub fn clear_write_ready2(&self, cx: &mut futures2::task::Context) -> io::Result<()> {
         let ready = mio::Ready::writable();
 

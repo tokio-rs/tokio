@@ -49,7 +49,7 @@
 //! [`Executor`]: #
 //! [`spawn`]: #
 
-
+#[cfg(not(feature = "unstable-futures"))]
 pub mod current_thread;
 
 pub mod thread_pool {
