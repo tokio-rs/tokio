@@ -119,6 +119,9 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "unstable-futures")]
+use futures2;
+
 /// Executes tasks on the current thread
 pub struct CurrentThread<P: Park = ParkThread> {
     /// Execute futures and receive unpark notifications.
@@ -386,6 +389,13 @@ impl tokio_executor::Executor for CurrentThread {
         self.borrow().spawn_local(future);
         Ok(())
     }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, _future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
+        -> Result<(), futures2::executor::SpawnError>
+    {
+        panic!("Futures 0.2 integration is not available for current_thread");
+    }
 }
 
 impl<P: Park> fmt::Debug for CurrentThread<P> {
@@ -589,6 +599,13 @@ impl tokio_executor::Executor for TaskExecutor {
         -> Result<(), SpawnError>
     {
         self.spawn_local(future)
+    }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, _future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
+        -> Result<(), futures2::executor::SpawnError>
+    {
+        panic!("Futures 0.2 integration is not available for current_thread");
     }
 
     fn status(&self) -> Result<(), SpawnError> {

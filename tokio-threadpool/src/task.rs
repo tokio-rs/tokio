@@ -155,7 +155,7 @@ impl Task {
         // `thread::panicking() -> true`. To do this, the future is dropped from
         // within the catch_unwind block.
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
+            struct Guard<'a>(&'a mut Option<TaskFuture>, bool);
 
             impl<'a> Drop for Guard<'a> {
                 fn drop(&mut self) {

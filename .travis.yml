@@ -26,6 +26,9 @@ script:
         cargo check --tests --all --target $TARGET
     else
         cargo test --all
+        cargo test --features unstable-futures
+        cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
+        cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
     fi
 
 deploy:

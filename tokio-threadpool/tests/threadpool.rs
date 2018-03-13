@@ -502,14 +502,26 @@ fn busy_threadpool_is_not_idle() {
 #[test]
 fn panic_in_task() {
     let pool = ThreadPool::new();
+    let mut tx = pool.sender().clone();
 
     struct Boom;
 
+    #[cfg(not(feature = "unstable-futures"))]
     impl Future for Boom {
         type Item = ();
         type Error = ();
 
         fn poll(&mut self) -> Poll<(), ()> {
+            panic!();
+        }
+    }
+
+    #[cfg(feature = "unstable-futures")]
+    impl Future for Boom {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self, _cx: &mut futures2::task::Context) -> Poll<(), ()> {
             panic!();
         }
     }
@@ -520,7 +532,7 @@ fn panic_in_task() {
         }
     }
 
-    pool.spawn(Boom);
+    spawn_pool(&mut tx, Boom);
 
-    pool.shutdown_on_idle().wait().unwrap();
+    await_shutdown(pool.shutdown_on_idle());
 }
