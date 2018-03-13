@@ -155,7 +155,7 @@ impl AtomicTask {
                 if actual == curr {
                     // Notify the task
                     unsafe {
-                        if let Some(ref task) = *self.task.get() {
+                        if let Some(ref task) = (*self.task.get()).take() {
                             task.notify();
                         }
                     }
