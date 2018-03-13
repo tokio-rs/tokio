@@ -33,7 +33,7 @@ are building a custom I/O resource.
 
 ## License
 
-This project is licensed under the [MIT license](../LICENSE).
+This project is licensed under the [MIT license](LICENSE).
 
 ### Contribution
 
