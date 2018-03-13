@@ -69,6 +69,8 @@ unstable-futures = [
     "futures2",
     "tokio-reactor/unstable-futures",
     "tokio-threadpool/unstable-futures",
-    "tokio-executor/unstable-futures"
+    "tokio-executor/unstable-futures",
+    "tokio-tcp/unstable-futures",
+    "tokio-udp/unstable-futures"
 ]
 default = []
