@@ -1,5 +1,5 @@
-use net::tcp::Incoming;
-use net::tcp::TcpStream;
+use super::Incoming;
+use super::TcpStream;
 
 use std::fmt;
 use std::io;
@@ -7,8 +7,7 @@ use std::net::{self, SocketAddr};
 
 use futures::{Poll, Async};
 use mio;
-
-use reactor::{Handle, PollEvented2};
+use tokio_reactor::{Handle, PollEvented};
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -18,7 +17,7 @@ use futures2;
 /// This object can be converted into a stream of incoming connections for
 /// various forms of processing.
 pub struct TcpListener {
-    io: PollEvented2<mio::net::TcpListener>,
+    io: PollEvented<mio::net::TcpListener>,
 }
 
 impl TcpListener {
@@ -174,12 +173,12 @@ impl TcpListener {
         -> io::Result<TcpListener>
     {
         let io = mio::net::TcpListener::from_std(listener)?;
-        let io = PollEvented2::new_with_handle(io, handle)?;
+        let io = PollEvented::new_with_handle(io, handle)?;
         Ok(TcpListener { io })
     }
 
     fn new(listener: mio::net::TcpListener) -> TcpListener {
-        let io = PollEvented2::new(listener);
+        let io = PollEvented::new(listener);
         TcpListener { io }
     }
 

@@ -27,6 +27,7 @@ members = [
   "tokio-io",
   "tokio-reactor",
   "tokio-threadpool",
+  "tokio-tcp",
   "futures2",
 ]
 
@@ -39,6 +40,7 @@ tokio-io = { version = "0.1.6", path = "tokio-io" }
 tokio-executor = { version = "0.1.0", path = "tokio-executor" }
 tokio-reactor = { version = "0.1.0", path = "tokio-reactor" }
 tokio-threadpool = { version = "0.1.0", path = "tokio-threadpool" }
+tokio-tcp = { version = "0.1.0", path = "tokio-tcp" }
 bytes = "0.4"
 log = "0.4"
 mio = "0.6.14"

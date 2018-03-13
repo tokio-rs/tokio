@@ -9,8 +9,7 @@ use futures::{Future, Poll, Async};
 use iovec::IoVec;
 use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
-
-use reactor::{Handle, PollEvented2};
+use tokio_reactor::{Handle, PollEvented};
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -24,7 +23,7 @@ use futures2;
 /// [accepting]: struct.TcpListener.html#method.accept
 /// [listener]: struct.TcpListener.html
 pub struct TcpStream {
-    io: PollEvented2<mio::net::TcpStream>,
+    io: PollEvented<mio::net::TcpStream>,
 }
 
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
@@ -62,7 +61,7 @@ impl TcpStream {
     }
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> TcpStream {
-        let io = PollEvented2::new(connected);
+        let io = PollEvented::new(connected);
         TcpStream { io }
     }
 
@@ -76,7 +75,7 @@ impl TcpStream {
         -> io::Result<TcpStream>
     {
         let io = mio::net::TcpStream::from_stream(stream)?;
-        let io = PollEvented2::new_with_handle(io, handle)?;
+        let io = PollEvented::new_with_handle(io, handle)?;
 
         Ok(TcpStream { io })
     }
@@ -107,7 +106,7 @@ impl TcpStream {
         use self::ConnectFutureState::*;
 
         let io = mio::net::TcpStream::connect_stream(stream, addr)
-            .and_then(|io| PollEvented2::new_with_handle(io, handle));
+            .and_then(|io| PollEvented::new_with_handle(io, handle));
 
         let inner = match io {
             Ok(io) => Waiting(TcpStream { io }),
@@ -584,7 +583,7 @@ impl futures2::Future for ConnectFuture {
 
 impl ConnectFutureState {
     fn poll_inner<F>(&mut self, f: F) -> Poll<TcpStream, io::Error>
-        where F: FnOnce(&mut PollEvented2<mio::net::TcpStream>) -> Poll<mio::Ready, io::Error>
+        where F: FnOnce(&mut PollEvented<mio::net::TcpStream>) -> Poll<mio::Ready, io::Error>
     {
         {
             let stream = match *self {

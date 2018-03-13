@@ -1,13 +1,14 @@
 extern crate env_logger;
-extern crate tokio;
+extern crate tokio_io;
+extern crate tokio_tcp;
 extern crate mio;
 extern crate futures;
 
 use std::{net, thread};
 use std::sync::mpsc::channel;
 
-use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
+use futures::{Future, Stream};
+use tokio_tcp::{TcpListener, TcpStream};
 
 
 macro_rules! t {
@@ -82,13 +83,14 @@ fn accept2() {
 
 #[cfg(unix)]
 mod unix {
-    use tokio::net::TcpStream;
-    use tokio::prelude::*;
+    use tokio_tcp::TcpStream;
 
     use env_logger;
-    use futures::future;
+    use futures::{Future, future};
     use mio::unix::UnixReady;
+    use tokio_io::AsyncRead;
 
+    use std::io::Write;
     use std::{net, thread};
     use std::time::Duration;
 
