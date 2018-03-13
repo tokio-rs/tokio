@@ -28,6 +28,7 @@ members = [
   "tokio-reactor",
   "tokio-threadpool",
   "tokio-tcp",
+  "tokio-udp",
   "futures2",
 ]
 
@@ -41,15 +42,13 @@ tokio-executor = { version = "0.1.0", path = "tokio-executor" }
 tokio-reactor = { version = "0.1.0", path = "tokio-reactor" }
 tokio-threadpool = { version = "0.1.0", path = "tokio-threadpool" }
 tokio-tcp = { version = "0.1.0", path = "tokio-tcp" }
-bytes = "0.4"
-log = "0.4"
+tokio-udp = { version = "0.1.0", path = "tokio-udp" }
 mio = "0.6.14"
-slab = "0.4"
-iovec = "0.1"
 futures = "0.1.18"
 futures2 = { version = "0.1", path = "futures2", optional = true }
 
 [dev-dependencies]
+bytes = "0.4"
 env_logger = { version = "0.4", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
 futures-cpupool = "0.1"

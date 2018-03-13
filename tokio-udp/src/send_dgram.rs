@@ -1,4 +1,4 @@
-use net::udp::socket::UdpSocket;
+use super::socket::UdpSocket;
 
 use std::io;
 use std::net::SocketAddr;

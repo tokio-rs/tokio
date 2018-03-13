@@ -36,8 +36,6 @@
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`framed`]: struct.UdpSocket.html#method.framed
 
-mod udp;
-
 pub use tokio_tcp::{TcpStream, ConnectFuture};
 pub use tokio_tcp::{TcpListener, Incoming};
-pub use self::udp::{UdpSocket, UdpFramed, SendDgram, RecvDgram};
+pub use tokio_udp::{UdpSocket, UdpFramed, SendDgram, RecvDgram};

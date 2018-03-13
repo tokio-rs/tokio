@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 extern crate futures;
-extern crate tokio;
+extern crate tokio_udp;
 #[macro_use]
 extern crate tokio_io;
 extern crate bytes;
@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 
 use futures::{Future, Poll, Stream, Sink};
 
-use tokio::net::{UdpSocket, UdpFramed};
+use tokio_udp::{UdpSocket, UdpFramed};
 use tokio_io::codec::{Encoder, Decoder};
 use bytes::{BytesMut, BufMut};
 

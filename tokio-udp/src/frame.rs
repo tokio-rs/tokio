@@ -3,7 +3,7 @@ use std::net::{SocketAddr, Ipv4Addr, SocketAddrV4};
 
 use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
 
-use net::UdpSocket;
+use super::UdpSocket;
 
 use tokio_io::codec::{Decoder, Encoder};
 use bytes::{BytesMut, BufMut};

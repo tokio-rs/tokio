@@ -65,20 +65,15 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.3")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
-extern crate bytes;
 #[macro_use]
 extern crate futures;
-extern crate iovec;
 extern crate mio;
-extern crate slab;
 extern crate tokio_io;
 extern crate tokio_executor;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
 extern crate tokio_tcp;
-
-#[macro_use]
-extern crate log;
+extern crate tokio_udp;
 
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
