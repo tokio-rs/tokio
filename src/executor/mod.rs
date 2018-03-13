@@ -198,7 +198,7 @@ pub struct Spawn(());
 /// onto the default executor returns an error. To avoid the panic, use
 /// [`DefaultExecutor`].
 ///
-/// [`DefaultExecutor`]: #
+/// [`DefaultExecutor`]: struct.DefaultExecutor.html
 pub fn spawn<F>(f: F) -> Spawn
 where F: Future<Item = (), Error = ()> + 'static + Send
 {

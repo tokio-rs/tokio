@@ -28,7 +28,7 @@ impl DefaultExecutor {
     /// Futures may be spawned onto the default executor using this handle.
     ///
     /// The returned handle will reference whichever executor is configured as
-    /// the default **at the time `spawn` is called`. This enables
+    /// the default **at the time `spawn` is called**. This enables
     /// `DefaultExecutor::current()` to be called before an execution context is
     /// setup, then passed **into** an execution context before it is used.
     pub fn current() -> DefaultExecutor {
