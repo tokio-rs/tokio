@@ -1,5 +1,5 @@
-use net::tcp::TcpListener;
-use net::tcp::TcpStream;
+use super::TcpListener;
+use super::TcpStream;
 
 use std::io;
 use futures::stream::Stream;

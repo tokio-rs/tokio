@@ -65,19 +65,15 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.3")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
-extern crate bytes;
 #[macro_use]
 extern crate futures;
-extern crate iovec;
 extern crate mio;
-extern crate slab;
 extern crate tokio_io;
 extern crate tokio_executor;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
-
-#[macro_use]
-extern crate log;
+extern crate tokio_tcp;
+extern crate tokio_udp;
 
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
@@ -189,20 +185,4 @@ pub mod prelude {
         Poll,
         task,
     };
-}
-
-#[cfg(feature = "unstable-futures")]
-fn lift_async<T>(old: futures::Async<T>) -> futures2::Async<T> {
-    match old {
-        futures::Async::Ready(x) => futures2::Async::Ready(x),
-        futures::Async::NotReady => futures2::Async::Pending,
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
-    match new {
-        futures2::Async::Ready(x) => futures::Async::Ready(x),
-        futures2::Async::Pending => futures::Async::NotReady,
-    }
 }

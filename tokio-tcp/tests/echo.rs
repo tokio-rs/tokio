@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate futures;
-extern crate tokio;
+extern crate tokio_tcp;
 extern crate tokio_io;
 
 use std::io::{Read, Write};
@@ -9,7 +9,7 @@ use std::thread;
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio::net::TcpListener;
+use tokio_tcp::TcpListener;
 use tokio_io::AsyncRead;
 use tokio_io::io::copy;
 

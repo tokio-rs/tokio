@@ -117,10 +117,16 @@ The crates included as part of Tokio are:
 * [`tokio-threadpool`]: Schedules the execution of futures across a pool of
   threads.
 
+* [`tokio-tcp`]: TCP bindings for use with `tokio-io` and `tokio-reactor`.
+
+* [`tokio-udp`]: UDP bindings for use with `tokio-io` and `tokio-reactor`.
+
 [`tokio-executor`]: tokio-executor
 [`tokio-io`]: tokio-io
 [`tokio-reactor`]: tokio-reactor
 [`tokio-threadpool`]: tokio-threadpool
+[`tokio-tcp`]: tokio-tcp
+[`tokio-udp`]: tokio-udp
 
 ## License
 

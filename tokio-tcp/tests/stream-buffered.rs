@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate futures;
-extern crate tokio;
+extern crate tokio_tcp;
 extern crate tokio_io;
 
 use std::io::{Read, Write};
@@ -11,7 +11,7 @@ use futures::Future;
 use futures::stream::Stream;
 use tokio_io::io::copy;
 use tokio_io::AsyncRead;
-use tokio::net::TcpListener;
+use tokio_tcp::TcpListener;
 
 macro_rules! t {
     ($e:expr) => (match $e {

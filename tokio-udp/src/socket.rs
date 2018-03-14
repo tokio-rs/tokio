@@ -1,4 +1,4 @@
-use net::udp::{SendDgram, RecvDgram};
+use super::{SendDgram, RecvDgram};
 
 use std::io;
 use std::net::{self, SocketAddr, Ipv4Addr, Ipv6Addr};
@@ -7,11 +7,11 @@ use std::fmt;
 use futures::{Async, Poll};
 use mio;
 
-use reactor::{Handle, PollEvented2};
+use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    io: PollEvented2<mio::net::UdpSocket>,
+    io: PollEvented<mio::net::UdpSocket>,
 }
 
 impl UdpSocket {
@@ -23,7 +23,7 @@ impl UdpSocket {
     }
 
     fn new(socket: mio::net::UdpSocket) -> UdpSocket {
-        let io = PollEvented2::new(socket);
+        let io = PollEvented::new(socket);
         UdpSocket { io: io }
     }
 
@@ -39,7 +39,7 @@ impl UdpSocket {
     pub fn from_std(socket: net::UdpSocket,
                     handle: &Handle) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let io = PollEvented2::new_with_handle(io, handle)?;
+        let io = PollEvented::new_with_handle(io, handle)?;
         Ok(UdpSocket { io })
     }
 
