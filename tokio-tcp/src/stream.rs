@@ -139,6 +139,14 @@ impl TcpStream {
         self.io.poll_read_ready(mask)
     }
 
+    /// Like `poll_read_ready`, but compatible with futures 0.2
+    #[cfg(feature = "unstable-futures")]
+    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context, mask: mio::Ready)
+        -> futures2::Poll<mio::Ready, io::Error>
+    {
+        self.io.poll_read_ready2(cx, mask)
+    }
+
     /// Check the TCP stream's write readiness state.
     ///
     /// This always checks for writable readiness and also checks for HUP
@@ -158,6 +166,14 @@ impl TcpStream {
     /// * called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.io.poll_write_ready()
+    }
+
+    /// Like `poll_write_ready`, but compatible with futures 0.2.
+    #[cfg(feature = "unstable-futures")]
+    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
+        -> futures2::Poll<mio::Ready, io::Error>
+    {
+        self.io.poll_write_ready2(cx)
     }
 
     /// Returns the local address that this stream is bound to.
