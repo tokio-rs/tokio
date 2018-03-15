@@ -274,7 +274,7 @@ mod date {
             LAST.with(|cache| {
                 let mut cache = cache.borrow_mut();
                 let now = time::get_time();
-                if now > cache.next_update {
+                if now >= cache.next_update {
                     cache.update(now);
                 }
                 f.write_str(cache.buffer())
