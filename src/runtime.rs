@@ -234,6 +234,7 @@ impl Runtime {
         let handle = reactor.handle().clone();
 
         let pool = threadpool::Builder::new()
+            .name_prefix("tokio-runtime-worker-")
             .around_worker(move |w, enter| {
                 ::tokio_reactor::with_default(&handle, enter, |_| {
                     w.run();
