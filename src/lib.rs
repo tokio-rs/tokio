@@ -84,6 +84,9 @@ pub mod reactor;
 pub mod runtime;
 
 pub use executor::spawn;
+#[cfg(feature = "unstable-futures")]
+pub use executor::spawn2;
+
 pub use runtime::run;
 
 pub mod io {
