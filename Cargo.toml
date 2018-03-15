@@ -27,6 +27,7 @@ members = [
   "tokio-io",
   "tokio-reactor",
   "tokio-threadpool",
+  "tokio-timer",
   "tokio-tcp",
   "tokio-udp",
   "futures2",
