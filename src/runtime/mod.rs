@@ -138,10 +138,10 @@ pub struct Runtime {
 #[derive(Debug)]
 struct Inner {
     /// Reactor running on a background thread.
-    pub reactor: Background,
+    reactor: Background,
 
     /// Task execution pool.
-    pub pool: threadpool::ThreadPool,
+    pool: threadpool::ThreadPool,
 }
 
 // ===== impl Runtime =====
