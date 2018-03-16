@@ -2,7 +2,7 @@ use inner::Inner;
 use state::{State, SHUTDOWN_NOW, MAX_FUTURES};
 use task::Task;
 
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 
 use tokio_executor::{self, SpawnError};

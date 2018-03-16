@@ -1,8 +1,8 @@
 use inner::Inner;
 use task::Task;
 
-use std::{mem};
-use std::sync::{Weak};
+use std::mem;
+use std::sync::Weak;
 
 use futures::executor::Notify;
 

@@ -1,9 +1,9 @@
 use worker::Worker;
 
-use tokio_executor::Enter;
-
 use std::fmt;
 use std::sync::Arc;
+
+use tokio_executor::Enter;
 
 #[derive(Clone)]
 pub(crate) struct Callback {
