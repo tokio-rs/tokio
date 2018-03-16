@@ -2,6 +2,8 @@
 use tokio_threadpool::Sender;
 
 use futures::future::{self, Future};
+#[cfg(feature = "unstable-futures")]
+use futures2;
 
 /// Executes futures on the runtime
 ///
