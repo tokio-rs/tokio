@@ -1,8 +1,10 @@
 use self::Kind::*;
 
 /// Errors that occur when working with a timer.
+#[derive(Debug)]
 pub struct Error(Kind);
 
+#[derive(Debug)]
 enum Kind {
     Shutdown,
     AtCapacity,

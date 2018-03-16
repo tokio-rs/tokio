@@ -130,6 +130,13 @@ where T: Park,
         }
     }
 
+    /// Returns a handle to the timer
+    pub fn handle(&self) -> Handle {
+        Handle {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
     /// Performs one iteration of the timer loop.
     pub fn turn(&mut self, max_wait: Option<Duration>) -> Result<Turn, T::Error> {
         match max_wait {
@@ -149,8 +156,6 @@ where T: Park,
 
     /// Run timer related logic
     fn process(&mut self) {
-        self.process_queue();
-
         let now = self.now.now();
 
         for i in (0..self.state.len()).rev() {
@@ -217,6 +222,8 @@ where T: Park,
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
+        self.process_queue();
+
         match self.next_expiration() {
             Some(deadline) => {
                 let now = self.now.now();
@@ -236,7 +243,8 @@ where T: Park,
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        // self.park.park_timeout(duration)
+        self.process_queue();
+
         match self.next_expiration() {
             Some(deadline) => {
                 let now = self.now.now();
