@@ -8,5 +8,5 @@ mod timer;
 
 pub use self::error::Error;
 pub use self::now::{Now, SystemNow};
-pub use self::timer::{Timer, with_default};
+pub use self::timer::{Timer, Turn, with_default};
 pub use self::sleep::Sleep;
