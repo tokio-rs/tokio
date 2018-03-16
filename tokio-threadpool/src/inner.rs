@@ -29,36 +29,36 @@ use rand::{Rng, SeedableRng, XorShiftRng};
 #[derive(Debug)]
 pub(crate) struct Inner {
     // ThreadPool state
-    pub(crate) state: AtomicUsize,
+    pub state: AtomicUsize,
 
     // Stack tracking sleeping workers.
-    pub(crate) sleep_stack: AtomicUsize,
+    pub sleep_stack: AtomicUsize,
 
     // Number of workers who haven't reached the final state of shutdown
     //
     // This is only used to know when to single `shutdown_task` once the
     // shutdown process has completed.
-    pub(crate) num_workers: AtomicUsize,
+    pub num_workers: AtomicUsize,
 
     // Used to generate a thread local RNG seed
-    pub(crate) next_thread_id: AtomicUsize,
+    pub next_thread_id: AtomicUsize,
 
     // Storage for workers
     //
     // This will *usually* be a small number
-    pub(crate) workers: Box<[WorkerEntry]>,
+    pub workers: Box<[WorkerEntry]>,
 
     // Task notified when the worker shuts down
-    pub(crate) shutdown_task: ShutdownTask,
+    pub shutdown_task: ShutdownTask,
 
     // Configuration
-    pub(crate) config: Config,
+    pub config: Config,
 }
 
 impl Inner {
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
-    pub(crate) fn shutdown(&self, now: bool, purge_queue: bool) {
+    pub fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
 
         trace!("shutdown; state={:?}", state);
@@ -118,7 +118,7 @@ impl Inner {
         self.terminate_sleeping_workers();
     }
 
-    pub(crate) fn terminate_sleeping_workers(&self) {
+    pub fn terminate_sleeping_workers(&self) {
         trace!("  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
         // transition, and terminate.
@@ -170,7 +170,7 @@ impl Inner {
         worker.wakeup();
     }
 
-    pub(crate) fn worker_terminated(&self) {
+    pub fn worker_terminated(&self) {
         let prev = self.num_workers.fetch_sub(1, AcqRel);
 
         trace!("worker_terminated; num_workers={}", prev - 1);
@@ -185,7 +185,7 @@ impl Inner {
     ///
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
-    pub(crate) fn submit(&self, task: Task, inner: &Arc<Inner>) {
+    pub fn submit(&self, task: Task, inner: &Arc<Inner>) {
         Worker::with_current(|worker| {
             match worker {
                 Some(worker) => {
@@ -242,7 +242,7 @@ impl Inner {
 
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
-    pub(crate) fn signal_work(&self, inner: &Arc<Inner>) {
+    pub fn signal_work(&self, inner: &Arc<Inner>) {
         if let Some((idx, mut state)) = self.pop_sleeper(WORKER_SIGNALED, EMPTY) {
             let entry = &self.workers[idx];
 
@@ -283,7 +283,7 @@ impl Inner {
     /// Push a worker on the sleep stack
     ///
     /// Returns `Err` if the pool has been terminated
-    pub(crate) fn push_sleeper(&self, idx: usize) -> Result<(), ()> {
+    pub fn push_sleeper(&self, idx: usize) -> Result<(), ()> {
         let mut state: SleepStack = self.sleep_stack.load(Acquire).into();
 
         debug_assert!(WorkerState::from(self.workers[idx].state.load(Relaxed)).is_pushed());
@@ -390,7 +390,7 @@ impl Inner {
     /// Generates a random number
     ///
     /// Uses a thread-local seeded XorShift.
-    pub(crate) fn rand_usize(&self) -> usize {
+    pub fn rand_usize(&self) -> usize {
         // Use a thread-local random number generator. If the thread does not
         // have one yet, then seed a new one
         thread_local!(static THREAD_RNG_KEY: UnsafeCell<Option<XorShiftRng>> = UnsafeCell::new(None));

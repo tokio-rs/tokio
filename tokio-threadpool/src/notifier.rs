@@ -12,7 +12,7 @@ use futures::executor::Notify;
 /// to poll the future again.
 #[derive(Debug)]
 pub(crate) struct Notifier {
-    pub(crate) inner: Weak<Inner>,
+    pub inner: Weak<Inner>,
 }
 
 impl Notify for Notifier {

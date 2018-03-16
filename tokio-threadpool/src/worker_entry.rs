@@ -37,7 +37,7 @@ pub(crate) struct WorkerEntry {
 }
 
 impl WorkerEntry {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let w = deque::Deque::new();
         let s = w.stealer();
 
@@ -53,7 +53,7 @@ impl WorkerEntry {
     }
 
     #[inline]
-    pub(crate) fn submit_internal(&self, task: Task) {
+    pub fn submit_internal(&self, task: Task) {
         self.push_internal(task);
     }
 
@@ -61,7 +61,7 @@ impl WorkerEntry {
     /// to the worker. Internal submissions go through another path.
     ///
     /// Returns `false` if the worker needs to be spawned.
-    pub(crate) fn submit_external(&self, task: Task, mut state: WorkerState) -> bool {
+    pub fn submit_external(&self, task: Task, mut state: WorkerState) -> bool {
         // Push the task onto the external queue
         self.push_external(task);
 
@@ -98,23 +98,23 @@ impl WorkerEntry {
     }
 
     #[inline]
-    pub(crate) fn push_internal(&self, task: Task) {
+    pub fn push_internal(&self, task: Task) {
         self.deque.push(task);
     }
 
     #[inline]
-    pub(crate) fn wakeup(&self) {
+    pub fn wakeup(&self) {
         let _lock = self.park_mutex.lock().unwrap();
         self.park_condvar.notify_one();
     }
 
     #[inline]
-    pub(crate) fn next_sleeper(&self) -> usize {
+    pub fn next_sleeper(&self) -> usize {
         unsafe { *self.next_sleeper.get() }
     }
 
     #[inline]
-    pub(crate) fn set_next_sleeper(&self, val: usize) {
+    pub fn set_next_sleeper(&self, val: usize) {
         unsafe { *self.next_sleeper.get() = val; }
     }
 }

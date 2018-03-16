@@ -38,35 +38,35 @@ pub(crate) const WORKER_SIGNALED: usize = 4;
 
 impl WorkerState {
     /// Returns true if the worker entry is pushed in the sleeper stack
-    pub(crate) fn is_pushed(&self) -> bool {
+    pub fn is_pushed(&self) -> bool {
         self.0 & PUSHED_MASK == PUSHED_MASK
     }
 
-    pub(crate) fn set_pushed(&mut self) {
+    pub fn set_pushed(&mut self) {
         self.0 |= PUSHED_MASK
     }
 
-    pub(crate) fn is_notified(&self) -> bool {
+    pub fn is_notified(&self) -> bool {
         match self.lifecycle() {
             WORKER_NOTIFIED | WORKER_SIGNALED => true,
             _ => false,
         }
     }
 
-    pub(crate) fn lifecycle(&self) -> usize {
+    pub fn lifecycle(&self) -> usize {
         (self.0 & WORKER_LIFECYCLE_MASK) >> WORKER_LIFECYCLE_SHIFT
     }
 
-    pub(crate) fn set_lifecycle(&mut self, val: usize) {
+    pub fn set_lifecycle(&mut self, val: usize) {
         self.0 = (self.0 & !WORKER_LIFECYCLE_MASK) |
             (val << WORKER_LIFECYCLE_SHIFT)
     }
 
-    pub(crate) fn is_signaled(&self) -> bool {
+    pub fn is_signaled(&self) -> bool {
         self.lifecycle() == WORKER_SIGNALED
     }
 
-    pub(crate) fn notify(&mut self) {
+    pub fn notify(&mut self) {
         if self.lifecycle() != WORKER_SIGNALED {
             self.set_lifecycle(WORKER_NOTIFIED)
         }

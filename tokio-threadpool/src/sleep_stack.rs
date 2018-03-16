@@ -34,17 +34,17 @@ const ABA_GUARD_MASK: usize = (1 << (32 - ABA_GUARD_SHIFT)) - 1;
 
 impl SleepStack {
     #[inline]
-    pub(crate) fn new() -> SleepStack {
+    pub fn new() -> SleepStack {
         SleepStack(EMPTY)
     }
 
     #[inline]
-    pub(crate) fn head(&self) -> usize {
+    pub fn head(&self) -> usize {
         self.0 & STACK_MASK
     }
 
     #[inline]
-    pub(crate) fn set_head(&mut self, val: usize) {
+    pub fn set_head(&mut self, val: usize) {
         // The ABA guard protects against the ABA problem w/ treiber stacks
         let aba_guard = ((self.0 >> ABA_GUARD_SHIFT) + 1) & ABA_GUARD_MASK;
 

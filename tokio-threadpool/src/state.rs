@@ -22,19 +22,19 @@ pub(crate) const MAX_FUTURES: usize = usize::MAX >> NUM_FUTURES_OFFSET;
 
 impl State {
     #[inline]
-    pub(crate) fn new() -> State {
+    pub fn new() -> State {
         State(0)
     }
 
     /// Returns the number of futures still pending completion.
-    pub(crate) fn num_futures(&self) -> usize {
+    pub fn num_futures(&self) -> usize {
         self.0 >> NUM_FUTURES_OFFSET
     }
 
     /// Increment the number of futures pending completion.
     ///
     /// Returns false on failure.
-    pub(crate) fn inc_num_futures(&mut self) {
+    pub fn inc_num_futures(&mut self) {
         debug_assert!(self.num_futures() < MAX_FUTURES);
         debug_assert!(self.lifecycle() < SHUTDOWN_NOW);
 
@@ -42,7 +42,7 @@ impl State {
     }
 
     /// Decrement the number of futures pending completion.
-    pub(crate) fn dec_num_futures(&mut self) {
+    pub fn dec_num_futures(&mut self) {
         let num_futures = self.num_futures();
 
         if num_futures == 0 {
@@ -58,19 +58,19 @@ impl State {
     }
 
     /// Set the number of futures pending completion to zero
-    pub(crate) fn clear_num_futures(&mut self) {
+    pub fn clear_num_futures(&mut self) {
         self.0 = self.0 & LIFECYCLE_MASK;
     }
 
-    pub(crate) fn lifecycle(&self) -> usize {
+    pub fn lifecycle(&self) -> usize {
         self.0 & LIFECYCLE_MASK
     }
 
-    pub(crate) fn set_lifecycle(&mut self, val: usize) {
+    pub fn set_lifecycle(&mut self, val: usize) {
         self.0 = (self.0 & NUM_FUTURES_MASK) | val;
     }
 
-    pub(crate) fn is_terminated(&self) -> bool {
+    pub fn is_terminated(&self) -> bool {
         self.lifecycle() == SHUTDOWN_NOW && self.num_futures() == 0
     }
 }
