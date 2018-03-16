@@ -1,4 +1,5 @@
-use {Notifier, Sender};
+use notifier::Notifier;
+use sender::Sender;
 
 use futures::{self, future, Future, Async};
 use futures::executor::{self, Spawn};
@@ -222,7 +223,7 @@ impl Task {
             let actual = self.inner().state.compare_and_swap(
                 Idle.into(),
                 Scheduled.into(),
-                AcqRel).into();
+                Relaxed).into();
 
             match actual {
                 Idle => return true,
