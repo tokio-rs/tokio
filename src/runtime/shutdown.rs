@@ -1,4 +1,4 @@
-use runtime::inner::Inner;
+use runtime::Inner;
 
 use std::fmt;
 

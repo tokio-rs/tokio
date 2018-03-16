@@ -1,5 +1,4 @@
-use runtime::inner::Inner;
-use runtime::runtime_impl::Runtime;
+use runtime::{Inner, Runtime};
 
 use reactor::Reactor;
 
