@@ -1,7 +1,7 @@
 use Error;
-use timer::{Handle, Registration};
+use timer::Registration;
 
-use futures::{Future, Async, Poll};
+use futures::{Future, Poll};
 
 use std::time::{Duration, Instant};
 
@@ -16,30 +16,24 @@ pub struct Sleep {
 impl Sleep {
     /// Create a new `Sleep` instance that elapses after `duration`.
     pub fn new(duration: Duration) -> Sleep {
-        unimplemented!();
+        Sleep::until(Instant::now() + duration)
     }
 
     /// Create a new `Sleep` instance that elapses at `deadline`.
     pub fn until(deadline: Instant) -> Sleep {
-        unimplemented!();
-    }
-
-    /// Returns true if the `Sleep` is expired.
-    ///
-    /// A `Sleep` is expired when the requested duration has elapsed.
-    pub fn is_expired(&self) -> bool {
-        unimplemented!();
-    }
-
-    /// Returns the duration remaining
-    pub fn remaining(&self) -> Duration {
-        let now = Instant::now();
-
-        if now >= self.deadline {
-            Duration::from_millis(0)
-        } else {
-            self.deadline - now
+        Sleep {
+            deadline,
+            registration: None,
         }
+    }
+
+    /// Returns true if the `Sleep` has elapsed
+    ///
+    /// A `Sleep` is elapsed when the requested duration has elapsed.
+    pub fn is_elapsed(&self) -> bool {
+        self.registration.as_ref()
+            .map(|r| r.is_elapsed())
+            .unwrap_or(false)
     }
 
     /// Register the sleep with the timer instance for the current execution
@@ -62,6 +56,7 @@ impl Future for Sleep {
         // Ensure the `Sleep` instance is associated with a timer.
         self.register()?;
 
-        unimplemented!();
+        self.registration.as_ref().unwrap()
+            .poll_elapsed()
     }
 }

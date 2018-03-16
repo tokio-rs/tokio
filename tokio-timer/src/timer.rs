@@ -1,5 +1,6 @@
 use Error;
 
+use futures::Poll;
 use futures::task::AtomicTask;
 use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark, ParkThread};
@@ -7,7 +8,7 @@ use tokio_executor::park::{Park, Unpark, ParkThread};
 use std::cell::{RefCell, UnsafeCell};
 use std::{cmp, fmt, ptr};
 use std::time::{Duration, Instant};
-use std::sync::{Arc, Weak, RwLock};
+use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::SeqCst;
 use std::usize;
@@ -122,7 +123,13 @@ where T: Park
 
         for i in (0..self.state.len()).rev() {
             if self.state[i].deadline <= now {
+                // Decrement the number of outstanding timeouts
+                self.inner.decrement();
+
+                // Fire the timeout
                 self.state[i].fire();
+
+                // Remove associated timer state
                 self.state.remove(i);
             }
         }
@@ -308,6 +315,14 @@ impl Registration {
 
         Ok(Registration { entry })
     }
+
+    pub fn is_elapsed(&self) -> bool {
+        self.entry.is_elapsed()
+    }
+
+    pub fn poll_elapsed(&self) -> Poll<(), Error> {
+        self.entry.poll_elapsed()
+    }
 }
 
 impl Drop for Registration {
@@ -383,7 +398,7 @@ impl Inner {
             let actual = self.process_head.compare_and_swap(curr, ptr, SeqCst);
 
             if actual == curr {
-                return;
+                break;
             }
 
             curr = actual;
@@ -422,5 +437,21 @@ impl Entry {
         }
 
         self.task.notify();
+    }
+
+    fn poll_elapsed(&self) -> Poll<(), Error> {
+        use futures::Async::NotReady;
+
+        if self.is_elapsed() {
+            return Ok(().into());
+        }
+
+        self.task.register();
+
+        if self.is_elapsed() {
+            return Ok(().into());
+        }
+
+        Ok(NotReady)
     }
 }
