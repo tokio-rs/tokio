@@ -218,13 +218,7 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        Builder::new()
-            .threadpool_builder(
-                threadpool::Builder::new()
-                    .name_prefix("tokio-runtime-worker-")
-                    .clone()
-            )
-            .build()
+        Builder::new().build()
     }
 
     /// Return a reference to the reactor handle for this runtime instance.

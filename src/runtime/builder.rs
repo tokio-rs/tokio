@@ -29,20 +29,21 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 /// # use tokio::runtime::Builder;
 ///
 /// # pub fn main() {
+/// // create and configure ThreadPool
+/// let mut threadpool_builder = tokio_threadpool::Builder::new();
+/// threadpool_builder
+///     .name_prefix("my-runtime-worker-")
+///     .pool_size(4);
+///
+/// // build Runtime
 /// let runtime = Builder::new()
-///     .threadpool_builder(
-///         // Create a thread pool with some configuration values
-///         tokio_threadpool::Builder::new()
-///             .name_prefix("my-runtime-worker-")
-///             .pool_size(4)
-///             .clone()
-///         )
+///     .threadpool_builder(threadpool_builder)
 ///     .build();
 /// // ... call runtime.run(...)
 /// # let _ = runtime;
 /// # }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Builder {
     /// Thread pool specific builder
     threadpool_builder: ThreadPoolBuilder,
@@ -54,10 +55,10 @@ impl Builder {
     ///
     /// Configuration methods can be chained on the return value.
     pub fn new() -> Builder {
+        let mut threadpool_builder = ThreadPoolBuilder::new();
+        threadpool_builder.name_prefix("tokio-runtime-worker-");
 
-        Builder {
-            threadpool_builder: ThreadPoolBuilder::new(),
-        }
+        Builder { threadpool_builder }
     }
 
     /// Set builder to set up the thread pool instance.
