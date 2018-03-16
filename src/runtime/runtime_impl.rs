@@ -104,10 +104,12 @@
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 
-use reactor::{Reactor, Handle};
+use runtime::builder::Builder;
 use runtime::inner::Inner;
 use runtime::shutdown::Shutdown;
 use runtime::task_executor::TaskExecutor;
+
+use reactor::Handle;
 
 use tokio_threadpool as threadpool;
 use futures::future::Future;
@@ -127,7 +129,7 @@ use futures2;
 /// [mod]: index.html
 #[derive(Debug)]
 pub struct Runtime {
-    inner: Option<Inner>,
+    pub(super) inner: Option<Inner>,
 }
 
 // ===== impl Runtime =====
@@ -204,27 +206,13 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        // Spawn a reactor on a background thread.
-        let reactor = Reactor::new()?.background()?;
-
-        // Get a handle to the reactor.
-        let handle = reactor.handle().clone();
-
-        let pool = threadpool::Builder::new()
-            .name_prefix("tokio-runtime-worker-")
-            .around_worker(move |w, enter| {
-                ::tokio_reactor::with_default(&handle, enter, |_| {
-                    w.run();
-                });
-            })
-            .build();
-
-        Ok(Runtime {
-            inner: Some(Inner {
-                reactor,
-                pool,
-            }),
-        })
+        Builder::new()
+            .threadpool_builder(
+                threadpool::Builder::new()
+                    .name_prefix("tokio-runtime-worker-")
+                    .clone()
+            )
+            .build()
     }
 
     /// Return a reference to the reactor handle for this runtime instance.

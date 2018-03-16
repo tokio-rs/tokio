@@ -129,7 +129,7 @@ pub struct Shutdown {
 /// thread_pool.shutdown().wait().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Builder {
     /// Thread pool specific configuration values
     config: Config,

@@ -104,11 +104,13 @@
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 
+mod builder;
 mod inner;
 mod runtime_impl;
 mod shutdown;
 mod task_executor;
 
+pub use self::builder::Builder;
 pub use self::runtime_impl::{run, Runtime};
 #[cfg(feature = "unstable-futures")]
 pub use self::runtime_impl::run2;
