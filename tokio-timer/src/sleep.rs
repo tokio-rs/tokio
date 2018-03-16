@@ -3,7 +3,7 @@ use timer::Registration;
 
 use futures::{Future, Poll};
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct Sleep {
@@ -14,13 +14,8 @@ pub struct Sleep {
 // ===== impl Sleep =====
 
 impl Sleep {
-    /// Create a new `Sleep` instance that elapses after `duration`.
-    pub fn new(duration: Duration) -> Sleep {
-        Sleep::until(Instant::now() + duration)
-    }
-
     /// Create a new `Sleep` instance that elapses at `deadline`.
-    pub fn until(deadline: Instant) -> Sleep {
+    pub fn new(deadline: Instant) -> Sleep {
         Sleep {
             deadline,
             registration: None,

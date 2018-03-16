@@ -1,4 +1,4 @@
-use Error;
+use {Error, Now, SystemNow};
 
 use futures::Poll;
 use futures::task::AtomicTask;
@@ -15,7 +15,7 @@ use std::usize;
 
 /// The timer instance.
 #[derive(Debug)]
-pub struct Timer<T> {
+pub struct Timer<T, N = SystemNow> {
     /// Shared state
     inner: Arc<Inner>,
 
@@ -27,6 +27,10 @@ pub struct Timer<T> {
 
     /// Thread parker. The `Timer` park implementation delegates to this.
     park: T,
+
+
+    /// Source of "now" instances
+    now: T,
 }
 
 /// Handle to the timer
@@ -88,23 +92,26 @@ thread_local!(static CURRENT_TIMER: RefCell<Option<Handle>> = RefCell::new(None)
 
 // ===== impl Timer =====
 
-impl Timer<ParkThread> {
-    pub fn new() -> Self {
-        Timer::new_with_park(ParkThread::new())
-    }
-}
-
 impl<T> Timer<T>
 where T: Park
 {
-    pub fn new_with_park(park: T) -> Self {
+    pub fn new(park: T) -> Self {
+        Timer::new_with_now(ParkThread::new())
+    }
+}
+
+impl<T, N> Timer<T, N>
+where T: Park,
+      N: Now,
+{
+    pub fn new_with_now(park: T, now: N) -> Self {
         let unpark = Box::new(park.unpark());
-        let inner = Arc::new(Inner::new(unpark));
 
         Timer {
-            inner,
+            inner: Arc::new(Inner::new(unpark)),
             state: vec![],
             park,
+            now,
         }
     }
 
@@ -119,7 +126,7 @@ where T: Park
     fn process(&mut self) {
         self.process_queue();
 
-        let now = Instant::now();
+        let now = self.now.now();
 
         for i in (0..self.state.len()).rev() {
             if self.state[i].deadline <= now {
@@ -167,6 +174,12 @@ where T: Park
     }
 }
 
+impl Default for Timer<ParkThread, SystemNow> {
+    fn default() -> Self {
+        Timer::new(ParkThread::new())
+    }
+}
+
 impl<T> Park for Timer<T>
 where T: Park,
 {
@@ -180,7 +193,7 @@ where T: Park,
     fn park(&mut self) -> Result<(), Self::Error> {
         match self.next_expiration() {
             Some(deadline) => {
-                let now = Instant::now();
+                let now = self.now.now();
 
                 if deadline > now {
                     self.park.park_timeout(deadline - now)?;
@@ -200,7 +213,7 @@ where T: Park,
         // self.park.park_timeout(duration)
         match self.next_expiration() {
             Some(deadline) => {
-                let now = Instant::now();
+                let now = self.now.now();
 
                 if deadline > now {
                     self.park.park_timeout(cmp::min(deadline - now, duration))?;
