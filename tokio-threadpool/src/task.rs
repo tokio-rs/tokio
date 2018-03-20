@@ -222,13 +222,13 @@ impl Task {
             let actual = self.inner().state.compare_and_swap(
                 Idle.into(),
                 Scheduled.into(),
-                Relaxed).into();
+                AcqRel).into();
 
             match actual {
                 Idle => return true,
                 Running => {
                     let actual = self.inner().state.compare_and_swap(
-                        Running.into(), Notified.into(), Relaxed).into();
+                        Running.into(), Notified.into(), AcqRel).into();
 
                     match actual {
                         Idle => continue,

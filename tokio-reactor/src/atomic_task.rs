@@ -1,9 +1,11 @@
+#![allow(dead_code)]
+
+use super::Task;
+
 use std::fmt;
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Release};
-
-use Task;
+use std::sync::atomic::Ordering::{Acquire, Release, AcqRel};
 
 /// A synchronization primitive for task notification.
 ///
@@ -24,37 +26,115 @@ use Task;
 /// `AtomicTask` does not provide any memory ordering guarantees, as such the
 /// user should use caution and use other synchronization primitives to guard
 /// the result of the underlying computation.
-pub struct AtomicTask {
+pub(crate) struct AtomicTask {
     state: AtomicUsize,
     task: UnsafeCell<Option<Task>>,
 }
 
-/// Initial state, the `AtomicTask` is currently not being used.
-///
-/// The value `2` is picked specifically because it between the write lock &
-/// read lock values. Since the read lock is represented by an incrementing
-/// counter, this enables an atomic fetch_sub operation to be used for releasing
-/// a lock.
-const WAITING: usize = 2;
+// `AtomicTask` is a multi-consumer, single-producer transfer cell. The cell
+// stores a `Task` value produced by calls to `register` and many threads can
+// race to take the task (to notify it) by calling `notify.
+//
+// If a new `Task` instance is produced by calling `register` before an existing
+// one is consumed, then the existing one is overwritten.
+//
+// While `AtomicTask` is single-producer, the implementation ensures memory
+// safety. In the event of concurrent calls to `register`, there will be a
+// single winner whose task will get stored in the cell. The losers will not
+// have their tasks notified. As such, callers should ensure to add
+// synchronization to calls to `register`.
+//
+// The implementation uses a single `AtomicUsize` value to coordinate access to
+// the `Task` cell. There are two bits that are operated on independently. These
+// are represented by `REGISTERING` and `NOTIFYING`.
+//
+// The `REGISTERING` bit is set when a producer enters the critical section. The
+// `NOTIFYING` bit is set when a consumer enters the critical section. Neither
+// bit being set is represented by `WAITING`.
+//
+// A thread obtains an exclusive lock on the task cell by transitioning the
+// state from `WAITING` to `REGISTERING` or `NOTIFYING`, depending on the
+// operation the thread wishes to perform. When this transition is made, it is
+// guaranteed that no other thread will access the task cell.
+//
+// # Registering
+//
+// On a call to `register`, an attempt to transition the state from WAITING to
+// REGISTERING is made. On success, the caller obtains a lock on the task cell.
+//
+// If the lock is obtained, then the thread sets the task cell to the task
+// provided as an argument. Then it attempts to transition the state back from
+// `REGISTERING` -> `WAITING`.
+//
+// If this transition is successful, then the registering process is complete
+// and the next call to `notify` will observe the task.
+//
+// If the transition fails, then there was a concurrent call to `notify` that
+// was unable to access the task cell (due to the registering thread holding the
+// lock). To handle this, the registering thread removes the task it just set
+// from the cell and calls `notify` on it. This call to notify represents the
+// attempt to notify by the other thread (that set the `NOTIFYING` bit). The
+// state is then transitioned from `REGISTERING | NOTIFYING` back to `WAITING`.
+// This transition must succeed because, at this point, the state cannot be
+// transitioned by another thread.
+//
+// # Notifying
+//
+// On a call to `notify`, an attempt to transition the state from `WAITING` to
+// `NOTIFYING` is made. On success, the caller obtains a lock on the task cell.
+//
+// If the lock is obtained, then the thread takes ownership of the current value
+// in teh task cell, and calls `notify` on it. The state is then transitioned
+// back to `WAITING`. This transition must succeed as, at this point, the state
+// cannot be transitioned by another thread.
+//
+// If the thread is unable to obtain the lock, the `NOTIFYING` bit is still.
+// This is because it has either been set by the current thread but the previous
+// value included the `REGISTERING` bit **or** a concurrent thread is in the
+// `NOTIFYING` critical section. Either way, no action must be taken.
+//
+// If the current thread is the only concurrent call to `notify` and another
+// thread is in the `register` critical section, when the other thread **exits**
+// the `register` critical section, it will observe the `NOTIFYING` bit and
+// handle the notify itself.
+//
+// If another thread is in the `notify` critical section, then it will handle
+// notifying the task.
+//
+// # A potential race (is safely handled).
+//
+// Imagine the following situation:
+//
+// * Thread A obtains the `notify` lock and notifies a task.
+//
+// * Before thread A releases the `notify` lock, the notified task is scheduled.
+//
+// * Thread B attempts to notify the task. In theory this should result in the
+//   task being notified, but it cannot because thread A still holds the notify
+//   lock.
+//
+// This case is handled by requiring users of `AtomicTask` to call `register`
+// **before** attempting to observe the application state change that resulted
+// in the task being notified. The notifiers also change the application state
+// before calling notify.
+//
+// Because of this, the task will do one of two things.
+//
+// 1) Observe the application state change that Thread B is notifying on. In
+//    this case, it is OK for Thread B's notification to be lost.
+//
+// 2) Call register before attempting to observe the application state. Since
+//    Thread A still holds the `notify` lock, the call to `register` will result
+//    in the task notifying itself and get scheduled again.
 
-/// The `register` function has determined that the task is no longer current.
-/// This implies that `AtomicTask::register` is being called from a different
-/// task than is represented by the currently stored task. The write lock is
-/// obtained to update the task cell.
-const LOCKED_WRITE: usize = 0;
+/// Idle state
+const WAITING: usize = 0;
 
-/// At least one call to `notify` happened concurrently to `register` updating
-/// the task cell. This state is detected when `register` exits the mutation
-/// code and signals to `register` that it is responsible for notifying its own
-/// task.
-const LOCKED_WRITE_NOTIFIED: usize = 1;
+/// A new task value is being registered with the `AtomicTask` cell.
+const REGISTERING: usize = 0b01;
 
-
-/// The `notify` function has locked access to the task cell for notification.
-///
-/// The constant is left here mostly for documentation reasons.
-#[allow(dead_code)]
-const LOCKED_READ: usize = 3;
+/// The task currently registered with the `AtomicTask` cell is being notified.
+const NOTIFYING: usize = 0b10;
 
 impl AtomicTask {
     /// Create an `AtomicTask` initialized with the given `Task`
@@ -69,7 +149,7 @@ impl AtomicTask {
         }
     }
 
-    /// Registers the task to be notified on calls to `notify`.
+    /// Registers the provided task to be notified on calls to `notify`.
     ///
     /// The new task will take place of any previous tasks that were registered
     /// by previous calls to `register`. Any calls to `notify` that happen after
@@ -84,36 +164,75 @@ impl AtomicTask {
     /// idea. Concurrent calls to `register` will attempt to register different
     /// tasks to be notified. One of the callers will win and have its task set,
     /// but there is no guarantee as to which caller will succeed.
-    pub(crate) fn register(&self, task: Task) {
-        match self.state.compare_and_swap(WAITING, LOCKED_WRITE, Acquire) {
+    pub fn register_task(&self, task: Task) {
+        match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
             WAITING => {
                 unsafe {
-                    // Locked acquired, update the task cell
-                    *self.task.get() = Some(task);
+                    // Locked acquired, update the waker cell
+                    *self.task.get() = Some(task.clone());
 
-                    // Release the lock. If the state transitioned to
-                    // `LOCKED_NOTIFIED`, this means that an notify has been
-                    // signaled, so notify the task.
-                    if LOCKED_WRITE_NOTIFIED == self.state.swap(WAITING, Release) {
-                        (*self.task.get()).as_ref().unwrap().notify();
+                    // Release the lock. If the state transitioned to include
+                    // the `NOTIFYING` bit, this means that a notify has been
+                    // called concurrently, so we have to remove the task and
+                    // notify it.`
+                    //
+                    // Start by assuming that the state is `REGISTERING` as this
+                    // is what we jut set it to.
+                    let mut curr = REGISTERING;
+
+                    // If a task has to be notified, it will be set here.
+                    let mut notify: Option<Task> = None;
+
+                    loop {
+                        let res = self.state.compare_exchange(
+                            curr, WAITING, AcqRel, Acquire);
+
+                        match res {
+                            Ok(_) => {
+                                // The atomic exchange was successful, now
+                                // notify the task (if set) and return.
+                                if let Some(task) = notify {
+                                    task.notify();
+                                }
+
+                                return;
+                            }
+                            Err(actual) => {
+                                // This branch can only be reached if a
+                                // concurrent thread called `notify`. In this
+                                // case, `actual` **must** be `REGISTERING |
+                                // `NOTIFYING`.
+                                debug_assert_eq!(actual, REGISTERING | NOTIFYING);
+
+                                // Take the task to notify once the atomic operation has
+                                // completed.
+                                notify = (*self.task.get()).take();
+
+                                // Update `curr` for the next iteration of the
+                                // loop
+                                curr = actual;
+                            }
+                        }
                     }
                 }
             }
-            LOCKED_WRITE | LOCKED_WRITE_NOTIFIED => {
-                // A thread is concurrently calling `register`. This shouldn't
-                // happen as it doesn't really make much sense, but it isn't
-                // unsafe per se. Since two threads are concurrently trying to
-                // update the task, it's undefined which one "wins" (no ordering
-                // guarantees), so we can just do nothing.
+            NOTIFYING => {
+                // Currently in the process of notifying the task, i.e.,
+                // `notify` is currently being called on the old task handle.
+                // So, we call notify on the new task handle
+                task.notify();
             }
             state => {
-                debug_assert!(state != LOCKED_WRITE, "unexpected state LOCKED_WRITE");
-                debug_assert!(state != LOCKED_WRITE_NOTIFIED, "unexpected state LOCKED_WRITE_NOTIFIED");
-
-                // Currently in a read locked state, this implies that `notify`
-                // is currently being called on the old task handle. So, we call
-                // notify on the new task handle
-                task.notify();
+                // In this case, a concurrent thread is holding the
+                // "registering" lock. This probably indicates a bug in the
+                // caller's code as racing to call `register` doesn't make much
+                // sense.
+                //
+                // We just want to maintain memory safety. It is ok to drop the
+                // call to `register`.
+                debug_assert!(
+                    state == REGISTERING ||
+                    state == REGISTERING | NOTIFYING);
             }
         }
     }
@@ -122,49 +241,33 @@ impl AtomicTask {
     ///
     /// If `register` has not been called yet, then this does nothing.
     pub fn notify(&self) {
-        let mut curr = WAITING;
+        // AcqRel ordering is used in order to acquire the value of the `task`
+        // cell as well as to establish a `release` ordering with whatever
+        // memory the `AtomicTask` is associated with.
+        match self.state.fetch_or(NOTIFYING, AcqRel) {
+            WAITING => {
+                // The notifying lock has been acquired.
+                let task = unsafe { (*self.task.get()).take() };
 
-        loop {
-            if curr == LOCKED_WRITE {
-                // Transition the state to LOCKED_NOTIFIED
-                let actual = self.state.compare_and_swap(LOCKED_WRITE, LOCKED_WRITE_NOTIFIED, Release);
+                // Release the lock
+                self.state.fetch_and(!NOTIFYING, Release);
 
-                if curr == actual {
-                    // Success, return
-                    return;
+                if let Some(task) = task {
+                    task.notify();
                 }
-
-                // update current state variable and try again
-                curr = actual;
-
-            } else if curr == LOCKED_WRITE_NOTIFIED {
-                // Currently in `LOCKED_WRITE_NOTIFIED` state, nothing else to do.
-                return;
-
-            } else {
-                // Currently in a LOCKED_READ state, so attempt to increment the
-                // lock count.
-                let actual = self.state.compare_and_swap(curr, curr + 1, Acquire);
-
-                // Locked acquired
-                if actual == curr {
-                    // Notify the task
-                    unsafe {
-                        if let Some(ref task) = (*self.task.get()).take() {
-                            task.notify();
-                        }
-                    }
-
-                    // Release the lock
-                    self.state.fetch_sub(1, Release);
-
-                    // Done
-                    return;
-                }
-
-                // update current state variable and try again
-                curr = actual;
-
+            }
+            state => {
+                // There is a concurrent thread currently updating the
+                // associated task.
+                //
+                // Nothing more to do as the `NOTIFYING` bit has been set. It
+                // doesn't matter if there are concurrent registering threads or
+                // not.
+                //
+                debug_assert!(
+                    state == REGISTERING ||
+                    state == REGISTERING | NOTIFYING ||
+                    state == NOTIFYING);
             }
         }
     }

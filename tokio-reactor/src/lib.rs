@@ -42,8 +42,8 @@ extern crate tokio_io;
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
-pub(crate) mod background;
 mod atomic_task;
+pub(crate) mod background;
 mod poll_evented;
 mod registration;
 
@@ -588,7 +588,7 @@ impl Inner {
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
-        task.register(t);
+        task.register_task(t);
 
         if sched.readiness.load(SeqCst) & ready.as_usize() != 0 {
             task.notify();
