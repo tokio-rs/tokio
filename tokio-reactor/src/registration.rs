@@ -411,7 +411,7 @@ impl Registration {
 
                     if actual != state {
                         // Back out of the node boxing
-                        let mut n = unsafe { Box::from_raw(node_ptr) };
+                        let n = unsafe { Box::from_raw(node_ptr) };
 
                         // Save this for next loop
                         node = Some(n);
