@@ -104,14 +104,21 @@
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 
-use reactor::{Reactor, Handle, Background};
+mod builder;
+mod shutdown;
+mod task_executor;
 
-use tokio_threadpool::{self as threadpool, ThreadPool, Sender};
-use futures::Poll;
-use futures::future::{self, Future};
+pub use self::builder::Builder;
+pub use self::shutdown::Shutdown;
+pub use self::task_executor::TaskExecutor;
 
-use std::{fmt, io};
+use reactor::{Background, Handle};
 
+use std::io;
+
+use tokio_threadpool as threadpool;
+
+use futures::future::Future;
 #[cfg(feature = "unstable-futures")]
 use futures2;
 
@@ -128,29 +135,13 @@ pub struct Runtime {
     inner: Option<Inner>,
 }
 
-/// Executes futures on the runtime
-///
-/// All futures spawned using this executor will be submitted to the associated
-/// Runtime's executor. This executor is usually a thread pool.
-///
-/// For more details, see the [module level](index.html) documentation.
-#[derive(Debug, Clone)]
-pub struct TaskExecutor {
-    inner: Sender,
-}
-
-/// A future that resolves when the Tokio `Runtime` is shut down.
-pub struct Shutdown {
-    inner: Box<Future<Item = (), Error = ()> + Send>,
-}
-
 #[derive(Debug)]
 struct Inner {
     /// Reactor running on a background thread.
     reactor: Background,
 
     /// Task execution pool.
-    pool: ThreadPool,
+    pool: threadpool::ThreadPool,
 }
 
 // ===== impl Runtime =====
@@ -227,27 +218,7 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        // Spawn a reactor on a background thread.
-        let reactor = Reactor::new()?.background()?;
-
-        // Get a handle to the reactor.
-        let handle = reactor.handle().clone();
-
-        let pool = threadpool::Builder::new()
-            .name_prefix("tokio-runtime-worker-")
-            .around_worker(move |w, enter| {
-                ::tokio_reactor::with_default(&handle, enter, |_| {
-                    w.run();
-                });
-            })
-            .build();
-
-        Ok(Runtime {
-            inner: Some(Inner {
-                reactor,
-                pool,
-            }),
-        })
+        Builder::new().build()
     }
 
     /// Return a reference to the reactor handle for this runtime instance.
@@ -386,127 +357,5 @@ impl Drop for Runtime {
             let shutdown = Shutdown::shutdown_now(inner);
             let _ = shutdown.wait();
         }
-    }
-}
-
-// ===== impl TaskExecutor =====
-
-impl TaskExecutor {
-    /// Spawn a future onto the Tokio runtime.
-    ///
-    /// This spawns the given future onto the runtime's executor, usually a
-    /// thread pool. The thread pool is then responsible for polling the future
-    /// until it completes.
-    ///
-    /// See [module level][mod] documentation for more details.
-    ///
-    /// [mod]: index.html
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
-    /// # use futures::{future, Future, Stream};
-    /// use tokio::runtime::Runtime;
-    ///
-    /// # fn dox() {
-    /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
-    /// let executor = rt.executor();
-    ///
-    /// // Spawn a future onto the runtime
-    /// executor.spawn(future::lazy(|| {
-    ///     println!("now running on a worker thread");
-    ///     Ok(())
-    /// }));
-    /// # }
-    /// # pub fn main() {}
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the spawn fails. Failure occurs if the executor
-    /// is currently at capacity and is unable to spawn a new future.
-    pub fn spawn<F>(&self, future: F)
-    where F: Future<Item = (), Error = ()> + Send + 'static,
-    {
-        self.inner.spawn(future).unwrap();
-    }
-}
-
-impl<T> future::Executor<T> for TaskExecutor
-where T: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
-        self.inner.execute(future)
-    }
-}
-
-impl ::executor::Executor for TaskExecutor {
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), ::executor::SpawnError>
-    {
-        self.inner.spawn(future)
-    }
-
-    #[cfg(feature = "unstable-futures")]
-    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
-        -> Result<(), futures2::executor::SpawnError>
-    {
-        self.inner.spawn2(future)
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::executor::Executor for TaskExecutor {
-    fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
-        futures2::executor::Executor::spawn(&mut self.inner, f)
-    }
-
-    fn status(&self) -> Result<(), futures2::executor::SpawnError> {
-        futures2::executor::Executor::status(&self.inner)
-    }
-}
-
-
-// ===== impl Shutdown =====
-
-impl Shutdown {
-    fn shutdown_now(inner: Inner) -> Self {
-        let inner = Box::new({
-            let pool = inner.pool;
-            let reactor = inner.reactor;
-
-            pool.shutdown_now().and_then(|_| {
-                reactor.shutdown_now()
-                    .then(|_| {
-                        Ok(())
-                    })
-            })
-        });
-
-        Shutdown { inner }
-    }
-}
-
-impl Future for Shutdown {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        try_ready!(self.inner.poll());
-        Ok(().into())
-    }
-}
-
-impl fmt::Debug for Shutdown {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Shutdown")
-            .field("inner", &"Box<Future<Item = (), Error = ()>>")
-            .finish()
     }
 }
