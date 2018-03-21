@@ -48,7 +48,7 @@ fn accept() {
     let client = srv.incoming().map(move |t| {
         tx.send(()).unwrap();
         t
-    }).into_future().map_err(|e| e.0);
+    }).next().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
     let t = thread::spawn(move || {
         net::TcpStream::connect(&addr).unwrap()
@@ -76,7 +76,7 @@ fn accept2() {
     let client = srv.incoming().map(move |t| {
         tx.send(()).unwrap();
         t
-    }).into_future().map_err(|e| e.0);
+    }).next().map_err(|e| e.0);
     assert!(rx.try_recv().is_err());
 
     let (mine, _remaining) = t!(block_on(client));
