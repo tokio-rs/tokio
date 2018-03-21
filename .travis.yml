@@ -13,11 +13,13 @@ matrix:
 
 script:
   - |
+    set -e
     if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
     then
         cargo build --benches --all
     fi
   - |
+    set -e
     if [[ "$TARGET" ]]
     then
         rustup target add $TARGET
