@@ -42,7 +42,7 @@ fn echo_server() {
     });
 
     let clients = srv.incoming();
-    let client = clients.into_future().map(|e| e.0.unwrap()).map_err(|e| e.0);
+    let client = clients.next().map(|e| e.0.unwrap()).map_err(|e| e.0);
     let halves = client.map(|s| s.split());
     let copied = halves.and_then(|(a, b)| a.copy_into(b));
 
