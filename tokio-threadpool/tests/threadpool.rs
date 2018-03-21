@@ -16,7 +16,13 @@ use futures::future::lazy;
 #[cfg(feature = "unstable-futures")]
 use futures2::prelude::*;
 #[cfg(feature = "unstable-futures")]
-use futures2::future::lazy;
+fn lazy<R, F>(f: F) -> Box<Future<Item = R::Item, Error = R::Error> + Send> where
+    F: Send + 'static + FnOnce() -> R,
+    R: Send + 'static + IntoFuture,
+    R::Future: Send,
+{
+    Box::new(::futures2::future::lazy(|_| f()))
+}
 
 use std::cell::Cell;
 use std::sync::{mpsc, Arc};
@@ -416,7 +422,13 @@ fn many_multishot_futures() {
         }
 
         for final_rx in final_rxs {
-            block_on(final_rx.into_future()).unwrap();
+            {#![cfg(feature = "unstable-futures")]
+             block_on(final_rx.next()).unwrap();
+            }
+
+            {#![cfg(not(feature = "unstable-futures"))]
+             block_on(final_rx.into_future()).unwrap();
+            }
         }
 
         // Shutdown the pool

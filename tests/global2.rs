@@ -34,7 +34,7 @@ fn hammer() {
             let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
             let addr = t!(srv.local_addr());
             let mine = TcpStream::connect(&addr);
-            let theirs = srv.incoming().into_future()
+            let theirs = srv.incoming().next()
                 .map(|(s, _)| s.unwrap())
                 .map_err(|(s, _)| s);
             let (mine, theirs) = t!(block_on(mine.join(theirs)));
