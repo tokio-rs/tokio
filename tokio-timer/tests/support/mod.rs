@@ -1,3 +1,5 @@
+#![allow(unused_macros)]
+
 use tokio_executor::park::{Park, Unpark};
 use tokio_timer::{Timer, Now};
 
@@ -7,6 +9,18 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, Duration};
+
+macro_rules! assert_ready {
+    ($f:expr) => {
+        assert!($f.poll().unwrap().is_ready());
+    }
+}
+
+macro_rules! assert_not_ready {
+    ($f:expr) => {
+        assert!(!$f.poll().unwrap().is_ready());
+    }
+}
 
 #[derive(Debug)]
 pub struct MockTime {
@@ -44,8 +58,24 @@ pub fn ms(num: u64) -> Duration {
     Duration::from_millis(num)
 }
 
-pub fn turn(timer: &mut Timer<MockPark, MockNow>, duration: Duration) {
-    timer.turn(Some(duration)).unwrap();
+pub trait IntoTimeout {
+    fn into_timeout(self) -> Option<Duration>;
+}
+
+impl IntoTimeout for Option<Duration> {
+    fn into_timeout(self) -> Self {
+        self
+    }
+}
+
+impl IntoTimeout for Duration {
+    fn into_timeout(self) -> Option<Duration> {
+        Some(self)
+    }
+}
+
+pub fn turn<T: IntoTimeout>(timer: &mut Timer<MockPark, MockNow>, duration: T) {
+    timer.turn(duration.into_timeout()).unwrap();
 }
 
 pub fn mocked<F, R>(f: F) -> R
