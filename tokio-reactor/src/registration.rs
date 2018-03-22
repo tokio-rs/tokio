@@ -6,7 +6,7 @@ use mio::{self, Evented};
 #[cfg(feature = "unstable-futures")]
 use futures2;
 
-use std::{io, mem, usize};
+use std::{io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -68,7 +68,7 @@ struct Inner {
 struct Node {
     direction: Direction,
     task: Task,
-    next: Option<Box<Node>>,
+    next: *mut Node,
 }
 
 /// Initial state. The handle is not set and the registration is idle.
@@ -197,40 +197,35 @@ impl Registration {
                     // are pending readiness notifications.
                     let actual = self.state.swap(READY, SeqCst);
 
-                    // Consume the stack of nodes.
-                    let ptr = actual & !LIFECYCLE_MASK;
+                    // Consume the stack of nodes
 
-                    if ptr != 0 {
-                        let mut read = false;
-                        let mut write = false;
-                        let mut curr = unsafe { Box::from_raw(ptr as *mut Node) };
+                    let mut read = false;
+                    let mut write = false;
+                    let mut ptr = (actual & !LIFECYCLE_MASK) as *mut Node;
 
-                        let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
+                    let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
 
-                        loop {
-                            let node = *curr;
-                            let Node {
-                                direction,
-                                task,
-                                next,
-                            } = node;
+                    while !ptr.is_null() {
+                        let node = unsafe { Box::from_raw(ptr) };
+                        let node = *node;
+                        let Node {
+                            direction,
+                            task,
+                            next,
+                        } = node;
 
-                            let flag = match direction {
-                                Direction::Read => &mut read,
-                                Direction::Write => &mut write,
-                            };
+                        let flag = match direction {
+                            Direction::Read => &mut read,
+                            Direction::Write => &mut write,
+                        };
 
-                            if !*flag {
-                                *flag = true;
+                        if !*flag {
+                            *flag = true;
 
-                                inner.register(direction, task);
-                            }
-
-                            match next {
-                                Some(next) => curr = next,
-                                None => break,
-                            }
+                            inner.register(direction, task);
                         }
+
+                        ptr = next;
                     }
 
                     return res.map(|_| true);
@@ -388,41 +383,35 @@ impl Registration {
                     let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
                     return inner.poll_ready(direction, notify, task);
                 }
-                _ => {
+                LOCKED => {
                     if !notify {
                         // Skip the notification tracking junk.
                         return Ok(None);
                     }
 
-                    let ptr = state & !LIFECYCLE_MASK;
+                    let next_ptr = (state & !LIFECYCLE_MASK) as *mut Node;
+
+                    let task = task();
 
                     // Get the node
                     let mut n = node.take().unwrap_or_else(|| {
                         Box::new(Node {
                             direction,
-                            task: task(),
-                            next: None,
+                            task: task,
+                            next: ptr::null_mut(),
                         })
                     });
 
-                    n.next = if ptr == 0 {
-                        None
-                    } else {
-                        // Great care must be taken of the CAS fails
-                        Some(unsafe { Box::from_raw(ptr as *mut Node) })
-                    };
+                    n.next = next_ptr;
 
-                    let ptr = Box::into_raw(n);
-                    let next = ptr as usize | (state & LIFECYCLE_MASK);
+                    let node_ptr = Box::into_raw(n);
+                    let next = node_ptr as usize | (state & LIFECYCLE_MASK);
 
                     let actual = self.state.compare_and_swap(state, next, SeqCst);
 
                     if actual != state {
                         // Back out of the node boxing
-                        let mut n = unsafe { Box::from_raw(ptr) };
-
-                        // We don't really own this
-                        mem::forget(n.next.take());
+                        let n = unsafe { Box::from_raw(node_ptr) };
 
                         // Save this for next loop
                         node = Some(n);
@@ -433,6 +422,7 @@ impl Registration {
 
                     return Ok(None);
                 }
+                _ => unreachable!(),
             }
         }
     }
@@ -532,10 +522,11 @@ impl Inner {
             sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
         if ready.is_empty() && notify {
+            let task = task();
             // Update the task info
             match direction {
-                Direction::Read => sched.reader.register(task()),
-                Direction::Write => sched.writer.register(task()),
+                Direction::Read => sched.reader.register_task(task),
+                Direction::Write => sched.writer.register_task(task),
             }
 
             // Try again

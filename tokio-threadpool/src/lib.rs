@@ -936,9 +936,10 @@ impl Future for Shutdown {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
+        use futures::task;
         trace!("Shutdown::poll");
 
-        self.inner().shutdown_task.task1.register();
+        self.inner().shutdown_task.task1.register_task(task::current());
 
         if 0 != self.inner().num_workers.load(Acquire) {
             return Ok(Async::NotReady);
