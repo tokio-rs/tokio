@@ -171,3 +171,26 @@ fn very_long_sleep() {
         assert_eq!(time.advanced(), ms(YR_5));
     })
 }
+
+#[test]
+fn unpark_is_delayed() {
+    mocked(|timer, time| {
+        let mut sleep1 = Sleep::new(time.now() + ms(100));
+        let mut sleep2 = Sleep::new(time.now() + ms(101));
+        let mut sleep3 = Sleep::new(time.now() + ms(200));
+
+        assert_not_ready!(sleep1);
+        assert_not_ready!(sleep2);
+        assert_not_ready!(sleep3);
+
+        time.park_for(ms(500));
+
+        turn(timer, None);
+
+        assert_eq!(time.advanced(), ms(500));
+
+        assert_ready!(sleep1);
+        assert_ready!(sleep2);
+        assert_ready!(sleep3);
+    })
+}

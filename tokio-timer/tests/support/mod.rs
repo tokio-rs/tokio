@@ -52,6 +52,7 @@ struct State {
     base: Instant,
     advance: Duration,
     unparked: bool,
+    park_for: Option<Duration>,
 }
 
 pub fn ms(num: u64) -> Duration {
@@ -103,6 +104,7 @@ impl MockTime {
             base: Instant::now(),
             advance: Duration::default(),
             unparked: false,
+            park_for: None,
         };
 
         MockTime {
@@ -135,6 +137,12 @@ impl MockTime {
     pub fn advanced(&self) -> Duration {
         self.inner.lock().unwrap().advance
     }
+
+    /// The next call to park_timeout will be for this duration, regardless of
+    /// the timeout passed to `park_timeout`.
+    pub fn park_for(&self, duration: Duration) {
+        self.inner.lock().unwrap().park_for = Some(duration);
+    }
 }
 
 impl Park for MockPark {
@@ -147,11 +155,24 @@ impl Park for MockPark {
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        unimplemented!();
+        let mut inner = self.inner.lock().unwrap();
+
+        let duration = inner.park_for.take()
+            .expect("call park_for first");
+
+        inner.advance(duration);
+        Ok(())
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.inner.lock().unwrap().advance(duration);
+        let mut inner = self.inner.lock().unwrap();
+
+        if let Some(duration) = inner.park_for.take() {
+            inner.advance(duration);
+        } else {
+            inner.advance(duration);
+        }
+
         Ok(())
     }
 }
