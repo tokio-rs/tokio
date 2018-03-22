@@ -19,11 +19,23 @@ pub struct Timer<T, N = SystemNow> {
     /// Shared state
     inner: Arc<Inner>,
 
-    /// Timer state.
+    /// The instant at which the timer started running.
+    start: Instant,
+
+    /// The number of milliseconds elapsed since the timer started.
+    elapsed: u64,
+
+    /// Timer wheel.
     ///
-    /// Currently, this is just a set of active timer entries. This should be
-    /// changed to a hierarchical hashed wheel.
-    state: Vec<Arc<Entry>>,
+    /// Levels:
+    ///
+    /// * 1 ms slots / 64 ms range
+    /// * 64 ms slots / ~ 4 sec range
+    /// * ~ 4 sec slots / ~ 4 min range
+    /// * ~ 4 min slots / ~ 4 hr range
+    /// * ~ 4 hr slots / ~ 12 day range
+    /// * ~ 12 day slots / ~ 2 yr range
+    levels: Vec<Level>,
 
     /// Thread parker. The `Timer` park implementation delegates to this.
     park: T,
@@ -70,22 +82,57 @@ pub struct Entry {
     /// Timer internals
     inner: Weak<Inner>,
 
-    /// Next entry in the "process" linked list.
-    /// `Sleep` deadline
-    deadline: Instant,
-
     /// Task to notify once the deadline is reached.
     task: AtomicTask,
 
     /// Tracks the entry state
     state: AtomicUsize,
 
+    /// Next entry in the "process" linked list.
+    ///
     /// Represents a strong Arc ref.
-    next: UnsafeCell<*mut Entry>,
+    next_queue: UnsafeCell<*mut Entry>,
+
+    /// `Sleep` deadline
+    deadline: Instant,
+
+    /// Next entry in the State's linked list.
+    ///
+    /// This is only accessed by the timer
+    next_state: UnsafeCell<Option<Arc<Entry>>>,
+
+    /// Previous entry in the State's linked list.
+    ///
+    /// This is only accessed by the timer and is used to unlink a canceled
+    /// entry.
+    ///
+    /// This is a weak reference.
+    prev_state: UnsafeCell<*const Entry>,
+}
+
+pub struct Level {
+    level: usize,
+
+    /// Tracks which slot entries are occupied.
+    occupied: u64,
+
+    /// Slots
+    slot: [Option<Arc<Entry>>; LEVEL_MULT],
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 struct State(usize);
+
+/// Number of levels
+const NUM_LEVELS: usize = 6;
+
+/// Level multiplier.
+///
+/// Being a power of 2 is very important.
+const LEVEL_MULT: usize = 64;
+
+/// The maximum duration of a sleep
+const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
 
 /// Maximum number of timeouts the system can handle concurrently.
 const MAX_TIMEOUTS: usize = usize::MAX >> 1;
@@ -119,12 +166,18 @@ impl<T, N> Timer<T, N>
 where T: Park,
       N: Now,
 {
-    pub fn new_with_now(park: T, now: N) -> Self {
+    pub fn new_with_now(park: T, mut now: N) -> Self {
         let unpark = Box::new(park.unpark());
+
+        let levels = (0..NUM_LEVELS)
+            .map(Level::new)
+            .collect();
 
         Timer {
             inner: Arc::new(Inner::new(unpark)),
-            state: vec![],
+            start: now.now(),
+            elapsed: 0,
+            levels,
             park,
             now,
         }
@@ -149,13 +202,26 @@ where T: Park,
 
     /// Returns the instant at which the next timeout expires.
     fn next_expiration(&self) -> Option<Instant> {
-        self.state.iter()
-            .filter_map(|entry| entry.deadline())
-            .min()
+        // Check all levels
+        for level in 0..NUM_LEVELS {
+            let occupied = match self.levels[level].next_occupied_slot() {
+                Some(occupied) => occupied,
+                None => continue,
+            };
+
+            let level_start = self.elapsed - (self.elapsed % level_range(level));
+            let slot_start = level_start + occupied as u64 * slot_range(level);
+
+            return Some(self.start + Duration::from_millis(slot_start));
+        }
+
+        None
     }
 
     /// Run timer related logic
     fn process(&mut self) {
+        unimplemented!();
+        /*
         let now = self.now.now();
 
         for i in (0..self.state.len()).rev() {
@@ -170,6 +236,7 @@ where T: Park,
                 self.state.remove(i);
             }
         }
+        */
     }
 
     /// Process the entry queue
@@ -182,7 +249,7 @@ where T: Park,
             let entry = unsafe { Arc::from_raw(ptr) };
 
             // Get the next entry
-            ptr = unsafe { (*entry.next.get()) };
+            ptr = unsafe { (*entry.next_queue.get()) };
 
             // Check the entry state
             if entry.is_elapsed() {
@@ -194,13 +261,51 @@ where T: Park,
     }
 
     fn clear_entry(&mut self, entry: Arc<Entry>) {
-        self.state.retain(|e| {
-            &**e as *const _ != &*entry as *const _
-        })
+        let when = self.normalize_deadline(&entry);
+
+        if when <= self.elapsed {
+            // The entry is no longer contained by the timer.
+            return;
+        }
+
+        // Get the level at which the entry should be stored
+        let level = level_for(when - self.elapsed);
+
+        self.levels[level].remove_entry(&entry, when);
     }
 
     fn add_entry(&mut self, entry: Arc<Entry>) {
-        self.state.push(entry);
+        // Avoid an underflow subtraction
+        if entry.deadline < self.start {
+            entry.fire();
+            return;
+        }
+
+        // Convert the duration to millis
+        let when = self.normalize_deadline(&entry);
+
+        // If the entry's deadline is in the past or present, trigger it.
+        if when <= self.elapsed {
+            entry.fire();
+            return;
+        }
+
+        // Get the level at which the entry should be stored
+        let level = level_for(when - self.elapsed);
+
+        self.levels[level].add_entry(entry, when);
+    }
+
+    fn normalize_deadline(&self, entry: &Entry) -> u64 {
+        // Convert the duration to millis
+        let mut when = ms(entry.deadline - self.start);
+
+        // Just cap at MAX_DURATION. This is a really long time...
+        if when > MAX_DURATION {
+            when = MAX_DURATION;
+        }
+
+        when
     }
 }
 
@@ -273,13 +378,9 @@ impl<T, N> Drop for Timer<T, N> {
             let entry = unsafe { Arc::from_raw(ptr) };
 
             // Get the next entry
-            ptr = unsafe { (*entry.next.get()) };
+            ptr = unsafe { (*entry.next_queue.get()) };
 
             // The entry must be flagged as errored
-            entry.error();
-        }
-
-        for entry in self.state.drain(..) {
             entry.error();
         }
     }
@@ -365,10 +466,12 @@ impl Registration {
 
         let entry = Arc::new(Entry {
             inner: handle.inner.clone(),
-            deadline: deadline,
             task: AtomicTask::new(),
             state: AtomicUsize::new(0),
-            next: UnsafeCell::new(ptr::null_mut()),
+            next_queue: UnsafeCell::new(ptr::null_mut()),
+            deadline: deadline,
+            next_state: UnsafeCell::new(None),
+            prev_state: UnsafeCell::new(ptr::null_mut()),
         });
 
         inner.queue(&entry)?;
@@ -463,7 +566,7 @@ impl Inner {
             // Update the `next` pointer. This is safe because setting the queued
             // bit is a "lock" on this field.
             unsafe {
-                *(entry.next.get()) = curr;
+                *(entry.next_queue.get()) = curr;
             }
 
             let actual = self.process_head.compare_and_swap(curr, ptr, SeqCst);
@@ -485,6 +588,176 @@ impl Inner {
 impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Inner")
+            .finish()
+    }
+}
+
+// ===== impl Level =====
+
+impl Level {
+    fn new(level: usize) -> Level {
+        Level {
+            level,
+            occupied: 0,
+            slot: [
+                // It does not look like the necessary traits are
+                // derived for [T; 64].
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+            ],
+        }
+    }
+
+    fn next_occupied_slot(&self) -> Option<usize> {
+        next_occupied_slot(self.occupied)
+    }
+
+    fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
+        let slot = slot_for(when, self.level);
+
+        push_entry(&mut self.slot[slot], entry);
+        self.occupied |= occupied_bit(slot);
+    }
+
+    fn remove_entry(&mut self, entry: &Entry, when: u64) {
+        let slot = slot_for(when, self.level);
+
+        remove_entry(&mut self.slot[slot], entry);
+
+        if self.slot[slot].is_none() {
+            // The bit is currently set
+            debug_assert!(self.occupied & occupied_bit(slot) != 0);
+
+            // Unset the bit
+            self.occupied ^= occupied_bit(slot);
+        }
+    }
+
+    fn pop_entry_slot(&mut self, slot: usize) -> Option<Arc<Entry>> {
+        let ret = pop_entry(&mut self.slot[slot]);
+
+        if ret.is_some() && self.slot[slot].is_none() {
+            // The bit is currently set
+            debug_assert!(self.occupied & occupied_bit(slot) != 0);
+
+            self.occupied ^= occupied_bit(slot);
+        }
+
+        ret
+    }
+}
+
+fn occupied_bit(slot: usize) -> u64 {
+    (1 << slot)
+}
+
+fn next_occupied_slot(occupied: u64) -> Option<usize> {
+    if occupied == 0 {
+        return None;
+    }
+
+    let zeros = occupied.leading_zeros();
+    Some((63 - zeros) as usize)
+}
+
+fn slot_range(level: usize) -> u64 {
+    LEVEL_MULT.pow(level as u32) as u64
+}
+
+fn level_range(level: usize) -> u64 {
+    LEVEL_MULT as u64 * slot_range(level)
+}
+
+/// Push an entry to the head of the linked list
+fn push_entry(head: &mut Option<Arc<Entry>>, entry: Arc<Entry>) {
+    // Get a pointer to the entry to for the prev link
+    let ptr = &*entry as *const _;
+
+    // Remove the old head entry
+    let old = head.take();
+
+    unsafe {
+        if let Some(ref entry) = old.as_ref() {
+            // Set the previous link on the old head
+            *entry.prev_state.get() = ptr;
+        }
+
+        // Set this entry's next pointer
+        *entry.next_state.get() = old;
+
+    }
+
+    // Update the head pointer
+    *head = Some(entry);
+}
+
+/// Pop the head of the linked list
+fn pop_entry(head: &mut Option<Arc<Entry>>) -> Option<Arc<Entry>> {
+    let entry = head.take();
+
+    unsafe {
+        if let Some(entry) = entry.as_ref() {
+            *head = (*entry.next_state.get()).take();
+
+            if let Some(entry) = head.as_ref() {
+                *entry.prev_state.get() = ptr::null();
+            }
+
+            *entry.prev_state.get() = ptr::null();
+        }
+    }
+
+    entry
+}
+
+/// Remove the entry from the linked list
+///
+/// The caller must ensure that the entry actually is contained by the list.
+fn remove_entry(head: &mut Option<Arc<Entry>>, entry: &Entry) {
+    unsafe {
+        // Unlink `entry` from the next node
+        let next = (*entry.next_state.get()).take();
+
+        if let Some(next) = next.as_ref() {
+            (*next.prev_state.get()) = *entry.prev_state.get();
+        }
+
+        // Unlink `entry` from the prev node
+
+        if let Some(prev) = (*entry.prev_state.get()).as_ref() {
+            *prev.next_state.get() = next;
+        } else {
+            // It is the head
+            *head = next;
+        }
+
+        // Unset the prev pointer
+        *entry.prev_state.get() = ptr::null();
+    }
+}
+
+impl Drop for Level {
+    fn drop(&mut self) {
+        while let Some(slot) = self.next_occupied_slot() {
+            // This should always have one
+            let entry = self.pop_entry_slot(slot)
+                .expect("occupied bit set invalid");
+
+            entry.error();
+        }
+    }
+}
+
+impl fmt::Debug for Level {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Level")
+            .field("occupied", &self.occupied)
             .finish()
     }
 }
@@ -598,5 +871,70 @@ impl From<usize> for State {
 impl From<State> for usize {
     fn from(src: State) -> Self {
         src.0
+    }
+}
+
+
+/// Convert a `Duration` to milliseconds, rounding up and saturating at
+/// `u64::MAX`.
+///
+/// The saturating is fine because `u64::MAX` milliseconds are still many
+/// million years.
+fn ms(duration: Duration) -> u64 {
+    const NANOS_PER_MILLI: u32 = 1_000_000;
+    const MILLIS_PER_SEC: u64 = 1_000;
+
+    // Round up.
+    let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
+    duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
+}
+
+/// Convert a duration (milliseconds) to a level
+fn level_for(duration: u64) -> usize {
+    debug_assert!(duration > 0);
+
+    // 63 is picked to offset this by 1. A duration of 0 is prohibited, so this
+    // cannot underflow.
+    let significant = 63 - duration.leading_zeros() as usize;
+    significant / 6
+}
+
+/// Convert a duration (milliseconds) and a level to a slot position
+fn slot_for(duration: u64, level: usize) -> usize {
+    ((duration >> (level * 6)) % LEVEL_MULT as u64) as usize
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_level_and_slot_for() {
+        for pos in 1..64 {
+            assert_eq!(0, level_for(pos), "level_for({}) -- binary = {:b}", pos, pos);
+            assert_eq!(pos as usize, slot_for(pos, 0));
+        }
+
+        for level in 1..5 {
+            for pos in level..64 {
+                let a = pos * 64_usize.pow(level as u32);
+                assert_eq!(level, level_for(a as u64),
+                           "level_for({}) -- binary = {:b}", a, a);
+
+                assert_eq!(pos as usize, slot_for(a as u64, level));
+
+                if pos > level {
+                    let a = a - 1;
+                    assert_eq!(level, level_for(a as u64),
+                               "level_for({}) -- binary = {:b}", a, a);
+                }
+
+                if pos < 64 {
+                    let a = a + 1;
+                    assert_eq!(level, level_for(a as u64),
+                               "level_for({}) -- binary = {:b}", a, a);
+                }
+            }
+        }
     }
 }
