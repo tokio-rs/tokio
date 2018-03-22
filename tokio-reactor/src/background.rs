@@ -137,7 +137,7 @@ impl Future for Shutdown {
 
     fn poll(&mut self) -> Poll<(), ()> {
         let task = Task::Futures1(task::current());
-        self.inner.shared.shutdown_task.register(task);
+        self.inner.shared.shutdown_task.register_task(task);
 
         if !self.inner.is_shutdown() {
             return Ok(Async::NotReady);

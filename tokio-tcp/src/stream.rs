@@ -139,6 +139,14 @@ impl TcpStream {
         self.io.poll_read_ready(mask)
     }
 
+    /// Like `poll_read_ready`, but compatible with futures 0.2
+    #[cfg(feature = "unstable-futures")]
+    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context, mask: mio::Ready)
+        -> futures2::Poll<mio::Ready, io::Error>
+    {
+        self.io.poll_read_ready2(cx, mask)
+    }
+
     /// Check the TCP stream's write readiness state.
     ///
     /// This always checks for writable readiness and also checks for HUP
@@ -158,6 +166,14 @@ impl TcpStream {
     /// * called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.io.poll_write_ready()
+    }
+
+    /// Like `poll_write_ready`, but compatible with futures 0.2.
+    #[cfg(feature = "unstable-futures")]
+    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
+        -> futures2::Poll<mio::Ready, io::Error>
+    {
+        self.io.poll_write_ready2(cx)
     }
 
     /// Returns the local address that this stream is bound to.
@@ -395,6 +411,16 @@ impl futures2::io::AsyncRead for TcpStream {
     {
         futures2::io::AsyncRead::poll_read(&mut self.io, cx, buf)
     }
+
+    fn poll_vectored_read(&mut self, cx: &mut futures2::task::Context, vec: &mut [&mut IoVec])
+        -> futures2::Poll<usize, io::Error>
+    {
+        futures2::io::AsyncRead::poll_vectored_read(&mut &*self, cx, vec)
+    }
+
+    unsafe fn initializer(&self) -> futures2::io::Initializer {
+        futures2::io::Initializer::nop()
+    }
 }
 
 impl AsyncWrite for TcpStream {
@@ -413,6 +439,12 @@ impl futures2::io::AsyncWrite for TcpStream {
         -> futures2::Poll<usize, io::Error>
     {
         futures2::io::AsyncWrite::poll_write(&mut self.io, cx, buf)
+    }
+
+    fn poll_vectored_write(&mut self, cx: &mut futures2::task::Context, vec: &[&IoVec])
+        -> futures2::Poll<usize, io::Error>
+    {
+        futures2::io::AsyncWrite::poll_vectored_write(&mut &*self, cx, vec)
     }
 
     fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
@@ -503,6 +535,31 @@ impl<'a> futures2::io::AsyncRead for &'a TcpStream {
     {
         futures2::io::AsyncRead::poll_read(&mut &self.io, cx, buf)
     }
+
+    fn poll_vectored_read(&mut self, cx: &mut futures2::task::Context, vec: &mut [&mut IoVec])
+        -> futures2::Poll<usize, io::Error>
+    {
+        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
+            return Ok(futures2::Async::Pending)
+        }
+
+        let r = self.io.get_ref().read_bufs(vec);
+
+        match r {
+            Ok(n) => {
+                Ok(futures2::Async::Ready(n))
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
+                Ok(futures2::Async::Pending)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    unsafe fn initializer(&self) -> futures2::io::Initializer {
+        futures2::io::Initializer::nop()
+    }
 }
 
 impl<'a> AsyncWrite for &'a TcpStream {
@@ -545,6 +602,27 @@ impl<'a> futures2::io::AsyncWrite for &'a TcpStream {
         -> futures2::Poll<usize, io::Error>
     {
         futures2::io::AsyncWrite::poll_write(&mut &self.io, cx, buf)
+    }
+
+    fn poll_vectored_write(&mut self, cx: &mut futures2::task::Context, vec: &[&IoVec])
+        -> futures2::Poll<usize, io::Error>
+    {
+        if let futures2::Async::Pending = self.io.poll_write_ready2(cx)? {
+            return Ok(futures2::Async::Pending)
+        }
+
+        let r = self.io.get_ref().write_bufs(vec);
+
+        match r {
+            Ok(n) => {
+                Ok(futures2::Async::Ready(n))
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_write_ready()?;
+                Ok(futures2::Async::Pending)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {

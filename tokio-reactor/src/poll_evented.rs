@@ -647,9 +647,9 @@ impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
 
 impl<E: Evented> Drop for PollEvented<E> {
     fn drop(&mut self) {
-        if let Some(io) = self.io.as_ref() {
+        if let Some(io) = self.io.take() {
             // Ignore errors
-            let _ = self.inner.registration.deregister(io);
+            let _ = self.inner.registration.deregister(&io);
         }
     }
 }

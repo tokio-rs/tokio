@@ -94,7 +94,7 @@ impl TcpListener {
     /// Attempt to accept a connection and create a new connected `TcpStream` if
     /// successful.
     ///
-    /// This function is the asme as `accept` above except that it returns a
+    /// This function is the same as `accept` above except that it returns a
     /// `std::net::TcpStream` instead of a `tokio::net::TcpStream`. This in turn
     /// can then allow for the TCP stream to be assoiated with a different
     /// reactor than the one this `TcpListener` is associated with.
@@ -195,6 +195,16 @@ impl TcpListener {
     ///
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
+    ///
+    /// # Errors
+    ///
+    /// Note that accepting a connection can lead to various errors and not all of them are
+    /// necessarily fatal ‒ for example having too many open file descriptors or the other side
+    /// closing the connection while it waits in an accept queue. These would terminate the stream
+    /// if not handled in any way.
+    ///
+    /// If aiming for production, decision what to do about them must be made. The
+    /// [`tk-listen`](https://crates.io/crates/tk-listen) crate might be of some help.
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
     }

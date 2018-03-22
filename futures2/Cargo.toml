@@ -8,4 +8,4 @@ repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 
 [dependencies]
-futures = "0.2.0-alpha"
+futures = "=0.2.0-beta"

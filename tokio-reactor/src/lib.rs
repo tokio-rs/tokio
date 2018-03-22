@@ -42,8 +42,8 @@ extern crate tokio_io;
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
-pub(crate) mod background;
 mod atomic_task;
+pub(crate) mod background;
 mod poll_evented;
 mod registration;
 
@@ -120,6 +120,9 @@ struct Inner {
     /// The underlying system event queue.
     io: mio::Poll,
 
+    /// ABA guard counter
+    next_aba_guard: AtomicUsize,
+
     /// Dispatch slabs for I/O and futures events
     io_dispatch: RwLock<Slab<ScheduledIo>>,
 
@@ -128,6 +131,7 @@ struct Inner {
 }
 
 struct ScheduledIo {
+    aba_guard: usize,
     readiness: AtomicUsize,
     reader: AtomicTask,
     writer: AtomicTask,
@@ -145,11 +149,11 @@ static HANDLE_FALLBACK: AtomicUsize = ATOMIC_USIZE_INIT;
 /// Tracks the reactor for the current execution context.
 thread_local!(static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None));
 
-const TOKEN_WAKEUP: mio::Token = mio::Token(0);
-const TOKEN_START: usize = 1;
+const TOKEN_SHIFT: usize = 22;
 
 // Kind of arbitrary, but this reserves some token space for later usage.
-const MAX_SOURCES: usize = usize::MAX >> 4;
+const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
+const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_SOURCES);
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -221,6 +225,7 @@ impl Reactor {
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
                 io: io,
+                next_aba_guard: AtomicUsize::new(0),
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
                 wakeup: wakeup_pair.1,
             }),
@@ -358,10 +363,16 @@ impl Reactor {
     }
 
     fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
-        let token = usize::from(token) - TOKEN_START;
+        let aba_guard = token.0 & !MAX_SOURCES;
+        let token = token.0 & MAX_SOURCES;
+
         let io_dispatch = self.inner.io_dispatch.read().unwrap();
 
         if let Some(io) = io_dispatch.get(token) {
+            if aba_guard != io.aba_guard {
+                return;
+            }
+
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
             if ready.is_writable() || platform::is_hup(&ready) {
@@ -545,6 +556,9 @@ impl Inner {
     fn add_source(&self, source: &Evented)
         -> io::Result<usize>
     {
+        // Get an ABA guard value
+        let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
+
         let mut io_dispatch = self.io_dispatch.write().unwrap();
 
         if io_dispatch.len() == MAX_SOURCES {
@@ -554,13 +568,14 @@ impl Inner {
 
         // Acquire a write lock
         let key = io_dispatch.insert(ScheduledIo {
+            aba_guard,
             readiness: AtomicUsize::new(0),
             reader: AtomicTask::new(),
             writer: AtomicTask::new(),
         });
 
         try!(self.io.register(source,
-                              mio::Token(TOKEN_START + key),
+                              mio::Token(aba_guard | key),
                               mio::Ready::all(),
                               mio::PollOpt::edge()));
 
@@ -588,7 +603,7 @@ impl Inner {
             Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
-        task.register(t);
+        task.register_task(t);
 
         if sched.readiness.load(SeqCst) & ready.as_usize() != 0 {
             task.notify();

@@ -47,6 +47,8 @@ A high level description of each example is:
 * [`tinydb`](tinydb.rs) - an in-memory database which shows sharing state
   between all connected clients, notably the key/value store of this database.
 
+* [`udp-client`](udp-client.rs) - a simple `send_dgram`/`recv_dgram` example.
+
 If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
 to make a PR!

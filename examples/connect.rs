@@ -198,24 +198,29 @@ mod udp {
 
         // All bytes from `stdin` will go to the `addr` specified in our
         // argument list. Like with TCP this is spawned concurrently
-        tokio::spawn(stdin.map(move |chunk| {
+        let forward_stdin = stdin.map(move |chunk| {
             (chunk, addr)
         }).forward(sink).then(|result| {
             if let Err(e) = result {
                 panic!("failed to write to socket: {}", e)
             }
             Ok(())
-        }));
+        });
 
         // With UDP we could receive data from any source, so filter out
         // anything coming from a different address
-        Box::new(stream.filter_map(move |(chunk, src)| {
+        let receive = stream.filter_map(move |(chunk, src)| {
             if src == addr {
                 Some(chunk.into())
             } else {
                 None
             }
-        }))
+        });
+
+        Box::new(future::lazy(|| {
+            tokio::spawn(forward_stdin);
+            future::ok(receive)
+        }).flatten_stream())
     }
 }
 
