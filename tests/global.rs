@@ -75,7 +75,7 @@ fn hammer_split() {
     use tokio_io::io;
 
     const N: usize = 100;
-    const ITER: usize = 100;
+    const ITER: usize = 10;
 
     let _ = env_logger::init();
 
