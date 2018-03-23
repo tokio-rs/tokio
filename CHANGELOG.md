@@ -1,3 +1,12 @@
+# 0.1.4 (March 22, 2018)
+
+* Fix build on FreeBSD (#218)
+* Shutdown the Runtime when the handle is dropped (#214)
+* Set Runtime thread name prefix for worker threads (#232)
+* Add builder for Runtime (#234)
+* Extract TCP and UDP types into separate crates (#224)
+* Optionally support futures 0.2.
+
 # 0.1.3 (March 09, 2018)
 
 * Fix `CurrentThread::turn` to block on idle (#212).
