@@ -22,7 +22,7 @@ tokio-reactor = { version = "0.1.0", path = "../tokio-reactor" }
 bytes = "0.4"
 mio = "0.6.14"
 iovec = "0.1"
-futures = "0.1.18"
+futures = "0.1.19"
 futures2 = { version = "0.1", path = "../futures2", optional = true }
 
 [dev-dependencies]
