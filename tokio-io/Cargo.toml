@@ -20,8 +20,3 @@ categories = ["asynchronous"]
 bytes = "0.4"
 futures = "0.1.18"
 log = "0.4"
-futures2 = { version = "0.1", path = "../futures2", optional = true }
-
-[features]
-unstable-futures = ["futures2"]
-default = []
