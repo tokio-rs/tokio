@@ -82,7 +82,13 @@ pub fn turn<T: IntoTimeout>(timer: &mut Timer<MockPark, MockNow>, duration: T) {
 pub fn mocked<F, R>(f: F) -> R
 where F: FnOnce(&mut Timer<MockPark, MockNow>, &mut MockTime) -> R
 {
-    let mut time = MockTime::new();
+    mocked_with_now(Instant::now(), f)
+}
+
+pub fn mocked_with_now<F, R>(now: Instant, f: F) -> R
+where F: FnOnce(&mut Timer<MockPark, MockNow>, &mut MockTime) -> R
+{
+    let mut time = MockTime::new(now);
     let park = time.mock_park();
     let now = time.mock_now();
 
@@ -99,9 +105,9 @@ where F: FnOnce(&mut Timer<MockPark, MockNow>, &mut MockTime) -> R
 }
 
 impl MockTime {
-    pub fn new() -> MockTime {
+    pub fn new(now: Instant) -> MockTime {
         let state = State {
-            base: Instant::now(),
+            base: now,
             advance: Duration::default(),
             unparked: false,
             park_for: None,

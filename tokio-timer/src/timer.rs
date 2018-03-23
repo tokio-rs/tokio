@@ -210,7 +210,7 @@ where T: Park,
     fn next_expiration(&self) -> Option<Expiration> {
         // Check all levels
         for level in 0..NUM_LEVELS {
-            let slot = match self.levels[level].next_occupied_slot() {
+            let slot = match self.levels[level].next_occupied_slot(self.elapsed) {
                 Some(slot) => slot,
                 None => continue,
             };
@@ -237,7 +237,7 @@ where T: Park,
     fn process(&mut self) {
         let now = ms(self.now.now() - self.start);
 
-        while self.elapsed < now {
+        loop {
             let expiration = match self.next_expiration() {
                 Some(expiration) => expiration,
                 None => break,
@@ -251,6 +251,8 @@ where T: Park,
             // Prcess the slot, either moving it down a level or firing the
             // timeout if currently at the final (boss) level.
             self.process_expiration(&expiration);
+
+            self.elapsed = expiration.deadline;
         }
 
         self.elapsed = now;
@@ -318,6 +320,11 @@ where T: Park,
         // Convert the duration to millis
         let when = self.normalize_deadline(&entry);
 
+        if when > MAX_DURATION {
+            entry.error();
+            return;
+        }
+
         // If the entry's deadline is in the past or present, trigger it.
         if when <= self.elapsed {
             entry.fire();
@@ -332,14 +339,7 @@ where T: Park,
 
     fn normalize_deadline(&self, entry: &Entry) -> u64 {
         // Convert the duration to millis
-        let mut when = ms(entry.deadline - self.start);
-
-        // Just cap at MAX_DURATION. This is a really long time...
-        if when > MAX_DURATION {
-            when = MAX_DURATION;
-        }
-
-        when
+        ms(entry.deadline - self.start)
     }
 }
 
@@ -650,8 +650,18 @@ impl Level {
         }
     }
 
-    fn next_occupied_slot(&self) -> Option<usize> {
-        next_occupied_slot(self.occupied)
+    fn next_occupied_slot(&self, now: u64) -> Option<usize> {
+        if self.occupied == 0 {
+            return None;
+        }
+
+        // Get the slot for now using Maths
+        let now_slot = (now / slot_range(self.level)) as usize;
+        let occupied = self.occupied.rotate_right(now_slot as u32);
+        let zeros = occupied.trailing_zeros() as usize;
+        let slot = (zeros + now_slot) % 64;
+
+        Some(slot)
     }
 
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
@@ -691,15 +701,6 @@ impl Level {
 
 fn occupied_bit(slot: usize) -> u64 {
     (1 << slot)
-}
-
-fn next_occupied_slot(occupied: u64) -> Option<usize> {
-    if occupied == 0 {
-        return None;
-    }
-
-    let zeros = occupied.leading_zeros();
-    Some((63 - zeros) as usize)
 }
 
 fn slot_range(level: usize) -> u64 {
@@ -780,7 +781,7 @@ fn remove_entry(head: &mut Option<Arc<Entry>>, entry: &Entry) {
 
 impl Drop for Level {
     fn drop(&mut self) {
-        while let Some(slot) = self.next_occupied_slot() {
+        while let Some(slot) = self.next_occupied_slot(0) {
             // This should always have one
             let entry = self.pop_entry_slot(slot)
                 .expect("occupied bit set invalid");
