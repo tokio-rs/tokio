@@ -78,7 +78,7 @@ struct Inner {
 }
 
 #[derive(Debug)]
-pub struct Entry {
+struct Entry {
     /// Timer internals
     inner: Weak<Inner>,
 
@@ -110,7 +110,7 @@ pub struct Entry {
     prev_state: UnsafeCell<*const Entry>,
 }
 
-pub struct Level {
+struct Level {
     level: usize,
 
     /// Tracks which slot entries are occupied.
@@ -118,6 +118,12 @@ pub struct Level {
 
     /// Slots
     slot: [Option<Arc<Entry>>; LEVEL_MULT],
+}
+
+struct Expiration {
+    level: usize,
+    slot: usize,
+    deadline: u64,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -201,42 +207,70 @@ where T: Park,
     }
 
     /// Returns the instant at which the next timeout expires.
-    fn next_expiration(&self) -> Option<Instant> {
+    fn next_expiration(&self) -> Option<Expiration> {
         // Check all levels
         for level in 0..NUM_LEVELS {
-            let occupied = match self.levels[level].next_occupied_slot() {
-                Some(occupied) => occupied,
+            let slot = match self.levels[level].next_occupied_slot() {
+                Some(slot) => slot,
                 None => continue,
             };
 
             let level_start = self.elapsed - (self.elapsed % level_range(level));
-            let slot_start = level_start + occupied as u64 * slot_range(level);
+            let deadline = level_start + slot as u64 * slot_range(level);
 
-            return Some(self.start + Duration::from_millis(slot_start));
+            return Some(Expiration {
+                level,
+                slot,
+                deadline,
+            });
         }
 
         None
     }
 
+    /// Converts an `Expiration` to an `Instant`.
+    fn expiration_instant(&self, expiration: &Expiration) -> Instant {
+        self.start + Duration::from_millis(expiration.deadline)
+    }
+
     /// Run timer related logic
     fn process(&mut self) {
-        unimplemented!();
-        /*
-        let now = self.now.now();
+        let now = ms(self.now.now() - self.start);
 
-        for i in (0..self.state.len()).rev() {
-            if self.state[i].deadline <= now {
-                // Decrement the number of outstanding timeouts
-                self.inner.decrement();
+        while self.elapsed < now {
+            let expiration = match self.next_expiration() {
+                Some(expiration) => expiration,
+                None => break,
+            };
 
-                // Fire the timeout
-                self.state[i].fire();
+            if expiration.deadline > now {
+                // This expiration should not fire on this tick
+                break;
+            }
 
-                // Remove associated timer state
-                self.state.remove(i);
+            // Prcess the slot, either moving it down a level or firing the
+            // timeout if currently at the final (boss) level.
+            self.process_expiration(&expiration);
+        }
+
+        self.elapsed = now;
+    }
+
+    fn process_expiration(&mut self, expiration: &Expiration) {
+        while let Some(entry) = self.pop_entry(expiration) {
+            if expiration.level == 0 {
+                entry.fire();
+            } else {
+                let when = ms(entry.deadline - self.start);
+
+                self.levels[expiration.level - 1]
+                    .add_entry(entry, when);
             }
         }
-        */
+    }
+
+    fn pop_entry(&mut self, expiration: &Expiration) -> Option<Arc<Entry>> {
+        self.levels[expiration.level].pop_entry_slot(expiration.slot)
     }
 
     /// Process the entry queue
@@ -330,8 +364,9 @@ where T: Park,
         self.process_queue();
 
         match self.next_expiration() {
-            Some(deadline) => {
+            Some(expiration) => {
                 let now = self.now.now();
+                let deadline = self.expiration_instant(&expiration);
 
                 if deadline > now {
                     self.park.park_timeout(deadline - now)?;
@@ -351,8 +386,9 @@ where T: Park,
         self.process_queue();
 
         match self.next_expiration() {
-            Some(deadline) => {
+            Some(expiration) => {
                 let now = self.now.now();
+                let deadline = self.expiration_instant(&expiration);
 
                 if deadline > now {
                     self.park.park_timeout(cmp::min(deadline - now, duration))?;
@@ -765,14 +801,6 @@ impl fmt::Debug for Level {
 // ===== impl Entry =====
 
 impl Entry {
-    fn deadline(&self) -> Option<Instant> {
-        if self.is_elapsed() {
-            return None;
-        }
-
-        Some(self.deadline)
-    }
-
     fn is_elapsed(&self) -> bool {
         let state: State = self.state.load(SeqCst).into();
         state.is_elapsed()
@@ -839,6 +867,17 @@ impl Entry {
         }
 
         Ok(NotReady)
+    }
+}
+
+impl Drop for Entry {
+    fn drop(&mut self) {
+        let inner = match self.inner.upgrade() {
+            Some(inner) => inner,
+            None => return,
+        };
+
+        inner.decrement();
     }
 }
 
