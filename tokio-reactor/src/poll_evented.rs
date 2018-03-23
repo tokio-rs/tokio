@@ -341,7 +341,7 @@ where E: Evented
     pub fn clear_write_ready(&self) -> io::Result<()> {
         let ready = mio::Ready::writable();
 
-        self.inner.read_readiness.fetch_and(!ready.as_usize(), Relaxed);
+        self.inner.write_readiness.fetch_and(!ready.as_usize(), Relaxed);
 
         if self.poll_write_ready()?.is_ready() {
             // Notify the current task
@@ -356,7 +356,7 @@ where E: Evented
     pub fn clear_write_ready2(&self, cx: &mut futures2::task::Context) -> io::Result<()> {
         let ready = mio::Ready::writable();
 
-        self.inner.read_readiness.fetch_and(!ready.as_usize(), Relaxed);
+        self.inner.write_readiness.fetch_and(!ready.as_usize(), Relaxed);
 
         if self.poll_write_ready2(cx)?.is_ready() {
             // Notify the current task
