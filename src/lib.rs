@@ -62,7 +62,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.3")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.4")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 #[macro_use]
