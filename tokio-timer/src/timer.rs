@@ -1,4 +1,5 @@
 use {Error, Handle, Now, SystemNow};
+use atomic::AtomicU64;
 
 use futures::Poll;
 use futures::task::AtomicTask;
@@ -9,7 +10,7 @@ use std::{cmp, fmt, ptr};
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{SeqCst, Relaxed};
 use std::usize;
 
 /// The timer instance.
@@ -17,9 +18,6 @@ use std::usize;
 pub struct Timer<T, N = SystemNow> {
     /// Shared state
     inner: Arc<Inner>,
-
-    /// The instant at which the timer started running.
-    start: Instant,
 
     /// The number of milliseconds elapsed since the timer started.
     elapsed: u64,
@@ -56,10 +54,16 @@ pub struct Turn(());
 /// `poll`
 #[derive(Debug)]
 pub struct Registration {
-    entry: Arc<Entry>,
+    entry: Option<Arc<Entry>>,
 }
 
 pub(crate) struct Inner {
+    /// The instant at which the timer started running.
+    start: Instant,
+
+    /// The last published timer `elapsed` value.
+    elapsed: AtomicU64,
+
     /// Number of active timeouts
     num: AtomicUsize,
 
@@ -170,8 +174,7 @@ where T: Park,
             .collect();
 
         Timer {
-            inner: Arc::new(Inner::new(unpark)),
-            start: now.now(),
+            inner: Arc::new(Inner::new(now.now(), unpark)),
             elapsed: 0,
             levels,
             park,
@@ -218,12 +221,12 @@ where T: Park,
 
     /// Converts an `Expiration` to an `Instant`.
     fn expiration_instant(&self, expiration: &Expiration) -> Instant {
-        self.start + Duration::from_millis(expiration.deadline)
+        self.inner.start + Duration::from_millis(expiration.deadline)
     }
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = ms(self.now.now() - self.start);
+        let now = ms(self.now.now() - self.inner.start);
 
         loop {
             let expiration = match self.next_expiration() {
@@ -248,7 +251,13 @@ where T: Park,
 
     fn set_elapsed(&mut self, when: u64) {
         assert!(self.elapsed <= when);
-        self.elapsed = when;
+
+        if when > self.elapsed {
+            self.elapsed = when;
+            self.inner.elapsed.store(when, Relaxed);
+        } else {
+            assert_eq!(self.elapsed, when);
+        }
     }
 
     fn process_expiration(&mut self, expiration: &Expiration) {
@@ -256,7 +265,7 @@ where T: Park,
             if expiration.level == 0 {
                 entry.fire();
             } else {
-                let when = ms(entry.deadline - self.start);
+                let when = ms(entry.deadline - self.inner.start);
 
                 self.levels[expiration.level - 1]
                     .add_entry(entry, when);
@@ -305,7 +314,7 @@ where T: Park,
 
     fn add_entry(&mut self, entry: Arc<Entry>) {
         // Avoid an underflow subtraction
-        if entry.deadline < self.start {
+        if entry.deadline < self.inner.start {
             entry.fire();
             return;
         }
@@ -332,7 +341,7 @@ where T: Park,
 
     fn normalize_deadline(&self, entry: &Entry) -> u64 {
         // Convert the duration to millis
-        ms(entry.deadline - self.start)
+        ms(entry.deadline - self.inner.start)
     }
 }
 
@@ -431,6 +440,14 @@ impl Registration {
             None => return Err(Error::shutdown()),
         };
 
+        if deadline <= inner.now() {
+            // The deadline has already elapsed, ther eis no point creating the
+            // structures.
+            return Ok(Registration {
+                entry: None
+            });
+        }
+
         // Increment the number of active timeouts
         inner.increment()?;
 
@@ -446,45 +463,62 @@ impl Registration {
 
         inner.queue(&entry)?;
 
-        Ok(Registration { entry })
+        Ok(Registration {
+            entry: Some(entry),
+        })
     }
 
     pub fn is_elapsed(&self) -> bool {
-        self.entry.is_elapsed()
+        self.entry.as_ref()
+            .map(|e| e.is_elapsed())
+            .unwrap_or(true)
     }
 
     pub fn poll_elapsed(&self) -> Poll<(), Error> {
-        self.entry.poll_elapsed()
+        self.entry.as_ref()
+            .map(|e| e.poll_elapsed())
+            .unwrap_or(Ok(().into()))
     }
 }
 
 impl Drop for Registration {
     fn drop(&mut self) {
-        let state: State = self.entry.state.fetch_or(ELAPSED, SeqCst).into();
+        let entry = match self.entry {
+            Some(ref e) => e,
+            None => return,
+        };
+
+        let state: State = entry.state.fetch_or(ELAPSED, SeqCst).into();
 
         if state.is_elapsed() {
             // Nothing more to do
             return;
         }
 
-        let inner = match self.entry.inner.upgrade() {
+        let inner = match entry.inner.upgrade() {
             Some(inner) => inner,
             None => return,
         };
 
-        let _ = inner.queue(&self.entry);
+        let _ = inner.queue(entry);
     }
 }
 
 // ===== impl Inner =====
 
 impl Inner {
-    fn new(unpark: Box<Unpark>) -> Inner {
+    fn new(start: Instant, unpark: Box<Unpark>) -> Inner {
         Inner {
             num: AtomicUsize::new(0),
+            elapsed: AtomicU64::new(0),
             process_head: AtomicPtr::new(ptr::null_mut()),
+            start,
             unpark,
         }
+    }
+
+    fn now(&self) -> Instant {
+        self.start + Duration::from_millis(self.elapsed.load(Relaxed))
     }
 
     /// Increment the number of active timeouts

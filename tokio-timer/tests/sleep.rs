@@ -17,33 +17,11 @@ fn immediate_sleep() {
         // Create `Sleep` that elapsed immediately.
         let mut sleep = Sleep::new(time.now());
 
-        // Even though the sleep is effectively elapsed, the future is not yet
-        // resolved. First, the timer must be turned.
-        assert_not_ready!(sleep);
-
-        // Turn the timer, note the duration of 1 sec.
-        turn(timer, ms(0));
-
-        // The sleep is now elapsed.
+        // Ready!
         assert_ready!(sleep);
 
-        // The time has not advanced. The `turn` completed immediately.
-        assert_eq!(time.advanced(), ms(0));
-    });
-
-    mocked(|timer, time| {
-        // Create `Sleep` that elapsed immediately.
-        let mut sleep = Sleep::new(time.now());
-
-        // Even though the sleep is effectively elapsed, the future is not yet
-        // resolved. First, the timer must be turned.
-        assert_not_ready!(sleep);
-
-        // Turn the timer, note the duration of 1 sec.
+        // Turn the timer, it runs for the elapsed time
         turn(timer, ms(1000));
-
-        // The sleep is now elapsed.
-        assert_ready!(sleep);
 
         // The time has not advanced. The `turn` completed immediately.
         assert_eq!(time.advanced(), ms(1000));
@@ -66,6 +44,24 @@ fn delayed_sleep_level_0() {
             assert_ready!(sleep);
         });
     }
+}
+
+#[test]
+fn sleep_with_deadline_in_past() {
+    mocked(|timer, time| {
+        // Create `Sleep` that elapsed immediately.
+        let mut sleep = Sleep::new(time.now() - ms(100));
+
+        // Even though the sleep expires in the past, it is not ready yet
+        // because the timer must observe it.
+        assert_ready!(sleep);
+
+        // Turn the timer, it runs for the elapsed time
+        turn(timer, ms(1000));
+
+        // The time has not advanced. The `turn` completed immediately.
+        assert_eq!(time.advanced(), ms(1000));
+    });
 }
 
 #[test]

@@ -3,6 +3,7 @@ extern crate tokio_executor;
 
 pub mod deadline;
 
+mod atomic;
 mod error;
 mod handle;
 mod interval;
