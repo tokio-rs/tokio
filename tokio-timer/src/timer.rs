@@ -240,10 +240,15 @@ where T: Park,
             // timeout if currently at the final (boss) level.
             self.process_expiration(&expiration);
 
-            self.elapsed = expiration.deadline;
+            self.set_elapsed(expiration.deadline);
         }
 
-        self.elapsed = now;
+        self.set_elapsed(now);
+    }
+
+    fn set_elapsed(&mut self, when: u64) {
+        assert!(self.elapsed <= when);
+        self.elapsed = when;
     }
 
     fn process_expiration(&mut self, expiration: &Expiration) {

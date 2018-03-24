@@ -22,6 +22,11 @@ impl Sleep {
         }
     }
 
+    /// Returns the `Sleep` instance's deadline
+    pub fn deadline(&self) -> Instant {
+        self.deadline
+    }
+
     /// Returns true if the `Sleep` has elapsed
     ///
     /// A `Sleep` is elapsed when the requested duration has elapsed.
