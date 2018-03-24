@@ -1,11 +1,10 @@
-use {Error, Now, SystemNow};
+use {Error, Handle, Now, SystemNow};
 
 use futures::Poll;
 use futures::task::AtomicTask;
-use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark, ParkThread};
 
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::{UnsafeCell};
 use std::{cmp, fmt, ptr};
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Weak};
@@ -44,12 +43,6 @@ pub struct Timer<T, N = SystemNow> {
     now: N,
 }
 
-/// Handle to the timer
-#[derive(Debug, Clone)]
-pub struct Handle {
-    inner: Weak<Inner>,
-}
-
 /// Return value from the `turn` method on `Timer`.
 ///
 /// Currently this value doesn't actually provide any functionality, but it may
@@ -66,7 +59,7 @@ pub struct Registration {
     entry: Arc<Entry>,
 }
 
-struct Inner {
+pub(crate) struct Inner {
     /// Number of active timeouts
     num: AtomicUsize,
 
@@ -155,9 +148,6 @@ const QUEUED: usize = 1 << 3;
 /// Used to indicate that the timer has shutdown.
 const SHUTDOWN: *mut Entry = 1 as *mut _;
 
-/// Tracks the timer for the current execution context.
-thread_local!(static CURRENT_TIMER: RefCell<Option<Handle>> = RefCell::new(None));
-
 // ===== impl Timer =====
 
 impl<T> Timer<T>
@@ -191,9 +181,7 @@ where T: Park,
 
     /// Returns a handle to the timer
     pub fn handle(&self) -> Handle {
-        Handle {
-            inner: Arc::downgrade(&self.inner),
-        }
+        Handle::new(Arc::downgrade(&self.inner))
     }
 
     /// Performs one iteration of the timer loop.
@@ -422,65 +410,6 @@ impl<T, N> Drop for Timer<T, N> {
     }
 }
 
-/// Set the default timer for the duration of the closure
-///
-/// # Panics
-///
-/// This function panics if there already is a default timer set.
-pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
-where F: FnOnce(&mut Enter) -> R
-{
-    // Ensure that the timer is removed from the thread-local context
-    // when leaving the scope. This handles cases that involve panicking.
-    struct Reset;
-
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            CURRENT_TIMER.with(|current| {
-                let mut current = current.borrow_mut();
-                *current = None;
-            });
-        }
-    }
-
-    // This ensures the value for the current timer gets reset even if there is
-    // a panic.
-    let _r = Reset;
-
-    CURRENT_TIMER.with(|current| {
-        {
-            let mut current = current.borrow_mut();
-            assert!(current.is_none(), "default Tokio timer already set \
-                    for execution context");
-            *current = Some(handle.clone());
-        }
-
-        f(enter)
-    })
-}
-
-// ===== impl Handle =====
-
-impl Handle {
-    /// Returns a handle to the current timer.
-    pub fn current() -> Handle {
-        Handle::try_current()
-            .unwrap_or(Handle { inner: Weak::new() })
-    }
-
-    /// Try to get a handle to the current timer.
-    ///
-    /// Returns `Err` if no handle is found.
-    pub(crate) fn try_current() -> Result<Handle, Error> {
-        CURRENT_TIMER.with(|current| {
-            match *current.borrow() {
-                Some(ref handle) => Ok(handle.clone()),
-                None => Err(Error::shutdown()),
-            }
-        })
-    }
-}
-
 // ===== impl Registration =====
 
 impl Registration {
@@ -492,7 +421,7 @@ impl Registration {
     fn new_with_handle(deadline: Instant, handle: Handle)
         -> Result<Registration, Error>
     {
-        let inner = match handle.inner.upgrade() {
+        let inner = match handle.inner() {
             Some(inner) => inner,
             None => return Err(Error::shutdown()),
         };
@@ -501,7 +430,7 @@ impl Registration {
         inner.increment()?;
 
         let entry = Arc::new(Entry {
-            inner: handle.inner.clone(),
+            inner: handle.into_inner(),
             task: AtomicTask::new(),
             state: AtomicUsize::new(0),
             next_queue: UnsafeCell::new(ptr::null_mut()),
