@@ -13,7 +13,10 @@ use std::time::{Instant, Duration};
 macro_rules! assert_ready {
     ($f:expr) => {
         assert!($f.poll().unwrap().is_ready());
-    }
+    };
+    ($f:expr, $expect:expr) => {
+        assert_eq!($f.poll().unwrap(), ::futures::Async::Ready($expect));
+    };
 }
 
 macro_rules! assert_not_ready {

@@ -12,9 +12,19 @@ pub struct Interval {
 }
 
 impl Interval {
-    pub fn new(starting: Instant, duration: Duration) -> Interval {
+    /// Create a new `Interval` that starts at `at` and yields every `duration`
+    /// interval after that.
+    ///
+    /// The `duration` argument must be a non-zero duration.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `duration` is zero.
+    pub fn new(at: Instant, duration: Duration) -> Interval {
+        assert!(duration > Duration::new(0, 0), "`duration` must be non-zero.");
+
         Interval {
-            sleep: Sleep::new(starting),
+            sleep: Sleep::new(at),
             duration,
         }
     }
