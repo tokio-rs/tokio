@@ -1,4 +1,7 @@
-use {Error, Handle, Now, SystemNow};
+pub use handle::{Handle, with_default};
+pub use now::{Now, SystemNow};
+
+use Error;
 use atomic::AtomicU64;
 
 use futures::Poll;
@@ -53,7 +56,7 @@ pub struct Turn(());
 /// The association between a `Sleep` instance and a timer is done lazily in
 /// `poll`
 #[derive(Debug)]
-pub struct Registration {
+pub(crate) struct Registration {
     entry: Option<Arc<Entry>>,
 }
 
@@ -159,6 +162,18 @@ where T: Park
 {
     pub fn new(park: T) -> Self {
         Timer::new_with_now(park, SystemNow::new())
+    }
+}
+
+impl<T, N> Timer<T, N> {
+    /// Returns a reference to the underlying `Park` instance.
+    pub fn get_ref(&self) -> &T {
+        &self.park
+    }
+
+    /// Returns a mutable reference to the underlying `Park` instance.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.park
     }
 }
 

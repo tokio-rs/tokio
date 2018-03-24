@@ -1,7 +1,7 @@
-#![allow(unused_macros)]
+#![allow(unused_macros, unused_imports, dead_code)]
 
 use tokio_executor::park::{Park, Unpark};
-use tokio_timer::{Timer, Now};
+use tokio_timer::timer::{Timer, Now};
 
 use futures::future::{lazy, Future};
 
@@ -19,6 +19,12 @@ macro_rules! assert_ready {
 macro_rules! assert_not_ready {
     ($f:expr) => {
         assert!(!$f.poll().unwrap().is_ready());
+    }
+}
+
+macro_rules! assert_elapsed {
+    ($f:expr) => {
+        assert!($f.poll().unwrap_err().is_elapsed());
     }
 }
 
@@ -75,8 +81,20 @@ impl IntoTimeout for Duration {
     }
 }
 
+/// Turn the timer state once
 pub fn turn<T: IntoTimeout>(timer: &mut Timer<MockPark, MockNow>, duration: T) {
     timer.turn(duration.into_timeout()).unwrap();
+}
+
+/// Advance the timer the specified amount
+pub fn advance(timer: &mut Timer<MockPark, MockNow>, duration: Duration) {
+    let inner = timer.get_ref().inner.clone();
+    let deadline = inner.lock().unwrap().now() + duration;
+
+    while inner.lock().unwrap().now() < deadline {
+        let dur = deadline - inner.lock().unwrap().now();
+        turn(timer, dur);
+    }
 }
 
 pub fn mocked<F, R>(f: F) -> R

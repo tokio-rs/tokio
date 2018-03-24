@@ -72,11 +72,11 @@ impl<T> Deadline<T> {
     }
 }
 
-impl<F> Future for Deadline<F>
-where F: Future,
+impl<T> Future for Deadline<T>
+where T: Future,
 {
-    type Item = F::Item;
-    type Error = DeadlineError<F::Error>;
+    type Item = T::Item;
+    type Error = DeadlineError<T::Error>;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         // First, try polling the future
@@ -89,7 +89,9 @@ where F: Future,
         // Now check the timer
         match self.sleep.poll() {
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Ok(Async::Ready(_)) => Err(DeadlineError::elapsed()),
+            Ok(Async::Ready(_)) => {
+                Err(DeadlineError::elapsed())
+            },
             Err(e) => Err(DeadlineError::timer(e)),
         }
     }

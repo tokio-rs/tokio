@@ -4,12 +4,13 @@ extern crate tokio_timer;
 
 #[macro_use]
 mod support;
-
-use futures::Future;
-use tokio_timer::*;
 use support::*;
 
-use std::time::Instant;
+use tokio_timer::*;
+
+use futures::Future;
+
+use std::time::{Duration, Instant};
 
 #[test]
 fn immediate_sleep() {
@@ -113,6 +114,39 @@ fn delayed_sleep_level_1() {
         assert_eq!(time.advanced(), ms(234));
 
         // The sleep has elapsed.
+        assert_ready!(sleep);
+    });
+}
+
+#[test]
+fn delayed_sub_ms_sleep() {
+    mocked(|timer, time|{
+        // Create a `Sleep` that elapses in the future
+        let mut sleep = Sleep::new(
+            time.now() + Duration::new(0, 1));
+
+        // The sleep has not elapsed.
+        assert_not_ready!(sleep);
+
+        turn(timer, ms(1000));
+        assert_eq!(time.advanced(), ms(1));
+
+        assert_ready!(sleep);
+
+        let mut sleep = Sleep::new(
+            time.now() + Duration::from_millis(123) + Duration::new(0, 123));
+
+        // The sleep has not elapsed.
+        assert_not_ready!(sleep);
+
+        turn(timer, ms(1000));
+        assert_eq!(time.advanced(), ms(64));
+
+        assert_not_ready!(sleep);
+
+        turn(timer, ms(1000));
+        assert_eq!(time.advanced(), ms(125));
+
         assert_ready!(sleep);
     });
 }

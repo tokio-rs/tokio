@@ -5,6 +5,7 @@ use futures::{Future, Poll};
 
 use std::time::Instant;
 
+/// A future that does nothing and completes at the specified instant.
 #[derive(Debug)]
 pub struct Sleep {
     deadline: Instant,
