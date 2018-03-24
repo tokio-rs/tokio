@@ -885,7 +885,9 @@ impl<'a> futures2::executor::Executor for &'a Sender {
         // execution.
 
         // Create a new task for the future
-        let task = Task::new2(f, |id| into_waker(Arc::new(Futures2Wake::new(id, &self.inner))));
+        let task = Task::new2(f, |id| {
+            into_unsafe_wake(Arc::new(Futures2Wake::new(id, &self.inner)))
+        });
 
         self.inner.submit(task, &self.inner);
 
@@ -1090,7 +1092,6 @@ impl Inner {
         trace!("worker_terminated; num_workers={}", prev - 1);
 
         if 1 == prev {
-            trace!("notifying shutdown task");
             self.shutdown_task.notify();
         }
     }
@@ -2222,6 +2223,11 @@ impl fmt::Debug for Callback {
 
 // ===== impl Futures2Wake =====
 
+// Futures2Wake doesn't need to drop_id on drop,
+// because the Futures2Wake is **only** ever held in:
+// - ::task::Task, which handles drop itself
+// - futures::Waker, that a user could have cloned. When that drops,
+//   it will call drop_raw, so we don't need to double drop.
 #[cfg(feature = "unstable-futures")]
 impl Futures2Wake {
     fn new(id: usize, inner: &Arc<Inner>) -> Futures2Wake {
@@ -2232,12 +2238,6 @@ impl Futures2Wake {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl Drop for Futures2Wake {
-    fn drop(&mut self) {
-        self.notifier.drop_id(self.id)
-    }
-}
 
 #[cfg(feature = "unstable-futures")]
 struct ArcWrapped(PhantomData<Futures2Wake>);
@@ -2266,9 +2266,143 @@ unsafe impl futures2::task::UnsafeWake for ArcWrapped {
 }
 
 #[cfg(feature = "unstable-futures")]
-fn into_waker(rc: Arc<Futures2Wake>) -> futures2::task::Waker {
+fn into_unsafe_wake(rc: Arc<Futures2Wake>) -> *mut futures2::task::UnsafeWake {
     unsafe {
-        let ptr = mem::transmute::<Arc<Futures2Wake>, *mut ArcWrapped>(rc);
-        futures2::task::Waker::new(ptr)
+        mem::transmute::<Arc<Futures2Wake>, *mut ArcWrapped>(rc)
     }
 }
+
+#[cfg(feature = "unstable-futures")]
+fn into_waker(rc: Arc<Futures2Wake>) -> futures2::task::Waker {
+    unsafe {
+        futures2::task::Waker::new(into_unsafe_wake(rc))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // We want most tests as integration tests, but these ones are special:
+    //
+    // This is testing that Task drop never happens more than it should,
+    // causing use-after-free bugs. ;_;
+
+    use super::{AtomicUsize, Relaxed, Release, Sender, Shutdown, ThreadPool};
+
+    #[cfg(not(feature = "unstable-futures"))]
+    use futures::{Poll, Async, Future};
+
+    #[cfg(feature = "unstable-futures")]
+    use futures2;
+    #[cfg(feature = "unstable-futures")]
+    use futures2::prelude::*;
+
+    static TASK_DROPS: AtomicUsize = ::std::sync::atomic::ATOMIC_USIZE_INIT;
+
+    pub(super) fn on_task_drop() {
+        TASK_DROPS.fetch_add(1, Release);
+    }
+
+    fn reset_task_drops() {
+        TASK_DROPS.store(0, Release);
+    }
+
+    #[cfg(not(feature = "unstable-futures"))]
+    fn spawn_pool<F>(pool: &mut Sender, f: F)
+        where F: Future<Item = (), Error = ()> + Send + 'static
+    {
+        pool.spawn(f).unwrap()
+    }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn_pool<F>(pool: &mut Sender, f: F)
+        where F: Future<Item = (), Error = ()> + Send + 'static
+    {
+        futures2::executor::Executor::spawn(
+            pool,
+            Box::new(f.map_err(|_| panic!()))
+        ).unwrap()
+    }
+
+    #[cfg(feature = "unstable-futures")]
+    fn await_shutdown(shutdown: Shutdown) {
+        ::futures::Future::wait(shutdown).unwrap()
+    }
+    #[cfg(not(feature = "unstable-futures"))]
+    fn await_shutdown(shutdown: Shutdown) {
+        shutdown.wait().unwrap()
+    }
+
+    #[test]
+    fn task_drop_counts() {
+        extern crate env_logger;
+        let _ = env_logger::init();
+
+        struct Always;
+
+        #[cfg(not(feature = "unstable-futures"))]
+        impl Future for Always {
+            type Item = ();
+            type Error = ();
+
+            fn poll(&mut self) -> Poll<(), ()> {
+                Ok(Async::Ready(()))
+            }
+        }
+
+        #[cfg(feature = "unstable-futures")]
+        impl Future for Always {
+            type Item = ();
+            type Error = ();
+
+            fn poll(&mut self, _: &mut futures2::task::Context) -> Poll<(), ()> {
+                Ok(Async::Ready(()))
+            }
+        }
+
+        reset_task_drops();
+
+        let pool = ThreadPool::new();
+        let mut tx = pool.sender().clone();
+        spawn_pool(&mut tx, Always);
+        await_shutdown(pool.shutdown());
+
+        // We've never cloned the waker/notifier, so should only be 1 drop
+        assert_eq!(TASK_DROPS.load(Relaxed), 1);
+
+
+        struct Park;
+
+        #[cfg(not(feature = "unstable-futures"))]
+        impl Future for Park {
+            type Item = ();
+            type Error = ();
+
+            fn poll(&mut self) -> Poll<(), ()> {
+                ::futures::task::current().notify();
+                Ok(Async::Ready(()))
+            }
+        }
+
+        #[cfg(feature = "unstable-futures")]
+        impl Future for Park {
+            type Item = ();
+            type Error = ();
+
+            fn poll(&mut self, cx: &mut futures2::task::Context) -> Poll<(), ()> {
+                cx.waker().clone().wake();
+                Ok(Async::Ready(()))
+            }
+        }
+
+        reset_task_drops();
+
+        let pool = ThreadPool::new();
+        let mut tx = pool.sender().clone();
+        spawn_pool(&mut tx, Park);
+        await_shutdown(pool.shutdown());
+
+        // We've cloned the task once, so should be 2 drops
+        assert_eq!(TASK_DROPS.load(Relaxed), 2);
+    }
+}
+

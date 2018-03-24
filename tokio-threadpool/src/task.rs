@@ -48,7 +48,12 @@ enum TaskFuture {
     #[cfg(feature = "unstable-futures")]
     Futures2 {
         tls: futures2::task::LocalMap,
-        waker: futures2::task::Waker,
+        // We hold a *mut UnsafeWake in here because we don't want
+        // to run Waker::drop when this future is dropped. That would
+        // trigger Task::drop.
+        //
+        // The Task will drop correctly afterwards.
+        waker: *mut futures2::task::UnsafeWake,
         fut: BoxFuture2,
     }
 }
@@ -102,7 +107,7 @@ impl Task {
     /// Create a new task handle for a futures 0.2 future
     #[cfg(feature = "unstable-futures")]
     pub fn new2<F>(fut: BoxFuture2, make_waker: F) -> Task
-        where F: FnOnce(usize) -> futures2::task::Waker
+        where F: FnOnce(usize) -> *mut futures2::task::UnsafeWake
     {
         let mut inner = Box::new(Inner {
             next: AtomicPtr::new(ptr::null_mut()),
@@ -297,6 +302,12 @@ impl Clone for Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
+        #[cfg(test)]
+        {
+            // Hook for tests that we never drop too many times.
+            super::tests::on_task_drop();
+        }
+
         // Because `fetch_sub` is already atomic, we do not need to synchronize
         // with other threads unless we are going to delete the object. This
         // same logic applies to the below `fetch_sub` to the `weak` count.
@@ -502,7 +513,16 @@ impl TaskFuture {
 
             #[cfg(feature = "unstable-futures")]
             TaskFuture::Futures2 { ref mut fut, ref waker, ref mut tls } => {
-                let mut cx = futures2::task::Context::new(tls, waker, exec);
+                // we don't want to construct a concrete Waker yet,
+                // since that needs to clone. We just need to give a reference.
+                // If the future clones, all is fine.
+                let w = unsafe {
+                    mem::transmute::<
+                        &*mut futures2::task::UnsafeWake,
+                        &futures2::task::Waker,
+                    >(waker)
+                };
+                let mut cx = futures2::task::Context::new(tls, w, exec);
                 match fut.poll(&mut cx).unwrap() {
                     futures2::Async::Pending => Ok(Async::NotReady),
                     futures2::Async::Ready(x) => Ok(Async::Ready(x)),
@@ -511,3 +531,4 @@ impl TaskFuture {
         }
     }
 }
+
