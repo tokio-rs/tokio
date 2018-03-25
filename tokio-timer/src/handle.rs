@@ -1,10 +1,11 @@
-use Error;
-use timer::Inner;
+use {Error, Sleep};
+use timer::{Registration, Inner};
 
 use tokio_executor::Enter;
 
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 /// Handle to the timer
 #[derive(Debug, Clone)]
@@ -61,6 +62,12 @@ impl Handle {
     pub fn current() -> Handle {
         Handle::try_current()
             .unwrap_or(Handle { inner: Weak::new() })
+    }
+
+    /// Create a `Sleep` driven by this handle's associated `Timer`.
+    pub fn sleep(&self, deadline: Instant) -> Result<Sleep, Error> {
+        let registration = Registration::new_with_handle(deadline, self.clone())?;
+        Ok(Sleep::new_with_registration(deadline, registration))
     }
 
     /// Try to get a handle to the current timer.

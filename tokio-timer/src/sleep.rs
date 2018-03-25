@@ -29,6 +29,16 @@ impl Sleep {
         }
     }
 
+    pub(crate) fn new_with_registration(
+        deadline: Instant,
+        registration: Registration) -> Sleep
+    {
+        Sleep {
+            deadline,
+            registration: Some(registration),
+        }
+    }
+
     /// Returns the `Sleep` instance's deadline
     pub fn deadline(&self) -> Instant {
         self.deadline

@@ -42,6 +42,13 @@ use std::usize;
 /// * Level 4: 64 x ~4 hour slots.
 /// * Level 5: 64 x ~12 day slots.
 ///
+/// When the timer processes entries at level zero, it will notify all the
+/// [`Sleep`] instances as their deadlines have been reached. For all higher
+/// levels, all entries will be redistributed across the wheel at the next level
+/// down. Eventually, as time progresses, entries will `Sleep` instances will
+/// either be canceled (dropped) or their associated entries will reach level
+/// zero and be notified.
+///
 /// [`Sleep`]: ../struct.Sleep.html
 /// [`Interval`]: ../struct.Interval.html
 /// [`Deadline`]: ../struct.Deadline.html
@@ -476,7 +483,7 @@ impl Registration {
         Registration::new_with_handle(deadline, handle)
     }
 
-    fn new_with_handle(deadline: Instant, handle: Handle)
+    pub fn new_with_handle(deadline: Instant, handle: Handle)
         -> Result<Registration, Error>
     {
         let inner = match handle.inner() {

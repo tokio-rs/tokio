@@ -35,9 +35,13 @@ enum Kind<T> {
 
 impl<T> Deadline<T> {
     pub fn new(future: T, deadline: Instant) -> Deadline<T> {
+        Deadline::new_with_sleep(future, Sleep::new(deadline))
+    }
+
+    pub(crate) fn new_with_sleep(future: T, sleep: Sleep) -> Deadline<T> {
         Deadline {
-            future: future,
-            sleep: Sleep::new(deadline),
+            future,
+            sleep,
         }
     }
 
