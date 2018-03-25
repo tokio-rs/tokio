@@ -478,45 +478,45 @@ impl<T, N> Drop for Timer<T, N> {
 // ===== impl Registration =====
 
 impl Registration {
-    pub fn new(deadline: Instant) -> Result<Registration, Error> {
-        let handle = Handle::try_current()?;
-        Registration::new_with_handle(deadline, handle)
+    pub fn new(deadline: Instant) -> Registration {
+        match Handle::try_current() {
+            Ok(handle) => Registration::new_with_handle(deadline, handle),
+            Err(_) => Registration::new_error(deadline),
+        }
     }
 
-    pub fn new_with_handle(deadline: Instant, handle: Handle)
-        -> Result<Registration, Error>
-    {
+    pub fn new_with_handle(deadline: Instant, handle: Handle) -> Registration {
         let inner = match handle.inner() {
             Some(inner) => inner,
-            None => return Err(Error::shutdown()),
+            None => return Registration::new_error(deadline),
         };
 
         if deadline <= inner.now() {
             // The deadline has already elapsed, ther eis no point creating the
             // structures.
-            return Ok(Registration {
+            return Registration {
                 entry: None
-            });
+            };
         }
 
         // Increment the number of active timeouts
-        inner.increment()?;
+        if inner.increment().is_err() {
+            return Registration::new_error(deadline);
+        }
 
-        let entry = Arc::new(Entry {
-            inner: handle.into_inner(),
-            task: AtomicTask::new(),
-            state: AtomicUsize::new(0),
-            next_queue: UnsafeCell::new(ptr::null_mut()),
-            deadline: deadline,
-            next_state: UnsafeCell::new(None),
-            prev_state: UnsafeCell::new(ptr::null_mut()),
-        });
+        let entry = Arc::new(Entry::new(deadline, handle));
 
-        inner.queue(&entry)?;
+        if inner.queue(&entry).is_err() {
+            // The timer has shutdown, transition the entry to the error state.
+            entry.error();
+        }
 
-        Ok(Registration {
-            entry: Some(entry),
-        })
+        Registration { entry: Some(entry) }
+    }
+
+    fn new_error(deadline: Instant) -> Registration {
+        let entry = Some(Arc::new(Entry::new_error(deadline)));
+        Registration { entry }
     }
 
     pub fn is_elapsed(&self) -> bool {
@@ -821,6 +821,32 @@ impl fmt::Debug for Level {
 // ===== impl Entry =====
 
 impl Entry {
+    fn new(deadline: Instant, handle: Handle) -> Entry {
+        Entry {
+            inner: handle.into_inner(),
+            task: AtomicTask::new(),
+            state: AtomicUsize::new(0),
+            next_queue: UnsafeCell::new(ptr::null_mut()),
+            deadline: deadline,
+            next_state: UnsafeCell::new(None),
+            prev_state: UnsafeCell::new(ptr::null_mut()),
+        }
+    }
+
+    /// Create a new `Entry` that is in the error state. Calling `poll_elapsed` on
+    /// this `Entry` will always result in `Err` being returned.
+    fn new_error(deadline: Instant) -> Entry {
+        Entry {
+            inner: Weak::new(),
+            task: AtomicTask::new(),
+            state: AtomicUsize::new(ELAPSED | ERROR),
+            next_queue: UnsafeCell::new(ptr::null_mut()),
+            deadline: deadline,
+            next_state: UnsafeCell::new(None),
+            prev_state: UnsafeCell::new(ptr::null_mut()),
+        }
+    }
+
     fn is_elapsed(&self) -> bool {
         let state: State = self.state.load(SeqCst).into();
         state.is_elapsed()

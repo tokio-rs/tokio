@@ -55,13 +55,12 @@ impl Sleep {
 
     /// Register the sleep with the timer instance for the current execution
     /// context.
-    fn register(&mut self) -> Result<(), Error> {
+    fn register(&mut self) {
         if self.registration.is_some() {
-            return Ok(());
+            return;
         }
 
-        self.registration = Some(Registration::new(self.deadline)?);
-        Ok(())
+        self.registration = Some(Registration::new(self.deadline));
     }
 }
 
@@ -71,7 +70,7 @@ impl Future for Sleep {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         // Ensure the `Sleep` instance is associated with a timer.
-        self.register()?;
+        self.register();
 
         self.registration.as_ref().unwrap()
             .poll_elapsed()

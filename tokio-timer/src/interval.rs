@@ -23,8 +23,12 @@ impl Interval {
     pub fn new(at: Instant, duration: Duration) -> Interval {
         assert!(duration > Duration::new(0, 0), "`duration` must be non-zero.");
 
+        Interval::new_with_sleep(Sleep::new(at), duration)
+    }
+
+    pub(crate) fn new_with_sleep(sleep: Sleep, duration: Duration) -> Interval {
         Interval {
-            sleep: Sleep::new(at),
+            sleep,
             duration,
         }
     }

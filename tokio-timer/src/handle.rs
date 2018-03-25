@@ -1,11 +1,11 @@
-use {Error, Sleep};
+use {Error, Sleep, Deadline, Interval};
 use timer::{Registration, Inner};
 
 use tokio_executor::Enter;
 
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Handle to the timer
 #[derive(Debug, Clone)]
@@ -65,9 +65,20 @@ impl Handle {
     }
 
     /// Create a `Sleep` driven by this handle's associated `Timer`.
-    pub fn sleep(&self, deadline: Instant) -> Result<Sleep, Error> {
-        let registration = Registration::new_with_handle(deadline, self.clone())?;
-        Ok(Sleep::new_with_registration(deadline, registration))
+    pub fn sleep(&self, deadline: Instant) -> Sleep {
+        let registration = Registration::new_with_handle(deadline, self.clone());
+        Sleep::new_with_registration(deadline, registration)
+    }
+
+    /// Create a `Deadline` driven by this handle's associated `Timer`.
+    pub fn deadline<T>(&self, future: T, deadline: Instant) -> Deadline<T> {
+        Deadline::new_with_sleep(future, self.sleep(deadline))
+    }
+
+    /// Create a new `Interval` that starts at `at` and yields every `duration`
+    /// interval after that.
+    pub fn interval(&self, at: Instant, duration: Duration) -> Interval {
+        Interval::new_with_sleep(self.sleep(at), duration)
     }
 
     /// Try to get a handle to the current timer.
