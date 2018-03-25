@@ -16,7 +16,36 @@ use std::sync::atomic::{AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::{SeqCst, Relaxed};
 use std::usize;
 
-/// The timer instance.
+/// Timer implementation that drives [`Sleep`], [`Interval`], and [`Deadline`].
+///
+/// # Implementation
+///
+/// `Timer` is based on the [paper by Varghese and Lauck][paper].
+///
+/// A hashed timing wheel is a vector of slots, where each slot handles a time
+/// slice. As time progresses, the timer walks over the slot for the current
+/// instant, and processes each entry for that slot. When the timer reaches the
+/// end of the wheel, it starts again at the beginning.
+///
+/// The `Timer` implementation maintains six wheels arranged in a set of levels.
+/// As the levels go up, the slots of the associated wheel represent larger
+/// intervals of time. At each level, the wheel has 64 slots. Each slot covers a
+/// range of time equal to the wheel at the lower level. At level zero, each
+/// slot represents one millisecond of time.
+///
+/// The wheels are:
+///
+/// * Level 0: 64 x 1 millisecond slots.
+/// * Level 1: 64 x 64 millisecond slots.
+/// * Level 2: 64 x ~4 second slots.
+/// * Level 3: 64 x ~4 minute slots.
+/// * Level 4: 64 x ~4 hour slots.
+/// * Level 5: 64 x ~12 day slots.
+///
+/// [`Sleep`]: ../struct.Sleep.html
+/// [`Interval`]: ../struct.Interval.html
+/// [`Deadline`]: ../struct.Deadline.html
+/// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
 #[derive(Debug)]
 pub struct Timer<T, N = SystemNow> {
     /// Shared state

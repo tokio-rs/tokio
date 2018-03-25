@@ -5,7 +5,9 @@ use futures::{Future, Poll};
 
 use std::time::Instant;
 
-/// A future that does nothing and completes at the specified instant.
+/// A future that completes at a specified instant in time.
+///
+/// This future performs no work.
 #[derive(Debug)]
 pub struct Sleep {
     deadline: Instant,
@@ -16,6 +18,10 @@ pub struct Sleep {
 
 impl Sleep {
     /// Create a new `Sleep` instance that elapses at `deadline`.
+    ///
+    /// Only millisecond level resolution is guaranteed. There is no guarantee
+    /// as to how the sub-millisecond portion of `deadline` will be handled.
+    /// `Sleep` should not be used for high-resolution timer use cases.
     pub fn new(deadline: Instant) -> Sleep {
         Sleep {
             deadline,
