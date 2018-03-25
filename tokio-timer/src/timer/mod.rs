@@ -1,8 +1,10 @@
 mod entry;
 mod handle;
+mod level;
 mod now;
 
 use self::entry::Entry;
+use self::level::{Level, Expiration};
 
 pub use self::handle::{Handle, with_default};
 pub use self::now::{Now, SystemNow};
@@ -117,29 +119,8 @@ pub(crate) struct Inner {
     unpark: Box<Unpark>,
 }
 
-struct Level {
-    level: usize,
-
-    /// Tracks which slot entries are occupied.
-    occupied: u64,
-
-    /// Slots
-    slot: [entry::Stack; LEVEL_MULT],
-}
-
-struct Expiration {
-    level: usize,
-    slot: usize,
-    deadline: u64,
-}
-
 /// Number of levels
 const NUM_LEVELS: usize = 6;
-
-/// Level multiplier.
-///
-/// Being a power of 2 is very important.
-const LEVEL_MULT: usize = 64;
 
 /// The maximum duration of a sleep
 const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
@@ -208,19 +189,9 @@ where T: Park,
     fn next_expiration(&self) -> Option<Expiration> {
         // Check all levels
         for level in 0..NUM_LEVELS {
-            let slot = match self.levels[level].next_occupied_slot(self.elapsed) {
-                Some(slot) => slot,
-                None => continue,
-            };
-
-            let level_start = self.elapsed - (self.elapsed % level_range(level));
-            let deadline = level_start + slot as u64 * slot_range(level);
-
-            return Some(Expiration {
-                level,
-                slot,
-                deadline,
-            });
+            if let Some(expiration) = self.levels[level].next_expiration(self.elapsed) {
+                return Some(expiration);
+            }
         }
 
         None
@@ -415,6 +386,16 @@ impl<T, N> Drop for Timer<T, N> {
     }
 }
 
+/// Convert a duration (milliseconds) to a level
+fn level_for(duration: u64) -> usize {
+    debug_assert!(duration > 0);
+
+    // 63 is picked to offset this by 1. A duration of 0 is prohibited, so this
+    // cannot underflow.
+    let significant = 63 - duration.leading_zeros() as usize;
+    significant / 6
+}
+
 // ===== impl Registration =====
 
 impl Registration {
@@ -531,119 +512,12 @@ impl Inner {
         }
 
         Ok(())
-}
+    }
 }
 
 impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Inner")
-            .finish()
-    }
-}
-
-// ===== impl Level =====
-
-impl Level {
-    fn new(level: usize) -> Level {
-        macro_rules! s {
-            () => { entry::Stack::new() };
-        };
-
-        Level {
-            level,
-            occupied: 0,
-            slot: [
-                // It does not look like the necessary traits are
-                // derived for [T; 64].
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-            ],
-        }
-    }
-
-    fn next_occupied_slot(&self, now: u64) -> Option<usize> {
-        if self.occupied == 0 {
-            return None;
-        }
-
-        // Get the slot for now using Maths
-        let now_slot = (now / slot_range(self.level)) as usize;
-        let occupied = self.occupied.rotate_right(now_slot as u32);
-        let zeros = occupied.trailing_zeros() as usize;
-        let slot = (zeros + now_slot) % 64;
-
-        Some(slot)
-    }
-
-    fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        let slot = slot_for(when, self.level);
-
-        self.slot[slot].push(entry);
-        self.occupied |= occupied_bit(slot);
-    }
-
-    fn remove_entry(&mut self, entry: &Entry, when: u64) {
-        let slot = slot_for(when, self.level);
-
-        self.slot[slot].remove(entry);
-
-        if self.slot[slot].is_empty() {
-            // The bit is currently set
-            debug_assert!(self.occupied & occupied_bit(slot) != 0);
-
-            // Unset the bit
-            self.occupied ^= occupied_bit(slot);
-        }
-    }
-
-    fn pop_entry_slot(&mut self, slot: usize) -> Option<Arc<Entry>> {
-        let ret = self.slot[slot].pop();
-
-        if ret.is_some() && self.slot[slot].is_empty() {
-            // The bit is currently set
-            debug_assert!(self.occupied & occupied_bit(slot) != 0);
-
-            self.occupied ^= occupied_bit(slot);
-        }
-
-        ret
-    }
-}
-
-fn occupied_bit(slot: usize) -> u64 {
-    (1 << slot)
-}
-
-fn slot_range(level: usize) -> u64 {
-    LEVEL_MULT.pow(level as u32) as u64
-}
-
-fn level_range(level: usize) -> u64 {
-    LEVEL_MULT as u64 * slot_range(level)
-}
-
-impl Drop for Level {
-    fn drop(&mut self) {
-        while let Some(slot) = self.next_occupied_slot(0) {
-            // This should always have one
-            let entry = self.pop_entry_slot(slot)
-                .expect("occupied bit set invalid");
-
-            entry.error();
-        }
-    }
-}
-
-impl fmt::Debug for Level {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Level")
-            .field("occupied", &self.occupied)
             .finish()
     }
 }
@@ -662,30 +536,14 @@ fn ms(duration: Duration) -> u64 {
     duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
 }
 
-/// Convert a duration (milliseconds) to a level
-fn level_for(duration: u64) -> usize {
-    debug_assert!(duration > 0);
-
-    // 63 is picked to offset this by 1. A duration of 0 is prohibited, so this
-    // cannot underflow.
-    let significant = 63 - duration.leading_zeros() as usize;
-    significant / 6
-}
-
-/// Convert a duration (milliseconds) and a level to a slot position
-fn slot_for(duration: u64, level: usize) -> usize {
-    ((duration >> (level * 6)) % LEVEL_MULT as u64) as usize
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_level_and_slot_for() {
+    fn test_level_for() {
         for pos in 1..64 {
             assert_eq!(0, level_for(pos), "level_for({}) -- binary = {:b}", pos, pos);
-            assert_eq!(pos as usize, slot_for(pos, 0));
         }
 
         for level in 1..5 {
@@ -693,8 +551,6 @@ mod test {
                 let a = pos * 64_usize.pow(level as u32);
                 assert_eq!(level, level_for(a as u64),
                            "level_for({}) -- binary = {:b}", a, a);
-
-                assert_eq!(pos as usize, slot_for(a as u64, level));
 
                 if pos > level {
                     let a = a - 1;
