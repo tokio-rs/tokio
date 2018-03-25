@@ -1,5 +1,8 @@
+mod entry;
 mod handle;
 mod now;
+
+use self::entry::Entry;
 
 pub use self::handle::{Handle, with_default};
 pub use self::now::{Now, SystemNow};
@@ -8,14 +11,12 @@ use Error;
 use atomic::AtomicU64;
 
 use futures::Poll;
-use futures::task::AtomicTask;
 use tokio_executor::park::{Park, Unpark, ParkThread};
 
-use std::cell::{UnsafeCell};
-use std::{cmp, fmt, ptr};
+use std::{cmp, fmt};
 use std::time::{Duration, Instant};
-use std::sync::{Arc, Weak};
-use std::sync::atomic::{AtomicUsize, AtomicPtr};
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{SeqCst, Relaxed};
 use std::usize;
 
@@ -110,43 +111,10 @@ pub(crate) struct Inner {
     num: AtomicUsize,
 
     /// Head of the "process" linked list.
-    process_head: AtomicPtr<Entry>,
+    process: entry::AtomicStack,
 
     /// Unparks the timer thread.
     unpark: Box<Unpark>,
-}
-
-#[derive(Debug)]
-struct Entry {
-    /// Timer internals
-    inner: Weak<Inner>,
-
-    /// Task to notify once the deadline is reached.
-    task: AtomicTask,
-
-    /// Tracks the entry state
-    state: AtomicUsize,
-
-    /// Next entry in the "process" linked list.
-    ///
-    /// Represents a strong Arc ref.
-    next_queue: UnsafeCell<*mut Entry>,
-
-    /// `Sleep` deadline
-    deadline: Instant,
-
-    /// Next entry in the State's linked list.
-    ///
-    /// This is only accessed by the timer
-    next_state: UnsafeCell<Option<Arc<Entry>>>,
-
-    /// Previous entry in the State's linked list.
-    ///
-    /// This is only accessed by the timer and is used to unlink a canceled
-    /// entry.
-    ///
-    /// This is a weak reference.
-    prev_state: UnsafeCell<*const Entry>,
 }
 
 struct Level {
@@ -156,7 +124,7 @@ struct Level {
     occupied: u64,
 
     /// Slots
-    slot: [Option<Arc<Entry>>; LEVEL_MULT],
+    slot: [entry::Stack; LEVEL_MULT],
 }
 
 struct Expiration {
@@ -164,9 +132,6 @@ struct Expiration {
     slot: usize,
     deadline: u64,
 }
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-struct State(usize);
 
 /// Number of levels
 const NUM_LEVELS: usize = 6;
@@ -181,18 +146,6 @@ const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
 
 /// Maximum number of timeouts the system can handle concurrently.
 const MAX_TIMEOUTS: usize = usize::MAX >> 1;
-
-/// Flag indicating a timer entry has elapsed
-const ELAPSED: usize = 1;
-
-/// Flag indicating a timer entry has reached an error state
-const ERROR: usize = 1 << 2;
-
-/// Flag indicating a timer entry is in the "process" queue
-const QUEUED: usize = 1 << 3;
-
-/// Used to indicate that the timer has shutdown.
-const SHUTDOWN: *mut Entry = 1 as *mut _;
 
 // ===== impl Timer =====
 
@@ -319,7 +272,7 @@ where T: Park,
             if expiration.level == 0 {
                 entry.fire();
             } else {
-                let when = ms(entry.deadline - self.inner.start);
+                let when = ms(entry.deadline() - self.inner.start);
 
                 self.levels[expiration.level - 1]
                     .add_entry(entry, when);
@@ -335,14 +288,7 @@ where T: Park,
     ///
     /// This handles adding and canceling timeouts.
     fn process_queue(&mut self) {
-        let mut ptr = self.inner.process_head.swap(ptr::null_mut(), SeqCst);
-
-        while !ptr.is_null() {
-            let entry = unsafe { Arc::from_raw(ptr) };
-
-            // Get the next entry
-            ptr = unsafe { (*entry.next_queue.get()) };
-
+        for entry in self.inner.process.take() {
             // Check the entry state
             if entry.is_elapsed() {
                 self.clear_entry(entry);
@@ -368,7 +314,7 @@ where T: Park,
 
     fn add_entry(&mut self, entry: Arc<Entry>) {
         // Avoid an underflow subtraction
-        if entry.deadline < self.inner.start {
+        if entry.deadline() < self.inner.start {
             entry.fire();
             return;
         }
@@ -395,7 +341,7 @@ where T: Park,
 
     fn normalize_deadline(&self, entry: &Entry) -> u64 {
         // Convert the duration to millis
-        ms(entry.deadline - self.inner.start)
+        ms(entry.deadline() - self.inner.start)
     }
 }
 
@@ -463,18 +409,9 @@ where T: Park,
 
 impl<T, N> Drop for Timer<T, N> {
     fn drop(&mut self) {
-        // Shutdown the processing queue
-        let mut ptr = self.inner.process_head.swap(SHUTDOWN, SeqCst);
-
-        while !ptr.is_null() {
-            let entry = unsafe { Arc::from_raw(ptr) };
-
-            // Get the next entry
-            ptr = unsafe { (*entry.next_queue.get()) };
-
-            // The entry must be flagged as errored
-            entry.error();
-        }
+        // Shutdown the stack of entries to process, preventing any new entries
+        // from being pushed.
+        self.inner.process.shutdown();
     }
 }
 
@@ -542,19 +479,7 @@ impl Drop for Registration {
             None => return,
         };
 
-        let state: State = entry.state.fetch_or(ELAPSED, SeqCst).into();
-
-        if state.is_elapsed() {
-            // Nothing more to do
-            return;
-        }
-
-        let inner = match entry.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        let _ = inner.queue(entry);
+        Entry::cancel(&entry);
     }
 }
 
@@ -565,7 +490,7 @@ impl Inner {
         Inner {
             num: AtomicUsize::new(0),
             elapsed: AtomicU64::new(0),
-            process_head: AtomicPtr::new(ptr::null_mut()),
+            process: entry::AtomicStack::new(),
             start,
             unpark,
         }
@@ -599,48 +524,14 @@ impl Inner {
         self.num.fetch_sub(1, SeqCst);
     }
 
-    /// Queues an entry for processing
     fn queue(&self, entry: &Arc<Entry>) -> Result<(), Error> {
-        // First, set the queued bit on the entry
-        let state: State = entry.state.fetch_or(QUEUED, SeqCst).into();
-
-        if state.is_queued() {
-            // Already queued, nothing more to do
-            return Ok(());
+        if self.process.push(entry)? {
+            // The timer is notified so that it can process the timeout
+            self.unpark.unpark();
         }
-
-        let ptr = Arc::into_raw(entry.clone()) as *mut _;
-
-        let mut curr = self.process_head.load(SeqCst);
-
-        loop {
-            if curr == SHUTDOWN {
-                // Don't leak the entry node
-                let _ = unsafe { Arc::from_raw(ptr) };
-
-                return Err(Error::shutdown());
-            }
-
-            // Update the `next` pointer. This is safe because setting the queued
-            // bit is a "lock" on this field.
-            unsafe {
-                *(entry.next_queue.get()) = curr;
-            }
-
-            let actual = self.process_head.compare_and_swap(curr, ptr, SeqCst);
-
-            if actual == curr {
-                break;
-            }
-
-            curr = actual;
-        }
-
-        // The timer is notified so that it can process the timeout
-        self.unpark.unpark();
 
         Ok(())
-    }
+}
 }
 
 impl fmt::Debug for Inner {
@@ -654,20 +545,24 @@ impl fmt::Debug for Inner {
 
 impl Level {
     fn new(level: usize) -> Level {
+        macro_rules! s {
+            () => { entry::Stack::new() };
+        };
+
         Level {
             level,
             occupied: 0,
             slot: [
                 // It does not look like the necessary traits are
                 // derived for [T; 64].
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
             ],
         }
     }
@@ -689,16 +584,16 @@ impl Level {
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
         let slot = slot_for(when, self.level);
 
-        push_entry(&mut self.slot[slot], entry);
+        self.slot[slot].push(entry);
         self.occupied |= occupied_bit(slot);
     }
 
     fn remove_entry(&mut self, entry: &Entry, when: u64) {
         let slot = slot_for(when, self.level);
 
-        remove_entry(&mut self.slot[slot], entry);
+        self.slot[slot].remove(entry);
 
-        if self.slot[slot].is_none() {
+        if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);
 
@@ -708,9 +603,9 @@ impl Level {
     }
 
     fn pop_entry_slot(&mut self, slot: usize) -> Option<Arc<Entry>> {
-        let ret = pop_entry(&mut self.slot[slot]);
+        let ret = self.slot[slot].pop();
 
-        if ret.is_some() && self.slot[slot].is_none() {
+        if ret.is_some() && self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);
 
@@ -733,74 +628,6 @@ fn level_range(level: usize) -> u64 {
     LEVEL_MULT as u64 * slot_range(level)
 }
 
-/// Push an entry to the head of the linked list
-fn push_entry(head: &mut Option<Arc<Entry>>, entry: Arc<Entry>) {
-    // Get a pointer to the entry to for the prev link
-    let ptr = &*entry as *const _;
-
-    // Remove the old head entry
-    let old = head.take();
-
-    unsafe {
-        if let Some(ref entry) = old.as_ref() {
-            // Set the previous link on the old head
-            *entry.prev_state.get() = ptr;
-        }
-
-        // Set this entry's next pointer
-        *entry.next_state.get() = old;
-
-    }
-
-    // Update the head pointer
-    *head = Some(entry);
-}
-
-/// Pop the head of the linked list
-fn pop_entry(head: &mut Option<Arc<Entry>>) -> Option<Arc<Entry>> {
-    let entry = head.take();
-
-    unsafe {
-        if let Some(entry) = entry.as_ref() {
-            *head = (*entry.next_state.get()).take();
-
-            if let Some(entry) = head.as_ref() {
-                *entry.prev_state.get() = ptr::null();
-            }
-
-            *entry.prev_state.get() = ptr::null();
-        }
-    }
-
-    entry
-}
-
-/// Remove the entry from the linked list
-///
-/// The caller must ensure that the entry actually is contained by the list.
-fn remove_entry(head: &mut Option<Arc<Entry>>, entry: &Entry) {
-    unsafe {
-        // Unlink `entry` from the next node
-        let next = (*entry.next_state.get()).take();
-
-        if let Some(next) = next.as_ref() {
-            (*next.prev_state.get()) = *entry.prev_state.get();
-        }
-
-        // Unlink `entry` from the prev node
-
-        if let Some(prev) = (*entry.prev_state.get()).as_ref() {
-            *prev.next_state.get() = next;
-        } else {
-            // It is the head
-            *head = next;
-        }
-
-        // Unset the prev pointer
-        *entry.prev_state.get() = ptr::null();
-    }
-}
-
 impl Drop for Level {
     fn drop(&mut self) {
         while let Some(slot) = self.next_occupied_slot(0) {
@@ -820,148 +647,6 @@ impl fmt::Debug for Level {
             .finish()
     }
 }
-
-// ===== impl Entry =====
-
-impl Entry {
-    fn new(deadline: Instant, handle: Handle) -> Entry {
-        Entry {
-            inner: handle.into_inner(),
-            task: AtomicTask::new(),
-            state: AtomicUsize::new(0),
-            next_queue: UnsafeCell::new(ptr::null_mut()),
-            deadline: deadline,
-            next_state: UnsafeCell::new(None),
-            prev_state: UnsafeCell::new(ptr::null_mut()),
-        }
-    }
-
-    /// Create a new `Entry` that is in the error state. Calling `poll_elapsed` on
-    /// this `Entry` will always result in `Err` being returned.
-    fn new_error(deadline: Instant) -> Entry {
-        Entry {
-            inner: Weak::new(),
-            task: AtomicTask::new(),
-            state: AtomicUsize::new(ELAPSED | ERROR),
-            next_queue: UnsafeCell::new(ptr::null_mut()),
-            deadline: deadline,
-            next_state: UnsafeCell::new(None),
-            prev_state: UnsafeCell::new(ptr::null_mut()),
-        }
-    }
-
-    fn is_elapsed(&self) -> bool {
-        let state: State = self.state.load(SeqCst).into();
-        state.is_elapsed()
-    }
-
-    fn fire(&self) {
-        let state: State = self.state.fetch_or(ELAPSED, SeqCst).into();
-
-        if state.is_elapsed() {
-            return;
-        }
-
-        self.task.notify();
-    }
-
-    fn error(&self) {
-        // Only transition to the error state if not currently elapsed
-        let mut curr: State = self.state.load(SeqCst).into();
-
-        loop {
-            if curr.is_elapsed() {
-                return;
-            }
-
-            let mut next = curr;
-            next.set_error();
-
-            let actual = self.state.compare_and_swap(
-                curr.into(), next.into(), SeqCst).into();
-
-            if curr == actual {
-                break;
-            }
-
-            curr = actual;
-        }
-
-        self.task.notify();
-    }
-
-    fn poll_elapsed(&self) -> Poll<(), Error> {
-        use futures::Async::NotReady;
-
-        let mut curr: State = self.state.load(SeqCst).into();
-
-        if curr.is_elapsed() {
-            if curr.is_error() {
-                return Err(Error::shutdown());
-            } else {
-                return Ok(().into());
-            }
-        }
-
-        self.task.register();
-
-        curr = self.state.load(SeqCst).into();
-
-        if curr.is_elapsed() {
-            if curr.is_error() {
-                return Err(Error::shutdown());
-            } else {
-                return Ok(().into());
-            }
-        }
-
-        Ok(NotReady)
-    }
-}
-
-impl Drop for Entry {
-    fn drop(&mut self) {
-        let inner = match self.inner.upgrade() {
-            Some(inner) => inner,
-            None => return,
-        };
-
-        inner.decrement();
-    }
-}
-
-// ===== impl State =====
-
-impl State {
-    fn is_elapsed(&self) -> bool {
-        self.0 & ELAPSED == ELAPSED
-    }
-
-    fn is_error(&self) -> bool {
-        self.0 & ERROR == ERROR
-    }
-
-    fn set_error(&mut self) {
-        self.0 |= ELAPSED | ERROR;
-    }
-
-    fn is_queued(&self) -> bool {
-        self.0 & QUEUED == QUEUED
-    }
-}
-
-impl From<usize> for State {
-    fn from(src: usize) -> Self {
-        State(src)
-    }
-}
-
-impl From<State> for usize {
-    fn from(src: State) -> Self {
-        src.0
-    }
-}
-
 
 /// Convert a `Duration` to milliseconds, rounding up and saturating at
 /// `u64::MAX`.
