@@ -1,5 +1,8 @@
-pub use handle::{Handle, with_default};
-pub use now::{Now, SystemNow};
+mod handle;
+mod now;
+
+pub use self::handle::{Handle, with_default};
+pub use self::now::{Now, SystemNow};
 
 use Error;
 use atomic::AtomicU64;

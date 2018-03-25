@@ -28,9 +28,7 @@ pub mod timer;
 mod atomic;
 mod deadline;
 mod error;
-mod handle;
 mod interval;
-mod now;
 mod sleep;
 
 pub use self::deadline::{Deadline, DeadlineError};
