@@ -7,7 +7,7 @@ use futures::task::AtomicTask;
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::sync::{Arc, Weak};
-use std::sync::atomic::{AtomicUsize, AtomicPtr};
+use std::sync::atomic::{AtomicUsize, AtomicBool, AtomicPtr};
 use std::sync::atomic::Ordering::SeqCst;
 
 #[derive(Debug)]
@@ -20,6 +20,9 @@ pub struct Entry {
 
     /// Tracks the entry state
     state: AtomicUsize,
+
+    /// True wheen the entry is queued in the "process" linked list
+    queued: AtomicBool,
 
     /// Next entry in the "process" linked list.
     ///
@@ -71,9 +74,6 @@ const ELAPSED: usize = 1;
 /// Flag indicating a timer entry has reached an error state
 const ERROR: usize = 1 << 2;
 
-/// Flag indicating a timer entry is in the "process" queue
-const QUEUED: usize = 1 << 3;
-
 /// Used to indicate that the timer has shutdown.
 const SHUTDOWN: *mut Entry = 1 as *mut _;
 
@@ -85,6 +85,7 @@ impl Entry {
             inner: handle.into_inner(),
             task: AtomicTask::new(),
             state: AtomicUsize::new(0),
+            queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when,
             next_stack: UnsafeCell::new(None),
@@ -99,6 +100,7 @@ impl Entry {
             inner: Weak::new(),
             task: AtomicTask::new(),
             state: AtomicUsize::new(ELAPSED | ERROR),
+            queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when: 0,
             next_stack: UnsafeCell::new(None),
@@ -326,9 +328,9 @@ impl AtomicStack {
     /// on the stack, `Err` if the timer is shutdown.
     pub fn push(&self, entry: &Arc<Entry>) -> Result<bool, Error> {
         // First, set the queued bit on the entry
-        let state: State = entry.state.fetch_or(QUEUED, SeqCst).into();
+        let queued = entry.queued.fetch_or(true, SeqCst).into();
 
-        if state.is_queued() {
+        if queued {
             // Already queued, nothing more to do
             return Ok(false);
         }
@@ -397,8 +399,8 @@ impl Iterator for AtomicStackEntries {
         self.ptr = unsafe { (*entry.next_atomic.get()) };
 
         // Unset the queued flag
-        let res = entry.state.fetch_and(!QUEUED, SeqCst);
-        debug_assert!(State::from(res).is_queued());
+        let res = entry.queued.fetch_and(false, SeqCst);
+        debug_assert!(res);
 
         // Return the entry
         Some(entry)
@@ -427,10 +429,6 @@ impl State {
 
     fn set_error(&mut self) {
         self.0 |= ELAPSED | ERROR;
-    }
-
-    fn is_queued(&self) -> bool {
-        self.0 & QUEUED == QUEUED
     }
 }
 
