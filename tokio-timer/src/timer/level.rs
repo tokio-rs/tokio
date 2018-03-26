@@ -3,20 +3,33 @@ use timer::{entry, Entry};
 use std::fmt;
 use std::sync::Arc;
 
+/// Wheel for a single level in the timer. This wheel contains 64 slots.
 pub struct Level {
     level: usize,
 
-    /// Tracks which slot entries are occupied.
+    /// Bit field tracking which slots currently contain entries.
+    ///
+    /// Using a bit field to track slots that contain entries allows avoiding a
+    /// scan to find entries. This field is updated when entries are added or
+    /// removed from a slot.
+    ///
+    /// The least-significant bit represents slot zero.
     occupied: u64,
 
     /// Slots
     slot: [entry::Stack; LEVEL_MULT],
 }
 
+/// Indicates when a slot must be processed next.
 #[derive(Debug)]
 pub struct Expiration {
+    /// The level containing the slot.
     pub level: usize,
+
+    /// The slot index.
     pub slot: usize,
+
+    /// The instant at which the slot needs to be processed.
     pub deadline: u64,
 }
 
@@ -27,6 +40,9 @@ const LEVEL_MULT: usize = 64;
 
 impl Level {
     pub fn new(level: usize) -> Level {
+        // Rust's derived implementations for arrays require that the value
+        // contained by the array be `Copy`. So, here we have to manually
+        // initialize every single slot.
         macro_rules! s {
             () => { entry::Stack::new() };
         };
@@ -49,23 +65,25 @@ impl Level {
         }
     }
 
-    /// Returns the instant at which the next timeout expires.
+    /// Finds the slot that needs to be processed next and returns the slot and
+    /// `Instant` at which this slot must be processed.
     pub fn next_expiration(&self, now: u64) -> Option<Expiration> {
+        // Use the `occupied` bit field to get the index of the next slot that
+        // needs to be processed.
         let slot = match self.next_occupied_slot(now) {
             Some(slot) => slot,
             None => return None,
         };
+
+        // From the slot index, calculate the `Instant` at which it needs to be
+        // processed. This value *must* be in the future with respect to `now`.
 
         let level_range = level_range(self.level);
         let slot_range = slot_range(self.level);
 
         // TODO: This can probably be simplified w/ power of 2 math
         let level_start = now - (now % level_range);
-        let mut deadline = level_start + slot as u64 * slot_range;
-
-        if deadline < now {
-            deadline += level_range;
-        }
+        let deadline = level_start + slot as u64 * slot_range;
 
         debug_assert!(deadline >= now, "deadline={}; now={}; level={}; slot={}; occupied={:b}",
                       deadline, now, self.level, slot, self.occupied);

@@ -94,6 +94,7 @@ pub struct Timer<T, N = SystemNow> {
 #[derive(Debug)]
 pub struct Turn(());
 
+/// Timer state shared between `Timer`, `Handle`, and `Registration`.
 pub(crate) struct Inner {
     /// The instant at which the timer started running.
     start: Instant,
@@ -111,7 +112,9 @@ pub(crate) struct Inner {
     unpark: Box<Unpark>,
 }
 
-/// Number of levels
+/// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
+/// each, the timer is able to track time up to 2 years into the future with a
+/// precision of 1 millisecond.
 const NUM_LEVELS: usize = 6;
 
 /// The maximum duration of a sleep
@@ -125,6 +128,8 @@ const MAX_TIMEOUTS: usize = usize::MAX >> 1;
 impl<T> Timer<T>
 where T: Park
 {
+    /// Create a new `Timer` instance that uses `park` to block the current
+    /// thread.
     pub fn new(park: T) -> Self {
         Timer::new_with_now(park, SystemNow::new())
     }
@@ -146,6 +151,8 @@ impl<T, N> Timer<T, N>
 where T: Park,
       N: Now,
 {
+    /// Create a new `Timer` instance that uses `park` to block the current
+    /// thread and `now` to get the current `Instant`.
     pub fn new_with_now(park: T, mut now: N) -> Self {
         let unpark = Box::new(park.unpark());
 
@@ -254,20 +261,8 @@ where T: Park,
                 let when = entry.deadline_ms(self.inner.start);
                 let next_level = expiration.level - 1;
 
-                debug_assert!({
-                    self.levels[next_level].next_expiration(self.elapsed)
-                        .map(|e| e.deadline >= self.elapsed)
-                        .unwrap_or(true)
-                });
-
                 self.levels[next_level]
                     .add_entry(entry, when);
-
-                debug_assert!({
-                    self.levels[next_level].next_expiration(self.elapsed)
-                        .map(|e| e.deadline >= self.elapsed)
-                        .unwrap_or(true)
-                });
             }
         }
     }
