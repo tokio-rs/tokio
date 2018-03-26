@@ -51,7 +51,9 @@ fn delayed_sleep_level_0() {
 fn sub_ms_delayed_sleep() {
     mocked(|timer, time| {
         for _ in 0..5 {
-            let deadline = time.now() + Duration::new(0, 1);
+            let deadline = time.now()
+                + Duration::from_millis(1)
+                + Duration::new(0, 1);
 
             let mut sleep = Sleep::new(deadline);
 
