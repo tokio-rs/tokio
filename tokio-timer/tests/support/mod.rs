@@ -91,7 +91,7 @@ pub fn turn<T: IntoTimeout>(timer: &mut Timer<MockPark, MockNow>, duration: T) {
 
 /// Advance the timer the specified amount
 pub fn advance(timer: &mut Timer<MockPark, MockNow>, duration: Duration) {
-    let inner = timer.get_ref().inner.clone();
+    let inner = timer.get_park().inner.clone();
     let deadline = inner.lock().unwrap().now() + duration;
 
     while inner.lock().unwrap().now() < deadline {

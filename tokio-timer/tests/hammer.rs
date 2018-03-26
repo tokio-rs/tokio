@@ -30,14 +30,14 @@ fn hammer_complete() {
     const MIN_DELAY: u64 = 1;
     const MAX_DELAY: u64 = 5_000;
 
-    for i in 0..ITERS {
+    for _ in 0..ITERS {
         let mut timer = Timer::default();
         let handle = timer.handle();
         let barrier = Arc::new(Barrier::new(THREADS));
 
         let done = Arc::new(Signal {
             rem: AtomicUsize::new(THREADS),
-            unpark: timer.get_ref().unpark(),
+            unpark: timer.get_park().unpark(),
         });
 
         for _ in 0..THREADS {
@@ -90,14 +90,14 @@ fn hammer_cancel() {
     const MIN_DELAY: u64 = 1;
     const MAX_DELAY: u64 = 5_000;
 
-    for i in 0..ITERS {
+    for _ in 0..ITERS {
         let mut timer = Timer::default();
         let handle = timer.handle();
         let barrier = Arc::new(Barrier::new(THREADS));
 
         let done = Arc::new(Signal {
             rem: AtomicUsize::new(THREADS),
-            unpark: timer.get_ref().unpark(),
+            unpark: timer.get_park().unpark(),
         });
 
         for _ in 0..THREADS {

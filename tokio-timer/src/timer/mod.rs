@@ -137,12 +137,12 @@ where T: Park
 
 impl<T, N> Timer<T, N> {
     /// Returns a reference to the underlying `Park` instance.
-    pub fn get_ref(&self) -> &T {
+    pub fn get_park(&self) -> &T {
         &self.park
     }
 
     /// Returns a mutable reference to the underlying `Park` instance.
-    pub fn get_mut(&mut self) -> &mut T {
+    pub fn get_park_mut(&mut self) -> &mut T {
         &mut self.park
     }
 }
