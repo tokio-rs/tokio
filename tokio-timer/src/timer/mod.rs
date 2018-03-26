@@ -256,9 +256,15 @@ where T: Park,
     fn process_expiration(&mut self, expiration: &Expiration) {
         while let Some(entry) = self.pop_entry(expiration) {
             if expiration.level == 0 {
+                // Track that the entry has been fired
+                entry.set_when_internal(None);
+
+                // Fire the entry
                 entry.fire();
             } else {
-                let when = entry.when();
+                let when = entry.when_internal()
+                    .expect("entry not tracked");
+
                 let next_level = expiration.level - 1;
 
                 self.levels[next_level]
@@ -276,44 +282,47 @@ where T: Park,
     /// This handles adding and canceling timeouts.
     fn process_queue(&mut self) {
         for entry in self.inner.process.take() {
-            // Check the entry state
-            if entry.is_elapsed() {
-                self.clear_entry(entry);
-            } else {
-                self.add_entry(entry);
+            match (entry.when_internal(), entry.load_state()) {
+                (None, None) => {
+                    // Nothing to do
+                }
+                (Some(when), None) => {
+                    // Update the entry state as visible by the timer.
+                    entry.set_when_internal(None);
+
+                    // Remove the entry
+                    self.clear_entry(entry, when);
+                }
+                (None, Some(when)) => {
+                    if when <= self.elapsed {
+                        entry.fire();
+                        return;
+                    } else if when - self.elapsed > MAX_DURATION {
+                        entry.error();
+                        continue;
+                    }
+
+                    // Update the entry state as visible by the timer.
+                    entry.set_when_internal(Some(when));
+
+                    // Queue the entry
+                    self.add_entry(entry, when);
+                }
+                (Some(_curr), Some(_next)) => {
+                    unimplemented!();
+                }
             }
         }
     }
 
-    fn clear_entry(&mut self, entry: Arc<Entry>) {
-        let when = entry.when();
-
-        if when <= self.elapsed {
-            // The entry is no longer contained by the timer.
-            return;
-        }
-
+    fn clear_entry(&mut self, entry: Arc<Entry>, when: u64) {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
         self.levels[level].remove_entry(&entry, when);
     }
 
-    fn add_entry(&mut self, entry: Arc<Entry>) {
-        // Convert the duration to millis
-        let when = entry.when();
-
-        if when > MAX_DURATION {
-            entry.error();
-            return;
-        }
-
-        // If the entry's deadline is in the past or present, trigger it.
-        if when <= self.elapsed {
-            entry.fire();
-            return;
-        }
-
+    fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 

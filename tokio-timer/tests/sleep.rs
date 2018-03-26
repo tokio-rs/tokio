@@ -376,3 +376,23 @@ fn unpark_is_delayed() {
         assert_ready!(sleep3);
     })
 }
+
+#[test]
+fn set_timeout_at_deadline_greater_than_max_timer() {
+    const YR_1: u64 = 365 * 24 * 60 * 60 * 1000;
+    const YR_5: u64 = 5 * YR_1;
+
+    mocked(|timer, time| {
+        for _ in 0..5 {
+            turn(timer, ms(YR_1));
+        }
+
+        let mut sleep = Sleep::new(time.now() + ms(1));
+        assert_not_ready!(sleep);
+
+        turn(timer, ms(1000));
+        assert_eq!(time.advanced(), Duration::from_millis(YR_5) + ms(1));
+
+        assert_ready!(sleep);
+    });
+}

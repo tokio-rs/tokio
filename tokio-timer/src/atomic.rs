@@ -23,6 +23,15 @@ mod imp {
         pub fn store(&self, val: u64, ordering: Ordering) {
             self.inner.store(val as usize, ordering)
         }
+
+        pub fn fetch_or(&self, val: u64, ordering: Ordering) -> u64 {
+            self.inner.fetch_or(val as usize, ordering) as u64
+        }
+
+        pub fn compare_and_swap(&self, old: u64, new: u64, ordering: Ordering) -> u64 {
+            self.inner.compare_and_swap(
+                old as usize, new as usize, ordering) as u64
+        }
     }
 }
 
@@ -48,6 +57,25 @@ mod imp {
 
         pub fn store(&self, val: u64, _: Ordering) {
             *self.inner.lock().unwrap() = val;
+        }
+
+        pub fn fetch_or(&self, val: u64, _: Ordering) -> u64 {
+            let mut lock = self.inner.lock().unwrap();
+            let prev = *lock;
+            *lock = prev | val;
+            prev
+        }
+
+        pub fn compare_and_swap(&self, old: u64, new: u64, _: Ordering) -> u64 {
+            let mut lock = self.inner.lock().unwrap();
+            let prev = *lock;
+
+            if prev != old {
+                return prev;
+            }
+
+            *lock = new;
+            prev
         }
     }
 }

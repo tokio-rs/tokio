@@ -1,4 +1,5 @@
 use Error;
+use atomic::AtomicU64;
 use timer::{Handle, Inner};
 
 use futures::Poll;
@@ -7,8 +8,9 @@ use futures::task::AtomicTask;
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::sync::{Arc, Weak};
-use std::sync::atomic::{AtomicUsize, AtomicBool, AtomicPtr};
+use std::sync::atomic::{AtomicBool, AtomicPtr};
 use std::sync::atomic::Ordering::SeqCst;
+use std::u64;
 
 #[derive(Debug)]
 pub struct Entry {
@@ -18,8 +20,8 @@ pub struct Entry {
     /// Task to notify once the deadline is reached.
     task: AtomicTask,
 
-    /// Tracks the entry state
-    state: AtomicUsize,
+    /// Signals to the timer when the caller would like the entry to expire.
+    state: AtomicU64,
 
     /// True wheen the entry is queued in the "process" linked list
     queued: AtomicBool,
@@ -30,8 +32,8 @@ pub struct Entry {
     next_atomic: UnsafeCell<*mut Entry>,
 
     /// When the entry expires, relative to the `start` of the timer
-    /// (Inner::start).
-    when: u64,
+    /// (Inner::start). This is only used by the timer.
+    when: UnsafeCell<Option<u64>>,
 
     /// Next entry in the State's linked list.
     ///
@@ -65,14 +67,11 @@ pub struct AtomicStackEntries {
     ptr: *mut Entry,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-struct State(usize);
-
 /// Flag indicating a timer entry has elapsed
-const ELAPSED: usize = 1;
+const ELAPSED: u64 = 1 << 63;
 
 /// Flag indicating a timer entry has reached an error state
-const ERROR: usize = 1 << 2;
+const ERROR: u64 = u64::MAX;
 
 /// Used to indicate that the timer has shutdown.
 const SHUTDOWN: *mut Entry = 1 as *mut _;
@@ -81,13 +80,15 @@ const SHUTDOWN: *mut Entry = 1 as *mut _;
 
 impl Entry {
     pub fn new(when: u64, handle: Handle) -> Entry {
+        assert!(when > 0 && when < u64::MAX);
+
         Entry {
             inner: handle.into_inner(),
             task: AtomicTask::new(),
-            state: AtomicUsize::new(0),
+            state: AtomicU64::new(when),
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
-            when,
+            when: UnsafeCell::new(None),
             next_stack: UnsafeCell::new(None),
             prev_stack: UnsafeCell::new(ptr::null_mut()),
         }
@@ -99,28 +100,45 @@ impl Entry {
         Entry {
             inner: Weak::new(),
             task: AtomicTask::new(),
-            state: AtomicUsize::new(ELAPSED | ERROR),
+            state: AtomicU64::new(ERROR),
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
-            when: 0,
+            when: UnsafeCell::new(None),
             next_stack: UnsafeCell::new(None),
             prev_stack: UnsafeCell::new(ptr::null_mut()),
         }
     }
 
-    pub fn when(&self) -> u64 {
-        self.when
+    /// The current entry state as known by the timer. This is not the value of
+    /// `state`, but lets the timer know how to converge its state to `state`.
+    pub fn when_internal(&self) -> Option<u64> {
+        unsafe { (*self.when.get()) }
+    }
+
+    pub fn set_when_internal(&self, when: Option<u64>) {
+        unsafe { (*self.when.get()) = when; }
+    }
+
+    /// Called by `Timer` to load the current value of `state` for processing
+    pub fn load_state(&self) -> Option<u64> {
+        let state = self.state.load(SeqCst);
+
+        if is_elapsed(state) {
+            None
+        } else {
+            Some(state)
+        }
     }
 
     pub fn is_elapsed(&self) -> bool {
-        let state: State = self.state.load(SeqCst).into();
-        state.is_elapsed()
+        let state = self.state.load(SeqCst);
+        is_elapsed(state)
     }
 
     pub fn fire(&self) {
-        let state: State = self.state.fetch_or(ELAPSED, SeqCst).into();
+        let state = self.state.fetch_or(ELAPSED, SeqCst).into();
 
-        if state.is_elapsed() {
+        if is_elapsed(state) {
             return;
         }
 
@@ -129,18 +147,16 @@ impl Entry {
 
     pub fn error(&self) {
         // Only transition to the error state if not currently elapsed
-        let mut curr: State = self.state.load(SeqCst).into();
+        let mut curr = self.state.load(SeqCst);
 
         loop {
-            if curr.is_elapsed() {
+            if is_elapsed(curr) {
                 return;
             }
 
-            let mut next = curr;
-            next.set_error();
+            let next = ERROR;
 
-            let actual = self.state.compare_and_swap(
-                curr.into(), next.into(), SeqCst).into();
+            let actual = self.state.compare_and_swap(curr, next, SeqCst);
 
             if curr == actual {
                 break;
@@ -153,9 +169,9 @@ impl Entry {
     }
 
     pub fn cancel(entry: &Arc<Entry>) {
-        let state: State = entry.state.fetch_or(ELAPSED, SeqCst).into();
+        let state = entry.state.fetch_or(ELAPSED, SeqCst);
 
-        if state.is_elapsed() {
+        if is_elapsed(state) {
             // Nothing more to do
             return;
         }
@@ -171,10 +187,10 @@ impl Entry {
     pub fn poll_elapsed(&self) -> Poll<(), Error> {
         use futures::Async::NotReady;
 
-        let mut curr: State = self.state.load(SeqCst).into();
+        let mut curr = self.state.load(SeqCst);
 
-        if curr.is_elapsed() {
-            if curr.is_error() {
+        if is_elapsed(curr) {
+            if curr == ERROR {
                 return Err(Error::shutdown());
             } else {
                 return Ok(().into());
@@ -185,8 +201,8 @@ impl Entry {
 
         curr = self.state.load(SeqCst).into();
 
-        if curr.is_elapsed() {
-            if curr.is_error() {
+        if is_elapsed(curr) {
+            if curr == ERROR {
                 return Err(Error::shutdown());
             } else {
                 return Ok(().into());
@@ -195,6 +211,10 @@ impl Entry {
 
         Ok(NotReady)
     }
+}
+
+fn is_elapsed(state: u64) -> bool {
+    state & ELAPSED == ELAPSED
 }
 
 impl Drop for Entry {
@@ -413,33 +433,5 @@ impl Drop for AtomicStackEntries {
             // Flag the entry as errored
             entry.error();
         }
-    }
-}
-
-// ===== impl State =====
-
-impl State {
-    fn is_elapsed(&self) -> bool {
-        self.0 & ELAPSED == ELAPSED
-    }
-
-    fn is_error(&self) -> bool {
-        self.0 & ERROR == ERROR
-    }
-
-    fn set_error(&mut self) {
-        self.0 |= ELAPSED | ERROR;
-    }
-}
-
-impl From<usize> for State {
-    fn from(src: usize) -> Self {
-        State(src)
-    }
-}
-
-impl From<State> for usize {
-    fn from(src: State) -> Self {
-        src.0
     }
 }
