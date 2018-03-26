@@ -10,7 +10,7 @@ use tokio_timer::*;
 
 use futures::Future;
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[test]
 fn immediate_sleep() {
@@ -32,7 +32,7 @@ fn immediate_sleep() {
 #[test]
 fn delayed_sleep_level_0() {
     for &i in &[1, 10, 60] {
-        mocked(|timer, time|{
+        mocked(|timer, time| {
             // Create a `Sleep` that elapses in the future
             let mut sleep = Sleep::new(time.now() + ms(i));
 
@@ -45,6 +45,43 @@ fn delayed_sleep_level_0() {
             assert_ready!(sleep);
         });
     }
+}
+
+#[test]
+fn sub_ms_delayed_sleep() {
+    mocked(|timer, time| {
+        for _ in 0..5 {
+            let deadline = time.now() + Duration::new(0, 1);
+
+            let mut sleep = Sleep::new(deadline);
+
+            assert_not_ready!(sleep);
+
+            turn(timer, None);
+            assert_ready!(sleep);
+
+            assert!(time.now() >= deadline);
+
+            time.advance(Duration::new(0, 1));
+        }
+    });
+}
+
+#[test]
+fn delayed_sleep_wrapping_level_0() {
+    mocked(|timer, time| {
+        turn(timer, ms(5));
+        assert_eq!(time.advanced(), ms(5));
+
+        let mut sleep = Sleep::new(time.now() + ms(60));
+
+        assert_not_ready!(sleep);
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(5 + 60));
+
+        assert_ready!(sleep);
+    });
 }
 
 #[test]

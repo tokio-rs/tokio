@@ -196,7 +196,7 @@ where T: Park,
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = ms(self.now.now() - self.inner.start);
+        let now = ms(self.now.now() - self.inner.start, Round::Down);
 
         loop {
             let expiration = match self.next_expiration() {
@@ -209,11 +209,11 @@ where T: Park,
                 break;
             }
 
-            self.set_elapsed(expiration.deadline);
-
             // Prcess the slot, either moving it down a level or firing the
             // timeout if currently at the final (boss) level.
             self.process_expiration(&expiration);
+
+            self.set_elapsed(expiration.deadline);
         }
 
         self.set_elapsed(now);
@@ -235,42 +235,25 @@ where T: Park,
             if expiration.level == 0 {
                 entry.fire();
             } else {
-                self.move_entry_down(entry, expiration.level);
+                let when = entry.deadline_ms(self.inner.start);
+                let next_level = expiration.level - 1;
+
+                debug_assert!({
+                    self.levels[next_level].next_expiration(self.elapsed)
+                        .map(|e| e.deadline >= self.elapsed)
+                        .unwrap_or(true)
+                });
+
+                self.levels[next_level]
+                    .add_entry(entry, when);
+
+                debug_assert!({
+                    self.levels[next_level].next_expiration(self.elapsed)
+                        .map(|e| e.deadline >= self.elapsed)
+                        .unwrap_or(true)
+                });
             }
         }
-
-        /*
-        for level in (expiration.level + 1)..NUM_LEVELS {
-            let slot = match self.levels[level].slot_for(self.elapsed) {
-                Some(slot) => slot,
-                None => return,
-            };
-
-            while let Some(entry) = self.levels[level].pop_entry_slot(slot) {
-                self.move_entry_down(entry, level);
-            }
-        }
-        */
-    }
-
-    fn move_entry_down(&mut self, entry: Arc<Entry>, level: usize) {
-        let when = ms(entry.deadline() - self.inner.start);
-        let next_level = level - 1;
-
-        debug_assert!({
-            self.levels[next_level].next_expiration(self.elapsed)
-                .map(|e| e.deadline >= self.elapsed)
-                .unwrap_or(true)
-        });
-
-        self.levels[next_level]
-            .add_entry(entry, when);
-
-        debug_assert!({
-            self.levels[next_level].next_expiration(self.elapsed)
-                .map(|e| e.deadline >= self.elapsed)
-                .unwrap_or(true)
-        });
     }
 
     fn pop_entry(&mut self, expiration: &Expiration) -> Option<Arc<Entry>> {
@@ -292,7 +275,7 @@ where T: Park,
     }
 
     fn clear_entry(&mut self, entry: Arc<Entry>) {
-        let when = self.normalize_deadline(&entry);
+        let when = entry.deadline_ms(self.inner.start);
 
         if when <= self.elapsed {
             // The entry is no longer contained by the timer.
@@ -313,7 +296,8 @@ where T: Park,
         }
 
         // Convert the duration to millis
-        let when = self.normalize_deadline(&entry);
+        let when = entry.deadline_ms(self.inner.start);
+        debug_assert!(entry.deadline() <= self.inner.start + Duration::from_millis(when));
 
         if when > MAX_DURATION {
             entry.error();
@@ -336,11 +320,6 @@ where T: Park,
                 .map(|e| e.deadline >= self.elapsed)
                 .unwrap_or(true)
         });
-    }
-
-    fn normalize_deadline(&self, entry: &Entry) -> u64 {
-        // Convert the duration to millis
-        ms(entry.deadline() - self.inner.start)
     }
 }
 
@@ -482,17 +461,27 @@ impl fmt::Debug for Inner {
     }
 }
 
+enum Round {
+    Up,
+    Down,
+}
+
 /// Convert a `Duration` to milliseconds, rounding up and saturating at
 /// `u64::MAX`.
 ///
 /// The saturating is fine because `u64::MAX` milliseconds are still many
 /// million years.
-fn ms(duration: Duration) -> u64 {
+#[inline]
+fn ms(duration: Duration, round: Round) -> u64 {
     const NANOS_PER_MILLI: u32 = 1_000_000;
     const MILLIS_PER_SEC: u64 = 1_000;
 
     // Round up.
-    let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
+    let millis = match round {
+        Round::Up => (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI,
+        Round::Down => duration.subsec_nanos() / NANOS_PER_MILLI,
+    };
+
     duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
 }
 

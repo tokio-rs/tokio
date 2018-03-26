@@ -165,6 +165,11 @@ impl MockTime {
         self.inner.lock().unwrap().advance
     }
 
+    pub fn advance(&self, duration: Duration) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.advance(duration);
+    }
+
     /// The next call to park_timeout will be for this duration, regardless of
     /// the timeout passed to `park_timeout`.
     pub fn park_for(&self, duration: Duration) {

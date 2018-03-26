@@ -110,6 +110,10 @@ impl Entry {
         self.deadline
     }
 
+    pub fn deadline_ms(&self, start: Instant) -> u64 {
+        super::ms(self.deadline - start, super::Round::Up)
+    }
+
     pub fn is_elapsed(&self) -> bool {
         let state: State = self.state.load(SeqCst).into();
         state.is_elapsed()

@@ -77,17 +77,6 @@ impl Level {
         })
     }
 
-    pub fn slot_for(&self, now: u64) -> Option<usize> {
-        let slot_range = slot_range(self.level);
-
-        // TODO: Improve with power of 2 math
-        if now % slot_range == 0 {
-            return Some((now / slot_range) as usize % LEVEL_MULT);
-        }
-
-        None
-    }
-
     fn next_occupied_slot(&self, now: u64) -> Option<usize> {
         if self.occupied == 0 {
             return None;
