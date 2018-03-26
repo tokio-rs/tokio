@@ -78,9 +78,41 @@ fn delayed_sleep_wrapping_level_0() {
         assert_not_ready!(sleep);
 
         turn(timer, None);
-        assert_eq!(time.advanced(), ms(5 + 60));
+        assert_eq!(time.advanced(), ms(64));
+        assert_not_ready!(sleep);
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(65));
 
         assert_ready!(sleep);
+    });
+}
+
+#[test]
+fn timer_wrapping_with_higher_levels() {
+    mocked(|timer, time| {
+        // Set sleep to hit level 1
+        let mut s1 = Sleep::new(time.now() + ms(64));
+        assert_not_ready!(s1);
+
+        // Turn a bit
+        turn(timer, ms(5));
+
+        // Set timeout such that it will hit level 0, but wrap
+        let mut s2 = Sleep::new(time.now() + ms(60));
+        assert_not_ready!(s2);
+
+        // This should result in s1 firing
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(64));
+
+        assert_ready!(s1);
+        assert_not_ready!(s2);
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(65));
+
+        assert_ready!(s2);
     });
 }
 
@@ -247,22 +279,18 @@ fn sorta_long_sleep() {
         // The sleep has not elapsed.
         assert_not_ready!(sleep);
 
-        // Turn the timer, this will go to the first cascade
-        turn(timer, None);
-        assert_eq!(time.advanced(), ms(262_144));
-        // 262_144+9*4096
+        let cascades = &[
+            262_144,
+            262_144 + 9 * 4096,
+            262_144 + 9 * 4096 + 15 * 64,
+        ];
 
-        assert_not_ready!(sleep);
+        for &elapsed in cascades {
+            turn(timer, None);
+            assert_eq!(time.advanced(), ms(elapsed));
 
-        turn(timer, None);
-        assert_eq!(time.advanced(), ms(262_144 + 9 * 4096));
-
-        assert_not_ready!(sleep);
-
-        turn(timer, None);
-        assert_eq!(time.advanced(), ms(262_144 + 9 * 4096 + 15 * 64));
-
-        assert_not_ready!(sleep);
+            assert_not_ready!(sleep);
+        }
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(MIN_5));

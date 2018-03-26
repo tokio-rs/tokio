@@ -182,6 +182,22 @@ where T: Park,
         // Check all levels
         for level in 0..NUM_LEVELS {
             if let Some(expiration) = self.levels[level].next_expiration(self.elapsed) {
+                // There cannot be any expirations at a higher level that happen
+                // before this one.
+                debug_assert!({
+                    let mut res = true;
+
+                    for l2 in (level+1)..NUM_LEVELS {
+                        if let Some(e2) = self.levels[l2].next_expiration(self.elapsed) {
+                            if e2.deadline < expiration.deadline {
+                                res = false;
+                            }
+                        }
+                    }
+
+                    res
+                });
+
                 return Some(expiration);
             }
         }
@@ -283,7 +299,7 @@ where T: Park,
         }
 
         // Get the level at which the entry should be stored
-        let level = level_for(when - self.elapsed);
+        let level = self.level_for(when);
 
         self.levels[level].remove_entry(&entry, when);
     }
@@ -311,7 +327,7 @@ where T: Park,
         }
 
         // Get the level at which the entry should be stored
-        let level = level_for(when - self.elapsed);
+        let level = self.level_for(when);
 
         self.levels[level].add_entry(entry, when);
 
@@ -321,6 +337,20 @@ where T: Park,
                 .unwrap_or(true)
         });
     }
+
+    fn level_for(&self, when: u64) -> usize {
+        level_for(self.elapsed, when)
+    }
+}
+
+fn level_for(elapsed: u64, when: u64) -> usize {
+    let masked = elapsed ^ when;
+
+    assert!(masked != 0, "elapsed={}; when={}", elapsed, when);
+
+    let leading_zeros = masked.leading_zeros() as usize;
+    let significant = 63 - leading_zeros;
+    significant / 6
 }
 
 impl Default for Timer<ParkThread, SystemNow> {
@@ -391,16 +421,6 @@ impl<T, N> Drop for Timer<T, N> {
         // from being pushed.
         self.inner.process.shutdown();
     }
-}
-
-/// Convert a duration (milliseconds) to a level
-fn level_for(duration: u64) -> usize {
-    debug_assert!(duration > 0);
-
-    // 63 is picked to offset this by 1. A duration of 0 is prohibited, so this
-    // cannot underflow.
-    let significant = 63 - duration.leading_zeros() as usize;
-    significant / 6
 }
 
 // ===== impl Inner =====
@@ -492,24 +512,24 @@ mod test {
     #[test]
     fn test_level_for() {
         for pos in 1..64 {
-            assert_eq!(0, level_for(pos), "level_for({}) -- binary = {:b}", pos, pos);
+            assert_eq!(0, level_for(0, pos), "level_for({}) -- binary = {:b}", pos, pos);
         }
 
         for level in 1..5 {
             for pos in level..64 {
                 let a = pos * 64_usize.pow(level as u32);
-                assert_eq!(level, level_for(a as u64),
+                assert_eq!(level, level_for(0, a as u64),
                            "level_for({}) -- binary = {:b}", a, a);
 
                 if pos > level {
                     let a = a - 1;
-                    assert_eq!(level, level_for(a as u64),
+                    assert_eq!(level, level_for(0, a as u64),
                                "level_for({}) -- binary = {:b}", a, a);
                 }
 
                 if pos < 64 {
                     let a = a + 1;
-                    assert_eq!(level, level_for(a as u64),
+                    assert_eq!(level, level_for(0, a as u64),
                                "level_for({}) -- binary = {:b}", a, a);
                 }
             }

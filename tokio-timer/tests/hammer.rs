@@ -23,14 +23,13 @@ struct Signal {
 
 #[test]
 fn hammer() {
-    const ITERS: usize = 100;
+    const ITERS: usize = 5;
     const THREADS: usize = 4;
     const PER_THREAD: usize = 40;
     const MIN_DELAY: u64 = 1;
-    const MAX_DELAY: u64 = 100;
+    const MAX_DELAY: u64 = 5_000;
 
     for i in 0..ITERS {
-        println!("~~~~~ ITER = {} ~~~~~", i);
         let mut timer = Timer::default();
         let handle = timer.handle();
         let barrier = Arc::new(Barrier::new(THREADS));

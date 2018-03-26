@@ -268,6 +268,24 @@ impl Stack {
     /// The caller must ensure that the entry actually is contained by the list.
     pub fn remove(&mut self, entry: &Entry) {
         unsafe {
+            // Ensure that the entry is in fact contained by the stack
+            debug_assert!({
+                // This walks the full linked list even if an entry is found.
+                let mut next = self.head.as_ref();
+                let mut contains = false;
+
+                while let Some(n) = next {
+                    if entry as *const _ == &**n as *const _ {
+                        debug_assert!(!contains);
+                        contains = true;
+                    }
+
+                    next = (*n.next_stack.get()).as_ref();
+                }
+
+                contains
+            });
+
             // Unlink `entry` from the next node
             let next = (*entry.next_stack.get()).take();
 
