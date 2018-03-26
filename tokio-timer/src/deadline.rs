@@ -46,31 +46,16 @@ impl<T> Deadline<T> {
     }
 
     /// Gets a reference to the underlying future in this deadline.
-    ///
-    /// # Return
-    ///
-    /// The function returns `None` if the inner future has already been
-    /// consumed.
     pub fn get_ref(&self) -> &T {
         &self.future
     }
 
     /// Gets a mutable reference to the underlying future in this deadline.
-    ///
-    /// # Return
-    ///
-    /// The function returns `None` if the inner future has already been
-    /// consumed.
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.future
     }
 
     /// Consumes this deadline, returning the underlying future.
-    ///
-    /// # Return
-    ///
-    /// The function returns `None` if the inner future has already been
-    /// consumed.
     pub fn into_inner(self) -> T {
         self.future
     }
