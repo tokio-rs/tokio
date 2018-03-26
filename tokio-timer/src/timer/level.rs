@@ -13,6 +13,7 @@ pub struct Level {
     slot: [entry::Stack; LEVEL_MULT],
 }
 
+#[derive(Debug)]
 pub struct Expiration {
     pub level: usize,
     pub slot: usize,
@@ -55,14 +56,36 @@ impl Level {
             None => return None,
         };
 
-        let level_start = now - (now % level_range(self.level));
-        let deadline = level_start + slot as u64 * slot_range(self.level);
+        let level_range = level_range(self.level);
+        let slot_range = slot_range(self.level);
+
+        // TODO: This can probably be simplified w/ power of 2 math
+        let level_start = now - (now % level_range);
+        let mut deadline = level_start + slot as u64 * slot_range;
+
+        if deadline < now {
+            deadline += level_range;
+        }
+
+        debug_assert!(deadline >= now, "deadline={}; now={}; level={}; slot={}; occupied={:b}",
+                      deadline, now, self.level, slot, self.occupied);
 
         Some(Expiration {
             level: self.level,
             slot,
             deadline,
         })
+    }
+
+    pub fn slot_for(&self, now: u64) -> Option<usize> {
+        let slot_range = slot_range(self.level);
+
+        // TODO: Improve with power of 2 math
+        if now % slot_range == 0 {
+            return Some((now / slot_range) as usize % LEVEL_MULT);
+        }
+
+        None
     }
 
     fn next_occupied_slot(&self, now: u64) -> Option<usize> {

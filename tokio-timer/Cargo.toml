@@ -14,3 +14,6 @@ Timer facilities for Tokio
 [dependencies]
 futures = "0.1.19"
 tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
+
+[dev-dependencies]
+rand = "0.4.2"

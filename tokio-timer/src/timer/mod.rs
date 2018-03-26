@@ -209,18 +209,18 @@ where T: Park,
                 break;
             }
 
+            self.set_elapsed(expiration.deadline);
+
             // Prcess the slot, either moving it down a level or firing the
             // timeout if currently at the final (boss) level.
             self.process_expiration(&expiration);
-
-            self.set_elapsed(expiration.deadline);
         }
 
         self.set_elapsed(now);
     }
 
     fn set_elapsed(&mut self, when: u64) {
-        assert!(self.elapsed <= when);
+        assert!(self.elapsed <= when, "elapsed={:?}; when={:?}", self.elapsed, when);
 
         if when > self.elapsed {
             self.elapsed = when;
@@ -235,12 +235,42 @@ where T: Park,
             if expiration.level == 0 {
                 entry.fire();
             } else {
-                let when = ms(entry.deadline() - self.inner.start);
-
-                self.levels[expiration.level - 1]
-                    .add_entry(entry, when);
+                self.move_entry_down(entry, expiration.level);
             }
         }
+
+        /*
+        for level in (expiration.level + 1)..NUM_LEVELS {
+            let slot = match self.levels[level].slot_for(self.elapsed) {
+                Some(slot) => slot,
+                None => return,
+            };
+
+            while let Some(entry) = self.levels[level].pop_entry_slot(slot) {
+                self.move_entry_down(entry, level);
+            }
+        }
+        */
+    }
+
+    fn move_entry_down(&mut self, entry: Arc<Entry>, level: usize) {
+        let when = ms(entry.deadline() - self.inner.start);
+        let next_level = level - 1;
+
+        debug_assert!({
+            self.levels[next_level].next_expiration(self.elapsed)
+                .map(|e| e.deadline >= self.elapsed)
+                .unwrap_or(true)
+        });
+
+        self.levels[next_level]
+            .add_entry(entry, when);
+
+        debug_assert!({
+            self.levels[next_level].next_expiration(self.elapsed)
+                .map(|e| e.deadline >= self.elapsed)
+                .unwrap_or(true)
+        });
     }
 
     fn pop_entry(&mut self, expiration: &Expiration) -> Option<Arc<Entry>> {
@@ -300,6 +330,12 @@ where T: Park,
         let level = level_for(when - self.elapsed);
 
         self.levels[level].add_entry(entry, when);
+
+        debug_assert!({
+            self.levels[level].next_expiration(self.elapsed)
+                .map(|e| e.deadline >= self.elapsed)
+                .unwrap_or(true)
+        });
     }
 
     fn normalize_deadline(&self, entry: &Entry) -> u64 {
