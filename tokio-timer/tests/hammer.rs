@@ -60,7 +60,6 @@ fn hammer_complete() {
                             .and_then(move |_| {
                                 let now = Instant::now();
                                 assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
-                                assert!(now < deadline + Duration::from_millis(15), "deadline past by {:?}", now - deadline);
                                 Ok(())
                             })
                     });
@@ -92,7 +91,6 @@ fn hammer_cancel() {
     const MAX_DELAY: u64 = 5_000;
 
     for i in 0..ITERS {
-        println!("~~ ITER ~~");
         let mut timer = Timer::default();
         let handle = timer.handle();
         let barrier = Arc::new(Barrier::new(THREADS));
@@ -130,8 +128,6 @@ fn hammer_cancel() {
                             .and_then(move |_| {
                                 let now = Instant::now();
                                 assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
-                                // TODO: Remove the next line
-                                assert!(now < deadline + Duration::from_millis(15), "deadline past by {:?}", now - deadline);
                                 Ok(())
                             })
                     });
