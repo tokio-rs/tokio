@@ -94,6 +94,19 @@ impl Entry {
         }
     }
 
+    pub fn new_elapsed(handle: Handle) -> Entry {
+        Entry {
+            inner: handle.into_inner(),
+            task: AtomicTask::new(),
+            state: AtomicU64::new(ELAPSED),
+            queued: AtomicBool::new(false),
+            next_atomic: UnsafeCell::new(ptr::null_mut()),
+            when: UnsafeCell::new(None),
+            next_stack: UnsafeCell::new(None),
+            prev_stack: UnsafeCell::new(ptr::null_mut()),
+        }
+    }
+
     /// Create a new `Entry` that is in the error state. Calling `poll_elapsed` on
     /// this `Entry` will always result in `Err` being returned.
     pub fn new_error() -> Entry {

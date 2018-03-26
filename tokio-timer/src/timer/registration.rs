@@ -12,7 +12,7 @@ use std::time::Instant;
 /// `poll`
 #[derive(Debug)]
 pub(crate) struct Registration {
-    entry: Option<Arc<Entry>>,
+    entry: Arc<Entry>,
 }
 
 impl Registration {
@@ -35,7 +35,7 @@ impl Registration {
             // The deadline has already elapsed, ther eis no point creating the
             // structures.
             return Registration {
-                entry: None
+                entry: Arc::new(Entry::new_elapsed(handle)),
             };
         }
 
@@ -51,34 +51,25 @@ impl Registration {
             entry.error();
         }
 
-        Registration { entry: Some(entry) }
+        Registration { entry }
     }
 
     fn new_error() -> Registration {
-        let entry = Some(Arc::new(Entry::new_error()));
+        let entry = Arc::new(Entry::new_error());
         Registration { entry }
     }
 
     pub fn is_elapsed(&self) -> bool {
-        self.entry.as_ref()
-            .map(|e| e.is_elapsed())
-            .unwrap_or(true)
+        self.entry.is_elapsed()
     }
 
     pub fn poll_elapsed(&self) -> Poll<(), Error> {
-        self.entry.as_ref()
-            .map(|e| e.poll_elapsed())
-            .unwrap_or(Ok(().into()))
+        self.entry.poll_elapsed()
     }
 }
 
 impl Drop for Registration {
     fn drop(&mut self) {
-        let entry = match self.entry {
-            Some(ref e) => e,
-            None => return,
-        };
-
-        Entry::cancel(&entry);
+        Entry::cancel(&self.entry);
     }
 }
