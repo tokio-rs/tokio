@@ -224,13 +224,22 @@ impl Stack {
     /// Push an entry to the head of the linked list
     pub fn push(&mut self, entry: Arc<Entry>) {
         // Get a pointer to the entry to for the prev link
-        let ptr = &*entry as *const _;
+        let ptr: *const Entry = &*entry as *const _;
 
         // Remove the old head entry
         let old = self.head.take();
 
         unsafe {
+            // Ensure the entry is not already in a stack.
+            debug_assert!((*entry.next_stack.get()).is_none());
+            debug_assert!((*entry.prev_stack.get()).is_null());
+
             if let Some(ref entry) = old.as_ref() {
+                debug_assert!({
+                    // The head is not already set to the entry
+                    ptr != &***entry as *const _
+                });
+
                 // Set the previous link on the old head
                 *entry.prev_stack.get() = ptr;
             }
@@ -390,6 +399,10 @@ impl Iterator for AtomicStackEntries {
 
         // Update `self.ptr` to point to the next element of the stack
         self.ptr = unsafe { (*entry.next_atomic.get()) };
+
+        // Unset the queued flag
+        let res = entry.state.fetch_and(!QUEUED, SeqCst);
+        debug_assert!(State::from(res).is_queued());
 
         // Return the entry
         Some(entry)
