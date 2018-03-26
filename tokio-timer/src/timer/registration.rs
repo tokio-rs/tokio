@@ -19,17 +19,19 @@ impl Registration {
     pub fn new(deadline: Instant) -> Registration {
         match Handle::try_current() {
             Ok(handle) => Registration::new_with_handle(deadline, handle),
-            Err(_) => Registration::new_error(deadline),
+            Err(_) => Registration::new_error(),
         }
     }
 
     pub fn new_with_handle(deadline: Instant, handle: Handle) -> Registration {
         let inner = match handle.inner() {
             Some(inner) => inner,
-            None => return Registration::new_error(deadline),
+            None => return Registration::new_error(),
         };
 
-        if deadline <= inner.now() {
+        let when = inner.normalize_deadline(deadline);
+
+        if when <= inner.elapsed() {
             // The deadline has already elapsed, ther eis no point creating the
             // structures.
             return Registration {
@@ -39,10 +41,10 @@ impl Registration {
 
         // Increment the number of active timeouts
         if inner.increment().is_err() {
-            return Registration::new_error(deadline);
+            return Registration::new_error();
         }
 
-        let entry = Arc::new(Entry::new(deadline, handle));
+        let entry = Arc::new(Entry::new(when, handle));
 
         if inner.queue(&entry).is_err() {
             // The timer has shutdown, transition the entry to the error state.
@@ -52,8 +54,8 @@ impl Registration {
         Registration { entry: Some(entry) }
     }
 
-    fn new_error(deadline: Instant) -> Registration {
-        let entry = Some(Arc::new(Entry::new_error(deadline)));
+    fn new_error() -> Registration {
+        let entry = Some(Arc::new(Entry::new_error()));
         Registration { entry }
     }
 

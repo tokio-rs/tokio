@@ -258,7 +258,7 @@ where T: Park,
             if expiration.level == 0 {
                 entry.fire();
             } else {
-                let when = entry.deadline_ms(self.inner.start);
+                let when = entry.when();
                 let next_level = expiration.level - 1;
 
                 self.levels[next_level]
@@ -286,7 +286,7 @@ where T: Park,
     }
 
     fn clear_entry(&mut self, entry: Arc<Entry>) {
-        let when = entry.deadline_ms(self.inner.start);
+        let when = entry.when();
 
         if when <= self.elapsed {
             // The entry is no longer contained by the timer.
@@ -300,15 +300,8 @@ where T: Park,
     }
 
     fn add_entry(&mut self, entry: Arc<Entry>) {
-        // Avoid an underflow subtraction
-        if entry.deadline() < self.inner.start {
-            entry.fire();
-            return;
-        }
-
         // Convert the duration to millis
-        let when = entry.deadline_ms(self.inner.start);
-        debug_assert!(entry.deadline() <= self.inner.start + Duration::from_millis(when));
+        let when = entry.when();
 
         if when > MAX_DURATION {
             entry.error();
@@ -431,8 +424,8 @@ impl Inner {
         }
     }
 
-    fn now(&self) -> Instant {
-        self.start + Duration::from_millis(self.elapsed.load(Relaxed))
+    fn elapsed(&self) -> u64 {
+        self.elapsed.load(Relaxed)
     }
 
     /// Increment the number of active timeouts
@@ -466,6 +459,14 @@ impl Inner {
         }
 
         Ok(())
+    }
+
+    fn normalize_deadline(&self, deadline: Instant) -> u64 {
+        if deadline < self.start {
+            return 0;
+        }
+
+        ms(deadline - self.start, Round::Up)
     }
 }
 

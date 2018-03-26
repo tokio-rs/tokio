@@ -9,7 +9,6 @@ use std::ptr;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::SeqCst;
-use std::time::Instant;
 
 #[derive(Debug)]
 pub struct Entry {
@@ -27,8 +26,9 @@ pub struct Entry {
     /// Represents a strong Arc ref.
     next_atomic: UnsafeCell<*mut Entry>,
 
-    /// `Sleep` deadline
-    deadline: Instant,
+    /// When the entry expires, relative to the `start` of the timer
+    /// (Inner::start).
+    when: u64,
 
     /// Next entry in the State's linked list.
     ///
@@ -80,13 +80,13 @@ const SHUTDOWN: *mut Entry = 1 as *mut _;
 // ===== impl Entry =====
 
 impl Entry {
-    pub fn new(deadline: Instant, handle: Handle) -> Entry {
+    pub fn new(when: u64, handle: Handle) -> Entry {
         Entry {
             inner: handle.into_inner(),
             task: AtomicTask::new(),
             state: AtomicUsize::new(0),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
-            deadline: deadline,
+            when,
             next_stack: UnsafeCell::new(None),
             prev_stack: UnsafeCell::new(ptr::null_mut()),
         }
@@ -94,24 +94,20 @@ impl Entry {
 
     /// Create a new `Entry` that is in the error state. Calling `poll_elapsed` on
     /// this `Entry` will always result in `Err` being returned.
-    pub fn new_error(deadline: Instant) -> Entry {
+    pub fn new_error() -> Entry {
         Entry {
             inner: Weak::new(),
             task: AtomicTask::new(),
             state: AtomicUsize::new(ELAPSED | ERROR),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
-            deadline: deadline,
+            when: 0,
             next_stack: UnsafeCell::new(None),
             prev_stack: UnsafeCell::new(ptr::null_mut()),
         }
     }
 
-    pub fn deadline(&self) -> Instant {
-        self.deadline
-    }
-
-    pub fn deadline_ms(&self, start: Instant) -> u64 {
-        super::ms(self.deadline - start, super::Round::Up)
+    pub fn when(&self) -> u64 {
+        self.when
     }
 
     pub fn is_elapsed(&self) -> bool {
