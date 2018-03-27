@@ -7,7 +7,13 @@ use std::time::Instant;
 
 /// A future that completes at a specified instant in time.
 ///
-/// This future performs no work.
+/// Instances of `Sleep` perform no work and complete with `()` once the
+/// specified deadline has been reached.
+///
+/// `Sleep` has a resolution of one millisecond and should not be used for tasks
+/// that require high-resolution timers.
+///
+/// [`new`]: #method.new
 #[derive(Debug)]
 pub struct Sleep {
     deadline: Instant,
@@ -39,7 +45,7 @@ impl Sleep {
         }
     }
 
-    /// Returns the `Sleep` instance's deadline
+    /// Returns the instant at which the future will complete.
     pub fn deadline(&self) -> Instant {
         self.deadline
     }
@@ -54,6 +60,12 @@ impl Sleep {
     }
 
     /// Reset the `Sleep` instance to a new deadline.
+    ///
+    /// Calling this function allows changing the instant at which the `Sleep`
+    /// future completes without having to create new associated state.
+    ///
+    /// This function can be called both before and after the future has
+    /// completed.
     pub fn reset(&mut self, deadline: Instant) {
         self.deadline = deadline;
 

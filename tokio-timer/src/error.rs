@@ -1,6 +1,6 @@
 use self::Kind::*;
 
-/// Errors that occur when working with a timer.
+/// Errors encountered by the timer implementation.
 #[derive(Debug)]
 pub struct Error(Kind);
 

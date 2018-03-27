@@ -1,3 +1,32 @@
+//! Timer implementation.
+//!
+//! This module contains the types needed to run a timer.
+//!
+//! The [`Timer`] type runs the timer logic. It holds all the necessary state
+//! to track all associated [`Sleep`] instances and delivering notifications
+//! once the deadlines are reached.
+//!
+//! The [`Handle`] type is a reference to a [`Timer`] instance. This type is
+//! `Clone`, `Send`, and `Sync`. This type is used to create instances of
+//! [`Sleep`].
+//!
+//! The [`Now`] trait describes how to get an `Instance` representing the
+//! current moment in time. [`SystemNow`] is the default implementation, where
+//! [`Now::now`] is implemented by calling `Instant::now`.
+//!
+//! [`Timer`] is generic over [`Now`]. This allows the source of time to be
+//! customized. This ability is especially useful in tests and any environment
+//! where determinism is necessary.
+//!
+//! Note, when using the Tokio runtime, the `Timer` does not need to be manually
+//! setup as the runtime comes pre-configured with a `Timer` instance.
+//!
+//! [`Timer`]: struct.Timer.html
+//! [`Handle`]: struct.Handle.html
+//! [`Sleep`]: ../struct.Sleep.html
+//! [`Now`]: trait.Now.html
+//! [`Now::now`]: trait.Now.html#method.now
+
 mod entry;
 mod handle;
 mod level;
@@ -47,9 +76,6 @@ use std::usize;
 /// When the `Timer` instance is dropped, any outstanding `Sleep` instance that
 /// has not elapsed will be notified with an error. At this point, calling
 /// `poll` on the sleep instance will result in `Err` being returned.
-///
-/// Note, when using the Tokio runtime, the `Timer` does not need to be manually
-/// setup as the runtime comes pre-configured with a `Timer` instance.
 ///
 /// # Implementation
 ///

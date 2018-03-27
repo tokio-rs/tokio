@@ -7,7 +7,14 @@ use std::cell::RefCell;
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
-/// Handle to the timer
+/// Handle to timer instance.
+///
+/// The `Handle` allows creating `Sleep` instances that are driven by the
+/// associated timer.
+///
+/// A `Handle` is obtained by calling [`Timer::handle`].
+///
+/// [`Timer::handle`]: struct.Timer.html#method.handle
 #[derive(Debug, Clone)]
 pub struct Handle {
     inner: Weak<Inner>,
@@ -16,11 +23,16 @@ pub struct Handle {
 /// Tracks the timer for the current execution context.
 thread_local!(static CURRENT_TIMER: RefCell<Option<Handle>> = RefCell::new(None));
 
-/// Set the default timer for the duration of the closure
+/// Set the default timer for the duration of the closure.
+///
+/// From within the closure, [`Sleep`] instances that are created via
+/// [`Sleep::new`] can be used.
 ///
 /// # Panics
 ///
 /// This function panics if there already is a default timer set.
+///
+/// [`Sleep`]: ../struct.Sleep.html
 pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where F: FnOnce(&mut Enter) -> R
 {
@@ -59,6 +71,16 @@ impl Handle {
     }
 
     /// Returns a handle to the current timer.
+    ///
+    /// The current timer is the timer that is currently set as default using
+    /// [`with_default`].
+    ///
+    /// This function should only be called from within the context of
+    /// [`with_default`]. Calling this function from outside of this context
+    /// will return a `Handle` that does not reference a timer. `Sleep`
+    /// instances created with this handle will error.
+    ///
+    /// [`with_default`]: ../fn.with_default.html
     pub fn current() -> Handle {
         Handle::try_current()
             .unwrap_or(Handle { inner: Weak::new() })

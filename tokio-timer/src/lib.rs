@@ -16,7 +16,7 @@
 //! [`Sleep`]: struct.Sleep.html
 //! [`Deadline`]: struct.Deadline.html
 //! [`Interval`]: struct.Interval.html
-//! [`Timer`]: struct.Timer.html
+//! [`Timer`]: timer/struct.Timer.html
 
 extern crate tokio_executor;
 
