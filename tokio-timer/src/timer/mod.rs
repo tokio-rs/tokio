@@ -25,6 +25,32 @@ use std::usize;
 
 /// Timer implementation that drives [`Sleep`], [`Interval`], and [`Deadline`].
 ///
+/// A `Timer` instance tracks the state necessary for managing time and
+/// notifying the [`Sleep`] instances once their deadlines are reached.
+///
+/// It is expected that a single `Timer` instance manages many individual
+/// `Sleep` instances. The `Timer` implementation is thread-safe and, as such,
+/// is able to handle callers from across threads.
+///
+/// Callers do not use `Timer` directly to create `Sleep` instances.  Instead,
+/// [`Handle`] is used. A handle for the timer instance is obtained by calling
+/// [`handle`]. [`Handle`] is the type that implements `Clone` and is `Send +
+/// Sync`.
+///
+/// After creating the `Timer` instance, the caller must repeatedly call
+/// [`turn`]. The timer will perform no work unless [`turn`] is called
+/// repeatedly.
+///
+/// The `Timer` has a resolution of one millisecond. Any unit of time that falls
+/// between milliseconds are rounded up to the next millisecond.
+///
+/// When the `Timer` instance is dropped, any outstanding `Sleep` instance that
+/// has not elapsed will be notified with an error. At this point, calling
+/// `poll` on the sleep instance will result in `Err` being returned.
+///
+/// Note, when using the Tokio runtime, the `Timer` does not need to be manually
+/// setup as the runtime comes pre-configured with a `Timer` instance.
+///
 /// # Implementation
 ///
 /// `Timer` is based on the [paper by Varghese and Lauck][paper].
@@ -60,6 +86,9 @@ use std::usize;
 /// [`Interval`]: ../struct.Interval.html
 /// [`Deadline`]: ../struct.Deadline.html
 /// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
+/// [`handle`]: #method.handle
+/// [`turn`]: #method.turn
+/// [`Handle`]: struct.Handle.html
 #[derive(Debug)]
 pub struct Timer<T, N = SystemNow> {
     /// Shared state
@@ -130,6 +159,14 @@ where T: Park
 {
     /// Create a new `Timer` instance that uses `park` to block the current
     /// thread.
+    ///
+    /// Once the timer has been created, a handle can be obtained using
+    /// [`handle`]. The handle is used to create `Sleep` instances.
+    ///
+    /// Use `default` when constructing a `Timer` using the default `park`
+    /// instance.
+    ///
+    /// [`handle`]: #method.handle
     pub fn new(park: T) -> Self {
         Timer::new_with_now(park, SystemNow::new())
     }
@@ -153,6 +190,8 @@ where T: Park,
 {
     /// Create a new `Timer` instance that uses `park` to block the current
     /// thread and `now` to get the current `Instant`.
+    ///
+    /// Specifying the source of time is useful when testing.
     pub fn new_with_now(park: T, mut now: N) -> Self {
         let unpark = Box::new(park.unpark());
 
@@ -169,12 +208,35 @@ where T: Park,
         }
     }
 
-    /// Returns a handle to the timer
+    /// Returns a handle to the timer.
+    ///
+    /// The `Handle` is how `Sleep` instances are created. The `Sleep` instances
+    /// can either be created directly or the `Handle` instance can be passed to
+    /// `with_default`, setting the timer as the default timer for the execution
+    /// context.
     pub fn handle(&self) -> Handle {
         Handle::new(Arc::downgrade(&self.inner))
     }
 
     /// Performs one iteration of the timer loop.
+    ///
+    /// This function must be called repeatedly in order for the `Timer`
+    /// instance to make progress. This is where the work happens.
+    ///
+    /// The `Timer` will use the `Park` instance that was specified in [`new`]
+    /// to block the current thread until the next `Sleep` instance elapses. One
+    /// call to `turn` results in at most one call to `park.park()`.
+    ///
+    /// # Return
+    ///
+    /// On success, `Ok(Turn)` is returned, where `Turn` is a placeholder type
+    /// that currently does nothing but may, in the future, have functions add
+    /// to provide information about the call to `turn`.
+    ///
+    /// If the call to `park.park()` fails, then `Err` is returned with the
+    /// error.
+    ///
+    /// [`new`]: #method.new
     pub fn turn(&mut self, max_wait: Option<Duration>) -> Result<Turn, T::Error> {
         match max_wait {
             Some(timeout) => self.park_timeout(timeout)?,

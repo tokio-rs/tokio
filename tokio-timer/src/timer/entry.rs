@@ -13,15 +13,35 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::time::Instant;
 use std::u64;
 
+/// Internal state shared between a `Sleep` instance and the timer.
+///
+/// This struct is used as a node in two intrusive data structures:
+///
+/// * An atomic stack used to signal to the timer thread that the entry state
+///   has changed. The timer thread will observe the entry on this stack and
+///   perform any actions as necessary.
+///
+/// * A doubly linked list used **only** by the timer thread. Each slot in the
+///   timer wheel is a head pointer to the list of entries that must be
+///   processed during that timer tick.
 #[derive(Debug)]
 pub struct Entry {
-    /// Timer internals
+    /// Timer internals. Using a weak pointer allows the timer to shutdown
+    /// without all `Sleep` instances having completed.
     inner: Weak<Inner>,
 
     /// Task to notify once the deadline is reached.
     task: AtomicTask,
 
-    /// Signals to the timer when the caller would like the entry to expire.
+    /// Tracks the entry state. This value contains the following information:
+    ///
+    /// * The deadline at which the entry must be "fired".
+    /// * A flag indicating if the entry has already been fired.
+    /// * Whether or not the entry transitioned to the error state.
+    ///
+    /// When an `Entry` is created, `state` is initialized to the instant at
+    /// which the entry must be fired. When a timer is reset to a different
+    /// instant, this value is changed.
     state: AtomicU64,
 
     /// When true, the entry is counted by `Inner` towards the max oustanding
@@ -34,7 +54,8 @@ pub struct Entry {
     /// improve the struct layout. To do this, we must always allocate the node.
     counted: bool,
 
-    /// True wheen the entry is queued in the "process" linked list
+    /// True wheen the entry is queued in the "process" stack. This value
+    /// is set before pushing the value and unset after popping the value.
     queued: AtomicBool,
 
     /// Next entry in the "process" linked list.
@@ -44,6 +65,16 @@ pub struct Entry {
 
     /// When the entry expires, relative to the `start` of the timer
     /// (Inner::start). This is only used by the timer.
+    ///
+    /// A `Sleep` instance can be reset to a different deadline by the thread
+    /// that owns the `Sleep` instance. In this case, the timer thread will not
+    /// immediately know that this has happened. The timer thread must know the
+    /// last deadline that it saw as it uses this value to locate the entry in
+    /// its wheel.
+    ///
+    /// Once the timer thread observes that the instant has changed, it updates
+    /// the wheel and sets this value. The idea is that this value eventually
+    /// converges to the value of `state` as the timer thread makes updates.
     when: UnsafeCell<Option<u64>>,
 
     /// Next entry in the State's linked list.
