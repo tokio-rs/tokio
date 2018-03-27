@@ -458,7 +458,8 @@ impl Inner {
 
     /// Decrement the number of active timeouts
     fn decrement(&self) {
-        self.num.fetch_sub(1, SeqCst);
+        let prev = self.num.fetch_sub(1, SeqCst);
+        debug_assert!(prev <= MAX_TIMEOUTS);
     }
 
     fn queue(&self, entry: &Arc<Entry>) -> Result<(), Error> {

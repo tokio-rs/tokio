@@ -29,6 +29,11 @@ impl Registration {
             None => return Registration::new_error(),
         };
 
+        // Increment the number of active timeouts
+        if inner.increment().is_err() {
+            return Registration::new_error();
+        }
+
         let when = inner.normalize_deadline(deadline);
 
         if when <= inner.elapsed() {
@@ -37,11 +42,6 @@ impl Registration {
             return Registration {
                 entry: Arc::new(Entry::new_elapsed(handle)),
             };
-        }
-
-        // Increment the number of active timeouts
-        if inner.increment().is_err() {
-            return Registration::new_error();
         }
 
         let entry = Arc::new(Entry::new(when, handle));

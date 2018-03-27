@@ -23,6 +23,16 @@ pub struct Entry {
     /// Signals to the timer when the caller would like the entry to expire.
     state: AtomicU64,
 
+    /// When true, the entry is counted by `Inner` towards the max oustanding
+    /// timeouts. The drop fn uses this to know if it should decrement the
+    /// counter.
+    ///
+    /// One might think that it would be easier to just not create the `Entry`.
+    /// The problem is that `Sleep` expects creating a `Registration` to always
+    /// return a `Registration` instance. This simplifying factor allows it to
+    /// improve the struct layout. To do this, we must always allocate the node.
+    counted: bool,
+
     /// True wheen the entry is queued in the "process" linked list
     queued: AtomicBool,
 
@@ -86,6 +96,7 @@ impl Entry {
             inner: handle.into_inner(),
             task: AtomicTask::new(),
             state: AtomicU64::new(when),
+            counted: true,
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when: UnsafeCell::new(None),
@@ -99,6 +110,7 @@ impl Entry {
             inner: handle.into_inner(),
             task: AtomicTask::new(),
             state: AtomicU64::new(ELAPSED),
+            counted: true,
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when: UnsafeCell::new(None),
@@ -114,6 +126,7 @@ impl Entry {
             inner: Weak::new(),
             task: AtomicTask::new(),
             state: AtomicU64::new(ERROR),
+            counted: false,
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when: UnsafeCell::new(None),
@@ -232,6 +245,10 @@ fn is_elapsed(state: u64) -> bool {
 
 impl Drop for Entry {
     fn drop(&mut self) {
+        if !self.counted {
+            return;
+        }
+
         let inner = match self.inner.upgrade() {
             Some(inner) => inner,
             None => return,
