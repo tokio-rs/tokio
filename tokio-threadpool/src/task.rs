@@ -1,4 +1,5 @@
-use {Notifier, Sender};
+use notifier::Notifier;
+use sender::Sender;
 
 use futures::{self, future, Future, Async};
 use futures::executor::{self, Spawn};
