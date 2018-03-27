@@ -162,11 +162,22 @@ impl Entry {
         is_elapsed(state)
     }
 
-    pub fn fire(&self) {
-        let state = self.state.fetch_or(ELAPSED, SeqCst).into();
+    pub fn fire(&self, when: u64) {
+        let mut curr = self.state.load(SeqCst);
 
-        if is_elapsed(state) {
-            return;
+        loop {
+            if is_elapsed(curr) || curr > when {
+                return;
+            }
+
+            let next = ELAPSED | curr;
+            let actual = self.state.compare_and_swap(curr, next, SeqCst);
+
+            if curr == actual {
+                break;
+            }
+
+            curr = actual;
         }
 
         self.task.notify();

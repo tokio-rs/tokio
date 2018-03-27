@@ -1,0 +1,5 @@
+# TSAN suppressions file for Tokio
+
+# TSAN does not understand fences. This causes many false positives from within
+# the Rust stdlib.
+race:liballoc

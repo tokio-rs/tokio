@@ -158,7 +158,7 @@ fn hammer_cancel() {
 #[test]
 fn hammer_reset() {
     const ITERS: usize = 5;
-    const THREADS: usize = 1;
+    const THREADS: usize = 4;
     const PER_THREAD: usize = 40;
     const MIN_DELAY: u64 = 1;
     const MAX_DELAY: u64 = 250;

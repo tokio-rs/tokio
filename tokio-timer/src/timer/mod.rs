@@ -256,11 +256,16 @@ where T: Park,
     fn process_expiration(&mut self, expiration: &Expiration) {
         while let Some(entry) = self.pop_entry(expiration) {
             if expiration.level == 0 {
-                // Track that the entry has been fired
-                entry.set_when_internal(None);
+                let when = entry.when_internal()
+                    .expect("invalid internal entry state");
+
+                debug_assert_eq!(when, expiration.deadline);
 
                 // Fire the entry
-                entry.fire();
+                entry.fire(when);
+
+                // Track that the entry has been fired
+                entry.set_when_internal(None);
             } else {
                 let when = entry.when_internal()
                     .expect("entry not tracked");
@@ -318,7 +323,7 @@ where T: Park,
             // The entry's deadline has elapsed, so fire it and update the
             // internal state accordingly.
             entry.set_when_internal(None);
-            entry.fire();
+            entry.fire(when);
 
             return;
         } else if when - self.elapsed > MAX_DURATION {
