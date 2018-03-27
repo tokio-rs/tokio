@@ -187,7 +187,7 @@ impl Park for MockPark {
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().map_err(|_| ())?;
 
         let duration = inner.park_for.take()
             .expect("call park_for first");
@@ -211,7 +211,9 @@ impl Park for MockPark {
 
 impl Unpark for MockUnpark {
     fn unpark(&self) {
-        self.inner.lock().unwrap().unparked = true;
+        if let Ok(mut inner) = self.inner.lock() {
+            inner.unparked = true;
+        }
     }
 }
 

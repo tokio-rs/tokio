@@ -47,7 +47,7 @@ impl Stream for Interval {
 
         // The next interval value is `duration` after the one that just
         // yielded.
-        self.sleep = Sleep::new(now + self.duration);
+        self.sleep.reset(now + self.duration);
 
         // Return the current instant
         Ok(Some(now).into())

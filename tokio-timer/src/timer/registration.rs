@@ -54,6 +54,10 @@ impl Registration {
         Registration { entry }
     }
 
+    pub fn reset(&self, deadline: Instant) {
+        Entry::reset(&self.entry, deadline);
+    }
+
     fn new_error() -> Registration {
         let entry = Arc::new(Entry::new_error());
         Registration { entry }

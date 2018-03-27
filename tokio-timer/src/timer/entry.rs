@@ -10,6 +10,7 @@ use std::ptr;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, AtomicPtr};
 use std::sync::atomic::Ordering::SeqCst;
+use std::time::Instant;
 use std::u64;
 
 #[derive(Debug)]
@@ -236,6 +237,52 @@ impl Entry {
         }
 
         Ok(NotReady)
+    }
+
+    pub fn reset(entry: &Arc<Entry>, deadline: Instant) {
+        let inner = match entry.inner.upgrade() {
+            Some(inner) => inner,
+            None => return,
+        };
+
+        let when = inner.normalize_deadline(deadline);
+        let elapsed = inner.elapsed();
+
+        let mut curr = entry.state.load(SeqCst);
+        let mut notify;
+
+        loop {
+            if curr == ERROR {
+                // Registration in error state, nothing further to do.
+                return;
+            } else if curr == when {
+                // State already set to notify at `deadline`.
+                return;
+            }
+
+            let next;
+
+            if when <= elapsed {
+                next = ELAPSED;
+                notify = !is_elapsed(curr);
+            } else {
+                next = when;
+                notify = true;
+            }
+
+            let actual = entry.state.compare_and_swap(
+                curr, next, SeqCst);
+
+            if curr == actual {
+                break;
+            }
+
+            curr = actual;
+        }
+
+        if notify {
+            let _ = inner.queue(entry);
+        }
     }
 }
 

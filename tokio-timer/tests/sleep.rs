@@ -396,3 +396,70 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
         assert_ready!(sleep);
     });
 }
+
+#[test]
+fn reset_future_sleep_before_fire() {
+    mocked(|timer, time| {
+        let mut sleep = Sleep::new(time.now() + ms(100));
+
+        assert_not_ready!(sleep);
+
+        sleep.reset(time.now() + ms(200));
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(192));
+
+        assert_not_ready!(sleep);
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(200));
+
+        assert_ready!(sleep);
+    });
+}
+
+#[test]
+fn reset_past_sleep_before_fire() {
+    mocked(|timer, time| {
+        let mut sleep = Sleep::new(time.now() + ms(100));
+
+        assert_not_ready!(sleep);
+
+        sleep.reset(time.now() + ms(80));
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(64));
+
+        assert_not_ready!(sleep);
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(80));
+
+        assert_ready!(sleep);
+    });
+}
+
+#[test]
+fn reset_future_sleep_after_fire() {
+    mocked(|timer, time| {
+        let mut sleep = Sleep::new(time.now() + ms(100));
+
+        assert_not_ready!(sleep);
+
+        turn(timer, ms(1000));
+        assert_eq!(time.advanced(), ms(64));
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(100));
+
+        assert_ready!(sleep);
+
+        sleep.reset(time.now() + ms(10));
+        assert_not_ready!(sleep);
+
+        turn(timer, ms(1000));
+        assert_eq!(time.advanced(), ms(110));
+
+        assert_ready!(sleep);
+    });
+}

@@ -53,6 +53,15 @@ impl Sleep {
             .unwrap_or(false)
     }
 
+    /// Reset the `Sleep` instance to a new deadline.
+    pub fn reset(&mut self, deadline: Instant) {
+        self.deadline = deadline;
+
+        if let Some(registration) = self.registration.as_ref() {
+            registration.reset(deadline);
+        }
+    }
+
     /// Register the sleep with the timer instance for the current execution
     /// context.
     fn register(&mut self) {

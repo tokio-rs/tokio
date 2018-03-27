@@ -20,7 +20,7 @@ use std::{cmp, fmt};
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{SeqCst, Relaxed};
+use std::sync::atomic::Ordering::SeqCst;
 use std::usize;
 
 /// Timer implementation that drives [`Sleep`], [`Interval`], and [`Deadline`].
@@ -247,7 +247,7 @@ where T: Park,
 
         if when > self.elapsed {
             self.elapsed = when;
-            self.inner.elapsed.store(when, Relaxed);
+            self.inner.elapsed.store(when, SeqCst);
         } else {
             assert_eq!(self.elapsed, when);
         }
@@ -434,7 +434,7 @@ impl Inner {
     }
 
     fn elapsed(&self) -> u64 {
-        self.elapsed.load(Relaxed)
+        self.elapsed.load(SeqCst)
     }
 
     /// Increment the number of active timeouts
