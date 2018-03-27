@@ -419,7 +419,7 @@ fn reset_future_sleep_before_fire() {
 }
 
 #[test]
-fn reset_past_sleep_before_fire() {
+fn reset_past_sleep_before_turn() {
     mocked(|timer, time| {
         let mut sleep = Sleep::new(time.now() + ms(100));
 
@@ -434,6 +434,29 @@ fn reset_past_sleep_before_fire() {
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(80));
+
+        assert_ready!(sleep);
+    });
+}
+
+#[test]
+fn reset_past_sleep_before_fire() {
+    mocked(|timer, time| {
+        let mut sleep = Sleep::new(time.now() + ms(100));
+
+        assert_not_ready!(sleep);
+        turn(timer, ms(10));
+
+        assert_not_ready!(sleep);
+        sleep.reset(time.now() + ms(80));
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(64));
+
+        assert_not_ready!(sleep);
+
+        turn(timer, None);
+        assert_eq!(time.advanced(), ms(90));
 
         assert_ready!(sleep);
     });

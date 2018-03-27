@@ -287,45 +287,53 @@ where T: Park,
                     // Nothing to do
                 }
                 (Some(when), None) => {
-                    // Update the entry state as visible by the timer.
-                    entry.set_when_internal(None);
-
                     // Remove the entry
-                    self.clear_entry(entry, when);
+                    self.clear_entry(&entry, when);
                 }
                 (None, Some(when)) => {
-                    if when <= self.elapsed {
-                        entry.fire();
-                        return;
-                    } else if when - self.elapsed > MAX_DURATION {
-                        entry.error();
-                        continue;
-                    }
-
-                    // Update the entry state as visible by the timer.
-                    entry.set_when_internal(Some(when));
-
                     // Queue the entry
                     self.add_entry(entry, when);
                 }
-                (Some(_curr), Some(_next)) => {
-                    unimplemented!();
+                (Some(curr), Some(next)) => {
+                    self.clear_entry(&entry, curr);
+                    self.add_entry(entry, next);
                 }
             }
         }
     }
 
-    fn clear_entry(&mut self, entry: Arc<Entry>, when: u64) {
+    fn clear_entry(&mut self, entry: &Arc<Entry>, when: u64) {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
+        self.levels[level].remove_entry(entry, when);
 
-        self.levels[level].remove_entry(&entry, when);
+        entry.set_when_internal(None);
     }
 
+    /// Fire the entry if it needs to, otherwise queue it to be processed later.
+    ///
+    /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
+        if when <= self.elapsed {
+            // The entry's deadline has elapsed, so fire it and update the
+            // internal state accordingly.
+            entry.set_when_internal(None);
+            entry.fire();
+
+            return;
+        } else if when - self.elapsed > MAX_DURATION {
+            // The entry's deadline is invalid, so error it and update the
+            // internal state accordingly.
+            entry.set_when_internal(None);
+            entry.error();
+
+            return;
+        }
+
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
+        entry.set_when_internal(Some(when));
         self.levels[level].add_entry(entry, when);
 
         debug_assert!({

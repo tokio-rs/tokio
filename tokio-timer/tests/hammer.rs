@@ -154,3 +154,87 @@ fn hammer_cancel() {
         }
     }
 }
+
+#[test]
+fn hammer_reset() {
+    const ITERS: usize = 5;
+    const THREADS: usize = 1;
+    const PER_THREAD: usize = 40;
+    const MIN_DELAY: u64 = 1;
+    const MAX_DELAY: u64 = 250;
+
+    for _ in 0..ITERS {
+        let mut timer = Timer::default();
+        let handle = timer.handle();
+        let barrier = Arc::new(Barrier::new(THREADS));
+
+        let done = Arc::new(Signal {
+            rem: AtomicUsize::new(THREADS),
+            unpark: timer.get_park().unpark(),
+        });
+
+        for _ in 0..THREADS {
+            let handle = handle.clone();
+            let barrier = barrier.clone();
+            let done = done.clone();
+
+            thread::spawn(move || {
+                let mut exec = FuturesUnordered::new();
+                let mut rng = rand::thread_rng();
+
+                barrier.wait();
+
+                for _ in 0..PER_THREAD {
+                    let deadline1 = Instant::now() + Duration::from_millis(
+                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+
+                    let deadline2 = deadline1 + Duration::from_millis(
+                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+
+                    let deadline3 = deadline2 + Duration::from_millis(
+                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+
+                    exec.push({
+                        handle.sleep(deadline1)
+                            // Select over a second sleep
+                            .select2(handle.sleep(deadline2))
+                            .map_err(|e| panic!("boom; err={:?}", e))
+                            .and_then(move |res| {
+                                use futures::future::Either::*;
+
+                                let now = Instant::now();
+                                assert!(now >= deadline1, "deadline greater by {:?}", deadline1 - now);
+
+                                let mut other = match res {
+                                    A((_, other)) => other,
+                                    B((_, other)) => other,
+                                };
+
+                                other.reset(deadline3);
+                                other
+                            })
+                            .and_then(move |_| {
+                                let now = Instant::now();
+                                assert!(now >= deadline3, "deadline greater by {:?}", deadline3 - now);
+                                Ok(())
+                            })
+                    });
+                }
+
+                // Run the logic
+                exec
+                    .for_each(|_| Ok(()))
+                    .wait()
+                    .unwrap();
+
+                if 1 == done.rem.fetch_sub(1, SeqCst) {
+                    done.unpark.unpark();
+                }
+            });
+        }
+
+        while done.rem.load(SeqCst) > 0 {
+            timer.turn(None).unwrap();
+        }
+    }
+}
