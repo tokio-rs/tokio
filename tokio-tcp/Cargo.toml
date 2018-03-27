@@ -31,5 +31,8 @@ futures2 = { version = "0.1", path = "../futures2", optional = true }
 env_logger = { version = "0.4", default-features = false }
 
 [features]
-unstable-futures = ["futures2"]
+unstable-futures = [
+  "futures2",
+  "tokio-reactor/unstable-futures",
+]
 default = []

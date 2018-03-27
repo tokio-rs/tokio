@@ -29,5 +29,8 @@ env_logger = "0.4"
 futures-cpupool = "0.1.7"
 
 [features]
-unstable-futures = ["futures2", "tokio-executor/unstable-futures"]
+unstable-futures = [
+  "futures2",
+  "tokio-executor/unstable-futures",
+]
 default = []
