@@ -1,4 +1,8 @@
-# 0.1.2 (unreleased)
+# 0.2.0 (unreleased)
+
+* Rewrite from scratch using a hierarchical wheel strategy (#249).
+
+# 0.1.2 (Jun 27, 2017)
 
 * Allow naming timer thread.
 * Track changes in dependencies.
