@@ -4,6 +4,8 @@ use Sleep;
 
 use futures::{Future, Poll, Async};
 
+use std::error;
+use std::fmt;
 use std::time::Instant;
 
 /// Allows a given `Future` up to the specified deadline.
@@ -22,9 +24,7 @@ pub struct Deadline<T> {
 
 /// Error returned by `Deadline` future.
 #[derive(Debug)]
-pub struct DeadlineError<T> {
-    kind: Kind<T>,
-}
+pub struct DeadlineError<T>(Kind<T>);
 
 /// Deadline error variants
 #[derive(Debug)]
@@ -100,15 +100,13 @@ impl<T> DeadlineError<T> {
     /// Create a new `DeadlineError` representing the inner future completing
     /// with `Err`.
     pub fn inner(err: T) -> DeadlineError<T> {
-        DeadlineError {
-            kind: Kind::Inner(err),
-        }
+        DeadlineError(Kind::Inner(err))
     }
 
     /// Returns `true` if the error was caused by the inner future completing
     /// with `Err`.
     pub fn is_inner(&self) -> bool {
-        match self.kind {
+        match self.0 {
             Kind::Inner(_) => true,
             _ => false,
         }
@@ -116,7 +114,7 @@ impl<T> DeadlineError<T> {
 
     /// Consumes `self`, returning the inner future error.
     pub fn into_inner(self) -> Option<T> {
-        match self.kind {
+        match self.0 {
             Kind::Inner(err) => Some(err),
             _ => None,
         }
@@ -125,15 +123,13 @@ impl<T> DeadlineError<T> {
     /// Create a new `DeadlineError` representing the inner future not
     /// completing before the deadline is reached.
     pub fn elapsed() -> DeadlineError<T> {
-        DeadlineError {
-            kind: Kind::Elapsed,
-        }
+        DeadlineError(Kind::Elapsed)
     }
 
     /// Returns `true` if the error was caused by the inner future not
     /// completing before the deadline is reached.
     pub fn is_elapsed(&self) -> bool {
-        match self.kind {
+        match self.0 {
             Kind::Elapsed => true,
             _ => false,
         }
@@ -142,14 +138,12 @@ impl<T> DeadlineError<T> {
     /// Creates a new `DeadlineError` representing an error encountered by the
     /// timer implementation
     pub fn timer(err: ::Error) -> DeadlineError<T> {
-        DeadlineError {
-            kind: Kind::Timer(err),
-        }
+        DeadlineError(Kind::Timer(err))
     }
 
     /// Returns `true` if the error was caused by the timer.
     pub fn is_timer(&self) -> bool {
-        match self.kind {
+        match self.0 {
             Kind::Timer(_) => true,
             _ => false,
         }
@@ -157,9 +151,33 @@ impl<T> DeadlineError<T> {
 
     /// Consumes `self`, returning the error raised by the timer implementation.
     pub fn into_timer(self) -> Option<::Error> {
-        match self.kind {
+        match self.0 {
             Kind::Timer(err) => Some(err),
             _ => None,
+        }
+    }
+}
+
+impl<T: error::Error> error::Error for DeadlineError<T> {
+    fn description(&self) -> &str {
+        use self::Kind::*;
+
+        match self.0 {
+            Inner(ref e) => e.description(),
+            Elapsed => "deadline has elapsed",
+            Timer(ref e) => e.description(),
+        }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for DeadlineError<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use self::Kind::*;
+
+        match self.0 {
+            Inner(ref e) => e.fmt(fmt),
+            Elapsed => "deadline has elapsed".fmt(fmt),
+            Timer(ref e) => e.fmt(fmt),
         }
     }
 }

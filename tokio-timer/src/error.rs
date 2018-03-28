@@ -1,5 +1,8 @@
 use self::Kind::*;
 
+use std::error;
+use std::fmt;
+
 /// Errors encountered by the timer implementation.
 #[derive(Debug)]
 pub struct Error(Kind);
@@ -35,5 +38,23 @@ impl Error {
             Kind::AtCapacity => true,
             _ => false,
         }
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        use self::Kind::*;
+
+        match self.0 {
+            Shutdown => "timer is shutdown",
+            AtCapacity => "timer is at capacity and cannot create a new entry",
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::error::Error;
+        self.description().fmt(fmt)
     }
 }
