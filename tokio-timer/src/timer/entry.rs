@@ -294,11 +294,11 @@ impl Entry {
         let mut notify;
 
         loop {
-            if curr == ERROR {
-                // Registration in error state, nothing further to do.
-                return;
-            } else if curr == when {
-                // State already set to notify at `deadline`.
+            // In these two cases, there is no work to do when resetting the
+            // timer. If the `Entry` is in an error state, then it cannot be
+            // used anymore. If resetting the entry to the current value, then
+            // the reset is a noop.
+            if curr == ERROR || curr == when {
                 return;
             }
 
