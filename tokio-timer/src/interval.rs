@@ -7,7 +7,10 @@ use std::time::{Instant, Duration};
 /// A stream representing notifications at fixed interval
 #[derive(Debug)]
 pub struct Interval {
+    /// Future that completes the next time the `Interval` yields a value.
     sleep: Sleep,
+
+    /// The duration between values yielded by `Interval`.
     duration: Duration,
 }
 

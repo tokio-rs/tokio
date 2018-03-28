@@ -16,7 +16,18 @@ use std::time::Instant;
 /// [`new`]: #method.new
 #[derive(Debug)]
 pub struct Sleep {
+    /// The instant at which the future completes.
     deadline: Instant,
+
+    /// The link between the `Sleep` instance at the timer that drives it.
+    ///
+    /// When `Sleep` is created with `new`, this is initialized to `None` and is
+    /// lazily set in `poll`. When `poll` is called, the default for the current
+    /// execution context is used (obtained via `Handle::current`).
+    ///
+    /// When `sleep` is created with `new_with_registration`, the value is set.
+    ///
+    /// Once `registration` is set to `Some`, it is never changed.
     registration: Option<Registration>,
 }
 

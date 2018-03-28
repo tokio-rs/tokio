@@ -25,7 +25,7 @@ use std::u64;
 ///   timer wheel is a head pointer to the list of entries that must be
 ///   processed during that timer tick.
 #[derive(Debug)]
-pub struct Entry {
+pub(crate) struct Entry {
     /// Timer internals. Using a weak pointer allows the timer to shutdown
     /// without all `Sleep` instances having completed.
     inner: Weak<Inner>,

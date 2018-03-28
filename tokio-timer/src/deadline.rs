@@ -8,10 +8,10 @@ use std::error;
 use std::fmt;
 use std::time::Instant;
 
-/// Allows a given `Future` up to the specified deadline.
+/// Allows a given `Future` to execute until the specified deadline.
 ///
 /// If the inner future completes before the deadline is reached, then
-/// `Deadline` completes with that value. Otherwise, `Deadline` complets with a
+/// `Deadline` completes with that value. Otherwise, `Deadline` completes with a
 /// [`DeadlineError`].
 ///
 /// [`DeadlineError`]: struct.DeadlineError.html

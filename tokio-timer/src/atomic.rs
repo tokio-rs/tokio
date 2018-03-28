@@ -1,3 +1,9 @@
+//! Implementation of an atomic u64 cell. On 64 bit platforms, this is a wrapper
+//! around `AtomicUsize`. On 32 bit platforms, this is implemented using a
+//! `Mutex`.
+//!
+//! This file can be removed if/when `AtomicU64` lands in `std`.
+
 pub use self::imp::AtomicU64;
 
 #[cfg(target_pointer_width = "64")]
