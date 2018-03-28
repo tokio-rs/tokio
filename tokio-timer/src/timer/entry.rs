@@ -92,20 +92,20 @@ pub(crate) struct Entry {
 }
 
 /// A doubly linked stack
-pub struct Stack {
+pub(crate) struct Stack {
     head: Option<Arc<Entry>>,
 }
 
 /// A stack of `Entry` nodes
 #[derive(Debug)]
-pub struct AtomicStack {
+pub(crate) struct AtomicStack {
     /// Stack head
     head: AtomicPtr<Entry>,
 }
 
 /// Entries that were removed from the stack
 #[derive(Debug)]
-pub struct AtomicStackEntries {
+pub(crate) struct AtomicStackEntries {
     ptr: *mut Entry,
 }
 

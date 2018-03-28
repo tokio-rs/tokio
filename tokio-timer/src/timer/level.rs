@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
-pub struct Level {
+pub(crate) struct Level {
     level: usize,
 
     /// Bit field tracking which slots currently contain entries.
