@@ -18,6 +18,9 @@
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
 
+#![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.0")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 extern crate tokio_executor;
 
 #[macro_use]

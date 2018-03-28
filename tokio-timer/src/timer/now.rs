@@ -5,6 +5,7 @@ use std::time::Instant;
 /// This allows customizing the source of time which is especially useful for
 /// testing.
 pub trait Now {
+    /// Returns an instant corresponding to "now".
     fn now(&mut self) -> Instant;
 }
 
