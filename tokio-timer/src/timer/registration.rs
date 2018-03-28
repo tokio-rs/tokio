@@ -17,6 +17,9 @@ pub(crate) struct Registration {
 
 impl Registration {
     pub fn new(deadline: Instant) -> Registration {
+        fn is_send<T: Send + Sync>() {}
+        is_send::<Registration>();
+
         match Handle::try_current() {
             Ok(handle) => Registration::new_with_handle(deadline, handle),
             Err(_) => Registration::new_error(),

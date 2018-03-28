@@ -347,6 +347,9 @@ impl Drop for Entry {
     }
 }
 
+unsafe impl Send for Entry {}
+unsafe impl Sync for Entry {}
+
 // ===== impl Stack =====
 
 impl Stack {
