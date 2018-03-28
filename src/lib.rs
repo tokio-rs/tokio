@@ -72,6 +72,7 @@ extern crate tokio_io;
 extern crate tokio_executor;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
+extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
 
@@ -82,6 +83,8 @@ pub mod executor;
 pub mod net;
 pub mod reactor;
 pub mod runtime;
+pub mod timer;
+pub mod util;
 
 pub use executor::spawn;
 #[cfg(feature = "unstable-futures")]
@@ -169,6 +172,10 @@ pub mod prelude {
     pub use tokio_io::{
         AsyncRead,
         AsyncWrite,
+    };
+
+    pub use util::{
+        FutureExt,
     };
 
     pub use ::std::io::{

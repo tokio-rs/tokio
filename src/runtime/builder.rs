@@ -4,9 +4,10 @@ use reactor::Reactor;
 
 use std::io;
 
+use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
-
-
+use tokio_threadpool::park::DefaultPark;
+use tokio_timer::timer::{self, Timer};
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -83,17 +84,38 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
+        use std::collections::HashMap;
+        use std::sync::{Arc, Mutex};
+
+        let timers = Arc::new(Mutex::new(HashMap::<_, timer::Handle>::new()));
+        let t1 = timers.clone();
+
         // Spawn a reactor on a background thread.
         let reactor = Reactor::new()?.background()?;
 
         // Get a handle to the reactor.
-        let handle = reactor.handle().clone();
+        let reactor_handle = reactor.handle().clone();
 
         let pool = self.threadpool_builder
             .around_worker(move |w, enter| {
-                ::tokio_reactor::with_default(&handle, enter, |_| {
-                    w.run();
+                let timer_handle = t1.lock().unwrap()
+                    .get(w.id()).unwrap()
+                    .clone();
+
+                tokio_reactor::with_default(&reactor_handle, enter, |enter| {
+                    timer::with_default(&timer_handle, enter, |_| {
+                        w.run();
+                    });
                 });
+            })
+            .custom_park(move |worker_id| {
+                // Create a new timer
+                let timer = Timer::new(DefaultPark::new());
+
+                timers.lock().unwrap()
+                    .insert(worker_id.clone(), timer.handle());
+
+                timer
             })
             .build();
 

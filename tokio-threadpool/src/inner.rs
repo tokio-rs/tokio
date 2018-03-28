@@ -7,7 +7,7 @@ use sleep_stack::{
 use shutdown_task::ShutdownTask;
 use state::{State, SHUTDOWN_ON_IDLE, SHUTDOWN_NOW};
 use task::Task;
-use worker::Worker;
+use worker::{Worker, WorkerId};
 use worker_entry::WorkerEntry;
 use worker_state::{
     WorkerState,
@@ -189,7 +189,7 @@ impl Inner {
         Worker::with_current(|worker| {
             match worker {
                 Some(worker) => {
-                    let idx = worker.idx;
+                    let idx = worker.id.idx;
 
                     trace!("    -> submit internal; idx={}", idx);
 
@@ -236,7 +236,7 @@ impl Inner {
         let entry = &self.workers[idx];
 
         if !entry.submit_external(task, state) {
-            Worker::spawn(idx, inner);
+            Worker::spawn(WorkerId::new(idx), inner);
         }
     }
 
@@ -273,7 +273,7 @@ impl Inner {
                 }
                 WORKER_SHUTDOWN => {
                     trace!("signal_work -- spawn; idx={}", idx);
-                    Worker::spawn(idx, inner);
+                    Worker::spawn(WorkerId::new(idx), inner);
                 }
                 _ => {}
             }
