@@ -127,6 +127,12 @@ pub trait Unpark: Sync + Send + 'static {
     fn unpark(&self);
 }
 
+impl Unpark for Box<Unpark> {
+    fn unpark(&self) {
+        (**self).unpark()
+    }
+}
+
 /// Blocks the current thread using a condition variable.
 ///
 /// Implements the [`Park`] functionality by using a condition variable. An

@@ -1,3 +1,4 @@
+use park::{BoxPark, BoxUnpark};
 use task::{Task, Queue};
 use worker_state::{
     WorkerState,
@@ -6,13 +7,12 @@ use worker_state::{
 };
 
 use std::cell::UnsafeCell;
-use std::sync::atomic::Ordering::{AcqRel};
+use std::fmt;
+use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Mutex, Condvar};
 
 use deque;
 
-#[derive(Debug)]
 pub(crate) struct WorkerEntry {
     // Worker state. This is mutated when notifying the worker.
     pub state: AtomicUsize,
@@ -26,18 +26,18 @@ pub(crate) struct WorkerEntry {
     // Stealer half of deque
     pub steal: deque::Stealer<Task>,
 
-    // Park mutex
-    pub park_mutex: Mutex<()>,
+    // Thread parker
+    pub park: UnsafeCell<BoxPark>,
 
-    // Park condvar
-    pub park_condvar: Condvar,
+    // Thread unparker
+    pub unpark: BoxUnpark,
 
     // MPSC queue of jobs submitted to the worker from an external source.
     pub inbound: Queue,
 }
 
 impl WorkerEntry {
-    pub fn new() -> Self {
+    pub fn new(park: BoxPark, unpark: BoxUnpark) -> Self {
         let w = deque::Deque::new();
         let s = w.stealer();
 
@@ -47,8 +47,8 @@ impl WorkerEntry {
             deque: w,
             steal: s,
             inbound: Queue::new(),
-            park_mutex: Mutex::new(()),
-            park_condvar: Condvar::new(),
+            park: UnsafeCell::new(park),
+            unpark,
         }
     }
 
@@ -104,8 +104,7 @@ impl WorkerEntry {
 
     #[inline]
     pub fn wakeup(&self) {
-        let _lock = self.park_mutex.lock().unwrap();
-        self.park_condvar.notify_one();
+        self.unpark.unpark();
     }
 
     #[inline]
@@ -116,5 +115,19 @@ impl WorkerEntry {
     #[inline]
     pub fn set_next_sleeper(&self, val: usize) {
         unsafe { *self.next_sleeper.get() = val; }
+    }
+}
+
+impl fmt::Debug for WorkerEntry {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("WorkerEntry")
+            .field("state", &self.state.load(Relaxed))
+            .field("next_sleeper", &"UnsafeCell<usize>")
+            .field("deque", &self.deque)
+            .field("steal", &self.steal)
+            .field("park", &"UnsafeCell<BoxPark>")
+            .field("unpark", &"BoxUnpark")
+            .field("inbound", &self.inbound)
+            .finish()
     }
 }

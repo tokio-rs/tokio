@@ -1,3 +1,7 @@
+# 0.1.2 (unreleased)
+
+* Add the ability to specify a custom thread parker.
+
 # 0.1.1 (March 22, 2018)
 
 * Handle futures that panic on the threadpool.

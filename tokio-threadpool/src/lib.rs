@@ -15,6 +15,8 @@ extern crate log;
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
+pub mod park;
+
 mod builder;
 mod callback;
 mod config;

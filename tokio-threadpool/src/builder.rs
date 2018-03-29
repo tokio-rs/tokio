@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use num_cpus;
 use tokio_executor::Enter;
+use tokio_executor::park::Park;
 use futures::task::AtomicTask;
 
 #[cfg(feature = "unstable-futures")]
@@ -267,12 +268,24 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&self) -> ThreadPool {
+        self.build_with_park(|| ::park::DefaultPark::new())
+    }
+
+    /// DOX
+    pub fn build_with_park<F, P>(&self, mut f: F) -> ThreadPool
+    where F: FnMut() -> P,
+          P: Park + Send + 'static,
+    {
         let mut workers = vec![];
 
         trace!("build; num-workers={}", self.pool_size);
 
         for _ in 0..self.pool_size {
-            workers.push(WorkerEntry::new());
+            let park = Box::new(::park::Boxed::new(f()));
+            // let park = ::park::DefaultPark::new().boxed();
+            let unpark = park.unpark();
+
+            workers.push(WorkerEntry::new(park, unpark));
         }
 
         let inner = Arc::new(Inner {
