@@ -13,15 +13,15 @@ use worker_state::{
     WORKER_SIGNALED,
 };
 
+use tokio_executor;
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::thread;
-use std::time::Instant;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-
-use tokio_executor;
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// Thread worker
 ///
@@ -41,6 +41,9 @@ pub struct Worker {
     // Keep the value on the current thread.
     _p: PhantomData<Rc<()>>,
 }
+
+// Pointer to the current worker info
+thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
 
 impl Worker {
     pub(crate) fn spawn(idx: usize, inner: &Arc<Inner>) {
@@ -107,6 +110,8 @@ impl Worker {
     ///
     /// This function blocks until the worker is shutting down.
     pub fn run(&self) {
+        const LIGHT_SLEEP_INTERVAL: usize = 32;
+
         // Get the notifier.
         let notify = Arc::new(Notifier {
             inner: Arc::downgrade(&self.inner),
@@ -115,6 +120,7 @@ impl Worker {
 
         let mut first = true;
         let mut spin_cnt = 0;
+        let mut tick = 0;
 
         while self.check_run_state(first) {
             first = false;
@@ -125,13 +131,24 @@ impl Worker {
 
             // Run the next available task
             if self.try_run_task(&notify, &mut sender) {
+                if tick % LIGHT_SLEEP_INTERVAL == 0 {
+                    self.sleep_light();
+                }
+
+                tick = tick.wrapping_add(1);
                 spin_cnt = 0;
+
                 // As long as there is work, keep looping.
                 continue;
             }
 
             // No work in this worker's queue, it is time to try stealing.
             if self.try_steal_task(&notify, &mut sender) {
+                if tick % LIGHT_SLEEP_INTERVAL == 0 {
+                    self.sleep_light();
+                }
+
+                tick = tick.wrapping_add(1);
                 spin_cnt = 0;
                 continue;
             }
@@ -142,16 +159,11 @@ impl Worker {
             }
 
             // Starting to get sleeeeepy
-            if spin_cnt < 32 {
+            if spin_cnt < 61 {
                 spin_cnt += 1;
-
-                // Don't do anything further
-            } else if spin_cnt < 256 {
-                spin_cnt += 1;
-
-                // Yield the thread
-                thread::yield_now();
             } else {
+                tick = 0;
+
                 if !self.sleep() {
                     return;
                 }
@@ -357,7 +369,6 @@ impl Worker {
     /// Put the worker to sleep
     ///
     /// Returns `true` if woken up due to new work arriving.
-    #[inline]
     fn sleep(&self) -> bool {
         trace!("Worker::sleep; idx={}", self.idx);
 
@@ -365,9 +376,7 @@ impl Worker {
 
         // The first part of the sleep process is to transition the worker state
         // to "pushed". Now, it may be that the worker is already pushed on the
-        // sleeper stack, in which case, we don't push again. However, part of
-        // this process is also to do some final state checks to avoid entering
-        // the mutex if at all possible.
+        // sleeper stack, in which case, we don't push again.
 
         loop {
             let mut next = state;
@@ -376,6 +385,9 @@ impl Worker {
                 WORKER_RUNNING => {
                     // Try setting the pushed state
                     next.set_pushed();
+
+                    // Transition the worker state to sleeping
+                    next.set_lifecycle(WORKER_SLEEPING);
                 }
                 WORKER_NOTIFIED | WORKER_SIGNALED => {
                     // No need to sleep, transition back to running and move on.
@@ -417,66 +429,18 @@ impl Worker {
             state = actual;
         }
 
-        // Acquire the sleep mutex, the state is transitioned to sleeping within
-        // the mutex in order to avoid losing wakeup notifications.
-        let mut lock = self.entry().park_mutex.lock().unwrap();
-
-        // Transition the state to sleeping, a CAS is still needed as other
-        // state transitions could happen unrelated to the sleep / wakeup
-        // process. We also have to redo the lifecycle check done above as
-        // the state could have been transitioned before entering the mutex.
-        loop {
-            let mut next = state;
-
-            match state.lifecycle() {
-                WORKER_RUNNING => {}
-                WORKER_NOTIFIED | WORKER_SIGNALED => {
-                    // Release the lock, sleep will not happen this call.
-                    drop(lock);
-
-                    // Transition back to running
-                    loop {
-                        let mut next = state;
-                        next.set_lifecycle(WORKER_RUNNING);
-
-                        let actual = self.entry().state.compare_and_swap(
-                            state.into(), next.into(), AcqRel).into();
-
-                        if actual == state {
-                            return true;
-                        }
-
-                        state = actual;
-                    }
-                }
-                _ => unreachable!(),
-            }
-
-            trace!(" sleeping -- set WORKER_SLEEPING; idx={}", self.idx);
-
-            next.set_lifecycle(WORKER_SLEEPING);
-
-            let actual = self.entry().state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
-
-            if actual == state {
-                break;
-            }
-
-            state = actual;
-        }
-
         trace!("    -> starting to sleep; idx={}", self.idx);
 
         let sleep_until = self.inner.config.keep_alive
             .map(|dur| Instant::now() + dur);
 
-        // The state has been transitioned to sleeping, we can now wait on the
-        // condvar. This is done in a loop as condvars can wakeup spuriously.
+        // The state has been transitioned to sleeping, we can now wait by
+        // calling the parker. This is done in a loop as condvars can wakeup
+        // spuriously.
         loop {
             let mut drop_thread = false;
 
-            lock = match sleep_until {
+            match sleep_until {
                 Some(when) => {
                     let now = Instant::now();
 
@@ -486,14 +450,20 @@ impl Worker {
 
                     let dur = when - now;
 
-                    self.entry().park_condvar
-                        .wait_timeout(lock, dur)
-                        .unwrap().0
+                    unsafe {
+                        (*self.entry().park.get())
+                            .park_timeout(dur)
+                            .unwrap();
+                    }
                 }
                 None => {
-                    self.entry().park_condvar.wait(lock).unwrap()
+                    unsafe {
+                        (*self.entry().park.get())
+                            .park()
+                            .unwrap();
+                    }
                 }
-            };
+            }
 
             trace!("    -> wakeup; idx={}", self.idx);
 
@@ -504,9 +474,6 @@ impl Worker {
                 match state.lifecycle() {
                     WORKER_SLEEPING => {}
                     WORKER_NOTIFIED | WORKER_SIGNALED => {
-                        // Release the lock, done sleeping
-                        drop(lock);
-
                         // Transition back to running
                         loop {
                             let mut next = state;
@@ -526,6 +493,7 @@ impl Worker {
                 }
 
                 if !drop_thread {
+                    // This goees back to the outer loop.
                     break;
                 }
 
@@ -544,6 +512,17 @@ impl Worker {
             }
 
             // The worker hasn't been notified, go back to sleep
+        }
+    }
+
+    /// This doesn't actually put the thread to sleep. It calls
+    /// `park.park_timeout` with a duration of 0. This allows the park
+    /// implementation to perform any work that might be done on an interval.
+    fn sleep_light(&self) {
+        unsafe {
+            (*self.entry().park.get())
+                .park_timeout(Duration::from_millis(0))
+                .unwrap();
         }
     }
 
@@ -568,6 +547,3 @@ impl Drop for Worker {
         }
     }
 }
-
-// Pointer to the current worker info
-thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));

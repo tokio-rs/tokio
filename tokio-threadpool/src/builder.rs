@@ -1,5 +1,6 @@
 use callback::Callback;
 use config::{Config, MAX_WORKERS};
+use park::{BoxPark, BoxedPark, DefaultPark};
 use sender::Sender;
 use shutdown_task::ShutdownTask;
 use sleep_stack::SleepStack;
@@ -9,12 +10,15 @@ use inner::Inner;
 use worker::Worker;
 use worker_entry::WorkerEntry;
 
+use std::error::Error;
+use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 
 use num_cpus;
 use tokio_executor::Enter;
+use tokio_executor::park::Park;
 use futures::task::AtomicTask;
 
 #[cfg(feature = "unstable-futures")]
@@ -58,13 +62,15 @@ use futures2;
 /// thread_pool.shutdown().wait().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct Builder {
     /// Thread pool specific configuration values
     config: Config,
 
     /// Number of workers to spawn
     pool_size: usize,
+
+    /// Generates the `Park` instances
+    new_park: Box<Fn() -> BoxPark>,
 }
 
 impl Builder {
@@ -92,6 +98,11 @@ impl Builder {
     pub fn new() -> Builder {
         let num_cpus = num_cpus::get();
 
+        let new_park = Box::new(|| {
+            Box::new(BoxedPark::new(DefaultPark::new()))
+                as BoxPark
+        });
+
         Builder {
             pool_size: num_cpus,
             config: Config {
@@ -100,6 +111,7 @@ impl Builder {
                 stack_size: None,
                 around_worker: None,
             },
+            new_park,
         }
     }
 
@@ -249,6 +261,45 @@ impl Builder {
         self
     }
 
+    /// Customize the `park` instance used by each worker thread.
+    ///
+    /// The provided closure `f` is called once per worker and returns a `Park`
+    /// instance that is used by the worker to put itself to sleep.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    /// # fn decorate<F>(f: F) -> F { f }
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .custom_park(|| {
+    ///         use tokio_threadpool::park::DefaultPark;
+    ///
+    ///         // This is the default park type that the worker would use if we
+    ///         // did not customize it.
+    ///         let park = DefaultPark::new();
+    ///
+    ///         // Decorate the `park` instance, allowing us to customize work
+    ///         // that happens when a worker therad goes to sleep.
+    ///         decorate(park)
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn custom_park<F, P>(&mut self, f: F) -> &mut Self
+    where F: Fn() -> P + 'static,
+          P: Park + Send + 'static,
+          P::Error: Error,
+    {
+        self.new_park = Box::new(move || Box::new(BoxedPark::new(f())));
+        self
+    }
+
     /// Create the configured `ThreadPool`.
     ///
     /// The returned `ThreadPool` instance is ready to spawn tasks.
@@ -272,7 +323,10 @@ impl Builder {
         trace!("build; num-workers={}", self.pool_size);
 
         for _ in 0..self.pool_size {
-            workers.push(WorkerEntry::new());
+            let park = (self.new_park)();
+            let unpark = park.unpark();
+
+            workers.push(WorkerEntry::new(park, unpark));
         }
 
         let inner = Arc::new(Inner {
@@ -297,5 +351,15 @@ impl Builder {
         let inner = Some(Sender { inner });
 
         ThreadPool { inner }
+    }
+}
+
+impl fmt::Debug for Builder {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Builder")
+            .field("config", &self.config)
+            .field("pool_size", &self.pool_size)
+            .field("new_park", &"Box<Fn() -> BoxPark>")
+            .finish()
     }
 }
