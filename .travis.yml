@@ -4,6 +4,9 @@ sudo: false
 
 matrix:
   include:
+  # This represents the minimum Rust version supported by Tokio. Updating this
+  # should be done in a dedicated PR and cannot be greater than two 0.x
+  # releases prior to the current stable.
   - rust: 1.21.0
   - rust: stable
   - os: osx
@@ -16,7 +19,21 @@ script:
     set -e
     if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
     then
+        # Pin the nightly version until rust-lang/rust#49436 is resolved.
+        rustup override set nightly-2018-03-26
+
+        # Make sure the benchmarks compile
         cargo build --benches --all
+
+        # Run address sanitizer
+        ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0" \
+        RUSTFLAGS="-Z sanitizer=address" \
+        cargo test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
+
+        # Run thread sanitizer
+        TSAN_OPTIONS="suppressions=`pwd`/ci/tsan" \
+        RUSTFLAGS="-Z sanitizer=thread" \
+        cargo test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
     fi
   - |
     set -e
