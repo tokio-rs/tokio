@@ -42,6 +42,9 @@ pub struct Worker {
     _p: PhantomData<Rc<()>>,
 }
 
+// Pointer to the current worker info
+thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
+
 impl Worker {
     pub(crate) fn spawn(idx: usize, inner: &Arc<Inner>) {
         trace!("spawning new worker thread; idx={}", idx);
@@ -544,6 +547,3 @@ impl Drop for Worker {
         }
     }
 }
-
-// Pointer to the current worker info
-thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
