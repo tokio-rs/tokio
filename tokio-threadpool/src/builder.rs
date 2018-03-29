@@ -277,7 +277,7 @@ impl Builder {
     /// # pub fn main() {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
-    ///     .custom_park(|| {
+    ///     .custom_park(|_| {
     ///         use tokio_threadpool::park::DefaultPark;
     ///
     ///         // This is the default park type that the worker would use if we
