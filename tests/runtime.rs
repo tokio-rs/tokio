@@ -1,11 +1,9 @@
-extern crate futures;
 extern crate tokio;
-extern crate tokio_io;
 extern crate env_logger;
 
-use futures::prelude::*;
+use tokio::io;
 use tokio::net::{TcpStream, TcpListener};
-use tokio_io::io;
+use tokio::prelude::*;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -18,8 +16,7 @@ macro_rules! t {
 fn basic_runtime_usage() {
     let _ = env_logger::init();
 
-    // TODO: Don't require the lazy wrapper
-    tokio::run(::futures::future::lazy(|| {
+    tokio::run({
         let server = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
         let addr = t!(server.local_addr());
         let client = TcpStream::connect(&addr);
@@ -44,9 +41,7 @@ fn basic_runtime_usage() {
                     .map_err(|e| panic!("read err = {:?}", e))
             });
 
-        tokio::spawn({
-            server.join(client)
-                .map(|_| ())
-        })
-    }));
+        server.join(client)
+            .map(|_| ())
+    });
 }
