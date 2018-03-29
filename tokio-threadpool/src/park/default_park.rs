@@ -1,5 +1,7 @@
 use tokio_executor::park::{Park, Unpark};
 
+use std::error::Error;
+use std::fmt;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -16,10 +18,6 @@ pub struct DefaultPark {
 pub struct DefaultUnpark {
     inner: Arc<Inner>,
 }
-
-/// Creates `DefaultPark` instances.
-#[derive(Debug)]
-pub struct NewDefaultPark;
 
 /// Error returned by [`ParkThread`]
 ///
@@ -154,5 +152,19 @@ impl Inner {
 
         // Wakeup the sleeper
         self.condvar.notify_one();
+    }
+}
+
+// ===== impl ParkError =====
+
+impl fmt::Display for ParkError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.description().fmt(fmt)
+    }
+}
+
+impl Error for ParkError {
+    fn description(&self) -> &str {
+        "unknown park error"
     }
 }
