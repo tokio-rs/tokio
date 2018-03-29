@@ -18,10 +18,10 @@ use tokio_executor;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::thread;
-use std::time::Instant;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// Thread worker
 ///
@@ -107,6 +107,8 @@ impl Worker {
     ///
     /// This function blocks until the worker is shutting down.
     pub fn run(&self) {
+        const LIGHT_SLEEP_INTERVAL: usize = 32;
+
         // Get the notifier.
         let notify = Arc::new(Notifier {
             inner: Arc::downgrade(&self.inner),
@@ -115,6 +117,7 @@ impl Worker {
 
         let mut first = true;
         let mut spin_cnt = 0;
+        let mut tick = 0;
 
         while self.check_run_state(first) {
             first = false;
@@ -125,13 +128,24 @@ impl Worker {
 
             // Run the next available task
             if self.try_run_task(&notify, &mut sender) {
+                if tick % LIGHT_SLEEP_INTERVAL == 0 {
+                    self.sleep_light();
+                }
+
+                tick = tick.wrapping_add(1);
                 spin_cnt = 0;
+
                 // As long as there is work, keep looping.
                 continue;
             }
 
             // No work in this worker's queue, it is time to try stealing.
             if self.try_steal_task(&notify, &mut sender) {
+                if tick % LIGHT_SLEEP_INTERVAL == 0 {
+                    self.sleep_light();
+                }
+
+                tick = tick.wrapping_add(1);
                 spin_cnt = 0;
                 continue;
             }
@@ -142,16 +156,11 @@ impl Worker {
             }
 
             // Starting to get sleeeeepy
-            if spin_cnt < 32 {
+            if spin_cnt < 61 {
                 spin_cnt += 1;
-
-                // Don't do anything further
-            } else if spin_cnt < 256 {
-                spin_cnt += 1;
-
-                // Yield the thread
-                thread::yield_now();
             } else {
+                tick = 0;
+
                 if !self.sleep() {
                     return;
                 }
@@ -357,7 +366,6 @@ impl Worker {
     /// Put the worker to sleep
     ///
     /// Returns `true` if woken up due to new work arriving.
-    #[inline]
     fn sleep(&self) -> bool {
         trace!("Worker::sleep; idx={}", self.idx);
 
@@ -501,6 +509,17 @@ impl Worker {
             }
 
             // The worker hasn't been notified, go back to sleep
+        }
+    }
+
+    /// This doesn't actually put the thread to sleep. It calls
+    /// `park.park_timeout` with a duration of 0. This allows the park
+    /// implementation to perform any work that might be done on an interval.
+    fn sleep_light(&self) {
+        unsafe {
+            (*self.entry().park.get())
+                .park_timeout(Duration::from_millis(0))
+                .unwrap();
         }
     }
 
