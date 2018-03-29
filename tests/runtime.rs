@@ -25,28 +25,28 @@ fn basic_runtime_usage() {
         let client = TcpStream::connect(&addr);
 
         let server = server.incoming().take(1)
-            .map_err(|e| println!("accept err = {:?}", e))
+            .map_err(|e| panic!("accept err = {:?}", e))
             .for_each(|socket| {
                 tokio::spawn({
                     io::write_all(socket, b"hello")
-                        .map(|_| println!("write done"))
-                        .map_err(|e| println!("write err = {:?}", e))
+                        .map(|_| ())
+                        .map_err(|e| panic!("write err = {:?}", e))
                 })
             })
-            .map(|_| println!("accept done"));
+            .map(|_| ());
 
         let client = client
-            .map_err(|e| println!("connect err = {:?}", e))
+            .map_err(|e| panic!("connect err = {:?}", e))
             .and_then(|client| {
                 // Read all
                 io::read_to_end(client, vec![])
-                    .map(|_| println!("read done"))
-                    .map_err(|e| println!("read err = {:?}", e))
+                    .map(|_| ())
+                    .map_err(|e| panic!("read err = {:?}", e))
             });
 
         tokio::spawn({
             server.join(client)
-                .map(|_| println!("done"))
+                .map(|_| ())
         })
     }));
 }
