@@ -579,8 +579,6 @@ fn hammer() {
     }
 
     for i in 0.. ITER {
-        println!("~~~ ITER {} ~~~", i);
-
         let pool = Builder::new()
             // .pool_size(30)
             .build();
