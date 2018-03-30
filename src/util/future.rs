@@ -11,8 +11,8 @@ use std::time::Instant;
 /// Currently, there only is a [`deadline`] function, but this will increase
 /// over time.
 ///
-/// Users are not expected this trait. All types that implement `Future` already
-/// implement `FutureExt`.
+/// Users are not expected to implement this trait. All types that implement
+/// `Future` already implement `FutureExt`.
 ///
 /// This trait can be imported directly or via the Tokio prelude: `use
 /// tokio::prelude::*`.
