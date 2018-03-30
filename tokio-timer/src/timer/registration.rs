@@ -8,7 +8,7 @@ use std::time::Instant;
 
 /// Registration with a timer.
 ///
-/// The association between a `Sleep` instance and a timer is done lazily in
+/// The association between a `Delay` instance and a timer is done lazily in
 /// `poll`
 #[derive(Debug)]
 pub(crate) struct Registration {

@@ -56,7 +56,7 @@ fn hammer_complete() {
                         rng.gen_range(MIN_DELAY, MAX_DELAY));
 
                     exec.push({
-                        handle.sleep(deadline)
+                        handle.delay(deadline)
                             .and_then(move |_| {
                                 let now = Instant::now();
                                 assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
@@ -120,8 +120,8 @@ fn hammer_cancel() {
 
                     let deadline = cmp::min(deadline1, deadline2);
 
-                    let sleep = handle.sleep(deadline1);
-                    let join = handle.deadline(sleep, deadline2);
+                    let delay = handle.delay(deadline1);
+                    let join = handle.deadline(delay, deadline2);
 
                     exec.push({
                         join
@@ -195,9 +195,9 @@ fn hammer_reset() {
                         rng.gen_range(MIN_DELAY, MAX_DELAY));
 
                     exec.push({
-                        handle.sleep(deadline1)
-                            // Select over a second sleep
-                            .select2(handle.sleep(deadline2))
+                        handle.delay(deadline1)
+                            // Select over a second delay
+                            .select2(handle.delay(deadline2))
                             .map_err(|e| panic!("boom; err={:?}", e))
                             .and_then(move |res| {
                                 use futures::future::Either::*;

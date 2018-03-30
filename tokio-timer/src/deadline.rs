@@ -1,6 +1,4 @@
-//! Docs
-
-use Sleep;
+use Delay;
 
 use futures::{Future, Poll, Async};
 
@@ -19,7 +17,7 @@ use std::time::Instant;
 #[derive(Debug)]
 pub struct Deadline<T> {
     future: T,
-    sleep: Sleep,
+    delay: Delay,
 }
 
 /// Error returned by `Deadline` future.
@@ -43,13 +41,13 @@ impl<T> Deadline<T> {
     /// Create a new `Deadline` that completes when `future` completes or when
     /// `deadline` is reached.
     pub fn new(future: T, deadline: Instant) -> Deadline<T> {
-        Deadline::new_with_sleep(future, Sleep::new(deadline))
+        Deadline::new_with_delay(future, Delay::new(deadline))
     }
 
-    pub(crate) fn new_with_sleep(future: T, sleep: Sleep) -> Deadline<T> {
+    pub(crate) fn new_with_delay(future: T, delay: Delay) -> Deadline<T> {
         Deadline {
             future,
-            sleep,
+            delay,
         }
     }
 
@@ -84,7 +82,7 @@ where T: Future,
         }
 
         // Now check the timer
-        match self.sleep.poll() {
+        match self.delay.poll() {
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Ok(Async::Ready(_)) => {
                 Err(DeadlineError::elapsed())

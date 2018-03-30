@@ -13,7 +13,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::time::Instant;
 use std::u64;
 
-/// Internal state shared between a `Sleep` instance and the timer.
+/// Internal state shared between a `Delay` instance and the timer.
 ///
 /// This struct is used as a node in two intrusive data structures:
 ///
@@ -27,7 +27,7 @@ use std::u64;
 #[derive(Debug)]
 pub(crate) struct Entry {
     /// Timer internals. Using a weak pointer allows the timer to shutdown
-    /// without all `Sleep` instances having completed.
+    /// without all `Delay` instances having completed.
     inner: Weak<Inner>,
 
     /// Task to notify once the deadline is reached.
@@ -49,7 +49,7 @@ pub(crate) struct Entry {
     /// counter.
     ///
     /// One might think that it would be easier to just not create the `Entry`.
-    /// The problem is that `Sleep` expects creating a `Registration` to always
+    /// The problem is that `Delay` expects creating a `Registration` to always
     /// return a `Registration` instance. This simplifying factor allows it to
     /// improve the struct layout. To do this, we must always allocate the node.
     counted: bool,
@@ -66,8 +66,8 @@ pub(crate) struct Entry {
     /// When the entry expires, relative to the `start` of the timer
     /// (Inner::start). This is only used by the timer.
     ///
-    /// A `Sleep` instance can be reset to a different deadline by the thread
-    /// that owns the `Sleep` instance. In this case, the timer thread will not
+    /// A `Delay` instance can be reset to a different deadline by the thread
+    /// that owns the `Delay` instance. In this case, the timer thread will not
     /// immediately know that this has happened. The timer thread must know the
     /// last deadline that it saw as it uses this value to locate the entry in
     /// its wheel.
