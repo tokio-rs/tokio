@@ -1,4 +1,4 @@
-# 0.2.0 (unreleased)
+# 0.2.0 (March 30, 2018)
 
 * Rewrite from scratch using a hierarchical wheel strategy (#249).
 
