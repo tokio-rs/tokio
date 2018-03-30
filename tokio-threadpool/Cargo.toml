@@ -1,6 +1,6 @@
 [package]
 name = "tokio-threadpool"
-version = "0.1.1"
+version = "0.1.2"
 documentation = "https://docs.rs/tokio-threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"

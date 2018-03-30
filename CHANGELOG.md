@@ -1,3 +1,7 @@
+# 0.1.5 (March 30, 2018)
+
+* Provide timer API (#266)
+
 # 0.1.4 (March 22, 2018)
 
 * Fix build on FreeBSD (#218)

@@ -1,4 +1,4 @@
-# 0.1.2 (unreleased)
+# 0.1.2 (March 30, 2018)
 
 * Implement `Unpark` for `Box<Unpark>`.
 
