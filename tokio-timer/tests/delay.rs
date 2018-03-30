@@ -13,13 +13,13 @@ use futures::Future;
 use std::time::{Duration, Instant};
 
 #[test]
-fn immediate_sleep() {
+fn immediate_delay() {
     mocked(|timer, time| {
-        // Create `Sleep` that elapsed immediately.
-        let mut sleep = Sleep::new(time.now());
+        // Create `Delay` that elapsed immediately.
+        let mut delay = Delay::new(time.now());
 
         // Ready!
-        assert_ready!(sleep);
+        assert_ready!(delay);
 
         // Turn the timer, it runs for the elapsed time
         turn(timer, ms(1000));
@@ -30,37 +30,37 @@ fn immediate_sleep() {
 }
 
 #[test]
-fn delayed_sleep_level_0() {
+fn delayed_delay_level_0() {
     for &i in &[1, 10, 60] {
         mocked(|timer, time| {
-            // Create a `Sleep` that elapses in the future
-            let mut sleep = Sleep::new(time.now() + ms(i));
+            // Create a `Delay` that elapses in the future
+            let mut delay = Delay::new(time.now() + ms(i));
 
-            // The sleep has not elapsed.
-            assert_not_ready!(sleep);
+            // The delay has not elapsed.
+            assert_not_ready!(delay);
 
             turn(timer, ms(1000));
             assert_eq!(time.advanced(), ms(i));
 
-            assert_ready!(sleep);
+            assert_ready!(delay);
         });
     }
 }
 
 #[test]
-fn sub_ms_delayed_sleep() {
+fn sub_ms_delayed_delay() {
     mocked(|timer, time| {
         for _ in 0..5 {
             let deadline = time.now()
                 + Duration::from_millis(1)
                 + Duration::new(0, 1);
 
-            let mut sleep = Sleep::new(deadline);
+            let mut delay = Delay::new(deadline);
 
-            assert_not_ready!(sleep);
+            assert_not_ready!(delay);
 
             turn(timer, None);
-            assert_ready!(sleep);
+            assert_ready!(delay);
 
             assert!(time.now() >= deadline);
 
@@ -70,38 +70,38 @@ fn sub_ms_delayed_sleep() {
 }
 
 #[test]
-fn delayed_sleep_wrapping_level_0() {
+fn delayed_delay_wrapping_level_0() {
     mocked(|timer, time| {
         turn(timer, ms(5));
         assert_eq!(time.advanced(), ms(5));
 
-        let mut sleep = Sleep::new(time.now() + ms(60));
+        let mut delay = Delay::new(time.now() + ms(60));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(64));
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(65));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
     });
 }
 
 #[test]
 fn timer_wrapping_with_higher_levels() {
     mocked(|timer, time| {
-        // Set sleep to hit level 1
-        let mut s1 = Sleep::new(time.now() + ms(64));
+        // Set delay to hit level 1
+        let mut s1 = Delay::new(time.now() + ms(64));
         assert_not_ready!(s1);
 
         // Turn a bit
         turn(timer, ms(5));
 
         // Set timeout such that it will hit level 0, but wrap
-        let mut s2 = Sleep::new(time.now() + ms(60));
+        let mut s2 = Delay::new(time.now() + ms(60));
         assert_not_ready!(s2);
 
         // This should result in s1 firing
@@ -119,14 +119,14 @@ fn timer_wrapping_with_higher_levels() {
 }
 
 #[test]
-fn sleep_with_deadline_in_past() {
+fn delay_with_deadline_in_past() {
     mocked(|timer, time| {
-        // Create `Sleep` that elapsed immediately.
-        let mut sleep = Sleep::new(time.now() - ms(100));
+        // Create `Delay` that elapsed immediately.
+        let mut delay = Delay::new(time.now() - ms(100));
 
-        // Even though the sleep expires in the past, it is not ready yet
+        // Even though the delay expires in the past, it is not ready yet
         // because the timer must observe it.
-        assert_ready!(sleep);
+        assert_ready!(delay);
 
         // Turn the timer, it runs for the elapsed time
         turn(timer, ms(1000));
@@ -137,149 +137,149 @@ fn sleep_with_deadline_in_past() {
 }
 
 #[test]
-fn delayed_sleep_level_1() {
+fn delayed_delay_level_1() {
     mocked(|timer, time| {
-        // Create a `Sleep` that elapses in the future
-        let mut sleep = Sleep::new(time.now() + ms(234));
+        // Create a `Delay` that elapses in the future
+        let mut delay = Delay::new(time.now() + ms(234));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         // Turn the timer, this will wake up to cascade the timer down.
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(192));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         // Turn the timer again
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(234));
 
-        // The sleep has elapsed.
-        assert_ready!(sleep);
+        // The delay has elapsed.
+        assert_ready!(delay);
     });
 
     mocked(|timer, time| {
-        // Create a `Sleep` that elapses in the future
-        let mut sleep = Sleep::new(time.now() + ms(234));
+        // Create a `Delay` that elapses in the future
+        let mut delay = Delay::new(time.now() + ms(234));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         // Turn the timer with a smaller timeout than the cascade.
         turn(timer, ms(100));
         assert_eq!(time.advanced(), ms(100));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         // Turn the timer, this will wake up to cascade the timer down.
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(192));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         // Turn the timer again
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(234));
 
-        // The sleep has elapsed.
-        assert_ready!(sleep);
+        // The delay has elapsed.
+        assert_ready!(delay);
     });
 }
 
 #[test]
-fn creating_sleep_outside_of_context() {
+fn creating_delay_outside_of_context() {
     let now = Instant::now();
 
-    // This creates a sleep outside of the context of a mock timer. This tests
+    // This creates a delay outside of the context of a mock timer. This tests
     // that it will still expire.
-    let mut sleep = Sleep::new(now + ms(500));
+    let mut delay = Delay::new(now + ms(500));
 
     mocked_with_now(now, |timer, time| {
-        // This registers the sleep with the timer
-        assert_not_ready!(sleep);
+        // This registers the delay with the timer
+        assert_not_ready!(delay);
 
         // Wait some time... the timer is cascading
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(448));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(500));
 
-        // The sleep has elapsed
-        assert_ready!(sleep);
+        // The delay has elapsed
+        assert_ready!(delay);
     });
 }
 
 #[test]
 fn concurrently_set_two_timers_second_one_shorter() {
     mocked(|timer, time| {
-        let mut sleep1 = Sleep::new(time.now() + ms(500));
-        let mut sleep2 = Sleep::new(time.now() + ms(200));
+        let mut delay1 = Delay::new(time.now() + ms(500));
+        let mut delay2 = Delay::new(time.now() + ms(200));
 
-        // The sleep has not elapsed
-        assert_not_ready!(sleep1);
-        assert_not_ready!(sleep2);
+        // The delay has not elapsed
+        assert_not_ready!(delay1);
+        assert_not_ready!(delay2);
 
-        // Sleep until a cascade
+        // Delay until a cascade
         turn(timer, None);
         assert_eq!(time.advanced(), ms(192));
 
-        // Sleep until the second timer.
+        // Delay until the second timer.
         turn(timer, None);
         assert_eq!(time.advanced(), ms(200));
 
-        // The shorter sleep fires
-        assert_ready!(sleep2);
-        assert_not_ready!(sleep1);
+        // The shorter delay fires
+        assert_ready!(delay2);
+        assert_not_ready!(delay1);
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(448));
 
-        assert_not_ready!(sleep1);
+        assert_not_ready!(delay1);
 
-        // Turn again, this time the time will advance to the second sleep
+        // Turn again, this time the time will advance to the second delay
         turn(timer, None);
         assert_eq!(time.advanced(), ms(500));
 
-        assert_ready!(sleep1);
+        assert_ready!(delay1);
     })
 }
 
 #[test]
-fn short_sleep() {
+fn short_delay() {
     mocked(|timer, time| {
-        // Create a `Sleep` that elapses in the future
-        let mut sleep = Sleep::new(time.now() + ms(1));
+        // Create a `Delay` that elapses in the future
+        let mut delay = Delay::new(time.now() + ms(1));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         // Turn the timer, but not enough timee will go by.
         turn(timer, None);
 
-        // The sleep has elapsed.
-        assert_ready!(sleep);
+        // The delay has elapsed.
+        assert_ready!(delay);
 
-        // The time has advanced to the point of the sleep elapsing.
+        // The time has advanced to the point of the delay elapsing.
         assert_eq!(time.advanced(), ms(1));
     })
 }
 
 #[test]
-fn sorta_long_sleep() {
+fn sorta_long_delay() {
     const MIN_5: u64 = 5 * 60 * 1000;
 
     mocked(|timer, time| {
-        // Create a `Sleep` that elapses in the future
-        let mut sleep = Sleep::new(time.now() + ms(MIN_5));
+        // Create a `Delay` that elapses in the future
+        let mut delay = Delay::new(time.now() + ms(MIN_5));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         let cascades = &[
             262_144,
@@ -291,27 +291,27 @@ fn sorta_long_sleep() {
             turn(timer, None);
             assert_eq!(time.advanced(), ms(elapsed));
 
-            assert_not_ready!(sleep);
+            assert_not_ready!(delay);
         }
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(MIN_5));
 
-        // The sleep has elapsed.
-        assert_ready!(sleep);
+        // The delay has elapsed.
+        assert_ready!(delay);
     })
 }
 
 #[test]
-fn very_long_sleep() {
+fn very_long_delay() {
     const MO_5: u64 = 5 * 30 * 24 * 60 * 60 * 1000;
 
     mocked(|timer, time| {
-        // Create a `Sleep` that elapses in the future
-        let mut sleep = Sleep::new(time.now() + ms(MO_5));
+        // Create a `Delay` that elapses in the future
+        let mut delay = Delay::new(time.now() + ms(MO_5));
 
-        // The sleep has not elapsed.
-        assert_not_ready!(sleep);
+        // The delay has not elapsed.
+        assert_not_ready!(delay);
 
         let cascades = &[
             12_884_901_888,
@@ -324,17 +324,17 @@ fn very_long_sleep() {
             turn(timer, None);
             assert_eq!(time.advanced(), ms(elapsed));
 
-            assert_not_ready!(sleep);
+            assert_not_ready!(delay);
         }
 
         // Turn the timer, but not enough time will go by.
         turn(timer, None);
 
-        // The time has advanced to the point of the sleep elapsing.
+        // The time has advanced to the point of the delay elapsing.
         assert_eq!(time.advanced(), ms(MO_5));
 
-        // The sleep has elapsed.
-        assert_ready!(sleep);
+        // The delay has elapsed.
+        assert_ready!(delay);
     })
 }
 
@@ -343,27 +343,27 @@ fn greater_than_max() {
     const YR_5: u64 = 5 * 365 * 24 * 60 * 60 * 1000;
 
     mocked(|timer, time| {
-        // Create a `Sleep` that elapses in the future
-        let mut sleep = Sleep::new(time.now() + ms(YR_5));
+        // Create a `Delay` that elapses in the future
+        let mut delay = Delay::new(time.now() + ms(YR_5));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, ms(0));
 
-        assert!(sleep.poll().is_err());
+        assert!(delay.poll().is_err());
     })
 }
 
 #[test]
 fn unpark_is_delayed() {
     mocked(|timer, time| {
-        let mut sleep1 = Sleep::new(time.now() + ms(100));
-        let mut sleep2 = Sleep::new(time.now() + ms(101));
-        let mut sleep3 = Sleep::new(time.now() + ms(200));
+        let mut delay1 = Delay::new(time.now() + ms(100));
+        let mut delay2 = Delay::new(time.now() + ms(101));
+        let mut delay3 = Delay::new(time.now() + ms(200));
 
-        assert_not_ready!(sleep1);
-        assert_not_ready!(sleep2);
-        assert_not_ready!(sleep3);
+        assert_not_ready!(delay1);
+        assert_not_ready!(delay2);
+        assert_not_ready!(delay3);
 
         time.park_for(ms(500));
 
@@ -371,9 +371,9 @@ fn unpark_is_delayed() {
 
         assert_eq!(time.advanced(), ms(500));
 
-        assert_ready!(sleep1);
-        assert_ready!(sleep2);
-        assert_ready!(sleep3);
+        assert_ready!(delay1);
+        assert_ready!(delay2);
+        assert_ready!(delay3);
     })
 }
 
@@ -387,87 +387,87 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
             turn(timer, ms(YR_1));
         }
 
-        let mut sleep = Sleep::new(time.now() + ms(1));
-        assert_not_ready!(sleep);
+        let mut delay = Delay::new(time.now() + ms(1));
+        assert_not_ready!(delay);
 
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), Duration::from_millis(YR_5) + ms(1));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
     });
 }
 
 #[test]
-fn reset_future_sleep_before_fire() {
+fn reset_future_delay_before_fire() {
     mocked(|timer, time| {
-        let mut sleep = Sleep::new(time.now() + ms(100));
+        let mut delay = Delay::new(time.now() + ms(100));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
-        sleep.reset(time.now() + ms(200));
+        delay.reset(time.now() + ms(200));
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(192));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(200));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
     });
 }
 
 #[test]
-fn reset_past_sleep_before_turn() {
+fn reset_past_delay_before_turn() {
     mocked(|timer, time| {
-        let mut sleep = Sleep::new(time.now() + ms(100));
+        let mut delay = Delay::new(time.now() + ms(100));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
-        sleep.reset(time.now() + ms(80));
+        delay.reset(time.now() + ms(80));
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(64));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(80));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
     });
 }
 
 #[test]
-fn reset_past_sleep_before_fire() {
+fn reset_past_delay_before_fire() {
     mocked(|timer, time| {
-        let mut sleep = Sleep::new(time.now() + ms(100));
+        let mut delay = Delay::new(time.now() + ms(100));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
         turn(timer, ms(10));
 
-        assert_not_ready!(sleep);
-        sleep.reset(time.now() + ms(80));
+        assert_not_ready!(delay);
+        delay.reset(time.now() + ms(80));
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(64));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, None);
         assert_eq!(time.advanced(), ms(90));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
     });
 }
 
 #[test]
-fn reset_future_sleep_after_fire() {
+fn reset_future_delay_after_fire() {
     mocked(|timer, time| {
-        let mut sleep = Sleep::new(time.now() + ms(100));
+        let mut delay = Delay::new(time.now() + ms(100));
 
-        assert_not_ready!(sleep);
+        assert_not_ready!(delay);
 
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(64));
@@ -475,14 +475,14 @@ fn reset_future_sleep_after_fire() {
         turn(timer, None);
         assert_eq!(time.advanced(), ms(100));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
 
-        sleep.reset(time.now() + ms(10));
-        assert_not_ready!(sleep);
+        delay.reset(time.now() + ms(10));
+        assert_not_ready!(delay);
 
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(110));
 
-        assert_ready!(sleep);
+        assert_ready!(delay);
     });
 }

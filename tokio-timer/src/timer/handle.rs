@@ -1,4 +1,4 @@
-use {Error, Sleep, Deadline, Interval};
+use {Error, Delay, Deadline, Interval};
 use timer::{Registration, Inner};
 
 use tokio_executor::Enter;
@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 /// Handle to timer instance.
 ///
-/// The `Handle` allows creating `Sleep` instances that are driven by the
+/// The `Handle` allows creating `Delay` instances that are driven by the
 /// associated timer.
 ///
 /// A `Handle` is obtained by calling [`Timer::handle`].
@@ -25,14 +25,14 @@ thread_local!(static CURRENT_TIMER: RefCell<Option<Handle>> = RefCell::new(None)
 
 /// Set the default timer for the duration of the closure.
 ///
-/// From within the closure, [`Sleep`] instances that are created via
-/// [`Sleep::new`] can be used.
+/// From within the closure, [`Delay`] instances that are created via
+/// [`Delay::new`] can be used.
 ///
 /// # Panics
 ///
 /// This function panics if there already is a default timer set.
 ///
-/// [`Sleep`]: ../struct.Sleep.html
+/// [`Delay`]: ../struct.Delay.html
 pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where F: FnOnce(&mut Enter) -> R
 {
@@ -77,7 +77,7 @@ impl Handle {
     ///
     /// This function should only be called from within the context of
     /// [`with_default`]. Calling this function from outside of this context
-    /// will return a `Handle` that does not reference a timer. `Sleep`
+    /// will return a `Handle` that does not reference a timer. `Delay`
     /// instances created with this handle will error.
     ///
     /// [`with_default`]: ../fn.with_default.html
@@ -86,21 +86,21 @@ impl Handle {
             .unwrap_or(Handle { inner: Weak::new() })
     }
 
-    /// Create a `Sleep` driven by this handle's associated `Timer`.
-    pub fn sleep(&self, deadline: Instant) -> Sleep {
+    /// Create a `Delay` driven by this handle's associated `Timer`.
+    pub fn delay(&self, deadline: Instant) -> Delay {
         let registration = Registration::new_with_handle(deadline, self.clone());
-        Sleep::new_with_registration(deadline, registration)
+        Delay::new_with_registration(deadline, registration)
     }
 
     /// Create a `Deadline` driven by this handle's associated `Timer`.
     pub fn deadline<T>(&self, future: T, deadline: Instant) -> Deadline<T> {
-        Deadline::new_with_sleep(future, self.sleep(deadline))
+        Deadline::new_with_delay(future, self.delay(deadline))
     }
 
     /// Create a new `Interval` that starts at `at` and yields every `duration`
     /// interval after that.
     pub fn interval(&self, at: Instant, duration: Duration) -> Interval {
-        Interval::new_with_sleep(self.sleep(at), duration)
+        Interval::new_with_delay(self.delay(at), duration)
     }
 
     /// Try to get a handle to the current timer.

@@ -3,7 +3,7 @@
 //! This module provides a number of types for executing code after a set period
 //! of time.
 //!
-//! * [`Sleep`][Sleep] is a future that does no work and completes at a specific `Instant`
+//! * [`Delay`][Delay] is a future that does no work and completes at a specific `Instant`
 //!   in time.
 //!
 //! * [`Interval`][Interval] is a stream yielding a value at a fixed period. It
@@ -28,14 +28,14 @@
 //!
 //! ```
 //! use tokio::prelude::*;
-//! use tokio::timer::Sleep;
+//! use tokio::timer::Delay;
 //!
 //! use std::time::{Duration, Instant};
 //!
 //! let when = Instant::now() + Duration::from_millis(100);
 //!
 //! tokio::run({
-//!     Sleep::new(when)
+//!     Delay::new(when)
 //!         .map_err(|e| panic!("timer failed; err={:?}", e))
 //!         .and_then(|_| {
 //!             println!("Hello world!");
@@ -81,5 +81,5 @@ pub use tokio_timer::{
     Deadline,
     DeadlineError,
     Interval,
-    Sleep,
+    Delay,
 };

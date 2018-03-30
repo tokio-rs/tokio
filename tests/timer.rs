@@ -17,7 +17,7 @@ fn timer_with_runtime() {
     let (tx, rx) = mpsc::channel();
 
     tokio::run({
-        Sleep::new(when)
+        Delay::new(when)
             .map_err(|e| panic!("unexpected error; err={:?}", e))
             .and_then(move |_| {
                 assert!(Instant::now() >= when);
@@ -35,7 +35,7 @@ fn starving() {
 
     let _ = env_logger::init();
 
-    struct Starve(Sleep, u64);
+    struct Starve(Delay, u64);
 
     impl Future for Starve {
         type Item = u64;
@@ -55,7 +55,7 @@ fn starving() {
     }
 
     let when = Instant::now() + Duration::from_millis(20);
-    let starve = Starve(Sleep::new(when), 0);
+    let starve = Starve(Delay::new(when), 0);
 
     let (tx, rx) = mpsc::channel();
 

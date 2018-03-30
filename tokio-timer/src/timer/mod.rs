@@ -3,12 +3,12 @@
 //! This module contains the types needed to run a timer.
 //!
 //! The [`Timer`] type runs the timer logic. It holds all the necessary state
-//! to track all associated [`Sleep`] instances and delivering notifications
+//! to track all associated [`Delay`] instances and delivering notifications
 //! once the deadlines are reached.
 //!
 //! The [`Handle`] type is a reference to a [`Timer`] instance. This type is
 //! `Clone`, `Send`, and `Sync`. This type is used to create instances of
-//! [`Sleep`].
+//! [`Delay`].
 //!
 //! The [`Now`] trait describes how to get an `Instance` representing the
 //! current moment in time. [`SystemNow`] is the default implementation, where
@@ -23,7 +23,7 @@
 //!
 //! [`Timer`]: struct.Timer.html
 //! [`Handle`]: struct.Handle.html
-//! [`Sleep`]: ../struct.Sleep.html
+//! [`Delay`]: ../struct.Delay.html
 //! [`Now`]: trait.Now.html
 //! [`Now::now`]: trait.Now.html#method.now
 
@@ -52,16 +52,16 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::usize;
 
-/// Timer implementation that drives [`Sleep`], [`Interval`], and [`Deadline`].
+/// Timer implementation that drives [`Delay`], [`Interval`], and [`Deadline`].
 ///
 /// A `Timer` instance tracks the state necessary for managing time and
-/// notifying the [`Sleep`] instances once their deadlines are reached.
+/// notifying the [`Delay`] instances once their deadlines are reached.
 ///
 /// It is expected that a single `Timer` instance manages many individual
-/// `Sleep` instances. The `Timer` implementation is thread-safe and, as such,
+/// `Delay` instances. The `Timer` implementation is thread-safe and, as such,
 /// is able to handle callers from across threads.
 ///
-/// Callers do not use `Timer` directly to create `Sleep` instances.  Instead,
+/// Callers do not use `Timer` directly to create `Delay` instances.  Instead,
 /// [`Handle`] is used. A handle for the timer instance is obtained by calling
 /// [`handle`]. [`Handle`] is the type that implements `Clone` and is `Send +
 /// Sync`.
@@ -73,9 +73,9 @@ use std::usize;
 /// The `Timer` has a resolution of one millisecond. Any unit of time that falls
 /// between milliseconds are rounded up to the next millisecond.
 ///
-/// When the `Timer` instance is dropped, any outstanding `Sleep` instance that
+/// When the `Timer` instance is dropped, any outstanding `Delay` instance that
 /// has not elapsed will be notified with an error. At this point, calling
-/// `poll` on the sleep instance will result in `Err` being returned.
+/// `poll` on the `Delay` instance will result in `Err` being returned.
 ///
 /// # Implementation
 ///
@@ -102,13 +102,13 @@ use std::usize;
 /// * Level 5: 64 x ~12 day slots.
 ///
 /// When the timer processes entries at level zero, it will notify all the
-/// [`Sleep`] instances as their deadlines have been reached. For all higher
+/// [`Delay`] instances as their deadlines have been reached. For all higher
 /// levels, all entries will be redistributed across the wheel at the next level
-/// down. Eventually, as time progresses, entries will `Sleep` instances will
+/// down. Eventually, as time progresses, entries will `Delay` instances will
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
 ///
-/// [`Sleep`]: ../struct.Sleep.html
+/// [`Delay`]: ../struct.Delay.html
 /// [`Interval`]: ../struct.Interval.html
 /// [`Deadline`]: ../struct.Deadline.html
 /// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
@@ -172,7 +172,7 @@ pub(crate) struct Inner {
 /// precision of 1 millisecond.
 const NUM_LEVELS: usize = 6;
 
-/// The maximum duration of a sleep
+/// The maximum duration of a delay
 const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
 
 /// Maximum number of timeouts the system can handle concurrently.
@@ -187,7 +187,7 @@ where T: Park
     /// thread.
     ///
     /// Once the timer has been created, a handle can be obtained using
-    /// [`handle`]. The handle is used to create `Sleep` instances.
+    /// [`handle`]. The handle is used to create `Delay` instances.
     ///
     /// Use `default` when constructing a `Timer` using the default `park`
     /// instance.
@@ -236,7 +236,7 @@ where T: Park,
 
     /// Returns a handle to the timer.
     ///
-    /// The `Handle` is how `Sleep` instances are created. The `Sleep` instances
+    /// The `Handle` is how `Delay` instances are created. The `Delay` instances
     /// can either be created directly or the `Handle` instance can be passed to
     /// `with_default`, setting the timer as the default timer for the execution
     /// context.
@@ -250,7 +250,7 @@ where T: Park,
     /// instance to make progress. This is where the work happens.
     ///
     /// The `Timer` will use the `Park` instance that was specified in [`new`]
-    /// to block the current thread until the next `Sleep` instance elapses. One
+    /// to block the current thread until the next `Delay` instance elapses. One
     /// call to `turn` results in at most one call to `park.park()`.
     ///
     /// # Return
