@@ -60,7 +60,7 @@
 //! # Box::new(futures::future::ok(()))
 //! }
 //!
-//!# fn main() {
+//! # fn main() {
 //! let when = Instant::now()  + Duration::from_millis(300);
 //!
 //! tokio::run({
