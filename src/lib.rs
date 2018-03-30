@@ -8,9 +8,10 @@
 //! * A [reactor][reactor] backed by the operating system's event queue (epoll, kqueue,
 //!   IOCP, etc...).
 //! * Asynchronous [TCP and UDP][net] sockets.
+//! * [Timer][timer] API for scheduling work in the future.
 //!
-//! Tokio is built using futures (provided by the [futures] crate) as the
-//! abstraction for managing the complexity of asynchronous programming.
+//! Tokio is built using [futures] as the abstraction for managing the
+//! complexity of asynchronous programming.
 //!
 //! Guide level documentation is found on the [website].
 //!
@@ -72,6 +73,7 @@ extern crate tokio_io;
 extern crate tokio_executor;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
+extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
 
@@ -82,6 +84,8 @@ pub mod executor;
 pub mod net;
 pub mod reactor;
 pub mod runtime;
+pub mod timer;
+pub mod util;
 
 pub use executor::spawn;
 #[cfg(feature = "unstable-futures")]
@@ -169,6 +173,10 @@ pub mod prelude {
     pub use tokio_io::{
         AsyncRead,
         AsyncWrite,
+    };
+
+    pub use util::{
+        FutureExt,
     };
 
     pub use ::std::io::{

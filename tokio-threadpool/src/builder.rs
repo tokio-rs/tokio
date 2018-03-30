@@ -7,7 +7,7 @@ use sleep_stack::SleepStack;
 use state::State;
 use thread_pool::ThreadPool;
 use inner::Inner;
-use worker::Worker;
+use worker::{Worker, WorkerId};
 use worker_entry::WorkerEntry;
 
 use std::error::Error;
@@ -70,7 +70,7 @@ pub struct Builder {
     pool_size: usize,
 
     /// Generates the `Park` instances
-    new_park: Box<Fn() -> BoxPark>,
+    new_park: Box<Fn(&WorkerId) -> BoxPark>,
 }
 
 impl Builder {
@@ -98,7 +98,7 @@ impl Builder {
     pub fn new() -> Builder {
         let num_cpus = num_cpus::get();
 
-        let new_park = Box::new(|| {
+        let new_park = Box::new(|_: &WorkerId| {
             Box::new(BoxedPark::new(DefaultPark::new()))
                 as BoxPark
         });
@@ -277,7 +277,7 @@ impl Builder {
     /// # pub fn main() {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
-    ///     .custom_park(|| {
+    ///     .custom_park(|_| {
     ///         use tokio_threadpool::park::DefaultPark;
     ///
     ///         // This is the default park type that the worker would use if we
@@ -292,11 +292,14 @@ impl Builder {
     /// # }
     /// ```
     pub fn custom_park<F, P>(&mut self, f: F) -> &mut Self
-    where F: Fn() -> P + 'static,
+    where F: Fn(&WorkerId) -> P + 'static,
           P: Park + Send + 'static,
           P::Error: Error,
     {
-        self.new_park = Box::new(move || Box::new(BoxedPark::new(f())));
+        self.new_park = Box::new(move |id| {
+            Box::new(BoxedPark::new(f(id)))
+        });
+
         self
     }
 
@@ -322,8 +325,9 @@ impl Builder {
 
         trace!("build; num-workers={}", self.pool_size);
 
-        for _ in 0..self.pool_size {
-            let park = (self.new_park)();
+        for i in 0..self.pool_size {
+            let id = WorkerId::new(i);
+            let park = (self.new_park)(&id);
             let unpark = park.unpark();
 
             workers.push(WorkerEntry::new(park, unpark));

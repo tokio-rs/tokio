@@ -4,6 +4,7 @@
 //!
 //! * A [reactor] to drive I/O resources.
 //! * An [executor] to execute tasks that use these I/O resources.
+//! * A [timer] for scheduling work to run after a set period of time.
 //!
 //! While it is possible to setup each component manually, this involves a bunch
 //! of boilerplate.
@@ -19,10 +20,14 @@
 //!
 //! * Spawn a background thread running a [`Reactor`] instance.
 //! * Start a [`ThreadPool`] for executing futures.
+//! * Run an instance of [`Timer`] **per** thread pool worker thread.
 //!
 //! The thread pool uses a work-stealing strategy and is configured to start a
 //! worker thread for each CPU core available on the system. This tends to be
 //! the ideal setup for Tokio applications.
+//!
+//! A timer per thread pool worker thread is used to minimize the amount of
+//! synchronization that is required for working with the timer.
 //!
 //! # Usage
 //!
@@ -98,11 +103,14 @@
 //!
 //! [reactor]: ../reactor/struct.Reactor.html
 //! [executor]: https://tokio.rs/docs/getting-started/runtime-model/#executors
+//! [timer]: ../timer/index.html
 //! [`Runtime`]: struct.Runtime.html
+//! [`Reactor`]: ../reactor/struct.Reactor.html
 //! [`ThreadPool`]: ../executor/thread_pool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
+//! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 
 mod builder;
 mod shutdown;
@@ -127,9 +135,15 @@ use futures2;
 /// The Tokio runtime includes a reactor as well as an executor for running
 /// tasks.
 ///
+/// Instances of `Runtime` can be created using [`new`] or [`Builder`]. However,
+/// most users will use [`tokio::run`], which uses a `Runtime` internally.
+///
 /// See [module level][mod] documentation for more details.
 ///
 /// [mod]: index.html
+/// [`new`]: #method.new
+/// [`Builder`]: struct.Builder.html
+/// [`tokio::run`]: fn.run.html
 #[derive(Debug)]
 pub struct Runtime {
     inner: Option<Inner>,
@@ -214,19 +228,82 @@ pub fn run2<F>(future: F)
 impl Runtime {
     /// Create a new runtime instance with default configuration values.
     ///
+    /// This results in a reactor, thread pool, and timer being initialized. The
+    /// thread pool will not spawn any worker threads until it needs to, i.e.
+    /// tasks are scheduled to run.
+    ///
+    /// Most users will not need to call this function directly, instead they
+    /// will use [`tokio::run`][fn.run.html].
+    ///
     /// See [module level][mod] documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// Creating a new `Runtime` with default configuration values.
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::prelude::*;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// // Use the runtime...
+    ///
+    /// // Shutdown the runtime
+    /// rt.shutdown_now()
+    ///     .wait().unwrap();
+    /// ```
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         Builder::new().build()
     }
 
-    /// Return a reference to the reactor handle for this runtime instance.
+    #[deprecated(since = "0.1.5", note = "use `reactor` instead")]
+    #[doc(hidden)]
     pub fn handle(&self) -> &Handle {
+        self.reactor()
+    }
+
+    /// Return a reference to the reactor handle for this runtime instance.
+    ///
+    /// The returned handle reference can be cloned in order to get an owned
+    /// value of the handle. This handle can be used to initialize I/O resources
+    /// (like TCP or UDP sockets) that will not be used on the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// let reactor_handle = rt.reactor().clone();
+    ///
+    /// // use `reactor_handle`
+    /// ```
+    pub fn reactor(&self) -> &Handle {
         self.inner().reactor.handle()
     }
 
     /// Return a handle to the runtime's executor.
+    ///
+    /// The returned handle can be used to spawn tasks that run on this runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// let executor_handle = rt.executor();
+    ///
+    /// // use `executor_handle`
+    /// ```
     pub fn executor(&self) -> TaskExecutor {
         let inner = self.inner().pool.sender().clone();
         TaskExecutor { inner }
@@ -302,6 +379,22 @@ impl Runtime {
     ///
     /// See [module level][mod] documentation for more details.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::prelude::*;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// // Use the runtime...
+    ///
+    /// // Shutdown the runtime
+    /// rt.shutdown_on_idle()
+    ///     .wait().unwrap();
+    /// ```
+    ///
     /// [mod]: index.html
     pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
@@ -335,6 +428,22 @@ impl Runtime {
     /// result in an error.
     ///
     /// See [module level][mod] documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::prelude::*;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// // Use the runtime...
+    ///
+    /// // Shutdown the runtime
+    /// rt.shutdown_now()
+    ///     .wait().unwrap();
+    /// ```
     ///
     /// [mod]: index.html
     pub fn shutdown_now(mut self) -> Shutdown {

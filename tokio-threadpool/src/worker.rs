@@ -33,7 +33,7 @@ pub struct Worker {
     pub(crate) inner: Arc<Inner>,
 
     // WorkerEntry index
-    pub(crate) idx: usize,
+    pub(crate) id: WorkerId,
 
     // Set when the worker should finalize on drop
     should_finalize: Cell<bool>,
@@ -42,17 +42,26 @@ pub struct Worker {
     _p: PhantomData<Rc<()>>,
 }
 
+/// Identifiers a thread pool worker.
+///
+/// This identifier is unique scoped by the thread pool. It is possible that
+/// different thread pool instances share worker identifier values.
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct WorkerId {
+    pub(crate) idx: usize,
+}
+
 // Pointer to the current worker info
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
 
 impl Worker {
-    pub(crate) fn spawn(idx: usize, inner: &Arc<Inner>) {
-        trace!("spawning new worker thread; idx={}", idx);
+    pub(crate) fn spawn(id: WorkerId, inner: &Arc<Inner>) {
+        trace!("spawning new worker thread; id={}", id.idx);
 
         let mut th = thread::Builder::new();
 
         if let Some(ref prefix) = inner.config.name_prefix {
-            th = th.name(format!("{}{}", prefix, idx));
+            th = th.name(format!("{}{}", prefix, id.idx));
         }
 
         if let Some(stack) = inner.config.stack_size {
@@ -63,8 +72,8 @@ impl Worker {
 
         th.spawn(move || {
             let worker = Worker {
-                inner: inner,
-                idx: idx,
+                inner,
+                id,
                 should_finalize: Cell::new(false),
                 _p: PhantomData,
             };
@@ -104,6 +113,14 @@ impl Worker {
                 f(Some(unsafe { &*ptr }))
             }
         })
+    }
+
+    /// Returns a reference to the worker's identifier.
+    ///
+    /// This identifier is unique scoped by the thread pool. It is possible that
+    /// different thread pool instances share worker identifier values.
+    pub fn id(&self) -> &WorkerId {
+        &self.id
     }
 
     /// Run the worker
@@ -261,7 +278,7 @@ impl Worker {
                         self.run_task(task, notify, sender);
 
                         trace!("try_steal_task -- signal_work; self={}; from={}",
-                               self.idx, idx);
+                               self.id.idx, idx);
 
                         // Signal other workers that work is available
                         self.inner.signal_work(&self.inner);
@@ -370,7 +387,7 @@ impl Worker {
     ///
     /// Returns `true` if woken up due to new work arriving.
     fn sleep(&self) -> bool {
-        trace!("Worker::sleep; idx={}", self.idx);
+        trace!("Worker::sleep; idx={}", self.id.idx);
 
         let mut state: WorkerState = self.entry().state.load(Acquire).into();
 
@@ -409,12 +426,12 @@ impl Worker {
                 if !state.is_pushed() {
                     debug_assert!(next.is_pushed());
 
-                    trace!("  sleeping -- push to stack; idx={}", self.idx);
+                    trace!("  sleeping -- push to stack; idx={}", self.id.idx);
 
                     // We obtained permission to push the worker into the
                     // sleeper queue.
-                    if let Err(_) = self.inner.push_sleeper(self.idx) {
-                        trace!("  sleeping -- push to stack failed; idx={}", self.idx);
+                    if let Err(_) = self.inner.push_sleeper(self.id.idx) {
+                        trace!("  sleeping -- push to stack failed; idx={}", self.id.idx);
                         // The push failed due to the pool being terminated.
                         //
                         // This is true because the "work" being woken up for is
@@ -429,7 +446,7 @@ impl Worker {
             state = actual;
         }
 
-        trace!("    -> starting to sleep; idx={}", self.idx);
+        trace!("    -> starting to sleep; idx={}", self.id.idx);
 
         let sleep_until = self.inner.config.keep_alive
             .map(|dur| Instant::now() + dur);
@@ -465,7 +482,7 @@ impl Worker {
                 }
             }
 
-            trace!("    -> wakeup; idx={}", self.idx);
+            trace!("    -> wakeup; idx={}", self.id.idx);
 
             // Reload the state
             state = self.entry().state.load(Acquire).into();
@@ -527,13 +544,13 @@ impl Worker {
     }
 
     fn entry(&self) -> &WorkerEntry {
-        &self.inner.workers[self.idx]
+        &self.inner.workers[self.id.idx]
     }
 }
 
 impl Drop for Worker {
     fn drop(&mut self) {
-        trace!("shutting down thread; idx={}", self.idx);
+        trace!("shutting down thread; idx={}", self.id.idx);
 
         if self.should_finalize.get() {
             // Drain all work
@@ -545,5 +562,11 @@ impl Drop for Worker {
             // TODO: Drain the work queue...
             self.inner.worker_terminated();
         }
+    }
+}
+
+impl WorkerId {
+    pub(crate) fn new(idx: usize) -> WorkerId {
+        WorkerId { idx }
     }
 }
