@@ -39,14 +39,14 @@ appveyor = { repository = "carllerche/tokio" }
 
 [dependencies]
 tokio-io = { version = "0.1.6", path = "tokio-io" }
-tokio-executor = { version = "0.1.1", path = "tokio-executor" }
+tokio-executor = { version = "0.1.2", path = "tokio-executor" }
 tokio-reactor = { version = "0.1.1", path = "tokio-reactor" }
-tokio-threadpool = { version = "0.1.1", path = "tokio-threadpool" }
+tokio-threadpool = { version = "0.1.2", path = "tokio-threadpool" }
 tokio-tcp = { version = "0.1.0", path = "tokio-tcp" }
 tokio-udp = { version = "0.1.0", path = "tokio-udp" }
 tokio-timer = { version = "0.2.0", path = "tokio-timer" }
 
-futures = "0.1.19"
+futures = "0.1.20"
 
 # Needed until `reactor` is removed from `tokio`.
 mio = "0.6.14"
