@@ -5,8 +5,19 @@ use futures::Future;
 use std::time::Instant;
 
 
-/// An extension trait for `Future`s that provides a variety of convenient
+/// An extension trait for `Future` that provides a variety of convenient
 /// combinator functions.
+///
+/// Currently, there only is a [`deadline`] function, but this will increase
+/// over time.
+///
+/// Users are not expected this trait. All types that implement `Future` already
+/// implement `FutureExt`.
+///
+/// This trait can be imported directly or via the Tokio prelude: `use
+/// tokio::prelude::*`.
+///
+/// [`deadline`]: #method.deadline
 pub trait FutureExt: Future {
 
     /// Creates a new future which allows `self` until `deadline`.

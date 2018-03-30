@@ -8,9 +8,10 @@
 //! * A [reactor][reactor] backed by the operating system's event queue (epoll, kqueue,
 //!   IOCP, etc...).
 //! * Asynchronous [TCP and UDP][net] sockets.
+//! * [Timer][timer] API for scheduling work in the future.
 //!
-//! Tokio is built using futures (provided by the [futures] crate) as the
-//! abstraction for managing the complexity of asynchronous programming.
+//! Tokio is built using [futures] as the abstraction for managing the
+//! complexity of asynchronous programming.
 //!
 //! Guide level documentation is found on the [website].
 //!
