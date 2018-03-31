@@ -44,7 +44,8 @@ mod imp {
 #[cfg(not(target_pointer_width = "64"))]
 mod imp {
     use std::sync::Mutex;
-
+    use std::sync::atomic::Ordering;
+    
     #[derive(Debug)]
     pub struct AtomicU64 {
         inner: Mutex<u64>,
