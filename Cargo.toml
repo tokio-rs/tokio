@@ -35,7 +35,7 @@ members = [
 
 [badges]
 travis-ci = { repository = "tokio-rs/tokio" }
-appveyor = { repository = "carllerche/tokio" }
+appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
 tokio-io = { version = "0.1.6", path = "tokio-io" }
