@@ -1,3 +1,7 @@
+# 0.2.1 (April 2, 2018)
+
+* Fix build on 32-bit systems (#274).
+
 # 0.2.0 (March 30, 2018)
 
 * Rewrite from scratch using a hierarchical wheel strategy (#249).
