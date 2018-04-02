@@ -1,6 +1,14 @@
 ---
 language: rust
 sudo: false
+cache:
+  - apt
+  - cargo
+addons:
+  apt:
+    packages:
+    # to x-compile miniz-sys from sources
+    - gcc-multilib
 
 matrix:
   include:
@@ -9,10 +17,12 @@ matrix:
   # releases prior to the current stable.
   - rust: 1.21.0
   - rust: stable
-  - os: osx
   - rust: beta
   - rust: nightly
+  - os: osx
   - env: TARGET=x86_64-unknown-freebsd
+  - env: TARGET=i686-unknown-freebsd
+  - env: TARGET=i686-unknown-linux-gnu
 
 script:
   - |
