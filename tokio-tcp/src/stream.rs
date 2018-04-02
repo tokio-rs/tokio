@@ -618,7 +618,7 @@ impl<'a> futures2::io::AsyncWrite for &'a TcpStream {
                 Ok(futures2::Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready()?;
+                self.io.clear_write_ready2(cx)?;
                 Ok(futures2::Async::Pending)
             }
             Err(e) => Err(e),
