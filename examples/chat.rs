@@ -216,9 +216,9 @@ impl Future for Peer {
             if let Some(message) = line {
                 // Append the peer's name to the front of the line:
                 let mut line = self.name.clone();
-                line.put(": ");
-                line.put(&message);
-                line.put("\r\n");
+                line.extend_from_slice(b": ");
+                line.extend_from_slice(&message);
+                line.extend_from_slice(b"\r\n");
 
                 // We're using `Bytes`, which allows zero-copy clones (by
                 // storing the data in an Arc internally).
