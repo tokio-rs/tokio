@@ -1,11 +1,14 @@
 environment:
   matrix:
   - TARGET: x86_64-pc-windows-msvc
+    platform: x64
+  - TARGET: i686-pc-windows-msvc
+    platform: x86
+
 install:
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init.exe -y --default-host x86_64-pc-windows-msvc
+  - rustup-init.exe -y --default-host %TARGET%
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
-  - if NOT "%TARGET%" == "x86_64-pc-windows-msvc" rustup target add %TARGET%
 
   - rustc -V
   - cargo -V
