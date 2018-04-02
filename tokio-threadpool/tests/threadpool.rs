@@ -578,7 +578,7 @@ fn hammer() {
         }
     }
 
-    for i in 0.. ITER {
+    for _ in 0.. ITER {
         let pool = Builder::new()
             // .pool_size(30)
             .build();
