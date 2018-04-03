@@ -16,13 +16,6 @@ matrix:
   # should be done in a dedicated PR and cannot be greater than two 0.x
   # releases prior to the current stable.
   - rust: 1.21.0
-  - rust: stable
-  - rust: beta
-  - rust: nightly
-  - os: osx
-  - env: TARGET=x86_64-unknown-freebsd
-  - env: TARGET=i686-unknown-freebsd
-  - env: TARGET=i686-unknown-linux-gnu
   # WASM support
   - rust: beta
     env: TARGET=wasm32-unknown-emscripten
