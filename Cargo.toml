@@ -44,7 +44,7 @@ tokio-reactor = { version = "0.1.1", path = "tokio-reactor" }
 tokio-threadpool = { version = "0.1.2", path = "tokio-threadpool" }
 tokio-tcp = { version = "0.1.0", path = "tokio-tcp" }
 tokio-udp = { version = "0.1.0", path = "tokio-udp" }
-tokio-timer = { version = "0.2.0", path = "tokio-timer" }
+tokio-timer = { version = "0.2.1", path = "tokio-timer" }
 
 futures = "0.1.20"
 
