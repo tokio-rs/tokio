@@ -23,6 +23,9 @@ matrix:
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
+  # WASM support
+  - rust: beta
+    env: TARGET=wasm32-unknown-emscripten
 
 script:
   - |
