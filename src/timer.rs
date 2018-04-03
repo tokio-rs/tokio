@@ -80,6 +80,7 @@
 pub use tokio_timer::{
     Deadline,
     DeadlineError,
+    Error,
     Interval,
     Delay,
 };
