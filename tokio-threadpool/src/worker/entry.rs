@@ -10,6 +10,9 @@ use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 use deque;
 
 // TODO: None of the fields should be public
+//
+// It would also be helpful to split up the state across what fields /
+// operations are thread-safe vs. which ones require ownership of the worker.
 pub(crate) struct WorkerEntry {
     // Worker state. This is mutated when notifying the worker.
     pub state: AtomicUsize,
@@ -18,10 +21,10 @@ pub(crate) struct WorkerEntry {
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    pub deque: deque::Deque<Task>,
+    deque: deque::Deque<Task>,
 
     // Stealer half of deque
-    pub steal: deque::Stealer<Task>,
+    steal: deque::Stealer<Task>,
 
     // Thread parker
     pub park: UnsafeCell<BoxPark>,
@@ -177,6 +180,30 @@ impl WorkerEntry {
         self.wakeup();
 
         Ok(())
+    }
+
+    /// Pop a task
+    ///
+    /// This **must** only be called by the thread that owns the worker entry.
+    /// This function is not `Sync`.
+    pub fn pop_task(&self) -> deque::Steal<Task> {
+        self.deque.steal()
+    }
+
+    /// Steal a task
+    ///
+    /// This is called by *other* workers to steal a task for processing. This
+    /// function is `Sync`.
+    pub fn steal_task(&self) -> deque::Steal<Task> {
+        self.steal.steal()
+    }
+
+    /// Drain (and drop) all tasks that are queued for work.
+    ///
+    /// This is called when the pool is shutting down.
+    pub fn drain_tasks(&self) {
+        while let Some(_) = self.deque.pop() {
+        }
     }
 
     #[inline]

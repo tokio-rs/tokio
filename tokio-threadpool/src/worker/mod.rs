@@ -254,7 +254,7 @@ impl Worker {
         use deque::Steal::*;
 
         // Poll the internal queue for a task to run
-        match self.entry().deque.steal() {
+        match self.entry().pop_task() {
             Data(task) => {
                 self.run_task(task, notify, sender);
                 true
@@ -278,7 +278,7 @@ impl Worker {
 
         loop {
             if idx < len {
-                match self.inner.workers[idx].steal.steal() {
+                match self.inner.workers[idx].steal_task() {
                     Data(task) => {
                         trace!("stole task");
 
@@ -571,11 +571,12 @@ impl Drop for Worker {
         trace!("shutting down thread; idx={}", self.id.idx);
 
         if self.should_finalize.get() {
-            // Drain all work
+            // Get all inbound work and push it onto the work queue. The work
+            // queue is drained in the next step.
             self.drain_inbound();
 
-            while let Some(_) = self.entry().deque.pop() {
-            }
+            // Drain the work queue
+            self.entry().drain_tasks();
 
             // TODO: Drain the work queue...
             self.inner.worker_terminated();
