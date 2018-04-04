@@ -11,7 +11,7 @@ pub(crate) use self::state::{
     PUSHED_MASK,
 };
 
-use pool::{Inner, PoolState};
+use pool::{Pool, PoolState};
 use notifier::Notifier;
 use sender::Sender;
 use task::Task;
@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug)]
 pub struct Worker {
     // Shared scheduler data
-    pub(crate) inner: Arc<Inner>,
+    pub(crate) inner: Arc<Pool>,
 
     // WorkerEntry index
     pub(crate) id: WorkerId,
@@ -58,7 +58,7 @@ pub struct WorkerId {
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
 
 impl Worker {
-    pub(crate) fn spawn(id: WorkerId, inner: &Arc<Inner>) {
+    pub(crate) fn spawn(id: WorkerId, inner: &Arc<Pool>) {
         trace!("spawning new worker thread; id={}", id.idx);
 
         let mut th = thread::Builder::new();
@@ -85,7 +85,7 @@ impl Worker {
             let wref = &worker;
 
             // Create another worker... It's ok, this is just a new type around
-            // `Inner` that is expected to stay on the current thread.
+            // `Pool` that is expected to stay on the current thread.
             CURRENT_WORKER.with(|c| {
                 c.set(wref as *const _);
 

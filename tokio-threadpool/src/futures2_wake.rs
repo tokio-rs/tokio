@@ -1,4 +1,4 @@
-use inner::Inner;
+use inner::Pool;
 use notifier::Notifier;
 
 use std::marker::PhantomData;
@@ -14,7 +14,7 @@ pub(crate) struct Futures2Wake {
 }
 
 impl Futures2Wake {
-    pub(crate) fn new(id: usize, inner: &Arc<Inner>) -> Futures2Wake {
+    pub(crate) fn new(id: usize, inner: &Arc<Pool>) -> Futures2Wake {
         let notifier = Arc::new(Notifier {
             inner: Arc::downgrade(inner),
         });

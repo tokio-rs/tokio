@@ -1,5 +1,5 @@
 use builder::Builder;
-use pool::Inner;
+use pool::Pool;
 use sender::Sender;
 use shutdown::Shutdown;
 
@@ -118,7 +118,7 @@ impl ThreadPool {
         Shutdown { inner: self.inner.take().unwrap() }
     }
 
-    fn inner(&self) -> &Inner {
+    fn inner(&self) -> &Pool {
         &*self.inner.as_ref().unwrap().inner
     }
 }

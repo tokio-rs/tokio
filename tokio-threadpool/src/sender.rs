@@ -1,4 +1,4 @@
-use pool::{Inner, PoolState, SHUTDOWN_NOW, MAX_FUTURES};
+use pool::{Pool, PoolState, SHUTDOWN_NOW, MAX_FUTURES};
 use task::Task;
 
 use std::sync::Arc;
@@ -27,7 +27,7 @@ use futures2_wake::{into_waker, Futures2Wake};
 /// [`ThreadPool::sender`]: struct.ThreadPool.html#method.sender
 #[derive(Debug)]
 pub struct Sender {
-    pub(crate) inner: Arc<Inner>,
+    pub(crate) inner: Arc<Pool>,
 }
 
 impl Sender {

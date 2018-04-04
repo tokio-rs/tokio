@@ -29,7 +29,7 @@ use rand::{Rng, SeedableRng, XorShiftRng};
 
 // TODO: Rename this
 #[derive(Debug)]
-pub(crate) struct Inner {
+pub(crate) struct Pool {
     // ThreadPool state
     pub state: AtomicUsize,
 
@@ -57,12 +57,12 @@ pub(crate) struct Inner {
     pub config: Config,
 }
 
-impl Inner {
-    /// Create a new `Inner`
-    pub fn new(workers: Box<[worker::Entry]>, config: Config) -> Inner {
+impl Pool {
+    /// Create a new `Pool`
+    pub fn new(workers: Box<[worker::Entry]>, config: Config) -> Pool {
         let pool_size = workers.len();
 
-        let ret = Inner {
+        let ret = Pool {
             state: AtomicUsize::new(PoolState::new().into()),
             sleep_stack: AtomicUsize::new(SleepStack::new().into()),
             num_workers: AtomicUsize::new(pool_size),
@@ -226,7 +226,7 @@ impl Inner {
     ///
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
-    pub fn submit(&self, task: Task, inner: &Arc<Inner>) {
+    pub fn submit(&self, task: Task, inner: &Arc<Pool>) {
         Worker::with_current(|worker| {
             match worker {
                 Some(worker) => {
@@ -248,7 +248,7 @@ impl Inner {
     ///
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
-    fn submit_external(&self, task: Task, inner: &Arc<Inner>) {
+    fn submit_external(&self, task: Task, inner: &Arc<Pool>) {
         use worker::Lifecycle::Notified;
 
         // First try to get a handle to a sleeping worker. This ensures that
@@ -274,7 +274,7 @@ impl Inner {
                           idx: usize,
                           task: Task,
                           state: WorkerState,
-                          inner: &Arc<Inner>)
+                          inner: &Arc<Pool>)
     {
         let entry = &self.workers[idx];
 
@@ -283,13 +283,13 @@ impl Inner {
         }
     }
 
-    fn spawn_worker(&self, idx: usize, inner: &Arc<Inner>) {
+    fn spawn_worker(&self, idx: usize, inner: &Arc<Pool>) {
         Worker::spawn(WorkerId::new(idx), inner);
     }
 
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
-    pub fn signal_work(&self, inner: &Arc<Inner>) {
+    pub fn signal_work(&self, inner: &Arc<Pool>) {
         use worker::Lifecycle::*;
 
         if let Some((idx, mut state)) = self.pop_sleeper(Signaled, EMPTY) {
@@ -479,5 +479,5 @@ impl Inner {
     }
 }
 
-unsafe impl Send for Inner {}
-unsafe impl Sync for Inner {}
+unsafe impl Send for Pool {}
+unsafe impl Sync for Pool {}
