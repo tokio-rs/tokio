@@ -157,61 +157,14 @@ impl Pool {
         // transition, and terminate.
         while let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, true) {
             trace!("  -> shutdown worker; idx={:?}; state={:?}", idx, worker_state);
-            self.signal_stop(idx, worker_state);
-        }
-    }
 
-    /// Signals to the worker that it should stop
-    fn signal_stop(&self, idx: usize, mut state: worker::State) {
-        use worker::Lifecycle::*;
-
-        let worker = &self.workers[idx];
-
-        // Transition the worker state to signaled
-        loop {
-            let mut next = state;
-
-            match state.lifecycle() {
-                Shutdown => {
-                    trace!("signal_stop -- WORKER_SHUTDOWN; idx={}", idx);
-                    // If the worker is in the shutdown state, then it will never be
-                    // started again.
-                    self.worker_terminated();
-
-                    return;
-                }
-                Running | Sleeping => {}
-                Notified | Signaled => {
-                    trace!("signal_stop -- skipping; idx={}; state={:?}", idx, state);
-                    // These two states imply that the worker is active, thus it
-                    // will eventually see the shutdown signal, so we don't need
-                    // to do anything.
-                    //
-                    // The worker is forced to see the shutdown signal
-                    // eventually as:
-                    //
-                    // a) No more work will arrive
-                    // b) The shutdown signal is stored as the head of the
-                    // sleep, stack which will prevent the worker from going to
-                    // sleep again.
-                    return;
-                }
+            if self.workers[idx].signal_stop(worker_state).is_err() {
+                // The worker is already in the shutdown state, immediately
+                // track that it has terminated as the worker will never work
+                // again.
+                self.worker_terminated();
             }
-
-            next.set_lifecycle(Signaled);
-
-            let actual = worker.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
-
-            if actual == state {
-                break;
-            }
-
-            state = actual;
         }
-
-        // Wakeup the worker
-        worker.wakeup();
     }
 
     pub fn worker_terminated(&self) {

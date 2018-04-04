@@ -1,11 +1,11 @@
 use park::{BoxPark, BoxUnpark};
 use task::{Task, Queue};
-use worker::State;
+use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::fmt;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
-use std::sync::atomic::AtomicUsize;
 
 use deque;
 
@@ -49,6 +49,21 @@ impl WorkerEntry {
         }
     }
 
+    /// Atomically unset the pushed flag.
+    ///
+    /// # Return
+    ///
+    /// The state *before* the push flag is unset.
+    ///
+    /// # Ordering
+    ///
+    /// The specified ordering is established on the entry's state variable.
+    pub fn fetch_unset_pushed(&self, ordering: Ordering) -> State {
+        self.state.fetch_and(!PUSHED_MASK, ordering).into()
+    }
+
+    /// Submit a task to this worker while currently on the same thread that is
+    /// running the worker.
     #[inline]
     pub fn submit_internal(&self, task: Task) {
         self.push_internal(task);
@@ -93,6 +108,62 @@ impl WorkerEntry {
                 true
             }
         }
+    }
+
+    /// Signals to the worker that it should stop
+    ///
+    /// `state` is the last observed state for the worker. This allows skipping
+    /// the initial load from the state atomic.
+    ///
+    /// # Return
+    ///
+    /// Returns `Ok` when the worker was successfully signaled.
+    ///
+    /// Returns `Err` if the worker has already terminated.
+    pub fn signal_stop(&self, mut state: State) -> Result<(), ()> {
+        use worker::Lifecycle::*;
+
+        // Transition the worker state to signaled
+        loop {
+            let mut next = state;
+
+            match state.lifecycle() {
+                Shutdown => {
+                    return Err(());
+                }
+                Running | Sleeping => {}
+                Notified | Signaled => {
+                    // These two states imply that the worker is active, thus it
+                    // will eventually see the shutdown signal, so we don't need
+                    // to do anything.
+                    //
+                    // The worker is forced to see the shutdown signal
+                    // eventually as:
+                    //
+                    // a) No more work will arrive
+                    // b) The shutdown signal is stored as the head of the
+                    // sleep, stack which will prevent the worker from going to
+                    // sleep again.
+                    return Ok(());
+                }
+            }
+
+            next.set_lifecycle(Signaled);
+
+            let actual = self.state.compare_and_swap(
+                state.into(), next.into(), AcqRel).into();
+
+            if actual == state {
+                break;
+            }
+
+            state = actual;
+        }
+
+        // Wakeup the worker
+        self.wakeup();
+
+        Ok(())
     }
 
     #[inline]

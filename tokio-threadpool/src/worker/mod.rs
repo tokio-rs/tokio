@@ -7,7 +7,6 @@ pub(crate) use self::entry::{
 pub(crate) use self::state::{
     State,
     Lifecycle,
-    PUSHED_MASK,
 };
 
 use pool::{self, Pool};

@@ -1,9 +1,9 @@
 use config::MAX_WORKERS;
-use worker::{self, PUSHED_MASK};
+use worker;
 
 use std::{fmt, usize};
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Release, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 
 /// Lock-free stack of sleeping workers.
 ///
@@ -176,15 +176,13 @@ impl SleepStack {
                 state.into(), next.into(), AcqRel).into();
 
             if actual == state {
-                // The worker has been removed from the stack, so the pushed bit
-                // can be unset. Release ordering is used to ensure that this
-                // operation happens after actually popping the task.
-                debug_assert_eq!(1, PUSHED_MASK);
-
-                // Unset the PUSHED flag and get the current state.
-                let state: worker::State = entries[head].state
-                    // TODO This should be fetch_and(!PUSHED_MASK)
-                    .fetch_sub(PUSHED_MASK, Release).into();
+                // Release ordering is needed to ensure that unsetting the
+                // `pushed` flag happens after popping the sleeper from the
+                // stack.
+                //
+                // Acquire ordering is required to acquire any memory associated
+                // with transitioning the worker's lifecycle.
+                let state = entries[head].fetch_unset_pushed(AcqRel);
 
                 if state.lifecycle() >= max_lifecycle {
                     // If the worker has already been notified, then it is
