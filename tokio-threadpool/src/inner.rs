@@ -7,9 +7,7 @@ use sleep_stack::{
 use shutdown_task::ShutdownTask;
 use state::{State, SHUTDOWN_ON_IDLE, SHUTDOWN_NOW};
 use task::Task;
-use worker::{Worker, WorkerId};
-use worker_entry::WorkerEntry;
-use worker_state::{self, PUSHED_MASK, WorkerState};
+use worker::{self, Worker, WorkerId, WorkerState, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Release, Relaxed};
@@ -38,7 +36,7 @@ pub(crate) struct Inner {
     // Storage for workers
     //
     // This will *usually* be a small number
-    pub workers: Box<[WorkerEntry]>,
+    pub workers: Box<[worker::Entry]>,
 
     // Task notified when the worker shuts down
     pub shutdown_task: ShutdownTask,
@@ -111,7 +109,7 @@ impl Inner {
     }
 
     pub fn terminate_sleeping_workers(&self) {
-        use worker_state::Lifecycle::Signaled;
+        use worker::Lifecycle::Signaled;
 
         trace!("  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
@@ -124,7 +122,7 @@ impl Inner {
 
     /// Signals to the worker that it should stop
     fn signal_stop(&self, idx: usize, mut state: WorkerState) {
-        use worker_state::Lifecycle::*;
+        use worker::Lifecycle::*;
 
         let worker = &self.workers[idx];
 
@@ -213,7 +211,7 @@ impl Inner {
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
     fn submit_external(&self, task: Task, inner: &Arc<Inner>) {
-        use worker_state::Lifecycle::Notified;
+        use worker::Lifecycle::Notified;
 
         // First try to get a handle to a sleeping worker. This ensures that
         // sleeping tasks get woken up
@@ -254,7 +252,7 @@ impl Inner {
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
     pub fn signal_work(&self, inner: &Arc<Inner>) {
-        use worker_state::Lifecycle::*;
+        use worker::Lifecycle::*;
 
         if let Some((idx, mut state)) = self.pop_sleeper(Signaled, EMPTY) {
             let entry = &self.workers[idx];
@@ -329,7 +327,7 @@ impl Inner {
     }
 
     /// Pop a worker from the sleep stack
-    fn pop_sleeper(&self, max_lifecycle: worker_state::Lifecycle, terminal: usize)
+    fn pop_sleeper(&self, max_lifecycle: worker::Lifecycle, terminal: usize)
         -> Option<(usize, WorkerState)>
     {
         debug_assert!(terminal == EMPTY || terminal == TERMINATED);

@@ -1,12 +1,21 @@
+mod entry;
+mod state;
+
+pub(crate) use self::entry::{
+    WorkerEntry as Entry,
+};
+pub(crate) use self::state::{
+    // TODO: Rename `State`
+    WorkerState,
+    Lifecycle,
+    PUSHED_MASK,
+};
+
 use inner::Inner;
 use notifier::Notifier;
 use sender::Sender;
 use state::State;
 use task::Task;
-use worker_entry::WorkerEntry;
-use worker_state::{
-    WorkerState,
-};
 
 use tokio_executor;
 
@@ -192,7 +201,7 @@ impl Worker {
     /// Returns `true` if the worker should run.
     #[inline]
     fn check_run_state(&self, first: bool) -> bool {
-        use worker_state::Lifecycle::*;
+        use self::Lifecycle::*;
 
         let mut state: WorkerState = self.entry().state.load(Acquire).into();
 
@@ -388,7 +397,7 @@ impl Worker {
     ///
     /// Returns `true` if woken up due to new work arriving.
     fn sleep(&self) -> bool {
-        use worker_state::Lifecycle::*;
+        use self::Lifecycle::*;
 
         trace!("Worker::sleep; worker={:?}", self);
 
@@ -555,7 +564,7 @@ impl Worker {
         }
     }
 
-    fn entry(&self) -> &WorkerEntry {
+    fn entry(&self) -> &Entry {
         &self.inner.workers[self.id.idx]
     }
 }

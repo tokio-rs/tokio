@@ -32,8 +32,6 @@ mod state;
 mod task;
 mod thread_pool;
 mod worker;
-mod worker_entry;
-mod worker_state;
 
 pub use builder::Builder;
 pub use sender::Sender;

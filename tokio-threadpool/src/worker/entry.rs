@@ -1,8 +1,6 @@
 use park::{BoxPark, BoxUnpark};
 use task::{Task, Queue};
-use worker_state::{
-    WorkerState,
-};
+use worker::WorkerState;
 
 use std::cell::UnsafeCell;
 use std::fmt;
@@ -61,7 +59,7 @@ impl WorkerEntry {
     ///
     /// Returns `false` if the worker needs to be spawned.
     pub fn submit_external(&self, task: Task, mut state: WorkerState) -> bool {
-        use worker_state::Lifecycle::*;
+        use worker::Lifecycle::*;
 
         // Push the task onto the external queue
         self.push_external(task);

@@ -7,8 +7,7 @@ use sleep_stack::SleepStack;
 use state::State;
 use thread_pool::ThreadPool;
 use inner::Inner;
-use worker::{Worker, WorkerId};
-use worker_entry::WorkerEntry;
+use worker::{self, Worker, WorkerId};
 
 use std::error::Error;
 use std::fmt;
@@ -330,7 +329,7 @@ impl Builder {
             let park = (self.new_park)(&id);
             let unpark = park.unpark();
 
-            workers.push(WorkerEntry::new(park, unpark));
+            workers.push(worker::Entry::new(park, unpark));
         }
 
         let inner = Arc::new(Inner {
