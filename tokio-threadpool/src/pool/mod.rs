@@ -18,6 +18,8 @@ use shutdown_task::ShutdownTask;
 use task::Task;
 use worker::{self, Worker, WorkerId, WorkerState, PUSHED_MASK};
 
+use futures::task::AtomicTask;
+
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Release, Relaxed};
 use std::sync::atomic::AtomicUsize;
@@ -56,6 +58,32 @@ pub(crate) struct Inner {
 }
 
 impl Inner {
+    /// Create a new `Inner`
+    pub fn new(workers: Box<[worker::Entry]>, config: Config) -> Inner {
+        let pool_size = workers.len();
+
+        let ret = Inner {
+            state: AtomicUsize::new(PoolState::new().into()),
+            sleep_stack: AtomicUsize::new(SleepStack::new().into()),
+            num_workers: AtomicUsize::new(pool_size),
+            next_thread_id: AtomicUsize::new(0),
+            workers,
+            shutdown_task: ShutdownTask {
+                task1: AtomicTask::new(),
+                #[cfg(feature = "unstable-futures")]
+                task2: futures2::task::AtomicWaker::new(),
+            },
+            config,
+        };
+
+        // Now, we prime the sleeper stack
+        for i in 0..pool_size {
+            ret.push_sleeper(i).unwrap();
+        }
+
+        ret
+    }
+
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
