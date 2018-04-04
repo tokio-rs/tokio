@@ -2,24 +2,18 @@ use callback::Callback;
 use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
 use sender::Sender;
-use shutdown_task::ShutdownTask;
-use sleep_stack::SleepStack;
-use state::State;
+use pool::Inner;
 use thread_pool::ThreadPool;
-use inner::Inner;
-use worker::{Worker, WorkerId};
-use worker_entry::WorkerEntry;
+use worker::{self, Worker, WorkerId};
 
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 
 use num_cpus;
 use tokio_executor::Enter;
 use tokio_executor::park::Park;
-use futures::task::AtomicTask;
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -330,29 +324,19 @@ impl Builder {
             let park = (self.new_park)(&id);
             let unpark = park.unpark();
 
-            workers.push(WorkerEntry::new(park, unpark));
+            workers.push(worker::Entry::new(park, unpark));
         }
 
-        let inner = Arc::new(Inner {
-            state: AtomicUsize::new(State::new().into()),
-            sleep_stack: AtomicUsize::new(SleepStack::new().into()),
-            num_workers: AtomicUsize::new(self.pool_size),
-            next_thread_id: AtomicUsize::new(0),
-            workers: workers.into_boxed_slice(),
-            shutdown_task: ShutdownTask {
-                task1: AtomicTask::new(),
-                #[cfg(feature = "unstable-futures")]
-                task2: futures2::task::AtomicWaker::new(),
-            },
-            config: self.config.clone(),
+        // Create the pool
+        let inner = Arc::new(
+            Inner::new(
+                workers.into_boxed_slice(),
+                self.config.clone()));
+
+        // Wrap with `Sender`
+        let inner = Some(Sender {
+            inner
         });
-
-        // Now, we prime the sleeper stack
-        for i in 0..self.pool_size {
-            inner.push_sleeper(i).unwrap();
-        }
-
-        let inner = Some(Sender { inner });
 
         ThreadPool { inner }
     }

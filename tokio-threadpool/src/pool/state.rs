@@ -6,7 +6,7 @@ use std::{fmt, usize};
 /// shutdown on idle, 2 for shutting down). The remaining bits represent the
 /// number of futures that still need to complete.
 #[derive(Eq, PartialEq, Clone, Copy)]
-pub(crate) struct State(usize);
+pub(crate) struct PoolState(usize);
 
 /// Flag used to track if the pool is running
 pub(crate) const SHUTDOWN_ON_IDLE: usize = 1;
@@ -20,10 +20,10 @@ const NUM_FUTURES_OFFSET: usize = 2;
 /// Max number of futures the pool can handle.
 pub(crate) const MAX_FUTURES: usize = usize::MAX >> NUM_FUTURES_OFFSET;
 
-impl State {
+impl PoolState {
     #[inline]
-    pub fn new() -> State {
-        State(0)
+    pub fn new() -> PoolState {
+        PoolState(0)
     }
 
     /// Returns the number of futures still pending completion.
@@ -75,19 +75,19 @@ impl State {
     }
 }
 
-impl From<usize> for State {
+impl From<usize> for PoolState {
     fn from(src: usize) -> Self {
-        State(src)
+        PoolState(src)
     }
 }
 
-impl From<State> for usize {
-    fn from(src: State) -> Self {
+impl From<PoolState> for usize {
+    fn from(src: PoolState) -> Self {
         src.0
     }
 }
 
-impl fmt::Debug for State {
+impl fmt::Debug for PoolState {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("State")
             .field("lifecycle", &self.lifecycle())

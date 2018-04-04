@@ -1,17 +1,20 @@
-use inner::Inner;
+mod entry;
+mod state;
+
+pub(crate) use self::entry::{
+    WorkerEntry as Entry,
+};
+pub(crate) use self::state::{
+    // TODO: Rename `State`
+    WorkerState,
+    Lifecycle,
+    PUSHED_MASK,
+};
+
+use pool::{Inner, PoolState};
 use notifier::Notifier;
 use sender::Sender;
-use state::State;
 use task::Task;
-use worker_entry::WorkerEntry;
-use worker_state::{
-    WorkerState,
-    WORKER_SHUTDOWN,
-    WORKER_RUNNING,
-    WORKER_SLEEPING,
-    WORKER_NOTIFIED,
-    WORKER_SIGNALED,
-};
 
 use tokio_executor;
 
@@ -197,10 +200,12 @@ impl Worker {
     /// Returns `true` if the worker should run.
     #[inline]
     fn check_run_state(&self, first: bool) -> bool {
+        use self::Lifecycle::*;
+
         let mut state: WorkerState = self.entry().state.load(Acquire).into();
 
         loop {
-            let pool_state: State = self.inner.state.load(Acquire).into();
+            let pool_state: PoolState = self.inner.state.load(Acquire).into();
 
             if pool_state.is_terminated() {
                 return false;
@@ -209,12 +214,16 @@ impl Worker {
             let mut next = state;
 
             match state.lifecycle() {
-                WORKER_RUNNING => break,
-                WORKER_NOTIFIED | WORKER_SIGNALED => {
+                Running => break,
+                Notified | Signaled => {
                     // transition back to running
-                    next.set_lifecycle(WORKER_RUNNING);
+                    next.set_lifecycle(Running);
                 }
-                lifecycle => panic!("unexpected worker state; lifecycle={}", lifecycle),
+                Shutdown | Sleeping => {
+                    // The worker should never be in these states when calling
+                    // this function.
+                    panic!("unexpected worker state; lifecycle={:?}", state.lifecycle());
+                }
             }
 
             let actual = self.entry().state.compare_and_swap(
@@ -311,7 +320,7 @@ impl Worker {
                 self.entry().push_internal(task);
             }
             Complete => {
-                let mut state: State = self.inner.state.load(Acquire).into();
+                let mut state: PoolState = self.inner.state.load(Acquire).into();
 
                 loop {
                     let mut next = state;
@@ -387,7 +396,9 @@ impl Worker {
     ///
     /// Returns `true` if woken up due to new work arriving.
     fn sleep(&self) -> bool {
-        trace!("Worker::sleep; idx={}", self.id.idx);
+        use self::Lifecycle::*;
+
+        trace!("Worker::sleep; worker={:?}", self);
 
         let mut state: WorkerState = self.entry().state.load(Acquire).into();
 
@@ -399,18 +410,22 @@ impl Worker {
             let mut next = state;
 
             match state.lifecycle() {
-                WORKER_RUNNING => {
+                Running => {
                     // Try setting the pushed state
                     next.set_pushed();
 
                     // Transition the worker state to sleeping
-                    next.set_lifecycle(WORKER_SLEEPING);
+                    next.set_lifecycle(Sleeping);
                 }
-                WORKER_NOTIFIED | WORKER_SIGNALED => {
+                Notified | Signaled => {
                     // No need to sleep, transition back to running and move on.
-                    next.set_lifecycle(WORKER_RUNNING);
+                    next.set_lifecycle(Running);
                 }
-                actual => panic!("unexpected worker state; {}", actual),
+                Shutdown | Sleeping => {
+                    // The worker cannot transition to sleep when already in a
+                    // sleeping state.
+                    panic!("unexpected worker state; actual={:?}", state.lifecycle());
+                }
             }
 
             let actual = self.entry().state.compare_and_swap(
@@ -489,12 +504,12 @@ impl Worker {
 
             loop {
                 match state.lifecycle() {
-                    WORKER_SLEEPING => {}
-                    WORKER_NOTIFIED | WORKER_SIGNALED => {
+                    Sleeping => {}
+                    Notified | Signaled => {
                         // Transition back to running
                         loop {
                             let mut next = state;
-                            next.set_lifecycle(WORKER_RUNNING);
+                            next.set_lifecycle(Running);
 
                             let actual = self.entry().state.compare_and_swap(
                                 state.into(), next.into(), AcqRel).into();
@@ -506,7 +521,12 @@ impl Worker {
                             state = actual;
                         }
                     }
-                    _ => unreachable!(),
+                    Shutdown | Running => {
+                        // To get here, the block above transitioned the tate to
+                        // `Sleeping`. No other thread can concurrently
+                        // transition to `Shutdown` or `Running`.
+                        unreachable!();
+                    }
                 }
 
                 if !drop_thread {
@@ -515,7 +535,7 @@ impl Worker {
                 }
 
                 let mut next = state;
-                next.set_lifecycle(WORKER_SHUTDOWN);
+                next.set_lifecycle(Shutdown);
 
                 let actual = self.entry().state.compare_and_swap(
                     state.into(), next.into(), AcqRel).into();
@@ -543,7 +563,7 @@ impl Worker {
         }
     }
 
-    fn entry(&self) -> &WorkerEntry {
+    fn entry(&self) -> &Entry {
         &self.inner.workers[self.id.idx]
     }
 }

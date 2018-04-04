@@ -1,3 +1,13 @@
+mod state;
+
+pub(crate) use self::state::{
+    // TODO: Rename `State`
+    PoolState,
+    SHUTDOWN_ON_IDLE,
+    SHUTDOWN_NOW,
+    MAX_FUTURES,
+};
+
 use config::{Config, MAX_WORKERS};
 use sleep_stack::{
     SleepStack,
@@ -5,19 +15,10 @@ use sleep_stack::{
     TERMINATED,
 };
 use shutdown_task::ShutdownTask;
-use state::{State, SHUTDOWN_ON_IDLE, SHUTDOWN_NOW};
 use task::Task;
-use worker::{Worker, WorkerId};
-use worker_entry::WorkerEntry;
-use worker_state::{
-    WorkerState,
-    PUSHED_MASK,
-    WORKER_SHUTDOWN,
-    WORKER_RUNNING,
-    WORKER_SLEEPING,
-    WORKER_NOTIFIED,
-    WORKER_SIGNALED,
-};
+use worker::{self, Worker, WorkerId, WorkerState, PUSHED_MASK};
+
+use futures::task::AtomicTask;
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Release, Relaxed};
@@ -26,6 +27,7 @@ use std::sync::Arc;
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
+// TODO: Rename this
 #[derive(Debug)]
 pub(crate) struct Inner {
     // ThreadPool state
@@ -46,7 +48,7 @@ pub(crate) struct Inner {
     // Storage for workers
     //
     // This will *usually* be a small number
-    pub workers: Box<[WorkerEntry]>,
+    pub workers: Box<[worker::Entry]>,
 
     // Task notified when the worker shuts down
     pub shutdown_task: ShutdownTask,
@@ -56,10 +58,36 @@ pub(crate) struct Inner {
 }
 
 impl Inner {
+    /// Create a new `Inner`
+    pub fn new(workers: Box<[worker::Entry]>, config: Config) -> Inner {
+        let pool_size = workers.len();
+
+        let ret = Inner {
+            state: AtomicUsize::new(PoolState::new().into()),
+            sleep_stack: AtomicUsize::new(SleepStack::new().into()),
+            num_workers: AtomicUsize::new(pool_size),
+            next_thread_id: AtomicUsize::new(0),
+            workers,
+            shutdown_task: ShutdownTask {
+                task1: AtomicTask::new(),
+                #[cfg(feature = "unstable-futures")]
+                task2: futures2::task::AtomicWaker::new(),
+            },
+            config,
+        };
+
+        // Now, we prime the sleeper stack
+        for i in 0..pool_size {
+            ret.push_sleeper(i).unwrap();
+        }
+
+        ret
+    }
+
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
-        let mut state: State = self.state.load(Acquire).into();
+        let mut state: PoolState = self.state.load(Acquire).into();
 
         trace!("shutdown; state={:?}", state);
 
@@ -119,10 +147,12 @@ impl Inner {
     }
 
     pub fn terminate_sleeping_workers(&self) {
+        use worker::Lifecycle::Signaled;
+
         trace!("  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
         // transition, and terminate.
-        while let Some((idx, worker_state)) = self.pop_sleeper(WORKER_SIGNALED, TERMINATED) {
+        while let Some((idx, worker_state)) = self.pop_sleeper(Signaled, TERMINATED) {
             trace!("  -> shutdown worker; idx={:?}; state={:?}", idx, worker_state);
             self.signal_stop(idx, worker_state);
         }
@@ -130,6 +160,8 @@ impl Inner {
 
     /// Signals to the worker that it should stop
     fn signal_stop(&self, idx: usize, mut state: WorkerState) {
+        use worker::Lifecycle::*;
+
         let worker = &self.workers[idx];
 
         // Transition the worker state to signaled
@@ -137,7 +169,7 @@ impl Inner {
             let mut next = state;
 
             match state.lifecycle() {
-                WORKER_SHUTDOWN => {
+                Shutdown => {
                     trace!("signal_stop -- WORKER_SHUTDOWN; idx={}", idx);
                     // If the worker is in the shutdown state, then it will never be
                     // started again.
@@ -145,16 +177,25 @@ impl Inner {
 
                     return;
                 }
-                WORKER_RUNNING | WORKER_SLEEPING => {}
-                _ => {
+                Running | Sleeping => {}
+                Notified | Signaled => {
                     trace!("signal_stop -- skipping; idx={}; state={:?}", idx, state);
-                    // All other states will naturally converge to a state of
-                    // shutdown.
+                    // These two states imply that the worker is active, thus it
+                    // will eventually see the shutdown signal, so we don't need
+                    // to do anything.
+                    //
+                    // The worker is forced to see the shutdown signal
+                    // eventually as:
+                    //
+                    // a) No more work will arrive
+                    // b) The shutdown signal is stored as the head of the
+                    // sleep, stack which will prevent the worker from going to
+                    // sleep again.
                     return;
                 }
             }
 
-            next.set_lifecycle(WORKER_SIGNALED);
+            next.set_lifecycle(Signaled);
 
             let actual = worker.state.compare_and_swap(
                 state.into(), next.into(), AcqRel).into();
@@ -208,9 +249,11 @@ impl Inner {
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
     fn submit_external(&self, task: Task, inner: &Arc<Inner>) {
+        use worker::Lifecycle::Notified;
+
         // First try to get a handle to a sleeping worker. This ensures that
         // sleeping tasks get woken up
-        if let Some((idx, state)) = self.pop_sleeper(WORKER_NOTIFIED, EMPTY) {
+        if let Some((idx, state)) = self.pop_sleeper(Notified, EMPTY) {
             trace!("submit to existing worker; idx={}; state={:?}", idx, state);
             self.submit_to_external(idx, task, state, inner);
             return;
@@ -236,23 +279,30 @@ impl Inner {
         let entry = &self.workers[idx];
 
         if !entry.submit_external(task, state) {
-            Worker::spawn(WorkerId::new(idx), inner);
+            self.spawn_worker(idx, inner);
         }
+    }
+
+    fn spawn_worker(&self, idx: usize, inner: &Arc<Inner>) {
+        Worker::spawn(WorkerId::new(idx), inner);
     }
 
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
     pub fn signal_work(&self, inner: &Arc<Inner>) {
-        if let Some((idx, mut state)) = self.pop_sleeper(WORKER_SIGNALED, EMPTY) {
+        use worker::Lifecycle::*;
+
+        if let Some((idx, mut state)) = self.pop_sleeper(Signaled, EMPTY) {
             let entry = &self.workers[idx];
+
+            debug_assert!(state.lifecycle() != Signaled, "actual={:?}", state.lifecycle());
 
             // Transition the worker state to signaled
             loop {
                 let mut next = state;
 
                 // pop_sleeper should skip these
-                debug_assert!(state.lifecycle() != WORKER_SIGNALED);
-                next.set_lifecycle(WORKER_SIGNALED);
+                next.set_lifecycle(Signaled);
 
                 let actual = entry.state.compare_and_swap(
                     state.into(), next.into(), AcqRel).into();
@@ -267,15 +317,17 @@ impl Inner {
             // The state has been transitioned to signal, now we need to wake up
             // the worker if necessary.
             match state.lifecycle() {
-                WORKER_SLEEPING => {
+                Sleeping => {
                     trace!("signal_work -- wakeup; idx={}", idx);
                     self.workers[idx].wakeup();
                 }
-                WORKER_SHUTDOWN => {
+                Shutdown => {
                     trace!("signal_work -- spawn; idx={}", idx);
                     Worker::spawn(WorkerId::new(idx), inner);
                 }
-                _ => {}
+                Running | Notified | Signaled => {
+                    // The workers are already active. No need to wake them up.
+                }
             }
         }
     }
@@ -313,7 +365,7 @@ impl Inner {
     }
 
     /// Pop a worker from the sleep stack
-    fn pop_sleeper(&self, max_lifecycle: usize, terminal: usize)
+    fn pop_sleeper(&self, max_lifecycle: worker::Lifecycle, terminal: usize)
         -> Option<(usize, WorkerState)>
     {
         debug_assert!(terminal == EMPTY || terminal == TERMINATED);
@@ -371,6 +423,7 @@ impl Inner {
 
                 // Unset the PUSHED flag and get the current state.
                 let state: WorkerState = self.workers[head].state
+                    // TODO This should be fetch_and(!PUSHED_MASK)
                     .fetch_sub(PUSHED_MASK, Release).into();
 
                 if state.lifecycle() >= max_lifecycle {

@@ -1,10 +1,6 @@
 use park::{BoxPark, BoxUnpark};
 use task::{Task, Queue};
-use worker_state::{
-    WorkerState,
-    WORKER_SHUTDOWN,
-    WORKER_SLEEPING,
-};
+use worker::WorkerState;
 
 use std::cell::UnsafeCell;
 use std::fmt;
@@ -13,6 +9,7 @@ use std::sync::atomic::AtomicUsize;
 
 use deque;
 
+// TODO: None of the fields should be public
 pub(crate) struct WorkerEntry {
     // Worker state. This is mutated when notifying the worker.
     pub state: AtomicUsize,
@@ -62,6 +59,8 @@ impl WorkerEntry {
     ///
     /// Returns `false` if the worker needs to be spawned.
     pub fn submit_external(&self, task: Task, mut state: WorkerState) -> bool {
+        use worker::Lifecycle::*;
+
         // Push the task onto the external queue
         self.push_external(task);
 
@@ -81,14 +80,18 @@ impl WorkerEntry {
         }
 
         match state.lifecycle() {
-            WORKER_SLEEPING => {
+            Sleeping => {
                 // The worker is currently sleeping, the condition variable must
                 // be signaled
                 self.wakeup();
                 true
             }
-            WORKER_SHUTDOWN => false,
-            _ => true,
+            Shutdown => false,
+            Running | Notified | Signaled => {
+                // In these states, the worker is active and will eventually see
+                // the task that was just submitted.
+                true
+            }
         }
     }
 

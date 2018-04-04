@@ -20,20 +20,17 @@ pub mod park;
 mod builder;
 mod callback;
 mod config;
-mod inner;
 #[cfg(feature = "unstable-futures")]
 mod futures2_wake;
 mod notifier;
+mod pool;
 mod sender;
 mod shutdown;
 mod shutdown_task;
 mod sleep_stack;
-mod state;
 mod task;
 mod thread_pool;
 mod worker;
-mod worker_entry;
-mod worker_state;
 
 pub use builder::Builder;
 pub use sender::Sender;

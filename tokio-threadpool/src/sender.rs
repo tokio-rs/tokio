@@ -1,5 +1,4 @@
-use inner::Inner;
-use state::{State, SHUTDOWN_NOW, MAX_FUTURES};
+use pool::{Inner, PoolState, SHUTDOWN_NOW, MAX_FUTURES};
 use task::Task;
 
 use std::sync::Arc;
@@ -90,7 +89,7 @@ impl Sender {
 
     /// Logic to prepare for spawning
     fn prepare_for_spawn(&self) -> Result<(), SpawnError> {
-        let mut state: State = self.inner.state.load(Acquire).into();
+        let mut state: PoolState = self.inner.state.load(Acquire).into();
 
         // Increment the number of futures spawned on the pool as well as
         // validate that the pool is still running/
@@ -145,7 +144,7 @@ impl tokio_executor::Executor for Sender {
 
 impl<'a> tokio_executor::Executor for &'a Sender {
     fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        let state: State = self.inner.state.load(Acquire).into();
+        let state: PoolState = self.inner.state.load(Acquire).into();
 
         if state.num_futures() == MAX_FUTURES {
             // No capacity
