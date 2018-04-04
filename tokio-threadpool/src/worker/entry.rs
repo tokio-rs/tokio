@@ -5,7 +5,7 @@ use worker::state::{State, PUSHED_MASK};
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 
 use deque;
 
@@ -49,6 +49,15 @@ impl WorkerEntry {
         }
     }
 
+    /// Atomically load the worker's state
+    ///
+    /// # Ordering
+    ///
+    /// An `Acquire` ordering is established on the entry's state variable.
+    pub fn load_state(&self) -> State {
+        self.state.load(Acquire).into()
+    }
+
     /// Atomically unset the pushed flag.
     ///
     /// # Return
@@ -73,6 +82,10 @@ impl WorkerEntry {
     /// to the worker. Internal submissions go through another path.
     ///
     /// Returns `false` if the worker needs to be spawned.
+    ///
+    /// # Ordering
+    ///
+    /// The `state` must have been obtained with an `Acquire` ordering.
     pub fn submit_external(&self, task: Task, mut state: State) -> bool {
         use worker::Lifecycle::*;
 

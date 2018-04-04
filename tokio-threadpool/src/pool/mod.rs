@@ -222,7 +222,7 @@ impl Pool {
 
         trace!("  -> submitting to random; idx={}", idx);
 
-        let state: worker::State = self.workers[idx].state.load(Acquire).into();
+        let state = self.workers[idx].load_state();
         self.submit_to_external(idx, task, state, inner);
     }
 
