@@ -1,5 +1,5 @@
+use pool::Inner;
 use sender::Sender;
-use inner::Inner;
 
 use std::sync::atomic::Ordering::{Acquire};
 

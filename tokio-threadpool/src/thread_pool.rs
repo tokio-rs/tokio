@@ -1,5 +1,5 @@
 use builder::Builder;
-use inner::Inner;
+use pool::Inner;
 use sender::Sender;
 use shutdown::Shutdown;
 

@@ -1,3 +1,13 @@
+mod state;
+
+pub(crate) use self::state::{
+    // TODO: Rename `State`
+    PoolState,
+    SHUTDOWN_ON_IDLE,
+    SHUTDOWN_NOW,
+    MAX_FUTURES,
+};
+
 use config::{Config, MAX_WORKERS};
 use sleep_stack::{
     SleepStack,
@@ -5,7 +15,6 @@ use sleep_stack::{
     TERMINATED,
 };
 use shutdown_task::ShutdownTask;
-use pool_state::{PoolState, SHUTDOWN_ON_IDLE, SHUTDOWN_NOW};
 use task::Task;
 use worker::{self, Worker, WorkerId, WorkerState, PUSHED_MASK};
 
@@ -16,6 +25,7 @@ use std::sync::Arc;
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
+// TODO: Rename this
 #[derive(Debug)]
 pub(crate) struct Inner {
     // ThreadPool state

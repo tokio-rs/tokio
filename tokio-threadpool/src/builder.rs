@@ -4,9 +4,8 @@ use park::{BoxPark, BoxedPark, DefaultPark};
 use sender::Sender;
 use shutdown_task::ShutdownTask;
 use sleep_stack::SleepStack;
-use pool_state::PoolState;
+use pool::{Inner, PoolState};
 use thread_pool::ThreadPool;
-use inner::Inner;
 use worker::{self, Worker, WorkerId};
 
 use std::error::Error;

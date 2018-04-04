@@ -1,5 +1,4 @@
-use inner::Inner;
-use pool_state::{PoolState, SHUTDOWN_NOW, MAX_FUTURES};
+use pool::{Inner, PoolState, SHUTDOWN_NOW, MAX_FUTURES};
 use task::Task;
 
 use std::sync::Arc;

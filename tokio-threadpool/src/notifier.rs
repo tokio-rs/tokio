@@ -1,4 +1,4 @@
-use inner::Inner;
+use pool::Inner;
 use task::Task;
 
 use std::mem;

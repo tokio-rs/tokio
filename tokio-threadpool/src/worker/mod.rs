@@ -11,10 +11,9 @@ pub(crate) use self::state::{
     PUSHED_MASK,
 };
 
-use inner::Inner;
+use pool::{Inner, PoolState};
 use notifier::Notifier;
 use sender::Sender;
-use pool_state::PoolState;
 use task::Task;
 
 use tokio_executor;
