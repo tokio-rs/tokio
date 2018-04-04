@@ -140,10 +140,12 @@ pub mod io {
         ReadToEnd,
         read_until,
         ReadUntil,
+        ReadHalf,
         shutdown,
         Shutdown,
         write_all,
         WriteAll,
+        WriteHalf,
     };
 
     // Re-export io::Error so that users don't have to deal
