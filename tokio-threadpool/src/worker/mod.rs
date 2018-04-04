@@ -14,7 +14,7 @@ pub(crate) use self::state::{
 use inner::Inner;
 use notifier::Notifier;
 use sender::Sender;
-use state::State;
+use pool_state::PoolState;
 use task::Task;
 
 use tokio_executor;
@@ -206,7 +206,7 @@ impl Worker {
         let mut state: WorkerState = self.entry().state.load(Acquire).into();
 
         loop {
-            let pool_state: State = self.inner.state.load(Acquire).into();
+            let pool_state: PoolState = self.inner.state.load(Acquire).into();
 
             if pool_state.is_terminated() {
                 return false;
@@ -321,7 +321,7 @@ impl Worker {
                 self.entry().push_internal(task);
             }
             Complete => {
-                let mut state: State = self.inner.state.load(Acquire).into();
+                let mut state: PoolState = self.inner.state.load(Acquire).into();
 
                 loop {
                     let mut next = state;

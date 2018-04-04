@@ -5,7 +5,7 @@ use sleep_stack::{
     TERMINATED,
 };
 use shutdown_task::ShutdownTask;
-use state::{State, SHUTDOWN_ON_IDLE, SHUTDOWN_NOW};
+use pool_state::{PoolState, SHUTDOWN_ON_IDLE, SHUTDOWN_NOW};
 use task::Task;
 use worker::{self, Worker, WorkerId, WorkerState, PUSHED_MASK};
 
@@ -49,7 +49,7 @@ impl Inner {
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
-        let mut state: State = self.state.load(Acquire).into();
+        let mut state: PoolState = self.state.load(Acquire).into();
 
         trace!("shutdown; state={:?}", state);
 

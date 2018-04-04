@@ -4,7 +4,7 @@ use park::{BoxPark, BoxedPark, DefaultPark};
 use sender::Sender;
 use shutdown_task::ShutdownTask;
 use sleep_stack::SleepStack;
-use state::State;
+use pool_state::PoolState;
 use thread_pool::ThreadPool;
 use inner::Inner;
 use worker::{self, Worker, WorkerId};
@@ -333,7 +333,7 @@ impl Builder {
         }
 
         let inner = Arc::new(Inner {
-            state: AtomicUsize::new(State::new().into()),
+            state: AtomicUsize::new(PoolState::new().into()),
             sleep_stack: AtomicUsize::new(SleepStack::new().into()),
             num_workers: AtomicUsize::new(self.pool_size),
             next_thread_id: AtomicUsize::new(0),
