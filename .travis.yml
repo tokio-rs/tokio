@@ -1,6 +1,14 @@
 ---
 language: rust
 sudo: false
+cache:
+  - apt
+  - cargo
+addons:
+  apt:
+    packages:
+    # to x-compile miniz-sys from sources
+    - gcc-multilib
 
 matrix:
   include:
@@ -8,11 +16,9 @@ matrix:
   # should be done in a dedicated PR and cannot be greater than two 0.x
   # releases prior to the current stable.
   - rust: 1.21.0
-  - rust: stable
-  - os: osx
+  # WASM support
   - rust: beta
-  - rust: nightly
-  - env: TARGET=x86_64-unknown-freebsd
+    env: TARGET=wasm32-unknown-emscripten
 
 script:
   - |
