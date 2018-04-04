@@ -1,4 +1,4 @@
-use pool::Inner;
+use pool::Pool;
 use task::Task;
 
 use std::mem;
@@ -12,7 +12,7 @@ use futures::executor::Notify;
 /// to poll the future again.
 #[derive(Debug)]
 pub(crate) struct Notifier {
-    pub inner: Weak<Inner>,
+    pub inner: Weak<Pool>,
 }
 
 impl Notify for Notifier {

@@ -1,4 +1,4 @@
-use pool::Inner;
+use pool::Pool;
 use sender::Sender;
 
 use std::sync::atomic::Ordering::{Acquire};
@@ -24,7 +24,7 @@ pub struct Shutdown {
 }
 
 impl Shutdown {
-    fn inner(&self) -> &Inner {
+    fn inner(&self) -> &Pool {
         &*self.inner.inner
     }
 }

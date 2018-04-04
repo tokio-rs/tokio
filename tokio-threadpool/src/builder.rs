@@ -2,7 +2,7 @@ use callback::Callback;
 use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
 use sender::Sender;
-use pool::Inner;
+use pool::Pool;
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
 
@@ -329,7 +329,7 @@ impl Builder {
 
         // Create the pool
         let inner = Arc::new(
-            Inner::new(
+            Pool::new(
                 workers.into_boxed_slice(),
                 self.config.clone()));
 

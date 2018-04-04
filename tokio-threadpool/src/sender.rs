@@ -1,4 +1,4 @@
-use pool::{Inner, PoolState, SHUTDOWN_NOW, MAX_FUTURES};
+use pool::{self, Pool, Lifecycle, MAX_FUTURES};
 use task::Task;
 
 use std::sync::Arc;
@@ -27,7 +27,7 @@ use futures2_wake::{into_waker, Futures2Wake};
 /// [`ThreadPool::sender`]: struct.ThreadPool.html#method.sender
 #[derive(Debug)]
 pub struct Sender {
-    pub(crate) inner: Arc<Inner>,
+    pub(crate) inner: Arc<Pool>,
 }
 
 impl Sender {
@@ -89,7 +89,7 @@ impl Sender {
 
     /// Logic to prepare for spawning
     fn prepare_for_spawn(&self) -> Result<(), SpawnError> {
-        let mut state: PoolState = self.inner.state.load(Acquire).into();
+        let mut state: pool::State = self.inner.state.load(Acquire).into();
 
         // Increment the number of futures spawned on the pool as well as
         // validate that the pool is still running/
@@ -101,7 +101,7 @@ impl Sender {
                 return Err(SpawnError::at_capacity());
             }
 
-            if next.lifecycle() == SHUTDOWN_NOW {
+            if next.lifecycle() == Lifecycle::ShutdownNow {
                 // Cannot execute the future, executor is shutdown.
                 return Err(SpawnError::shutdown());
             }
@@ -144,14 +144,14 @@ impl tokio_executor::Executor for Sender {
 
 impl<'a> tokio_executor::Executor for &'a Sender {
     fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        let state: PoolState = self.inner.state.load(Acquire).into();
+        let state: pool::State = self.inner.state.load(Acquire).into();
 
         if state.num_futures() == MAX_FUTURES {
             // No capacity
             return Err(SpawnError::at_capacity());
         }
 
-        if state.lifecycle() == SHUTDOWN_NOW {
+        if state.lifecycle() == Lifecycle::ShutdownNow {
             // Cannot execute the future, executor is shutdown.
             return Err(SpawnError::shutdown());
         }

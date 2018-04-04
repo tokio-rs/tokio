@@ -5,13 +5,11 @@ pub(crate) use self::entry::{
     WorkerEntry as Entry,
 };
 pub(crate) use self::state::{
-    // TODO: Rename `State`
-    WorkerState,
+    State,
     Lifecycle,
-    PUSHED_MASK,
 };
 
-use pool::{Inner, PoolState};
+use pool::{self, Pool};
 use notifier::Notifier;
 use sender::Sender;
 use task::Task;
@@ -33,7 +31,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug)]
 pub struct Worker {
     // Shared scheduler data
-    pub(crate) inner: Arc<Inner>,
+    pub(crate) inner: Arc<Pool>,
 
     // WorkerEntry index
     pub(crate) id: WorkerId,
@@ -58,7 +56,7 @@ pub struct WorkerId {
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
 
 impl Worker {
-    pub(crate) fn spawn(id: WorkerId, inner: &Arc<Inner>) {
+    pub(crate) fn spawn(id: WorkerId, inner: &Arc<Pool>) {
         trace!("spawning new worker thread; id={}", id.idx);
 
         let mut th = thread::Builder::new();
@@ -85,7 +83,7 @@ impl Worker {
             let wref = &worker;
 
             // Create another worker... It's ok, this is just a new type around
-            // `Inner` that is expected to stay on the current thread.
+            // `Pool` that is expected to stay on the current thread.
             CURRENT_WORKER.with(|c| {
                 c.set(wref as *const _);
 
@@ -202,10 +200,10 @@ impl Worker {
     fn check_run_state(&self, first: bool) -> bool {
         use self::Lifecycle::*;
 
-        let mut state: WorkerState = self.entry().state.load(Acquire).into();
+        let mut state: State = self.entry().state.load(Acquire).into();
 
         loop {
-            let pool_state: PoolState = self.inner.state.load(Acquire).into();
+            let pool_state: pool::State = self.inner.state.load(Acquire).into();
 
             if pool_state.is_terminated() {
                 return false;
@@ -256,7 +254,7 @@ impl Worker {
         use deque::Steal::*;
 
         // Poll the internal queue for a task to run
-        match self.entry().deque.steal() {
+        match self.entry().pop_task() {
             Data(task) => {
                 self.run_task(task, notify, sender);
                 true
@@ -280,7 +278,7 @@ impl Worker {
 
         loop {
             if idx < len {
-                match self.inner.workers[idx].steal.steal() {
+                match self.inner.workers[idx].steal_task() {
                     Data(task) => {
                         trace!("stole task");
 
@@ -320,7 +318,7 @@ impl Worker {
                 self.entry().push_internal(task);
             }
             Complete => {
-                let mut state: PoolState = self.inner.state.load(Acquire).into();
+                let mut state: pool::State = self.inner.state.load(Acquire).into();
 
                 loop {
                     let mut next = state;
@@ -400,7 +398,7 @@ impl Worker {
 
         trace!("Worker::sleep; worker={:?}", self);
 
-        let mut state: WorkerState = self.entry().state.load(Acquire).into();
+        let mut state: State = self.entry().state.load(Acquire).into();
 
         // The first part of the sleep process is to transition the worker state
         // to "pushed". Now, it may be that the worker is already pushed on the
@@ -573,11 +571,12 @@ impl Drop for Worker {
         trace!("shutting down thread; idx={}", self.id.idx);
 
         if self.should_finalize.get() {
-            // Drain all work
+            // Get all inbound work and push it onto the work queue. The work
+            // queue is drained in the next step.
             self.drain_inbound();
 
-            while let Some(_) = self.entry().deque.pop() {
-            }
+            // Drain the work queue
+            self.entry().drain_tasks();
 
             // TODO: Drain the work queue...
             self.inner.worker_terminated();

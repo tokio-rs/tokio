@@ -1,9 +1,8 @@
-use std::cmp;
 use std::fmt;
 
 /// Tracks worker state
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub(crate) struct WorkerState(usize);
+pub(crate) struct State(usize);
 
 /// Set when the worker is pushed onto the scheduler's stack of sleeping
 /// threads.
@@ -13,7 +12,7 @@ pub(crate) const PUSHED_MASK: usize = 0b001;
 const LIFECYCLE_MASK: usize = 0b1110;
 const LIFECYCLE_SHIFT: usize = 1;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 #[repr(usize)]
 pub(crate) enum Lifecycle {
     /// The worker does not currently have an associated thread.
@@ -34,7 +33,7 @@ pub(crate) enum Lifecycle {
     Signaled = 4 << LIFECYCLE_SHIFT,
 }
 
-impl WorkerState {
+impl State {
     /// Returns true if the worker entry is pushed in the sleeper stack
     pub fn is_pushed(&self) -> bool {
         self.0 & PUSHED_MASK == PUSHED_MASK
@@ -74,28 +73,28 @@ impl WorkerState {
     }
 }
 
-impl Default for WorkerState {
-    fn default() -> WorkerState {
+impl Default for State {
+    fn default() -> State {
         // All workers will start pushed in the sleeping stack
-        WorkerState(PUSHED_MASK)
+        State(PUSHED_MASK)
     }
 }
 
-impl From<usize> for WorkerState {
+impl From<usize> for State {
     fn from(src: usize) -> Self {
-        WorkerState(src)
+        State(src)
     }
 }
 
-impl From<WorkerState> for usize {
-    fn from(src: WorkerState) -> Self {
+impl From<State> for usize {
+    fn from(src: State) -> Self {
         src.0
     }
 }
 
-impl fmt::Debug for WorkerState {
+impl fmt::Debug for State {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("WorkerState")
+        fmt.debug_struct("worker::State")
             .field("lifecycle", &self.lifecycle())
             .field("is_pushed", &self.is_pushed())
             .finish()
@@ -124,16 +123,6 @@ impl From<Lifecycle> for usize {
         let v = src as usize;
         debug_assert!(v & LIFECYCLE_MASK == v);
         v
-    }
-}
-
-impl cmp::PartialOrd for Lifecycle {
-    #[inline]
-    fn partial_cmp(&self, other: &Lifecycle) -> Option<cmp::Ordering> {
-        let a: usize = (*self).into();
-        let b: usize = (*other).into();
-
-        a.partial_cmp(&b)
     }
 }
 
