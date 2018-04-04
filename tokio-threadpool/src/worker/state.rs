@@ -3,7 +3,7 @@ use std::fmt;
 
 /// Tracks worker state
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub(crate) struct WorkerState(usize);
+pub(crate) struct State(usize);
 
 /// Set when the worker is pushed onto the scheduler's stack of sleeping
 /// threads.
@@ -34,7 +34,7 @@ pub(crate) enum Lifecycle {
     Signaled = 4 << LIFECYCLE_SHIFT,
 }
 
-impl WorkerState {
+impl State {
     /// Returns true if the worker entry is pushed in the sleeper stack
     pub fn is_pushed(&self) -> bool {
         self.0 & PUSHED_MASK == PUSHED_MASK
@@ -74,28 +74,28 @@ impl WorkerState {
     }
 }
 
-impl Default for WorkerState {
-    fn default() -> WorkerState {
+impl Default for State {
+    fn default() -> State {
         // All workers will start pushed in the sleeping stack
-        WorkerState(PUSHED_MASK)
+        State(PUSHED_MASK)
     }
 }
 
-impl From<usize> for WorkerState {
+impl From<usize> for State {
     fn from(src: usize) -> Self {
-        WorkerState(src)
+        State(src)
     }
 }
 
-impl From<WorkerState> for usize {
-    fn from(src: WorkerState) -> Self {
+impl From<State> for usize {
+    fn from(src: State) -> Self {
         src.0
     }
 }
 
-impl fmt::Debug for WorkerState {
+impl fmt::Debug for State {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("WorkerState")
+        fmt.debug_struct("worker::State")
             .field("lifecycle", &self.lifecycle())
             .field("is_pushed", &self.is_pushed())
             .finish()

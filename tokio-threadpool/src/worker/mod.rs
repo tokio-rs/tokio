@@ -5,8 +5,7 @@ pub(crate) use self::entry::{
     WorkerEntry as Entry,
 };
 pub(crate) use self::state::{
-    // TODO: Rename `State`
-    WorkerState,
+    State,
     Lifecycle,
     PUSHED_MASK,
 };
@@ -202,7 +201,7 @@ impl Worker {
     fn check_run_state(&self, first: bool) -> bool {
         use self::Lifecycle::*;
 
-        let mut state: WorkerState = self.entry().state.load(Acquire).into();
+        let mut state: State = self.entry().state.load(Acquire).into();
 
         loop {
             let pool_state: pool::State = self.inner.state.load(Acquire).into();
@@ -400,7 +399,7 @@ impl Worker {
 
         trace!("Worker::sleep; worker={:?}", self);
 
-        let mut state: WorkerState = self.entry().state.load(Acquire).into();
+        let mut state: State = self.entry().state.load(Acquire).into();
 
         // The first part of the sleep process is to transition the worker state
         // to "pushed". Now, it may be that the worker is already pushed on the

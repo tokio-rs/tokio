@@ -1,5 +1,5 @@
 use config::MAX_WORKERS;
-use worker::{self, WorkerState, PUSHED_MASK};
+use worker::{self, PUSHED_MASK};
 
 use std::{fmt, usize};
 use std::sync::atomic::AtomicUsize;
@@ -73,7 +73,7 @@ impl SleepStack {
     pub fn push(&self, entries: &[worker::Entry], idx: usize) -> Result<(), ()> {
         let mut state: State = self.state.load(Acquire).into();
 
-        debug_assert!(WorkerState::from(entries[idx].state.load(Relaxed)).is_pushed());
+        debug_assert!(worker::State::from(entries[idx].state.load(Relaxed)).is_pushed());
 
         loop {
             let mut next = state;
@@ -114,7 +114,7 @@ impl SleepStack {
     pub fn pop(&self, entries: &[worker::Entry],
                   max_lifecycle: worker::Lifecycle,
                   terminate: bool)
-        -> Option<(usize, WorkerState)>
+        -> Option<(usize, worker::State)>
     {
         // Figure out the empty value
         let terminal = match terminate {
@@ -182,7 +182,7 @@ impl SleepStack {
                 debug_assert_eq!(1, PUSHED_MASK);
 
                 // Unset the PUSHED flag and get the current state.
-                let state: WorkerState = entries[head].state
+                let state: worker::State = entries[head].state
                     // TODO This should be fetch_and(!PUSHED_MASK)
                     .fetch_sub(PUSHED_MASK, Release).into();
 

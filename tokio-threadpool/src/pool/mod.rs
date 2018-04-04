@@ -12,7 +12,7 @@ use self::stack::SleepStack;
 use config::Config;
 use shutdown_task::ShutdownTask;
 use task::Task;
-use worker::{self, Worker, WorkerId, WorkerState};
+use worker::{self, Worker, WorkerId};
 
 use futures::task::AtomicTask;
 
@@ -162,7 +162,7 @@ impl Pool {
     }
 
     /// Signals to the worker that it should stop
-    fn signal_stop(&self, idx: usize, mut state: WorkerState) {
+    fn signal_stop(&self, idx: usize, mut state: worker::State) {
         use worker::Lifecycle::*;
 
         let worker = &self.workers[idx];
@@ -269,14 +269,14 @@ impl Pool {
 
         trace!("  -> submitting to random; idx={}", idx);
 
-        let state: WorkerState = self.workers[idx].state.load(Acquire).into();
+        let state: worker::State = self.workers[idx].state.load(Acquire).into();
         self.submit_to_external(idx, task, state, inner);
     }
 
     fn submit_to_external(&self,
                           idx: usize,
                           task: Task,
-                          state: WorkerState,
+                          state: worker::State,
                           inner: &Arc<Pool>)
     {
         let entry = &self.workers[idx];

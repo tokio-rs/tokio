@@ -1,6 +1,6 @@
 use park::{BoxPark, BoxUnpark};
 use task::{Task, Queue};
-use worker::WorkerState;
+use worker::State;
 
 use std::cell::UnsafeCell;
 use std::fmt;
@@ -39,7 +39,7 @@ impl WorkerEntry {
         let s = w.stealer();
 
         WorkerEntry {
-            state: AtomicUsize::new(WorkerState::default().into()),
+            state: AtomicUsize::new(State::default().into()),
             next_sleeper: UnsafeCell::new(0),
             deque: w,
             steal: s,
@@ -58,7 +58,7 @@ impl WorkerEntry {
     /// to the worker. Internal submissions go through another path.
     ///
     /// Returns `false` if the worker needs to be spawned.
-    pub fn submit_external(&self, task: Task, mut state: WorkerState) -> bool {
+    pub fn submit_external(&self, task: Task, mut state: State) -> bool {
         use worker::Lifecycle::*;
 
         // Push the task onto the external queue
