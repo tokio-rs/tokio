@@ -1,4 +1,4 @@
-use pool::{self, Pool, SHUTDOWN_NOW, MAX_FUTURES};
+use pool::{self, Pool, Lifecycle, MAX_FUTURES};
 use task::Task;
 
 use std::sync::Arc;
@@ -101,7 +101,7 @@ impl Sender {
                 return Err(SpawnError::at_capacity());
             }
 
-            if next.lifecycle() == SHUTDOWN_NOW {
+            if next.lifecycle() == Lifecycle::ShutdownNow {
                 // Cannot execute the future, executor is shutdown.
                 return Err(SpawnError::shutdown());
             }
@@ -151,7 +151,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
             return Err(SpawnError::at_capacity());
         }
 
-        if state.lifecycle() == SHUTDOWN_NOW {
+        if state.lifecycle() == Lifecycle::ShutdownNow {
             // Cannot execute the future, executor is shutdown.
             return Err(SpawnError::shutdown());
         }

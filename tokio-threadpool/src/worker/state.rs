@@ -1,4 +1,3 @@
-use std::cmp;
 use std::fmt;
 
 /// Tracks worker state
@@ -13,7 +12,7 @@ pub(crate) const PUSHED_MASK: usize = 0b001;
 const LIFECYCLE_MASK: usize = 0b1110;
 const LIFECYCLE_SHIFT: usize = 1;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 #[repr(usize)]
 pub(crate) enum Lifecycle {
     /// The worker does not currently have an associated thread.
@@ -124,16 +123,6 @@ impl From<Lifecycle> for usize {
         let v = src as usize;
         debug_assert!(v & LIFECYCLE_MASK == v);
         v
-    }
-}
-
-impl cmp::PartialOrd for Lifecycle {
-    #[inline]
-    fn partial_cmp(&self, other: &Lifecycle) -> Option<cmp::Ordering> {
-        let a: usize = (*self).into();
-        let b: usize = (*other).into();
-
-        a.partial_cmp(&b)
     }
 }
 

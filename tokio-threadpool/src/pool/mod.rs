@@ -3,8 +3,7 @@ mod stack;
 
 pub(crate) use self::state::{
     State,
-    SHUTDOWN_ON_IDLE,
-    SHUTDOWN_NOW,
+    Lifecycle,
     MAX_FUTURES,
 };
 use self::stack::SleepStack;
@@ -90,13 +89,13 @@ impl Pool {
         // For now, this must be true
         debug_assert!(!purge_queue || now);
 
-        // Start by setting the SHUTDOWN flag
+        // Start by setting the shutdown flag
         loop {
             let mut next = state;
 
             let num_futures = next.num_futures();
 
-            if next.lifecycle() >= SHUTDOWN_NOW {
+            if next.lifecycle() == Lifecycle::ShutdownNow {
                 // Already transitioned to shutting down state
 
                 if !purge_queue || num_futures == 0 {
@@ -110,9 +109,9 @@ impl Pool {
             } else {
                 next.set_lifecycle(if now || num_futures == 0 {
                     // If already idle, always transition to shutdown now.
-                    SHUTDOWN_NOW
+                    Lifecycle::ShutdownNow
                 } else {
-                    SHUTDOWN_ON_IDLE
+                    Lifecycle::ShutdownOnIdle
                 });
 
                 if purge_queue {

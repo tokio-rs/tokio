@@ -8,9 +8,18 @@ use std::{fmt, usize};
 #[derive(Eq, PartialEq, Clone, Copy)]
 pub(crate) struct State(usize);
 
-/// Flag used to track if the pool is running
-pub(crate) const SHUTDOWN_ON_IDLE: usize = 1;
-pub(crate) const SHUTDOWN_NOW: usize = 2;
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
+#[repr(usize)]
+pub(crate) enum Lifecycle {
+    /// The thread pool is currently running
+    Running = 0,
+
+    /// The thread pool should shutdown once it reaches an idle state.
+    ShutdownOnIdle = 1,
+
+    /// The thread pool should start the process of shutting down.
+    ShutdownNow = 2,
+}
 
 /// Mask used to extract the number of futures from the state
 const LIFECYCLE_MASK: usize = 0b11;
@@ -19,6 +28,8 @@ const NUM_FUTURES_OFFSET: usize = 2;
 
 /// Max number of futures the pool can handle.
 pub(crate) const MAX_FUTURES: usize = usize::MAX >> NUM_FUTURES_OFFSET;
+
+// ===== impl State =====
 
 impl State {
     #[inline]
@@ -36,7 +47,7 @@ impl State {
     /// Returns false on failure.
     pub fn inc_num_futures(&mut self) {
         debug_assert!(self.num_futures() < MAX_FUTURES);
-        debug_assert!(self.lifecycle() < SHUTDOWN_NOW);
+        debug_assert!(self.lifecycle() < Lifecycle::ShutdownNow);
 
         self.0 += 1 << NUM_FUTURES_OFFSET;
     }
@@ -52,8 +63,8 @@ impl State {
 
         self.0 -= 1 << NUM_FUTURES_OFFSET;
 
-        if self.lifecycle() == SHUTDOWN_ON_IDLE && num_futures == 1 {
-            self.0 = SHUTDOWN_NOW;
+        if self.lifecycle() == Lifecycle::ShutdownOnIdle && num_futures == 1 {
+            self.set_lifecycle(Lifecycle::ShutdownNow);
         }
     }
 
@@ -62,16 +73,17 @@ impl State {
         self.0 = self.0 & LIFECYCLE_MASK;
     }
 
-    pub fn lifecycle(&self) -> usize {
-        self.0 & LIFECYCLE_MASK
+    pub fn lifecycle(&self) -> Lifecycle {
+        (self.0 & LIFECYCLE_MASK).into()
     }
 
-    pub fn set_lifecycle(&mut self, val: usize) {
-        self.0 = (self.0 & NUM_FUTURES_MASK) | val;
+    pub fn set_lifecycle(&mut self, val: Lifecycle) {
+        self.0 = (self.0 & NUM_FUTURES_MASK) | (val as usize);
     }
 
     pub fn is_terminated(&self) -> bool {
-        self.lifecycle() == SHUTDOWN_NOW && self.num_futures() == 0
+        self.lifecycle() == Lifecycle::ShutdownNow &&
+            self.num_futures() == 0
     }
 }
 
@@ -89,9 +101,32 @@ impl From<State> for usize {
 
 impl fmt::Debug for State {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("State")
+        fmt.debug_struct("pool::State")
             .field("lifecycle", &self.lifecycle())
             .field("num_futures", &self.num_futures())
             .finish()
+    }
+}
+
+// ===== impl Lifecycle =====
+
+impl From<usize> for Lifecycle {
+    fn from(src: usize) -> Lifecycle {
+        use self::Lifecycle::*;
+
+        debug_assert!(
+            src == Running as usize ||
+            src == ShutdownOnIdle as usize ||
+            src == ShutdownNow as usize);
+
+        unsafe { ::std::mem::transmute(src) }
+    }
+}
+
+impl From<Lifecycle> for usize {
+    fn from(src: Lifecycle) -> usize {
+        let v = src as usize;
+        debug_assert!(v & LIFECYCLE_MASK == v);
+        v
     }
 }
