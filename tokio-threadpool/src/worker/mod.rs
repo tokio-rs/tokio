@@ -11,7 +11,7 @@ pub(crate) use self::state::{
     PUSHED_MASK,
 };
 
-use pool::{Pool, PoolState};
+use pool::{self, Pool};
 use notifier::Notifier;
 use sender::Sender;
 use task::Task;
@@ -205,7 +205,7 @@ impl Worker {
         let mut state: WorkerState = self.entry().state.load(Acquire).into();
 
         loop {
-            let pool_state: PoolState = self.inner.state.load(Acquire).into();
+            let pool_state: pool::State = self.inner.state.load(Acquire).into();
 
             if pool_state.is_terminated() {
                 return false;
@@ -320,7 +320,7 @@ impl Worker {
                 self.entry().push_internal(task);
             }
             Complete => {
-                let mut state: PoolState = self.inner.state.load(Acquire).into();
+                let mut state: pool::State = self.inner.state.load(Acquire).into();
 
                 loop {
                     let mut next = state;

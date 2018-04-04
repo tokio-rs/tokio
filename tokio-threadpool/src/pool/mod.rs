@@ -2,8 +2,7 @@ mod state;
 mod stack;
 
 pub(crate) use self::state::{
-    // TODO: Rename `State`
-    PoolState,
+    State,
     SHUTDOWN_ON_IDLE,
     SHUTDOWN_NOW,
     MAX_FUTURES,
@@ -60,7 +59,7 @@ impl Pool {
         let pool_size = workers.len();
 
         let ret = Pool {
-            state: AtomicUsize::new(PoolState::new().into()),
+            state: AtomicUsize::new(State::new().into()),
             sleep_stack: SleepStack::new(),
             num_workers: AtomicUsize::new(pool_size),
             next_thread_id: AtomicUsize::new(0),
@@ -84,7 +83,7 @@ impl Pool {
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
-        let mut state: PoolState = self.state.load(Acquire).into();
+        let mut state: State = self.state.load(Acquire).into();
 
         trace!("shutdown; state={:?}", state);
 
