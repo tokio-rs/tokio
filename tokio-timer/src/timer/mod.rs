@@ -32,6 +32,7 @@ mod handle;
 mod level;
 mod now;
 mod registration;
+mod mock;
 
 use self::entry::Entry;
 use self::level::{Level, Expiration};
