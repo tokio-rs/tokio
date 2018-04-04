@@ -12,7 +12,7 @@ use std::{fmt, usize};
 /// - EMPTY: No sleepers
 /// - TERMINATED: Don't spawn more threads
 #[derive(Eq, PartialEq, Clone, Copy)]
-pub(crate) struct SleepStack(usize);
+pub(crate) struct StackState(usize);
 
 /// Extracts the head of the worker stack from the scheduler state
 const STACK_MASK: usize = ((1 << 16) - 1);
@@ -32,10 +32,10 @@ const ABA_GUARD_MASK: usize = (1 << (64 - ABA_GUARD_SHIFT)) - 1;
 #[cfg(target_pointer_width = "32")]
 const ABA_GUARD_MASK: usize = (1 << (32 - ABA_GUARD_SHIFT)) - 1;
 
-impl SleepStack {
+impl StackState {
     #[inline]
-    pub fn new() -> SleepStack {
-        SleepStack(EMPTY)
+    pub fn new() -> StackState {
+        StackState(EMPTY)
     }
 
     #[inline]
@@ -52,23 +52,23 @@ impl SleepStack {
     }
 }
 
-impl From<usize> for SleepStack {
+impl From<usize> for StackState {
     fn from(src: usize) -> Self {
-        SleepStack(src)
+        StackState(src)
     }
 }
 
-impl From<SleepStack> for usize {
-    fn from(src: SleepStack) -> Self {
+impl From<StackState> for usize {
+    fn from(src: StackState) -> Self {
         src.0
     }
 }
 
-impl fmt::Debug for SleepStack {
+impl fmt::Debug for StackState {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let head = self.head();
 
-        let mut fmt = fmt.debug_struct("SleepStack");
+        let mut fmt = fmt.debug_struct("StackState");
 
         if head < MAX_WORKERS {
             fmt.field("head", &head);

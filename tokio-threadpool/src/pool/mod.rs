@@ -10,7 +10,7 @@ pub(crate) use self::state::{
 
 use config::{Config, MAX_WORKERS};
 use sleep_stack::{
-    SleepStack,
+    StackState,
     EMPTY,
     TERMINATED,
 };
@@ -64,7 +64,7 @@ impl Pool {
 
         let ret = Pool {
             state: AtomicUsize::new(PoolState::new().into()),
-            sleep_stack: AtomicUsize::new(SleepStack::new().into()),
+            sleep_stack: AtomicUsize::new(StackState::new().into()),
             num_workers: AtomicUsize::new(pool_size),
             next_thread_id: AtomicUsize::new(0),
             workers,
@@ -336,7 +336,7 @@ impl Pool {
     ///
     /// Returns `Err` if the pool has been terminated
     pub fn push_sleeper(&self, idx: usize) -> Result<(), ()> {
-        let mut state: SleepStack = self.sleep_stack.load(Acquire).into();
+        let mut state: StackState = self.sleep_stack.load(Acquire).into();
 
         debug_assert!(WorkerState::from(self.workers[idx].state.load(Relaxed)).is_pushed());
 
@@ -370,7 +370,7 @@ impl Pool {
     {
         debug_assert!(terminal == EMPTY || terminal == TERMINATED);
 
-        let mut state: SleepStack = self.sleep_stack.load(Acquire).into();
+        let mut state: StackState = self.sleep_stack.load(Acquire).into();
 
         loop {
             let head = state.head();
