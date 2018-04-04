@@ -3,3 +3,4 @@
 # TSAN does not understand fences and `Arc::drop` is implemented using a fence.
 # This causes many false positives.
 race:Arc*drop
+race:arc*Weak*drop
