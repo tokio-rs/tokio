@@ -27,7 +27,6 @@ mod pool;
 mod sender;
 mod shutdown;
 mod shutdown_task;
-mod sleep_stack;
 mod task;
 mod thread_pool;
 mod worker;
