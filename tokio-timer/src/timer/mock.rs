@@ -3,6 +3,7 @@
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use timer::Now;
 use tokio_executor::park::{Park, Unpark};
 
 #[derive(Debug, Clone)]
@@ -13,13 +14,16 @@ impl Clock {
         Clock(Arc::new(Mutex::new(Instant::now())))
     }
 
-    pub fn sleep(&self, duration: Duration) {
+    pub fn advance(&self, duration: Duration) {
         let mut time = self.0.lock().expect("Clock's mutex was poisoned");
         *time += duration;
+        // println!("Advancing {:?} to {:?}", duration, *time);
     }
 
     pub fn now(&self) -> Instant {
-        self.0.lock().expect("Clock's mutex was poisoned").clone()
+        let n = self.0.lock().expect("Clock's mutex was poisoned").clone();
+        // println!("Fetching current time {:?}", n);
+        n
     }
 }
 
@@ -43,17 +47,31 @@ impl Park for NopPark {
     type Error = ();
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.0.sleep(Duration::new(0, PARK_DELAY));
-        Ok(())
+        self.park_timeout(Duration::new(0, PARK_DELAY))
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.0.sleep(duration);
+        self.0.advance(duration);
         Ok(())
     }
 
     fn unpark(&self) -> Self::Unpark {
         NopUnpark
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MockNow(Clock);
+
+impl MockNow {
+    pub(crate) fn new(clock: Clock) -> MockNow {
+        MockNow(clock.clone())
+    }
+}
+
+impl Now for MockNow {
+    fn now(&mut self) -> Instant {
+        self.0.now()
     }
 }
 
@@ -64,6 +82,7 @@ pub struct NopUnpark;
 impl Unpark for NopUnpark {
     fn unpark(&self) {
         // a NopPark will never block, so there's no unparking to be done.
+        // println!("Unparked");
     }
 }
 
@@ -79,7 +98,7 @@ mod tests {
         let dur = Duration::new(1, 0);
         let should_be = start + dur;
 
-        c.sleep(dur);
+        c.advance(dur);
         let got = c.now();
         assert_eq!(got, should_be);
     }
