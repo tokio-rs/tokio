@@ -4,6 +4,7 @@ use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::fmt;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 
@@ -21,10 +22,10 @@ pub(crate) struct WorkerEntry {
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    deque: deque::Deque<Task>,
+    deque: deque::Deque<Arc<Task>>,
 
     // Stealer half of deque
-    steal: deque::Stealer<Task>,
+    steal: deque::Stealer<Arc<Task>>,
 
     // Thread parker
     pub park: UnsafeCell<BoxPark>,
@@ -77,7 +78,7 @@ impl WorkerEntry {
     /// Submit a task to this worker while currently on the same thread that is
     /// running the worker.
     #[inline]
-    pub fn submit_internal(&self, task: Task) {
+    pub fn submit_internal(&self, task: Arc<Task>) {
         self.push_internal(task);
     }
 
@@ -89,7 +90,7 @@ impl WorkerEntry {
     /// # Ordering
     ///
     /// The `state` must have been obtained with an `Acquire` ordering.
-    pub fn submit_external(&self, task: Task, mut state: State) -> bool {
+    pub fn submit_external(&self, task: Arc<Task>, mut state: State) -> bool {
         use worker::Lifecycle::*;
 
         // Push the task onto the external queue
@@ -186,7 +187,7 @@ impl WorkerEntry {
     ///
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
-    pub fn pop_task(&self) -> deque::Steal<Task> {
+    pub fn pop_task(&self) -> deque::Steal<Arc<Task>> {
         self.deque.steal()
     }
 
@@ -194,7 +195,7 @@ impl WorkerEntry {
     ///
     /// This is called by *other* workers to steal a task for processing. This
     /// function is `Sync`.
-    pub fn steal_task(&self) -> deque::Steal<Task> {
+    pub fn steal_task(&self) -> deque::Steal<Arc<Task>> {
         self.steal.steal()
     }
 
@@ -207,12 +208,12 @@ impl WorkerEntry {
     }
 
     #[inline]
-    fn push_external(&self, task: Task) {
+    fn push_external(&self, task: Arc<Task>) {
         self.inbound.push(task);
     }
 
     #[inline]
-    pub fn push_internal(&self, task: Task) {
+    pub fn push_internal(&self, task: Arc<Task>) {
         self.deque.push(task);
     }
 

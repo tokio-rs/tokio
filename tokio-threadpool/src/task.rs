@@ -1,34 +1,56 @@
 use notifier::Notifier;
 use sender::Sender;
 
-use futures::{self, future, Future, Async};
+use futures::{self, Future, Async};
 use futures::executor::{self, Spawn};
 
-use std::{fmt, mem, panic, ptr};
-use std::cell::Cell;
+use std::{fmt, panic, ptr};
+use std::cell::{UnsafeCell};
 use std::sync::Arc;
-use std::sync::atomic::{self, AtomicUsize, AtomicPtr};
+use std::sync::atomic::{AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
 
+/// Harness around a future.
+///
+/// This also behaves as a node in the inbound work queue and the blocking
+/// queue.
 pub(crate) struct Task {
-    ptr: *mut Inner,
+    /// Task state
+    state: AtomicUsize,
+
+    /// Next pointer in the queue that submits tasks to a worker.
+    next: AtomicPtr<Task>,
+
+    /// Store the future at the head of the struct
+    ///
+    /// The future is dropped immediately when it transitions to Complete
+    future: UnsafeCell<Option<TaskFuture>>,
 }
 
+// TODO: Move this into other file
 #[derive(Debug)]
 pub(crate) struct Queue {
-    head: AtomicPtr<Inner>,
-    tail: Cell<*mut Inner>,
-    stub: Box<Inner>,
+    /// Queue head.
+    ///
+    /// This is a strong reference to `Task` (i.e, `Arc<Task>`)
+    head: AtomicPtr<Task>,
+
+    /// Tail pointer. This is `Arc<Task>`.
+    tail: UnsafeCell<*mut Task>,
+
+    /// Stub pointer, used as part of the intrusive mpsc channel algorithm
+    /// described by 1024cores.
+    stub: Box<Task>,
 }
 
 #[derive(Debug)]
 pub(crate) enum Poll {
     Empty,
     Inconsistent,
-    Data(Task),
+    Data(Arc<Task>),
 }
 
 #[derive(Debug)]
@@ -54,61 +76,64 @@ enum TaskFuture {
     }
 }
 
-struct Inner {
-    // Next pointer in the queue that submits tasks to a worker.
-    next: AtomicPtr<Inner>,
-
-    // Task state
-    state: AtomicUsize,
-
-    // Number of outstanding references to the task
-    ref_count: AtomicUsize,
-
-    // Store the future at the head of the struct
-    //
-    // The future is dropped immediately when it transitions to Complete
-    future: Option<TaskFuture>,
-}
-
+// TODO: use repr(usize)
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum State {
     /// Task is currently idle
     Idle,
+
     /// Task is currently running
     Running,
+
     /// Task is currently running, but has been notified that it must run again.
     Notified,
+
     /// Task has been scheduled
     Scheduled,
+
     /// Task is complete
     Complete,
 }
 
 // ===== impl Task =====
 
+/*
 impl Task {
-    /// Create a new task handle
-    pub fn new(future: BoxFuture) -> Task {
-        let task_fut = TaskFuture::Futures1(executor::spawn(future));
-        let inner = Box::new(Inner {
-            next: AtomicPtr::new(ptr::null_mut()),
-            state: AtomicUsize::new(State::new().into()),
-            ref_count: AtomicUsize::new(1),
-            future: Some(task_fut),
-        });
-
-        Task { ptr: Box::into_raw(inner) }
+    /// Transmute a u64 to a Task
+    pub unsafe fn from_notify_id(unpark_id: usize) -> Arc<Task> {
+        mem::transmute(unpark_id)
     }
 
-    /// Create a new task handle for a futures 0.2 future
+    /// Transmute a u64 to a task ref
+    pub unsafe fn from_notify_id_ref<'a>(unpark_id: &'a usize) -> &'a Task {
+        mem::transmute(unpark_id)
+    }
+}
+*/
+
+// ===== impl Task =====
+
+impl Task {
+    /// Create a new `Task` as a harness for `future`.
+    pub fn new(future: BoxFuture) -> Task {
+        // Wrap the future with an execution context.
+        let task_fut = TaskFuture::Futures1(executor::spawn(future));
+
+        Task {
+            state: AtomicUsize::new(State::new().into()),
+            next: AtomicPtr::new(ptr::null_mut()),
+            future: UnsafeCell::new(Some(task_fut)),
+        }
+    }
+
+    /// Create a new `Task` as a harness for a futures 0.2 `future`.
     #[cfg(feature = "unstable-futures")]
     pub fn new2<F>(fut: BoxFuture2, make_waker: F) -> Task
-        where F: FnOnce(usize) -> futures2::task::Waker
+    where F: FnOnce(usize) -> futures2::task::Waker
     {
-        let mut inner = Box::new(Inner {
+        let mut inner = Box::new(Task {
             next: AtomicPtr::new(ptr::null_mut()),
             state: AtomicUsize::new(State::new().into()),
-            ref_count: AtomicUsize::new(1),
             future: None,
         });
 
@@ -119,14 +144,17 @@ impl Task {
         Task { ptr: Box::into_raw(inner) }
     }
 
-    /// Transmute a u64 to a Task
-    pub unsafe fn from_notify_id(unpark_id: usize) -> Task {
-        mem::transmute(unpark_id)
-    }
+    /// Create a fake `Task` to be used as part of the intrusive mpsc channel
+    /// algorithm.
+    fn stub() -> Task {
+        let future = Box::new(futures::empty());
+        let task_fut = TaskFuture::Futures1(executor::spawn(future));
 
-    /// Transmute a u64 to a task ref
-    pub unsafe fn from_notify_id_ref<'a>(unpark_id: &'a usize) -> &'a Task {
-        mem::transmute(unpark_id)
+        Task {
+            next: AtomicPtr::new(ptr::null_mut()),
+            state: AtomicUsize::new(State::stub().into()),
+            future: UnsafeCell::new(Some(task_fut)),
+        }
     }
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
@@ -136,7 +164,7 @@ impl Task {
 
         // Transition task to running state. At this point, the task must be
         // scheduled.
-        let actual: State = self.inner().state.compare_and_swap(
+        let actual: State = self.state.compare_and_swap(
             Scheduled.into(), Running.into(), AcqRel).into();
 
         trace!("running; state={:?}", actual);
@@ -146,9 +174,11 @@ impl Task {
             _ => panic!("unexpected task state; {:?}", actual),
         }
 
-        trace!("Task::run; state={:?}", State::from(self.inner().state.load(Relaxed)));
+        trace!("Task::run; state={:?}", State::from(self.state.load(Relaxed)));
 
-        let fut = &mut self.inner_mut().future;
+        // The transition to `Running` done above ensures that a lock on the
+        // future has been obtained.
+        let fut = unsafe { &mut (*self.future.get()) };
 
         // This block deals with the future panicking while being polled.
         //
@@ -170,7 +200,7 @@ impl Task {
             let mut g = Guard(fut, true);
 
             let ret = g.0.as_mut().unwrap()
-                .poll(unpark, self.ptr as usize, exec);
+                .poll(unpark, self as *const _ as usize, exec);
 
 
             g.1 = false;
@@ -182,11 +212,15 @@ impl Task {
             Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
                 trace!("    -> task complete");
 
-                // Drop the future
-                self.inner_mut().drop_future();
+                // The future has completed. Drop it immediately to free
+                // resources and run drop handlers.
+                //
+                // The `Task` harness will stay around longer if it is contained
+                // by any of the various queues.
+                self.drop_future();
 
                 // Transition to the completed state
-                self.inner().state.store(State::Complete.into(), Release);
+                self.state.store(State::Complete.into(), Release);
 
                 Run::Complete
             }
@@ -198,13 +232,13 @@ impl Task {
                 // fails, then the task has been unparked concurrent to running,
                 // in which case it transitions immediately back to scheduled
                 // and we return `true`.
-                let prev: State = self.inner().state.compare_and_swap(
+                let prev: State = self.state.compare_and_swap(
                     Running.into(), Idle.into(), AcqRel).into();
 
                 match prev {
                     Running => Run::Idle,
                     Notified => {
-                        self.inner().state.store(Scheduled.into(), Release);
+                        self.state.store(Scheduled.into(), Release);
                         Run::Schedule
                     }
                     _ => unreachable!(),
@@ -220,7 +254,8 @@ impl Task {
         use self::State::*;
 
         loop {
-            let actual = self.inner().state.compare_and_swap(
+            // Scheduling can only be done from the `Idle` state.
+            let actual = self.state.compare_and_swap(
                 Idle.into(),
                 Scheduled.into(),
                 AcqRel).into();
@@ -228,7 +263,10 @@ impl Task {
             match actual {
                 Idle => return true,
                 Running => {
-                    let actual = self.inner().state.compare_and_swap(
+                    // The task is already running on another thread. Transition
+                    // the state to `Notified`. If this CAS fails, then restart
+                    // the logic again from `Idle`.
+                    let actual = self.state.compare_and_swap(
                         Running.into(), Notified.into(), AcqRel).into();
 
                     match actual {
@@ -241,126 +279,20 @@ impl Task {
         }
     }
 
-    #[inline]
-    fn inner(&self) -> &Inner {
-        unsafe { &*self.ptr }
-    }
-
-    #[inline]
-    fn inner_mut(&self) -> &mut Inner {
-        unsafe { &mut *self.ptr }
+    /// Drop the future
+    ///
+    /// This must only be called by the thread that successfully transitioned
+    /// the future state to `Running`.
+    fn drop_future(&self) {
+        let _ = unsafe { (*self.future.get()).take() };
     }
 }
 
 impl fmt::Debug for Task {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Task")
-            .field("inner", self.inner())
-            .finish()
-    }
-}
-
-impl Clone for Task {
-    fn clone(&self) -> Task {
-        use std::isize;
-
-        const MAX_REFCOUNT: usize = (isize::MAX) as usize;
-        // Using a relaxed ordering is alright here, as knowledge of the
-        // original reference prevents other threads from erroneously deleting
-        // the object.
-        //
-        // As explained in the [Boost documentation][1], Increasing the
-        // reference counter can always be done with memory_order_relaxed: New
-        // references to an object can only be formed from an existing
-        // reference, and passing an existing reference from one thread to
-        // another must already provide any required synchronization.
-        //
-        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        let old_size = self.inner().ref_count.fetch_add(1, Relaxed);
-
-        // However we need to guard against massive refcounts in case someone
-        // is `mem::forget`ing Arcs. If we don't do this the count can overflow
-        // and users will use-after free. We racily saturate to `isize::MAX` on
-        // the assumption that there aren't ~2 billion threads incrementing
-        // the reference count at once. This branch will never be taken in
-        // any realistic program.
-        //
-        // We abort because such a program is incredibly degenerate, and we
-        // don't care to support it.
-        if old_size > MAX_REFCOUNT {
-            // TODO: abort
-            panic!();
-        }
-
-        Task { ptr: self.ptr }
-    }
-}
-
-impl Drop for Task {
-    fn drop(&mut self) {
-        // Because `fetch_sub` is already atomic, we do not need to synchronize
-        // with other threads unless we are going to delete the object. This
-        // same logic applies to the below `fetch_sub` to the `weak` count.
-        if self.inner().ref_count.fetch_sub(1, Release) != 1 {
-            return;
-        }
-
-        // This fence is needed to prevent reordering of use of the data and
-        // deletion of the data.  Because it is marked `Release`, the decreasing
-        // of the reference count synchronizes with this `Acquire` fence. This
-        // means that use of the data happens before decreasing the reference
-        // count, which happens before this fence, which happens before the
-        // deletion of the data.
-        //
-        // As explained in the [Boost documentation][1],
-        //
-        // > It is important to enforce any possible access to the object in one
-        // > thread (through an existing reference) to *happen before* deleting
-        // > the object in a different thread. This is achieved by a "release"
-        // > operation after dropping a reference (any access to the object
-        // > through this reference must obviously happened before), and an
-        // > "acquire" operation before deleting the object.
-        //
-        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        atomic::fence(Acquire);
-
-        unsafe {
-            let _ = Box::from_raw(self.ptr);
-        }
-    }
-}
-
-unsafe impl Send for Task {}
-
-// ===== impl Inner =====
-
-impl Inner {
-    fn stub() -> Inner {
-        Inner {
-            next: AtomicPtr::new(ptr::null_mut()),
-            state: AtomicUsize::new(State::stub().into()),
-            ref_count: AtomicUsize::new(0),
-            future: Some(TaskFuture::Futures1(executor::spawn(Box::new(future::empty())))),
-        }
-    }
-
-    fn drop_future(&mut self) {
-        let _ = self.future.take();
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        self.drop_future();
-    }
-}
-
-impl fmt::Debug for Inner {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Inner")
             .field("next", &self.next)
             .field("state", &self.state)
-            .field("ref_count", &self.ref_count)
             .field("future", &"Spawn<BoxFuture>")
             .finish()
     }
@@ -369,44 +301,51 @@ impl fmt::Debug for Inner {
 // ===== impl Queue =====
 
 impl Queue {
+    /// Create a new, empty, `Queue`.
     pub fn new() -> Queue {
-        let stub = Box::new(Inner::stub());
+        let stub = Box::new(Task::stub());
         let ptr = &*stub as *const _ as *mut _;
 
         Queue {
             head: AtomicPtr::new(ptr),
-            tail: Cell::new(ptr),
+            tail: UnsafeCell::new(ptr),
             stub: stub,
         }
     }
 
-    pub fn push(&self, handle: Task) {
+    /// Push a task onto the queue.
+    ///
+    /// This function is `Sync`.
+    pub fn push(&self, task: Arc<Task>) {
         unsafe {
-            self.push2(handle.ptr);
-
-            // Forgetting the handle is necessary to avoid the ref dec
-            mem::forget(handle);
+            self.push2(Arc::into_raw(task));
         }
     }
 
-    unsafe fn push2(&self, handle: *mut Inner) {
+    unsafe fn push2(&self, task: *const Task) {
+        let task = task as *mut Task;
+
         // Set the next pointer. This does not require an atomic operation as
         // this node is not accessible. The write will be flushed with the next
         // operation
-        (*handle).next = AtomicPtr::new(ptr::null_mut());
+        (*task).next.store(ptr::null_mut(), Relaxed);
 
         // Update the head to point to the new node. We need to see the previous
-        // node in order to update the next pointer as well as release `handle`
+        // node in order to update the next pointer as well as release `task`
         // to any other threads calling `push`.
-        let prev = self.head.swap(handle, AcqRel);
+        let prev = self.head.swap(task, AcqRel);
 
-        // Release `handle` to the consume end.
-        (*prev).next.store(handle, Release);
+        // Release `task` to the consume end.
+        (*prev).next.store(task, Release);
     }
 
+    /// Poll a task from the queue.
+    ///
+    /// This function is **not** `Sync` and requires coordination by the caller.
     pub unsafe fn poll(&self) -> Poll {
-        let mut tail = self.tail.get();
+        let mut tail = *self.tail.get();
         let mut next = (*tail).next.load(Acquire);
+
         let stub = &*self.stub as *const _ as *mut _;
 
         if tail == stub {
@@ -414,19 +353,17 @@ impl Queue {
                 return Poll::Empty;
             }
 
-            self.tail.set(next);
+            *self.tail.get() = next;
             tail = next;
             next = (*next).next.load(Acquire);
         }
 
         if !next.is_null() {
-            self.tail.set(next);
+            *self.tail.get() = next;
 
             // No ref_count inc is necessary here as this poll is paired
             // with a `push` which "forgets" the handle.
-            return Poll::Data(Task {
-                ptr: tail,
-            });
+            return Poll::Data(Arc::from_raw(tail));
         }
 
         if self.head.load(Acquire) != tail {
@@ -438,10 +375,9 @@ impl Queue {
         next = (*tail).next.load(Acquire);
 
         if !next.is_null() {
-            self.tail.set(next);
-            return Poll::Data(Task {
-                ptr: tail,
-            });
+            *self.tail.get() = next;
+
+            return Poll::Data(Arc::from_raw(tail));
         }
 
         Poll::Inconsistent

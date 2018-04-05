@@ -2,7 +2,7 @@ use pool::Pool;
 use task::Task;
 
 use std::mem;
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 use futures::executor::Notify;
 
@@ -19,29 +19,36 @@ impl Notify for Notifier {
     fn notify(&self, id: usize) {
         trace!("Notifier::notify; id=0x{:x}", id);
 
-        let id = id as usize;
-        let task = unsafe { Task::from_notify_id_ref(&id) };
+        unsafe {
+            let ptr = id as *const Task;
+            let task = Arc::from_raw(ptr);
 
-        if !task.schedule() {
-            trace!("    -> task already scheduled");
-            // task is already scheduled, there is nothing more to do
-            return;
-        }
+            if task.schedule() {
+                // TODO: Check if the pool is still running
+                //
+                // Bump the ref count
+                let task = task.clone();
 
-        // TODO: Check if the pool is still running
+                if let Some(inner) = self.inner.upgrade() {
+                    let _ = inner.submit(task, &inner);
+                }
+            }
 
-        // Bump the ref count
-        let task = task.clone();
-
-        if let Some(inner) = self.inner.upgrade() {
-            let _ = inner.submit(task, &inner);
+            // We did not actually take ownership of the `Arc` in this function.
+            mem::forget(task);
         }
     }
 
     fn clone_id(&self, id: usize) -> usize {
         unsafe {
-            let handle = Task::from_notify_id_ref(&id);
-            mem::forget(handle.clone());
+            let ptr = id as *const Task;
+
+            let t1 = Arc::from_raw(ptr);
+            let t2 = t1.clone();
+
+            // Forget both handles as we don't want any ref decs
+            mem::forget(t1);
+            mem::forget(t2);
         }
 
         id
@@ -49,7 +56,8 @@ impl Notify for Notifier {
 
     fn drop_id(&self, id: usize) {
         unsafe {
-            let _ = Task::from_notify_id(id);
+            let ptr = id as *const Task;
+            let _ = Arc::from_raw(ptr);
         }
     }
 }

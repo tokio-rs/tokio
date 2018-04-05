@@ -309,7 +309,7 @@ impl Worker {
         found_work
     }
 
-    fn run_task(&self, task: Task, notify: &Arc<Notifier>, sender: &mut Sender) {
+    fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>, sender: &mut Sender) {
         use task::Run::*;
 
         match task.run(notify, sender) {

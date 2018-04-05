@@ -181,7 +181,7 @@ impl Pool {
     ///
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
-    pub fn submit(&self, task: Task, inner: &Arc<Pool>) {
+    pub fn submit(&self, task: Arc<Task>, inner: &Arc<Pool>) {
         Worker::with_current(|worker| {
             match worker {
                 Some(worker) => {
@@ -203,7 +203,7 @@ impl Pool {
     ///
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
-    fn submit_external(&self, task: Task, inner: &Arc<Pool>) {
+    fn submit_external(&self, task: Arc<Task>, inner: &Arc<Pool>) {
         use worker::Lifecycle::Notified;
 
         // First try to get a handle to a sleeping worker. This ensures that
@@ -227,7 +227,7 @@ impl Pool {
 
     fn submit_to_external(&self,
                           idx: usize,
-                          task: Task,
+                          task: Arc<Task>,
                           state: worker::State,
                           inner: &Arc<Pool>)
     {
