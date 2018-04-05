@@ -168,7 +168,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         // execution.
 
         // Create a new task for the future
-        let task = Task::new(future);
+        let task = Arc::new(Task::new(future));
 
         self.inner.submit(task, &self.inner);
 
