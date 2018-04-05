@@ -1,8 +1,6 @@
 use pool::Pool;
 use sender::Sender;
 
-use std::sync::atomic::Ordering::{Acquire};
-
 use futures::{Future, Poll, Async};
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -35,11 +33,10 @@ impl Future for Shutdown {
 
     fn poll(&mut self) -> Poll<(), ()> {
         use futures::task;
-        trace!("Shutdown::poll");
 
         self.inner().shutdown_task.task1.register_task(task::current());
 
-        if 0 != self.inner().num_workers.load(Acquire) {
+        if !self.inner().is_shutdown() {
             return Ok(Async::NotReady);
         }
 

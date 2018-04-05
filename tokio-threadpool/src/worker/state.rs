@@ -18,7 +18,7 @@ pub(crate) enum Lifecycle {
     /// The worker does not currently have an associated thread.
     Shutdown = 0 << LIFECYCLE_SHIFT,
 
-    /// The worker is currently processing its task.
+    /// The worker is doing work
     Running = 1 << LIFECYCLE_SHIFT,
 
     /// The worker is currently asleep in the condvar

@@ -4,3 +4,4 @@
 # This causes many false positives.
 race:Arc*drop
 race:arc*Weak*drop
+race:crossbeam_deque

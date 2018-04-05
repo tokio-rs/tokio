@@ -1,10 +1,15 @@
+mod blocking;
+mod blocking_state;
 mod queue;
 mod state;
 
+pub(crate) use self::blocking::{Blocking, CanBlock};
 pub(crate) use self::queue::{Queue, Poll};
+use self::blocking_state::BlockingState;
 use self::state::State;
 
 use notifier::Notifier;
+use pool::Pool;
 use sender::Sender;
 
 use futures::{self, Future, Async};
@@ -24,11 +29,17 @@ use futures2;
 /// This also behaves as a node in the inbound work queue and the blocking
 /// queue.
 pub(crate) struct Task {
-    /// Task state
+    /// Task lifecycle state
     state: AtomicUsize,
+
+    /// Task blocking related state
+    blocking: AtomicUsize,
 
     /// Next pointer in the queue that submits tasks to a worker.
     next: AtomicPtr<Task>,
+
+    /// Next pointer in the queue of tasks pending blocking capacity.
+    next_blocking: AtomicPtr<Task>,
 
     /// Store the future at the head of the struct
     ///
@@ -69,7 +80,9 @@ impl Task {
 
         Task {
             state: AtomicUsize::new(State::new().into()),
+            blocking: AtomicUsize::new(BlockingState::new().into()),
             next: AtomicPtr::new(ptr::null_mut()),
+            next_blocking: AtomicPtr::new(ptr::null_mut()),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -80,8 +93,10 @@ impl Task {
     where F: FnOnce(usize) -> futures2::task::Waker
     {
         let mut inner = Box::new(Task {
-            next: AtomicPtr::new(ptr::null_mut()),
             state: AtomicUsize::new(State::new().into()),
+            blocking: AtomicUsize::new(BlockingState::new().into()),
+            next: AtomicPtr::new(ptr::null_mut()),
+            next_blocking: AtomicPtr::new(ptr::null_mut()),
             future: None,
         });
 
@@ -99,8 +114,10 @@ impl Task {
         let task_fut = TaskFuture::Futures1(executor::spawn(future));
 
         Task {
-            next: AtomicPtr::new(ptr::null_mut()),
             state: AtomicUsize::new(State::stub().into()),
+            blocking: AtomicUsize::new(BlockingState::new().into()),
+            next: AtomicPtr::new(ptr::null_mut()),
+            next_blocking: AtomicPtr::new(ptr::null_mut()),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -114,8 +131,6 @@ impl Task {
         // scheduled.
         let actual: State = self.state.compare_and_swap(
             Scheduled.into(), Running.into(), AcqRel).into();
-
-        trace!("running; state={:?}", actual);
 
         match actual {
             Scheduled => {},
@@ -195,6 +210,19 @@ impl Task {
         }
     }
 
+    /// Notify the task
+    pub fn notify(me: Arc<Task>, pool: &Arc<Pool>) {
+        if me.schedule(){
+            let _ = pool.submit(me, pool);
+        }
+    }
+
+    /// Notify the task it has been allocated blocking capacity
+    pub fn notify_blocking(me: Arc<Task>, pool: &Arc<Pool>) {
+        BlockingState::notify_blocking(&me.blocking, AcqRel);
+        Task::notify(me, pool);
+    }
+
     /// Transition the task state to scheduled.
     ///
     /// Returns `true` if the caller is permitted to schedule the task.
@@ -225,6 +253,15 @@ impl Task {
                 Complete | Notified | Scheduled => return false,
             }
         }
+    }
+
+    /// Consumes any allocated capacity to block.
+    ///
+    /// Returns `true` if capacity was allocated, `false` otherwise.
+    pub fn consume_blocking_allocation(&self) -> CanBlock {
+        // This flag is the primary point of coordination. The queued flag
+        // happens "around" setting the blocking capacity.
+        BlockingState::consume_allocation(&self.blocking, AcqRel)
     }
 
     /// Drop the future

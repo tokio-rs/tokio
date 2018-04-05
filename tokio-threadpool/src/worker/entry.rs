@@ -137,7 +137,7 @@ impl WorkerEntry {
     /// Returns `Ok` when the worker was successfully signaled.
     ///
     /// Returns `Err` if the worker has already terminated.
-    pub fn signal_stop(&self, mut state: State) -> Result<(), ()> {
+    pub fn signal_stop(&self, mut state: State) {
         use worker::Lifecycle::*;
 
         // Transition the worker state to signaled
@@ -146,7 +146,7 @@ impl WorkerEntry {
 
             match state.lifecycle() {
                 Shutdown => {
-                    return Err(());
+                    return;
                 }
                 Running | Sleeping => {}
                 Notified | Signaled => {
@@ -161,7 +161,7 @@ impl WorkerEntry {
                     // b) The shutdown signal is stored as the head of the
                     // sleep, stack which will prevent the worker from going to
                     // sleep again.
-                    return Ok(());
+                    return;
                 }
             }
 
@@ -179,8 +179,6 @@ impl WorkerEntry {
 
         // Wakeup the worker
         self.wakeup();
-
-        Ok(())
     }
 
     /// Pop a task

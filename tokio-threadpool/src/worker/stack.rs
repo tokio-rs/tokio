@@ -19,7 +19,7 @@ use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 ///
 /// Treiber stack: https://en.wikipedia.org/wiki/Treiber_Stack
 #[derive(Debug)]
-pub(crate) struct SleepStack {
+pub(crate) struct Stack {
     state: AtomicUsize,
 }
 
@@ -36,6 +36,8 @@ pub(crate) struct SleepStack {
 pub struct State(usize);
 
 /// Extracts the head of the worker stack from the scheduler state
+///
+/// The 16 relates to the value of MAX_WORKERS
 const STACK_MASK: usize = ((1 << 16) - 1);
 
 /// Used to mark the stack as empty
@@ -53,13 +55,13 @@ const ABA_GUARD_MASK: usize = (1 << (64 - ABA_GUARD_SHIFT)) - 1;
 #[cfg(target_pointer_width = "32")]
 const ABA_GUARD_MASK: usize = (1 << (32 - ABA_GUARD_SHIFT)) - 1;
 
-// ===== impl SleepStack =====
+// ===== impl Stack =====
 
-impl SleepStack {
-    /// Create a new `SleepStack` representing the empty state.
-    pub fn new() -> SleepStack {
+impl Stack {
+    /// Create a new `Stack` representing the empty state.
+    pub fn new() -> Stack {
         let state = AtomicUsize::new(State::new().into());
-        SleepStack { state }
+        Stack { state }
     }
 
     /// Push a worker onto the stack
@@ -98,7 +100,6 @@ impl SleepStack {
             state = actual;
         }
     }
-
 
     /// Pop a worker off the stack.
     ///
