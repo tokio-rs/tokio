@@ -1,3 +1,9 @@
+mod queue;
+mod state;
+
+pub(crate) use self::queue::{Queue, Poll};
+use self::state::State;
+
 use notifier::Notifier;
 use sender::Sender;
 
@@ -8,7 +14,7 @@ use std::{fmt, panic, ptr};
 use std::cell::{UnsafeCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Release, Relaxed};
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -28,29 +34,6 @@ pub(crate) struct Task {
     ///
     /// The future is dropped immediately when it transitions to Complete
     future: UnsafeCell<Option<TaskFuture>>,
-}
-
-// TODO: Move this into other file
-#[derive(Debug)]
-pub(crate) struct Queue {
-    /// Queue head.
-    ///
-    /// This is a strong reference to `Task` (i.e, `Arc<Task>`)
-    head: AtomicPtr<Task>,
-
-    /// Tail pointer. This is `Arc<Task>`.
-    tail: UnsafeCell<*mut Task>,
-
-    /// Stub pointer, used as part of the intrusive mpsc channel algorithm
-    /// described by 1024cores.
-    stub: Box<Task>,
-}
-
-#[derive(Debug)]
-pub(crate) enum Poll {
-    Empty,
-    Inconsistent,
-    Data(Arc<Task>),
 }
 
 #[derive(Debug)]
@@ -75,41 +58,6 @@ enum TaskFuture {
         fut: BoxFuture2,
     }
 }
-
-// TODO: use repr(usize)
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum State {
-    /// Task is currently idle
-    Idle,
-
-    /// Task is currently running
-    Running,
-
-    /// Task is currently running, but has been notified that it must run again.
-    Notified,
-
-    /// Task has been scheduled
-    Scheduled,
-
-    /// Task is complete
-    Complete,
-}
-
-// ===== impl Task =====
-
-/*
-impl Task {
-    /// Transmute a u64 to a Task
-    pub unsafe fn from_notify_id(unpark_id: usize) -> Arc<Task> {
-        mem::transmute(unpark_id)
-    }
-
-    /// Transmute a u64 to a task ref
-    pub unsafe fn from_notify_id_ref<'a>(unpark_id: &'a usize) -> &'a Task {
-        mem::transmute(unpark_id)
-    }
-}
-*/
 
 // ===== impl Task =====
 
@@ -295,137 +243,6 @@ impl fmt::Debug for Task {
             .field("state", &self.state)
             .field("future", &"Spawn<BoxFuture>")
             .finish()
-    }
-}
-
-// ===== impl Queue =====
-
-impl Queue {
-    /// Create a new, empty, `Queue`.
-    pub fn new() -> Queue {
-        let stub = Box::new(Task::stub());
-        let ptr = &*stub as *const _ as *mut _;
-
-        Queue {
-            head: AtomicPtr::new(ptr),
-            tail: UnsafeCell::new(ptr),
-            stub: stub,
-        }
-    }
-
-    /// Push a task onto the queue.
-    ///
-    /// This function is `Sync`.
-    pub fn push(&self, task: Arc<Task>) {
-        unsafe {
-            self.push2(Arc::into_raw(task));
-        }
-    }
-
-    unsafe fn push2(&self, task: *const Task) {
-        let task = task as *mut Task;
-
-        // Set the next pointer. This does not require an atomic operation as
-        // this node is not accessible. The write will be flushed with the next
-        // operation
-        (*task).next.store(ptr::null_mut(), Relaxed);
-
-        // Update the head to point to the new node. We need to see the previous
-        // node in order to update the next pointer as well as release `task`
-        // to any other threads calling `push`.
-        let prev = self.head.swap(task, AcqRel);
-
-        // Release `task` to the consume end.
-        (*prev).next.store(task, Release);
-    }
-
-    /// Poll a task from the queue.
-    ///
-    /// This function is **not** `Sync` and requires coordination by the caller.
-    pub unsafe fn poll(&self) -> Poll {
-        let mut tail = *self.tail.get();
-        let mut next = (*tail).next.load(Acquire);
-
-        let stub = &*self.stub as *const _ as *mut _;
-
-        if tail == stub {
-            if next.is_null() {
-                return Poll::Empty;
-            }
-
-            *self.tail.get() = next;
-            tail = next;
-            next = (*next).next.load(Acquire);
-        }
-
-        if !next.is_null() {
-            *self.tail.get() = next;
-
-            // No ref_count inc is necessary here as this poll is paired
-            // with a `push` which "forgets" the handle.
-            return Poll::Data(Arc::from_raw(tail));
-        }
-
-        if self.head.load(Acquire) != tail {
-            return Poll::Inconsistent;
-        }
-
-        self.push2(stub);
-
-        next = (*tail).next.load(Acquire);
-
-        if !next.is_null() {
-            *self.tail.get() = next;
-
-            return Poll::Data(Arc::from_raw(tail));
-        }
-
-        Poll::Inconsistent
-    }
-}
-
-// ===== impl State =====
-
-impl State {
-    /// Returns the initial task state.
-    ///
-    /// Tasks start in the scheduled state as they are immediately scheduled on
-    /// creation.
-    fn new() -> State {
-        State::Scheduled
-    }
-
-    fn stub() -> State {
-        State::Idle
-    }
-}
-
-impl From<usize> for State {
-    fn from(src: usize) -> Self {
-        use self::State::*;
-
-        match src {
-            0 => Idle,
-            1 => Running,
-            2 => Notified,
-            3 => Scheduled,
-            4 => Complete,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<State> for usize {
-    fn from(src: State) -> Self {
-        use self::State::*;
-
-        match src {
-            Idle => 0,
-            Running => 1,
-            Notified => 2,
-            Scheduled => 3,
-            Complete => 4,
-        }
     }
 }
 
