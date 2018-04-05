@@ -40,16 +40,22 @@ impl Notify for Notifier {
     }
 
     fn clone_id(&self, id: usize) -> usize {
-        unsafe {
-            let ptr = id as *const Task;
+        let ptr = id as *const Task;
 
-            let t1 = Arc::from_raw(ptr);
-            let t2 = t1.clone();
+        // This function doesn't actually get a strong ref to the task here.
+        // However, the only method we have to convert a raw pointer -> &Arc<T>
+        // is to call `Arc::from_raw` which returns a strong ref. So, to
+        // maintain the invariants, `t1` has to be forgotten. This prevents the
+        // ref count from being decremented.
+        let t1 = unsafe { Arc::from_raw(ptr) };
+        let t2 = t1.clone();
 
-            // Forget both handles as we don't want any ref decs
-            mem::forget(t1);
-            mem::forget(t2);
-        }
+        mem::forget(t1);
+
+        // t2 is forgotten so that the fn exits without decrementing the ref
+        // count. The caller of `clone_id` ensures that `drop_id` is called when
+        // the ref count needs to be decremented.
+        mem::forget(t2);
 
         id
     }
