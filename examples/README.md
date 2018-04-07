@@ -49,6 +49,9 @@ A high level description of each example is:
 
 * [`udp-client`](udp-client.rs) - a simple `send_dgram`/`recv_dgram` example.
 
+* [`single-threaded`](single-threaded.rs) - manually composing a single-threaded
+  runtime.
+
 If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
 to make a PR!
