@@ -11,4 +11,4 @@ Enables depending on futures 0.2 and futures 0.1 in the same crate.
 """
 
 [dependencies]
-futures = "=0.2.0-beta"
+futures = "0.2"
