@@ -119,25 +119,6 @@ fn wait_with_output_captures() {
     assert_eq!(output.stderr.len(), 0);
 }
 
-#[allow(deprecated)]
-#[test]
-fn status_closes_any_pipes() {
-    let mut core = Core::new().unwrap();
-
-    // Cat will open a pipe between the parent and child.
-    // If `status_async` doesn't ensure the handles are closed,
-    // we would end up blocking forever (and time out).
-    let child = cat().status_async(&core.handle());
-    let timeout = Timeout::new(Duration::from_secs(1), &core.handle())
-        .expect("timeout registration failed")
-        .map(|()| panic!("time out exceeded! did we get stuck waiting on the child?"));
-
-    match core.run(child.select(timeout)) {
-        Ok((status, _)) => assert!(status.success()),
-        Err(_) => panic!("failed to run futures"),
-    }
-}
-
 #[test]
 fn status2_closes_any_pipes() {
     let mut core = Core::new().unwrap();
