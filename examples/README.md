@@ -19,6 +19,10 @@ A high level description of each example is:
   connections and then echos back any contents that are read from each connected
   client.
 
+* [`print_each_packet`](print_each_packet.rs) - this server will create a TCP
+  listener, accept connections in a loop, and put down in the stdout everything
+  that's read off of each TCP connection.
+
 * [`echo-udp`](echo-udp.rs) - again your standard "echo server", except for UDP
   instead of TCP.  This will echo back any packets received to the original
   sender.
