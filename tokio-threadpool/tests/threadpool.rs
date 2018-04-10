@@ -254,7 +254,7 @@ fn drop_threadpool_drops_futures() {
         let a = num_inc.clone();
         let b = num_dec.clone();
 
-        let mut pool = Builder::new()
+        let pool = Builder::new()
             .around_worker(move |w, _| {
                 a.fetch_add(1, Relaxed);
                 w.run();
