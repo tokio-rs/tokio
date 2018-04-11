@@ -481,14 +481,16 @@ impl<'a, P: Park> Entered<'a, P> {
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
-        let res = self.executor.park.park_timeout(Duration::from_millis(0));
+        const ZERO_DURATION: Duration = Duration::from_millis(0);
+
+        let res = self.executor.park.park_timeout(ZERO_DURATION);
         if res.is_err() {
             return Err(TurnError { _p: () });
         }
 
         let mut polled = self.tick();
 
-        if !polled {
+        if !polled && duration.map(|d| d > ZERO_DURATION).unwrap_or(true) {
             let res = match duration {
                 Some(duration) => self.executor.park.park_timeout(duration),
                 None => self.executor.park.park(),
