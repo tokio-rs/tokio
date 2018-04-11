@@ -8,6 +8,8 @@ use futures::Future;
 
 use std::io;
 
+/// Single-threaded runtime provides a way to start reactor
+/// and executor on the same thread
 ///
 /// # Examples
 ///
@@ -30,7 +32,7 @@ pub struct SingleThreaded {
 }
 
 impl SingleThreaded {
-    /// Returns a new singlethreaded runtime initialized with default
+    /// Returns a new single-threaded runtime initialized with default
     /// configuration values.
     pub fn new() -> io::Result<SingleThreaded> {
         // We need a reactor to receive events about IO objects from kernel

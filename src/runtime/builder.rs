@@ -69,6 +69,7 @@ impl Builder {
     }
 
     /// Create a new singlethreaded runtime
+    ///
     /// # Examples
     ///
     /// ```
