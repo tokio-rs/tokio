@@ -14,6 +14,8 @@ use task::Task;
 use worker::{self, Worker, WorkerId};
 
 use futures::task::AtomicTask;
+#[cfg(feature = "unstable-futures")]
+use futures2;
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
@@ -172,7 +174,6 @@ impl Pool {
         trace!("worker_terminated; num_workers={}", prev - 1);
 
         if 1 == prev {
-            trace!("notifying shutdown task");
             self.shutdown_task.notify();
         }
     }
