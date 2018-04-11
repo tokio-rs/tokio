@@ -1,4 +1,4 @@
-use runtime::{Inner, Runtime, SinglethreadedRuntime};
+use runtime::{Inner, Runtime, SingleThreaded};
 
 use reactor::Reactor;
 
@@ -75,13 +75,13 @@ impl Builder {
     /// # extern crate tokio;
     /// # use tokio::runtime::Builder;
     /// # pub fn main() {
-    /// let runtime = Builder::new().singlethreaded().unwrap();
+    /// let runtime = Builder::new().single_threaded().unwrap();
     /// // ... call runtime.block_on(f) where f is a future
     /// # let _ = runtime;
     /// # }
     /// ```
-    pub fn singlethreaded(&mut self) -> io::Result<SinglethreadedRuntime> {
-        SinglethreadedRuntime::new()
+    pub fn single_threaded(&mut self) -> io::Result<SingleThreaded> {
+        SingleThreaded::new()
     }
 
     /// Create the configured `Runtime`.
