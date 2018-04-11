@@ -82,12 +82,12 @@ impl Task {
         let mut inner = Box::new(Task {
             next: AtomicPtr::new(ptr::null_mut()),
             state: AtomicUsize::new(State::new().into()),
-            future: None,
+            future: UnsafeCell::new(None),
         });
 
         let waker = make_waker((&*inner) as *const _ as usize);
         let tls = futures2::task::LocalMap::new();
-        inner.future = Some(TaskFuture::Futures2 { waker, tls, fut });
+        inner.future = UnsafeCell::new(Some(TaskFuture::Futures2 { waker, tls, fut }));
 
         Task { ptr: Box::into_raw(inner) }
     }

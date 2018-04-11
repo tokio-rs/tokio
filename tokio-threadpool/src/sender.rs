@@ -227,9 +227,11 @@ impl<'a> futures2::executor::Executor for &'a Sender {
         // execution.
 
         // Create a new task for the future
-        let task = Task::new2(f, |id| into_waker(Arc::new(Futures2Wake::new(id, &self.inner))));
+        let task = Task::new2(f, |id| {
+            into_waker(Arc::new(Futures2Wake::new(id, &self.inner)))
+        });
 
-        self.inner.submit(task, &self.inner);
+        self.inner.submit(Arc::new(task), &self.inner);
 
         Ok(())
     }
