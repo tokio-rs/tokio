@@ -147,9 +147,10 @@ pub struct TaskExecutor {
     _p: ::std::marker::PhantomData<Rc<()>>,
 }
 
-/// Returned by the `turn` function
+/// Returned by the `turn` function. Contains `true` if any futures were
+/// polled at all and `false` otherwise.
 #[derive(Debug)]
-pub struct Turn(());
+pub struct Turn(pub bool);
 
 /// A `CurrentThread` instance bound to a supplied execution conext.
 pub struct Entered<'a, P: Park + 'a> {
@@ -480,7 +481,14 @@ impl<'a, P: Park> Entered<'a, P> {
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
-        if !self.tick() {
+        let res = self.executor.park.park_timeout(Duration::from_millis(0));
+        if res.is_err() {
+            return Err(TurnError { _p: () });
+        }
+
+        let mut polled = self.tick();
+
+        if !polled {
             let res = match duration {
                 Some(duration) => self.executor.park.park_timeout(duration),
                 None => self.executor.park.park(),
@@ -490,10 +498,10 @@ impl<'a, P: Park> Entered<'a, P> {
                 return Err(TurnError { _p: () });
             }
 
-            self.tick();
+            polled = self.tick();
         }
 
-        Ok(Turn(()))
+        Ok(Turn(polled))
     }
 
     fn run_timeout2(&mut self, dur: Option<Duration>)
