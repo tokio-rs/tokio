@@ -124,6 +124,7 @@ pub mod io {
     pub use tokio_io::{
         AsyncRead,
         AsyncWrite,
+        IoFuture,
     };
 
     // Utils
