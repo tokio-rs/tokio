@@ -5,3 +5,4 @@
 race:Arc*drop
 race:arc*Weak*drop
 race:crossbeam_deque
+race:std*mpsc_queue
