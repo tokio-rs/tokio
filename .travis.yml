@@ -52,11 +52,11 @@ script:
 
         # Run address sanitizer
         RUSTFLAGS="-Z sanitizer=address" \
-        cargo test -p tokio-threadpool
+        cargo test -p tokio-threadpool --tests
 
         # Run thread sanitizer
         RUSTFLAGS="-Z sanitizer=thread" \
-        cargo test -p tokio-threadpool
+        cargo test -p tokio-threadpool --tests
     fi
   - |
     set -e
