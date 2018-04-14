@@ -19,10 +19,10 @@ use std::io;
 /// use tokio::runtime::SingleThreaded;
 /// use tokio::prelude::*;
 ///
-/// let rt = SingleThreaded::new().unwrap();
+/// let mut runtime = SingleThreaded::new().unwrap();
 ///
 /// // Use the runtime...
-/// // rt.block_on(f); // where f is a future
+/// // runtime.block_on(f); // where f is a future
 /// ```
 #[derive(Debug)]
 pub struct SingleThreaded {

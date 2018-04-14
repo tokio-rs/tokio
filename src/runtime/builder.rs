@@ -76,7 +76,7 @@ impl Builder {
     /// # extern crate tokio;
     /// # use tokio::runtime::Builder;
     /// # pub fn main() {
-    /// let runtime = Builder::new().single_threaded().unwrap();
+    /// let mut runtime = Builder::new().single_threaded().unwrap();
     /// // ... call runtime.block_on(f) where f is a future
     /// # let _ = runtime;
     /// # }
