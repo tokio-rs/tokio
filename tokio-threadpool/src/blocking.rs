@@ -25,6 +25,17 @@ pub struct BlockingError {
 ///
 /// [build]: struct.Builder.html#method.max_blocking
 ///
+/// # Return
+///
+/// When the blocking closure is executed, `Ok(T)` is returned, where `T` is the
+/// closure's return value.
+///
+/// If the thread pool has shutdown, `Err` is returned.
+///
+/// If the number of concurrent `blocking` calls has reached the maximum,
+/// `Ok(NotReady)` is returned and the current task is notified when a call to
+/// `blocking` will succeed.
+///
 /// # Background
 ///
 /// By default, the Tokio thread pool expects that tasks will only run for short
@@ -48,6 +59,56 @@ pub struct BlockingError {
 /// Instead, `blocking` hands off the responsiblity of processing the work queue
 /// to another thread. This hand off is light compared to a channel and does not
 /// require buffering.
+///
+/// # Examples
+///
+/// Block on receiving a message from a `std` channel. This example is a little
+/// silly as using the non-blocking channel from the `futures` crate would make
+/// more sense. The blocking receive can be replaced with any blocking operation
+/// that needs to be performed.
+///
+/// ```rust
+/// # extern crate futures;
+/// # extern crate tokio_threadpool;
+///
+/// use tokio_threadpool::{ThreadPool, blocking};
+///
+/// use futures::Future;
+/// use futures::future::{lazy, poll_fn};
+///
+/// use std::sync::mpsc;
+/// use std::thread;
+/// use std::time::Duration;
+///
+/// pub fn main() {
+///     // This is a *blocking* channel
+///     let (tx, rx) = mpsc::channel();
+///
+///     // Spawn a thread to send a message
+///     thread::spawn(move || {
+///         thread::sleep(Duration::from_millis(500));
+///         tx.send("hello").unwrap();
+///     });
+///
+///     let pool = ThreadPool::new();
+///
+///     pool.spawn(lazy(move || {
+///         // Because `blocking` returns `Poll`, it is intended to be used
+///         // from the context of a `Future` implementation. Since we don't
+///         // have a complicated requirement, we can use `poll_fn` in this
+///         // case.
+///         poll_fn(move || {
+///             blocking(|| {
+///                 let msg = rx.recv().unwrap();
+///                 println!("message = {}", msg);
+///             }).map_err(|_| panic!("the threadpool shut down"))
+///         })
+///     }));
+///
+///     // Wait for the task we just spawned to complete.
+///     pool.shutdown_on_idle().wait().unwrap();
+/// }
+/// ```
 ///
 /// # Panics
 ///
