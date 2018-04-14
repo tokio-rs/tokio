@@ -36,6 +36,9 @@ pub struct BlockingError {
 /// `Ok(NotReady)` is returned and the current task is notified when a call to
 /// `blocking` will succeed.
 ///
+/// If `blocking` is called from outside the context of a Tokio thread pool,
+/// `Err` is returned.
+///
 /// # Background
 ///
 /// By default, the Tokio thread pool expects that tasks will only run for short
@@ -109,15 +112,16 @@ pub struct BlockingError {
 ///     pool.shutdown_on_idle().wait().unwrap();
 /// }
 /// ```
-///
-/// # Panics
-///
-/// This function panics if not called from the context of a thread pool worker.
 pub fn blocking<F, T>(f: F) -> Poll<T, BlockingError>
 where F: FnOnce() -> T,
 {
     let res = Worker::with_current(|worker| {
-        let worker = worker.expect("not called from a runtime thread");
+        let worker = match worker {
+            Some(worker) => worker,
+            None => {
+                return Err(BlockingError { _p: () });
+            }
+        };
 
         // Transition the worker state to blocking. This will exit the fn early
         // with `NotRead` if the pool does not have enough capacity to enter
