@@ -55,7 +55,7 @@ impl Notify for Notifier {
         // ref count from being decremented.
         let t1 = Forget::new(unsafe { Arc::from_raw(ptr) });
 
-        // t2 is forgotten so that the fn exits without decrementing the ref
+        // The clone is forgotten so that the fn exits without decrementing the ref
         // count. The caller of `clone_id` ensures that `drop_id` is called when
         // the ref count needs to be decremented.
         let _ = Forget::new(t1.clone());
