@@ -6,3 +6,10 @@ race:Arc*drop
 race:arc*Weak*drop
 race:crossbeam_deque
 race:std*mpsc_queue
+
+# This is excluded as this race shows up due to using the stealing features of
+# the deque. Unfortunately, the implementation uses a fence, which makes tsan
+# unhappy.
+#
+# TODO: It would be nice to not have to filter this out.
+race:try_steal_task
