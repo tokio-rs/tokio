@@ -289,7 +289,27 @@ impl Builder {
         self
     }
 
-    /// TODO: Dox
+    /// Execute function `f` after each thread is started but before it starts
+    /// doing work.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .after_start(|| {
+    ///         println!("thread started");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
         where F: Fn() + Send + Sync + 'static
     {
@@ -297,7 +317,26 @@ impl Builder {
         self
     }
 
-    /// TODO: Dox
+    /// Execute function `f` before each thread stops.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .before_stop(|| {
+    ///         println!("thread stopping");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
         where F: Fn() + Send + Sync + 'static
     {
