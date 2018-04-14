@@ -184,6 +184,11 @@ impl Backup {
         }
     }
 
+    pub fn is_pushed(&self) -> bool {
+        let state: State = self.state.load(Relaxed).into();
+        state.is_pushed()
+    }
+
     pub fn set_pushed(&self, ordering: Ordering) {
         let prev: State = self.state.fetch_or(PUSHED, ordering).into();
         debug_assert!(!prev.is_pushed());

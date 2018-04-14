@@ -124,6 +124,7 @@ impl BackupStack {
             }
 
             debug_assert!(head.0 < MAX_BACKUP);
+            debug_assert!(entries[head.0].is_pushed());
 
             let mut next = state;
 

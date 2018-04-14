@@ -13,3 +13,12 @@ race:std*mpsc_queue
 #
 # TODO: It would be nice to not have to filter this out.
 race:try_steal_task
+
+# This filters out an expected data race in the treiber stack implementation.
+# Treiber stacks are inherently racy. The pop operation will attempt to access
+# the "next" pointer on the node it is attempting to pop. However, at this
+# point it has not gained ownership of the node and another thread might beat
+# it and take ownership of the node first (touching the next pointer). The
+# original pop operation will fail due to the ABA guard, but tsan still picks
+# up the access on the next pointer.
+race:Backup::next_sleeper
