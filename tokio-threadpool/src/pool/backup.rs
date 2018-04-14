@@ -6,6 +6,25 @@ use std::fmt;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{self, Acquire, AcqRel, Relaxed};
 
+/// State associated with a thread in the thread pool.
+///
+/// The pool manages a number of threads. Some of those threads are considered
+/// "primary" threads and process the work queue. When a task being run on a
+/// primary thread enters a blocking context, the responsibility of processing
+/// the work queue must be handed off to another thread. This is done by first
+/// checking for idle threads on the backup stack. If one is found, the worker
+/// token (`WorkerId`) is handed off to that running thread. If none are found,
+/// a new thread is spawned.
+///
+/// This state is manages the exchange. A thread that is idle, not assigned to a
+/// work queue, sits around for a specified amount of time. When the worker
+/// token is handed off, it is first stored in `handoff`. The backup thread is
+/// then signaled. At this point, the backup thread wakes up from sleep and
+/// reads `handoff`. At that point, it has been promoted to a primary thread and
+/// will begin processing inbound work on the work queue.
+///
+/// The name `Backup` isn't really great for what the type does, but I have not
+/// come up with a better name... Maybe it should just be named `Thread`.
 #[derive(Debug)]
 pub(crate) struct Backup {
     /// Worker ID that is being handed to this thread.
