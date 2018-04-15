@@ -9,7 +9,10 @@ use futures::Future;
 use std::io;
 
 /// Single-threaded runtime provides a way to start reactor
-/// and executor on the same thread
+/// and executor on the same thread.
+///
+/// The single-threaded runtime is not `Send` and cannot be
+/// safely moved to other threads.
 ///
 /// # Examples
 ///
