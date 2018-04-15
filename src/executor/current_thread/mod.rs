@@ -383,6 +383,16 @@ impl<P: Park> CurrentThread<P> {
         }
     }
 
+    /// Returns a reference to the underlying `Park` instance.
+    pub fn get_park(&self) -> &P {
+        &self.park
+    }
+
+    /// Returns a mutable reference to the underlying `Park` instance.
+    pub fn get_park_mut(&mut self) -> &mut P {
+        &mut self.park
+    }
+
     fn borrow(&mut self) -> Borrow<P::Unpark> {
         Borrow {
             scheduler: &mut self.scheduler,
@@ -505,6 +515,16 @@ impl<'a, P: Park> Entered<'a, P> {
         let polled = self.tick();
 
         Ok(Turn { polled })
+    }
+
+    /// Returns a reference to the underlying `Park` instance.
+    pub fn get_park(&self) -> &P {
+        &self.executor.park
+    }
+
+    /// Returns a mutable reference to the underlying `Park` instance.
+    pub fn get_park_mut(&mut self) -> &mut P {
+        &mut self.executor.park
     }
 
     fn run_timeout2(&mut self, dur: Option<Duration>)
