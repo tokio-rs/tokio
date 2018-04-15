@@ -478,6 +478,8 @@ where T: Park,
 
                 if deadline > now {
                     self.park.park_timeout(deadline - now)?;
+                } else {
+                    self.park.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
@@ -500,6 +502,8 @@ where T: Park,
 
                 if deadline > now {
                     self.park.park_timeout(cmp::min(deadline - now, duration))?;
+                } else {
+                    self.park.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
