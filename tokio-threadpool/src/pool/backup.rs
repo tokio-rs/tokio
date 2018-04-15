@@ -16,7 +16,7 @@ use std::sync::atomic::Ordering::{self, Acquire, AcqRel, Relaxed};
 /// token (`WorkerId`) is handed off to that running thread. If none are found,
 /// a new thread is spawned.
 ///
-/// This state is manages the exchange. A thread that is idle, not assigned to a
+/// This state manages the exchange. A thread that is idle, not assigned to a
 /// work queue, sits around for a specified amount of time. When the worker
 /// token is handed off, it is first stored in `handoff`. The backup thread is
 /// then signaled. At this point, the backup thread wakes up from sleep and

@@ -12,7 +12,7 @@ pub struct BlockingError {
 ///
 /// The `blocking` function annotates a section of code that performs a blocking
 /// operation, either by issuing a blocking syscall or by performing a long
-/// running CPU bound computation.
+/// running CPU-bound computation.
 ///
 /// When the `blocking` function enters, it hands off the responsibility of
 /// processing the current work queue to another thread. Then, it calls the

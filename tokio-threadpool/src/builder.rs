@@ -147,6 +147,10 @@ impl Builder {
 
     /// Set the maximum number of concurrent blocking sections.
     ///
+    /// When the maximum concurrent `blocking` calls is reached, any further
+    /// calls to `blocking` will return `NotReady` and the task is notified once
+    /// previously in-flight calls to `blocking` return.
+    ///
     /// This must be a number between 1 and 32,768 though it is advised to keep
     /// this value on the smaller side.
     ///
