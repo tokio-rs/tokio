@@ -77,10 +77,40 @@ impl SingleThreaded {
                     let mut executor = executor.enter(enter);
                     // Run the provided future
                     executor.block_on(f).unwrap();
+                });
+            });
+        });
+    }
+
+    /// Blocks and runs all the other futures that are still left in the executor
+    ///
+    /// This is similar to running a runtime, but uses only the current thread.
+    fn shutdown_on_idle(&mut self) -> () {
+        let SingleThreaded { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
+
+        // Binds an executor to this thread
+        let mut enter = tokio_executor::enter().expect("Multiple executors at once");
+
+        // This will set the default handle and timer to use inside the closure and run the future.
+        tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
+            timer::with_default(&timer_handle, enter, |enter| {
+                // The TaskExecutor is a fake executor that looks into the current single-threaded
+                // executor when used. This is a trick, because we need two mutable references to the
+                // executor (one to run the provided future, another to install as the default one). We
+                // use the fake one here as the default one.
+                let mut default_executor = current_thread::TaskExecutor::current();
+                tokio_executor::with_default(&mut default_executor, enter, |enter| {
+                    let mut executor = executor.enter(enter);
                     // Run all the other futures that are still left in the executor
                     executor.run().unwrap();
                 });
             });
         });
+    }
+}
+
+impl Drop for SingleThreaded {
+    fn drop(&mut self) {
+        self.shutdown_on_idle();
     }
 }
