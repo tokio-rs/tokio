@@ -57,8 +57,8 @@ impl SingleThreaded {
     ///
     /// This is similar to running a runtime, but uses only the current thread.
     pub fn block_on<F: Future<Item = (), Error = ()>>(&mut self, f: F) -> () {
-        let reactor_handle = self.reactor_handle.clone();
-        let timer_handle = self.timer_handle.clone();
+        let SingleThreaded { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
+
         // Binds an executor to this thread
         let mut enter = tokio_executor::enter().expect("Multiple executors at once");
 
@@ -71,7 +71,7 @@ impl SingleThreaded {
                 // use the fake one here as the default one.
                 let mut default_executor = current_thread::TaskExecutor::current();
                 tokio_executor::with_default(&mut default_executor, enter, |enter| {
-                    let mut executor = self.executor.enter(enter);
+                    let mut executor = executor.enter(enter);
                     // Run the provided future
                     executor.block_on(f).unwrap();
                     // Run all the other futures that are still left in the executor

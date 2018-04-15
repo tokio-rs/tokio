@@ -54,7 +54,7 @@ fn runtime_single_threaded() {
     let _ = env_logger::init();
 
     let mut runtime = tokio::runtime::Builder::new()
-        .single_threaded()
+        .build_single_threaded()
         .unwrap();
     runtime.block_on(create_client_server_future());
 }

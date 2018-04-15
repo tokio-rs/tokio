@@ -76,12 +76,12 @@ impl Builder {
     /// # extern crate tokio;
     /// # use tokio::runtime::Builder;
     /// # pub fn main() {
-    /// let mut runtime = Builder::new().single_threaded().unwrap();
+    /// let mut runtime = Builder::new().build_single_threaded().unwrap();
     /// // ... call runtime.block_on(f) where f is a future
     /// # let _ = runtime;
     /// # }
     /// ```
-    pub fn single_threaded(&mut self) -> io::Result<SingleThreaded> {
+    pub fn build_single_threaded(&mut self) -> io::Result<SingleThreaded> {
         SingleThreaded::new()
     }
 
