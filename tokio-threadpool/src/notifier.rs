@@ -2,6 +2,7 @@ use pool::Pool;
 use task::Task;
 
 use std::mem;
+use std::ops;
 use std::sync::{Arc, Weak};
 
 use futures::executor::Notify;
@@ -15,14 +16,22 @@ pub(crate) struct Notifier {
     pub inner: Weak<Pool>,
 }
 
+/// A guard that ensures that the inner value gets forgotten.
+#[derive(Debug)]
+struct Forget<T>(Option<T>);
+
 impl Notify for Notifier {
     fn notify(&self, id: usize) {
         trace!("Notifier::notify; id=0x{:x}", id);
 
         unsafe {
             let ptr = id as *const Task;
-            let task = Arc::from_raw(ptr);
 
+            // We did not actually take ownership of the `Arc` in this function
+            // so we must ensure that the Arc is forgotten.
+            let task = Forget::new(Arc::from_raw(ptr));
+
+            // TODO: Unify this with Task::notify
             if task.schedule() {
                 // TODO: Check if the pool is still running
                 //
@@ -33,9 +42,6 @@ impl Notify for Notifier {
                     let _ = inner.submit(task, &inner);
                 }
             }
-
-            // We did not actually take ownership of the `Arc` in this function.
-            mem::forget(task);
         }
     }
 
@@ -47,15 +53,12 @@ impl Notify for Notifier {
         // is to call `Arc::from_raw` which returns a strong ref. So, to
         // maintain the invariants, `t1` has to be forgotten. This prevents the
         // ref count from being decremented.
-        let t1 = unsafe { Arc::from_raw(ptr) };
-        let t2 = t1.clone();
+        let t1 = Forget::new(unsafe { Arc::from_raw(ptr) });
 
-        mem::forget(t1);
-
-        // t2 is forgotten so that the fn exits without decrementing the ref
+        // The clone is forgotten so that the fn exits without decrementing the ref
         // count. The caller of `clone_id` ensures that `drop_id` is called when
         // the ref count needs to be decremented.
-        mem::forget(t2);
+        let _ = Forget::new(t1.clone());
 
         id
     }
@@ -65,5 +68,27 @@ impl Notify for Notifier {
             let ptr = id as *const Task;
             let _ = Arc::from_raw(ptr);
         }
+    }
+}
+
+// ===== impl Forget =====
+
+impl<T> Forget<T> {
+    fn new(t: T) -> Self {
+        Forget(Some(t))
+    }
+}
+
+impl<T> ops::Deref for Forget<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl<T> Drop for Forget<T> {
+    fn drop(&mut self) {
+        mem::forget(self.0.take());
     }
 }

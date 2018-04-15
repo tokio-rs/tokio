@@ -1,24 +1,31 @@
+mod backup;
+mod backup_stack;
 mod state;
-mod stack;
 
+pub(crate) use self::backup::{Backup, BackupId};
+pub(crate) use self::backup_stack::MAX_BACKUP;
 pub(crate) use self::state::{
     State,
     Lifecycle,
     MAX_FUTURES,
 };
-use self::stack::SleepStack;
+
+use self::backup::Handoff;
+use self::backup_stack::BackupStack;
 
 use config::Config;
 use shutdown_task::ShutdownTask;
-use task::Task;
+use task::{Task, Blocking};
 use worker::{self, Worker, WorkerId};
 
+use futures::Poll;
 use futures::task::AtomicTask;
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::thread;
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
@@ -29,9 +36,9 @@ pub(crate) struct Pool {
     pub state: AtomicUsize,
 
     // Stack tracking sleeping workers.
-    sleep_stack: SleepStack,
+    sleep_stack: worker::Stack,
 
-    // Number of workers who haven't reached the final state of shutdown
+    // Number of workers that haven't reached the final state of shutdown
     //
     // This is only used to know when to single `shutdown_task` once the
     // shutdown process has completed.
@@ -40,10 +47,27 @@ pub(crate) struct Pool {
     // Used to generate a thread local RNG seed
     pub next_thread_id: AtomicUsize,
 
-    // Storage for workers
+    // Worker state
     //
-    // This will *usually* be a small number
+    // A worker is a thread that is processing the work queue and polling
+    // futures.
+    //
+    // This will *usually* be a small number.
     pub workers: Box<[worker::Entry]>,
+
+    // Backup thread state
+    //
+    // In order to efficiently support `blocking`, a pool of backup threads is
+    // needed. These backup threads are ready to take over a worker if the
+    // future being processed requires blocking.
+    backup: Box<[Backup]>,
+
+    // Stack of sleeping backup threads
+    pub backup_stack: BackupStack,
+
+    // State regarding coordinating blocking sections and tracking tasks that
+    // are pending blocking capacity.
+    blocking: Blocking,
 
     // Task notified when the worker shuts down
     pub shutdown_task: ShutdownTask,
@@ -52,17 +76,41 @@ pub(crate) struct Pool {
     pub config: Config,
 }
 
+const TERMINATED: usize = 1;
+
 impl Pool {
     /// Create a new `Pool`
-    pub fn new(workers: Box<[worker::Entry]>, config: Config) -> Pool {
+    pub fn new(workers: Box<[worker::Entry]>, max_blocking: usize, config: Config) -> Pool {
         let pool_size = workers.len();
+        let total_size = max_blocking + pool_size;
+
+        // Create the set of backup entries
+        //
+        // This is `backup + pool_size` because the core thread pool running the
+        // workers is spawned from backup as well.
+        let backup = (0..total_size).map(|_| {
+            Backup::new()
+        }).collect::<Vec<_>>().into_boxed_slice();
+
+        let backup_stack = BackupStack::new();
+
+        for i in (0..backup.len()).rev() {
+            backup_stack.push(&backup, BackupId(i))
+                .unwrap();
+        }
+
+        // Initialize the blocking state
+        let blocking = Blocking::new(max_blocking);
 
         let ret = Pool {
             state: AtomicUsize::new(State::new().into()),
-            sleep_stack: SleepStack::new(),
-            num_workers: AtomicUsize::new(pool_size),
+            sleep_stack: worker::Stack::new(),
+            num_workers: AtomicUsize::new(0),
             next_thread_id: AtomicUsize::new(0),
             workers,
+            backup,
+            backup_stack,
+            blocking,
             shutdown_task: ShutdownTask {
                 task1: AtomicTask::new(),
                 #[cfg(feature = "unstable-futures")]
@@ -141,6 +189,10 @@ impl Pool {
         self.terminate_sleeping_workers();
     }
 
+    pub fn is_shutdown(&self) -> bool {
+        self.num_workers.load(Acquire) == TERMINATED
+    }
+
     /// Called by `Worker` as it tries to enter a sleeping state. Before it
     /// sleeps, it must push itself onto the sleep stack. This enables other
     /// threads to see it when signaling work.
@@ -151,30 +203,65 @@ impl Pool {
     pub fn terminate_sleeping_workers(&self) {
         use worker::Lifecycle::Signaled;
 
+        // First, set the TERMINATED flag on `num_workers`. This signals that
+        // whichever thread transitions the count to zero must notify the
+        // shutdown task.
+        let prev = self.num_workers.fetch_or(TERMINATED, AcqRel);
+        let notify = prev == 0;
+
         trace!("  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
         // transition, and terminate.
         while let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, true) {
-            trace!("  -> shutdown worker; idx={:?}; state={:?}", idx, worker_state);
+            self.workers[idx].signal_stop(worker_state);
+        }
 
-            if self.workers[idx].signal_stop(worker_state).is_err() {
-                // The worker is already in the shutdown state, immediately
-                // track that it has terminated as the worker will never work
-                // again.
-                self.worker_terminated();
-            }
+        // Now terminate any backup threads
+        //
+        // The call to `pop` must be successful because shutting down the pool
+        // is coordinated and at this point, this is the only thread that will
+        // attempt to transition the backup stack to "terminated".
+        while let Ok(Some(backup_id)) = self.backup_stack.pop(&self.backup, true) {
+            self.backup[backup_id.0].signal_stop();
+        }
+
+        if notify {
+            self.shutdown_task.notify();
         }
     }
 
-    pub fn worker_terminated(&self) {
-        let prev = self.num_workers.fetch_sub(1, AcqRel);
+    /// Track that a worker thread has started
+    ///
+    /// If `Err` is returned, then the thread is not permitted to started.
+    fn thread_started(&self) -> Result<(), ()> {
+        let mut curr = self.num_workers.load(Acquire);
 
-        trace!("worker_terminated; num_workers={}", prev - 1);
+        loop {
+            if curr & TERMINATED == TERMINATED {
+                return Err(());
+            }
 
-        if 1 == prev {
-            trace!("notifying shutdown task");
+            let actual = self.num_workers.compare_and_swap(
+                curr, curr + 2, AcqRel);
+
+            if curr == actual {
+                return Ok(());
+            }
+
+            curr = actual;
+        }
+    }
+
+    fn thread_stopped(&self) {
+        let prev = self.num_workers.fetch_sub(2, AcqRel);
+
+        if prev == TERMINATED | 2 {
             self.shutdown_task.notify();
         }
+    }
+
+    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), ::BlockingError> {
+        self.blocking.poll_blocking_capacity(task)
     }
 
     /// Submit a task to the scheduler.
@@ -184,15 +271,19 @@ impl Pool {
     pub fn submit(&self, task: Arc<Task>, inner: &Arc<Pool>) {
         Worker::with_current(|worker| {
             match worker {
-                Some(worker) => {
-                    let idx = worker.id.idx;
+                // If the worker is in blocking mode, then even though the
+                // thread-local variable is set, the current thread does not
+                // have ownership of that worker entry. This is because the
+                // worker entry has already been handed off to another thread.
+                Some(worker) if !worker.is_blocking() => {
+                    let idx = worker.id.0;
 
                     trace!("    -> submit internal; idx={}", idx);
 
                     worker.inner.workers[idx].submit_internal(task);
                     worker.inner.signal_work(inner);
                 }
-                None => {
+                _ => {
                     self.submit_external(task, inner);
                 }
             }
@@ -203,7 +294,7 @@ impl Pool {
     ///
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
-    fn submit_external(&self, task: Arc<Task>, inner: &Arc<Pool>) {
+    pub fn submit_external(&self, task: Arc<Task>, inner: &Arc<Pool>) {
         use worker::Lifecycle::Notified;
 
         // First try to get a handle to a sleeping worker. This ensures that
@@ -234,12 +325,130 @@ impl Pool {
         let entry = &self.workers[idx];
 
         if !entry.submit_external(task, state) {
-            self.spawn_worker(idx, inner);
+            self.spawn_thread(WorkerId::new(idx), inner);
         }
     }
 
-    fn spawn_worker(&self, idx: usize, inner: &Arc<Pool>) {
-        Worker::spawn(WorkerId::new(idx), inner);
+    pub fn release_backup(&self, backup_id: BackupId) -> Result<(), ()> {
+        // First update the state, this cannot fail because the caller must have
+        // exclusive access to the backup token.
+        self.backup[backup_id.0].release();
+
+        // Push the backup entry back on the stack
+        self.backup_stack.push(&self.backup, backup_id)
+    }
+
+    pub fn notify_blocking_task(&self, pool: &Arc<Pool>) {
+        self.blocking.notify_task(&pool);
+    }
+
+    /// Provision a thread to run a worker
+    pub fn spawn_thread(&self, id: WorkerId, inner: &Arc<Pool>) {
+        let backup_id = match self.backup_stack.pop(&self.backup, false) {
+            Ok(Some(backup_id)) => backup_id,
+            Ok(None) => panic!("no thread available"),
+            Err(_) => {
+                debug!("failed to spawn worker thread due to the thread pool shutting down");
+                return;
+            }
+        };
+
+        let need_spawn = self.backup[backup_id.0]
+            .worker_handoff(id.clone());
+
+        if !need_spawn {
+            return;
+        }
+
+        if self.thread_started().is_err() {
+            // The pool is shutting down.
+            return;
+        }
+
+        let mut th = thread::Builder::new();
+
+        if let Some(ref prefix) = inner.config.name_prefix {
+            th = th.name(format!("{}{}", prefix, backup_id.0));
+        }
+
+        if let Some(stack) = inner.config.stack_size {
+            th = th.stack_size(stack);
+        }
+
+        let inner = inner.clone();
+
+        let res = th.spawn(move || {
+            if let Some(ref f) = inner.config.after_start {
+                f();
+            }
+
+            let mut worker_id = id;
+
+            inner.backup[backup_id.0].start(&worker_id);
+
+            loop {
+                // The backup token should be in the running state.
+                debug_assert!(inner.backup[backup_id.0].is_running());
+
+                // TODO: Avoid always cloning
+                let worker = Worker::new(worker_id, backup_id, inner.clone());
+
+                // Run the worker. If the worker transitioned to a "blocking"
+                // state, then `is_blocking` will be true.
+                if !worker.do_run() {
+                    // The worker shutdown, so exit the thread.
+                    break;
+                }
+
+                // Push the thread back onto the backup stack. This makes it
+                // available for future handoffs.
+                //
+                // This **must** happen before notifying the task.
+                let res = inner.backup_stack
+                    .push(&inner.backup, backup_id);
+
+                if res.is_err() {
+                    // The pool is being shutdown.
+                    break;
+                }
+
+                // The task switched the current thread to blocking mode.
+                // Now that the blocking task completed, any tasks
+                inner.notify_blocking_task(&inner);
+
+                debug_assert!(inner.backup[backup_id.0].is_running());
+
+                // Wait for a handoff
+                let handoff = inner.backup[backup_id.0]
+                    .wait_for_handoff(true);
+
+                match handoff {
+                    Handoff::Worker(id) => {
+                        debug_assert!(inner.backup[backup_id.0].is_running());
+                        worker_id = id;
+                    }
+                    Handoff::Idle => {
+                        // Worker is idle
+                        break;
+                    }
+                    Handoff::Terminated => {
+                        // TODO: When wait_for_handoff supports blocking with a
+                        // timeout, this will have to be smarter
+                        break;
+                    }
+                }
+            }
+
+            if let Some(ref f) = inner.config.before_stop {
+                f();
+            }
+
+            inner.thread_stopped();
+        });
+
+        if let Err(e) = res {
+            warn!("failed to spawn worker thread; err={:?}", e);
+        }
     }
 
     /// If there are any other workers currently relaxing, signal them that work
@@ -277,7 +486,7 @@ impl Pool {
                 }
                 Shutdown => {
                     trace!("signal_work -- spawn; idx={}", idx);
-                    Worker::spawn(WorkerId::new(idx), inner);
+                    self.spawn_thread(WorkerId(idx), inner);
                 }
                 Running | Notified | Signaled => {
                     // The workers are already active. No need to wake them up.
@@ -285,7 +494,6 @@ impl Pool {
             }
         }
     }
-
 
     /// Generates a random number
     ///

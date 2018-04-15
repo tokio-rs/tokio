@@ -2,7 +2,7 @@ use callback::Callback;
 use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
 use sender::Sender;
-use pool::Pool;
+use pool::{Pool, MAX_BACKUP};
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
 
@@ -63,6 +63,10 @@ pub struct Builder {
     /// Number of workers to spawn
     pool_size: usize,
 
+    /// Maximum number of futures that can be in a blocking section
+    /// concurrently.
+    max_blocking: usize,
+
     /// Generates the `Park` instances
     new_park: Box<Fn(&WorkerId) -> BoxPark>,
 }
@@ -99,11 +103,14 @@ impl Builder {
 
         Builder {
             pool_size: num_cpus,
+            max_blocking: 100,
             config: Config {
                 keep_alive: None,
                 name_prefix: None,
                 stack_size: None,
                 around_worker: None,
+                after_start: None,
+                before_stop: None,
             },
             new_park,
         }
@@ -135,6 +142,37 @@ impl Builder {
         assert!(val <= MAX_WORKERS, "max value is {}", 32768);
 
         self.pool_size = val;
+        self
+    }
+
+    /// Set the maximum number of concurrent blocking sections.
+    ///
+    /// When the maximum concurrent `blocking` calls is reached, any further
+    /// calls to `blocking` will return `NotReady` and the task is notified once
+    /// previously in-flight calls to `blocking` return.
+    ///
+    /// This must be a number between 1 and 32,768 though it is advised to keep
+    /// this value on the smaller side.
+    ///
+    /// The default value is 100.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .max_blocking(200)
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn max_blocking(&mut self, val: usize) -> &mut Self {
+        assert!(val <= MAX_BACKUP, "max value is {}", MAX_BACKUP);
+        self.max_blocking = val;
         self
     }
 
@@ -255,6 +293,61 @@ impl Builder {
         self
     }
 
+    /// Execute function `f` after each thread is started but before it starts
+    /// doing work.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .after_start(|| {
+    ///         println!("thread started");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn after_start<F>(&mut self, f: F) -> &mut Self
+        where F: Fn() + Send + Sync + 'static
+    {
+        self.config.after_start = Some(Arc::new(f));
+        self
+    }
+
+    /// Execute function `f` before each thread stops.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = Builder::new()
+    ///     .before_stop(|| {
+    ///         println!("thread stopping");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn before_stop<F>(&mut self, f: F) -> &mut Self
+        where F: Fn() + Send + Sync + 'static
+    {
+        self.config.before_stop = Some(Arc::new(f));
+        self
+    }
+
     /// Customize the `park` instance used by each worker thread.
     ///
     /// The provided closure `f` is called once per worker and returns a `Park`
@@ -331,6 +424,7 @@ impl Builder {
         let inner = Arc::new(
             Pool::new(
                 workers.into_boxed_slice(),
+                self.max_blocking,
                 self.config.clone()));
 
         // Wrap with `Sender`

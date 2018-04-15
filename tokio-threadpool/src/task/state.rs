@@ -17,6 +17,8 @@ pub(crate) enum State {
     Complete = 4,
 }
 
+// ===== impl State =====
+
 impl State {
     /// Returns the initial task state.
     ///
@@ -37,7 +39,7 @@ impl From<usize> for State {
 
         debug_assert!(
             src >= Idle as usize &&
-            src <= Complete as usize);
+            src <= Complete as usize, "actual={}", src);
 
         unsafe { ::std::mem::transmute(src) }
     }

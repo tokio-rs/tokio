@@ -4,3 +4,29 @@
 # This causes many false positives.
 race:Arc*drop
 race:arc*Weak*drop
+
+# `std` mpsc is not used in any Tokio code base. This race is triggered by some
+# rust runtime logic.
+race:std*mpsc_queue
+
+# Probably more fences in std.
+race:__call_tls_dtors
+
+# The crossbeam deque uses fences.
+race:crossbeam_deque
+
+# This is excluded as this race shows up due to using the stealing features of
+# the deque. Unfortunately, the implementation uses a fence, which makes tsan
+# unhappy.
+#
+# TODO: It would be nice to not have to filter this out.
+race:try_steal_task
+
+# This filters out an expected data race in the treiber stack implementation.
+# Treiber stacks are inherently racy. The pop operation will attempt to access
+# the "next" pointer on the node it is attempting to pop. However, at this
+# point it has not gained ownership of the node and another thread might beat
+# it and take ownership of the node first (touching the next pointer). The
+# original pop operation will fail due to the ABA guard, but tsan still picks
+# up the access on the next pointer.
+race:Backup::next_sleeper

@@ -53,6 +53,17 @@ impl DefaultPark {
 
         DefaultPark { inner }
     }
+
+    /// Unpark the thread without having to clone the unpark handle.
+    ///
+    /// Named `notify` to avoid conflicting with the `unpark` fn.
+    pub(crate) fn notify(&self) {
+        self.inner.unpark();
+    }
+
+    pub(crate) fn park_sync(&self, duration: Option<Duration>) {
+        self.inner.park(duration);
+    }
 }
 
 impl Park for DefaultPark {
@@ -65,11 +76,13 @@ impl Park for DefaultPark {
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.inner.park(None)
+        self.inner.park(None);
+        Ok(())
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.inner.park(Some(duration))
+        self.inner.park(Some(duration));
+        Ok(())
     }
 }
 
@@ -83,11 +96,11 @@ impl Unpark for DefaultUnpark {
 
 impl Inner {
     /// Park the current thread for at most `dur`.
-    fn park(&self, timeout: Option<Duration>) -> Result<(), ParkError> {
+    fn park(&self, timeout: Option<Duration>) {
         // If currently notified, then we skip sleeping. This is checked outside
         // of the lock to avoid acquiring a mutex if not necessary.
         match self.state.compare_and_swap(NOTIFY, IDLE, SeqCst) {
-            NOTIFY => return Ok(()),
+            NOTIFY => return,
             IDLE => {},
             _ => unreachable!(),
         }
@@ -95,7 +108,7 @@ impl Inner {
         // If the duration is zero, then there is no need to actually block
         if let Some(ref dur) = timeout {
             if *dur == Duration::from_millis(0) {
-                return Ok(());
+                return;
             }
         }
 
@@ -109,7 +122,7 @@ impl Inner {
                 // Notified before we could sleep, consume the notification and
                 // exit
                 self.state.store(IDLE, SeqCst);
-                return Ok(());
+                return;
             }
             IDLE => {},
             _ => unreachable!(),
@@ -128,8 +141,6 @@ impl Inner {
         // except that I find it helpful to make it explicit where we want the
         // mutex to unlock.
         drop(m);
-
-        Ok(())
     }
 
     fn unpark(&self) {

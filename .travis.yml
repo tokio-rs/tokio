@@ -35,15 +35,28 @@ script:
         # Make sure the benchmarks compile
         cargo build --benches --all
 
+        export ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0"
+        export TSAN_OPTIONS="suppressions=`pwd`/ci/tsan"
+
+        # === tokio-timer ====
+
         # Run address sanitizer
-        ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0" \
         RUSTFLAGS="-Z sanitizer=address" \
         cargo test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
 
         # Run thread sanitizer
-        TSAN_OPTIONS="suppressions=`pwd`/ci/tsan" \
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
+
+        # === tokio-threadpool ====
+
+        # Run address sanitizer
+        RUSTFLAGS="-Z sanitizer=address" \
+        cargo test -p tokio-threadpool --tests
+
+        # Run thread sanitizer
+        RUSTFLAGS="-Z sanitizer=thread" \
+        cargo test -p tokio-threadpool --tests
     fi
   - |
     set -e

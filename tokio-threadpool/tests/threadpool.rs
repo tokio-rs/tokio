@@ -26,7 +26,7 @@ fn lazy<R, F>(f: F) -> Box<Future<Item = R::Item, Error = R::Error> + Send> wher
 
 use std::cell::Cell;
 use std::sync::{mpsc, Arc};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use std::sync::atomic::*;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::Duration;
 
@@ -88,19 +88,25 @@ fn natural_shutdown_simple_futures() {
     let _ = ::env_logger::init();
 
     for _ in 0..1_000 {
-        static NUM_INC: AtomicUsize = ATOMIC_USIZE_INIT;
-        static NUM_DEC: AtomicUsize = ATOMIC_USIZE_INIT;
+        let num_inc = Arc::new(AtomicUsize::new(0));
+        let num_dec = Arc::new(AtomicUsize::new(0));
 
         FOO.with(|f| {
             f.set(1);
 
-            let pool = Builder::new()
-                .around_worker(|w, _| {
-                    NUM_INC.fetch_add(1, Relaxed);
-                    w.run();
-                    NUM_DEC.fetch_add(1, Relaxed);
-                })
-                .build();
+            let pool = {
+                let num_inc = num_inc.clone();
+                let num_dec = num_dec.clone();
+
+                Builder::new()
+                    .around_worker(move |w, _| {
+                        num_inc.fetch_add(1, Relaxed);
+                        w.run();
+                        num_dec.fetch_add(1, Relaxed);
+                    })
+                    .build()
+            };
+
             let mut tx = pool.sender().clone();
 
             let a = {
@@ -136,11 +142,11 @@ fn natural_shutdown_simple_futures() {
             await_shutdown(pool.shutdown());
 
             // Assert that at least one thread started
-            let num_inc = NUM_INC.load(Relaxed);
+            let num_inc = num_inc.load(Relaxed);
             assert!(num_inc > 0);
 
             // Assert that all threads shutdown
-            let num_dec = NUM_DEC.load(Relaxed);
+            let num_dec = num_dec.load(Relaxed);
             assert_eq!(num_inc, num_dec);
         });
     }
@@ -255,6 +261,8 @@ fn drop_threadpool_drops_futures() {
         let b = num_dec.clone();
 
         let pool = Builder::new()
+            .max_blocking(2)
+            .pool_size(20)
             .around_worker(move |w, _| {
                 a.fetch_add(1, Relaxed);
                 w.run();
@@ -471,7 +479,11 @@ fn busy_threadpool_is_not_idle() {
     #[cfg(feature = "unstable-futures")]
     use futures2::channel::oneshot;
 
-    let pool = ThreadPool::new();
+    // let pool = ThreadPool::new();
+    let pool = Builder::new()
+        .pool_size(4)
+        .max_blocking(2)
+        .build();
     let mut tx = pool.sender().clone();
 
     let (term_tx, term_rx) = oneshot::channel();
@@ -547,102 +559,4 @@ fn panic_in_task() {
     spawn_pool(&mut tx, Boom);
 
     await_shutdown(pool.shutdown_on_idle());
-}
-
-#[test]
-#[cfg(not(feature = "unstable-futures"))]
-fn hammer() {
-    use futures::future;
-    use futures::sync::{oneshot, mpsc};
-
-    const N: usize = 1000;
-    const ITER: usize = 20;
-
-    struct Counted<T> {
-        cnt: Arc<AtomicUsize>,
-        inner: T,
-    }
-
-    impl<T: Future> Future for Counted<T> {
-        type Item = T::Item;
-        type Error = T::Error;
-
-        fn poll(&mut self) -> Poll<T::Item, T::Error> {
-            self.inner.poll()
-        }
-    }
-
-    impl<T> Drop for Counted<T> {
-        fn drop(&mut self) {
-            self.cnt.fetch_add(1, Relaxed);
-        }
-    }
-
-    for _ in 0.. ITER {
-        let pool = Builder::new()
-            // .pool_size(30)
-            .build();
-
-        let cnt = Arc::new(AtomicUsize::new(0));
-
-        let (listen_tx, listen_rx) = mpsc::unbounded::<oneshot::Sender<oneshot::Sender<()>>>();
-        let mut listen_tx = listen_tx.wait();
-
-        pool.spawn({
-            let c1 = cnt.clone();
-            let c2 = cnt.clone();
-            let pool = pool.sender().clone();
-            let task = listen_rx
-                .map_err(|e| panic!("accept error = {:?}", e))
-                .for_each(move |tx| {
-                    let task = future::lazy(|| {
-                        let (tx2, rx2) = oneshot::channel();
-
-                        tx.send(tx2).unwrap();
-                        rx2
-                    })
-                    .map_err(|e| panic!("e={:?}", e))
-                    .and_then(|_| {
-                        Ok(())
-                    });
-
-                    pool.spawn(Counted {
-                        inner: task,
-                        cnt: c1.clone(),
-                    }).unwrap();
-
-                    Ok(())
-                });
-
-            Counted {
-                inner: task,
-                cnt: c2,
-            }
-        });
-
-        for _ in 0..N {
-            let cnt = cnt.clone();
-            let (tx, rx) = oneshot::channel();
-            listen_tx.send(tx).unwrap();
-
-            pool.spawn({
-                let task = rx
-                    .map_err(|e| panic!("rx err={:?}", e))
-                    .and_then(|tx| {
-                        tx.send(()).unwrap();
-                        Ok(())
-                    });
-
-                Counted {
-                    inner: task,
-                    cnt,
-                }
-            });
-        }
-
-        drop(listen_tx);
-
-        pool.shutdown_on_idle().wait().unwrap();
-        assert_eq!(N * 2 + 1, cnt.load(Relaxed));
-    }
 }

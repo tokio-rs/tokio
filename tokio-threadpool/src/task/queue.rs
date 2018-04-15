@@ -13,7 +13,7 @@ pub(crate) struct Queue {
     /// This is a strong reference to `Task` (i.e, `Arc<Task>`)
     head: AtomicPtr<Task>,
 
-    /// Tail pointer. This is `Arc<Task>`.
+    /// Tail pointer. This is `Arc<Task>` unless it points to `stub`.
     tail: UnsafeCell<*mut Task>,
 
     /// Stub pointer, used as part of the intrusive mpsc channel algorithm

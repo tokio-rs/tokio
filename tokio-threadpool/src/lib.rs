@@ -4,8 +4,10 @@
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 extern crate tokio_executor;
-extern crate futures;
+
 extern crate crossbeam_deque as deque;
+#[macro_use]
+extern crate futures;
 extern crate num_cpus;
 extern crate rand;
 
@@ -17,6 +19,7 @@ extern crate futures2;
 
 pub mod park;
 
+mod blocking;
 mod builder;
 mod callback;
 mod config;
@@ -31,6 +34,7 @@ mod task;
 mod thread_pool;
 mod worker;
 
+pub use blocking::{blocking, BlockingError};
 pub use builder::Builder;
 pub use sender::Sender;
 pub use shutdown::Shutdown;
