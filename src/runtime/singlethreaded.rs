@@ -107,10 +107,12 @@ impl SingleThreaded {
             });
         });
     }
-}
 
-impl Drop for SingleThreaded {
-    fn drop(&mut self) {
+    /// Blocks and runs the given future untill there are no other futures left in the executor
+    ///
+    /// This is similar to running a runtime, but uses only the current thread.
+    pub fn run<F: Future<Item = (), Error = ()>>(&mut self, f: F) -> () {
+        self.block_on(f);
         self.shutdown_on_idle();
     }
 }
