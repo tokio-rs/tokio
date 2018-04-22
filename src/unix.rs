@@ -90,7 +90,11 @@ impl Child {
         if self.reaped {
             Ok(())
         } else {
-            self.inner.kill()
+            self.inner.kill()?;
+            let mut status = 0;
+            let id = self.id() as c_int;
+            unsafe { libc::waitpid(id, &mut status, 0) };
+            Ok(())
         }
     }
 
