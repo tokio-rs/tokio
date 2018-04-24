@@ -56,7 +56,8 @@ fn runtime_single_threaded() {
     let mut runtime = tokio::runtime::current_thread::Builder::new()
         .build()
         .unwrap();
-    runtime.run(create_client_server_future());
+    runtime.block_on(create_client_server_future()).unwrap();
+    runtime.run().unwrap();
 }
 
 #[test]

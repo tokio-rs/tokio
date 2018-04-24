@@ -59,7 +59,8 @@ impl Runtime {
     /// Blocks and runs the given future.
     ///
     /// This is similar to running a runtime, but uses only the current thread.
-    pub fn block_on<F: Future<Item = (), Error = ()>>(&mut self, f: F) -> () {
+    pub fn block_on<F: Future<Item = (), Error = ()>>(&mut self, f: F)
+            -> Result<(), current_thread::BlockError<()>> {
         let Runtime { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
 
         // Binds an executor to this thread
@@ -76,16 +77,16 @@ impl Runtime {
                 tokio_executor::with_default(&mut default_executor, enter, |enter| {
                     let mut executor = executor.enter(enter);
                     // Run the provided future
-                    executor.block_on(f).unwrap();
-                });
-            });
-        });
+                    executor.block_on(f)
+                })
+            })
+        })
     }
 
     /// Blocks and runs all the other futures that are still left in the executor
     ///
     /// This is similar to running a runtime, but uses only the current thread.
-    fn shutdown_on_idle(&mut self) -> () {
+    pub fn run(&mut self) -> Result<(), current_thread::RunError> {
         let Runtime { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
 
         // Binds an executor to this thread
@@ -102,17 +103,9 @@ impl Runtime {
                 tokio_executor::with_default(&mut default_executor, enter, |enter| {
                     let mut executor = executor.enter(enter);
                     // Run all the other futures that are still left in the executor
-                    executor.run().unwrap();
-                });
-            });
-        });
-    }
-
-    /// Blocks and runs the given future untill there are no other futures left in the executor
-    ///
-    /// This is similar to running a runtime, but uses only the current thread.
-    pub fn run<F: Future<Item = (), Error = ()>>(&mut self, f: F) -> () {
-        self.block_on(f);
-        self.shutdown_on_idle();
+                    executor.run()
+                })
+            })
+        })
     }
 }
