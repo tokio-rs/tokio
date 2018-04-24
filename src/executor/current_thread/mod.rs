@@ -147,10 +147,18 @@ pub struct TaskExecutor {
     _p: ::std::marker::PhantomData<Rc<()>>,
 }
 
-/// Returned by the `turn` function. Contains `true` if any futures were
-/// polled at all and `false` otherwise.
+/// Returned by the `turn` function.
 #[derive(Debug)]
-pub struct Turn(pub bool);
+pub struct Turn {
+    polled: bool
+}
+
+impl Turn {
+    /// `true` if any futures were polled at all and `false` otherwise.
+    pub fn has_polled(&self) -> bool {
+        self.polled
+    }
+}
 
 /// A `CurrentThread` instance bound to a supplied execution conext.
 pub struct Entered<'a, P: Park + 'a> {
@@ -481,29 +489,22 @@ impl<'a, P: Park> Entered<'a, P> {
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
-        const ZERO_DURATION: Duration = Duration::from_millis(0);
+        let res = if self.executor.scheduler.has_pending_futures() {
+            self.executor.park.park_timeout(Duration::from_millis(0))
+        } else {
+            match duration {
+                Some(duration) => self.executor.park.park_timeout(duration),
+                None => self.executor.park.park(),
+            }
+        };
 
-        let res = self.executor.park.park_timeout(ZERO_DURATION);
         if res.is_err() {
             return Err(TurnError { _p: () });
         }
 
-        let mut polled = self.tick();
+        let polled = self.tick();
 
-        if !polled && duration.map(|d| d > ZERO_DURATION).unwrap_or(true) {
-            let res = match duration {
-                Some(duration) => self.executor.park.park_timeout(duration),
-                None => self.executor.park.park(),
-            };
-
-            if res.is_err() {
-                return Err(TurnError { _p: () });
-            }
-
-            polled = self.tick();
-        }
-
-        Ok(Turn(polled))
+        Ok(Turn { polled })
     }
 
     fn run_timeout2(&mut self, dur: Option<Duration>)
