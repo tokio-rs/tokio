@@ -19,25 +19,25 @@ use std::io;
 /// Creating a new `Runtime` with default configuration values.
 ///
 /// ```
-/// use tokio::runtime::SingleThreaded;
+/// use tokio::runtime::current_thread::Runtime;
 /// use tokio::prelude::*;
 ///
-/// let mut runtime = SingleThreaded::new().unwrap();
+/// let mut runtime = Runtime::new().unwrap();
 ///
 /// // Use the runtime...
 /// // runtime.block_on(f); // where f is a future
 /// ```
 #[derive(Debug)]
-pub struct SingleThreaded {
+pub struct Runtime {
     reactor_handle: tokio_reactor::Handle,
     timer_handle: timer::Handle,
     executor: CurrentThread<Timer<Reactor>>,
 }
 
-impl SingleThreaded {
+impl Runtime {
     /// Returns a new single-threaded runtime initialized with default
     /// configuration values.
-    pub fn new() -> io::Result<SingleThreaded> {
+    pub fn new() -> io::Result<Runtime> {
         // We need a reactor to receive events about IO objects from kernel
         let reactor = Reactor::new()?;
         let reactor_handle = reactor.handle();
@@ -52,7 +52,7 @@ impl SingleThreaded {
         // futures to continue in their life.
         let executor = CurrentThread::new_with_park(timer);
 
-        let runtime = SingleThreaded { reactor_handle, timer_handle, executor };
+        let runtime = Runtime { reactor_handle, timer_handle, executor };
         Ok(runtime)
     }
 
@@ -60,7 +60,7 @@ impl SingleThreaded {
     ///
     /// This is similar to running a runtime, but uses only the current thread.
     pub fn block_on<F: Future<Item = (), Error = ()>>(&mut self, f: F) -> () {
-        let SingleThreaded { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
+        let Runtime { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
 
         // Binds an executor to this thread
         let mut enter = tokio_executor::enter().expect("Multiple executors at once");
@@ -86,7 +86,7 @@ impl SingleThreaded {
     ///
     /// This is similar to running a runtime, but uses only the current thread.
     fn shutdown_on_idle(&mut self) -> () {
-        let SingleThreaded { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
+        let Runtime { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
 
         // Binds an executor to this thread
         let mut enter = tokio_executor::enter().expect("Multiple executors at once");

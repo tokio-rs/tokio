@@ -113,12 +113,11 @@
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 
 mod builder;
-mod singlethreaded;
+pub mod current_thread;
 mod shutdown;
 mod task_executor;
 
 pub use self::builder::Builder;
-pub use self::singlethreaded::SingleThreaded;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 

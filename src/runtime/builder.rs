@@ -1,4 +1,4 @@
-use runtime::{Inner, Runtime, SingleThreaded};
+use runtime::{Inner, Runtime};
 
 use reactor::Reactor;
 
@@ -66,23 +66,6 @@ impl Builder {
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
         self
-    }
-
-    /// Create a new singlethreaded runtime
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate tokio;
-    /// # use tokio::runtime::Builder;
-    /// # pub fn main() {
-    /// let mut runtime = Builder::new().build_single_threaded().unwrap();
-    /// // ... call runtime.block_on(f) where f is a future
-    /// # let _ = runtime;
-    /// # }
-    /// ```
-    pub fn build_single_threaded(&mut self) -> io::Result<SingleThreaded> {
-        SingleThreaded::new()
     }
 
     /// Create the configured `Runtime`.
