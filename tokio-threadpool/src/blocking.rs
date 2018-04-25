@@ -2,6 +2,9 @@ use worker::Worker;
 
 use futures::Poll;
 
+use std::error::Error;
+use std::fmt;
+
 /// Error raised by `blocking`.
 #[derive(Debug)]
 pub struct BlockingError {
@@ -124,7 +127,7 @@ where F: FnOnce() -> T,
         };
 
         // Transition the worker state to blocking. This will exit the fn early
-        // with `NotRead` if the pool does not have enough capacity to enter
+        // with `NotReady` if the pool does not have enough capacity to enter
         // blocking mode.
         worker.transition_to_blocking()
     });
@@ -145,4 +148,16 @@ where F: FnOnce() -> T,
 
     // Return the result
     Ok(ret.into())
+}
+
+impl fmt::Display for BlockingError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for BlockingError {
+    fn description(&self) -> &str {
+        "`blocking` annotation used from outside the context of a thread pool"
+    }
 }
