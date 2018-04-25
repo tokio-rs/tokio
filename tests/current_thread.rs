@@ -2,7 +2,6 @@
 
 extern crate tokio;
 extern crate tokio_executor;
-extern crate tokio_reactor;
 extern crate futures;
 
 use tokio::executor::current_thread::{self, block_on_all, CurrentThread};
@@ -430,25 +429,56 @@ fn turn_has_polled() {
     assert!(!res.has_polled());
 }
 
+// Our own mock Park that is never really waiting and the only
+// thing it does is to send, on request, something (once) to a onshot
+// channel
+struct MyPark {
+    sender: Option<oneshot::Sender<()>>,
+    send_now: Rc<Cell<bool>>,
+}
+
+struct MyUnpark;
+
+impl tokio_executor::park::Park for MyPark {
+    type Unpark = MyUnpark;
+    type Error = ();
+
+    fn unpark(&self) -> Self::Unpark {
+        MyUnpark
+    }
+
+    fn park(&mut self) -> Result<(), Self::Error> {
+        // If called twice with send_now, this will intentionally panic
+        if self.send_now.get() {
+            self.sender.take().unwrap().send(()).unwrap();
+        }
+
+        Ok(())
+    }
+
+    fn park_timeout(&mut self, _duration: Duration) -> Result<(), Self::Error> {
+        self.park()
+    }
+}
+
+impl tokio_executor::park::Unpark for MyUnpark {
+    fn unpark(&self) {}
+}
+
 #[test]
 fn turn_fair() {
-    use std::net as std_net;
-    use tokio::net as tokio_net;
-
-    let receiver_socket = tokio_net::UdpSocket::bind(&"0.0.0.0:0".parse().unwrap()).unwrap();
-    let local_addr = receiver_socket.local_addr().unwrap();
-    let sender_socket = std_net::UdpSocket::bind("0.0.0.0:0").unwrap();
+    let send_now = Rc::new(Cell::new(false));
 
     let (sender, receiver) = oneshot::channel::<()>();
-
     let (sender_2, receiver_2) = oneshot::channel::<()>();
+    let (sender_3, receiver_3) = oneshot::channel::<()>();
 
-    let reactor = tokio_reactor::Reactor::new().unwrap();
+    let my_park = MyPark {
+        sender: Some(sender_3),
+        send_now: send_now.clone(),
+    };
 
-    reactor.set_fallback().unwrap();
-    let handle = reactor.handle();
-    let mut enter = ::tokio_executor::enter().unwrap();
-    let mut current_thread = CurrentThread::new_with_park(reactor);
+    let mut current_thread = CurrentThread::new_with_park(my_park);
 
     let receiver_1_done = Rc::new(Cell::new(false));
     let receiver_1_done_clone = receiver_1_done.clone();
@@ -476,65 +506,65 @@ fn turn_fair() {
         })
     );
 
-    let count = Rc::new(Cell::new(0));
-    let count_clone = count.clone();
-    // Just count the number of packets we received
-    current_thread.spawn(receiver_socket.recv_dgram(vec![0; 128])
-        .map_err(|_| unreachable!())
-        .and_then(move |(_socket, _buf, _len, _addr)| {
-            count_clone.set(1 + count_clone.get());
+    // The third receiver is only woken up from our Park implementation, it simulates
+    // e.g. a socket that first has to be polled to know if it is ready now
+    let receiver_3_done = Rc::new(Cell::new(false));
+    let receiver_3_done_clone = receiver_3_done.clone();
 
+    current_thread.spawn(receiver_3
+        .map_err(|_| unreachable!())
+        .and_then(move |_| {
+            receiver_3_done_clone.set(true);
             Ok(())
         })
     );
 
-    tokio_reactor::with_default(&handle, &mut enter, move |enter| {
-        // First turn should've polled both and considered them not ready
-        let res = current_thread.enter(enter).turn(Some(Duration::from_millis(0))).unwrap();
-        assert!(res.has_polled());
+    // First turn should've polled both and considered them not ready
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    assert!(res.has_polled());
 
-        // Next turn should've polled nothing
-        let res = current_thread.enter(enter).turn(Some(Duration::from_millis(0))).unwrap();
-        assert!(!res.has_polled());
+    // Next turn should've polled nothing
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    assert!(!res.has_polled());
 
-        assert_eq!(count.get(), 0);
-        assert!(!receiver_1_done.get());
-        assert!(!receiver_2_done.get());
+    assert!(!receiver_1_done.get());
+    assert!(!receiver_2_done.get());
+    assert!(!receiver_3_done.get());
 
-        // After this the receiver future will wake up the second receiver future,
-        // so there are pending futures again
-        sender.send(()).unwrap();
+    // After this the receiver future will wake up the second receiver future,
+    // so there are pending futures again
+    sender.send(()).unwrap();
 
-        // Now the first receiver should be done, the second receiver should be ready
-        // to be polled again and the socket not yet
-        let res = current_thread.enter(enter).turn(None).unwrap();
-        assert!(res.has_polled());
+    // Now the first receiver should be done, the second receiver should be ready
+    // to be polled again and the socket not yet
+    let res = current_thread.turn(None).unwrap();
+    assert!(res.has_polled());
 
-        assert_eq!(count.get(), 0);
-        assert!(receiver_1_done.get());
-        assert!(!receiver_2_done.get());
+    assert!(receiver_1_done.get());
+    assert!(!receiver_2_done.get());
+    assert!(!receiver_3_done.get());
 
-        // After this the receiver socket would be ready to be polled again, but
-        // CurrentThread will only know about that if it parked the thread at least
-        // shortly, i.e. polled the reactor
-        sender_socket.send_to(&vec![1, 2, 3], &local_addr).unwrap();
+    // Now let our park implementation know that it should send something to sender 3
+    send_now.set(true);
 
-        // This should resolve the second receiver directly, but also poll the socket
-        // and read the packet from it. If it didn't do both here, we would handle
-        // futures that are woken up from the reactor and directly unfairly and would
-        // favour the ones that are woken up directly.
-        let res = current_thread.enter(enter).turn(None).unwrap();
-        assert!(res.has_polled());
+    // This should resolve the second receiver directly, but also poll the socket
+    // and read the packet from it. If it didn't do both here, we would handle
+    // futures that are woken up from the reactor and directly unfairly and would
+    // favour the ones that are woken up directly.
+    let res = current_thread.turn(None).unwrap();
+    assert!(res.has_polled());
 
-        assert_eq!(count.get(), 1);
-        assert!(receiver_1_done.get());
-        assert!(receiver_2_done.get());
+    assert!(receiver_1_done.get());
+    assert!(receiver_2_done.get());
+    assert!(receiver_3_done.get());
 
-        // Now we should be idle and turning should not poll anything
-        assert!(current_thread.is_idle());
-        let res = current_thread.enter(enter).turn(None).unwrap();
-        assert!(!res.has_polled());
-    });
+    // Don't send again
+    send_now.set(false);
+
+    // Now we should be idle and turning should not poll anything
+    assert!(current_thread.is_idle());
+    let res = current_thread.turn(None).unwrap();
+    assert!(!res.has_polled());
 }
 
 fn ok() -> future::FutureResult<(), ()> {
