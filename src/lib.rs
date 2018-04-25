@@ -398,6 +398,36 @@ impl Child {
     /// Normally a `Child` is killed if it's still alive when dropped, but this
     /// method will ensure that the child may continue running once the `Child`
     /// instance is dropped.
+    ///
+    /// > **Note**: this method may leak OS resources depending on your platform.
+    /// > To ensure resources are eventually cleaned up, consider sending the
+    /// > `Child` instance into an event loop as an alternative to this method.
+    ///
+    /// ```no_run
+    /// # extern crate futures;
+    /// # extern crate tokio_core;
+    /// # extern crate tokio_process;
+    /// #
+    /// # use std::process::Command;
+    /// #
+    /// # use futures::Future;
+    /// # use tokio_core::reactor::Core;
+    /// # use tokio_process::CommandExt;
+    /// #
+    /// # fn main() {
+    /// let core = Core::new().unwrap();
+    /// let handle = core.handle();
+    ///
+    /// let child = Command::new("echo").arg("hello").arg("world")
+    ///                     .spawn_async(&handle)
+    ///                     .expect("failed to spawn");
+    ///
+    /// let do_cleanup = child.map(|_| ()) // Ignore result
+    ///                       .map_err(|_| ()); // Ignore errors
+    ///
+    /// handle.spawn(do_cleanup);
+    /// # }
+    /// ```
     pub fn forget(mut self) {
         self.kill_on_drop = false;
     }
