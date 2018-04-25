@@ -196,6 +196,15 @@ where U: Unpark,
         self.inner.enqueue(ptr);
     }
 
+    /// Returns `true` if there are currently any pending futures
+    pub fn has_pending_futures(&mut self) -> bool {
+        // See function definition for why the unsafe is needed and
+        // correctly used here
+        unsafe {
+            self.inner.has_pending_futures()
+        }
+    }
+
     /// Advance the scheduler state, returning `true` if any futures were
     /// processed.
     ///
@@ -437,6 +446,22 @@ impl<U> Inner<U> {
             let prev = self.head_readiness.swap(node, AcqRel);
             (*prev).next_readiness.store(node, Release);
         }
+    }
+
+    /// Returns `true` if there are currently any pending futures
+    ///
+    /// See `dequeue` for an explanation why this function is unsafe.
+    unsafe fn has_pending_futures(&self) -> bool {
+        let tail = *self.tail_readiness.get();
+        let next = (*tail).next_readiness.load(Acquire);
+
+        if tail == self.stub() {
+            if next.is_null() {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// The dequeue function from the 1024cores intrusive MPSC queue algorithm
