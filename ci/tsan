@@ -22,7 +22,7 @@ race:crossbeam_deque
 # TODO: It would be nice to not have to filter this out.
 race:try_steal_task
 
-# This filters out an expected data race in the treiber stack implementation.
+# This filters out expected data race in the treiber stack implementations.
 # Treiber stacks are inherently racy. The pop operation will attempt to access
 # the "next" pointer on the node it is attempting to pop. However, at this
 # point it has not gained ownership of the node and another thread might beat
@@ -30,3 +30,4 @@ race:try_steal_task
 # original pop operation will fail due to the ABA guard, but tsan still picks
 # up the access on the next pointer.
 race:Backup::next_sleeper
+race:WorkerEntry::set_next_sleeper

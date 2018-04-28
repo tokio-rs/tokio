@@ -1,6 +1,6 @@
 use {codec, AsyncRead, AsyncWrite};
 
-use bytes::{Buf, BufMut, BytesMut, IntoBuf, BigEndian, LittleEndian};
+use bytes::{Buf, BufMut, BytesMut, IntoBuf};
 use bytes::buf::Chain;
 
 use futures::{Async, AsyncSink, Stream, Sink, StartSend, Poll};
@@ -291,9 +291,9 @@ impl Decoder {
 
             // match endianess
             let n = if self.builder.length_field_is_big_endian {
-                src.get_uint::<BigEndian>(field_len)
+                src.get_uint_be(field_len)
             } else {
-                src.get_uint::<LittleEndian>(field_len)
+                src.get_uint_le(field_len)
             };
 
             if n > self.builder.max_frame_len as u64 {
@@ -479,9 +479,9 @@ impl<T: AsyncWrite, B: IntoBuf> FramedWrite<T, B> {
         };
 
         if self.builder.length_field_is_big_endian {
-            head.put_uint::<BigEndian>(n as u64, self.builder.length_field_len);
+            head.put_uint_be(n as u64, self.builder.length_field_len);
         } else {
-            head.put_uint::<LittleEndian>(n as u64, self.builder.length_field_len);
+            head.put_uint_le(n as u64, self.builder.length_field_len);
         }
 
         debug_assert!(self.frame.is_none());

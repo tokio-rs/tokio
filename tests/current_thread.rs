@@ -392,6 +392,181 @@ fn hammer_turn() {
     }
 }
 
+#[test]
+fn turn_has_polled() {
+    let mut current_thread = CurrentThread::new();
+
+    // Spawn oneshot receiver
+    let (sender, receiver) = oneshot::channel::<()>();
+    current_thread.spawn(receiver.then(|_| Ok(())));
+
+    // Turn once...
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+
+    // Should've polled the receiver once, but considered it not ready
+    assert!(res.has_polled());
+
+    // Turn another time
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+
+    // Should've polled nothing, the receiver is not ready yet
+    assert!(!res.has_polled());
+
+    // Make the receiver ready
+    sender.send(()).unwrap();
+
+    // Turn another time
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+
+    // Should've polled the receiver, it's ready now
+    assert!(res.has_polled());
+
+    // Now the executor should be empty
+    assert!(current_thread.is_idle());
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+
+    // So should've polled nothing
+    assert!(!res.has_polled());
+}
+
+// Our own mock Park that is never really waiting and the only
+// thing it does is to send, on request, something (once) to a onshot
+// channel
+struct MyPark {
+    sender: Option<oneshot::Sender<()>>,
+    send_now: Rc<Cell<bool>>,
+}
+
+struct MyUnpark;
+
+impl tokio_executor::park::Park for MyPark {
+    type Unpark = MyUnpark;
+    type Error = ();
+
+    fn unpark(&self) -> Self::Unpark {
+        MyUnpark
+    }
+
+    fn park(&mut self) -> Result<(), Self::Error> {
+        // If called twice with send_now, this will intentionally panic
+        if self.send_now.get() {
+            self.sender.take().unwrap().send(()).unwrap();
+        }
+
+        Ok(())
+    }
+
+    fn park_timeout(&mut self, _duration: Duration) -> Result<(), Self::Error> {
+        self.park()
+    }
+}
+
+impl tokio_executor::park::Unpark for MyUnpark {
+    fn unpark(&self) {}
+}
+
+#[test]
+fn turn_fair() {
+    let send_now = Rc::new(Cell::new(false));
+
+    let (sender, receiver) = oneshot::channel::<()>();
+    let (sender_2, receiver_2) = oneshot::channel::<()>();
+    let (sender_3, receiver_3) = oneshot::channel::<()>();
+
+    let my_park = MyPark {
+        sender: Some(sender_3),
+        send_now: send_now.clone(),
+    };
+
+    let mut current_thread = CurrentThread::new_with_park(my_park);
+
+    let receiver_1_done = Rc::new(Cell::new(false));
+    let receiver_1_done_clone = receiver_1_done.clone();
+
+    // Once an item is received on the oneshot channel, it will immediately
+    // immediately make the second oneshot channel ready
+    current_thread.spawn(receiver
+        .map_err(|_| unreachable!())
+        .and_then(move |_| {
+            sender_2.send(()).unwrap();
+            receiver_1_done_clone.set(true);
+
+            Ok(())
+        })
+    );
+
+    let receiver_2_done = Rc::new(Cell::new(false));
+    let receiver_2_done_clone = receiver_2_done.clone();
+
+    current_thread.spawn(receiver_2
+        .map_err(|_| unreachable!())
+        .and_then(move |_| {
+            receiver_2_done_clone.set(true);
+            Ok(())
+        })
+    );
+
+    // The third receiver is only woken up from our Park implementation, it simulates
+    // e.g. a socket that first has to be polled to know if it is ready now
+    let receiver_3_done = Rc::new(Cell::new(false));
+    let receiver_3_done_clone = receiver_3_done.clone();
+
+    current_thread.spawn(receiver_3
+        .map_err(|_| unreachable!())
+        .and_then(move |_| {
+            receiver_3_done_clone.set(true);
+            Ok(())
+        })
+    );
+
+    // First turn should've polled both and considered them not ready
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    assert!(res.has_polled());
+
+    // Next turn should've polled nothing
+    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    assert!(!res.has_polled());
+
+    assert!(!receiver_1_done.get());
+    assert!(!receiver_2_done.get());
+    assert!(!receiver_3_done.get());
+
+    // After this the receiver future will wake up the second receiver future,
+    // so there are pending futures again
+    sender.send(()).unwrap();
+
+    // Now the first receiver should be done, the second receiver should be ready
+    // to be polled again and the socket not yet
+    let res = current_thread.turn(None).unwrap();
+    assert!(res.has_polled());
+
+    assert!(receiver_1_done.get());
+    assert!(!receiver_2_done.get());
+    assert!(!receiver_3_done.get());
+
+    // Now let our park implementation know that it should send something to sender 3
+    send_now.set(true);
+
+    // This should resolve the second receiver directly, but also poll the socket
+    // and read the packet from it. If it didn't do both here, we would handle
+    // futures that are woken up from the reactor and directly unfairly and would
+    // favour the ones that are woken up directly.
+    let res = current_thread.turn(None).unwrap();
+    assert!(res.has_polled());
+
+    assert!(receiver_1_done.get());
+    assert!(receiver_2_done.get());
+    assert!(receiver_3_done.get());
+
+    // Don't send again
+    send_now.set(false);
+
+    // Now we should be idle and turning should not poll anything
+    assert!(current_thread.is_idle());
+    let res = current_thread.turn(None).unwrap();
+    assert!(!res.has_polled());
+}
+
 fn ok() -> future::FutureResult<(), ()> {
     future::ok(())
 }
