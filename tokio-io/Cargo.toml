@@ -17,6 +17,6 @@ Core I/O primitives for asynchronous I/O in Rust.
 categories = ["asynchronous"]
 
 [dependencies]
-bytes = "0.4.1"
+bytes = "0.4.7"
 futures = "0.1.18"
 log = "0.4"
