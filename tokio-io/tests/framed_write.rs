@@ -28,7 +28,7 @@ impl Encoder for U32Encoder {
     fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {
         // Reserve space
         dst.reserve(4);
-        dst.put_u32::<BigEndian>(item);
+        dst.put_u32_be(item);
         Ok(())
     }
 }
@@ -65,7 +65,7 @@ fn write_hits_backpressure() {
 
     for i in 0..(ITER + 1) {
         let mut b = BytesMut::with_capacity(4);
-        b.put_u32::<BigEndian>(i as u32);
+        b.put_u32_be(i as u32);
 
         // Append to the end
         match mock.calls.back_mut().unwrap() {
