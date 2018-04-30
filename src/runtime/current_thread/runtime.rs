@@ -59,8 +59,9 @@ impl Runtime {
     /// Blocks and runs the given future.
     ///
     /// This is similar to running a runtime, but uses only the current thread.
-    pub fn block_on<F: Future<Item = (), Error = ()>>(&mut self, f: F)
-            -> Result<(), current_thread::BlockError<()>> {
+    pub fn block_on<F>(&mut self, f: F) -> Result<F::Item, F::Error>
+        where F: Future
+    {
         let Runtime { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
 
         // Binds an executor to this thread
@@ -77,7 +78,8 @@ impl Runtime {
                 tokio_executor::with_default(&mut default_executor, enter, |enter| {
                     let mut executor = executor.enter(enter);
                     // Run the provided future
-                    executor.block_on(f)
+                    let ret = executor.block_on(f);
+                    ret.map_err(|e| e.into_inner().expect("unexpected execution error"))
                 })
             })
         })
