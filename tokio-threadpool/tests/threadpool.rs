@@ -11,7 +11,7 @@ use tokio_threadpool::*;
 #[cfg(not(feature = "unstable-futures"))]
 use futures::{Poll, Sink, Stream, Async, Future};
 #[cfg(not(feature = "unstable-futures"))]
-use futures::future::lazy;
+use futures::future::{lazy, ok, poll_fn};
 
 #[cfg(feature = "unstable-futures")]
 use futures2::prelude::*;
@@ -585,4 +585,33 @@ fn test_block_on() {
 #[should_panic]
 fn test_block_on_panic() {
     let _ = ThreadPool::new().sender().block_on(lazy::<_, Result<(), ()>>(|| panic!()));
+}
+
+#[test]
+#[should_panic]
+fn test_block_on_async_context() {
+    let pool = ThreadPool::new();
+    let sender = pool.sender();
+    let _ = sender.block_on(lazy::<_, Result<(), ()>>(|| {
+        let _ = sender.block_on(ok::<(), ()>(()));
+        Ok(())
+    }));
+}
+
+#[test]
+fn test_block_on_shutdown() {
+    let pool = ThreadPool::new();
+    let sender = pool.sender().clone();
+    let mut pool = Some(pool);
+
+    // Shutdown the pool while the future is executing.
+    let error = sender.block_on(poll_fn::<(), (), _>(move || {
+        pool.take().map(ThreadPool::shutdown);
+        Ok(Async::NotReady)
+    })).unwrap_err();
+    assert!(error.is_shutdown());
+
+    // Execute a future on an already shutdown pool.
+    let error = sender.block_on(ok::<(), ()>(())).unwrap_err();
+    assert!(error.is_shutdown());
 }

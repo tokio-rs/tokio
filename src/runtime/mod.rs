@@ -372,8 +372,8 @@ impl Runtime {
     ///
     /// # Panics
     ///
-    /// This function panics if the executor it at capacity, or if the provided
-    /// future panics.
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
     pub fn block_on<F>(&mut self, future: F) -> Result<F::Item, F::Error>
         where F: Future + Send,
               F::Item: Send,

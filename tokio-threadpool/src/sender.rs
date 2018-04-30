@@ -115,25 +115,52 @@ impl Sender {
     ///
     /// # Panics
     ///
-    /// This method will panic if the provided future panics.
+    /// This method will panic if the provided future panics, or if called from
+    /// within an asynchronous execution context.
     pub fn block_on<F>(&self, mut future: F) -> Result<Result<F::Item, F::Error>, SpawnError>
         where F: Future + Send,
               F::Item: Send,
               F::Error: Send {
 
-        struct BlockOnFuture<F> where F: Future + Send {
+        /// A task which drives the future, notifying the calling thread when it completes.
+        struct BlockOnTask<F>
+            where F: Future + Send,
+                  F::Item: Send,
+                  F::Error: Send {
             future: *mut F,
-            result: *mut thread::Result<Result<F::Item, F::Error>>,
-            finished: *const AtomicBool,
+            result: *mut thread::Result<Result<Result<F::Item, F::Error>, SpawnError>>,
+            /// A local mirror of `finished_flag` which prevents reading from `finished_flag` after
+            /// notifying the thread, since the lifetime of `finished_flag` may be complete at that
+            /// point.
+            finished: bool,
+            finished_flag: *const AtomicBool,
             thread: *const Thread,
         }
 
-        unsafe impl <F> Send for BlockOnFuture<F>
+        impl <F> BlockOnTask<F>
             where F: Future + Send,
                   F::Item: Send,
-                  F::Error: Send {};
+                  F::Error: Send {
 
-        impl <F> Future for BlockOnFuture<F> where F: Future + Send {
+            /// Notifies the waiting thread with a result.
+            ///
+            /// # Unsafety
+            ///
+            /// This function must only be called once per `BlockOnTask`.
+            unsafe fn notify(&mut self,
+                             result: thread::Result<Result<Result<F::Item, F::Error>, SpawnError>>) {
+                debug_assert!(!self.finished);
+                ptr::write(self.result, result);
+                (&*self.finished_flag).store(true, Release);
+                (&*self.thread).unpark();
+                self.finished = true;
+            }
+        }
+
+        impl <F> Future for BlockOnTask<F>
+            where F: Future + Send,
+                  F::Item: Send,
+                  F::Error: Send {
             type Item = ();
             type Error = ();
             fn poll(&mut self) -> Poll<(), ()> {
@@ -142,40 +169,60 @@ impl Sender {
                         (&mut *self.future).poll()
                     }));
                     let result = match result {
-                        Ok(Ok(Async::Ready(item))) => Ok(Ok(item)),
+                        Ok(Ok(Async::Ready(item))) => Ok(Ok(Ok(item))),
                         Ok(Ok(Async::NotReady)) => return Ok(Async::NotReady),
-                        Ok(Err(error)) => Ok(Err(error)),
+                        Ok(Err(error)) => Ok(Ok(Err(error))),
                         Err(panic) => Err(panic),
                     };
-                    ptr::write(self.result, result);
-                    (&*self.finished).store(true, Release);
-                    (&*self.thread).unpark();
+                    self.notify(result);
                 }
                 Ok(Async::Ready(()))
             }
         }
 
-        let mut result: thread::Result<Result<F::Item, F::Error>> = unsafe { mem::uninitialized() };
-        let finished = AtomicBool::new(false);
+        unsafe impl <F> Send for BlockOnTask<F>
+            where F: Future + Send,
+                  F::Item: Send,
+                  F::Error: Send {};
+
+        impl <F> Drop for BlockOnTask<F>
+            where F: Future + Send,
+                  F::Item: Send,
+                  F::Error: Send {
+            fn drop(&mut self) {
+                // If the task is dropped before it's complete, then the threadpool has been shut
+                // down. Notify the waiting thread that a threadpool error has occurred.
+                if !self.finished {
+                    unsafe { self.notify(Ok(Err(SpawnError::shutdown()))); }
+                }
+            }
+        }
+
+        tokio_executor::enter().expect("block_on called from within an async execution context");
+
+        let mut result: thread::Result<Result<Result<F::Item, F::Error>, SpawnError>> =
+            unsafe { mem::uninitialized() };
+        let finished_flag = AtomicBool::new(false);
         let thread = thread::current();
 
-        let future: Box<Future<Item=(), Error=()>> = Box::new(BlockOnFuture {
+        let task: Box<Future<Item=(), Error=()>> = Box::new(BlockOnTask {
             future: &mut future,
             result: &mut result,
-            finished: &finished,
+            finished: false,
+            finished_flag: &finished_flag,
             thread: &thread,
         });
-        let future: Box<Future<Item=(), Error=()> + Send> = unsafe { mem::transmute(future) };
+        let task: Box<Future<Item=(), Error=()> + Send> = unsafe { mem::transmute(task) };
 
         let mut s = self;
-        tokio_executor::Executor::spawn(&mut s, future)?;
+        tokio_executor::Executor::spawn(&mut s, task)?;
 
-        while !finished.load(Acquire) {
+        while !finished_flag.load(Acquire) {
             thread::park();
         }
 
         match result {
-            Ok(result) => Ok(result),
+            Ok(result) => result,
             Err(panic) => panic::resume_unwind(panic),
         }
     }
