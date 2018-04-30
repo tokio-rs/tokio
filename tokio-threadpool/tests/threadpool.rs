@@ -75,8 +75,12 @@ fn await_shutdown(shutdown: Shutdown) {
 }
 
 #[cfg(not(feature = "unstable-futures"))]
-fn block_on<F: Future>(f: F) -> Result<F::Item, F::Error> {
-    f.wait()
+fn block_on<F>(pool: &Sender, f: F) -> Result<F::Item, F::Error>
+    where F: Future + Send,
+          F::Item: Send,
+          F::Error: Send
+{
+    pool.block_on(f).unwrap()
 }
 #[cfg(feature = "unstable-futures")]
 fn block_on<F: Future>(f: F) -> Result<F::Item, F::Error> {
@@ -426,7 +430,7 @@ fn many_multishot_futures() {
         }
 
         for start_tx in start_txs {
-            block_on(start_tx.send("ping")).unwrap();
+            block_on(&pool_tx, start_tx.send("ping")).unwrap();
         }
 
         for final_rx in final_rxs {
@@ -435,7 +439,7 @@ fn many_multishot_futures() {
             }
 
             {#![cfg(not(feature = "unstable-futures"))]
-             block_on(final_rx.into_future()).unwrap();
+             block_on(&pool_tx, final_rx.into_future()).unwrap();
             }
         }
 
@@ -516,7 +520,7 @@ fn busy_threadpool_is_not_idle() {
         }
     }
 
-    block_on(IdleFut(&mut idle)).unwrap();
+    block_on(&tx, IdleFut(&mut idle)).unwrap();
 
     term_tx.send(()).unwrap();
 
@@ -559,4 +563,26 @@ fn panic_in_task() {
     spawn_pool(&mut tx, Boom);
 
     await_shutdown(pool.shutdown_on_idle());
+}
+
+#[test]
+fn test_block_on() {
+    use futures::stream;
+    use futures::sync::mpsc;
+
+    let pool = ThreadPool::new();
+    let (send, recv) = mpsc::channel(1);
+
+    // Send 100 items into the channel in the background.
+    pool.sender().spawn(ignore_results(send.send_all(stream::iter_ok(0..100)))).unwrap();
+
+    // Receive the 100 items.
+    let items = pool.sender().block_on(recv.collect()).unwrap().unwrap();
+    assert_eq!(100, items.len());
+}
+
+#[test]
+#[should_panic]
+fn test_block_on_panic() {
+    let _ = ThreadPool::new().sender().block_on(lazy::<_, Result<(), ()>>(|| panic!()));
 }

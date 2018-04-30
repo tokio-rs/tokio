@@ -1,11 +1,20 @@
 use pool::{self, Pool, Lifecycle, MAX_FUTURES};
 use task::Task;
 
+use std::mem;
+use std::panic;
+use std::ptr;
 use std::sync::Arc;
-use std::sync::atomic::Ordering::{AcqRel, Acquire};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::thread::{self, Thread};
 
 use tokio_executor::{self, SpawnError};
 use futures::{future, Future};
+use futures::{
+    Async,
+    Poll,
+};
 #[cfg(feature = "unstable-futures")]
 use futures2;
 #[cfg(feature = "unstable-futures")]
@@ -31,7 +40,7 @@ pub struct Sender {
 }
 
 impl Sender {
-    /// Spawn a future onto the thread pool
+    /// Spawn a future onto the thread pool.
     ///
     /// This function takes ownership of the future and spawns it onto the
     /// thread pool, assigning it to a worker thread. The exact strategy used to
@@ -85,6 +94,90 @@ impl Sender {
     {
         let mut s = self;
         tokio_executor::Executor::spawn(&mut s, Box::new(future))
+    }
+
+    /// Run a future to completion on the thread pool.
+    ///
+    /// This function will block the caller until the given future has completed,
+    /// so it should not be called from an asynchronous context.
+    ///
+    /// If `block_on` returns `Err`, then the future failed to be run. There
+    /// are two possible causes:
+    ///
+    /// * The thread pool is at capacity and is unable to run a new future.
+    ///   This is a temporary failure. At some point in the future, the thread
+    ///   pool might be able to run new futures.
+    /// * The thread pool is shutdown. This is a permanent failure indicating
+    ///   that the handle will never be able to run new futures.
+    ///
+    /// The status of the thread pool can be queried before calling `block_on`
+    /// using the `status` function (part of the `Executor` trait).
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if the provided future panics.
+    pub fn block_on<F>(&self, mut future: F) -> Result<Result<F::Item, F::Error>, SpawnError>
+        where F: Future + Send,
+              F::Item: Send,
+              F::Error: Send {
+
+        struct BlockOnFuture<F> where F: Future + Send {
+            future: *mut F,
+            result: *mut thread::Result<Result<F::Item, F::Error>>,
+            finished: *const AtomicBool,
+            thread: *const Thread,
+        }
+
+        unsafe impl <F> Send for BlockOnFuture<F>
+            where F: Future + Send,
+                  F::Item: Send,
+                  F::Error: Send {};
+
+        impl <F> Future for BlockOnFuture<F> where F: Future + Send {
+            type Item = ();
+            type Error = ();
+            fn poll(&mut self) -> Poll<(), ()> {
+                unsafe {
+                    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        (&mut *self.future).poll()
+                    }));
+                    let result = match result {
+                        Ok(Ok(Async::Ready(item))) => Ok(Ok(item)),
+                        Ok(Ok(Async::NotReady)) => return Ok(Async::NotReady),
+                        Ok(Err(error)) => Ok(Err(error)),
+                        Err(panic) => Err(panic),
+                    };
+                    ptr::write(self.result, result);
+                    (&*self.finished).store(true, Release);
+                    (&*self.thread).unpark();
+                }
+                Ok(Async::Ready(()))
+            }
+        }
+
+        let mut result: thread::Result<Result<F::Item, F::Error>> = unsafe { mem::uninitialized() };
+        let finished = AtomicBool::new(false);
+        let thread = thread::current();
+
+        let future: Box<Future<Item=(), Error=()>> = Box::new(BlockOnFuture {
+            future: &mut future,
+            result: &mut result,
+            finished: &finished,
+            thread: &thread,
+        });
+        let future: Box<Future<Item=(), Error=()> + Send> = unsafe { mem::transmute(future) };
+
+        let mut s = self;
+        tokio_executor::Executor::spawn(&mut s, future)?;
+
+        while !finished.load(Acquire) {
+            thread::park();
+        }
+
+        match result {
+            Ok(result) => Ok(result),
+            Err(panic) => panic::resume_unwind(panic),
+        }
     }
 
     /// Logic to prepare for spawning

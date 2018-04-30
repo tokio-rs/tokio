@@ -364,6 +364,23 @@ impl Runtime {
         self
     }
 
+    /// Run a future to completion on the Tokio runtime.
+    ///
+    /// This runs the given future onto the runtime's executor, usually a
+    /// thread pool, blocking until it is complete. This method should not be
+    /// called from an asynchrounous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor it at capacity, or if the provided
+    /// future panics.
+    pub fn block_on<F>(&mut self, future: F) -> Result<F::Item, F::Error>
+        where F: Future + Send,
+              F::Item: Send,
+              F::Error: Send {
+        self.inner_mut().pool.sender().block_on(future).unwrap()
+    }
+
     /// Signals the runtime to shutdown once it becomes idle.
     ///
     /// Returns a future that completes once the shutdown operation has
