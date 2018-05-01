@@ -55,7 +55,7 @@ mio = "0.6.14"
 futures2 = { version = "0.1.0", path = "futures2", optional = true }
 
 [dev-dependencies]
-bytes = "0.4"
+bytes = "0.4.7"
 env_logger = { version = "0.4", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
 futures-cpupool = "0.1"
