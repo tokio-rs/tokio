@@ -21,7 +21,7 @@ impl Decoder for U32Codec {
             return Ok(None);
         }
 
-        let n = buf.split_to(4).into_buf().get_u32::<BigEndian>();
+        let n = buf.split_to(4).into_buf().get_u32_be();
         Ok(Some(n))
     }
 }
@@ -33,7 +33,7 @@ impl Encoder for U32Codec {
     fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {
         // Reserve space
         dst.reserve(4);
-        dst.put_u32::<BigEndian>(item);
+        dst.put_u32_be(item);
         Ok(())
     }
 }
@@ -94,4 +94,3 @@ fn external_buf_does_not_shrink() {
 
     assert_eq!(readbuf.capacity(), INITIAL_CAPACITY * 2);
 }
-
