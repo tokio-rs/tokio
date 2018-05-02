@@ -32,8 +32,6 @@
 //! [rt]: struct.Runtime.html
 //! [concurrent-rt]: ../struct.Runtime.html
 
-mod builder;
 mod runtime;
 
-pub use self::builder::Builder;
 pub use self::runtime::Runtime;

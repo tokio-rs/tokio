@@ -53,8 +53,7 @@ fn runtime_tokio_run() {
 fn runtime_single_threaded() {
     let _ = env_logger::init();
 
-    let mut runtime = tokio::runtime::current_thread::Builder::new()
-        .build()
+    let mut runtime = tokio::runtime::current_thread::Runtime::new()
         .unwrap();
     runtime.block_on(create_client_server_future()).unwrap();
     runtime.run().unwrap();
