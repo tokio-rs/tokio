@@ -20,8 +20,7 @@ categories = ["asynchronous", "network-programming", "filesystem"]
 
 [dependencies]
 futures = "0.1.21"
-# TODO: Set real version
-tokio-threadpool = { version = "0.1.1", path = "../tokio-threadpool" }
+tokio-threadpool = { version = "0.1.3", path = "../tokio-threadpool" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 
 [dev-dependencies]
