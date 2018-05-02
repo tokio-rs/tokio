@@ -113,6 +113,7 @@
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 
 mod builder;
+pub mod current_thread;
 mod shutdown;
 mod task_executor;
 

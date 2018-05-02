@@ -78,7 +78,7 @@ impl Builder {
     /// # extern crate tokio;
     /// # use tokio::runtime::Builder;
     /// # pub fn main() {
-    /// let runtime = Builder::new().build();
+    /// let runtime = Builder::new().build().unwrap();
     /// // ... call runtime.run(...)
     /// # let _ = runtime;
     /// # }
