@@ -6,7 +6,7 @@ Asynchronous filesystem manipulation operations (and stdin, stdout, stderr).
 
 ## Overview
 
-This crate provides timer facilities for usage with Tokio.
+This crate provides filesystem manipulation facilities for usage with Tokio.
 
 ## License
 
