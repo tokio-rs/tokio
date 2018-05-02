@@ -1,3 +1,7 @@
+# 0.2.2 (May 2, 2018)
+
+* Improve parking semantics (#327).
+
 # 0.2.1 (April 2, 2018)
 
 * Fix build on 32-bit systems (#274).

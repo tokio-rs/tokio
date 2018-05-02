@@ -1,3 +1,10 @@
+# 0.1.6 (May 2, 2018)
+
+* Add asynchronous filesystem APIs (#323).
+* Add "current thread" runtime variant (#308).
+* `CurrentThread`: Expose inner `Park` instance.
+* Improve fairness of `CurrentThread` executor (#313).
+
 # 0.1.5 (March 30, 2018)
 
 * Provide timer API (#266)
