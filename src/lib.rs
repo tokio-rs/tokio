@@ -8,6 +8,7 @@
 //! * A [reactor][reactor] backed by the operating system's event queue (epoll, kqueue,
 //!   IOCP, etc...).
 //! * Asynchronous [TCP and UDP][net] sockets.
+//! * Asynchronous [filesystem][fs] operations.
 //! * [Timer][timer] API for scheduling work in the future.
 //!
 //! Tokio is built using [futures] as the abstraction for managing the
@@ -71,6 +72,7 @@ extern crate futures;
 extern crate mio;
 extern crate tokio_io;
 extern crate tokio_executor;
+extern crate tokio_fs;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
 extern crate tokio_timer;
@@ -81,6 +83,7 @@ extern crate tokio_udp;
 extern crate futures2;
 
 pub mod executor;
+pub mod fs;
 pub mod net;
 pub mod reactor;
 pub mod runtime;
@@ -100,14 +103,34 @@ pub mod io {
     //! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which extend the
     //! `Read` and `Write` traits of the standard library.
     //!
+    //! # AsyncRead and AsyncWrite
+    //!
     //! [`AsyncRead`] and [`AsyncWrite`] must only be implemented for
     //! non-blocking I/O types that integrate with the futures type system. In
     //! other words, these types must never block the thread, and instead the
     //! current task is notified when the I/O resource is ready.
     //!
+    //! # Standard input and output
+    //!
+    //! Tokio provides asynchronous APIs to standard [input], [output], and [error].
+    //! These APIs are very similar to the ones provided by `std`, but they also
+    //! implement [`AsyncRead`] and [`AsyncWrite`].
+    //!
+    //! Unlike *most* other Tokio APIs, the standard input / output APIs
+    //! **must** be used from the context of the Tokio runtime as they require
+    //! Tokio specific features to function.
+    //!
+    //! [input]: fn.stdin.html
+    //! [output]: fn.stdout.html
+    //! [error]: fn.stderr.html
+    //!
+    //! # Utility functions
+    //!
     //! Utilities functions are provided for working with [`AsyncRead`] /
     //! [`AsyncWrite`] types. For example, [`copy`] asynchronously copies all
     //! data from a source to a destination.
+    //!
+    //! # `std` re-exports
     //!
     //! Additionally, [`Read`], [`Write`], [`Error`], [`ErrorKind`], and
     //! [`Result`] are re-exported from `std::io` for ease of use.
@@ -124,6 +147,16 @@ pub mod io {
     pub use tokio_io::{
         AsyncRead,
         AsyncWrite,
+    };
+
+    // standard input, output, and error
+    pub use tokio_fs::{
+        stdin,
+        Stdin,
+        stdout,
+        Stdout,
+        stderr,
+        Stderr,
     };
 
     // Utils
