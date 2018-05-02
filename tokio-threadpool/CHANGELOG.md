@@ -1,3 +1,7 @@
+# 0.1.3 (May 2, 2018)
+
+* Add `blocking` annotation (#317).
+
 # 0.1.2 (March 30, 2018)
 
 * Add the ability to specify a custom thread parker.

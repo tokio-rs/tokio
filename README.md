@@ -109,23 +109,29 @@ The crates included as part of Tokio are:
 
 * [`tokio-executor`]: Task execution related traits and utilities.
 
+* [`tokio-fs`]: Filesystem (and standard in / out) APIs.
+
 * [`tokio-io`]: Asynchronous I/O related traits and utilities.
 
 * [`tokio-reactor`]: Event loop that drives I/O resources (like TCP and UDP
   sockets).
 
+* [`tokio-tcp`]: TCP bindings for use with `tokio-io` and `tokio-reactor`.
+
 * [`tokio-threadpool`]: Schedules the execution of futures across a pool of
   threads.
 
-* [`tokio-tcp`]: TCP bindings for use with `tokio-io` and `tokio-reactor`.
+* [ `tokio-timer`]: Time related APIs.
 
 * [`tokio-udp`]: UDP bindings for use with `tokio-io` and `tokio-reactor`.
 
 [`tokio-executor`]: tokio-executor
+[`tokio-fs`]: tokio-fs
 [`tokio-io`]: tokio-io
 [`tokio-reactor`]: tokio-reactor
-[`tokio-threadpool`]: tokio-threadpool
 [`tokio-tcp`]: tokio-tcp
+[`tokio-threadpool`]: tokio-threadpool
+[`tokio-timer`]: tokio-timer
 [`tokio-udp`]: tokio-udp
 
 ## License

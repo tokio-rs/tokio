@@ -1,6 +1,6 @@
 [package]
 name = "tokio-timer"
-version = "0.2.1"
+version = "0.2.3"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
