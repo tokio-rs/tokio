@@ -11,22 +11,9 @@ use std::io;
 /// Single-threaded runtime provides a way to start reactor
 /// and executor on the current thread.
 ///
-/// The single-threaded runtime is not `Send` and cannot be
-/// safely moved to other threads.
+/// See [module level][mod] documentation for more details.
 ///
-/// # Examples
-///
-/// Creating a new `Runtime` with default configuration values.
-///
-/// ```
-/// use tokio::runtime::current_thread::Runtime;
-/// use tokio::prelude::*;
-///
-/// let mut runtime = Runtime::new().unwrap();
-///
-/// // Use the runtime...
-/// // runtime.block_on(f); // where f is a future
-/// ```
+/// [mod]: index.html
 #[derive(Debug)]
 pub struct Runtime {
     reactor_handle: tokio_reactor::Handle,
@@ -48,7 +35,7 @@ impl Runtime {
         let reactor_handle = reactor.handle();
 
         // Place a timer wheel on top of the reactor. If there are no timeouts to fire, it'll let the
-        // reactor pick up new some new external events.
+        // reactor pick up some new external events.
         let timer = Timer::new(reactor);
         let timer_handle = timer.handle();
 
@@ -61,6 +48,44 @@ impl Runtime {
         Ok(runtime)
     }
 
+    /// Spawn a future onto the single-threaded Tokio runtime.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use futures::{future, Future, Stream};
+    /// use tokio::runtime::current_thread::Runtime;
+    ///
+    /// # fn dox() {
+    /// // Create the runtime
+    /// let mut rt = Runtime::new().unwrap();
+    ///
+    /// // Spawn a future onto the runtime
+    /// rt.spawn(future::lazy(|| {
+    ///     println!("running on the runtime");
+    ///     Ok(())
+    /// }));
+    /// # }
+    /// # pub fn main() {}
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Failure occurs if the executor
+    /// is currently at capacity and is unable to spawn a new future.
+    pub fn spawn<F>(&mut self, future: F) -> &mut Self
+    where F: Future<Item = (), Error = ()> + 'static,
+    {
+        self.executor.spawn(future);
+        self
+    }
+
     /// Runs the provided future, blocking the current thread until the future
     /// completes.
     ///
@@ -71,10 +96,12 @@ impl Runtime {
     ///
     /// Note that this function will **also** execute any spawned futures on the
     /// current thread, but will **not** block until these other spawned futures
-    /// have completed.
+    /// have completed. Once the function returns, any uncompleted futures
+    /// remain pending in the `Runtime` instance. These futures will not run
+    /// until `block_on` or `run` is called again.
     ///
     /// The caller is responsible for ensuring that other spawned futures
-    /// complete execution.
+    /// complete execution by calling `block_on` or `run`.
     pub fn block_on<F>(&mut self, f: F) -> Result<F::Item, F::Error>
         where F: Future
     {
