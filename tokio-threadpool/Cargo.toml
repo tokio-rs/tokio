@@ -20,9 +20,6 @@ num_cpus = "1.2"
 rand = "0.4"
 log = "0.4"
 
-# Futures 0.2 integration
-futures2 = { version = "0.1", path = "../futures2", optional = true }
-
 [dev-dependencies]
 tokio-timer = "0.1"
 env_logger = "0.4"
@@ -30,10 +27,3 @@ env_logger = "0.4"
 # For comparison benchmarks
 futures-cpupool = "0.1.7"
 threadpool = "1.7.1"
-
-[features]
-unstable-futures = [
-  "futures2",
-  "tokio-executor/unstable-futures",
-]
-default = []

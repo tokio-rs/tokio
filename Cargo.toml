@@ -51,9 +51,6 @@ futures = "0.1.20"
 # Needed until `reactor` is removed from `tokio`.
 mio = "0.6.14"
 
-# Futures 0.2 integration
-futures2 = { version = "0.1.0", path = "futures2", optional = true }
-
 [dev-dependencies]
 bytes = "0.4"
 env_logger = { version = "0.4", default-features = false }
@@ -67,17 +64,3 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 time = "0.1"
-
-[patch.crates-io]
-tokio-io = { path = "tokio-io" }
-
-[features]
-unstable-futures = [
-    "futures2",
-    "tokio-reactor/unstable-futures",
-    "tokio-threadpool/unstable-futures",
-    "tokio-executor/unstable-futures",
-    "tokio-tcp/unstable-futures",
-    "tokio-udp/unstable-futures"
-]
-default = []
