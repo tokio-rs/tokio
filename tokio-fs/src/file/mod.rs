@@ -56,7 +56,7 @@ impl File {
     /// `CreateFuture` results in an error if called from outside of the Tokio
     /// runtime or if the underlying [`create`] call results in an error.
     ///
-    /// [`open`]: https://doc.rust-lang.org/std/fs/struct.File.html#method.create
+    /// [`create`]: https://doc.rust-lang.org/std/fs/struct.File.html#method.create
     pub fn create<P>(path: P) -> CreateFuture<P>
     where P: AsRef<Path> + Send + 'static,
     {
