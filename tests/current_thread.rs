@@ -567,6 +567,23 @@ fn turn_fair() {
     assert!(!res.has_polled());
 }
 
+#[test]
+fn spawn_from_other_thread() {
+    let mut current_thread = CurrentThread::new();
+
+    let handle = current_thread.handle();
+    let (sender, receiver) = oneshot::channel::<()>();
+
+    thread::spawn(move || {
+        handle.spawn(lazy(move || {
+            sender.send(()).unwrap();
+            Ok(())
+        }));
+    });
+
+    let _ = current_thread.block_on(receiver).unwrap();
+}
+
 fn ok() -> future::FutureResult<(), ()> {
     future::ok(())
 }

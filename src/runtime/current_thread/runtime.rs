@@ -8,6 +8,9 @@ use futures::Future;
 
 use std::io;
 
+// Re-export Handle from here
+pub use executor::current_thread::Handle;
+
 /// Single-threaded runtime provides a way to start reactor
 /// and executor on the current thread.
 ///
@@ -46,6 +49,14 @@ impl Runtime {
 
         let runtime = Runtime { reactor_handle, timer_handle, executor };
         Ok(runtime)
+    }
+
+    /// Get a new handle to spawn futures on the single-threaded Tokio runtime
+    ///
+    /// Different to the runtime itself, the handle can be sent to different
+    /// threads.
+    pub fn handle(&self) -> Handle {
+        self.executor.handle().clone()
     }
 
     /// Spawn a future onto the single-threaded Tokio runtime.
@@ -124,7 +135,7 @@ impl Runtime {
     fn enter<F, R>(&mut self, f: F) -> R
     where F: FnOnce(&mut current_thread::Entered<Timer<Reactor>>) -> R
     {
-        let Runtime { ref reactor_handle, ref timer_handle, ref mut executor } = *self;
+        let Runtime { ref reactor_handle, ref timer_handle, ref mut executor, .. } = *self;
 
         // Binds an executor to this thread
         let mut enter = tokio_executor::enter().expect("Multiple executors at once");

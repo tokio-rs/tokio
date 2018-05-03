@@ -112,6 +112,7 @@ use tokio_executor::park::{Park, Unpark, ParkThread};
 
 use futures::{executor, Async, Future};
 use futures::future::{self, Executor, ExecuteError, ExecuteErrorKind};
+use futures::sync::mpsc;
 
 use std::fmt;
 use std::cell::Cell;
@@ -132,6 +133,12 @@ pub struct CurrentThread<P: Park = ParkThread> {
 
     /// Thread park handle
     park: P,
+
+    /// Handle for spawning new futures from other threads
+    spawn_handle: Handle,
+
+    /// Receiver for futures spawned from other threads
+    spawn_receiver: executor::Spawn<mpsc::UnboundedReceiver<Box<Future<Item = (), Error = ()> + Send + 'static>>>
 }
 
 /// Executes futures on the current thread.
@@ -304,10 +311,16 @@ impl<P: Park> CurrentThread<P> {
     pub fn new_with_park(park: P) -> Self {
         let unpark = park.unpark();
 
+        // XXX: Should this use a bounded channel with an arbitrary limit instead, and then
+        // panic spawning if the channel is full?
+        let (spawn_sender, spawn_receiver) = mpsc::unbounded();
+
         CurrentThread {
             scheduler: Scheduler::new(unpark),
             num_futures: 0,
             park,
+            spawn_handle: Handle { inner: spawn_sender },
+            spawn_receiver: executor::spawn(spawn_receiver),
         }
     }
 
@@ -398,6 +411,14 @@ impl<P: Park> CurrentThread<P> {
             scheduler: &mut self.scheduler,
             num_futures: &mut self.num_futures,
         }
+    }
+
+    /// Get a new handle to spawn futures on the executor
+    ///
+    /// Different to the executor itself, the handle can be sent to different
+    /// threads and can be used to spawn futures on the executor.
+    pub fn handle(&self) -> Handle {
+        self.spawn_handle.clone()
     }
 }
 
@@ -569,9 +590,41 @@ impl<'a, P: Park> Entered<'a, P> {
 
     /// Returns `true` if any futures were processed
     fn tick(&mut self) -> bool {
-        self.executor.scheduler.tick(
+        // Spawn any futures that were spawned from other threads by manually
+        // looping over the receiver stream
+
+        // FIXME: Slightly ugly but needed to make the borrow checker happy
+        let (mut borrow, spawn_receiver) = (
+            Borrow {
+                scheduler: &mut self.executor.scheduler,
+                num_futures: &mut self.executor.num_futures,
+            },
+            &mut self.executor.spawn_receiver,
+        );
+
+        let notify = borrow.scheduler.notify();
+
+        loop {
+            let res = borrow.enter(self.enter, || {
+                spawn_receiver.poll_stream_notify(&notify, 0)
+            });
+
+            match res {
+                Ok(Async::Ready(Some(future))) => {
+                    borrow.spawn_local(future);
+                },
+                Ok(Async::Ready(None)) |
+                Ok(Async::NotReady) => {
+                    break;
+                }
+                Err(()) => unreachable!(),
+            }
+        }
+
+        // After any pending futures were scheduled, do the actual tick
+        borrow.scheduler.tick(
             &mut *self.enter,
-            &mut self.executor.num_futures)
+            borrow.num_futures)
     }
 }
 
@@ -581,6 +634,36 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
             .field("executor", &self.executor)
             .field("enter", &self.enter)
             .finish()
+    }
+}
+
+// ===== impl Handle =====
+
+/// Handle to spawn a future on the corresponding `CurrentThread` instance
+#[derive(Clone)]
+pub struct Handle {
+    inner: mpsc::UnboundedSender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+}
+
+// Manual implementation because the Sender does not implement Debug
+impl fmt::Debug for Handle {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Handle")
+            .finish()
+    }
+}
+
+impl Handle {
+    /// Spawn a future onto the `CurrentThread` instance corresponding to this handle
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
+    /// instance of the `Handle` does not exist anymore.
+    pub fn spawn<F>(&self, future: F)
+    where F: Future<Item = (), Error = ()> + Send + 'static {
+        self.inner.unbounded_send(Box::new(future))
+            .expect("CurrentThread does not exist anymore")
     }
 }
 
