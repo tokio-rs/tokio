@@ -2,7 +2,7 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_signal;
 
-use futures::{Stream, Future};
+use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 
 /// how many signals to handle before exiting
@@ -26,25 +26,29 @@ fn main() {
     // how many Ctrl+C have we received so far?
     let mut counter = 0;
 
-    println!("This program is now waiting for you to press Ctrl+C {0} times.
+    println!(
+        "This program is now waiting for you to press Ctrl+C {0} times.
   * If running via `cargo run --example ctrl-c`, Ctrl+C also kills it, \
     due to https://github.com/rust-lang-nursery/rustup.rs/issues/806
   * If running the binary directly, the Ctrl+C is properly trapped.
     Terminate by repeating Ctrl+C {0} times, or ahead of time by \
     opening a second terminal and issuing `pkill -sigkil ctrl-c`",
-    STOP_AFTER);
+        STOP_AFTER
+    );
 
     // Stream::for_each is a powerful primitive provided by the Futures crate.
     // It turns a Stream into a Future that completes after all stream-items
     // have been completed, or the first time the closure returns an error
     let future = limited_stream.for_each(|()| {
-
         // Note how we manipulate the counter without any fancy synchronisation.
         // The borrowchecker realises there can't be any conflicts, so the closure
         // can just capture it.
         counter += 1;
-        println!("Ctrl+C received {} times! {} more before exit",
-                 counter, STOP_AFTER-counter);
+        println!(
+            "Ctrl+C received {} times! {} more before exit",
+            counter,
+            STOP_AFTER - counter
+        );
 
         // return Ok-result to continue handling the stream
         Ok(())

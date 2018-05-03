@@ -11,27 +11,27 @@ extern crate mio_uds;
 
 use std::cell::UnsafeCell;
 use std::collections::HashSet;
-use std::io::prelude::*;
 use std::io;
+use std::io::prelude::*;
 use std::mem;
 use std::os::unix::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
-use futures::future;
-use futures::sync::mpsc::{Receiver, Sender, channel};
-use futures::{Async, AsyncSink, Future};
-use futures::{Sink, Stream, Poll};
 use self::libc::c_int;
-use self::mio::Poll as MioPoll;
 use self::mio::unix::EventedFd;
-use self::mio::{Evented, Token, Ready, PollOpt};
+use self::mio::Poll as MioPoll;
+use self::mio::{Evented, PollOpt, Ready, Token};
 use self::mio_uds::UnixStream;
+use futures::future;
+use futures::sync::mpsc::{channel, Receiver, Sender};
+use futures::{Async, AsyncSink, Future};
+use futures::{Poll, Sink, Stream};
+use tokio_core::reactor::{CoreId, Handle, PollEvented};
 use tokio_io::IoFuture;
-use tokio_core::reactor::{Handle, CoreId, PollEvented};
 
-pub use self::libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
-pub use self::libc::{SIGHUP, SIGQUIT, SIGPIPE, SIGALRM, SIGTRAP};
+pub use self::libc::{SIGUSR1, SIGUSR2, SIGINT, SIGTERM};
+pub use self::libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
 
 // Number of different unix signals
 const SIGNUM: usize = 32;
@@ -95,11 +95,9 @@ fn globals() -> &'static Globals {
 /// Those two operations shoudl both be async-signal safe. After that's done we
 /// just try to call a previous signal handler, if any, to be "good denizens of
 /// the internet"
-extern fn handler(signum: c_int,
-                  info: *mut libc::siginfo_t,
-                  ptr: *mut libc::c_void) {
-    type FnSigaction = extern fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
-    type FnHandler = extern fn(c_int);
+extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc::c_void) {
+    type FnSigaction = extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
+    type FnHandler = extern "C" fn(c_int);
     unsafe {
         let slot = match (*GLOBALS).signals.get(signum as usize) {
             Some(slot) => slot,
@@ -113,7 +111,7 @@ extern fn handler(signum: c_int,
 
         let fnptr = (*slot.prev.get()).sa_sigaction;
         if fnptr == 0 || fnptr == libc::SIG_DFL || fnptr == libc::SIG_IGN {
-            return
+            return;
         }
         if (*slot.prev.get()).sa_flags & libc::SA_SIGINFO == 0 {
             let action = mem::transmute::<usize, FnHandler>(fnptr);
@@ -133,22 +131,17 @@ extern fn handler(signum: c_int,
 fn signal_enable(signal: c_int) -> io::Result<()> {
     let siginfo = match globals().signals.get(signal as usize) {
         Some(slot) => slot,
-        None => {
-            return Err(io::Error::new(io::ErrorKind::Other, "signal too large"))
-        }
+        None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
     };
     unsafe {
         #[cfg(target_os = "android")]
         fn flags() -> libc::c_ulong {
-            (libc::SA_RESTART as libc::c_ulong) |
-                libc::SA_SIGINFO |
-                (libc::SA_NOCLDSTOP as libc::c_ulong)
+            (libc::SA_RESTART as libc::c_ulong) | libc::SA_SIGINFO
+                | (libc::SA_NOCLDSTOP as libc::c_ulong)
         }
         #[cfg(not(target_os = "android"))]
         fn flags() -> c_int {
-            libc::SA_RESTART |
-                libc::SA_SIGINFO |
-                libc::SA_NOCLDSTOP
+            libc::SA_RESTART | libc::SA_SIGINFO | libc::SA_NOCLDSTOP
         }
         let mut err = None;
         siginfo.init.call_once(|| {
@@ -162,13 +155,15 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
             }
         });
         if let Some(err) = err {
-            return Err(err)
+            return Err(err);
         }
         if *siginfo.initialized.get() {
             Ok(())
         } else {
-            Err(io::Error::new(io::ErrorKind::Other,
-                               "failed to register signal handler"))
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to register signal handler",
+            ))
         }
     }
 }
@@ -182,7 +177,13 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
 struct EventedReceiver;
 
 impl Evented for EventedReceiver {
-    fn register(&self, poll: &MioPoll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
+    fn register(
+        &self,
+        poll: &MioPoll,
+        token: Token,
+        events: Ready,
+        opts: PollOpt,
+    ) -> io::Result<()> {
         let fd = globals().receiver.as_raw_fd();
         match EventedFd(&fd).register(poll, token, events, opts) {
             Ok(()) => Ok(()),
@@ -191,7 +192,13 @@ impl Evented for EventedReceiver {
             Err(e) => Err(e),
         }
     }
-    fn reregister(&self, poll: &MioPoll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
+    fn reregister(
+        &self,
+        poll: &MioPoll,
+        token: Token,
+        events: Ready,
+        opts: PollOpt,
+    ) -> io::Result<()> {
         let fd = globals().receiver.as_raw_fd();
         EventedFd(&fd).reregister(poll, token, events, opts)
     }
@@ -270,7 +277,7 @@ impl Driver {
         for (sig, slot) in globals().signals.iter().enumerate() {
             // Any signal of this kind arrived since we checked last?
             if !slot.pending.swap(false, Ordering::SeqCst) {
-                continue
+                continue;
             }
 
             let signum = sig as c_int;
@@ -289,7 +296,9 @@ impl Driver {
                 match recipients[i].start_send(signum) {
                     Ok(AsyncSink::Ready) => {}
                     Ok(AsyncSink::NotReady(_)) => {}
-                    Err(_) => { recipients.swap_remove(i); }
+                    Err(_) => {
+                        recipients.swap_remove(i);
+                    }
                 }
             }
         }
