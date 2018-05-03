@@ -61,3 +61,38 @@ fn main() {
 
     println!("Stream ended, quiting the program.");
 }
+
+#[cfg(test)]
+// `Child::kill` terminates the application instead of sending the equivalent to SIGKILL on windows
+#[cfg(unix)]
+mod tests {
+    use super::*;
+
+    use std::env;
+    use std::path::Path;
+    use std::process::Command;
+
+    #[test]
+    fn ctrl_c() {
+        let args = env::args().collect::<Vec<_>>();
+        let ctrl_c_child = "ctrl_c_child";
+        if args.len() >= 3 && args.last().map(|s| &s[..]) == Some(ctrl_c_child) {
+            super::main();
+        } else {
+            let ctrl_c_path = Path::new("target")
+                .join("debug")
+                .join("examples")
+                .join("ctrl-c");
+            let mut child = Command::new(ctrl_c_path)
+                .args(&["ctrl_c", "--nocapture", ctrl_c_child])
+                .spawn()
+                .unwrap();
+
+            for i in 0..STOP_AFTER {
+                println!("Kill {}", i);
+                child.kill().unwrap();
+            }
+            child.wait().unwrap();
+        }
+    }
+}
