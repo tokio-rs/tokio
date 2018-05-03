@@ -5,12 +5,12 @@ extern crate libc;
 extern crate tokio_core;
 extern crate tokio_signal;
 
-use std::time::Duration;
-use std::thread;
 use std::sync::mpsc::channel;
+use std::thread;
+use std::time::Duration;
 
-use futures::Future;
 use futures::stream::Stream;
+use futures::Future;
 use tokio_core::reactor::{Core, Timeout};
 use tokio_signal::unix::Signal;
 
@@ -34,7 +34,9 @@ fn notify_both() {
     unsafe {
         assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR2), 0);
     }
-    lp.run(signal1.into_future().join(signal2.into_future())).ok().unwrap();
+    lp.run(signal1.into_future().join(signal2.into_future()))
+        .ok()
+        .unwrap();
 }
 
 #[test]
