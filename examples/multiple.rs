@@ -4,7 +4,7 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_signal;
 
-use futures::{Stream, Future};
+use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 
@@ -21,9 +21,11 @@ fn main() {
 
     // Wait for a signal to arrive
     println!("Waiting for SIGINT or SIGTERM");
-    println!("  TIP: use `pkill -sigint multiple` from a second terminal \
-                to send a SIGINT to all processes named 'multiple' \
-                (i.e. this binary)");
+    println!(
+        "  TIP: use `pkill -sigint multiple` from a second terminal \
+         to send a SIGINT to all processes named 'multiple' \
+         (i.e. this binary)"
+    );
     let (item, _rest) = core.run(stream.into_future()).ok().unwrap();
 
     // Figure out which signal we received
@@ -35,4 +37,3 @@ fn main() {
         println!("received SIGTERM");
     }
 }
-

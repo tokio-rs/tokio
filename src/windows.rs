@@ -15,14 +15,14 @@ use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
+use self::winapi::shared::minwindef::*;
+use self::winapi::um::wincon::*;
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
-use futures::{Future, IntoFuture, Poll, Async, Stream};
-use tokio_core::reactor::{PollEvented, Handle};
-use self::winapi::shared::minwindef::*;
-use self::winapi::um::wincon::*;
+use futures::{Async, Future, IntoFuture, Poll, Stream};
+use tokio_core::reactor::{Handle, PollEvented};
 
 use IoFuture;
 
@@ -103,11 +103,11 @@ impl Event {
         let new_signal = future::lazy(move || {
             let (tx, rx) = oneshot::channel();
             let msg = Message::NewEvent(signum, tx);
-            let res = unsafe {
-                (*GLOBAL_STATE).tx.clone().unbounded_send(msg)
-            };
-            res.expect("failed to request a new signal stream, did the \
-                        first event loop go away?");
+            let res = unsafe { (*GLOBAL_STATE).tx.clone().unbounded_send(msg) };
+            res.expect(
+                "failed to request a new signal stream, did the \
+                 first event loop go away?",
+            );
             rx.then(|r| r.unwrap())
         });
         match init {
@@ -123,28 +123,38 @@ impl Stream for Event {
 
     fn poll(&mut self) -> Poll<Option<()>, io::Error> {
         if !self.reg.poll_read().is_ready() {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
         self.reg.need_read();
-        self.reg.get_ref()
-                .inner.borrow()
-                .as_ref().unwrap().1
-                .set_readiness(mio::Ready::empty())
-                .expect("failed to set readiness");
+        self.reg
+            .get_ref()
+            .inner
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .1
+            .set_readiness(mio::Ready::empty())
+            .expect("failed to set readiness");
         Ok(Async::Ready(Some(())))
     }
 }
 
 fn global_init(handle: &Handle) -> io::Result<()> {
     let (tx, rx) = mpsc::unbounded();
-    let reg = MyRegistration { inner: RefCell::new(None) };
+    let reg = MyRegistration {
+        inner: RefCell::new(None),
+    };
     let reg = try!(PollEvented::new(reg, handle));
     let ready = reg.get_ref().inner.borrow().as_ref().unwrap().1.clone();
     unsafe {
         let state = Box::new(GlobalState {
             ready: ready,
-            ctrl_c: GlobalEventState { ready: AtomicBool::new(false) },
-            ctrl_break: GlobalEventState { ready: AtomicBool::new(false) },
+            ctrl_c: GlobalEventState {
+                ready: AtomicBool::new(false),
+            },
+            ctrl_break: GlobalEventState {
+                ready: AtomicBool::new(false),
+            },
             tx: tx,
         });
         GLOBAL_STATE = Box::into_raw(state);
@@ -153,7 +163,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
         if rc == 0 {
             Box::from_raw(GLOBAL_STATE);
             GLOBAL_STATE = 0 as *mut _;
-            return Err(io::Error::last_os_error())
+            return Err(io::Error::last_os_error());
         }
 
         handle.spawn(DriverTask {
@@ -184,12 +194,12 @@ impl Future for DriverTask {
 
 impl DriverTask {
     fn check_event_drops(&mut self) {
-        self.ctrl_c.tasks.retain(|task| {
-            !task.0.borrow_mut().poll().is_err()
-        });
-        self.ctrl_break.tasks.retain(|task| {
-            !task.0.borrow_mut().poll().is_err()
-        });
+        self.ctrl_c
+            .tasks
+            .retain(|task| !task.0.borrow_mut().poll().is_err());
+        self.ctrl_break
+            .tasks
+            .retain(|task| !task.0.borrow_mut().poll().is_err());
     }
 
     fn check_messages(&mut self) {
@@ -197,8 +207,7 @@ impl DriverTask {
             // Acquire the next message
             let message = match self.rx.poll().unwrap() {
                 Async::Ready(Some(e)) => e,
-                Async::Ready(None) |
-                Async::NotReady => break,
+                Async::Ready(None) | Async::NotReady => break,
             };
             let (sig, complete) = match message {
                 Message::NewEvent(sig, complete) => (sig, complete),
@@ -212,12 +221,14 @@ impl DriverTask {
 
             // Acquire the (registration, set_readiness) pair by... assuming
             // we're on the event loop (true because of the spawn above).
-            let reg = MyRegistration { inner: RefCell::new(None) };
+            let reg = MyRegistration {
+                inner: RefCell::new(None),
+            };
             let reg = match PollEvented::new(reg, &self.handle) {
                 Ok(reg) => reg,
                 Err(e) => {
                     drop(complete.send(Err(e)));
-                    continue
+                    continue;
                 }
             };
 
@@ -235,18 +246,30 @@ impl DriverTask {
 
     fn check_events(&mut self) {
         if self.reg.poll_read().is_not_ready() {
-            return
+            return;
         }
         self.reg.need_read();
-        self.reg.get_ref().inner.borrow().as_ref().unwrap()
-            .1.set_readiness(mio::Ready::empty()).unwrap();
+        self.reg
+            .get_ref()
+            .inner
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .1
+            .set_readiness(mio::Ready::empty())
+            .unwrap();
 
         if unsafe { (*GLOBAL_STATE).ctrl_c.ready.swap(false, Ordering::SeqCst) } {
             for task in self.ctrl_c.tasks.iter() {
                 task.1.set_readiness(mio::Ready::readable()).unwrap();
             }
         }
-        if unsafe { (*GLOBAL_STATE).ctrl_break.ready.swap(false, Ordering::SeqCst) } {
+        if unsafe {
+            (*GLOBAL_STATE)
+                .ctrl_break
+                .ready
+                .swap(false, Ordering::SeqCst)
+        } {
             for task in self.ctrl_break.tasks.iter() {
                 task.1.set_readiness(mio::Ready::readable()).unwrap();
             }
@@ -258,7 +281,7 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
     let event = match ty {
         CTRL_C_EVENT => &(*GLOBAL_STATE).ctrl_c,
         CTRL_BREAK_EVENT => &(*GLOBAL_STATE).ctrl_break,
-        _ => return FALSE
+        _ => return FALSE,
     };
     if event.ready.swap(true, Ordering::SeqCst) {
         FALSE
@@ -276,21 +299,25 @@ struct MyRegistration {
 }
 
 impl mio::Evented for MyRegistration {
-    fn register(&self,
-                poll: &mio::Poll,
-                token: mio::Token,
-                events: mio::Ready,
-                opts: mio::PollOpt) -> io::Result<()> {
+    fn register(
+        &self,
+        poll: &mio::Poll,
+        token: mio::Token,
+        events: mio::Ready,
+        opts: mio::PollOpt,
+    ) -> io::Result<()> {
         let reg = mio::Registration::new(poll, token, events, opts);
         *self.inner.borrow_mut() = Some(reg);
         Ok(())
     }
 
-    fn reregister(&self,
-                  _poll: &mio::Poll,
-                  _token: mio::Token,
-                  _events: mio::Ready,
-                  _opts: mio::PollOpt) -> io::Result<()> {
+    fn reregister(
+        &self,
+        _poll: &mio::Poll,
+        _token: mio::Token,
+        _events: mio::Ready,
+        _opts: mio::PollOpt,
+    ) -> io::Result<()> {
         Ok(())
     }
 

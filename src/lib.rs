@@ -84,8 +84,8 @@ extern crate tokio_io;
 
 use std::io;
 
-use futures::Future;
 use futures::stream::Stream;
+use futures::Future;
 use tokio_core::reactor::Handle;
 
 pub mod unix;
@@ -113,15 +113,17 @@ pub fn ctrl_c(handle: &Handle) -> IoFuture<IoStream<()>> {
 
     #[cfg(unix)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        Box::new(unix::Signal::new(unix::libc::SIGINT, handle).map(|x| {
-            Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>
-        }))
+        Box::new(
+            unix::Signal::new(unix::libc::SIGINT, handle)
+                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>),
+        )
     }
 
     #[cfg(windows)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        Box::new(windows::Event::ctrl_c(handle).map(|x| {
-            Box::new(x) as Box<Stream<Item = _, Error = _> + Send>
-        }))
+        Box::new(
+            windows::Event::ctrl_c(handle)
+                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>),
+        )
     }
 }
