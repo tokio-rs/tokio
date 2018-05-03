@@ -79,14 +79,16 @@
 #![deny(missing_docs)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate mio;
+extern crate tokio_executor;
 extern crate tokio_io;
+extern crate tokio_reactor;
 
 use std::io;
 
 use futures::stream::Stream;
-use futures::Future;
-use tokio_core::reactor::Handle;
+use futures::{future, Future};
+use tokio_reactor::Handle;
 
 pub mod unix;
 pub mod windows;
@@ -121,9 +123,11 @@ pub fn ctrl_c(handle: &Handle) -> IoFuture<IoStream<()>> {
 
     #[cfg(windows)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        Box::new(
-            windows::Event::ctrl_c(handle)
-                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>),
-        )
+        let handle = handle.clone();
+        // Use lazy to ensure that `ctrl_c` gets called while on an event loop
+        Box::new(future::lazy(move || {
+            windows::Event::ctrl_c(&handle)
+                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>)
+        }))
     }
 }
