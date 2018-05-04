@@ -10,7 +10,6 @@ extern crate mio;
 extern crate mio_uds;
 
 use std::cell::UnsafeCell;
-use std::collections::HashSet;
 use std::io;
 use std::io::prelude::*;
 use std::mem;
@@ -27,7 +26,7 @@ use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async, AsyncSink, Future};
 use futures::{Poll, Sink, Stream};
-use tokio_core::reactor::{CoreId, Handle, PollEvented};
+use tokio_reactor::{Handle, PollEvented};
 use tokio_io::IoFuture;
 
 pub use self::libc::{SIGUSR1, SIGUSR2, SIGINT, SIGTERM};
@@ -50,7 +49,6 @@ struct Globals {
     sender: UnixStream,
     receiver: UnixStream,
     signals: [SignalInfo; SIGNUM],
-    drivers: Mutex<HashSet<CoreId>>,
 }
 
 impl Default for SignalInfo {
@@ -77,7 +75,6 @@ fn globals() -> &'static Globals {
                 sender: sender,
                 receiver: receiver,
                 signals: Default::default(),
-                drivers: Mutex::new(HashSet::new()),
             };
             GLOBALS = Box::into_raw(Box::new(globals));
         });
@@ -215,7 +212,6 @@ impl Read for EventedReceiver {
 }
 
 struct Driver {
-    id: CoreId,
     wakeup: PollEvented<EventedReceiver>,
 }
 
@@ -234,18 +230,10 @@ impl Future for Driver {
     }
 }
 
-impl Drop for Driver {
-    fn drop(&mut self) {
-        let mut drivers = globals().drivers.lock().unwrap();
-        drivers.remove(&self.id);
-    }
-}
-
 impl Driver {
     fn new(handle: &Handle) -> io::Result<Driver> {
         Ok(Driver {
-            id: handle.id(),
-            wakeup: try!(PollEvented::new(EventedReceiver, handle)),
+            wakeup: try!(PollEvented::new_with_handle(EventedReceiver, handle)),
         })
     }
 
@@ -374,35 +362,31 @@ impl Signal {
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
     pub fn new(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
-        let result = (|| {
-            // Turn the signal delivery on once we are ready for it
-            try!(signal_enable(signal));
+        let handle = handle.clone();
+        Box::new(future::lazy(move || {
+            let result = (|| {
+                // Turn the signal delivery on once we are ready for it
+                try!(signal_enable(signal));
 
-            // Ensure there's a driver for our associated event loop processing
-            // signals.
-            let id = handle.id();
-            let mut drivers = globals().drivers.lock().unwrap();
-            if !drivers.contains(&id) {
-                handle.spawn(try!(Driver::new(handle)));
-                drivers.insert(id);
-            }
-            drop(drivers);
+                // Ensure there's a driver for our associated event loop processing
+                // signals.
+                ::tokio_executor::spawn(try!(Driver::new(&handle)));
 
-            // One wakeup in a queue is enough, no need for us to buffer up any
-            // more.
-            let (tx, rx) = channel(1);
-            let tx = Box::new(tx);
-            let id: *const _ = &*tx;
-            let idx = signal as usize;
-            globals().signals[idx].recipients.lock().unwrap().push(tx);
-            Ok(Signal {
-                rx: rx,
-                id: id,
-                signal: signal,
-            })
-        })();
-
-        Box::new(future::result(result))
+                // One wakeup in a queue is enough, no need for us to buffer up any
+                // more.
+                let (tx, rx) = channel(1);
+                let tx = Box::new(tx);
+                let id: *const _ = &*tx;
+                let idx = signal as usize;
+                globals().signals[idx].recipients.lock().unwrap().push(tx);
+                Ok(Signal {
+                    rx: rx,
+                    id: id,
+                    signal: signal,
+                })
+            })();
+            future::result(result)
+        }))
     }
 }
 

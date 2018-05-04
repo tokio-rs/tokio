@@ -11,6 +11,7 @@ use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
+    let handle = handle.new_tokio_handle();
 
     // Create a stream for each of the signals we'd like to handle.
     let sigint = Signal::new(SIGINT, &handle).flatten_stream();
