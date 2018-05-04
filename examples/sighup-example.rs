@@ -11,7 +11,7 @@ fn main() {
     let mut core = Core::new().unwrap();
 
     // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
-    let stream = Signal::new(SIGHUP, &core.handle()).flatten_stream();
+    let stream = Signal::new(SIGHUP, &core.handle().new_tokio_handle()).flatten_stream();
 
     println!("Waiting for SIGHUPS (Ctrl+C to quit)");
     println!(
