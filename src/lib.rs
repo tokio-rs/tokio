@@ -28,6 +28,7 @@
 //! fn main() {
 //!     let mut core = Core::new().unwrap();
 //!     let handle = core.handle();
+//!     let handle = handle.new_tokio_handle();
 //!
 //!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
 //!     // on this stream may represent multiple ctrl-c signals.
@@ -63,6 +64,7 @@
 //! fn main() {
 //!     let mut core = Core::new().unwrap();
 //!     let handle = core.handle();
+//!     let handle = handle.new_tokio_handle();
 //!
 //!     // Like the previous example, this is an infinite stream of signals
 //!     // being received, and signals may be coalesced while pending.
@@ -115,10 +117,11 @@ pub fn ctrl_c(handle: &Handle) -> IoFuture<IoStream<()>> {
 
     #[cfg(unix)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        Box::new(
-            unix::Signal::new(unix::libc::SIGINT, handle)
-                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>),
-        )
+        let handle = handle.clone();
+        Box::new(future::lazy(move || {
+            unix::Signal::new(unix::libc::SIGINT, &handle)
+                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>)
+        }))
     }
 
     #[cfg(windows)]
