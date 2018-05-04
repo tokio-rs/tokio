@@ -20,7 +20,7 @@ use futures2;
 
 /// Builds a thread pool with custom configuration values.
 ///
-/// Methods can be chanined in order to set the configuration values. The thread
+/// Methods can be chained in order to set the configuration values. The thread
 /// pool is constructed by calling [`build`].
 ///
 /// New instances of `Builder` are obtained via [`Builder::new`].
