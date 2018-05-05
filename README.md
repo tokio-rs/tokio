@@ -19,19 +19,16 @@ Next you can use this in conjunction with the `tokio-core` and `futures` crates:
 
 ```rust,no_run
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_signal;
 
-use tokio_core::reactor::Core;
 use futures::{Future, Stream};
 
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
 
     // Create an infinite stream of "Ctrl+C" notifications. Each item received
     // on this stream may represent multiple ctrl-c signals.
-    let ctrl_c = tokio_signal::ctrl_c(&handle).flatten_stream();
+    let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
 
     // Process each ctrl-c as it comes in
     let prog = ctrl_c.for_each(|()| {
@@ -39,7 +36,7 @@ fn main() {
         Ok(())
     });
 
-    core.run(prog).unwrap();
+    tokio::run(prog.map_err(|err| panic!("{}", err)));
 }
 ```
 
