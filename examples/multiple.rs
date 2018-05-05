@@ -10,12 +10,10 @@ use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let handle = handle.new_tokio_handle();
 
     // Create a stream for each of the signals we'd like to handle.
-    let sigint = Signal::new(SIGINT, &handle).flatten_stream();
-    let sigterm = Signal::new(SIGTERM, &handle).flatten_stream();
+    let sigint = Signal::new(SIGINT).flatten_stream();
+    let sigterm = Signal::new(SIGTERM).flatten_stream();
 
     // Use the `select` combinator to merge these two streams into one
     let stream = sigint.select(sigterm);
