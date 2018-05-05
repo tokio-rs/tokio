@@ -328,6 +328,7 @@ impl Driver {
 /// repo, though, as I'd love to chat about this! In other words, I'd love to
 /// alleviate some of these limitations if possible!
 pub struct Signal {
+    driver: Driver,
     signal: c_int,
     // Used only as an identifier. We place the real sender into a Box, so it
     // stays on the same address forever. That gives us a unique pointer, so we
@@ -370,7 +371,7 @@ impl Signal {
 
                 // Ensure there's a driver for our associated event loop processing
                 // signals.
-                ::tokio_executor::spawn(try!(Driver::new(&handle)));
+                let driver = try!(Driver::new(&handle));
 
                 // One wakeup in a queue is enough, no need for us to buffer up any
                 // more.
@@ -380,6 +381,7 @@ impl Signal {
                 let idx = signal as usize;
                 globals().signals[idx].recipients.lock().unwrap().push(tx);
                 Ok(Signal {
+                    driver: driver,
                     rx: rx,
                     id: id,
                     signal: signal,
@@ -395,6 +397,7 @@ impl Stream for Signal {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<c_int>, io::Error> {
+        self.driver.poll().unwrap();
         // receivers don't generate errors
         self.rx.poll().map_err(|_| panic!())
     }
