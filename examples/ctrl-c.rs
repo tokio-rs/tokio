@@ -19,7 +19,7 @@ fn main() {
     // the `flatten_stream()` convenience method lazily defers that
     // initialisation, allowing us to use it 'as if' it is already the
     // stream we want, reducing boilerplate Future-handling.
-    let endless_stream = tokio_signal::ctrl_c(&core.handle().new_tokio_handle()).flatten_stream();
+    let endless_stream = tokio_signal::ctrl_c().flatten_stream();
     // don't keep going forever: convert the endless stream to a bounded one.
     let limited_stream = endless_stream.take(STOP_AFTER);
 

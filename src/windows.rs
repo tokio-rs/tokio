@@ -84,7 +84,15 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub fn ctrl_c(handle: &Handle) -> IoFuture<Event> {
+    pub fn ctrl_c() -> IoFuture<Event> {
+        Event::ctrl_c_handle(&Handle::current())
+    }
+
+    /// Creates a new stream listening for the `CTRL_C_EVENT` events.
+    ///
+    /// This function will register a handler via `SetConsoleCtrlHandler` and
+    /// deliver notifications to the returned stream.
+    pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_C_EVENT, handle)
     }
 
@@ -92,7 +100,15 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub fn ctrl_break(handle: &Handle) -> IoFuture<Event> {
+    pub fn ctrl_break() -> IoFuture<Event> {
+        Event::ctrl_break_handle(&Handle::current())
+    }
+
+    /// Creates a new stream listening for the `CTRL_BREAK_EVENT` events.
+    ///
+    /// This function will register a handler via `SetConsoleCtrlHandler` and
+    /// deliver notifications to the returned stream.
+    pub fn ctrl_break_handle(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_BREAK_EVENT, handle)
     }
 

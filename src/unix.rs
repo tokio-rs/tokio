@@ -347,6 +347,28 @@ impl Signal {
     /// Creates a new stream which will receive notifications when the current
     /// process receives the signal `signal`.
     ///
+    /// This function will create a new stream which binds to the default event
+    /// loop. This function returns a future which will
+    /// then resolve to the signal stream, if successful.
+    ///
+    /// The `Signal` stream is an infinite stream which will receive
+    /// notifications whenever a signal is received. More documentation can be
+    /// found on `Signal` itself, but to reiterate:
+    ///
+    /// * Signals may be coalesced beyond what the kernel already does.
+    /// * Once a signal handler is registered with the process the underlying
+    ///   libc signal handler is never unregistered.
+    ///
+    /// A `Signal` stream can be created for a particular signal number
+    /// multiple times. When a signal is received then all the associated
+    /// channels will receive the signal notification.
+    pub fn new(signal: c_int) -> IoFuture<Signal> {
+        Signal::with_handle(signal, &Handle::current())
+    }
+
+    /// Creates a new stream which will receive notifications when the current
+    /// process receives the signal `signal`.
+    ///
     /// This function will create a new stream which may be based on the
     /// event loop handle provided. This function returns a future which will
     /// then resolve to the signal stream, if successful.
@@ -362,7 +384,7 @@ impl Signal {
     /// A `Signal` stream can be created for a particular signal number
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
-    pub fn new(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
+    pub fn with_handle(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
         let handle = handle.clone();
         Box::new(future::lazy(move || {
             let result = (|| {
