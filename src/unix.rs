@@ -33,7 +33,8 @@ pub use self::libc::{SIGUSR1, SIGUSR2, SIGINT, SIGTERM};
 pub use self::libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
 
 // Number of different unix signals
-const SIGNUM: usize = 32;
+// (FreeBSD has 33)
+const SIGNUM: usize = 33;
 
 struct SignalInfo {
     pending: AtomicBool,
@@ -48,7 +49,7 @@ struct SignalInfo {
 struct Globals {
     sender: UnixStream,
     receiver: UnixStream,
-    signals: [SignalInfo; SIGNUM],
+    signals: Vec<SignalInfo>,
 }
 
 impl Default for SignalInfo {
@@ -74,7 +75,7 @@ fn globals() -> &'static Globals {
             let globals = Globals {
                 sender: sender,
                 receiver: receiver,
-                signals: Default::default(),
+                signals: (0..SIGNUM).map(|_| Default::default()).collect(),
             };
             GLOBALS = Box::into_raw(Box::new(globals));
         });
