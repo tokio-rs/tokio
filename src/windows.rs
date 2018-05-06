@@ -324,7 +324,8 @@ impl mio::Evented for MyRegistration {
         events: mio::Ready,
         opts: mio::PollOpt,
     ) -> io::Result<()> {
-        let reg = mio::Registration::new(poll, token, events, opts);
+        let reg = mio::Registration::new2();
+        reg.0.register(poll, token, events, opts)?;
         *self.inner.borrow_mut() = Some(reg);
         Ok(())
     }
