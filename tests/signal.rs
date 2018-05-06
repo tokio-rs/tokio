@@ -2,6 +2,7 @@
 
 extern crate futures;
 extern crate libc;
+extern crate tokio;
 extern crate tokio_core;
 extern crate tokio_signal;
 
@@ -10,15 +11,14 @@ use std::thread;
 use std::time::Duration;
 
 use futures::stream::Stream;
-use futures::Future;
+use futures::{Future, IntoFuture};
 use tokio_core::reactor::{Core, Timeout};
 use tokio_signal::unix::Signal;
 
 #[test]
 fn simple() {
     let mut lp = Core::new().unwrap();
-    let handle = lp.handle();
-    let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
+    let signal = lp.run(Signal::new(libc::SIGUSR1)).unwrap();
     unsafe {
         assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
     }
@@ -26,11 +26,32 @@ fn simple() {
 }
 
 #[test]
+fn tokio_simple() {
+    tokio::run(
+        Signal::new(libc::SIGUSR1)
+            .into_future()
+            .and_then(|signal| {
+                unsafe {
+                    assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
+                }
+                signal.into_future().map(|_| ()).map_err(|(err, _)| err)
+            })
+            .map_err(|err| panic!("{}", err)),
+    )
+}
+
+#[test]
 fn notify_both() {
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
-    let signal1 = lp.run(Signal::new(libc::SIGUSR2, &handle)).unwrap();
-    let signal2 = lp.run(Signal::new(libc::SIGUSR2, &handle)).unwrap();
+    let signal1 = lp.run(Signal::with_handle(
+        libc::SIGUSR2,
+        &handle.new_tokio_handle(),
+    )).unwrap();
+    let signal2 = lp.run(Signal::with_handle(
+        libc::SIGUSR2,
+        &handle.new_tokio_handle(),
+    )).unwrap();
     unsafe {
         assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR2), 0);
     }
@@ -43,7 +64,10 @@ fn notify_both() {
 fn drop_then_get_a_signal() {
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
-    let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
+    let signal = lp.run(Signal::with_handle(
+        libc::SIGUSR1,
+        &handle.new_tokio_handle(),
+    )).unwrap();
     drop(signal);
     unsafe {
         assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
@@ -55,8 +79,7 @@ fn drop_then_get_a_signal() {
 #[test]
 fn twice() {
     let mut lp = Core::new().unwrap();
-    let handle = lp.handle();
-    let signal = lp.run(Signal::new(libc::SIGUSR1, &handle)).unwrap();
+    let signal = lp.run(Signal::new(libc::SIGUSR1)).unwrap();
     unsafe {
         assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
     }
@@ -80,8 +103,7 @@ fn multi_loop() {
                 let sender = sender.clone();
                 thread::spawn(move || {
                     let mut lp = Core::new().unwrap();
-                    let handle = lp.handle();
-                    let signal = lp.run(Signal::new(libc::SIGHUP, &handle)).unwrap();
+                    let signal = lp.run(Signal::new(libc::SIGHUP)).unwrap();
                     sender.send(()).unwrap();
                     lp.run(signal.into_future()).ok().unwrap();
                 })

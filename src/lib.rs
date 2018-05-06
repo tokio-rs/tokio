@@ -27,11 +27,10 @@
 //!
 //! fn main() {
 //!     let mut core = Core::new().unwrap();
-//!     let handle = core.handle();
 //!
 //!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
 //!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = tokio_signal::ctrl_c(&handle).flatten_stream();
+//!     let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
 //!
 //!     // Process each ctrl-c as it comes in
 //!     let prog = ctrl_c.for_each(|()| {
@@ -62,11 +61,10 @@
 //!
 //! fn main() {
 //!     let mut core = Core::new().unwrap();
-//!     let handle = core.handle();
 //!
 //!     // Like the previous example, this is an infinite stream of signals
 //!     // being received, and signals may be coalesced while pending.
-//!     let stream = Signal::new(SIGHUP, &handle).flatten_stream();
+//!     let stream = Signal::new(SIGHUP).flatten_stream();
 //!
 //!     // Convert out stream into a future and block the program
 //!     core.run(stream.into_future()).ok().unwrap();
@@ -79,14 +77,16 @@
 #![deny(missing_docs)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate mio;
+extern crate tokio_executor;
 extern crate tokio_io;
+extern crate tokio_reactor;
 
 use std::io;
 
 use futures::stream::Stream;
-use futures::Future;
-use tokio_core::reactor::Handle;
+use futures::{future, Future};
+use tokio_reactor::Handle;
 
 pub mod unix;
 pub mod windows;
@@ -103,27 +103,45 @@ pub type IoStream<T> = Box<Stream<Item = T, Error = io::Error> + Send>;
 /// event to a console process can be represented as a stream for both Windows
 /// and Unix.
 ///
+/// This function binds to the default event loop. Note that
+/// there are a number of caveats listening for signals, and you may wish to
+/// read up on the documentation in the `unix` or `windows` module to take a
+/// peek.
+pub fn ctrl_c() -> IoFuture<IoStream<()>> {
+    ctrl_c_handle(&Handle::current())
+}
+
+/// Creates a stream which receives "ctrl-c" notifications sent to a process.
+///
+/// In general signals are handled very differently across Unix and Windows, but
+/// this is somewhat cross platform in terms of how it can be handled. A ctrl-c
+/// event to a console process can be represented as a stream for both Windows
+/// and Unix.
+///
 /// This function receives a `Handle` to an event loop and returns a future
 /// which when resolves yields a stream receiving all signal events. Note that
 /// there are a number of caveats listening for signals, and you may wish to
 /// read up on the documentation in the `unix` or `windows` module to take a
 /// peek.
-pub fn ctrl_c(handle: &Handle) -> IoFuture<IoStream<()>> {
+pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<IoStream<()>> {
     return ctrl_c_imp(handle);
 
     #[cfg(unix)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        Box::new(
-            unix::Signal::new(unix::libc::SIGINT, handle)
-                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>),
-        )
+        let handle = handle.clone();
+        Box::new(future::lazy(move || {
+            unix::Signal::with_handle(unix::libc::SIGINT, &handle)
+                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>)
+        }))
     }
 
     #[cfg(windows)]
     fn ctrl_c_imp(handle: &Handle) -> IoFuture<IoStream<()>> {
-        Box::new(
-            windows::Event::ctrl_c(handle)
-                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>),
-        )
+        let handle = handle.clone();
+        // Use lazy to ensure that `ctrl_c` gets called while on an event loop
+        Box::new(future::lazy(move || {
+            windows::Event::ctrl_c_handle(&handle)
+                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>)
+        }))
     }
 }

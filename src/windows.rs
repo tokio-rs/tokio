@@ -15,14 +15,15 @@ use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
-use self::winapi::shared::minwindef::*;
-use self::winapi::um::wincon::*;
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{Async, Future, IntoFuture, Poll, Stream};
-use tokio_core::reactor::{Handle, PollEvented};
+use tokio_reactor::{Handle, PollEvented};
+use mio::Ready;
+use self::winapi::shared::minwindef::*;
+use self::winapi::um::wincon::*;
 
 use IoFuture;
 
@@ -83,7 +84,15 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub fn ctrl_c(handle: &Handle) -> IoFuture<Event> {
+    pub fn ctrl_c() -> IoFuture<Event> {
+        Event::ctrl_c_handle(&Handle::current())
+    }
+
+    /// Creates a new stream listening for the `CTRL_C_EVENT` events.
+    ///
+    /// This function will register a handler via `SetConsoleCtrlHandler` and
+    /// deliver notifications to the returned stream.
+    pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_C_EVENT, handle)
     }
 
@@ -91,7 +100,15 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub fn ctrl_break(handle: &Handle) -> IoFuture<Event> {
+    pub fn ctrl_break() -> IoFuture<Event> {
+        Event::ctrl_break_handle(&Handle::current())
+    }
+
+    /// Creates a new stream listening for the `CTRL_BREAK_EVENT` events.
+    ///
+    /// This function will register a handler via `SetConsoleCtrlHandler` and
+    /// deliver notifications to the returned stream.
+    pub fn ctrl_break_handle(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_BREAK_EVENT, handle)
     }
 
@@ -122,10 +139,10 @@ impl Stream for Event {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<()>, io::Error> {
-        if !self.reg.poll_read().is_ready() {
+        if !self.reg.poll_read_ready(Ready::readable())?.is_ready() {
             return Ok(Async::NotReady);
         }
-        self.reg.need_read();
+        self.reg.clear_read_ready(Ready::readable())?;
         self.reg
             .get_ref()
             .inner
@@ -144,7 +161,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
     let reg = MyRegistration {
         inner: RefCell::new(None),
     };
-    let reg = try!(PollEvented::new(reg, handle));
+    let reg = try!(PollEvented::new_with_handle(reg, handle));
     let ready = reg.get_ref().inner.borrow().as_ref().unwrap().1.clone();
     unsafe {
         let state = Box::new(GlobalState {
@@ -166,13 +183,13 @@ fn global_init(handle: &Handle) -> io::Result<()> {
             return Err(io::Error::last_os_error());
         }
 
-        handle.spawn(DriverTask {
+        ::tokio_executor::spawn(Box::new(DriverTask {
             handle: handle.clone(),
             rx: rx.fuse(),
             reg: reg,
             ctrl_c: EventState { tasks: Vec::new() },
             ctrl_break: EventState { tasks: Vec::new() },
-        });
+        }));
 
         Ok(())
     }
@@ -185,7 +202,7 @@ impl Future for DriverTask {
     fn poll(&mut self) -> Poll<(), ()> {
         self.check_event_drops();
         self.check_messages();
-        self.check_events();
+        self.check_events().unwrap();
 
         // TODO: when to finish this task?
         Ok(Async::NotReady)
@@ -224,7 +241,7 @@ impl DriverTask {
             let reg = MyRegistration {
                 inner: RefCell::new(None),
             };
-            let reg = match PollEvented::new(reg, &self.handle) {
+            let reg = match PollEvented::new_with_handle(reg, &self.handle) {
                 Ok(reg) => reg,
                 Err(e) => {
                     drop(complete.send(Err(e)));
@@ -244,11 +261,11 @@ impl DriverTask {
         }
     }
 
-    fn check_events(&mut self) {
-        if self.reg.poll_read().is_not_ready() {
-            return;
+    fn check_events(&mut self) -> io::Result<()> {
+        if self.reg.poll_read_ready(Ready::readable())?.is_not_ready() {
+            return Ok(());
         }
-        self.reg.need_read();
+        self.reg.clear_read_ready(Ready::readable())?;
         self.reg
             .get_ref()
             .inner
@@ -274,6 +291,7 @@ impl DriverTask {
                 task.1.set_readiness(mio::Ready::readable()).unwrap();
             }
         }
+        Ok(())
     }
 }
 

@@ -10,7 +10,6 @@ extern crate mio;
 extern crate mio_uds;
 
 use std::cell::UnsafeCell;
-use std::collections::HashSet;
 use std::io;
 use std::io::prelude::*;
 use std::mem;
@@ -27,7 +26,7 @@ use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async, AsyncSink, Future};
 use futures::{Poll, Sink, Stream};
-use tokio_core::reactor::{CoreId, Handle, PollEvented};
+use tokio_reactor::{Handle, PollEvented};
 use tokio_io::IoFuture;
 
 pub use self::libc::{SIGUSR1, SIGUSR2, SIGINT, SIGTERM};
@@ -50,7 +49,6 @@ struct Globals {
     sender: UnixStream,
     receiver: UnixStream,
     signals: [SignalInfo; SIGNUM],
-    drivers: Mutex<HashSet<CoreId>>,
 }
 
 impl Default for SignalInfo {
@@ -77,7 +75,6 @@ fn globals() -> &'static Globals {
                 sender: sender,
                 receiver: receiver,
                 signals: Default::default(),
-                drivers: Mutex::new(HashSet::new()),
             };
             GLOBALS = Box::into_raw(Box::new(globals));
         });
@@ -215,7 +212,6 @@ impl Read for EventedReceiver {
 }
 
 struct Driver {
-    id: CoreId,
     wakeup: PollEvented<EventedReceiver>,
 }
 
@@ -234,18 +230,10 @@ impl Future for Driver {
     }
 }
 
-impl Drop for Driver {
-    fn drop(&mut self) {
-        let mut drivers = globals().drivers.lock().unwrap();
-        drivers.remove(&self.id);
-    }
-}
-
 impl Driver {
     fn new(handle: &Handle) -> io::Result<Driver> {
         Ok(Driver {
-            id: handle.id(),
-            wakeup: try!(PollEvented::new(EventedReceiver, handle)),
+            wakeup: try!(PollEvented::new_with_handle(EventedReceiver, handle)),
         })
     }
 
@@ -340,6 +328,7 @@ impl Driver {
 /// repo, though, as I'd love to chat about this! In other words, I'd love to
 /// alleviate some of these limitations if possible!
 pub struct Signal {
+    driver: Driver,
     signal: c_int,
     // Used only as an identifier. We place the real sender into a Box, so it
     // stays on the same address forever. That gives us a unique pointer, so we
@@ -358,6 +347,28 @@ impl Signal {
     /// Creates a new stream which will receive notifications when the current
     /// process receives the signal `signal`.
     ///
+    /// This function will create a new stream which binds to the default event
+    /// loop. This function returns a future which will
+    /// then resolve to the signal stream, if successful.
+    ///
+    /// The `Signal` stream is an infinite stream which will receive
+    /// notifications whenever a signal is received. More documentation can be
+    /// found on `Signal` itself, but to reiterate:
+    ///
+    /// * Signals may be coalesced beyond what the kernel already does.
+    /// * Once a signal handler is registered with the process the underlying
+    ///   libc signal handler is never unregistered.
+    ///
+    /// A `Signal` stream can be created for a particular signal number
+    /// multiple times. When a signal is received then all the associated
+    /// channels will receive the signal notification.
+    pub fn new(signal: c_int) -> IoFuture<Signal> {
+        Signal::with_handle(signal, &Handle::current())
+    }
+
+    /// Creates a new stream which will receive notifications when the current
+    /// process receives the signal `signal`.
+    ///
     /// This function will create a new stream which may be based on the
     /// event loop handle provided. This function returns a future which will
     /// then resolve to the signal stream, if successful.
@@ -373,36 +384,33 @@ impl Signal {
     /// A `Signal` stream can be created for a particular signal number
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
-    pub fn new(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
-        let result = (|| {
-            // Turn the signal delivery on once we are ready for it
-            try!(signal_enable(signal));
+    pub fn with_handle(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
+        let handle = handle.clone();
+        Box::new(future::lazy(move || {
+            let result = (|| {
+                // Turn the signal delivery on once we are ready for it
+                try!(signal_enable(signal));
 
-            // Ensure there's a driver for our associated event loop processing
-            // signals.
-            let id = handle.id();
-            let mut drivers = globals().drivers.lock().unwrap();
-            if !drivers.contains(&id) {
-                handle.spawn(try!(Driver::new(handle)));
-                drivers.insert(id);
-            }
-            drop(drivers);
+                // Ensure there's a driver for our associated event loop processing
+                // signals.
+                let driver = try!(Driver::new(&handle));
 
-            // One wakeup in a queue is enough, no need for us to buffer up any
-            // more.
-            let (tx, rx) = channel(1);
-            let tx = Box::new(tx);
-            let id: *const _ = &*tx;
-            let idx = signal as usize;
-            globals().signals[idx].recipients.lock().unwrap().push(tx);
-            Ok(Signal {
-                rx: rx,
-                id: id,
-                signal: signal,
-            })
-        })();
-
-        Box::new(future::result(result))
+                // One wakeup in a queue is enough, no need for us to buffer up any
+                // more.
+                let (tx, rx) = channel(1);
+                let tx = Box::new(tx);
+                let id: *const _ = &*tx;
+                let idx = signal as usize;
+                globals().signals[idx].recipients.lock().unwrap().push(tx);
+                Ok(Signal {
+                    driver: driver,
+                    rx: rx,
+                    id: id,
+                    signal: signal,
+                })
+            })();
+            future::result(result)
+        }))
     }
 }
 
@@ -411,6 +419,7 @@ impl Stream for Signal {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<c_int>, io::Error> {
+        self.driver.poll().unwrap();
         // receivers don't generate errors
         self.rx.poll().map_err(|_| panic!())
     }
