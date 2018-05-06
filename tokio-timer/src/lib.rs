@@ -34,8 +34,15 @@ mod delay;
 mod error;
 mod interval;
 
+use std::time::{Duration, Instant};
+
 pub use self::deadline::{Deadline, DeadlineError};
 pub use self::delay::Delay;
 pub use self::error::Error;
 pub use self::interval::Interval;
-pub use self::timer::{Timer, with_default};
+pub use self::timer::{with_default, Timer};
+
+/// Create a Future that completes in `duration` from now.
+pub fn sleep(duration: Duration) -> Delay {
+    Delay::new(Instant::now() + duration)
+}
