@@ -11,7 +11,7 @@ use tokio_timer::timer::{self, Timer};
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
-/// Methods can be chanined in order to set the configuration values. The
+/// Methods can be chained in order to set the configuration values. The
 /// Runtime is constructed by calling [`build`].
 ///
 /// New instances of `Builder` are obtained via [`Builder::new`].

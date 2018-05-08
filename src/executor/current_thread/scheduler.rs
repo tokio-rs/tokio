@@ -52,7 +52,7 @@ struct List<U> {
 // Specifically, when a node is stored in at least one of the two lists
 // described above, this represents a logical `Arc` handle. This is how
 // `Scheduler` maintains its reference to all nodes it manages. Each
-// `NotifyHande` instance is an `Arc<Node>` as well.
+// `NotifyHandle` instance is an `Arc<Node>` as well.
 //
 // When `Scheduler` drops, it clears the linked list of all nodes that it
 // manages. When doing so, it must attempt to decrement the reference count (by
@@ -642,7 +642,7 @@ impl<'a, U> Clone for Notify<'a, U> {
 
 impl<'a, U> fmt::Debug for Notify<'a, U> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Notiy").finish()
+        fmt.debug_struct("Notify").finish()
     }
 }
 

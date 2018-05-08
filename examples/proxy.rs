@@ -1,7 +1,7 @@
 //! A proxy that forwards data to another server and forwards that server's
 //! responses back to clients.
 //!
-//! Because the Tokio runtime uses a thread poool, each TCP connection is
+//! Because the Tokio runtime uses a thread pool, each TCP connection is
 //! processed concurrently with all other TCP connections across multiple
 //! threads.
 //!

@@ -68,6 +68,6 @@ fn main() {
     // `map_err` handles the error by logging it and maps the future to a type
     // that can be spawned.
     //
-    // `tokio::run` spanws the task on the Tokio runtime and starts running.
+    // `tokio::run` spawns the task on the Tokio runtime and starts running.
     tokio::run(server.map_err(|e| println!("server error = {:?}", e)));
 }

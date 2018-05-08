@@ -46,7 +46,7 @@ impl BackupStack {
     /// Returns `Ok` on success.
     ///
     /// Returns `Err` if the pool has transitioned to the `TERMINATED` state.
-    /// Whene terminated, pushing new entries is no longer permitted.
+    /// When terminated, pushing new entries is no longer permitted.
     pub fn push(&self, entries: &[Backup], id: BackupId) -> Result<(), ()> {
         let mut state: State = self.state.load(Acquire).into();
 

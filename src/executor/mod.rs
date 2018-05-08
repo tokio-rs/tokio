@@ -21,7 +21,7 @@
 //!
 //! * **[`thread_pool`]**: A multi-threaded executor that maintains a pool of
 //! threads. Tasks are spawned to one of the threads in the pool and executed.
-//! The pool employes a [work-stealing] strategy for optimizing how tasks get
+//! The pool employs a [work-stealing] strategy for optimizing how tasks get
 //! spread across the available threads.
 //!
 //! # `Executor` trait.

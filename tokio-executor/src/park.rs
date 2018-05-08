@@ -29,7 +29,7 @@
 //!
 //! * If [`unpark`] is called before [`park`], the next call to [`park`] will
 //! **not** block the thread.
-//! * **Spurious** wakeups are permited, i.e., the [`park`] method may unblock
+//! * **Spurious** wakeups are permitted, i.e., the [`park`] method may unblock
 //!   even if [`unpark`] was not called.
 //! * [`park_timeout`] does the same as [`park`] but allows specifying a maximum
 //!   time to block the thread for.
@@ -75,7 +75,7 @@ pub trait Park {
     ///
     /// # Panics
     ///
-    /// This function **should** not panic, but ultimiately, panics are left as
+    /// This function **should** not panic, but ultimately, panics are left as
     /// an implementation detail. Refer to the documentation for the specific
     /// `Park` implementation
     ///
@@ -95,7 +95,7 @@ pub trait Park {
     ///
     /// # Panics
     ///
-    /// This function **should** not panic, but ultimiately, panics are left as
+    /// This function **should** not panic, but ultimately, panics are left as
     /// an implementation detail. Refer to the documentation for the specific
     /// `Park` implementation
     ///
@@ -119,7 +119,7 @@ pub trait Unpark: Sync + Send + 'static {
     ///
     /// # Panics
     ///
-    /// This function **should** not panic, but ultimiately, panics are left as
+    /// This function **should** not panic, but ultimately, panics are left as
     /// an implementation detail. Refer to the documentation for the specific
     /// `Unpark` implementation
     ///
@@ -264,7 +264,7 @@ impl Inner {
             None => self.condvar.wait(m).unwrap(),
         };
 
-        // Transition back to idle. If the state has transitione dto `NOTIFY`,
+        // Transition back to idle. If the state has transitioned to `NOTIFY`,
         // this will consume that notification
         self.state.store(IDLE, Ordering::SeqCst);
 

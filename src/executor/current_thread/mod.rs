@@ -160,7 +160,7 @@ impl Turn {
     }
 }
 
-/// A `CurrentThread` instance bound to a supplied execution conext.
+/// A `CurrentThread` instance bound to a supplied execution context.
 pub struct Entered<'a, P: Park + 'a> {
     executor: &'a mut CurrentThread<P>,
     enter: &'a mut Enter,
@@ -248,7 +248,7 @@ where F: FnOnce(&mut Context) -> R
 /// and blocks the current thread until the provided future and **all**
 /// subsequently spawned futures complete. In other words:
 ///
-/// * If the provided boostrap future does **not** spawn any additional tasks,
+/// * If the provided bootstrap future does **not** spawn any additional tasks,
 ///   `block_on_all` returns once `future` completes.
 /// * If the provided bootstrap future **does** spawn additional tasks, then
 ///   `block_on_all` returns once **all** spawned futures complete.
@@ -733,7 +733,7 @@ impl RunTimeoutError {
         RunTimeoutError { timeout }
     }
 
-    /// Returns `true` if the error was caused by the operation timeing out.
+    /// Returns `true` if the error was caused by the operation timing out.
     pub fn is_timeout(&self) -> bool {
         self.timeout
     }

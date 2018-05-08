@@ -3,7 +3,7 @@
 //! This server will create a TCP listener, accept connections in a loop, and
 //! write back everything that's read off of each TCP connection.
 //!
-//! Because the Tokio runtime uses a thread poool, each TCP connection is
+//! Because the Tokio runtime uses a thread pool, each TCP connection is
 //! processed concurrently with all other TCP connections across multiple
 //! threads.
 //!

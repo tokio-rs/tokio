@@ -71,7 +71,7 @@ impl Stack {
     /// Returns `Ok` on success.
     ///
     /// Returns `Err` if the pool has transitioned to the `TERMINATED` state.
-    /// Whene terminated, pushing new entries is no longer permitted.
+    /// When terminated, pushing new entries is no longer permitted.
     pub fn push(&self, entries: &[worker::Entry], idx: usize) -> Result<(), ()> {
         let mut state: State = self.state.load(Acquire).into();
 
@@ -105,7 +105,7 @@ impl Stack {
     ///
     /// If `terminate` is set and the stack is empty when this function is
     /// called, the state of the stack is transitioned to "terminated". At this
-    /// point, no further workers can be pusheed onto the stack.
+    /// point, no further workers can be pushed onto the stack.
     ///
     /// # Return
     ///

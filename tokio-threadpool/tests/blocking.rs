@@ -238,7 +238,7 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
 }
 
 #[test]
-fn blockin_one_time_gets_capacity_for_multiple_blocks() {
+fn blocking_one_time_gets_capacity_for_multiple_blocks() {
     const ITER: usize = 1;
     const BLOCKING: usize = 2;
 

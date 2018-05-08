@@ -62,7 +62,7 @@ pub struct BlockingError {
 /// ideal as it requires bidirectional message passing as well as a channel to
 /// communicate which adds a level of buffering.
 ///
-/// Instead, `blocking` hands off the responsiblity of processing the work queue
+/// Instead, `blocking` hands off the responsibility of processing the work queue
 /// to another thread. This hand off is light compared to a channel and does not
 /// require buffering.
 ///

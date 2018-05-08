@@ -259,7 +259,7 @@ fn short_delay() {
         // The delay has not elapsed.
         assert_not_ready!(delay);
 
-        // Turn the timer, but not enough timee will go by.
+        // Turn the timer, but not enough time will go by.
         turn(timer, None);
 
         // The delay has elapsed.

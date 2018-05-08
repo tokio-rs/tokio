@@ -96,7 +96,7 @@ impl TcpListener {
     ///
     /// This function is the same as `accept` above except that it returns a
     /// `std::net::TcpStream` instead of a `tokio::net::TcpStream`. This in turn
-    /// can then allow for the TCP stream to be assoiated with a different
+    /// can then allow for the TCP stream to be associated with a different
     /// reactor than the one this `TcpListener` is associated with.
     ///
     /// # Return

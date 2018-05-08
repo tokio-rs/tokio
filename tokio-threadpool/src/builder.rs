@@ -372,7 +372,7 @@ impl Builder {
     ///         let park = DefaultPark::new();
     ///
     ///         // Decorate the `park` instance, allowing us to customize work
-    ///         // that happens when a worker therad goes to sleep.
+    ///         // that happens when a worker thread goes to sleep.
     ///         decorate(park)
     ///     })
     ///     .build();

@@ -38,7 +38,7 @@ A high level description of each example is:
   in multiple terminals and use it to chat between the terminals.
 
 * [`chat-combinator`](chat-combinator.rs) - Similar to `chat`, but this uses a
-  much more functional programming approch using combinators.
+  much more functional programming approach using combinators.
 
 * [`proxy`](proxy.rs) - an example proxy server that will forward all connected
   TCP clients to the remote address specified when starting the program.
