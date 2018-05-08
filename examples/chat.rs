@@ -157,7 +157,7 @@ impl Peer {
 
 /// This is where a connected client is managed.
 ///
-/// A `Peer` is also a future representing completly processing the client.
+/// A `Peer` is also a future representing completely processing the client.
 ///
 /// When a `Peer` is created, the first line (representing the client's name)
 /// has already been read. When the socket closes, the `Peer` future completes.

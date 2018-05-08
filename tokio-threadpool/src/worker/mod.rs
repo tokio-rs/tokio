@@ -227,7 +227,7 @@ impl Worker {
         while self.check_run_state(first) {
             first = false;
 
-            // Poll inbound until empty, transfering all tasks to the internal
+            // Poll inbound until empty, transferring all tasks to the internal
             // queue.
             let consistent = self.drain_inbound();
 

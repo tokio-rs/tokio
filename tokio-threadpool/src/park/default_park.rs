@@ -133,7 +133,7 @@ impl Inner {
             None => self.condvar.wait(m).unwrap(),
         };
 
-        // Transition back to idle. If the state has transitione dto `NOTIFY`,
+        // Transition back to idle. If the state has transitions dto `NOTIFY`,
         // this will consume that notification
         self.state.store(IDLE, SeqCst);
 

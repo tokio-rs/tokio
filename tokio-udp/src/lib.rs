@@ -7,7 +7,7 @@
 //! Reading and writing to it can be done using futures, which return the
 //! [`RecvDgram`] and [`SendDgram`] structs respectively.
 //!
-//! For convience it's also possible to convert raw datagrams into higher-level
+//! For convenience it's also possible to convert raw datagrams into higher-level
 //! frames.
 //!
 //! [`UdpSocket`]: struct.UdpSocket.html

@@ -24,7 +24,7 @@ pub trait FutureExt: Future {
     ///
     /// This combinator creates a new future which wraps the receiving future
     /// with a deadline. The returned future is allowed to execute until it
-    /// completes or `deadline` is reached, whicheever happens first.
+    /// completes or `deadline` is reached, whichever happens first.
     ///
     /// If the future completes before `deadline` then the future will resolve
     /// with that item. Otherwise the future will resolve to an error once

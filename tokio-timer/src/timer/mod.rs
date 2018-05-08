@@ -320,7 +320,7 @@ where T: Park,
                 break;
             }
 
-            // Prcess the slot, either moving it down a level or firing the
+            // Process the slot, either moving it down a level or firing the
             // timeout if currently at the final (boss) level.
             self.process_expiration(&expiration);
 

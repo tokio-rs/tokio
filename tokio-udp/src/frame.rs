@@ -114,7 +114,7 @@ const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 impl<C> UdpFramed<C> {
     /// Create a new `UdpFramed` backed by the given socket and codec.
     ///
-    /// See struct level documention for more details.
+    /// See struct level documentation for more details.
     pub fn new(socket: UdpSocket, codec: C) -> UdpFramed<C> {
         UdpFramed {
             socket: socket,

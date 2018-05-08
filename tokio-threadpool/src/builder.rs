@@ -20,7 +20,7 @@ use futures2;
 
 /// Builds a thread pool with custom configuration values.
 ///
-/// Methods can be chanined in order to set the configuration values. The thread
+/// Methods can be chained in order to set the configuration values. The thread
 /// pool is constructed by calling [`build`].
 ///
 /// New instances of `Builder` are obtained via [`Builder::new`].
@@ -372,7 +372,7 @@ impl Builder {
     ///         let park = DefaultPark::new();
     ///
     ///         // Decorate the `park` instance, allowing us to customize work
-    ///         // that happens when a worker therad goes to sleep.
+    ///         // that happens when a worker thread goes to sleep.
     ///         decorate(park)
     ///     })
     ///     .build();

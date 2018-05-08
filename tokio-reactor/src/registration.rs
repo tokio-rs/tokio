@@ -120,7 +120,7 @@ impl Registration {
         self.register2(io, || Handle::try_current())
     }
 
-    /// Deregister the I/O resource from the reactor it is associatd with.
+    /// Deregister the I/O resource from the reactor it is associated with.
     ///
     /// This function must be called before the I/O resource associated with the
     /// registration is dropped.

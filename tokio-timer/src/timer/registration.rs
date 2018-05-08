@@ -40,7 +40,7 @@ impl Registration {
         let when = inner.normalize_deadline(deadline);
 
         if when <= inner.elapsed() {
-            // The deadline has already elapsed, ther eis no point creating the
+            // The deadline has already elapsed, there is no point creating the
             // structures.
             return Registration {
                 entry: Arc::new(Entry::new_elapsed(handle)),

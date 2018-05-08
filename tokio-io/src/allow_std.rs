@@ -76,6 +76,6 @@ impl<T> io::Read for AllowStdIo<T> where T: io::Read {
 }
 
 impl<T> AsyncRead for AllowStdIo<T> where T: io::Read {
-    // TODO: override prepare_unitialized_buffer once `Read::initializer` is stable.
+    // TODO: override prepare_uninitialized_buffer once `Read::initializer` is stable.
     // See rust-lang/rust #42788
 }

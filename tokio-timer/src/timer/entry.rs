@@ -44,7 +44,7 @@ pub(crate) struct Entry {
     /// instant, this value is changed.
     state: AtomicU64,
 
-    /// When true, the entry is counted by `Inner` towards the max oustanding
+    /// When true, the entry is counted by `Inner` towards the max outstanding
     /// timeouts. The drop fn uses this to know if it should decrement the
     /// counter.
     ///
@@ -54,7 +54,7 @@ pub(crate) struct Entry {
     /// improve the struct layout. To do this, we must always allocate the node.
     counted: bool,
 
-    /// True wheen the entry is queued in the "process" stack. This value
+    /// True when the entry is queued in the "process" stack. This value
     /// is set before pushing the value and unset after popping the value.
     queued: AtomicBool,
 

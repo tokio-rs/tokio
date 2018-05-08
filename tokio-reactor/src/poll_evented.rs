@@ -27,7 +27,7 @@ use std::sync::atomic::Ordering::Relaxed;
 ///
 /// **Note**: While `PollEvented` is `Sync` (if the underlying I/O type is
 /// `Sync`), the caller must ensure that there are at most two tasks that use a
-/// `PollEvented` instance concurrenty. One for reading and one for writing.
+/// `PollEvented` instance concurrently. One for reading and one for writing.
 /// While violating this requirement is "safe" from a Rust memory model point of
 /// view, it will result in unexpected behavior in the form of lost
 /// notifications and tasks hanging.
@@ -50,7 +50,7 @@ use std::sync::atomic::Ordering::Relaxed;
 /// [`clear_write_ready`]. This clears the readiness state until a new readiness
 /// event is received.
 ///
-/// This allows the caller to implement additional funcitons. For example,
+/// This allows the caller to implement additional functions. For example,
 /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
 /// [`clear_write_ready`].
 ///

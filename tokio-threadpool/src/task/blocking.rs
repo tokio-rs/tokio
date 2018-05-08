@@ -363,7 +363,7 @@ impl Blocking {
                 debug_assert!(State::from(state).is_ptr());
 
                 if state != tail as usize {
-                    // Try aain
+                    // Try again
                     thread::yield_now();
                     continue 'outer;
                 }
@@ -438,7 +438,7 @@ impl State {
         true
     }
 
-    /// Add blockin capacity.
+    /// Add blocking capacity.
     fn add_capacity(&mut self, capacity: usize, stub: &Task) -> bool {
         debug_assert!(capacity > 0);
 
