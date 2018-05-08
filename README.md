@@ -15,7 +15,7 @@ First, add this to your `Cargo.toml`:
 tokio-signal = "0.1"
 ```
 
-Next you can use this in conjunction with the `tokio-core` and `futures` crates:
+Next you can use this in conjunction with the `tokio` and `futures` crates:
 
 ```rust,no_run
 extern crate futures;
