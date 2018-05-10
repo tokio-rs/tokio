@@ -34,7 +34,6 @@ use mio::unix::{EventedFd, UnixReady};
 use mio::{PollOpt, Ready, Token};
 use mio::event::Evented;
 use mio;
-use self::libc::c_int;
 use self::tokio_signal::unix::Signal;
 use std::fmt;
 use tokio_io::IoFuture;
@@ -87,24 +86,21 @@ impl Child {
     }
 
     pub fn kill(&mut self) -> io::Result<()> {
-        if self.reaped {
-            Ok(())
-        } else {
+        if !self.reaped {
+            // NB: SIGKILL cannnot be caught, so the process will definitely exit immediately.
+            // We're not waiting for the process itself but for the kernel to execute the kill.
             self.inner.kill()?;
-            let mut status = 0;
-            let id = self.id() as c_int;
-            unsafe { libc::waitpid(id, &mut status, 0) };
-            Ok(())
+            let _ = self.try_wait(true);
         }
+
+        Ok(())
     }
 
     pub fn poll_exit(&mut self) -> Poll<ExitStatus, io::Error> {
-        assert!(!self.reaped);
         loop {
             // Ensure that once we've successfully waited we won't try to
             // `kill` above.
-            if let Some(e) = try!(self.try_wait()) {
-                self.reaped = true;
+            if let Some(e) = try!(self.try_wait(false)) {
                 return Ok(e.into())
             }
 
@@ -120,23 +116,35 @@ impl Child {
         }
     }
 
-    fn try_wait(&self) -> io::Result<Option<ExitStatus>> {
-        let id = self.id() as c_int;
-        let mut status = 0;
-        loop {
-            match unsafe { libc::waitpid(id, &mut status, libc::WNOHANG) } {
-                0 => return Ok(None),
-                n if n < 0 => {
-                    let err = io::Error::last_os_error();
-                    if err.kind() == io::ErrorKind::Interrupted {
-                        continue
-                    }
-                    return Err(err)
+    fn try_wait(&mut self, block_on_wait: bool) -> io::Result<Option<ExitStatus>> {
+        assert!(!self.reaped);
+        let exit = try!(try_wait_process(self.id() as libc::pid_t, block_on_wait));
+
+        if let Some(_) = exit {
+            self.reaped = true;
+        }
+
+        Ok(exit)
+    }
+}
+
+fn try_wait_process(id: libc::pid_t, block_on_wait: bool) -> io::Result<Option<ExitStatus>> {
+    let wait_flags = if block_on_wait { 0 } else { libc::WNOHANG };
+    let mut status = 0;
+
+    loop {
+        match unsafe { libc::waitpid(id, &mut status, wait_flags) } {
+            0 => return Ok(None),
+            n if n < 0 => {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue
                 }
-                n => {
-                    assert_eq!(n, id);
-                    return Ok(Some(ExitStatus::from_raw(status)))
-                }
+                return Err(err)
+            }
+            n => {
+                assert_eq!(n, id);
+                return Ok(Some(ExitStatus::from_raw(status)))
             }
         }
     }
