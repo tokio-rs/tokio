@@ -708,7 +708,7 @@ impl Task {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 mod platform {
     use mio::Ready;
     use mio::unix::UnixReady;
@@ -722,7 +722,7 @@ mod platform {
     }
 }
 
-#[cfg(any(windows, target_os = "fuchsia"))]
+#[cfg(windows)]
 mod platform {
     use mio::Ready;
 
