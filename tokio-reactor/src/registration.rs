@@ -1,4 +1,4 @@
-use {Handle, Direction, Task};
+use {Handle, HandlePriv, Direction, Task};
 
 use futures::{Async, Poll, task};
 use mio::{self, Evented};
@@ -59,7 +59,7 @@ pub struct Registration {
 
 #[derive(Debug)]
 struct Inner {
-    handle: Handle,
+    handle: HandlePriv,
     token: usize,
 }
 
@@ -117,7 +117,7 @@ impl Registration {
     pub fn register<T>(&self, io: &T) -> io::Result<bool>
     where T: Evented,
     {
-        self.register2(io, || Handle::try_current())
+        self.register2(io, || HandlePriv::try_current())
     }
 
     /// Deregister the I/O resource from the reactor it is associated with.
@@ -164,12 +164,23 @@ impl Registration {
     pub fn register_with<T>(&self, io: &T, handle: &Handle) -> io::Result<bool>
     where T: Evented,
     {
+        self.register2(io, || {
+            match handle.as_priv() {
+                Some(handle) => Ok(handle.clone()),
+                None => HandlePriv::try_current(),
+            }
+        })
+    }
+
+    pub(crate) fn register_with_priv<T>(&self, io: &T, handle: &HandlePriv) -> io::Result<bool>
+    where T: Evented,
+    {
         self.register2(io, || Ok(handle.clone()))
     }
 
     fn register2<T, F>(&self, io: &T, f: F) -> io::Result<bool>
     where T: Evented,
-          F: Fn() -> io::Result<Handle>,
+          F: Fn() -> io::Result<HandlePriv>,
     {
         let mut state = self.state.load(SeqCst);
 
@@ -434,7 +445,7 @@ unsafe impl Sync for Registration {}
 // ===== impl Inner =====
 
 impl Inner {
-    fn new<T>(io: &T, handle: Handle) -> (Self, io::Result<()>)
+    fn new<T>(io: &T, handle: HandlePriv) -> (Self, io::Result<()>)
     where T: Evented,
     {
         let mut res = Ok(());

@@ -160,7 +160,12 @@ where E: Evented
     /// Creates a new `PollEvented` associated with the specified reactor.
     pub fn new_with_handle(io: E, handle: &Handle) -> io::Result<Self> {
         let ret = PollEvented::new(io);
-        ret.inner.registration.register_with(ret.io.as_ref().unwrap(), handle)?;
+
+        if let Some(handle) = handle.as_priv() {
+            ret.inner.registration
+                .register_with_priv(ret.io.as_ref().unwrap(), handle)?;
+        }
+
         Ok(ret)
     }
 
