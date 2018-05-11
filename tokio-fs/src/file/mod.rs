@@ -1,6 +1,6 @@
 //! Types for working with [`File`].
 //!
-//! [`File`]: struct.File.html
+//! [`File`]: file/struct.File.html
 
 mod create;
 mod open;
