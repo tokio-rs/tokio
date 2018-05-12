@@ -4,7 +4,7 @@
 //! illustrate more concepts.
 //!
 //! A chat server for telnet clients. After a telnet client connects, the first
-//! line should contain the client's name. After that, all lines send by a
+//! line should contain the client's name. After that, all lines sent by a
 //! client are broadcasted to all other connected clients.
 //!
 //! Because the client is telnet, lines are delimited by "\r\n".
