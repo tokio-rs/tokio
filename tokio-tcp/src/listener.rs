@@ -159,6 +159,7 @@ impl TcpListener {
     ///
     /// Finally, the `handle` argument is the event loop that this listener will
     /// be bound to.
+    /// Use `Handle::default()` to lazily bind to an event loop, just like `bind` does.
     ///
     /// The platform specific behavior of this function looks like:
     ///
