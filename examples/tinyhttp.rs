@@ -21,6 +21,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate time;
 extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 
 use std::{env, fmt, io};
@@ -29,7 +30,7 @@ use std::net::SocketAddr;
 use tokio::net::{TcpStream, TcpListener};
 use tokio::prelude::*;
 
-use tokio_io::codec::{Encoder, Decoder};
+use tokio_codec::{Encoder, Decoder};
 
 use bytes::BytesMut;
 use http::header::HeaderValue;
@@ -55,10 +56,10 @@ fn main() {
 }
 
 fn process(socket: TcpStream) {
-    let (tx, rx) = socket
+    let (tx, rx) =
         // Frame the socket using the `Http` protocol. This maps the TCP socket
         // to a Stream + Sink of HTTP frames.
-        .framed(Http)
+        Http.framed(socket)
         // This splits a single `Stream + Sink` value into two separate handles
         // that can be used independently (even on different tasks or threads).
         .split();

@@ -1,9 +1,10 @@
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate bytes;
 extern crate futures;
 
 use tokio_io::AsyncWrite;
-use tokio_io::codec::{Encoder, FramedWrite};
+use tokio_codec::{Encoder, FramedWrite};
 
 use futures::{Sink, Poll};
 use bytes::{BytesMut, BufMut, BigEndian};

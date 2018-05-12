@@ -17,6 +17,7 @@
 #![deny(warnings)]
 
 extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate futures;
 extern crate bytes;
@@ -82,7 +83,7 @@ fn main() {
 mod codec {
     use std::io;
     use bytes::{BufMut, BytesMut};
-    use tokio_io::codec::{Encoder, Decoder};
+    use tokio_codec::{Encoder, Decoder};
 
     /// A simple `Codec` implementation that just ships bytes around.
     ///
@@ -120,6 +121,7 @@ mod codec {
 
 mod tcp {
     use tokio;
+    use tokio_codec::Decoder;
     use tokio::net::TcpStream;
     use tokio::prelude::*;
 
@@ -151,7 +153,7 @@ mod tcp {
         // to the TCP stream. This is done to ensure that happens concurrently
         // with us reading data from the stream.
         Box::new(tcp.map(move |stream| {
-            let (sink, stream) = stream.framed(Bytes).split();
+            let (sink, stream) = Bytes.framed(stream).split();
 
             tokio::spawn(stdin.forward(sink).then(|result| {
                 if let Err(e) = result {

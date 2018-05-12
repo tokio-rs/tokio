@@ -5,20 +5,16 @@ use std::fmt;
 
 use {AsyncRead, AsyncWrite};
 use codec::{Decoder, Encoder};
-use framed::Fuse;
+use super::framed::Fuse;
 
 use futures::{Async, AsyncSink, Poll, Stream, Sink, StartSend};
 use bytes::BytesMut;
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
-#[doc(hidden)]
 pub struct FramedWrite<T, E> {
     inner: FramedWrite2<Fuse<T, E>>,
 }
 
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
-#[doc(hidden)]
 pub struct FramedWrite2<T> {
     inner: T,
     buffer: BytesMut,

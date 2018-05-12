@@ -5,8 +5,8 @@ use std::fmt;
 
 use {AsyncRead, AsyncWrite};
 use codec::{Decoder, Encoder};
-use framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
-use framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
+use super::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
+use super::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
 
 use futures::{Stream, Sink, StartSend, Poll};
 use bytes::{BytesMut};
@@ -15,16 +15,29 @@ use bytes::{BytesMut};
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
 ///
 /// You can create a `Framed` instance by using the `AsyncRead::framed` adapter.
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
-#[doc(hidden)]
 pub struct Framed<T, U> {
     inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
 }
 
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
-#[doc(hidden)]
 pub struct Fuse<T, U>(pub T, pub U);
 
+/// Provides a `Stream` and `Sink` interface for reading and writing to this
+/// `Io` object, using `Decode` and `Encode` to read and write the raw data.
+///
+/// Raw I/O objects work with byte sequences, but higher-level code usually
+/// wants to batch these into meaningful chunks, called "frames". This
+/// method layers framing on top of an I/O object, by using the `Codec`
+/// traits to handle encoding and decoding of messages frames. Note that
+/// the incoming and outgoing frame types may be distinct.
+///
+/// This function returns a *single* object that is both `Stream` and
+/// `Sink`; grouping this into a single object is often useful for layering
+/// things like gzip or TLS, which require both read and write access to the
+/// underlying object.
+///
+/// If you want to work more directly with the streams and sink, consider
+/// calling `split` on the `Framed` returned by this method, which will
+/// break them into separate objects, allowing them to interact more easily.
 pub fn framed<T, U>(inner: T, codec: U) -> Framed<T, U>
     where T: AsyncRead + AsyncWrite,
           U: Decoder + Encoder,

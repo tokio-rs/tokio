@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use {codec, AsyncRead, AsyncWrite};
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
