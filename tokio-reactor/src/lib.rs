@@ -94,6 +94,9 @@ pub struct Reactor {
 /// A `Handle` is used for associating I/O objects with an event loop
 /// explicitly. Typically though you won't end up using a `Handle` that often
 /// and will instead use the default reactor for the execution context.
+///
+/// By default, most components bind lazily to reactors.
+/// To get this behavior when manually passing a `Handle`, use `default()`.
 #[derive(Clone)]
 pub struct Handle {
     inner: Option<HandlePriv>,
@@ -475,6 +478,7 @@ impl Unpark for Handle {
 }
 
 impl Default for Handle {
+    /// Returns a "default" handle, i.e., a handle that lazily binds to a reactor.
     fn default() -> Handle {
         Handle { inner: None }
     }
