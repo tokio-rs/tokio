@@ -14,31 +14,27 @@
 //!
 //! ```no_run
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_process;
 //!
 //! use std::process::Command;
 //!
 //! use futures::Future;
-//! use tokio_core::reactor::Core;
 //! use tokio_process::CommandExt;
 //!
 //! fn main() {
-//!     // Create our own local event loop
-//!     let mut core = Core::new().unwrap();
-//!
 //!     // Use the standard library's `Command` type to build a process and
 //!     // then execute it via the `CommandExt` trait.
 //!     let child = Command::new("echo").arg("hello").arg("world")
-//!                         .spawn_async_with_handle(core.handle().new_tokio_handle());
+//!                         .spawn_async();
 //!
-//!     // Make sure our child succeeded in spawning
-//!     let child = child.expect("failed to spawn");
+//!     // Make sure our child succeeded in spawning and process the result
+//!     let future = child.expect("failed to spawn")
+//!         .map(|status| println!("exit status: {}", status))
+//!         .map_err(|e| panic!("failed to wait for exit: {}", e));
 //!
-//!     match core.run(child) {
-//!         Ok(status) => println!("exit status: {}", status),
-//!         Err(e) => panic!("failed to wait for exit: {}", e),
-//!     }
+//!     // Send the future to the tokio runtime for execution
+//!     tokio::run(future)
 //! }
 //! ```
 //!
@@ -47,26 +43,27 @@
 //!
 //! ```no_run
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_process;
 //!
 //! use std::process::Command;
 //!
 //! use futures::Future;
-//! use tokio_core::reactor::Core;
 //! use tokio_process::CommandExt;
 //!
 //! fn main() {
-//!     let mut core = Core::new().unwrap();
-//!
 //!     // Like above, but use `output_async` which returns a future instead of
 //!     // immediately returning the `Child`.
 //!     let output = Command::new("echo").arg("hello").arg("world")
-//!                         .output_async_with_handle(core.handle().new_tokio_handle());
-//!     let output = core.run(output).expect("failed to collect output");
+//!                         .output_async();
 //!
-//!     assert!(output.status.success());
-//!     assert_eq!(output.stdout, b"hello world\n");
+//!     let future = output.map_err(|e| panic!("failed to collect output: {}", e))
+//!         .map(|output| {
+//!             assert!(output.status.success());
+//!             assert_eq!(output.stdout, b"hello world\n");
+//!         });
+//!
+//!     tokio::run(future);
 //! }
 //! ```
 //!
@@ -74,18 +71,17 @@
 //!
 //! ```no_run
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_process;
 //! extern crate tokio_io;
 //!
 //! use std::io;
-//! use std::process::{Command, Stdio, ExitStatus};
+//! use std::process::{Command, Stdio};
 //!
-//! use futures::{BoxFuture, Future, Stream};
-//! use tokio_core::reactor::Core;
+//! use futures::{Future, Stream};
 //! use tokio_process::{CommandExt, Child};
 //!
-//! fn print_lines(mut cat: Child) -> BoxFuture<ExitStatus, io::Error> {
+//! fn print_lines(mut cat: Child) -> Box<Future<Item = (), Error = ()> + Send + 'static> {
 //!     let stdout = cat.stdout().take().unwrap();
 //!     let reader = io::BufReader::new(stdout);
 //!     let lines = tokio_io::io::lines(reader);
@@ -93,15 +89,20 @@
 //!         println!("Line: {}", l);
 //!         Ok(())
 //!     });
-//!     cycle.join(cat).map(|((), s)| s).boxed()
+//!
+//!     let future = cycle.join(cat)
+//!         .map(|_| ())
+//!         .map_err(|e| panic!("{}", e));
+//!
+//!     Box::new(future)
 //! }
 //!
 //! fn main() {
-//!     let mut core = Core::new().unwrap();
 //!     let mut cmd = Command::new("cat");
-//!     let mut cat = cmd.stdout(Stdio::piped());
-//!     let child = cat.spawn_async_with_handle(core.handle().new_tokio_handle()).unwrap();
-//!     core.run(print_lines(child)).unwrap();
+//!     cmd.stdout(Stdio::piped());
+//!
+//!     let future = print_lines(cmd.spawn_async().expect("failed to spawn command"));
+//!     tokio::run(future);
 //! }
 //! ```
 //!
@@ -120,7 +121,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.1")]
 
 extern crate futures;
-extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_reactor;
 extern crate mio;
