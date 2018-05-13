@@ -11,7 +11,7 @@ fn simple() {
     let mut lp = Core::new().unwrap();
     let mut cmd = support::cmd("exit");
     cmd.arg("2");
-    let mut child = cmd.spawn_async(&lp.handle()).unwrap();
+    let mut child = cmd.spawn_async_with_handle(lp.handle().new_tokio_handle()).unwrap();
     let id = child.id();
     assert!(id > 0);
     let status = lp.run(&mut child).unwrap();

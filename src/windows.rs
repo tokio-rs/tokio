@@ -36,7 +36,7 @@ use self::winapi::um::synchapi::*;
 use self::winapi::um::threadpoollegacyapiset::*;
 use self::winapi::um::winbase::*;
 use self::winapi::um::winnt::*;
-use tokio_core::reactor::{PollEvented, Handle};
+use tokio_reactor::{Handle, PollEvented};
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
@@ -182,6 +182,6 @@ fn stdio<T>(option: Option<T>, handle: &Handle)
         None => return Ok(None),
     };
     let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
-    let io = try!(PollEvented::new(pipe, handle));
+    let io = try!(PollEvented::new_with_handle(pipe, handle));
     Ok(Some(io))
 }

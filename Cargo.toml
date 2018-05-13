@@ -20,6 +20,7 @@ futures = "0.1.11"
 mio = "0.6.5"
 tokio-core = "0.1.6"
 tokio-io = "0.1"
+tokio-reactor = "0.1"
 
 [dev-dependencies]
 env_logger = { version = "0.4", default-features = false }
@@ -43,4 +44,4 @@ features = [
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-tokio-signal = "0.1"
+tokio-signal = "0.2"

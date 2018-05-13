@@ -85,7 +85,7 @@ fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = i
 /// - The child does produce EOF on stdout after the last line.
 fn feed_a_lot() {
     let mut lp = Core::new().unwrap();
-    let child = cat().spawn_async(&lp.handle()).unwrap();
+    let child = cat().spawn_async_with_handle(lp.handle().new_tokio_handle()).unwrap();
     let status = lp.run(feed_cat(child, 10000)).unwrap();
     assert_eq!(status.code(), Some(0));
 }
@@ -93,7 +93,7 @@ fn feed_a_lot() {
 #[test]
 fn drop_kills() {
     let mut lp = Core::new().unwrap();
-    let mut child = cat().spawn_async(&lp.handle()).unwrap();
+    let mut child = cat().spawn_async_with_handle(lp.handle().new_tokio_handle()).unwrap();
     let stdin = child.stdin().take().unwrap();
     let stdout = child.stdout().take().unwrap();
     drop(child);
@@ -107,7 +107,7 @@ fn drop_kills() {
 fn wait_with_output_captures() {
     let mut core = Core::new().unwrap();
 
-    let mut child = cat().spawn_async(&core.handle()).unwrap();
+    let mut child = cat().spawn_async_with_handle(core.handle().new_tokio_handle()).unwrap();
     let stdin = child.stdin().take().unwrap();
     let out = child.wait_with_output();
 
@@ -126,7 +126,7 @@ fn status_closes_any_pipes() {
     // Cat will open a pipe between the parent and child.
     // If `status_async` doesn't ensure the handles are closed,
     // we would end up blocking forever (and time out).
-    let child = cat().status_async(&core.handle()).unwrap();
+    let child = cat().status_async_with_handle(core.handle().new_tokio_handle()).unwrap();
     let timeout = Timeout::new(Duration::from_secs(1), &core.handle())
         .expect("timeout registration failed")
         .map(|()| panic!("time out exceeded! did we get stuck waiting on the child?"));
