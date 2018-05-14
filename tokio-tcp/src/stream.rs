@@ -69,8 +69,7 @@ impl TcpStream {
     ///
     /// This function will convert a TCP stream created by the standard library
     /// to a TCP stream ready to be used with the provided event loop handle.
-    /// The stream returned is associated with the event loop and ready to
-    /// perform I/O.
+    /// Use `Handle::default()` to lazily bind to an event loop, just like `connect` does.
     pub fn from_std(stream: net::TcpStream, handle: &Handle)
         -> io::Result<TcpStream>
     {

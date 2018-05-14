@@ -36,6 +36,8 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
+    ///
+    /// Use `Handle::default()` to lazily bind to an event loop, just like `bind` does.
     pub fn from_std(socket: net::UdpSocket,
                     handle: &Handle) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
