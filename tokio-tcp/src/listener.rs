@@ -234,7 +234,7 @@ impl fmt::Debug for TcpListener {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 mod sys {
     use std::os::unix::prelude::*;
     use super::TcpListener;

@@ -398,7 +398,7 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix))]
 mod sys {
     use std::os::unix::prelude::*;
     use super::UdpSocket;

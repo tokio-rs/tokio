@@ -717,7 +717,7 @@ impl futures2::Future for ConnectFutureState {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 mod sys {
     use std::os::unix::prelude::*;
     use super::TcpStream;
