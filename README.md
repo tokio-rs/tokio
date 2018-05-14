@@ -16,6 +16,7 @@ the Rust programming language. It is:
 [![MIT licensed][mit-badge]][mit-url]
 [![Travis Build Status][travis-badge]][travis-url]
 [![Appveyor Build Status][appveyor-badge]][appveyor-url]
+[![Gitter chat][gitter-badge]][gitter-url]
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
@@ -25,10 +26,13 @@ the Rust programming language. It is:
 [travis-url]: https://travis-ci.org/tokio-rs/tokio
 [appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7/branch/master?svg=true
 [appveyor-url]: https://ci.appveyor.com/project/carllerche/tokio/branch/master
+[gitter-badge]: https://img.shields.io/gitter/room/tokio-rs/tokio.svg
+[gitter-url]: https://gitter.im/tokio-rs/tokio
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/getting-started/hello-world/) |
-[API Docs](https://docs.rs/tokio)
+[API Docs](https://docs.rs/tokio) |
+[Chat](https://gitter.im/tokio-rs/tokio)
 
 The API docs for the master branch are published [here][master-dox].
 
