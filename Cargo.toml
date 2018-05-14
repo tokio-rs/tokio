@@ -31,6 +31,7 @@ members = [
   "tokio-timer",
   "tokio-tcp",
   "tokio-udp",
+  "tokio-uds",
   "futures2",
 ]
 

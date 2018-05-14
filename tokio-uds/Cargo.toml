@@ -1,0 +1,31 @@
+[package]
+name = "tokio-uds"
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Create "v0.2.x" git tag.
+version = "0.2.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://github.com/tokio-rs/tokio"
+documentation = "https://docs.rs/tokio-uds"
+description = """
+Unix Domain sockets for Tokio
+"""
+categories = ["asynchronous"]
+
+[dependencies]
+bytes = "0.4"
+futures = "0.1"
+iovec = "0.1"
+libc = "0.2"
+log = "0.4"
+mio = "0.6.14"
+mio-uds = "0.6.5"
+tokio-reactor = { version = "0.1.1", path = "../tokio-reactor" }
+tokio-io = { version = "0.1.6", path = "../tokio-io" }
+
+[dev-dependencies]
+tokio = { version = "0.1.6", path = "../" }
+tempdir = "0.3.7"

@@ -129,6 +129,9 @@ The crates included as part of Tokio are:
 
 * [`tokio-udp`]: UDP bindings for use with `tokio-io` and `tokio-reactor`.
 
+* [`tokio-uds`]: Unix Domain Socket bindings for use with `tokio-io` and
+  `tokio-reactor`.
+
 [`tokio-executor`]: tokio-executor
 [`tokio-fs`]: tokio-fs
 [`tokio-io`]: tokio-io
@@ -137,6 +140,7 @@ The crates included as part of Tokio are:
 [`tokio-threadpool`]: tokio-threadpool
 [`tokio-timer`]: tokio-timer
 [`tokio-udp`]: tokio-udp
+[`tokio-udp`]: tokio-uds
 
 ## License
 
