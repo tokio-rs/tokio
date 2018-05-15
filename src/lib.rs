@@ -436,27 +436,23 @@ impl Child {
     ///
     /// ```no_run
     /// # extern crate futures;
-    /// # extern crate tokio_core;
+    /// # extern crate tokio;
     /// # extern crate tokio_process;
     /// #
     /// # use std::process::Command;
     /// #
     /// # use futures::Future;
-    /// # use tokio_core::reactor::Core;
     /// # use tokio_process::CommandExt;
     /// #
     /// # fn main() {
-    /// let core = Core::new().unwrap();
-    /// let handle = core.handle();
-    ///
     /// let child = Command::new("echo").arg("hello").arg("world")
-    ///                     .spawn_async(&handle)
+    ///                     .spawn_async()
     ///                     .expect("failed to spawn");
     ///
     /// let do_cleanup = child.map(|_| ()) // Ignore result
     ///                       .map_err(|_| ()); // Ignore errors
     ///
-    /// handle.spawn(do_cleanup);
+    /// tokio::spawn(do_cleanup);
     /// # }
     /// ```
     pub fn forget(mut self) {
