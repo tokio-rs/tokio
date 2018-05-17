@@ -31,7 +31,7 @@ macro_rules! assert_elapsed {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MockTime {
     inner: Inner,
     _p: PhantomData<Rc<()>>,
