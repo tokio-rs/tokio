@@ -118,7 +118,7 @@
 
 #![warn(missing_debug_implementations)]
 #![deny(missing_docs)]
-#![doc(html_root_url = "https://docs.rs/tokio-process/0.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-process/0.2")]
 
 extern crate futures;
 extern crate tokio_io;

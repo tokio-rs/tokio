@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.1] - 2018-05-18
 ### Changed
 - **Breaking**: asynchronous spawning of a child process now requires using a
 reactor handle from the `tokio` crate instead of the `tokio-core` crate
@@ -55,7 +57,8 @@ the locally vendored `Command` type.
 ## 0.1.0 - 2016-09-10
 - First release!
 
-[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.1.6...HEAD
+[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/alexcrichton/tokio-process/compare/0.1.6...0.2.1
 [0.1.6]: https://github.com/alexcrichton/tokio-process/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/alexcrichton/tokio-process/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/alexcrichton/tokio-process/compare/0.1.3...0.1.4
