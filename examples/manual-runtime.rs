@@ -1,12 +1,12 @@
-//! An example how to manually assemble a single-threaded runtime and run some tasks on it.
+//! An example how to manually assemble a runtime and run some tasks on it.
 //!
-//! Note that the error handling is a bit left out. Also, the `run_singlethreaded` could be
-//! modified to return the result of the provided future.
+//! This is closer to the single-threaded runtime than the default tokio one, as it is simpler to
+//! grasp. There are conceptually similar, but the multi-threaded one would be more code. If you
+//! just want to *use* a single-threaded runtime, use the one provided by tokio directly
+//! (`tokio::runtime::current_thread::Runtime::new()`. This is a demonstration only.
 //!
-//! Also, if you just need to run a single-threaded runtime, you can use
-//! `tokio::runtime::current_thread::Runtime::new()`. This is a demonstration of how to assemble
-//! it manually in case some building block needs to be replaced or something tweaked in a way the
-//! provided runtimes don't allow.
+//! Note that the error handling is a bit left out. Also, the `run` could be modified to return the
+//! result of the provided future.
 
 extern crate futures;
 extern crate tokio;
@@ -22,10 +22,10 @@ use tokio::executor::current_thread::{self, CurrentThread};
 use tokio_reactor::Reactor;
 use tokio_timer::timer::{self, Timer};
 
-/// Creates a single-threaded „runtime“.
+/// Creates a „runtime“.
 ///
-/// This is similar to running a runtime, but uses only the current thread.
-fn run_singlethreaded<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
+/// This is similar to running `tokio::runtime::current_thread::Runtime::new()`.
+fn run<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
     // We need a reactor to receive events about IO objects from kernel
     let reactor = Reactor::new()?;
     let reactor_handle = reactor.handle();
@@ -60,7 +60,7 @@ fn run_singlethreaded<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoEr
 }
 
 fn main() {
-    run_singlethreaded(future::lazy(|| {
+    run(future::lazy(|| {
         // Here comes the application logic. It can spawn further tasks by current_thread::spawn().
         // It also can use the default reactor and create timeouts.
 
@@ -71,7 +71,7 @@ fn main() {
             .map(|_| println!("Connected"))
             .map_err(|e| println!("Failed to connect: {}", e));
         // We can spawn it without requiring Send. This would panic if we run it outside of the
-        // `run_singlethreaded` (or outside of anything else)
+        // `run` (or outside of anything else)
         current_thread::spawn(connect);
 
         // We can also create timeouts.
