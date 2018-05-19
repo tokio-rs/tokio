@@ -37,7 +37,7 @@ pub struct MockTime {
     _p: PhantomData<Rc<()>>,
 }
 
-#[derive(Clone Debug)]
+#[derive(Clone, Debug)]
 pub struct MockNow {
     inner: Inner,
     _p: PhantomData<Rc<()>>,
