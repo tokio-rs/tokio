@@ -4,13 +4,13 @@ use std::time::Instant;
 ///
 /// This allows customizing the source of time which is especially useful for
 /// testing.
-pub trait Now {
+pub trait Now: Clone {
     /// Returns an instant corresponding to "now".
     fn now(&mut self) -> Instant;
 }
 
 /// Returns the instant corresponding to now using a monotonic clock.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SystemNow(());
 
 impl SystemNow {
