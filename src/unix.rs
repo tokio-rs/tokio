@@ -98,10 +98,10 @@ impl Child {
 
     pub fn poll_exit(&mut self) -> Poll<ExitStatus, io::Error> {
         loop {
-            // Ensure that once we've successfully waited we won't try to
-            // `kill` above.
-            if let Some(e) = try!(self.try_wait(false)) {
-                return Ok(e.into())
+            // Ensure we don't register for additional notifications
+            // if the child has already finished.
+            if self.reaped {
+                return Ok(Async::NotReady);
             }
 
             // If the child hasn't exited yet, then it's our responsibility to
@@ -110,8 +110,34 @@ impl Child {
             //
             // As described in `spawn` above, we just indicate that we can
             // next make progress once a SIGCHLD is received.
-            if try!(self.sigchld.poll()).is_not_ready() {
-                return Ok(Async::NotReady)
+            //
+            // However, we will register for a notification on the next signal
+            // BEFORE we poll the child. Otherwise it is possible that the child
+            // can exit and the signal can arrive after we last polled the child,
+            // but before we've registered for a notification on the next signal
+            // (this can cause a deadlock if there are no more spawned children
+            // which can generate a different signal for us). A side effect of
+            // pre-registering for signal notifications is that when the child
+            // exits, we will have already registered for an additional
+            // notification we don't need to consume. If another signal arrives,
+            // this future's task will be notified/woken up again. Since the
+            // futures model allows for spurious wake ups this extra wakeup
+            // should not cause significant issues with parent futures.
+            let registered_interest = try!(self.sigchld.poll()).is_not_ready();
+
+            if let Some(e) = try!(self.try_wait(false)) {
+                return Ok(e.into());
+            }
+
+            // If our attempt to poll for the next signal was not ready, then
+            // we've arranged for our task to get notified and we can bail out.
+            if registered_interest {
+                return Ok(Async::NotReady);
+            } else {
+                // Otherwise, if the signal stream delivered a signal to us, we
+                // won't get notified at the next signal, so we'll loop and try
+                // again.
+                continue;
             }
         }
     }
