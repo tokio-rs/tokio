@@ -1,113 +1,40 @@
-//! Execute many tasks concurrently on the current thread.
+//! A single-threaded executor which executes tasks on the same thread from which
+//! they are spawned.
 //!
-//! [`CurrentThread`] is an executor that keeps tasks on the same thread that
-//! they were spawned from. This allows it to execute futures that are not
-//! `Send`.
 //!
-//! A single [`CurrentThread`] instance is able to efficiently manage a large
-//! number of tasks and will attempt to schedule all tasks fairly.
+//! The crate provides:
 //!
-//! All tasks that are being managed by a [`CurrentThread`] executor are able to
-//! spawn additional tasks by calling [`spawn`]. This function only works from
-//! within the context of a running [`CurrentThread`] instance.
+//! * [`CurrentThread`] is the main type of this crate. It executes tasks on the current thread.
+//!   The easiest way to start a new [`CurrentThread`] executor is to call
+//!   [`block_on_all`] with an initial task to seed the executor.
+//!   All tasks that are being managed by a [`CurrentThread`] executor are able to
+//!   spawn additional tasks by calling [`spawn`].
 //!
-//! The easiest way to start a new [`CurrentThread`] executor is to call
-//! [`block_on_all`] with an initial task to seed the executor.
 //!
-//! For example:
+//! Application authors will not use this crate directly. Instead, they will use the
+//! `tokio` crate. Library authors should only depend on `tokio-current-thread` if they
+//! are building a custom task executor.
 //!
-//! ```
-//! # extern crate tokio;
-//! # extern crate futures;
-//! # use tokio::executor::current_thread;
-//! use futures::future::lazy;
+//! For more details, see [executor module] documentation in the Tokio crate.
 //!
-//! // Calling execute here results in a panic
-//! // current_thread::spawn(my_future);
-//!
-//! # pub fn main() {
-//! current_thread::block_on_all(lazy(|| {
-//!     // The execution context is setup, futures may be executed.
-//!     current_thread::spawn(lazy(|| {
-//!         println!("called from the current thread executor");
-//!         Ok(())
-//!     }));
-//!
-//!     Ok::<_, ()>(())
-//! }));
-//! # }
-//! ```
-//!
-//! The `block_on_all` function will block the current thread until **all**
-//! tasks that have been spawned onto the [`CurrentThread`] instance have
-//! completed.
-//!
-//! More fine-grain control can be achieved by using [`CurrentThread`] directly.
-//!
-//! ```
-//! # extern crate tokio;
-//! # extern crate futures;
-//! # use tokio::executor::current_thread::CurrentThread;
-//! use futures::future::{lazy, empty};
-//! use std::time::Duration;
-//!
-//! // Calling execute here results in a panic
-//! // current_thread::spawn(my_future);
-//!
-//! # pub fn main() {
-//! let mut current_thread = CurrentThread::new();
-//!
-//! // Spawn a task, the task is not executed yet.
-//! current_thread.spawn(lazy(|| {
-//!     println!("Spawning a task");
-//!     Ok(())
-//! }));
-//!
-//! // Spawn a task that never completes
-//! current_thread.spawn(empty());
-//!
-//! // Run the executor, but only until the provided future completes. This
-//! // provides the opportunity to start executing previously spawned tasks.
-//! let res = current_thread.block_on(lazy(|| {
-//!     Ok::<_, ()>("Hello")
-//! })).unwrap();
-//!
-//! // Now, run the executor for *at most* 1 second. Since a task was spawned
-//! // that never completes, this function will return with an error.
-//! current_thread.run_timeout(Duration::from_secs(1)).unwrap_err();
-//! # }
-//! ```
-//!
-//! # Execution model
-//!
-//! Internally, [`CurrentThread`] maintains a queue. When one of its tasks is
-//! notified, the task gets added to the queue. The executor will pop tasks from
-//! the queue and call [`Future::poll`]. If the task gets notified while it is
-//! being executed, it won't get re-executed until all other tasks currently in
-//! the queue get polled.
-//!
-//! Before the task is polled, a thread-local variable referencing the current
-//! [`CurrentThread`] instance is set. This enables [`spawn`] to spawn new tasks
-//! onto the same executor without having to thread through a handle value.
-//!
-//! If the [`CurrentThread`] instance still has uncompleted tasks, but none of
-//! these tasks are ready to be polled, the current thread is put to sleep. When
-//! a task is notified, the thread is woken up and processing resumes.
-//!
-//! All tasks managed by [`CurrentThread`] remain on the current thread. When a
-//! task completes, it is dropped.
-//!
+//! [`CurrentThread`]: struct.CurrentThread.html
 //! [`spawn`]: fn.spawn.html
 //! [`block_on_all`]: fn.block_on_all.html
-//! [`CurrentThread`]: struct.CurrentThread.html
-//! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
+//! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
+
+#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.6")]
+#![deny(warnings, missing_docs, missing_debug_implementations)]
 
 #![allow(deprecated)]
 
+extern crate futures;
+extern crate tokio_executor;
+
 mod scheduler;
+
 use self::scheduler::Scheduler;
 
-use tokio_executor::{self, Enter, SpawnError};
+use tokio_executor::{Enter, SpawnError};
 use tokio_executor::park::{Park, Unpark, ParkThread};
 
 use futures::{executor, Async, Future};

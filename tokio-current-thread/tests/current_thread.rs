@@ -1,10 +1,10 @@
 #![cfg(not(feature = "unstable-futures"))]
 
-extern crate tokio;
+extern crate tokio_current_thread;
 extern crate tokio_executor;
 extern crate futures;
 
-use tokio::executor::current_thread::{self, block_on_all, CurrentThread};
+use tokio_current_thread::{block_on_all, CurrentThread};
 
 use std::any::Any;
 use std::cell::{Cell, RefCell};
@@ -22,11 +22,11 @@ fn spawn_from_block_on_all() {
     let cnt = Rc::new(Cell::new(0));
     let c = cnt.clone();
 
-    let msg = current_thread::block_on_all(lazy(move || {
+    let msg = tokio_current_thread::block_on_all(lazy(move || {
         c.set(1 + c.get());
 
         // Spawn!
-        current_thread::spawn(lazy(move || {
+        tokio_current_thread::spawn(lazy(move || {
             c.set(1 + c.get());
             Ok::<(), ()>(())
         }));
@@ -63,17 +63,17 @@ fn spawn_many() {
     const ITER: usize = 200;
 
     let cnt = Rc::new(Cell::new(0));
-    let mut current_thread = CurrentThread::new();
+    let mut tokio_current_thread = CurrentThread::new();
 
     for _ in 0..ITER {
         let cnt = cnt.clone();
-        current_thread.spawn(lazy(move || {
+        tokio_current_thread.spawn(lazy(move || {
             cnt.set(1 + cnt.get());
             Ok::<(), ()>(())
         }));
     }
 
-    current_thread.run().unwrap();
+    tokio_current_thread.run().unwrap();
 
     assert_eq!(cnt.get(), ITER);
 }
@@ -95,12 +95,12 @@ fn does_not_set_global_executor_by_default() {
 fn spawn_from_block_on_future() {
     let cnt = Rc::new(Cell::new(0));
 
-    let mut current_thread = CurrentThread::new();
+    let mut tokio_current_thread = CurrentThread::new();
 
-    current_thread.block_on(lazy(|| {
+    tokio_current_thread.block_on(lazy(|| {
         let cnt = cnt.clone();
 
-        current_thread::spawn(lazy(move || {
+        tokio_current_thread::spawn(lazy(move || {
             cnt.set(1 + cnt.get());
             Ok(())
         }));
@@ -108,7 +108,7 @@ fn spawn_from_block_on_future() {
         Ok::<_, ()>(())
     })).unwrap();
 
-    current_thread.run().unwrap();
+    tokio_current_thread.run().unwrap();
 
     assert_eq!(1, cnt.get());
 }
@@ -128,10 +128,10 @@ impl Future for Never {
 fn outstanding_tasks_are_dropped_when_executor_is_dropped() {
     let mut rc = Rc::new(());
 
-    let mut current_thread = CurrentThread::new();
-    current_thread.spawn(Never(rc.clone()));
+    let mut tokio_current_thread = CurrentThread::new();
+    tokio_current_thread.spawn(Never(rc.clone()));
 
-    drop(current_thread);
+    drop(tokio_current_thread);
 
     // Ensure the daemon is dropped
     assert!(Rc::get_mut(&mut rc).is_some());
@@ -140,14 +140,14 @@ fn outstanding_tasks_are_dropped_when_executor_is_dropped() {
 
     let mut rc = Rc::new(());
 
-    let mut current_thread = CurrentThread::new();
+    let mut tokio_current_thread = CurrentThread::new();
 
-    current_thread.block_on(lazy(|| {
-        current_thread::spawn(Never(rc.clone()));
+    tokio_current_thread.block_on(lazy(|| {
+        tokio_current_thread::spawn(Never(rc.clone()));
         Ok::<_, ()>(())
     })).unwrap();
 
-    drop(current_thread);
+    drop(tokio_current_thread);
 
     // Ensure the daemon is dropped
     assert!(Rc::get_mut(&mut rc).is_some());
@@ -169,7 +169,7 @@ fn nesting_run() {
 #[should_panic]
 fn run_in_future() {
     block_on_all(lazy(|| {
-        current_thread::spawn(lazy(|| {
+        tokio_current_thread::spawn(lazy(|| {
             block_on_all(lazy(|| {
                 ok()
             })).unwrap();
@@ -246,12 +246,12 @@ fn tasks_are_scheduled_fairly() {
     }
 
     block_on_all(lazy(|| {
-        current_thread::spawn(Spin {
+        tokio_current_thread::spawn(Spin {
             state: state.clone(),
             idx: 0,
         });
 
-        current_thread::spawn(Spin {
+        tokio_current_thread::spawn(Spin {
             state: state,
             idx: 1,
         });
@@ -265,21 +265,21 @@ fn spawn_and_turn() {
     let cnt = Rc::new(Cell::new(0));
     let c = cnt.clone();
 
-    let mut current_thread = CurrentThread::new();
+    let mut tokio_current_thread = CurrentThread::new();
 
     // Spawn a basic task to get the executor to turn
-    current_thread.spawn(lazy(move || {
+    tokio_current_thread.spawn(lazy(move || {
         Ok(())
     }));
 
     // Turn once...
-    current_thread.turn(None).unwrap();
+    tokio_current_thread.turn(None).unwrap();
 
-    current_thread.spawn(lazy(move || {
+    tokio_current_thread.spawn(lazy(move || {
         c.set(1 + c.get());
 
         // Spawn!
-        current_thread::spawn(lazy(move || {
+        tokio_current_thread::spawn(lazy(move || {
             c.set(1 + c.get());
             Ok::<(), ()>(())
         }));
@@ -288,21 +288,21 @@ fn spawn_and_turn() {
     }));
 
     // This does not run the newly spawned thread
-    current_thread.turn(None).unwrap();
+    tokio_current_thread.turn(None).unwrap();
     assert_eq!(1, cnt.get());
 
     // This runs the newly spawned thread
-    current_thread.turn(None).unwrap();
+    tokio_current_thread.turn(None).unwrap();
     assert_eq!(2, cnt.get());
 }
 
 #[test]
 fn spawn_in_drop() {
-    let mut current_thread = CurrentThread::new();
+    let mut tokio_current_thread = CurrentThread::new();
 
     let (tx, rx) = oneshot::channel();
 
-    current_thread.spawn({
+    tokio_current_thread.spawn({
         struct OnDrop<F: FnOnce()>(Option<F>);
 
         impl<F: FnOnce()> Drop for OnDrop<F> {
@@ -326,7 +326,7 @@ fn spawn_in_drop() {
 
         MyFuture {
             _data: Box::new(OnDrop(Some(move || {
-                current_thread::spawn(lazy(move || {
+                tokio_current_thread::spawn(lazy(move || {
                     tx.send(()).unwrap();
                     Ok(())
                 }));
@@ -334,8 +334,8 @@ fn spawn_in_drop() {
         }
     });
 
-    current_thread.block_on(rx).unwrap();
-    current_thread.run().unwrap();
+    tokio_current_thread.block_on(rx).unwrap();
+    tokio_current_thread.run().unwrap();
 }
 
 #[test]
@@ -352,11 +352,11 @@ fn hammer_turn() {
         // Add some jitter
         for _ in 0..THREADS {
             let th = thread::spawn(|| {
-                let mut current_thread = CurrentThread::new();
+                let mut tokio_current_thread = CurrentThread::new();
 
                 let (tx, rx) = mpsc::unbounded();
 
-                current_thread.spawn({
+                tokio_current_thread.spawn({
                     let cnt = Rc::new(Cell::new(0));
                     let c = cnt.clone();
 
@@ -378,8 +378,8 @@ fn hammer_turn() {
                     }
                 });
 
-                while !current_thread.is_idle() {
-                    current_thread.turn(None).unwrap();
+                while !tokio_current_thread.is_idle() {
+                    tokio_current_thread.turn(None).unwrap();
                 }
             });
 
@@ -394,20 +394,20 @@ fn hammer_turn() {
 
 #[test]
 fn turn_has_polled() {
-    let mut current_thread = CurrentThread::new();
+    let mut tokio_current_thread = CurrentThread::new();
 
     // Spawn oneshot receiver
     let (sender, receiver) = oneshot::channel::<()>();
-    current_thread.spawn(receiver.then(|_| Ok(())));
+    tokio_current_thread.spawn(receiver.then(|_| Ok(())));
 
     // Turn once...
-    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
 
     // Should've polled the receiver once, but considered it not ready
     assert!(res.has_polled());
 
     // Turn another time
-    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
 
     // Should've polled nothing, the receiver is not ready yet
     assert!(!res.has_polled());
@@ -416,14 +416,14 @@ fn turn_has_polled() {
     sender.send(()).unwrap();
 
     // Turn another time
-    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
 
     // Should've polled the receiver, it's ready now
     assert!(res.has_polled());
 
     // Now the executor should be empty
-    assert!(current_thread.is_idle());
-    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    assert!(tokio_current_thread.is_idle());
+    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
 
     // So should've polled nothing
     assert!(!res.has_polled());
@@ -478,14 +478,14 @@ fn turn_fair() {
         send_now: send_now.clone(),
     };
 
-    let mut current_thread = CurrentThread::new_with_park(my_park);
+    let mut tokio_current_thread = CurrentThread::new_with_park(my_park);
 
     let receiver_1_done = Rc::new(Cell::new(false));
     let receiver_1_done_clone = receiver_1_done.clone();
 
     // Once an item is received on the oneshot channel, it will immediately
     // immediately make the second oneshot channel ready
-    current_thread.spawn(receiver
+    tokio_current_thread.spawn(receiver
         .map_err(|_| unreachable!())
         .and_then(move |_| {
             sender_2.send(()).unwrap();
@@ -498,7 +498,7 @@ fn turn_fair() {
     let receiver_2_done = Rc::new(Cell::new(false));
     let receiver_2_done_clone = receiver_2_done.clone();
 
-    current_thread.spawn(receiver_2
+    tokio_current_thread.spawn(receiver_2
         .map_err(|_| unreachable!())
         .and_then(move |_| {
             receiver_2_done_clone.set(true);
@@ -511,7 +511,7 @@ fn turn_fair() {
     let receiver_3_done = Rc::new(Cell::new(false));
     let receiver_3_done_clone = receiver_3_done.clone();
 
-    current_thread.spawn(receiver_3
+    tokio_current_thread.spawn(receiver_3
         .map_err(|_| unreachable!())
         .and_then(move |_| {
             receiver_3_done_clone.set(true);
@@ -520,11 +520,11 @@ fn turn_fair() {
     );
 
     // First turn should've polled both and considered them not ready
-    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
     assert!(res.has_polled());
 
     // Next turn should've polled nothing
-    let res = current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
     assert!(!res.has_polled());
 
     assert!(!receiver_1_done.get());
@@ -537,7 +537,7 @@ fn turn_fair() {
 
     // Now the first receiver should be done, the second receiver should be ready
     // to be polled again and the socket not yet
-    let res = current_thread.turn(None).unwrap();
+    let res = tokio_current_thread.turn(None).unwrap();
     assert!(res.has_polled());
 
     assert!(receiver_1_done.get());
@@ -551,7 +551,7 @@ fn turn_fair() {
     // and read the packet from it. If it didn't do both here, we would handle
     // futures that are woken up from the reactor and directly unfairly and would
     // favour the ones that are woken up directly.
-    let res = current_thread.turn(None).unwrap();
+    let res = tokio_current_thread.turn(None).unwrap();
     assert!(res.has_polled());
 
     assert!(receiver_1_done.get());
@@ -562,8 +562,8 @@ fn turn_fair() {
     send_now.set(false);
 
     // Now we should be idle and turning should not poll anything
-    assert!(current_thread.is_idle());
-    let res = current_thread.turn(None).unwrap();
+    assert!(tokio_current_thread.is_idle());
+    let res = tokio_current_thread.turn(None).unwrap();
     assert!(!res.has_polled());
 }
 
