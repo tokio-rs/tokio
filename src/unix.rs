@@ -111,7 +111,11 @@ extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc:
         if fnptr == 0 || fnptr == libc::SIG_DFL || fnptr == libc::SIG_IGN {
             return;
         }
-        if (*slot.prev.get()).sa_flags & libc::SA_SIGINFO == 0 {
+        #[cfg(all(target_os = "android", target_pointer_width = "64"))]
+        let contains_siginfo = (*slot.prev.get()).sa_flags & libc::SA_SIGINFO as libc::c_uint;
+        #[cfg(not(all(target_os = "android", target_pointer_width = "64")))]
+        let contains_siginfo = (*slot.prev.get()).sa_flags & libc::SA_SIGINFO;
+        if contains_siginfo == 0 {
             let action = mem::transmute::<usize, FnHandler>(fnptr);
             action(signum)
         } else {
@@ -132,10 +136,15 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
     };
     unsafe {
-        #[cfg(target_os = "android")]
+        #[cfg(all(target_os = "android", target_pointer_width = "32"))]
         fn flags() -> libc::c_ulong {
             (libc::SA_RESTART as libc::c_ulong) | libc::SA_SIGINFO
                 | (libc::SA_NOCLDSTOP as libc::c_ulong)
+        }
+        #[cfg(all(target_os = "android", target_pointer_width = "64"))]
+        fn flags() -> libc::c_uint {
+            (libc::SA_RESTART as libc::c_uint) | (libc::SA_SIGINFO as libc::c_uint)
+                | (libc::SA_NOCLDSTOP as libc::c_uint)
         }
         #[cfg(not(target_os = "android"))]
         fn flags() -> c_int {
