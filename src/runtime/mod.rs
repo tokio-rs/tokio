@@ -234,7 +234,7 @@ impl Runtime {
     /// tasks are scheduled to run.
     ///
     /// Most users will not need to call this function directly, instead they
-    /// will use [`tokio::run`][fn.run.html].
+    /// will use [`tokio::run`](fn.run.html).
     ///
     /// See [module level][mod] documentation for more details.
     ///
