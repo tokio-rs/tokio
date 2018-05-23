@@ -140,7 +140,7 @@ The crates included as part of Tokio are:
 [`tokio-threadpool`]: tokio-threadpool
 [`tokio-timer`]: tokio-timer
 [`tokio-udp`]: tokio-udp
-[`tokio-udp`]: tokio-uds
+[`tokio-uds`]: tokio-uds
 
 ## License
 
