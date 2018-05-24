@@ -269,24 +269,30 @@ impl Pool {
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
     pub fn submit(&self, task: Arc<Task>, inner: &Arc<Pool>) {
+        debug_assert_eq!(*self, **inner);
+
         Worker::with_current(|worker| {
-            match worker {
+            if let Some(worker) = worker {
                 // If the worker is in blocking mode, then even though the
                 // thread-local variable is set, the current thread does not
                 // have ownership of that worker entry. This is because the
                 // worker entry has already been handed off to another thread.
-                Some(worker) if !worker.is_blocking() => {
+                //
+                // The second check handles the case where the current thread is
+                // part of a different threadpool than the one being submitted
+                // to.
+                if !worker.is_blocking() && *self == *worker.inner {
                     let idx = worker.id.0;
 
                     trace!("    -> submit internal; idx={}", idx);
 
                     worker.inner.workers[idx].submit_internal(task);
                     worker.inner.signal_work(inner);
-                }
-                _ => {
-                    self.submit_external(task, inner);
+                    return;
                 }
             }
+
+            self.submit_external(task, inner);
         });
     }
 
@@ -295,6 +301,8 @@ impl Pool {
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
     pub fn submit_external(&self, task: Arc<Task>, inner: &Arc<Pool>) {
+        debug_assert_eq!(*self, **inner);
+
         use worker::Lifecycle::Notified;
 
         // First try to get a handle to a sleeping worker. This ensures that
@@ -322,6 +330,8 @@ impl Pool {
                           state: worker::State,
                           inner: &Arc<Pool>)
     {
+        debug_assert_eq!(*self, **inner);
+
         let entry = &self.workers[idx];
 
         if !entry.submit_external(task, state) {
@@ -338,12 +348,15 @@ impl Pool {
         self.backup_stack.push(&self.backup, backup_id)
     }
 
-    pub fn notify_blocking_task(&self, pool: &Arc<Pool>) {
-        self.blocking.notify_task(&pool);
+    pub fn notify_blocking_task(&self, inner: &Arc<Pool>) {
+        debug_assert_eq!(*self, **inner);
+        self.blocking.notify_task(&inner);
     }
 
     /// Provision a thread to run a worker
     pub fn spawn_thread(&self, id: WorkerId, inner: &Arc<Pool>) {
+        debug_assert_eq!(*self, **inner);
+
         let backup_id = match self.backup_stack.pop(&self.backup, false) {
             Ok(Some(backup_id)) => backup_id,
             Ok(None) => panic!("no thread available"),
@@ -454,6 +467,8 @@ impl Pool {
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
     pub fn signal_work(&self, inner: &Arc<Pool>) {
+        debug_assert_eq!(*self, **inner);
+
         use worker::Lifecycle::*;
 
         if let Some((idx, mut worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
@@ -531,6 +546,12 @@ impl Pool {
 
             rng.as_mut().unwrap().next_u32() as usize
         })
+    }
+}
+
+impl PartialEq for Pool {
+    fn eq(&self, other: &Pool) -> bool {
+        self as *const _ == other as *const _
     }
 }
 

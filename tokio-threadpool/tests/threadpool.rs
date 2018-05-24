@@ -560,3 +560,29 @@ fn panic_in_task() {
 
     await_shutdown(pool.shutdown_on_idle());
 }
+
+#[test]
+fn multi_threadpool() {
+    use futures::sync::oneshot;
+
+    let pool1 = ThreadPool::new();
+    let pool2 = ThreadPool::new();
+
+    let (tx, rx) = oneshot::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    pool2.spawn({
+        rx.and_then(move |_| {
+            done_tx.send(()).unwrap();
+            Ok(())
+        })
+        .map_err(|e| panic!("err={:?}", e))
+    });
+
+    pool1.spawn(lazy(move || {
+        tx.send(()).unwrap();
+        Ok(())
+    }));
+
+    done_rx.recv().unwrap();
+}
