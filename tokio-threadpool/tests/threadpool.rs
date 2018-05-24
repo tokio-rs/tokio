@@ -11,7 +11,7 @@ use tokio_threadpool::*;
 #[cfg(not(feature = "unstable-futures"))]
 use futures::{Poll, Sink, Stream, Async, Future};
 #[cfg(not(feature = "unstable-futures"))]
-use futures::future::lazy;
+use futures::future::{lazy, ok, poll_fn};
 
 #[cfg(feature = "unstable-futures")]
 use futures2::prelude::*;
@@ -75,8 +75,12 @@ fn await_shutdown(shutdown: Shutdown) {
 }
 
 #[cfg(not(feature = "unstable-futures"))]
-fn block_on<F: Future>(f: F) -> Result<F::Item, F::Error> {
-    f.wait()
+fn block_on<F>(pool: &Sender, f: F) -> Result<F::Item, F::Error>
+    where F: Future + Send,
+          F::Item: Send,
+          F::Error: Send
+{
+    pool.block_on(f).unwrap()
 }
 #[cfg(feature = "unstable-futures")]
 fn block_on<F: Future>(f: F) -> Result<F::Item, F::Error> {
@@ -426,7 +430,7 @@ fn many_multishot_futures() {
         }
 
         for start_tx in start_txs {
-            block_on(start_tx.send("ping")).unwrap();
+            block_on(&pool_tx, start_tx.send("ping")).unwrap();
         }
 
         for final_rx in final_rxs {
@@ -435,7 +439,7 @@ fn many_multishot_futures() {
             }
 
             {#![cfg(not(feature = "unstable-futures"))]
-             block_on(final_rx.into_future()).unwrap();
+             block_on(&pool_tx, final_rx.into_future()).unwrap();
             }
         }
 
@@ -516,7 +520,7 @@ fn busy_threadpool_is_not_idle() {
         }
     }
 
-    block_on(IdleFut(&mut idle)).unwrap();
+    block_on(&tx, IdleFut(&mut idle)).unwrap();
 
     term_tx.send(()).unwrap();
 
@@ -559,4 +563,55 @@ fn panic_in_task() {
     spawn_pool(&mut tx, Boom);
 
     await_shutdown(pool.shutdown_on_idle());
+}
+
+#[test]
+fn test_block_on() {
+    use futures::stream;
+    use futures::sync::mpsc;
+
+    let pool = ThreadPool::new();
+    let (send, recv) = mpsc::channel(1);
+
+    // Send 100 items into the channel in the background.
+    pool.sender().spawn(ignore_results(send.send_all(stream::iter_ok(0..100)))).unwrap();
+
+    // Receive the 100 items.
+    let items = pool.sender().block_on(recv.collect()).unwrap().unwrap();
+    assert_eq!(100, items.len());
+}
+
+#[test]
+#[should_panic]
+fn test_block_on_panic() {
+    let _ = ThreadPool::new().sender().block_on(lazy::<_, Result<(), ()>>(|| panic!()));
+}
+
+#[test]
+#[should_panic]
+fn test_block_on_async_context() {
+    let pool = ThreadPool::new();
+    let sender = pool.sender();
+    let _ = sender.block_on(lazy::<_, Result<(), ()>>(|| {
+        let _ = sender.block_on(ok::<(), ()>(()));
+        Ok(())
+    }));
+}
+
+#[test]
+fn test_block_on_shutdown() {
+    let pool = ThreadPool::new();
+    let sender = pool.sender().clone();
+    let mut pool = Some(pool);
+
+    // Shutdown the pool while the future is executing.
+    let error = sender.block_on(poll_fn::<(), (), _>(move || {
+        pool.take().map(ThreadPool::shutdown);
+        Ok(Async::NotReady)
+    })).unwrap_err();
+    assert!(error.is_shutdown());
+
+    // Execute a future on an already shutdown pool.
+    let error = sender.block_on(ok::<(), ()>(())).unwrap_err();
+    assert!(error.is_shutdown());
 }
