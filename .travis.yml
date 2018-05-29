@@ -29,9 +29,6 @@ script:
     set -e
     if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
     then
-        # Pin the nightly version until rust-lang/rust#49436 is resolved.
-        rustup override set nightly-2018-03-26
-
         # Make sure the benchmarks compile
         cargo build --benches --all
 
