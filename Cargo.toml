@@ -32,7 +32,6 @@ members = [
   "tokio-tcp",
   "tokio-udp",
   "tokio-uds",
-  "futures2",
 ]
 
 [badges]
