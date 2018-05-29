@@ -3,8 +3,6 @@
 A library for scheduling execution of futures concurrently across a pool of
 threads.
 
-**Note**: This library isn't quite ready for use.
-
 ### Why not Rayon?
 
 Rayon is designed to handle parallelizing single computations by breaking them
