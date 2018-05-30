@@ -578,7 +578,7 @@ fn spawn_from_other_thread() {
         handle.spawn(lazy(move || {
             sender.send(()).unwrap();
             Ok(())
-        }));
+        })).unwrap();
     });
 
     let _ = current_thread.block_on(receiver).unwrap();
@@ -600,7 +600,7 @@ fn spawn_from_other_thread_unpark() {
         handle.spawn(lazy(move || {
             sender_1.send(()).unwrap();
             Ok(())
-        }));
+        })).unwrap();
     });
 
     // Ensure that unparking the executor works correctly. It will first

@@ -660,10 +660,12 @@ impl Handle {
     ///
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
-    pub fn spawn<F>(&self, future: F)
+    pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
     where F: Future<Item = (), Error = ()> + Send + 'static {
         self.inner.unbounded_send(Box::new(future))
-            .expect("CurrentThread does not exist anymore")
+            .expect("CurrentThread does not exist anymore");
+
+        Ok(())
     }
 }
 
