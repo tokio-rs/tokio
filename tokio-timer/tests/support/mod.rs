@@ -1,4 +1,4 @@
-#![allow(unused_macros, unused_imports, dead_code)]
+#![allow(unused_macros, unused_imports, dead_code, deprecated)]
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_timer::timer::{Timer, Now};

@@ -27,6 +27,9 @@
 //! [`Now`]: trait.Now.html
 //! [`Now::now`]: trait.Now.html#method.now
 
+// This allows the usage of the old `Now` trait.
+#![allow(deprecated)]
+
 mod entry;
 mod handle;
 mod level;
