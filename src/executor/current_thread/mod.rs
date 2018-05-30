@@ -112,13 +112,13 @@ use tokio_executor::park::{Park, Unpark, ParkThread};
 
 use futures::{executor, Async, Future};
 use futures::future::{self, Executor, ExecuteError, ExecuteErrorKind};
-use futures::sync::mpsc;
 
 use std::fmt;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use std::sync::mpsc;
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -138,7 +138,7 @@ pub struct CurrentThread<P: Park = ParkThread> {
     spawn_handle: Handle,
 
     /// Receiver for futures spawned from other threads
-    spawn_receiver: executor::Spawn<mpsc::UnboundedReceiver<Box<Future<Item = (), Error = ()> + Send + 'static>>>
+    spawn_receiver: mpsc::Receiver<Box<Future<Item = (), Error = ()> + Send + 'static>>,
 }
 
 /// Executes futures on the current thread.
@@ -311,16 +311,17 @@ impl<P: Park> CurrentThread<P> {
     pub fn new_with_park(park: P) -> Self {
         let unpark = park.unpark();
 
-        // XXX: Should this use a bounded channel with an arbitrary limit instead, and then
-        // panic spawning if the channel is full?
-        let (spawn_sender, spawn_receiver) = mpsc::unbounded();
+        let (spawn_sender, spawn_receiver) = mpsc::channel();
+
+        let scheduler = Scheduler::new(unpark);
+        let notify = scheduler.notify();
 
         CurrentThread {
-            scheduler: Scheduler::new(unpark),
+            scheduler: scheduler,
             num_futures: 0,
             park,
-            spawn_handle: Handle { inner: spawn_sender },
-            spawn_receiver: executor::spawn(spawn_receiver),
+            spawn_handle: Handle { sender: spawn_sender, notify: notify },
+            spawn_receiver: spawn_receiver,
         }
     }
 
@@ -602,23 +603,8 @@ impl<'a, P: Park> Entered<'a, P> {
             &mut self.executor.spawn_receiver,
         );
 
-        let notify = borrow.scheduler.notify();
-
-        loop {
-            let res = borrow.enter(self.enter, || {
-                spawn_receiver.poll_stream_notify(&notify, 0)
-            });
-
-            match res {
-                Ok(Async::Ready(Some(future))) => {
-                    borrow.spawn_local(future);
-                },
-                Ok(Async::Ready(None)) |
-                Ok(Async::NotReady) => {
-                    break;
-                }
-                Err(()) => unreachable!(),
-            }
+        while let Ok(future) = spawn_receiver.try_recv() {
+            borrow.spawn_local(future);
         }
 
         // After any pending futures were scheduled, do the actual tick
@@ -642,7 +628,8 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 /// Handle to spawn a future on the corresponding `CurrentThread` instance
 #[derive(Clone)]
 pub struct Handle {
-    inner: mpsc::UnboundedSender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    sender: mpsc::Sender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    notify: executor::NotifyHandle,
 }
 
 // Manual implementation because the Sender does not implement Debug
@@ -662,8 +649,10 @@ impl Handle {
     /// instance of the `Handle` does not exist anymore.
     pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
     where F: Future<Item = (), Error = ()> + Send + 'static {
-        self.inner.unbounded_send(Box::new(future))
+        self.sender.send(Box::new(future))
             .expect("CurrentThread does not exist anymore");
+        // use 0 for the id, CurrentThread does not make use of it
+        self.notify.notify(0);
 
         Ok(())
     }
