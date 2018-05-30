@@ -155,12 +155,16 @@ pub mod current_thread {
     //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
 
     pub use tokio_current_thread::{
-        TaskExecutor,
+        BlockError,
         CurrentThread,
-        RunError,
         Entered,
-        spawn,
+        RunError,
+        RunTimeoutError,
+        TaskExecutor,
+        Turn,
+        TurnError,
         block_on_all,
+        spawn,
     };
 }
 
