@@ -22,7 +22,7 @@
 //! [`block_on_all`]: fn.block_on_all.html
 //! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
 
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.6")]
+#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.0")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 #![allow(deprecated)]
@@ -100,7 +100,7 @@ pub struct Entered<'a, P: Park + 'a> {
     enter: &'a mut Enter,
 }
 
-#[deprecated(since = "0.1.2", note = "use block_on_all instead")]
+#[deprecated(since = "0.1.0", note = "use block_on_all instead")]
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct Context<'a> {
@@ -151,7 +151,7 @@ thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
     spawn: Cell::new(None),
 });
 
-#[deprecated(since = "0.1.2", note = "use block_on_all instead")]
+#[deprecated(since = "0.1.0", note = "use block_on_all instead")]
 #[doc(hidden)]
 #[allow(deprecated)]
 pub fn run<F, R>(f: F) -> R
@@ -587,7 +587,7 @@ impl Handle {
 
 // ===== impl TaskExecutor =====
 
-#[deprecated(since = "0.1.2", note = "use TaskExecutor::current instead")]
+#[deprecated(since = "0.1.0", note = "use TaskExecutor::current instead")]
 #[doc(hidden)]
 pub fn task_executor() -> TaskExecutor {
     TaskExecutor {
