@@ -3,10 +3,12 @@
 //! [`File`]: file/struct.File.html
 
 mod create;
+mod metadata;
 mod open;
 mod open_options;
 
 pub use self::create::CreateFuture;
+pub use self::metadata::MetadataFuture;
 pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
 
@@ -131,6 +133,11 @@ impl File {
     /// writing.
     pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
         ::blocking_io(|| self.std().set_len(size))
+    }
+
+    /// Queries metadata about the underlying file.
+    pub fn metadata(self) -> MetadataFuture {
+        MetadataFuture::new(self)
     }
 
     /// Queries metadata about the underlying file.

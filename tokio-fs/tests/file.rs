@@ -41,7 +41,9 @@ fn read_write() {
         let contents = contents.clone();
 
         File::create(file_path)
-            .and_then(move |file| io::write_all(file, contents))
+            .and_then(|file| file.metadata())
+            .inspect(|&(_, ref metadata)| assert!(metadata.is_file()))
+            .and_then(move |(file, _)| io::write_all(file, contents))
             .and_then(|(mut file, _)| {
                 poll_fn(move || file.poll_sync_all())
             })
