@@ -28,6 +28,7 @@ thread_local!(static CLOCK: Cell<Option<*const Clock>> = Cell::new(None));
 /// # Examples
 ///
 /// ```
+/// # use tokio_timer::clock;
 /// let now = clock::now();
 /// ```
 pub fn now() -> Instant {
