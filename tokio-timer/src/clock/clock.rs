@@ -8,7 +8,10 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// TODO: Dox
+/// A handle to a source of time.
+///
+/// `Clock` instances return `Instant` values corresponding to "now". The source
+/// of these values is configurable. The default source is `Instant::now()`.
 #[derive(Default, Clone)]
 pub struct Clock {
     now: Option<Arc<Now>>,
@@ -17,42 +20,58 @@ pub struct Clock {
 /// Thread-local tracking the current clock
 thread_local!(static CLOCK: Cell<Option<*const Clock>> = Cell::new(None));
 
-/// TODO: Dox
+/// Returns an `Instant` corresponding to "now".
+///
+/// This function delegates to the source of time configured for the current
+/// execution context. By default, this is `Instant::now()`.
+///
+/// # Examples
+///
+/// ```
+/// let now = clock::now();
+/// ```
 pub fn now() -> Instant {
     CLOCK.with(|current| {
         match current.get() {
-            Some(_) => unimplemented!(),
+            Some(ptr) => {
+                unsafe { (*ptr).now() }
+            }
             None => Instant::now(),
         }
     })
 }
 
 impl Clock {
-    /// TODO: Dox
+    /// Return a new `Clock` instance that uses the current execution context's
+    /// source of time.
     pub fn new() -> Clock {
         CLOCK.with(|current| {
             match current.get() {
-                Some(_) => unimplemented!(),
+                Some(ptr) => {
+                    unsafe { (*ptr).clone() }
+                }
                 None => Clock::system(),
             }
         })
     }
 
-    /// TODO: Dox
+    /// Return a new `Clock` instance that uses `now` as the source of time.
     pub fn new_with_now<T: Now>(now: T) -> Clock {
         Clock {
             now: Some(Arc::new(now)),
         }
     }
 
-    /// TODO: Dox
+    /// Return a new `Clock` instance that uses `Instant::now()` as the source
+    /// of time.
     pub fn system() -> Clock {
         Clock {
             now: None,
         }
     }
 
-    /// TODO: Docs
+    /// Returns an instant corresponding to "now" by using the instance's source
+    /// of time.
     pub fn now(&self) -> Instant {
         match self.now {
             Some(ref now) => now.now(),
@@ -82,7 +101,11 @@ impl fmt::Debug for Clock {
     }
 }
 
-/// TODO: Dox
+/// Set the default clock for the duration of the closure.
+///
+/// # Panics
+///
+/// This function panics if there already is a default clock set.
 pub fn with_default<F, R>(clock: &Clock, enter: &mut Enter, f: F) -> R
 where F: FnOnce(&mut Enter) -> R
 {
