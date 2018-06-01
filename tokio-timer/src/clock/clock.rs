@@ -25,6 +25,12 @@ thread_local!(static CLOCK: Cell<Option<*const Clock>> = Cell::new(None));
 /// This function delegates to the source of time configured for the current
 /// execution context. By default, this is `Instant::now()`.
 ///
+/// Note that, because the source of time is configurable, it is possible to
+/// observe non-monotonic behavior when calling [`now`] from different
+/// executors.
+///
+/// See [module](index.html) level documentation for more details.
+///
 /// # Examples
 ///
 /// ```
