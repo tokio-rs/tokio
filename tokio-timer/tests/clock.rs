@@ -1,7 +1,8 @@
 extern crate tokio_executor;
 extern crate tokio_timer;
 
-use tokio_timer::clock::{self, *};
+use tokio_timer::clock;
+use tokio_timer::clock::*;
 
 use std::time::Instant;
 
