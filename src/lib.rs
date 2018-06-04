@@ -94,7 +94,7 @@ pub use executor::spawn;
 #[cfg(feature = "unstable-futures")]
 pub use executor::spawn2;
 
-pub use runtime::run;
+pub use runtime::{block_on, run};
 
 pub mod io {
     //! Asynchronous I/O.

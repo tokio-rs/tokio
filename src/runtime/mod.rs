@@ -127,6 +127,7 @@ use std::io;
 
 use tokio_threadpool as threadpool;
 
+use futures;
 use futures::future::Future;
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -212,6 +213,63 @@ where F: Future<Item = (), Error = ()> + Send + 'static,
     let mut runtime = Runtime::new().unwrap();
     runtime.spawn(future);
     runtime.shutdown_on_idle().wait().unwrap();
+}
+
+/// Start a Tokio runtime and run the supplied future to completion.
+///
+/// This function is used to execute a single future and retrieve its result.
+/// Internally, it does the following:
+///
+/// * Start the Tokio runtime using a default configuration.
+/// * Spawn the given future onto the thread pool.
+/// * Wait on the future's resolved result using a `oneshot` channel.
+/// * Block the current thread until the runtime shuts down.
+///
+/// If you will be executing many futures in sequence, you should prefer
+/// creating a new [`Runtime`], and calling [`Runtime::block_on`], as this
+/// avoids the cost of setting up and tearing down the runtime for each future.
+///
+/// Note that the function will not return immediately once `future` has
+/// completed. Instead it waits for the entire runtime to become idle.
+///
+/// See the [module level][mod] documentation for more details.
+///
+/// # Examples
+///
+/// ```rust
+/// # extern crate tokio;
+/// # extern crate futures;
+/// # use futures::{Future, Stream};
+/// use std::time::{Instant, Duration};
+/// use tokio::timer;
+///
+/// fn after_1s<T>(x: T) -> Box<Future<Item = T, Error = timer::Error> + Send>
+/// where T: Send + 'static {
+///     Box::new(
+///       timer::Delay::new(Instant::now() + Duration::from_secs(1))
+///         .map(move |_| x))
+/// }
+///
+/// # pub fn main() {
+/// assert_eq!(tokio::block_on(after_1s(42)).unwrap(), 42);
+/// # }
+/// ```
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+///
+/// [mod]: ../index.html
+pub fn block_on<F, R, E>(future: F) -> Result<R, E>
+where
+    F: Send + 'static + Future<Item = R, Error = E>,
+    R: Send + 'static,
+    E: Send + 'static,
+{
+    let mut runtime = Runtime::new().unwrap();
+    let r = runtime.block_on(future);
+    runtime.shutdown_on_idle().wait().unwrap();
+    r
 }
 
 /// Start the Tokio runtime using the supplied future to bootstrap execution.
@@ -363,6 +421,29 @@ impl Runtime {
             self.inner_mut().pool.sender_mut(), Box::new(future)
         ).unwrap();
         self
+    }
+
+    /// Run a future to completion on the Tokio runtime.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers which
+    /// the future spawns internally will be executed on the runtime.
+    ///
+    /// This method should not be called from an asynchrounous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
+    pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
+    where
+        F: Send + 'static + Future<Item = R, Error = E>,
+        R: Send + 'static,
+        E: Send + 'static,
+    {
+        let (tx, rx) = futures::sync::oneshot::channel();
+        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
+        rx.wait().unwrap()
     }
 
     /// Signals the runtime to shutdown once it becomes idle.
