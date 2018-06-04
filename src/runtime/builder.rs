@@ -69,6 +69,12 @@ impl Builder {
         }
     }
 
+    /// Set the `Clock` instance that will be used by the runtime.
+    pub fn clock(&mut self, clock: Clock) -> &mut Self {
+        self.clock = clock;
+        self
+    }
+
     /// Set builder to set up the thread pool instance.
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
