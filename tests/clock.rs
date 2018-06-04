@@ -4,7 +4,7 @@ extern crate tokio_timer;
 extern crate env_logger;
 
 use tokio::prelude::*;
-use tokio::runtime;
+use tokio::runtime::{self, current_thread};
 use tokio::timer::*;
 use tokio_timer::clock::Clock;
 
@@ -20,7 +20,7 @@ impl tokio_timer::clock::Now for MockNow {
 }
 
 #[test]
-fn clock_and_timer() {
+fn clock_and_timer_concurrent() {
     let _ = env_logger::init();
 
     let when = Instant::now() + Duration::from_millis(5_000);
@@ -44,4 +44,26 @@ fn clock_and_timer() {
     });
 
     rx.recv().unwrap();
+}
+
+#[test]
+fn clock_and_timer_single_threaded() {
+    let _ = env_logger::init();
+
+    let when = Instant::now() + Duration::from_millis(5_000);
+    let clock = Clock::new_with_now(MockNow(when));
+
+    let mut rt = current_thread::Builder::new()
+        .clock(clock)
+        .build()
+        .unwrap();
+
+    rt.block_on({
+        Delay::new(when)
+            .map_err(|e| panic!("unexpected error; err={:?}", e))
+            .and_then(move |_| {
+                assert!(Instant::now() < when);
+                Ok(())
+            })
+    }).unwrap();
 }
