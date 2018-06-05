@@ -57,7 +57,7 @@ impl OpenOptions {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// use tokio::fs::OpenOptions;
     ///
     /// let mut options = OpenOptions::new();
