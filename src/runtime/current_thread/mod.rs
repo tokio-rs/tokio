@@ -17,11 +17,9 @@
 //!
 //! # Spawning from other threads
 //!
-//! By default, [`current_thread::Runtime`][rt] does not provide a way to spawn
-//! tasks from other threads. However, this can be accomplished by using a
-//! [`mpsc::channel`][chan]. To do so, create a channel to send the task, then
-//! spawn a task on [`current_thread::Runtime`][rt] that consumes the channel
-//! messages and spawns new tasks for them.
+//! While [`current_thread::Runtime`][rt] does not implement `Send` and cannot
+//! safely be moved to other threads, it provides a `Handle` that can be sent
+//! to other threads and allows to spawn new tasks from there.
 //!
 //! For example:
 //!
@@ -30,17 +28,15 @@
 //! # extern crate futures;
 //! use tokio::runtime::current_thread::Runtime;
 //! use tokio::prelude::*;
-//! use futures::sync::mpsc;
+//! use std::thread;
 //!
 //! # fn main() {
 //! let mut runtime = Runtime::new().unwrap();
-//! let (tx, rx) = mpsc::channel(128);
-//! # tx.send(future::ok(()));
+//! let handle = runtime.handle();
 //!
-//! runtime.spawn(rx.for_each(|task| {
-//!     tokio::spawn(task);
-//!     Ok(())
-//! }).map_err(|e| panic!("channel error")));
+//! thread::spawn(move || {
+//!     handle.spawn(future::ok(()));
+//! }).join().unwrap();
 //!
 //! # /*
 //! runtime.run().unwrap();
@@ -69,4 +65,4 @@
 
 mod runtime;
 
-pub use self::runtime::Runtime;
+pub use self::runtime::{Runtime, Handle};
