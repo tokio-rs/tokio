@@ -115,6 +115,69 @@ impl OpenOptions {
         self
     }
 
+    /// See the underlying [`mode`] call for details.
+    ///
+    /// [`mode`]: https://doc.rust-lang.org/beta/std/os/unix/fs/trait.OpenOptionsExt.html#tymethod.mode
+    #[cfg(unix)]
+    pub fn mode(&mut self, mode: u32) -> &mut OpenOptions {
+        self.0.mode(mode);
+        self
+    }
+
+    /// See the underlying [`custom_flags`] call for details.
+    ///
+    /// [`custom_flags`]: https://doc.rust-lang.org/beta/std/os/unix/fs/trait.OpenOptionsExt.html#tymethod.custom_flags
+    #[cfg(unix)]
+    pub fn custom_flags(&mut self, flags: i32) -> &mut OpenOptions {
+        self.0.custom_flags(flags);
+        self
+    }
+
+    /// See the underlying [`access_mode`] call for details.
+    ///
+    /// [`access_mode`]: https://doc.rust-lang.org/beta/std/os/windows/fs/trait.OpenOptionsExt.html#tymethod.access_mode
+    #[cfg(windows)]
+    pub fn access_mode(&mut self, access: u32) -> &mut OpenOptions {
+        self.0.access_mode(access);
+        self
+    }
+
+    /// See the underlying [`share_mode`] call for details.
+    ///
+    /// [`share_mode`]: https://doc.rust-lang.org/beta/std/os/windows/fs/trait.OpenOptionsExt.html#tymethod.share_mode
+    #[cfg(windows)]
+    pub fn share_mode(&mut self, share: u32) -> &mut OpenOptions {
+        self.0.share_mode(share);
+        self
+    }
+
+    /// See the underlying [`custom_flags`] call for details.
+    ///
+    /// [`custom_flags`]: https://doc.rust-lang.org/beta/std/os/windows/fs/trait.OpenOptionsExt.html#tymethod.custom_flags
+    #[cfg(windows)]
+    pub fn custom_flags(&mut self, flags: u32) -> &mut OpenOptions {
+        self.0.custom_flags(flags);
+        self
+    }
+
+    /// See the underlying [`attributes`] call for details.
+    ///
+    /// [`attributes`]: https://doc.rust-lang.org/beta/std/os/windows/fs/trait.OpenOptionsExt.html#tymethod.attributes
+    #[cfg(windows)]
+    pub fn attributes(&mut self, attributes: u32) -> &mut OpenOptions {
+        self.0.attributes(attributes);
+        self
+    }
+
+    /// See the underlying [`security_qos_flags`] call for details.
+    ///
+    /// [`security_qos_flags`]: https://doc.rust-lang.org/beta/std/os/windows/fs/trait.OpenOptionsExt.html#tymethod.security_qos_flags
+    #[cfg(windows)]
+    pub fn security_qos_flags(&mut self, flags: u32) -> &mut OpenOptions {
+        self.0.security_qos_flags(flags);
+        self
+    }
+
     /// Opens a file at `path` with the options specified by `self`.
     ///
     /// # Errors
@@ -142,46 +205,5 @@ impl OpenOptions {
     where P: AsRef<Path> + Send + 'static
     {
         OpenOptionsFuture::new(self.0, path)
-    }
-}
-
-#[cfg(unix)]
-impl UnixOpenOptionsExt for OpenOptions {
-    fn mode(&mut self, mode: u32) -> &mut OpenOptions {
-        self.0.mode(mode);
-        self
-    }
-
-    fn custom_flags(&mut self, flags: i32) -> &mut OpenOptions {
-        self.0.custom_flags(flags);
-        self
-    }
-}
-
-#[cfg(windows)]
-impl WindowsOpenOptionsExt for OpenOptions {
-    fn access_mode(&mut self, access: u32) -> &mut OpenOptions {
-        self.0.access_mode(access);
-        self
-    }
-
-    fn share_mode(&mut self, share: u32) -> &mut OpenOptions {
-        self.0.share_mode(share);
-        self
-    }
-
-    fn custom_flags(&mut self, flags: u32) -> &mut OpenOptions {
-        self.0.custom_flags(flags);
-        self
-    }
-
-    fn attributes(&mut self, attributes: u32) -> &mut OpenOptions {
-        self.0.attributes(attributes);
-        self
-    }
-
-    fn security_qos_flags(&mut self, flags: u32) -> &mut OpenOptions {
-        self.0.security_qos_flags(flags);
-        self
     }
 }
