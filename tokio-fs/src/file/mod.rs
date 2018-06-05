@@ -8,7 +8,7 @@ mod open_options;
 
 pub use self::create::CreateFuture;
 pub use self::open::OpenFuture;
-pub use self::open_options::{OpenOptionsExt, OpenOptionsFuture};
+pub use self::open_options::{OpenOptions, OpenOptionsFuture};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -38,11 +38,9 @@ pub struct File {
 impl File {
     /// Attempts to open a file in read-only mode.
     ///
-    /// See [`std::fs::OpenOptions`] and [`OpenOptionsExt::open_async`] for
-    /// more details.
+    /// See [`OpenOptions`] for more details.
     ///
-    /// [`std::fs::OpenOptions`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html
-    /// [`OpenOptionsExt::open_async`]: trait.OpenOptionsExt.html#tymethod.open_async
+    /// [`OpenOptions`]: struct.OpenOptions.html
     ///
     /// # Errors
     ///
@@ -61,11 +59,9 @@ impl File {
     /// This function will create a file if it does not exist, and will truncate
     /// it if it does.
     ///
-    /// See [`std::fs::OpenOptions`] and [`OpenOptionsExt::open_async`] for
-    /// more details.
+    /// See [`OpenOptions`] for more details.
     ///
-    /// [`std::fs::OpenOptions`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html
-    /// [`OpenOptionsExt::open_async`]: trait.OpenOptionsExt.html#tymethod.open_async
+    /// [`OpenOptions`]: struct.OpenOptions.html
     ///
     /// # Errors
     ///
