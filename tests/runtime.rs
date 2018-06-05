@@ -66,6 +66,13 @@ fn runtime_single_threaded() {
 }
 
 #[test]
+fn runtime_single_threaded_block_on() {
+    let _ = env_logger::init();
+
+    tokio::runtime::current_thread::block_on(create_client_server_future()).unwrap();
+}
+
+#[test]
 fn runtime_multi_threaded() {
     let _ = env_logger::init();
 
