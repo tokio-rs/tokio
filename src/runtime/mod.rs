@@ -127,6 +127,7 @@ use std::io;
 
 use tokio_threadpool as threadpool;
 
+use futures;
 use futures::future::Future;
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -363,6 +364,29 @@ impl Runtime {
             self.inner_mut().pool.sender_mut(), Box::new(future)
         ).unwrap();
         self
+    }
+
+    /// Run a future to completion on the Tokio runtime.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers which
+    /// the future spawns internally will be executed on the runtime.
+    ///
+    /// This method should not be called from an asynchrounous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
+    pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
+    where
+        F: Send + 'static + Future<Item = R, Error = E>,
+        R: Send + 'static,
+        E: Send + 'static,
+    {
+        let (tx, rx) = futures::sync::oneshot::channel();
+        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
+        rx.wait().unwrap()
     }
 
     /// Signals the runtime to shutdown once it becomes idle.
