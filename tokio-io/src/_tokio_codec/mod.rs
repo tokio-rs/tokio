@@ -31,6 +31,6 @@ mod framed_write;
 
 pub use self::decoder::Decoder;
 pub use self::encoder::Encoder;
-pub use self::framed::{framed, Framed, FramedParts};
+pub use self::framed::{Framed, FramedParts};
 pub use self::framed_read::FramedRead;
 pub use self::framed_write::FramedWrite;
