@@ -3,6 +3,9 @@ use bytes::BytesMut;
 
 /// Trait of helper objects to write out messages as bytes, for use with
 /// `FramedWrite`.
+
+// Note: We can't deprecate this trait, because the deprecation carries through to tokio-codec, and
+// there doesn't seem to be a way to un-deprecate the re-export.
 pub trait Encoder {
     /// The type of items consumed by the `Encoder`
     type Item;

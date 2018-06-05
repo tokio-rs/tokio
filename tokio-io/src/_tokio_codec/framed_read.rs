@@ -4,20 +4,16 @@ use std::fmt;
 
 use AsyncRead;
 use codec::Decoder;
-use framed::Fuse;
+use super::framed::Fuse;
 
 use futures::{Async, Poll, Stream, Sink, StartSend};
 use bytes::BytesMut;
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
-#[doc(hidden)]
 pub struct FramedRead<T, D> {
     inner: FramedRead2<Fuse<T, D>>,
 }
 
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
-#[doc(hidden)]
 pub struct FramedRead2<T> {
     inner: T,
     eof: bool,

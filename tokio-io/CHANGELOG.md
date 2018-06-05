@@ -1,3 +1,7 @@
+# Unreleased
+
+* Move `codec::{Encode, Decode, Framed*}` into `tokio-codec` (#353)
+
 # 0.1.6 (March 09, 2018)
 
 * Add native endian builder fn to length_delimited (#144)

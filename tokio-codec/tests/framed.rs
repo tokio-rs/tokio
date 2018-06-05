@@ -1,10 +1,11 @@
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate bytes;
 extern crate futures;
 
 use futures::{Stream, Future};
 use std::io::{self, Read};
-use tokio_io::codec::{Framed, FramedParts, Decoder, Encoder};
+use tokio_codec::{Framed, FramedParts, Decoder, Encoder};
 use tokio_io::AsyncRead;
 use bytes::{BytesMut, Buf, BufMut, IntoBuf, BigEndian};
 

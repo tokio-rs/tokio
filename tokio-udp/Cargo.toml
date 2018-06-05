@@ -17,6 +17,7 @@ UDP bindings for tokio.
 categories = ["asynchronous"]
 
 [dependencies]
+tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 tokio-reactor = { version = "0.1.1", path = "../tokio-reactor" }
 bytes = "0.4"

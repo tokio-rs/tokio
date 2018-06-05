@@ -1,6 +1,11 @@
 use std::io;
 use bytes::BytesMut;
 
+use {AsyncWrite, AsyncRead};
+use super::encoder::Encoder;
+
+use ::_tokio_codec::{framed, Framed};
+
 /// Decoding of frames via buffers.
 ///
 /// This trait is used when constructing an instance of `Framed` or
@@ -11,6 +16,9 @@ use bytes::BytesMut;
 /// Implementations are able to track state on `self`, which enables
 /// implementing stateful streaming parsers. In many cases, though, this type
 /// will simply be a unit struct (e.g. `struct HttpDecoder`).
+
+// Note: We can't deprecate this trait, because the deprecation carries through to tokio-codec, and
+// there doesn't seem to be a way to un-deprecate the re-export.
 pub trait Decoder {
     /// The type of decoded frames.
     type Item;
@@ -82,5 +90,28 @@ pub trait Decoder {
                 }
             }
         }
+    }
+
+    /// Provides a `Stream` and `Sink` interface for reading and writing to this
+    /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
+    ///
+    /// Raw I/O objects work with byte sequences, but higher-level code usually
+    /// wants to batch these into meaningful chunks, called "frames". This
+    /// method layers framing on top of an I/O object, by using the `Codec`
+    /// traits to handle encoding and decoding of messages frames. Note that
+    /// the incoming and outgoing frame types may be distinct.
+    ///
+    /// This function returns a *single* object that is both `Stream` and
+    /// `Sink`; grouping this into a single object is often useful for layering
+    /// things like gzip or TLS, which require both read and write access to the
+    /// underlying object.
+    ///
+    /// If you want to work more directly with the streams and sink, consider
+    /// calling `split` on the `Framed` returned by this method, which will
+    /// break them into separate objects, allowing them to interact more easily.
+    fn framed<T: AsyncRead + AsyncWrite + Sized>(self, io: T) -> Framed<T, Self>
+        where Self: Encoder + Sized,
+    {
+        framed(io, self)
     }
 }

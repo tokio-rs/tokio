@@ -9,6 +9,7 @@
 #![deny(warnings)]
 
 extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate env_logger;
 
@@ -16,7 +17,7 @@ use std::net::SocketAddr;
 
 use tokio::prelude::*;
 use tokio::net::{UdpSocket, UdpFramed};
-use tokio_io::codec::BytesCodec;
+use tokio_codec::BytesCodec;
 
 fn main() {
     let _ = env_logger::init();

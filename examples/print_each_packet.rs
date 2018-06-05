@@ -55,9 +55,10 @@
 #![deny(warnings)]
 
 extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 
-use tokio_io::codec::BytesCodec;
+use tokio_codec::{Decoder, BytesCodec};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
@@ -99,8 +100,8 @@ fn main() {
             // We're parsing each socket with the `BytesCodec` included in `tokio_io`,
             // and then we `split` each codec into the reader/writer halves.
             //
-            // See https://docs.rs/tokio-io/0.1/src/tokio_io/codec/bytes_codec.rs.html
-            let framed = socket.framed(BytesCodec::new());
+            // See https://docs.rs/tokio-codec/0.1/src/tokio_codec/bytes_codec.rs.html
+            let framed = BytesCodec::new().framed(socket);
             let (_writer, reader) = framed.split();
 
             let processor = reader
