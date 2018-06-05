@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use {AsyncWrite, AsyncRead};
 use super::encoder::Encoder;
 
-use ::_tokio_codec::{framed, Framed};
+use ::_tokio_codec::Framed;
 
 /// Decoding of frames via buffers.
 ///
@@ -112,6 +112,6 @@ pub trait Decoder {
     fn framed<T: AsyncRead + AsyncWrite + Sized>(self, io: T) -> Framed<T, Self>
         where Self: Encoder + Sized,
     {
-        framed(io, self)
+        Framed::new(io, self)
     }
 }
