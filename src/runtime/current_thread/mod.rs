@@ -63,6 +63,8 @@
 //! [concurrent-rt]: ../struct.Runtime.html
 //! [chan]: https://docs.rs/futures/0.1/futures/sync/mpsc/fn.channel.html
 
+mod builder;
 mod runtime;
 
+pub use self::builder::Builder;
 pub use self::runtime::{Runtime, Handle};

@@ -7,6 +7,7 @@ use std::io;
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_threadpool::park::DefaultPark;
+use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -48,6 +49,9 @@ use tokio_timer::timer::{self, Timer};
 pub struct Builder {
     /// Thread pool specific builder
     threadpool_builder: ThreadPoolBuilder,
+
+    /// The clock to use
+    clock: Clock,
 }
 
 impl Builder {
@@ -59,7 +63,16 @@ impl Builder {
         let mut threadpool_builder = ThreadPoolBuilder::new();
         threadpool_builder.name_prefix("tokio-runtime-worker-");
 
-        Builder { threadpool_builder }
+        Builder {
+            threadpool_builder,
+            clock: Clock::new(),
+        }
+    }
+
+    /// Set the `Clock` instance that will be used by the runtime.
+    pub fn clock(&mut self, clock: Clock) -> &mut Self {
+        self.clock = clock;
+        self
     }
 
     /// Set builder to set up the thread pool instance.
@@ -87,6 +100,10 @@ impl Builder {
         use std::collections::HashMap;
         use std::sync::{Arc, Mutex};
 
+        // Get a handle to the clock for the runtime.
+        let clock1 = self.clock.clone();
+        let clock2 = clock1.clone();
+
         let timers = Arc::new(Mutex::new(HashMap::<_, timer::Handle>::new()));
         let t1 = timers.clone();
 
@@ -103,14 +120,16 @@ impl Builder {
                     .clone();
 
                 tokio_reactor::with_default(&reactor_handle, enter, |enter| {
-                    timer::with_default(&timer_handle, enter, |_| {
-                        w.run();
-                    });
+                    clock::with_default(&clock1, enter, |enter| {
+                        timer::with_default(&timer_handle, enter, |_| {
+                            w.run();
+                        });
+                    })
                 });
             })
             .custom_park(move |worker_id| {
                 // Create a new timer
-                let timer = Timer::new(DefaultPark::new());
+                let timer = Timer::new_with_now(DefaultPark::new(), clock2.clone());
 
                 timers.lock().unwrap()
                     .insert(worker_id.clone(), timer.handle());

@@ -82,6 +82,7 @@ extern crate tokio_udp;
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
 
+pub mod clock;
 pub mod executor;
 pub mod fs;
 pub mod net;

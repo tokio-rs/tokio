@@ -1,7 +1,9 @@
 use executor::current_thread::{self, CurrentThread};
 use executor::current_thread::Handle as ExecutorHandle;
+use runtime::current_thread::Builder;
 
 use tokio_reactor::{self, Reactor};
+use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 use tokio_executor;
 
@@ -19,6 +21,7 @@ use std::io;
 pub struct Runtime {
     reactor_handle: tokio_reactor::Handle,
     timer_handle: timer::Handle,
+    clock: Clock,
     executor: CurrentThread<Timer<Reactor>>,
 }
 
@@ -48,22 +51,21 @@ pub struct RunError {
 impl Runtime {
     /// Returns a new runtime initialized with default configuration values.
     pub fn new() -> io::Result<Runtime> {
-        // We need a reactor to receive events about IO objects from kernel
-        let reactor = Reactor::new()?;
-        let reactor_handle = reactor.handle();
+        Builder::new().build()
+    }
 
-        // Place a timer wheel on top of the reactor. If there are no timeouts to fire, it'll let the
-        // reactor pick up some new external events.
-        let timer = Timer::new(reactor);
-        let timer_handle = timer.handle();
-
-        // And now put a single-threaded executor on top of the timer. When there are no futures ready
-        // to do something, it'll let the timer or the reactor to generate some new stimuli for the
-        // futures to continue in their life.
-        let executor = CurrentThread::new_with_park(timer);
-
-        let runtime = Runtime { reactor_handle, timer_handle, executor };
-        Ok(runtime)
+    pub(super) fn new2(
+        reactor_handle: tokio_reactor::Handle,
+        timer_handle: timer::Handle,
+        clock: Clock,
+        executor: CurrentThread<Timer<Reactor>>) -> Runtime
+    {
+        Runtime {
+            reactor_handle,
+            timer_handle,
+            clock,
+            executor,
+        }
     }
 
     /// Get a new handle to spawn futures on the single-threaded Tokio runtime
@@ -150,7 +152,13 @@ impl Runtime {
     fn enter<F, R>(&mut self, f: F) -> R
     where F: FnOnce(&mut current_thread::Entered<Timer<Reactor>>) -> R
     {
-        let Runtime { ref reactor_handle, ref timer_handle, ref mut executor, .. } = *self;
+        let Runtime {
+            ref reactor_handle,
+            ref timer_handle,
+            ref clock,
+            ref mut executor,
+            ..
+        } = *self;
 
         // Binds an executor to this thread
         let mut enter = tokio_executor::enter().expect("Multiple executors at once");
@@ -158,16 +166,18 @@ impl Runtime {
         // This will set the default handle and timer to use inside the closure
         // and run the future.
         tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
-            timer::with_default(&timer_handle, enter, |enter| {
-                // The TaskExecutor is a fake executor that looks into the
-                // current single-threaded executor when used. This is a trick,
-                // because we need two mutable references to the executor (one
-                // to run the provided future, another to install as the default
-                // one). We use the fake one here as the default one.
-                let mut default_executor = current_thread::TaskExecutor::current();
-                tokio_executor::with_default(&mut default_executor, enter, |enter| {
-                    let mut executor = executor.enter(enter);
-                    f(&mut executor)
+            clock::with_default(clock, enter, |enter| {
+                timer::with_default(&timer_handle, enter, |enter| {
+                    // The TaskExecutor is a fake executor that looks into the
+                    // current single-threaded executor when used. This is a trick,
+                    // because we need two mutable references to the executor (one
+                    // to run the provided future, another to install as the default
+                    // one). We use the fake one here as the default one.
+                    let mut default_executor = current_thread::TaskExecutor::current();
+                    tokio_executor::with_default(&mut default_executor, enter, |enter| {
+                        let mut executor = executor.enter(enter);
+                        f(&mut executor)
+                    })
                 })
             })
         })
