@@ -1,6 +1,7 @@
 extern crate env_logger;
 extern crate futures;
 extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate tokio_threadpool;
 extern crate bytes;
@@ -11,9 +12,8 @@ use std::net::Shutdown;
 use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_io::codec::{Encoder, Decoder};
+use tokio_codec::{Encoder, Decoder};
 use tokio_io::io::{write_all, read};
-use tokio_io::AsyncRead;
 use tokio_threadpool::Builder;
 
 pub struct LineCodec;
@@ -61,7 +61,7 @@ fn echo() {
     let addr = listener.local_addr().unwrap();
     let sender = pool.sender().clone();
     let srv = listener.incoming().for_each(move |socket| {
-        let (sink, stream) = socket.framed(LineCodec).split();
+        let (sink, stream) = LineCodec.framed(socket).split();
         sender.spawn(sink.send_all(stream).map(|_| ()).map_err(|_| ())).unwrap();
         Ok(())
     });

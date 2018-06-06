@@ -1,8 +1,8 @@
-extern crate tokio_io;
+extern crate tokio_codec;
 extern crate bytes;
 
 use bytes::{BytesMut, Bytes, BufMut};
-use tokio_io::codec::{BytesCodec, LinesCodec, Decoder, Encoder};
+use tokio_codec::{BytesCodec, LinesCodec, Decoder, Encoder};
 
 #[test]
 fn bytes_decoder() {

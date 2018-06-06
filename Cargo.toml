@@ -23,6 +23,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 members = [
   "./",
+  "tokio-codec",
   "tokio-executor",
   "tokio-fs",
   "tokio-io",
@@ -39,6 +40,7 @@ travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
+tokio-codec = { version = "0.1.0", path = "tokio-codec" }
 tokio-io = { version = "0.1.6", path = "tokio-io" }
 tokio-executor = { version = "0.1.2", path = "tokio-executor" }
 tokio-reactor = { version = "0.1.1", path = "tokio-reactor" }

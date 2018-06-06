@@ -1,12 +1,9 @@
-#![allow(deprecated)]
-
 use bytes::{Bytes, BufMut, BytesMut};
-use codec::{Encoder, Decoder};
+use tokio_io::_tokio_codec::{Encoder, Decoder};
 use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
 pub struct BytesCodec(());
 
 impl BytesCodec {

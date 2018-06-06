@@ -1,4 +1,5 @@
 use executor::current_thread::{self, CurrentThread};
+use executor::current_thread::Handle as ExecutorHandle;
 use runtime::current_thread::Builder;
 
 use tokio_reactor::{self, Reactor};
@@ -22,6 +23,23 @@ pub struct Runtime {
     timer_handle: timer::Handle,
     clock: Clock,
     executor: CurrentThread<Timer<Reactor>>,
+}
+
+/// Handle to spawn a future on the corresponding `CurrentThread` runtime instance
+#[derive(Debug, Clone)]
+pub struct Handle(ExecutorHandle);
+
+impl Handle {
+    /// Spawn a future onto the `CurrentThread` runtime instance corresponding to this handle
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
+    /// instance of the `Handle` does not exist anymore.
+    pub fn spawn<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
+    where F: Future<Item = (), Error = ()> + Send + 'static {
+        self.0.spawn(future)
+    }
 }
 
 /// Error returned by the `run` function.
@@ -48,6 +66,14 @@ impl Runtime {
             clock,
             executor,
         }
+    }
+
+    /// Get a new handle to spawn futures on the single-threaded Tokio runtime
+    ///
+    /// Different to the runtime itself, the handle can be sent to different
+    /// threads.
+    pub fn handle(&self) -> Handle {
+        Handle(self.executor.handle().clone())
     }
 
     /// Spawn a future onto the single-threaded Tokio runtime.
@@ -130,7 +156,8 @@ impl Runtime {
             ref reactor_handle,
             ref timer_handle,
             ref clock,
-            ref mut executor
+            ref mut executor,
+            ..
         } = *self;
 
         // Binds an executor to this thread

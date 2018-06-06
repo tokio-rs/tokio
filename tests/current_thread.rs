@@ -567,6 +567,56 @@ fn turn_fair() {
     assert!(!res.has_polled());
 }
 
+#[test]
+fn spawn_from_other_thread() {
+    let mut current_thread = CurrentThread::new();
+
+    let handle = current_thread.handle();
+    let (sender, receiver) = oneshot::channel::<()>();
+
+    thread::spawn(move || {
+        handle.spawn(lazy(move || {
+            sender.send(()).unwrap();
+            Ok(())
+        })).unwrap();
+    });
+
+    let _ = current_thread.block_on(receiver).unwrap();
+}
+
+#[test]
+fn spawn_from_other_thread_unpark() {
+    use std::sync::mpsc::channel as mpsc_channel;
+
+    let mut current_thread = CurrentThread::new();
+
+    let handle = current_thread.handle();
+    let (sender_1, receiver_1) = oneshot::channel::<()>();
+    let (sender_2, receiver_2) = mpsc_channel::<()>();
+
+    thread::spawn(move || {
+        let _ = receiver_2.recv().unwrap();
+
+        handle.spawn(lazy(move || {
+            sender_1.send(()).unwrap();
+            Ok(())
+        })).unwrap();
+    });
+
+    // Ensure that unparking the executor works correctly. It will first
+    // check if there are new futures (there are none), then execute the
+    // lazy future below which will cause the future to be spawned from
+    // the other thread. Then the executor will park but should be woken
+    // up because *now* we have a new future to schedule
+    let _ = current_thread.block_on(
+        lazy(move || {
+            sender_2.send(()).unwrap();
+            Ok(())
+        })
+        .and_then(|_| receiver_1)
+    ).unwrap();
+}
+
 fn ok() -> future::FutureResult<(), ()> {
     future::ok(())
 }

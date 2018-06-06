@@ -1,12 +1,13 @@
 //! Echo everything received on STDIN to STDOUT.
+#![deny(deprecated, warnings)]
 
 extern crate futures;
 extern crate tokio_fs;
-extern crate tokio_io;
+extern crate tokio_codec;
 extern crate tokio_threadpool;
 
 use tokio_fs::{stdin, stdout, stderr};
-use tokio_io::codec::{FramedRead, FramedWrite, LinesCodec};
+use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio_threadpool::Builder;
 
 use futures::{Future, Stream, Sink};

@@ -10,6 +10,14 @@
 //! [`Stream`]: #
 //! [transports]: #
 
+// tokio_io::codec originally held all codec-related helpers. This is now intended to be in
+// tokio_codec instead. However, for backward compatibility, this remains here. When the next major
+// breaking change comes, `Encoder` and `Decoder` need to be moved to `tokio_codec`, and the rest
+// of this module should be removed.
+
+#![doc(hidden)]
+#![allow(deprecated)]
+
 mod decoder;
 mod encoder;
 mod bytes_codec;

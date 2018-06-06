@@ -56,6 +56,7 @@ mod length_delimited;
 mod lines;
 mod split;
 mod window;
+pub mod _tokio_codec;
 
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;

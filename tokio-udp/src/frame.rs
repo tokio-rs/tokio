@@ -5,7 +5,7 @@ use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
 
 use super::UdpSocket;
 
-use tokio_io::codec::{Decoder, Encoder};
+use tokio_codec::{Decoder, Encoder};
 use bytes::{BytesMut, BufMut};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using

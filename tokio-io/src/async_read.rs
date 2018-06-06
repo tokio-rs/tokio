@@ -3,6 +3,7 @@ use bytes::BufMut;
 use futures::{Async, Poll};
 
 use {framed, split, AsyncWrite};
+#[allow(deprecated)]
 use codec::{Decoder, Encoder, Framed};
 use split::{ReadHalf, WriteHalf};
 
@@ -129,6 +130,8 @@ pub trait AsyncRead: std_io::Read {
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
+    #[deprecated(since = "0.1.7", note = "Use tokio_codec::Decoder::framed instead")]
+    #[allow(deprecated)]
     fn framed<T: Encoder + Decoder>(self, codec: T) -> Framed<Self, T>
         where Self: AsyncWrite + Sized,
     {
