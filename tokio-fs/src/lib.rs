@@ -59,6 +59,6 @@ where F: FnOnce() -> io::Result<T>,
 }
 
 fn blocking_err() -> io::Error {
-    io::Error::new(Other, "tokio-fs::File::open must be called \
+    io::Error::new(Other, "`blocking` annotated I/O must be called \
                    from the context of the Tokio runtime.")
 }
