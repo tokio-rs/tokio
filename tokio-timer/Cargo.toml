@@ -1,6 +1,10 @@
 [package]
 name = "tokio-timer"
-version = "0.2.3"
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Create "v0.2.x" git tag.
+version = "0.2.4"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"

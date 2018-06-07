@@ -1,6 +1,6 @@
 //! A work-stealing based thread pool for executing futures.
 
-#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.2")]
+#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.4")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 extern crate tokio_executor;

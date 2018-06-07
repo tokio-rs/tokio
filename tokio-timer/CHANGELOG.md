@@ -1,6 +1,13 @@
-# 0.2.2 (May 2, 2018)
+# 0.2.4 (June 6, 2018)
+
+* Add `sleep` function for easy interval delays (#347).
+* Provide `clock::now()`, a configurable source of time (#381).
+
+# 0.2.3 (May 2, 2018)
 
 * Improve parking semantics (#327).
+
+# 0.2.2 (Skipped due to failure in counting module)
 
 # 0.2.1 (April 2, 2018)
 
