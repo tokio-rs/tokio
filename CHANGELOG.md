@@ -1,3 +1,10 @@
+# 0.1.7 (June 6, 2018)
+
+* Add `Runtime::block_on` for concurrent runtime (#391).
+* Provide handle to `current_thread::Runtime` that allows spawning tasks from
+  other threads (#340).
+* Provide `clock::now()`, a configurable source of time (#381).
+
 # 0.1.6 (May 2, 2018)
 
 * Add asynchronous filesystem APIs (#323).

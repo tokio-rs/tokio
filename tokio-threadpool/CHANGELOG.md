@@ -1,3 +1,7 @@
+# 0.1.4 (June 6, 2018)
+
+* Fix bug that can occur with multiple pools in a process (#375).
+
 # 0.1.3 (May 2, 2018)
 
 * Add `blocking` annotation (#317).
