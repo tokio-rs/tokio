@@ -389,6 +389,31 @@ impl Runtime {
         rx.wait().unwrap()
     }
 
+    /// Run a future to completion on the Tokio runtime, then wait for all
+    /// background futures to complete too.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, waiting for background futures to complete, and yielding
+    /// its resolved result. Any tasks or timers which the future spawns
+    /// internally will be executed on the runtime and waited for completion.
+    ///
+    /// This method should not be called from an asynchrounous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
+    pub fn block_on_all<F, R, E>(mut self, future: F) -> Result<R, E>
+    where
+        F: Send + 'static + Future<Item = R, Error = E>,
+        R: Send + 'static,
+        E: Send + 'static,
+    {
+        let res = self.block_on(future);
+        self.shutdown_on_idle().wait().unwrap();
+        res
+    }
+
     /// Signals the runtime to shutdown once it becomes idle.
     ///
     /// Returns a future that completes once the shutdown operation has
