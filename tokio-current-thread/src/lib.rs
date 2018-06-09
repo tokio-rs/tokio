@@ -25,8 +25,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.0")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
-#![allow(deprecated)]
-
 extern crate futures;
 extern crate tokio_executor;
 
@@ -38,11 +36,10 @@ use tokio_executor::{Enter, SpawnError};
 use tokio_executor::park::{Park, Unpark, ParkThread};
 
 use futures::{executor, Async, Future};
-use futures::future::{self, Executor, ExecuteError, ExecuteErrorKind};
+use futures::future::{Executor, ExecuteError, ExecuteErrorKind};
 
 use std::fmt;
 use std::cell::Cell;
-use std::marker::PhantomData;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use std::sync::mpsc;
@@ -100,14 +97,6 @@ pub struct Entered<'a, P: Park + 'a> {
     enter: &'a mut Enter,
 }
 
-#[deprecated(since = "0.1.0", note = "use block_on_all instead")]
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct Context<'a> {
-    cancel: Cell<bool>,
-    _p: PhantomData<&'a ()>,
-}
-
 /// Error returned by the `run` function.
 #[derive(Debug)]
 pub struct RunError {
@@ -150,31 +139,6 @@ struct CurrentRunner {
 thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
     spawn: Cell::new(None),
 });
-
-#[deprecated(since = "0.1.0", note = "use block_on_all instead")]
-#[doc(hidden)]
-#[allow(deprecated)]
-pub fn run<F, R>(f: F) -> R
-where F: FnOnce(&mut Context) -> R
-{
-    let mut context = Context {
-        cancel: Cell::new(false),
-        _p: PhantomData,
-    };
-
-    let mut current_thread = CurrentThread::new();
-
-    let ret = current_thread
-        .block_on(future::lazy(|| Ok::<_, ()>(f(&mut context))))
-        .unwrap();
-
-    if context.cancel.get() {
-        return ret;
-    }
-
-    current_thread.run().unwrap();
-    ret
-}
 
 /// Run the executor bootstrapping the execution with the provided future.
 ///
@@ -587,14 +551,6 @@ impl Handle {
 
 // ===== impl TaskExecutor =====
 
-#[deprecated(since = "0.1.0", note = "use TaskExecutor::current instead")]
-#[doc(hidden)]
-pub fn task_executor() -> TaskExecutor {
-    TaskExecutor {
-        _p: ::std::marker::PhantomData,
-    }
-}
-
 impl TaskExecutor {
     /// Returns an executor that executes futures on the current thread.
     ///
@@ -666,15 +622,6 @@ where F: Future<Item = (), Error = ()> + 'static
                 }
             }
         })
-    }
-}
-
-// ===== impl Context =====
-
-impl<'a> Context<'a> {
-    /// Cancels *all* executing futures.
-    pub fn cancel_all_spawned(&self) {
-        self.cancel.set(true);
     }
 }
 
