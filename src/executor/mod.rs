@@ -158,6 +158,7 @@ pub mod current_thread {
         BlockError,
         CurrentThread,
         Entered,
+        Handle,
         RunError,
         RunTimeoutError,
         TaskExecutor,
