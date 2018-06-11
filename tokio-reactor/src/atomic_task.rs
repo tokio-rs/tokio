@@ -84,7 +84,7 @@ pub(crate) struct AtomicTask {
 // `NOTIFYING` is made. On success, the caller obtains a lock on the task cell.
 //
 // If the lock is obtained, then the thread takes ownership of the current value
-// in teh task cell, and calls `notify` on it. The state is then transitioned
+// in the task cell, and calls `notify` on it. The state is then transitioned
 // back to `WAITING`. This transition must succeed as, at this point, the state
 // cannot be transitioned by another thread.
 //
