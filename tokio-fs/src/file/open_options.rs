@@ -189,21 +189,6 @@ impl OpenOptions {
     pub fn open<P>(&self, path: P) -> OpenOptionsFuture<P>
     where P: AsRef<Path> + Send + 'static
     {
-        self.clone().into_open(path)
-    }
-
-    /// Opens a file at `path` with the options specified by `self`, consuming
-    /// `self`.
-    ///
-    /// # Errors
-    ///
-    /// `OpenOptionsFuture` results in an error if called from outside of the
-    /// Tokio runtime or if the underlying [`open`] call results in an error.
-    ///
-    /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
-    pub fn into_open<P>(self, path: P) -> OpenOptionsFuture<P>
-    where P: AsRef<Path> + Send + 'static
-    {
-        OpenOptionsFuture::new(self.0, path)
+        OpenOptionsFuture::new(self.0.clone(), path)
     }
 }
