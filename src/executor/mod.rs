@@ -5,7 +5,7 @@
 //! the future must be submitted to an executor. A future that is submitted to
 //! an executor is called a "task".
 //!
-//! The executor executor is responsible for ensuring that [`Future::poll`] is
+//! The executor is responsible for ensuring that [`Future::poll`] is
 //! called whenever the task is [notified]. Notification happens when the
 //! internal state of a task transitions from "not ready" to ready. For
 //! example, a socket might have received data and a call to `read` will now be
