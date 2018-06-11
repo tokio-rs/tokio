@@ -8,7 +8,7 @@ mod open_options;
 
 pub use self::create::CreateFuture;
 pub use self::open::OpenFuture;
-pub use self::open_options::{OpenOptions, OpenOptionsFuture};
+pub use self::open_options::OpenOptions;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -51,7 +51,7 @@ impl File {
     pub fn open<P>(path: P) -> OpenFuture<P>
     where P: AsRef<Path> + Send + 'static,
     {
-        OpenFuture::new(path)
+        OpenOptions::new().read(true).open(path)
     }
 
     /// Opens a file in write-only mode.

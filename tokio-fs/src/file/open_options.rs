@@ -1,45 +1,11 @@
-use super::File;
-
-use futures::{Future, Poll};
+use super::OpenFuture;
 
 use std::fs::OpenOptions as StdOpenOptions;
-use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt as UnixOpenOptionsExt;
 #[cfg(windows)]
 use std::os::windows::fs::OpenOptionsExt as WindowsOpenOptionsExt;
 use std::path::Path;
-
-/// Future returned by `OpenOptions::open` and resolves to a `File` instance.
-#[derive(Debug)]
-pub struct OpenOptionsFuture<P> {
-    options: StdOpenOptions,
-    path: P,
-}
-
-impl<P> OpenOptionsFuture<P>
-where P: AsRef<Path> + Send + 'static,
-{
-    pub(crate) fn new(options: StdOpenOptions, path: P) -> Self {
-        OpenOptionsFuture { options, path }
-    }
-}
-
-impl<P> Future for OpenOptionsFuture<P>
-where P: AsRef<Path> + Send + 'static,
-{
-    type Item = File;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let std = try_ready!(::blocking_io(|| {
-            self.options.open(&self.path)
-        }));
-
-        let file = File::from_std(std);
-        Ok(file.into())
-    }
-}
 
 /// Options and flags which can be used to configure how a file is opened.
 ///
@@ -186,9 +152,9 @@ impl OpenOptions {
     /// Tokio runtime or if the underlying [`open`] call results in an error.
     ///
     /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
-    pub fn open<P>(&self, path: P) -> OpenOptionsFuture<P>
+    pub fn open<P>(&self, path: P) -> OpenFuture<P>
     where P: AsRef<Path> + Send + 'static
     {
-        OpenOptionsFuture::new(self.0.clone(), path)
+        OpenFuture::new(self.0.clone(), path)
     }
 }
