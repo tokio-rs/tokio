@@ -53,7 +53,7 @@ fn test_drop_on_notify() {
         }
     }
 
-    let addr = "0.0.0.0:0".parse().unwrap();
+    let addr = "127.0.0.1:0".parse().unwrap();
     let mut reactor = Reactor::new().unwrap();
 
     // Create a listener
