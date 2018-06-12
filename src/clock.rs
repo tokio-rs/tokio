@@ -6,7 +6,7 @@
 //! tests or performing caching operations to reduce the number of syscalls.
 //!
 //! Note that, because the source of time is configurable, it is possible to
-//! observe non-monotonic behavior when calling [`now`] from different
+//! observe non-monotonic behavior when calling [`now`][n] from different
 //! executors.
 //!
 //! [n]: fn.now.html
