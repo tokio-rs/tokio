@@ -1,0 +1,22 @@
+[package]
+name = "tokio-current-thread"
+
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Create "v0.1.x" git tag.
+version = "0.1.0"
+documentation = "https://docs.rs/tokio-current-thread"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://github.com/tokio-rs/tokio"
+license = "MIT"
+authors = ["Carl Lerche <me@carllerche.com>"]
+description = """
+Single threaded executor which manage many tasks concurrently on the current thread.
+"""
+keywords = ["futures", "tokio"]
+categories = ["concurrency", "asynchronous"]
+
+[dependencies]
+tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
+futures = "0.1.19"
