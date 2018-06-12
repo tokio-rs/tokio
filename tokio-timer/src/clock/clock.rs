@@ -96,14 +96,12 @@ impl timer::Now for Clock {
 
 impl fmt::Debug for Clock {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let str_repr = match self.now.is_some() {
+            true => "Some(Arc<Now>)",
+            false => "None"
+        };
         fmt.debug_struct("Clock")
-            .field("now", {
-                if self.now.is_some() {
-                    &"Some(Arc<Now>)"
-                } else {
-                    &"None"
-                }
-            })
+            .field("now", &str_repr)
             .finish()
     }
 }
