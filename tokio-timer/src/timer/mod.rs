@@ -35,6 +35,7 @@ mod handle;
 mod level;
 mod now;
 mod registration;
+mod mock;
 
 use self::entry::Entry;
 use self::level::{Level, Expiration};
@@ -42,6 +43,7 @@ use self::level::{Level, Expiration};
 pub use self::handle::{Handle, with_default};
 pub use self::now::{Now, SystemNow};
 pub(crate) use self::registration::Registration;
+pub use self::mock::{NopPark, NopUnpark, Clock, MockNow};
 
 use Error;
 use atomic::AtomicU64;
@@ -520,6 +522,18 @@ where T: Park,
     }
 }
 
+impl Timer<NopPark, MockNow> {
+    /// Create a mocked timer to simulate the passage of time.
+    pub fn mock() -> (Self, Clock) {
+        let c = Clock::new();
+        let park = NopPark::new(c.clone());
+        let now = MockNow::new(c.clone());
+
+        let timer = Timer::new_with_now(park, now);
+        (timer, c)
+    }
+}
+
 impl<T, N> Drop for Timer<T, N> {
     fn drop(&mut self) {
         // Shutdown the stack of entries to process, preventing any new entries
@@ -622,6 +636,7 @@ fn ms(duration: Duration, round: Round) -> u64 {
 #[cfg(test)]
 mod test {
     use super::*;
+    use futures::Future;
 
     #[test]
     fn test_level_for() {
@@ -648,5 +663,41 @@ mod test {
                 }
             }
         }
+    }
+
+    /// The target API for a mocked timer.
+    /// 
+    /// Shamelessly stolen from https://github.com/tokio-rs/tokio/issues/127
+    #[test]
+    #[ignore] // FIXME: How do I handle "no Task is currently running"?
+    fn mocked_timer_api() {
+        let (timer, clock) = Timer::mock();
+
+        let sleep_duration = Duration::from_secs(30);
+        let deadline = clock.now() + sleep_duration;
+
+        let mut fut = timer.handle().delay(deadline);
+        assert!(fut.poll().unwrap().is_not_ready());
+
+        clock.advance(Duration::from_secs(29));
+        assert!(fut.poll().unwrap().is_not_ready());
+
+        clock.advance(Duration::from_secs(1));
+        assert!(fut.poll().unwrap().is_ready());
+    }
+
+    #[test]
+    #[ignore] // FIXME: why doesn't the future progress?
+    fn delay_future_from_mocked_timer_actually_completes() {
+        let (timer, clock) = Timer::mock();
+
+        let sleep_duration = Duration::from_secs(30);
+        let deadline = clock.now() + sleep_duration;
+
+        let fut = timer.handle().delay(deadline);
+
+        // if this doesn't deadlock because we didn't manually make the clock
+        // progress, the test passes.
+        fut.wait().unwrap();
     }
 }
