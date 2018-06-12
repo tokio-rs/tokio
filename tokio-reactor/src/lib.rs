@@ -392,9 +392,19 @@ impl Reactor {
         let aba_guard = token.0 & !MAX_SOURCES;
         let token = token.0 & MAX_SOURCES;
 
-        let io_dispatch = self.inner.io_dispatch.read().unwrap();
+        let mut rd = None;
+        let mut wr = None;
 
-        if let Some(io) = io_dispatch.get(token) {
+        // Create a scope to ensure that notifying the tasks stays out of the
+        // lock's critical section.
+        {
+            let io_dispatch = self.inner.io_dispatch.read().unwrap();
+
+            let io = match io_dispatch.get(token) {
+                Some(io) => io,
+                None => return,
+            };
+
             if aba_guard != io.aba_guard {
                 return;
             }
@@ -402,12 +412,20 @@ impl Reactor {
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
             if ready.is_writable() || platform::is_hup(&ready) {
-                io.writer.notify();
+                wr = io.writer.take_to_notify();
             }
 
             if !(ready & (!mio::Ready::writable())).is_empty() {
-                io.reader.notify();
+                rd = io.reader.take_to_notify();
             }
+        }
+
+        if let Some(task) = rd {
+            task.notify();
+        }
+
+        if let Some(task) = wr {
+            task.notify();
         }
     }
 }

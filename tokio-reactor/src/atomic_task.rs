@@ -237,10 +237,9 @@ impl AtomicTask {
         }
     }
 
-    /// Notifies the task that last called `register`.
-    ///
-    /// If `register` has not been called yet, then this does nothing.
-    pub fn notify(&self) {
+    /// Attempts to take the `Task` value out of the `AtomicTask` with the
+    /// intention that the caller will notify the task.
+    pub fn take_to_notify(&self) -> Option<Task> {
         // AcqRel ordering is used in order to acquire the value of the `task`
         // cell as well as to establish a `release` ordering with whatever
         // memory the `AtomicTask` is associated with.
@@ -252,9 +251,7 @@ impl AtomicTask {
                 // Release the lock
                 self.state.fetch_and(!NOTIFYING, Release);
 
-                if let Some(task) = task {
-                    task.notify();
-                }
+                task
             }
             state => {
                 // There is a concurrent thread currently updating the
@@ -268,7 +265,18 @@ impl AtomicTask {
                     state == REGISTERING ||
                     state == REGISTERING | NOTIFYING ||
                     state == NOTIFYING);
+
+                None
             }
+        }
+    }
+
+    /// Notifies the task that last called `register`.
+    ///
+    /// If `register` has not been called yet, then this does nothing.
+    pub fn notify(&self) {
+        if let Some(task) = self.take_to_notify() {
+            task.notify();
         }
     }
 }
