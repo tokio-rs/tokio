@@ -155,6 +155,15 @@ impl File {
         ::blocking_io(|| self.std().set_permissions(perm))
     }
 
+    /// Destructures the `tokio_fs::File` into a [`std::fs::File`][std].
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if [`shutdown`] has been called.
+    pub fn into_std(mut self) -> StdFile {
+        self.std.take().expect("`File` instance already shutdown")
+    }
+
     fn std(&mut self) -> &mut StdFile {
         self.std.as_mut().expect("`File` instance already shutdown")
     }
