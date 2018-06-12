@@ -43,7 +43,7 @@
 #[doc(hidden)]
 pub mod current_thread;
 
-#[deprecated(since = "0.1.8", note = "use tokio-thread-pool crate instead")]
+#[deprecated(since = "0.1.8", note = "use tokio-threadpool crate instead")]
 #[doc(hidden)]
 pub mod thread_pool {
     //! Maintains a pool of threads across which the set of spawned tasks are
