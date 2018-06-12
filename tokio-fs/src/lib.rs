@@ -23,6 +23,7 @@ mod stdout;
 mod stderr;
 
 pub use file::File;
+pub use file::OpenOptions;
 pub use stdin::{stdin, Stdin};
 pub use stdout::{stdout, Stdout};
 pub use stderr::{stderr, Stderr};
