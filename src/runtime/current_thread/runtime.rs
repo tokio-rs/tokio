@@ -1,5 +1,5 @@
-use executor::current_thread::{self, CurrentThread};
-use executor::current_thread::Handle as ExecutorHandle;
+use tokio_current_thread::{self as current_thread, CurrentThread};
+use tokio_current_thread::Handle as ExecutorHandle;
 use runtime::current_thread::Builder;
 
 use tokio_reactor::{self, Reactor};
