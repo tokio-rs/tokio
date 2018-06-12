@@ -10,6 +10,7 @@
 
 extern crate futures;
 extern crate tokio;
+extern crate tokio_current_thread;
 extern crate tokio_executor;
 extern crate tokio_reactor;
 extern crate tokio_timer;
@@ -18,11 +19,11 @@ use std::io::Error as IoError;
 use std::time::{Duration, Instant};
 
 use futures::{future, Future};
-use tokio::executor::current_thread::{self, CurrentThread};
+use tokio_current_thread::CurrentThread;
 use tokio_reactor::Reactor;
 use tokio_timer::timer::{self, Timer};
 
-/// Creates a „runtime“.
+/// Creates a "runtime".
 ///
 /// This is similar to running `tokio::runtime::current_thread::Runtime::new()`.
 fn run<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
@@ -46,7 +47,7 @@ fn run<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
             // executor when used. This is a trick, because we need two mutable references to the
             // executor (one to run the provided future, another to install as the default one). We
             // use the fake one here as the default one.
-            let mut default_executor = current_thread::TaskExecutor::current();
+            let mut default_executor = tokio_current_thread::TaskExecutor::current();
             tokio_executor::with_default(&mut default_executor, enter, |enter| {
                 let mut executor = executor.enter(enter);
                 // Run the provided future
@@ -61,7 +62,7 @@ fn run<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
 
 fn main() {
     run(future::lazy(|| {
-        // Here comes the application logic. It can spawn further tasks by current_thread::spawn().
+        // Here comes the application logic. It can spawn further tasks by tokio_current_thread::spawn().
         // It also can use the default reactor and create timeouts.
 
         // Connect somewhere. And then do nothing with it. Yes, useless.
@@ -72,7 +73,7 @@ fn main() {
             .map_err(|e| println!("Failed to connect: {}", e));
         // We can spawn it without requiring Send. This would panic if we run it outside of the
         // `run` (or outside of anything else)
-        current_thread::spawn(connect);
+        tokio_current_thread::spawn(connect);
 
         // We can also create timeouts.
         let deadline = tokio::timer::Delay::new(Instant::now() + Duration::from_secs(5))
