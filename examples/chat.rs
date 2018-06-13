@@ -290,7 +290,7 @@ impl Lines {
     fn poll_flush(&mut self) -> Poll<(), io::Error> {
         // As long as there is buffered data to write, try to write it.
         while !self.wr.is_empty() {
-            // Try to read some bytes from the socket
+            // Try to write some bytes to the socket
             let n = try_ready!(self.socket.poll_write(&self.wr));
 
             // As long as the wr is not empty, a successful write should
