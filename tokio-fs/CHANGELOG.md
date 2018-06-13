@@ -1,4 +1,4 @@
-# 0.1.1 (June 12, 2018)
+# 0.1.1 (June 13, 2018)
 
 * Add `OpenOptions` (#390)
 * Add `into_std` to `File` (#403)

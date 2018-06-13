@@ -1,4 +1,4 @@
-# 0.1.2 (June 12, 2018)
+# 0.1.2 (June 13, 2018)
 
 * Fix deadlock that can happen when shutting down (#409)
 * Handle::default() lazily binds to reactor (#350)
