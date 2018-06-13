@@ -7,7 +7,7 @@
 //! The [`now`][n] function returns the current `Instant`. By default, it delegates
 //! to [`Instant::now`][std].
 //!
-//! The source of time used by [`now`] can be configured by implementing the
+//! The source of time used by [`now`][n] can be configured by implementing the
 //! [`Now`] trait and passing an instance to [`with_default`].
 //!
 //! [n]: fn.now.html
