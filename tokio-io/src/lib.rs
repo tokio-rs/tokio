@@ -7,7 +7,7 @@
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
 #![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-io/0.1.6")]
+#![doc(html_root_url = "https://docs.rs/tokio-io/0.1.7")]
 
 #[macro_use]
 extern crate log;

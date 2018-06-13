@@ -12,6 +12,9 @@
 //!
 //! [blocking]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool/fn.blocking.html
 
+#![deny(missing_docs, missing_debug_implementations, warnings)]
+#![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.1")]
+
 #[macro_use]
 extern crate futures;
 extern crate tokio_io;

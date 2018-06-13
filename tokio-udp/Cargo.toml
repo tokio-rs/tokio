@@ -5,7 +5,7 @@ name = "tokio-udp"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -18,7 +18,7 @@ categories = ["asynchronous"]
 
 [dependencies]
 tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
-tokio-io = { version = "0.1.6", path = "../tokio-io" }
+tokio-io = { version = "0.1.7", path = "../tokio-io" }
 tokio-reactor = { version = "0.1.1", path = "../tokio-reactor" }
 bytes = "0.4"
 mio = "0.6.14"

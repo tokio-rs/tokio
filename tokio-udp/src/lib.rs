@@ -16,7 +16,7 @@
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`framed`]: struct.UdpSocket.html#method.framed
 
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.1")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;

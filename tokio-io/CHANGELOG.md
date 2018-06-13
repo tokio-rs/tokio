@@ -1,4 +1,4 @@
-# Unreleased
+# 0.1.7 (June 13, 2018)
 
 * Move `codec::{Encode, Decode, Framed*}` into `tokio-codec` (#353)
 
