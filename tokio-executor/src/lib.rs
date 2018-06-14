@@ -182,6 +182,25 @@ pub trait Executor {
     }
 }
 
+impl<E: Executor + ?Sized> Executor for Box<E> {
+    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
+        -> Result<(), SpawnError>
+    {
+        (**self).spawn(future)
+    }
+
+    #[cfg(feature = "unstable-futures")]
+    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
+        -> Result<(), futures2::executor::SpawnError>
+    {
+        (**self).spawn2(future)
+    }
+
+    fn status(&self) -> Result<(), SpawnError> {
+        (**self).status()
+    }
+}
+
 /// Errors returned by `Executor::spawn`.
 ///
 /// Spawn errors should represent relatively rare scenarios. Currently, the two
