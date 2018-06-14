@@ -70,6 +70,11 @@
 // thread that most recently went to sleep getting woken up first. When the pool
 // is not under load, this helps threads shutdown faster.
 //
+// Sleeping is done by using `tokio_executor::Park` implementations. This allows
+// the user of the thread pool to customize the work that is performed to sleep.
+// This is how injecting timers and other functionality into the thread pool is
+// done.
+//
 // # Notifying workers
 //
 // When there is work to be done, workers must be notified. However, notifying a
