@@ -29,10 +29,16 @@ use std::thread;
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
-// TODO: Rename this
 #[derive(Debug)]
 pub(crate) struct Pool {
-    // ThreadPool state
+    // Tracks the state of the thread pool (running, shutting down, ...).
+    //
+    // While workers check this field as a hint to detect shutdown, it is
+    // **not** used as a primary point of coordination for workers. The sleep
+    // stack is used as the primary point of coordination for workers.
+    //
+    // The value of this atomic is deserialized into a `pool::State` instance.
+    // See comments for that type.
     pub state: AtomicUsize,
 
     // Stack tracking sleeping workers.
