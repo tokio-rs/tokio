@@ -173,3 +173,33 @@ fn spawn_many() {
     runtime.shutdown_on_idle().wait().unwrap();
     assert_eq!(ITER, *cnt.lock().unwrap());
 }
+
+#[test]
+fn spawn_from_block_on_all() {
+    let cnt = Arc::new(Mutex::new(0));
+    let c = cnt.clone();
+
+    let mut runtime = Runtime::new().unwrap();
+    let msg = runtime
+        .block_on_all(lazy(move || {
+            {
+                let mut x = c.lock().unwrap();
+                *x = 1 + *x;
+            }
+
+            // Spawn!
+            tokio::spawn(lazy(move || {
+                {
+                    let mut x = c.lock().unwrap();
+                    *x = 1 + *x;
+                }
+                Ok::<(), ()>(())
+            }));
+
+            Ok::<_, ()>("hello")
+        }))
+        .unwrap();
+
+    assert_eq!(2, *cnt.lock().unwrap());
+    assert_eq!(msg, "hello");
+}
