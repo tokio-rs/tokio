@@ -3,26 +3,25 @@
 #![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.4")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
-// The Tokio thread pool is a thread pool designed to scheduled futures in Tokio
-// based applications. The thread pool structure manages two sets of threads:
+// The Tokio thread pool is designed to scheduled futures in Tokio based
+// applications. The thread pool structure manages two sets of threads:
 //
 // * Worker threads.
 // * Backup threads.
 //
-// Worker threads are primary threads and are used to schedule futures. These
-// threads operate using a work-stealing strategy. Backup threads are to support
-// the `blocking` API. Threads will transition between the two sets.
+// Worker threads are used to schedule futures using a work-stealing strategy.
+// Backup threads, on the other hand, are intended only to support the
+// `blocking` API. Threads will transition between the two sets.
 //
-// The advantage of the work-stealing strategy is minimal cross thread
+// The advantage of the work-stealing strategy is minimal cross-thread
 // coordination. The thread pool attempts to make as much progress as possible
 // without communicating across threads.
 //
 // # Crate layout
 //
-// The primary type is `Pool`. This struct contains the majority of the pool
-// state. Because worker threads will shutdown and be reestarted, the pool also
-// contains the state for each worker. The state dedicated to a worker is
-// represented by `worker::Entry`.
+// The primary type, `Pool`, holds the majority of a thread pool's state,
+// including the state for each worker. Each worker's state is maintained in an
+// instance of `worker::Entry`.
 //
 // `Worker` contains the logic that runs on each worker thread. It holds an
 // `Arc` to `Pool` and is able to access its state from `Pool`.
@@ -46,16 +45,19 @@
 // To do this, it randomly scans other workers' deques and tries to pop a task.
 // If it finds no work to steal, the thread goes to sleep.
 //
+// When the worker detects that the pool has been shut down, it exits the loop,
+// cleans up its state, and shuts the thread down.
+//
 // # Thread pool initialization
 //
 // By default, no threads are spawned on creation. Instead, when new futures are
-// spawned, the pool first checks if there are enough active workeer threads. If
+// spawned, the pool first checks if there are enough active worker threads. If
 // not, a new worker thread is spawned.
 //
 // # Spawning futures
 //
-// The process for spawning a future depends on whether the action is taken from
-// a workere thread or external to the thread pool.
+// The spawning behavior depends on whether a future was spawned from within a
+// worker or thread or if it was spawned from an external handle.
 //
 // When spawning a future while external to the thread pool, the current
 // strategy is to randomly pick a worker to submit the task to. The task is then
@@ -66,7 +68,7 @@
 //
 // # Sleeping workers
 //
-// Sleeping workers are tracked using a treiber stack. This results in the
+// Sleeping workers are tracked using a treiber stack [1]. This results in the
 // thread that most recently went to sleep getting woken up first. When the pool
 // is not under load, this helps threads shutdown faster.
 //
@@ -74,6 +76,8 @@
 // the user of the thread pool to customize the work that is performed to sleep.
 // This is how injecting timers and other functionality into the thread pool is
 // done.
+//
+// [1]: https://en.wikipedia.org/wiki/Treiber_Stack
 //
 // # Notifying workers
 //
@@ -90,7 +94,7 @@
 // In the first case, the worker will always be notified. However, it could be
 // possible to avoid the notification if the mpsc channel has two or greater
 // number of tasks *after* the task is submitted. In this case, we are able to
-// assume that the worker has preeviously been notified.
+// assume that the worker has previously been notified.
 //
 // The second case is trickier. Currently, whenever a worker spawns a new future
 // (pushing it onto its deque) and when it pops a future from its mpsc, it tries
