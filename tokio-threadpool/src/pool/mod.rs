@@ -85,7 +85,6 @@ impl Pool {
         let total_size = max_blocking + pool_size;
 
         // Create the set of backup entries
-        //
         // This is `backup + pool_size` because the core thread pool running the
         // workers is spawned from backup as well.
         let backup = (0..total_size).map(|_| {
@@ -319,7 +318,11 @@ impl Pool {
         let idx = self.rand_usize() % len;
 
         trace!("  -> submitting to random; idx={}", idx);
+        self.submit_external_to_worker(idx, task, inner);
+    }
 
+    /// Submit a task to a specific worker within the pool
+    pub fn submit_external_to_worker(&self, idx: usize, task: Arc<Task>, inner: &Arc<Pool>) {
         let state = self.workers[idx].load_state();
         self.submit_to_external(idx, task, state, inner);
     }

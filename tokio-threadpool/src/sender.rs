@@ -87,6 +87,18 @@ impl Sender {
         tokio_executor::Executor::spawn(&mut s, Box::new(future))
     }
 
+    /// Same as spawn, but submits the future to a specific
+    /// worker within the pool to execute.
+    pub fn spawn_to_worker<F>(&mut self, worker_idx: usize, future: F) -> Result<(), SpawnError>
+    where F: Future<Item = (), Error = ()> + Send + 'static,
+    {
+        self.prepare_for_spawn()?;
+        let task = Arc::new(Task::new(Box::new(future)));
+        self.inner.submit_external_to_worker(worker_idx, task, &self.inner);
+        Ok(())
+    }
+
+
     /// Logic to prepare for spawning
     fn prepare_for_spawn(&self) -> Result<(), SpawnError> {
         let mut state: pool::State = self.inner.state.load(Acquire).into();

@@ -586,3 +586,23 @@ fn multi_threadpool() {
 
     done_rx.recv().unwrap();
 }
+
+#[test]
+fn test_submit_external_to_worker() {
+    let mut pool = ThreadPool::new();
+    let idx = 0;
+
+    struct F;
+
+    #[cfg(not(feature = "unstable-futures"))]
+    impl Future for F {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            Ok(Async::Ready(()))
+        }
+    }
+
+    pool.sender_mut().spawn_to_worker(idx, F{});
+}
