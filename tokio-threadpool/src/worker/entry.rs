@@ -16,6 +16,9 @@ use deque;
 // operations are thread-safe vs. which ones require ownership of the worker.
 pub(crate) struct WorkerEntry {
     // Worker state. This is mutated when notifying the worker.
+    //
+    // The `usize` value is deserialized to a `worker::State` instance. See
+    // comments on that type.
     pub state: AtomicUsize,
 
     // Next entry in the parked Trieber stack

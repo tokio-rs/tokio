@@ -336,8 +336,29 @@ impl Worker {
             state = actual;
         }
 
-        // If this is the first iteration of the worker loop, then the state can
-        // be signaled.
+        // `first` is set to true the first time this function is called after
+        // the thread has started.
+        //
+        // This check is to handle the scenario where a worker gets signaled
+        // while it is already happily running. The `is_signaled` state is
+        // intended to wake up a worker that has been previously sleeping in
+        // effect increasing the number of active workers. If this is the first
+        // time `check_run_state` is called, then being in a signalled state is
+        // normal and the thread was started to handle it.  However, if this is
+        // **not** the first time the fn was called, then the number of active
+        // workers has not been increased by the signal, so `signal_work` has to
+        // be called again to try to wake up another worker.
+        //
+        // For example, if the thread pool is configured to allow 4 workers.
+        // Worker 1 is processing tasks from its `deque`. Worker 2 receives its
+        // first task. Worker 2 will pick a random worker to signal. It does
+        // this by popping off the sleep stack, but there is no guarantee that
+        // workers on the sleep stack are actually sleeping. It is possible that
+        // Worker 1 gets signaled.
+        //
+        // Without this check, in the above case, no additional workers will get
+        // started, which results in the thread pool permanently being at 2
+        // workers even though it should reach 4.
         if !first && state.is_signaled() {
             trace!("Worker::check_run_state; delegate signal");
             // This worker is not ready to be signaled, so delegate the signal
@@ -537,6 +558,9 @@ impl Worker {
             match task {
                 Empty => {
                     if found_work {
+                        // TODO: Why is this called on every iteration? Would it
+                        // not be better to only signal when work was found
+                        // after waking up?
                         trace!("found work while draining; signal_work");
                         self.inner.signal_work(&self.inner);
                     }
