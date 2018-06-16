@@ -30,5 +30,5 @@ pub use incoming::Incoming;
 pub use listener::UnixListener;
 pub use recv_dgram::RecvDgram;
 pub use send_dgram::SendDgram;
-pub use stream::UnixStream;
+pub use stream::{UnixStream, ConnectFuture};
 pub use ucred::UCred;
