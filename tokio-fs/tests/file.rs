@@ -73,3 +73,33 @@ fn read_write() {
             })
     });
 }
+
+#[test]
+fn metadata() {
+    let dir = TempDir::new("tokio-fs-tests").unwrap();
+    let file_path = dir.path().join("metadata.txt");
+
+    let pool = Builder::new().pool_size(1).build();
+
+    let (tx, rx) = oneshot::channel();
+
+    pool.spawn({
+        let file_path = file_path.clone();
+        let file_path2 = file_path.clone();
+        let file_path3 = file_path.clone();
+
+        tokio_fs::metadata(file_path)
+            .then(|r| {
+                let _ = r.err().unwrap();
+                Ok(())
+            })
+            .and_then(|_| File::create(file_path2))
+            .and_then(|_| tokio_fs::metadata(file_path3))
+            .then(|r| {
+                assert!(r.unwrap().is_file());
+                tx.send(())
+            })
+    });
+
+    rx.wait().unwrap();
+}
