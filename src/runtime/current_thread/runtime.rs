@@ -76,6 +76,28 @@ impl Runtime {
         Handle(self.executor.handle().clone())
     }
 
+    /// Return a reference to the reactor handle for this runtime instance.
+    ///
+    /// The returned handle reference can be cloned in order to get an owned
+    /// value of the handle. This handle can be used to initialize I/O resources
+    /// (like TCP or UDP sockets) that will not be used on the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::current_thread::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// let reactor_handle = rt.reactor().clone();
+    ///
+    /// // use `reactor_handle`
+    /// ```
+    pub fn reactor(&self) -> &tokio_reactor::Handle {
+        &self.reactor_handle
+    }
+
     /// Spawn a future onto the single-threaded Tokio runtime.
     ///
     /// See [module level][mod] documentation for more details.
