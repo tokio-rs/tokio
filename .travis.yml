@@ -34,6 +34,7 @@ script:
 
         export ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0"
         export TSAN_OPTIONS="suppressions=`pwd`/ci/tsan"
+        export RUST_BACKTRACE=1
 
         # === tokio-timer ====
 
