@@ -7,7 +7,7 @@ use tokio_io::AsyncWrite;
 use tokio_codec::{Encoder, FramedWrite};
 
 use futures::{Sink, Poll};
-use bytes::{BytesMut, BufMut, BigEndian};
+use bytes::{BytesMut, BufMut};
 
 use std::io::{self, Write};
 use std::collections::VecDeque;
