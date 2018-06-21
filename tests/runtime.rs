@@ -179,7 +179,7 @@ fn spawn_from_block_on_all() {
     let cnt = Arc::new(Mutex::new(0));
     let c = cnt.clone();
 
-    let mut runtime = Runtime::new().unwrap();
+    let runtime = Runtime::new().unwrap();
     let msg = runtime
         .block_on_all(lazy(move || {
             {
