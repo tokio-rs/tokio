@@ -370,7 +370,7 @@ pub mod length_delimited {
     //! [`AsyncRead`]: ../../trait.AsyncRead.html
     //! [`AsyncWrite`]: ../../trait.AsyncWrite.html
     //! [`Encoder`]: ../trait.Encoder.html
-    //! [`BytesMut`]: https://docs.rs/bytes/~0.4/bytes/struct.BytesMut.html
+    //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
     pub use ::length_delimited::*;
 }

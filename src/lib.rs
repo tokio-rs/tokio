@@ -17,7 +17,7 @@
 //! Guide level documentation is found on the [website].
 //!
 //! [website]: https://tokio.rs/docs/getting-started/hello-world/
-//! [futures]: http://docs.rs/futures
+//! [futures]: http://docs.rs/futures/0.1
 //!
 //! # Examples
 //!
