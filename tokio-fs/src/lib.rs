@@ -21,43 +21,23 @@ extern crate tokio_io;
 extern crate tokio_threadpool;
 
 pub mod file;
+mod metadata;
 mod stdin;
 mod stdout;
 mod stderr;
 
 pub use file::File;
 pub use file::OpenOptions;
+pub use metadata::{metadata, MetadataFuture};
 pub use stdin::{stdin, Stdin};
 pub use stdout::{stdout, Stdout};
 pub use stderr::{stderr, Stderr};
 
-use futures::{Future, Poll};
+use futures::Poll;
 use futures::Async::*;
 
-use std::fs::{self, Metadata};
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
-use std::path::PathBuf;
-
-/// Queries the file system metadata for a path
-pub fn metadata(path: PathBuf) -> MetadataFuture {
-    MetadataFuture { path }
-}
-
-/// Future returned by `metadata`
-#[derive(Debug)]
-pub struct MetadataFuture {
-    path: PathBuf,
-}
-
-impl Future for MetadataFuture {
-    type Item = Metadata;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        blocking_io(|| fs::metadata(&self.path))
-    }
-}
 
 fn blocking_io<F, T>(f: F) -> Poll<T, io::Error>
 where F: FnOnce() -> io::Result<T>,
