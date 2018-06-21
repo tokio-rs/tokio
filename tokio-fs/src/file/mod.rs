@@ -6,11 +6,13 @@ mod create;
 mod metadata;
 mod open;
 mod open_options;
+mod seek;
 
 pub use self::create::CreateFuture;
 pub use self::metadata::MetadataFuture;
 pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
+pub use self::seek::SeekFuture;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -98,6 +100,16 @@ impl File {
     /// Seeking to a negative offset is considered an error.
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
         ::blocking_io(|| self.std().seek(pos))
+    }
+
+    /// Seek to an offset, in bytes, in a stream.
+    ///
+    /// Similar to `poll_seek`, but returning a `Future`.
+    ///
+    /// This method consumes the `File` and returns it back when the future
+    /// completes.
+    pub fn seek(self, pos: io::SeekFrom) -> SeekFuture {
+        SeekFuture::new(self, pos)
     }
 
     /// Attempts to sync all OS-internal metadata to disk.

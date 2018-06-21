@@ -16,7 +16,7 @@ use rand::{thread_rng, Rng};
 use tempdir::TempDir;
 
 use std::fs::File as StdFile;
-use std::io::Read;
+use std::io::{Read, SeekFrom};
 
 #[test]
 fn read_write() {
@@ -100,6 +100,42 @@ fn metadata() {
                 tx.send(())
             })
     });
+
+    rx.wait().unwrap();
+}
+
+#[test]
+fn seek() {
+    let dir = TempDir::new("tokio-fs-tests").unwrap();
+    let file_path = dir.path().join("seek.txt");
+
+    let pool = Builder::new().pool_size(1).build();
+
+    let (tx, rx) = oneshot::channel();
+
+    pool.spawn(
+        OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(file_path)
+            .and_then(|file| io::write_all(file, "Hello, world!"))
+            .and_then(|(file, _)| file.seek(SeekFrom::End(-6)))
+            .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
+            .and_then(|(file, buf)| {
+                assert_eq!(buf, b"world");
+                file.seek(SeekFrom::Start(0))
+            })
+            .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
+            .and_then(|(_, buf)| {
+                assert_eq!(buf, b"Hello");
+                Ok(())
+            })
+            .then(|r| {
+                let _ = r.unwrap();
+                tx.send(())
+            }),
+    );
 
     rx.wait().unwrap();
 }
