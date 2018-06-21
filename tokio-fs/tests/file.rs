@@ -63,15 +63,20 @@ fn read_write() {
 
     assert_eq!(dst, contents);
 
+    let (tx, rx) = oneshot::channel();
+
     pool.spawn({
         File::open(file_path)
             .and_then(|file| io::read_to_end(file, vec![]))
             .then(move |res| {
                 let (_, buf) = res.unwrap();
                 assert_eq!(buf, contents);
+                tx.send(()).unwrap();
                 Ok(())
             })
     });
+
+    rx.wait().unwrap();
 }
 
 #[test]
