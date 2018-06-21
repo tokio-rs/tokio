@@ -250,14 +250,16 @@ impl<P: Park> CurrentThread<P> {
         -> Result<F::Item, BlockError<F::Error>>
     where F: Future
     {
-        let mut enter = tokio_executor::enter().unwrap();
+        let mut enter = tokio_executor::enter()
+            .expect("failed to start `current_thread::Runtime`");
         self.enter(&mut enter).block_on(future)
     }
 
     /// Run the executor to completion, blocking the thread until **all**
     /// spawned futures have completed.
     pub fn run(&mut self) -> Result<(), RunError> {
-        let mut enter = tokio_executor::enter().unwrap();
+        let mut enter = tokio_executor::enter()
+            .expect("failed to start `current_thread::Runtime`");
         self.enter(&mut enter).run()
     }
 
@@ -266,7 +268,8 @@ impl<P: Park> CurrentThread<P> {
     pub fn run_timeout(&mut self, duration: Duration)
         -> Result<(), RunTimeoutError>
     {
-        let mut enter = tokio_executor::enter().unwrap();
+        let mut enter = tokio_executor::enter()
+            .expect("failed to start `current_thread::Runtime`");
         self.enter(&mut enter).run_timeout(duration)
     }
 
@@ -276,7 +279,8 @@ impl<P: Park> CurrentThread<P> {
     pub fn turn(&mut self, duration: Option<Duration>)
         -> Result<Turn, TurnError>
     {
-        let mut enter = tokio_executor::enter().unwrap();
+        let mut enter = tokio_executor::enter()
+            .expect("failed to start `current_thread::Runtime`");
         self.enter(&mut enter).turn(duration)
     }
 
