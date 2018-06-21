@@ -20,9 +20,16 @@ pub struct Enter {
 
 /// An error returned by `enter` if an execution scope has already been
 /// entered.
-#[derive(Debug)]
 pub struct EnterError {
     _a: (),
+}
+
+impl fmt::Debug for EnterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("EnterError")
+            .field("reason", &"attempted to run an executor while another executor is already running")
+            .finish()
+    }
 }
 
 /// Marks the current thread as being within the dynamic extent of an
