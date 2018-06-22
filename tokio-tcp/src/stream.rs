@@ -374,6 +374,17 @@ impl TcpStream {
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.io.get_ref().set_linger(dur)
     }
+
+    /// Creates a new independently owned handle to the underlying socket.
+    ///
+    /// The returned `TcpStream` is a reference to the same stream that this
+    /// object references. Both handles will read and write the same stream of
+    /// data, and options set on one stream will be propagated to the other
+    /// stream.
+    pub fn try_clone(&self) -> io::Result<TcpStream> {
+        let io = self.io.get_ref().try_clone()?;
+        Ok(TcpStream::new(io))
+    }
 }
 
 // ===== impl Read / Write =====
