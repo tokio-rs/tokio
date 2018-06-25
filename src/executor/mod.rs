@@ -44,79 +44,10 @@
 pub mod current_thread;
 
 #[deprecated(since = "0.1.8", note = "use tokio-threadpool crate instead")]
-#[doc(hidden)]
+/// Re-exports of [`tokio-threadpool`], deprecated in favor of the crate.
+///
+/// [`tokio-threadpool`]: https://docs.rs/tokio-threadpool/0.1
 pub mod thread_pool {
-    //! Maintains a pool of threads across which the set of spawned tasks are
-    //! executed.
-    //!
-    //! [`ThreadPool`] is an executor that uses a thread pool for executing
-    //! tasks concurrently across multiple cores. It uses a thread pool that is
-    //! optimized for use cases that involve multiplexing large number of
-    //! independent tasks that perform short(ish) amounts of computation and are
-    //! mainly waiting on I/O, i.e. the Tokio use case.
-    //!
-    //! Usually, users of [`ThreadPool`] will not create pool instances.
-    //! Instead, they will create a [`Runtime`] instance, which comes with a
-    //! pre-configured thread pool.
-    //!
-    //! At the core, [`ThreadPool`] uses a work-stealing based scheduling
-    //! strategy. When spawning a task while *external* to the thread pool
-    //! (i.e., from a thread that is not part of the thread pool), the task is
-    //! randomly assigned to a worker thread. When spawning a task while
-    //! *internal* to the thread pool, the task is assigned to the current
-    //! worker.
-    //!
-    //! Each worker maintains its own queue and first focuses on processing all
-    //! tasks in its queue. When the worker's queue is empty, the worker will
-    //! attempt to *steal* tasks from other worker queues. This strategy helps
-    //! ensure that work is evenly distributed across threads while minimizing
-    //! synchronization between worker threads.
-    //!
-    //! # Usage
-    //!
-    //! Thread pool instances are created using [`ThreadPool::new`] or
-    //! [`Builder::new`]. The first option returns a thread pool with default
-    //! configuration values. The second option allows configuring the thread
-    //! pool before instantiating it.
-    //!
-    //! Once an instance is obtained, futures may be spawned onto it using the
-    //! [`spawn`] function.
-    //!
-    //! A handle to the thread pool is obtained using [`ThreadPool::sender`].
-    //! This handle is **only** able to spawn futures onto the thread pool. It
-    //! is unable to affect the lifecycle of the thread pool in any way. This
-    //! handle can be passed into functions or stored in structs as a way to
-    //! grant the capability of spawning futures.
-    //!
-    //! # Examples
-    //!
-    //! ```rust
-    //! # extern crate tokio;
-    //! # extern crate futures;
-    //! # use tokio::executor::thread_pool::ThreadPool;
-    //! use futures::future::{Future, lazy};
-    //!
-    //! # pub fn main() {
-    //! // Create a thread pool with default configuration values
-    //! let thread_pool = ThreadPool::new();
-    //!
-    //! thread_pool.spawn(lazy(|| {
-    //!     println!("called from a worker thread");
-    //!     Ok(())
-    //! }));
-    //!
-    //! // Gracefully shutdown the threadpool
-    //! thread_pool.shutdown().wait().unwrap();
-    //! # }
-    //! ```
-    //!
-    //! [`ThreadPool`]: struct.ThreadPool.html
-    //! [`ThreadPool::new`]: struct.ThreadPool.html#method.new
-    //! [`ThreadPool::sender`]: struct.ThreadPool.html#method.sender
-    //! [`spawn`]: struct.ThreadPool.html#method.spawn
-    //! [`Builder::new`]: struct.Builder.html#method.new
-    //! [`Runtime`]: ../../runtime/struct.Runtime.html
-
     pub use tokio_threadpool::{
         Builder,
         Sender,
