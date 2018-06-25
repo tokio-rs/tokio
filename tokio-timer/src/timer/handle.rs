@@ -33,6 +33,7 @@ thread_local!(static CURRENT_TIMER: RefCell<Option<Handle>> = RefCell::new(None)
 /// This function panics if there already is a default timer set.
 ///
 /// [`Delay`]: ../struct.Delay.html
+/// [`Delay::new`]: ../struct.Delay.html#method.new
 pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where F: FnOnce(&mut Enter) -> R
 {

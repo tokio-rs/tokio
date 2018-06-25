@@ -104,7 +104,7 @@ pub mod length_delimited {
     //! [`FramedRead`] adapts an [`AsyncRead`] into a `Stream` of [`BytesMut`],
     //! such that each yielded [`BytesMut`] value contains the contents of an
     //! entire frame. There are many configuration parameters enabling
-    //! [`FrameRead`] to handle a wide range of protocols. Here are some
+    //! [`FramedRead`] to handle a wide range of protocols. Here are some
     //! examples that will cover the various options at a high level.
     //!
     //! ## Example 1

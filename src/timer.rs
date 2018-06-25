@@ -76,6 +76,9 @@
 //! [runtime]: ../runtime/struct.Runtime.html
 //! [tokio-timer]: https://docs.rs/tokio-timer
 //! [ext]: ../util/trait.FutureExt.html#method.deadline
+//! [Deadline]: struct.Deadline.html
+//! [Delay]: struct.Delay.html
+//! [Interval]: struct.Interval.html
 
 pub use tokio_timer::{
     Deadline,

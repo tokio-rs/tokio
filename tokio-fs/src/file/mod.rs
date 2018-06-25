@@ -190,7 +190,9 @@ impl File {
     ///
     /// # Panics
     ///
-    /// This function will panic if [`shutdown`] has been called.
+    /// This function will panic if `shutdown` has been called.
+    ///
+    /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
     pub fn into_std(mut self) -> StdFile {
         self.std.take().expect("`File` instance already shutdown")
     }
