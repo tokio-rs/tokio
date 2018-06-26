@@ -6,7 +6,6 @@ use std::error::Error;
 use std::fmt;
 
 /// Error raised by `blocking`.
-#[derive(Debug)]
 pub struct BlockingError {
     _p: (),
 }
@@ -153,6 +152,14 @@ where F: FnOnce() -> T,
 impl fmt::Display for BlockingError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}", self.description())
+    }
+}
+
+impl fmt::Debug for BlockingError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("BlockingError")
+            .field("reason", &self.description())
+            .finish()
     }
 }
 
