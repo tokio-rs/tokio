@@ -17,7 +17,7 @@ appveyor = { repository = "alexcrichton/tokio-signal" }
 
 [dependencies]
 futures = "0.1.11"
-mio = "0.6.5"
+mio = "0.6.14"
 tokio-reactor = "0.1.0"
 tokio-executor = "0.1.0"
 tokio-io = "0.1"
