@@ -149,4 +149,4 @@ pub use builder::Builder;
 pub use sender::Sender;
 pub use shutdown::Shutdown;
 pub use thread_pool::ThreadPool;
-pub use worker::Worker;
+pub use worker::{Worker, WorkerId};
