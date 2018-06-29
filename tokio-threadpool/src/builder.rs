@@ -41,7 +41,6 @@ use futures2;
 /// use std::time::Duration;
 ///
 /// # pub fn main() {
-/// // Create a thread pool with default configuration values
 /// let thread_pool = Builder::new()
 ///     .pool_size(4)
 ///     .keep_alive(Some(Duration::from_secs(30)))
@@ -86,7 +85,6 @@ impl Builder {
     /// use std::time::Duration;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .pool_size(4)
     ///     .keep_alive(Some(Duration::from_secs(30)))
@@ -131,7 +129,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .pool_size(4)
     ///     .build();
@@ -164,7 +161,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .max_blocking(200)
     ///     .build();
@@ -196,7 +192,6 @@ impl Builder {
     /// use std::time::Duration;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .keep_alive(Some(Duration::from_secs(30)))
     ///     .build();
@@ -224,7 +219,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .name_prefix("my-pool-")
     ///     .build();
@@ -251,7 +245,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .stack_size(32 * 1024)
     ///     .build();
@@ -265,7 +258,7 @@ impl Builder {
     /// Execute function `f` on each worker thread.
     ///
     /// This function is provided a handle to the worker and is expected to call
-    /// `Worker::run`, otherwise the worker thread will shutdown without doing
+    /// [`Worker::run`], otherwise the worker thread will shutdown without doing
     /// any work.
     ///
     /// # Examples
@@ -276,7 +269,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .around_worker(|worker, _| {
     ///         println!("worker is starting up");
@@ -286,6 +278,8 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
+    ///
+    /// [`Worker::run`]: struct.Worker.html#method.run
     pub fn around_worker<F>(&mut self, f: F) -> &mut Self
         where F: Fn(&Worker, &mut Enter) + Send + Sync + 'static
     {
@@ -306,7 +300,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .after_start(|| {
     ///         println!("thread started");
@@ -333,7 +326,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .before_stop(|| {
     ///         println!("thread stopping");
@@ -362,7 +354,6 @@ impl Builder {
     /// # fn decorate<F>(f: F) -> F { f }
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .custom_park(|_| {
     ///         use tokio_threadpool::park::DefaultPark;
@@ -402,7 +393,6 @@ impl Builder {
     /// # use tokio_threadpool::Builder;
     ///
     /// # pub fn main() {
-    /// // Create a thread pool with default configuration values
     /// let thread_pool = Builder::new()
     ///     .build();
     /// # }
