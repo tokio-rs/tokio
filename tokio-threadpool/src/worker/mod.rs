@@ -70,7 +70,7 @@ struct CurrentTask {
     can_block: Cell<CanBlock>,
 }
 
-/// Identifiers a thread pool worker.
+/// Identifies a thread pool worker.
 ///
 /// This identifier is unique scoped by the thread pool. It is possible that
 /// different thread pool instances share worker identifier values.
