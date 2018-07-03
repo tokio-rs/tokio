@@ -29,8 +29,12 @@ use std::time::{Duration, Instant};
 
 /// Thread worker
 ///
-/// This is passed to the `around_worker` callback set on `Builder`. This
-/// callback is only expected to call `run` on it.
+/// This is passed to the [`around_worker`] callback set on [`Builder`]. This
+/// callback is only expected to call [`run`] on it.
+///
+/// [`Builder`]: struct.Builder.html
+/// [`around_worker`]: struct.Builder.html#method.around_worker
+/// [`run`]: struct.Worker.html#method.run
 #[derive(Debug)]
 pub struct Worker {
     // Shared scheduler data
