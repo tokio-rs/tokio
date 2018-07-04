@@ -79,6 +79,20 @@ impl super::Executor for DefaultExecutor {
             }
         })
     }
+
+    fn status(&self) -> Result<(), SpawnError> {
+        EXECUTOR.with(|current_executor| {
+            match current_executor.get() {
+                Some(executor) => {
+                    let executor = unsafe { &mut *executor };
+                    executor.status()
+                }
+                None => {
+                    Err(SpawnError::shutdown())
+                }
+            }
+        })
+    }
 }
 
 // ===== global spawn fns =====
