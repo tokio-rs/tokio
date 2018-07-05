@@ -1,3 +1,8 @@
+# 0.1.5 (July 3, 2018)
+
+* Fix race condition bug when threads are woken up (#459).
+* Improve `BlockingError` message (#451).
+
 # 0.1.4 (June 6, 2018)
 
 * Fix bug that can occur with multiple pools in a process (#375).
