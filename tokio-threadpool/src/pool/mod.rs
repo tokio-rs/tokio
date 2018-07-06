@@ -21,13 +21,14 @@ use worker::{self, Worker, WorkerId};
 use futures::Poll;
 use futures::task::AtomicTask;
 
-use std::cell::UnsafeCell;
-use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
+use std::cell::Cell;
+use std::num::Wrapping;
+use std::sync::atomic::Ordering::{Acquire, AcqRel};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand;
 
 #[derive(Debug)]
 pub(crate) struct Pool {
@@ -49,9 +50,6 @@ pub(crate) struct Pool {
     // This is only used to know when to single `shutdown_task` once the
     // shutdown process has completed.
     pub num_workers: AtomicUsize,
-
-    // Used to generate a thread local RNG seed
-    pub next_thread_id: AtomicUsize,
 
     // Worker state
     //
@@ -112,7 +110,6 @@ impl Pool {
             state: AtomicUsize::new(State::new().into()),
             sleep_stack: worker::Stack::new(),
             num_workers: AtomicUsize::new(0),
-            next_thread_id: AtomicUsize::new(0),
             workers,
             backup,
             backup_stack,
@@ -518,39 +515,25 @@ impl Pool {
 
     /// Generates a random number
     ///
-    /// Uses a thread-local seeded XorShift.
+    /// Uses a thread-local random number generator based on XorShift.
     pub fn rand_usize(&self) -> usize {
-        // Use a thread-local random number generator. If the thread does not
-        // have one yet, then seed a new one
-        thread_local!(static THREAD_RNG_KEY: UnsafeCell<Option<XorShiftRng>> = UnsafeCell::new(None));
-
-        THREAD_RNG_KEY.with(|t| {
-            #[cfg(target_pointer_width = "32")]
-            fn new_rng(thread_id: usize) -> XorShiftRng {
-                XorShiftRng::from_seed([
-                    thread_id as u32,
-                    0x00000000,
-                    0xa8a7d469,
-                    0x97830e05])
+        thread_local! {
+            static RNG: Cell<Wrapping<u32>> = {
+                // The initial seed must be non-zero.
+                let init = rand::random::<u32>() | 1;
+                Cell::new(Wrapping(init))
             }
+        }
 
-            #[cfg(target_pointer_width = "64")]
-            fn new_rng(thread_id: usize) -> XorShiftRng {
-                XorShiftRng::from_seed([
-                    thread_id as u32,
-                    (thread_id >> 32) as u32,
-                    0xa8a7d469,
-                    0x97830e05])
-            }
-
-            let thread_id = self.next_thread_id.fetch_add(1, Relaxed);
-            let rng = unsafe { &mut *t.get() };
-
-            if rng.is_none() {
-                *rng = Some(new_rng(thread_id));
-            }
-
-            rng.as_mut().unwrap().next_u32() as usize
+        RNG.with(|rng| {
+            // This is the 32-bit variant of Xorshift.
+            // https://en.wikipedia.org/wiki/Xorshift
+            let mut x = rng.get();
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            rng.set(x);
+            x.0 as usize
         })
     }
 }
