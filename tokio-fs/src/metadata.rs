@@ -6,7 +6,7 @@ use std::fs::{self, Metadata};
 use std::io;
 use std::path::Path;
 
-/// Queries the file system metadata for a path
+/// Queries the file system metadata for a path.
 pub fn metadata<P>(path: P) -> MetadataFuture<P>
 where
     P: AsRef<Path> + Send + 'static,
@@ -14,7 +14,7 @@ where
     MetadataFuture::new(path)
 }
 
-/// Future returned by `metadata`
+/// Future returned by `metadata`.
 #[derive(Debug)]
 pub struct MetadataFuture<P>
 where
