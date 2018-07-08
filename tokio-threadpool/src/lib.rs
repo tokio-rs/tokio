@@ -22,19 +22,7 @@
 //! coordination. The thread pool attempts to make as much progress as possible
 //! without communicating across threads.
 //!
-//! # Crate layout
-//!
-//! The primary type, `Pool`, holds the majority of a thread pool's state,
-//! including the state for each worker. Each worker's state is maintained in an
-//! instance of `worker::Entry`.
-//!
-//! `Worker` contains the logic that runs on each worker thread. It holds an
-//! `Arc` to `Pool` and is able to access its state from `Pool`.
-//!
-//! `Task` is a harness around an individual future. It manages polling and
-//! scheduling that future.
-//!
-//! # Worker overview
+//! ## Worker overview
 //!
 //! Each worker has two queues: a deque and a mpsc channel. The deque is the
 //! primary queue for tasks that are scheduled to run on the worker thread. Tasks
@@ -53,7 +41,7 @@
 //! When the worker detects that the pool has been shut down, it exits the loop,
 //! cleans up its state, and shuts the thread down.
 //!
-//! # Thread pool initialization
+//! ## Thread pool initialization
 //!
 //! Note, users normally will use the threadpool created by a [`runtime`].
 //!
@@ -61,7 +49,7 @@
 //! spawned, the pool first checks if there are enough active worker threads. If
 //! not, a new worker thread is spawned.
 //!
-//! # Spawning futures
+//! ## Spawning futures
 //!
 //! The spawning behavior depends on whether a future was spawned from within a
 //! worker or thread or if it was spawned from an external handle.
@@ -73,7 +61,32 @@
 //! When spawning a future while on a worker thread, the task is pushed onto the
 //! back of the current worker's deque.
 //!
-//! # Sleeping workers
+//! ## Blocking annotation strategy
+//!
+//! The [`blocking`] function is used to annotate a section of code that
+//! performs a blocking operation, either by issuing a blocking syscall or
+//! performing any long running CPU-bound computation.
+//!
+//! The strategy for handling blocking closures is to hand off the worker to a
+//! new thread. This implies handing off the `deque` and `mpsc`. Once this is
+//! done, the new thread continues to process the work queue and the original
+//! thread is able to block. Once it finishes processing the blocking future, the
+//! thread has no additional work and is inserted into the backup pool. This
+//! makes it available to other workers that encounter a [`blocking`] call.
+//!
+//! ## Implementaton notes
+//!
+//! The primary type, `Pool`, holds the majority of a thread pool's state,
+//! including the state for each worker. Each worker's state is maintained in an
+//! instance of `worker::Entry`.
+//!
+//! `Worker` contains the logic that runs on each worker thread. It holds an
+//! `Arc` to `Pool` and is able to access its state from `Pool`.
+//!
+//! `Task` is a harness around an individual future. It manages polling and
+//! scheduling that future.
+//!
+//! ### Sleeping workers
 //!
 //! Sleeping workers are tracked using a [treiber stack]. This results in the
 //! thread that most recently went to sleep getting woken up first. When the pool
@@ -84,7 +97,7 @@
 //! This is how injecting timers and other functionality into the thread pool is
 //! done.
 //!
-//! # Notifying workers
+//! ### Notifying workers
 //!
 //! When there is work to be done, workers must be notified. However, notifying a
 //! worker requires cross thread coordination. Ideally, a worker would only be
@@ -93,8 +106,8 @@
 //!
 //! The two cases when a worker might need to be notified are:
 //!
-//! 1) A task is externally submitted to a worker via the mpsc channel.
-//! 2) A worker has a back log of work and needs other workers to steal from it.
+//! 1. A task is externally submitted to a worker via the mpsc channel.
+//! 2. A worker has a back log of work and needs other workers to steal from it.
 //!
 //! In the first case, the worker will always be notified. However, it could be
 //! possible to avoid the notification if the mpsc channel has two or greater
@@ -109,15 +122,7 @@
 //! Also, whenever a worker is woken up via a signal and it does find work, it,
 //! in turn, will try to wake up a new worker.
 //!
-//! # `blocking`
-//!
-//! The strategy for handling blocking closures is to hand off the worker to a
-//! new thread. This implies handing off the `deque` and `mpsc`. Once this is
-//! done, the new thread continues to process the work queue and the original
-//! thread is able to block. Once it finishes processing the blocking future, the
-//! thread has no additional work and is inserted into the backup pool. This
-//! makes it available to other workers that encounter a `blocking` call.
-//!
+//! [`blocking`]: fn.blocking.html
 //! [`runtime`]: https://docs.rs/tokio/0.1/tokio/runtime/
 //! [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
 
