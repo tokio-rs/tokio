@@ -6,7 +6,7 @@
 //! an executor is called a "task".
 //!
 //! The executor is responsible for ensuring that [`Future::poll`] is called
-//! whenever the task is [notified]. Notification happens when the internal
+//! whenever the task is notified. Notification happens when the internal
 //! state of a task transitions from "not ready" to ready. For example, a socket
 //! might have received data and a call to `read` will now be able to succeed.
 //!
