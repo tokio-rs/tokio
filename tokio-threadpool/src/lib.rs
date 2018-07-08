@@ -3,8 +3,13 @@
 
 //! A work-stealing based thread pool for executing futures.
 //!
-//! The Tokio thread pool is designed to scheduled futures in Tokio based
-//! applications. The thread pool structure manages two sets of threads:
+//! The Tokio thread pool supports scheduling futures and processing them on
+//! multiple CPU cores. It is optimized for the primary Tokio use case of many
+//! independent tasks with limited computation and with most tasks waiting on
+//! I/O. Usually, users will not create a `ThreadPool` instance directly, but
+//! will use one via a [`runtime`].
+//!
+//! The `TheadPool` structure manages two sets of threads:
 //!
 //! * Worker threads.
 //! * Backup threads.
@@ -50,6 +55,8 @@
 //!
 //! # Thread pool initialization
 //!
+//! Note, users normally will use the threadpool created by a [`runtime`].
+//!
 //! By default, no threads are spawned on creation. Instead, when new futures are
 //! spawned, the pool first checks if there are enough active worker threads. If
 //! not, a new worker thread is spawned.
@@ -76,8 +83,6 @@
 //! the user of the thread pool to customize the work that is performed to sleep.
 //! This is how injecting timers and other functionality into the thread pool is
 //! done.
-//!
-//! [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
 //!
 //! # Notifying workers
 //!
@@ -112,6 +117,10 @@
 //! thread is able to block. Once it finishes processing the blocking future, the
 //! thread has no additional work and is inserted into the backup pool. This
 //! makes it available to other workers that encounter a `blocking` call.
+//!
+//! [`runtime`]: https://docs.rs/tokio/0.1/tokio/runtime/
+//! [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
+
 
 extern crate tokio_executor;
 
