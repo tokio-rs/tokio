@@ -116,6 +116,7 @@
 extern crate tokio_executor;
 
 extern crate crossbeam_deque as deque;
+extern crate crossbeam_utils;
 #[macro_use]
 extern crate futures;
 extern crate num_cpus;
