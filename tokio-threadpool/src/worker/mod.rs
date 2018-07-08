@@ -25,7 +25,8 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::thread;
+use std::time::Instant;
 
 /// Thread worker
 ///
@@ -216,7 +217,7 @@ impl Worker {
     ///
     /// This function blocks until the worker is shutting down.
     pub fn run(&self) {
-        const LIGHT_SLEEP_INTERVAL: usize = 32;
+        const MAX_SPINS: usize = 50;
 
         // Get the notifier.
         let notify = Arc::new(Notifier {
@@ -226,7 +227,6 @@ impl Worker {
 
         let mut first = true;
         let mut spin_cnt = 0;
-        let mut tick = 0;
 
         while self.check_run_state(first) {
             first = false;
@@ -242,31 +242,27 @@ impl Worker {
                     return;
                 }
 
-                if tick % LIGHT_SLEEP_INTERVAL == 0 {
-                    self.sleep_light();
-                }
-
-                tick = tick.wrapping_add(1);
-                spin_cnt = 0;
-
                 // As long as there is work, keep looping.
+                spin_cnt = 0;
                 continue;
             }
 
             if !consistent {
+                thread::yield_now();
                 spin_cnt = 0;
                 continue;
             }
 
-            // Starting to get sleeeeepy
-            if spin_cnt < 61 {
-                spin_cnt += 1;
-            } else {
-                tick = 0;
+            spin_cnt += 1;
 
-                if !self.sleep() {
-                    return;
-                }
+            if spin_cnt < MAX_SPINS {
+                thread::yield_now();
+                continue;
+            }
+
+            // Starting to get sleeeeepy
+            if !self.sleep() {
+                return;
             }
 
             // If there still isn't any work to do, shutdown the worker?
@@ -807,17 +803,6 @@ impl Worker {
                     }
                 }
             }
-        }
-    }
-
-    /// This doesn't actually put the thread to sleep. It calls
-    /// `park.park_timeout` with a duration of 0. This allows the park
-    /// implementation to perform any work that might be done on an interval.
-    fn sleep_light(&self) {
-        unsafe {
-            (*self.entry().park.get())
-                .park_timeout(Duration::from_millis(0))
-                .unwrap();
         }
     }
 
