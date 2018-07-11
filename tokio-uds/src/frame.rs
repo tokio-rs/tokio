@@ -40,7 +40,7 @@ impl<C: Decoder> Stream for UnixDatagramFramed<C> {
     type Item = (C::Item, SocketAddr);
     type Error = C::Error;
 
-    fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.rd.reserve(INITIAL_RD_CAPACITY);
 
         let (n, addr) = unsafe {
@@ -146,10 +146,5 @@ impl<C> UnixDatagramFramed<C> {
     /// with.
     pub fn get_mut(&mut self) -> &mut UnixDatagram {
         &mut self.socket
-    }
-
-    /// Consumes the `Framed`, returning its underlying I/O stream.
-    pub fn into_inner(self) -> UnixDatagram {
-        self.socket
     }
 }
