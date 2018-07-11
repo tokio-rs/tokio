@@ -220,6 +220,7 @@ impl<P: Park> CurrentThread<P> {
                 sender: spawn_sender,
                 num_futures: num_futures,
                 notify: notify,
+                shut_down: Cell::new(false),
             },
             spawn_receiver: spawn_receiver,
         }
@@ -556,6 +557,7 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 pub struct Handle {
     sender: mpsc::Sender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
     num_futures: Arc<atomic::AtomicUsize>,
+    shut_down: Cell<bool>,
     notify: executor::NotifyHandle,
 }
 
@@ -563,6 +565,7 @@ pub struct Handle {
 impl fmt::Debug for Handle {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Handle")
+            .field("shut_down", &self.shut_down.get())
             .finish()
     }
 }
@@ -578,11 +581,19 @@ impl Handle {
     where
         F: Future<Item = (), Error = ()> + Send + 'static,
     {
+        if self.shut_down.get() {
+            return Err(SpawnError::shutdown());
+        }
+
         // NOTE: += 2 since LSB is the shutdown bit
         let pending = self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
         if pending % 2 == 1 {
             // Bring the count back so we still know when the Runtime is idle.
             self.num_futures.fetch_sub(2, atomic::Ordering::SeqCst);
+
+            // Once the Runtime is shutting down, we know it won't come back.
+            self.shut_down.set(true);
+
             return Err(SpawnError::shutdown());
         }
 
