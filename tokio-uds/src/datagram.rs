@@ -104,6 +104,7 @@ impl UnixDatagram {
         let r = self.io.get_ref().recv_from(buf);
         if is_wouldblock(&r) {
             self.io.clear_read_ready(Ready::readable())?;
+            return Ok(Async::NotReady);
         }
         r.map(Async::Ready)
     }
@@ -118,6 +119,7 @@ impl UnixDatagram {
         let r = self.io.get_ref().recv(buf);
         if is_wouldblock(&r) {
             self.io.clear_read_ready(Ready::readable())?;
+            return Ok(Async::NotReady);
         }
         r.map(Async::Ready)
     }
