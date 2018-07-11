@@ -3,8 +3,6 @@ use super::{Executor, Enter, SpawnError};
 use futures::Future;
 
 use std::cell::Cell;
-use std::marker::PhantomData;
-use std::rc::Rc;
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -21,8 +19,7 @@ use futures2;
 /// variable and is set using `tokio_executor::with_default`
 #[derive(Debug, Clone)]
 pub struct DefaultExecutor {
-    // Prevent the handle from moving across threads.
-    _p: PhantomData<Rc<()>>,
+    _dummy: (),
 }
 
 impl DefaultExecutor {
@@ -34,9 +31,13 @@ impl DefaultExecutor {
     /// the default **at the time `spawn` is called**. This enables
     /// `DefaultExecutor::current()` to be called before an execution context is
     /// setup, then passed **into** an execution context before it is used.
+    ///
+    /// This is also true for sending the handle across threads, so calling
+    /// `DefaultExecutor::current()` on thread A and then sending the result to
+    /// thread B will _not_ reference the default executor that was set on thread A.
     pub fn current() -> DefaultExecutor {
         DefaultExecutor {
-            _p: PhantomData,
+            _dummy: (),
         }
     }
 }
@@ -194,4 +195,16 @@ where T: Executor,
 unsafe fn hide_lt<'a>(p: *mut (Executor + 'a)) -> *mut (Executor + 'static) {
     use std::mem;
     mem::transmute(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DefaultExecutor;
+
+    #[test]
+    fn default_executor_is_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<DefaultExecutor>();
+    }
 }
