@@ -25,10 +25,10 @@ pub(crate) struct WorkerEntry {
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    deque: deque::Deque<Arc<Task>>,
+    worker: deque::Worker<Arc<Task>>,
 
     // Stealer half of deque
-    steal: deque::Stealer<Arc<Task>>,
+    stealer: deque::Stealer<Arc<Task>>,
 
     // Thread parker
     pub park: UnsafeCell<BoxPark>,
@@ -42,14 +42,13 @@ pub(crate) struct WorkerEntry {
 
 impl WorkerEntry {
     pub fn new(park: BoxPark, unpark: BoxUnpark) -> Self {
-        let w = deque::Deque::new();
-        let s = w.stealer();
+        let (w, s) = deque::fifo();
 
         WorkerEntry {
             state: AtomicUsize::new(State::default().into()),
             next_sleeper: UnsafeCell::new(0),
-            deque: w,
-            steal: s,
+            worker: w,
+            stealer: s,
             inbound: Queue::new(),
             park: UnsafeCell::new(park),
             unpark,
@@ -188,23 +187,23 @@ impl WorkerEntry {
     ///
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
-    pub fn pop_task(&self) -> deque::Steal<Arc<Task>> {
-        self.deque.steal()
+    pub fn pop_task(&self) -> Option<Arc<Task>> {
+        self.worker.pop()
     }
 
     /// Steal a task
     ///
     /// This is called by *other* workers to steal a task for processing. This
     /// function is `Sync`.
-    pub fn steal_task(&self) -> deque::Steal<Arc<Task>> {
-        self.steal.steal()
+    pub fn steal_task(&self) -> Option<Arc<Task>> {
+        self.stealer.steal()
     }
 
     /// Drain (and drop) all tasks that are queued for work.
     ///
     /// This is called when the pool is shutting down.
     pub fn drain_tasks(&self) {
-        while let Some(_) = self.deque.pop() {
+        while let Some(_) = self.worker.pop() {
         }
     }
 
@@ -215,7 +214,7 @@ impl WorkerEntry {
 
     #[inline]
     pub fn push_internal(&self, task: Arc<Task>) {
-        self.deque.push(task);
+        self.worker.push(task);
     }
 
     #[inline]
@@ -239,8 +238,8 @@ impl fmt::Debug for WorkerEntry {
         fmt.debug_struct("WorkerEntry")
             .field("state", &self.state.load(Relaxed))
             .field("next_sleeper", &"UnsafeCell<usize>")
-            .field("deque", &self.deque)
-            .field("steal", &self.steal)
+            .field("worker", &self.worker)
+            .field("stealer", &self.stealer)
             .field("park", &"UnsafeCell<BoxPark>")
             .field("unpark", &"BoxUnpark")
             .field("inbound", &self.inbound)
