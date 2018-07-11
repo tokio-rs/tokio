@@ -100,6 +100,40 @@ fn runtime_single_threaded_block_on_all() {
 }
 
 #[test]
+fn runtime_single_threaded_racy_spawn() {
+    let (trigger, exit) = futures::sync::oneshot::channel();
+    let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
+    let jh = ::std::thread::spawn(move || {
+        let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+        handle_tx.send(rt.handle()).unwrap();
+
+        // don't exit until we are told to
+        rt.block_on(exit.map_err(|_| ())).unwrap();
+
+        // run until all spawned futures (incl. the "exit" signal future) have completed.
+        rt.run().unwrap();
+    });
+
+    let (tx, rx) = futures::sync::oneshot::channel();
+
+    let handle = handle_rx.recv().unwrap();
+    handle
+        .spawn(futures::future::lazy(move || {
+            tx.send(()).unwrap();
+            Ok(())
+        }))
+        .unwrap();
+
+    // signal runtime thread to exit
+    trigger.send(()).unwrap();
+
+    // wait for runtime thread to exit
+    jh.join().unwrap();
+
+    assert_eq!(rx.wait().unwrap(), ());
+}
+
+#[test]
 fn runtime_multi_threaded() {
     let _ = env_logger::init();
 

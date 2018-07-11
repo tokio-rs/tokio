@@ -41,8 +41,8 @@ use futures::future::{Executor, ExecuteError, ExecuteErrorKind};
 use std::fmt;
 use std::cell::Cell;
 use std::rc::Rc;
+use std::sync::{atomic, mpsc, Arc};
 use std::time::{Duration, Instant};
-use std::sync::mpsc;
 
 #[cfg(feature = "unstable-futures")]
 use futures2;
@@ -52,8 +52,11 @@ pub struct CurrentThread<P: Park = ParkThread> {
     /// Execute futures and receive unpark notifications.
     scheduler: Scheduler<P::Unpark>,
 
-    /// Current number of futures being executed
-    num_futures: usize,
+    /// Current number of futures being executed.
+    ///
+    /// The LSB is used to indicate that the runtime is preparing to shut down.
+    /// Thus, to get the actual number of pending futures, `>>1`.
+    num_futures: Arc<atomic::AtomicUsize>,
 
     /// Thread park handle
     park: P,
@@ -124,11 +127,11 @@ pub struct BlockError<T> {
 /// This is mostly split out to make the borrow checker happy.
 struct Borrow<'a, U: 'a> {
     scheduler: &'a mut Scheduler<U>,
-    num_futures: &'a mut usize,
+    num_futures: &'a atomic::AtomicUsize,
 }
 
 trait SpawnLocal {
-    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>);
+    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>, already_counted: bool);
 }
 
 struct CurrentRunner {
@@ -207,11 +210,17 @@ impl<P: Park> CurrentThread<P> {
         let scheduler = Scheduler::new(unpark);
         let notify = scheduler.notify();
 
+        let num_futures = Arc::new(atomic::AtomicUsize::new(0));
+
         CurrentThread {
             scheduler: scheduler,
-            num_futures: 0,
+            num_futures: num_futures.clone(),
             park,
-            spawn_handle: Handle { sender: spawn_sender, notify: notify },
+            spawn_handle: Handle {
+                sender: spawn_sender,
+                num_futures: num_futures,
+                notify: notify,
+            },
             spawn_receiver: spawn_receiver,
         }
     }
@@ -219,8 +228,11 @@ impl<P: Park> CurrentThread<P> {
     /// Returns `true` if the executor is currently idle.
     ///
     /// An idle executor is defined by not currently having any spawned tasks.
+    ///
+    /// Note that this method is inherently racy -- if a future is spawned from a remote `Handle`,
+    /// this method may return `true` even though there are more futures to be executed.
     pub fn is_idle(&self) -> bool {
-        self.num_futures == 0
+        self.num_futures.load(atomic::Ordering::SeqCst) <= 1
     }
 
     /// Spawn the future on the executor.
@@ -229,7 +241,7 @@ impl<P: Park> CurrentThread<P> {
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
     where F: Future<Item = (), Error = ()> + 'static,
     {
-        self.borrow().spawn_local(Box::new(future));
+        self.borrow().spawn_local(Box::new(future), false);
         self
     }
 
@@ -305,7 +317,7 @@ impl<P: Park> CurrentThread<P> {
     fn borrow(&mut self) -> Borrow<P::Unpark> {
         Borrow {
             scheduler: &mut self.scheduler,
-            num_futures: &mut self.num_futures,
+            num_futures: &*self.num_futures,
         }
     }
 
@@ -318,11 +330,30 @@ impl<P: Park> CurrentThread<P> {
     }
 }
 
+impl<P: Park> Drop for CurrentThread<P> {
+    fn drop(&mut self) {
+        // Signal to Handles that no more futures can be spawned by setting LSB.
+        //
+        // NOTE: this isn't technically necessary since the send on the mpsc will fail once the
+        // receiver is dropped, but it's useful to illustrate how clean shutdown will be
+        // implemented (e.g., by setting the LSB).
+        let pending = self.num_futures.fetch_add(1, atomic::Ordering::SeqCst);
+
+        // TODO: We currently ignore any pending futures at the time we shut down.
+        //
+        // The "proper" fix for this is to have an explicit shutdown phase (`shutdown_on_idle`)
+        // which sets LSB (as above) do make Handle::spawn stop working, and then runs until
+        // num_futures.load() == 1.
+        let _ = pending;
+    }
+}
+
 impl tokio_executor::Executor for CurrentThread {
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), SpawnError>
-    {
-        self.borrow().spawn_local(future);
+    fn spawn(
+        &mut self,
+        future: Box<Future<Item = (), Error = ()> + Send>,
+    ) -> Result<(), SpawnError> {
+        self.borrow().spawn_local(future, false);
         Ok(())
     }
 
@@ -338,7 +369,7 @@ impl<P: Park> fmt::Debug for CurrentThread<P> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("CurrentThread")
             .field("scheduler", &self.scheduler)
-            .field("num_futures", &self.num_futures)
+            .field("num_futures", &self.num_futures.load(atomic::Ordering::SeqCst))
             .finish()
     }
 }
@@ -352,7 +383,7 @@ impl<'a, P: Park> Entered<'a, P> {
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
     where F: Future<Item = (), Error = ()> + 'static,
     {
-        self.executor.borrow().spawn_local(Box::new(future));
+        self.executor.borrow().spawn_local(Box::new(future), false);
         self
     }
 
@@ -493,13 +524,13 @@ impl<'a, P: Park> Entered<'a, P> {
         let (mut borrow, spawn_receiver) = (
             Borrow {
                 scheduler: &mut self.executor.scheduler,
-                num_futures: &mut self.executor.num_futures,
+                num_futures: &*self.executor.num_futures,
             },
             &mut self.executor.spawn_receiver,
         );
 
         while let Ok(future) = spawn_receiver.try_recv() {
-            borrow.spawn_local(future);
+            borrow.spawn_local(future, true);
         }
 
         // After any pending futures were scheduled, do the actual tick
@@ -524,6 +555,7 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 #[derive(Clone)]
 pub struct Handle {
     sender: mpsc::Sender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    num_futures: Arc<atomic::AtomicUsize>,
     notify: executor::NotifyHandle,
 }
 
@@ -543,8 +575,19 @@ impl Handle {
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
     pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
-    where F: Future<Item = (), Error = ()> + Send + 'static {
-        self.sender.send(Box::new(future))
+    where
+        F: Future<Item = (), Error = ()> + Send + 'static,
+    {
+        // NOTE: += 2 since LSB is the shutdown bit
+        let pending = self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
+        if pending % 2 == 1 {
+            // Bring the count back so we still know when the Runtime is idle.
+            self.num_futures.fetch_sub(2, atomic::Ordering::SeqCst);
+            return Err(SpawnError::shutdown());
+        }
+
+        self.sender
+            .send(Box::new(future))
             .expect("CurrentThread does not exist anymore");
         // use 0 for the id, CurrentThread does not make use of it
         self.notify.notify(0);
@@ -575,7 +618,7 @@ impl TaskExecutor {
         CURRENT.with(|current| {
             match current.spawn.get() {
                 Some(spawn) => {
-                    unsafe { (*spawn).spawn_local(future) };
+                    unsafe { (*spawn).spawn_local(future, false) };
                     Ok(())
                 }
                 None => {
@@ -618,7 +661,7 @@ where F: Future<Item = (), Error = ()> + 'static
         CURRENT.with(|current| {
             match current.spawn.get() {
                 Some(spawn) => {
-                    unsafe { (*spawn).spawn_local(Box::new(future)) };
+                    unsafe { (*spawn).spawn_local(Box::new(future), false) };
                     Ok(())
                 }
                 None => {
@@ -644,8 +687,12 @@ impl<'a, U: Unpark> Borrow<'a, U> {
 }
 
 impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
-    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>) {
-        *self.num_futures += 1;
+    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>, already_counted: bool) {
+        if !already_counted {
+            // NOTE: we have a borrow of the Runtime, so we know that it isn't shut down.
+            // NOTE: += 2 since LSB is the shutdown bit
+            self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
+        }
         self.scheduler.schedule(future);
     }
 }
