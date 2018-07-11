@@ -1,16 +1,29 @@
-//! Asynchronous filesystem manipulation operations (and stdin, stdout, stderr).
+//! Asynchronous file and standard stream adaptation.
 //!
-//! This module contains basic methods and types for manipulating the contents
-//! of the local filesystem from within the context of the Tokio runtime.
+//! This module contains utility methods and adapter types for input/output to
+//! files or standard streams (`Stdin`, `Stdout`, `Stderr`), and
+//! filesystem manipulation, for use within (and only within) a Tokio runtime.
 //!
-//! Tasks running on the Tokio runtime are expected to be asynchronous, i.e.,
-//! they will not block the thread of execution. Filesystem operations do not
-//! satisfy this requirement. In order to perform filesystem operations
-//! asynchronously, this library uses the [`blocking`][blocking] annotation
-//! to signal to the runtime that a blocking operation is being performed. This
-//! allows the runtime to compensate.
+//! Tasks run by *worker* threads should not block, as this could delay
+//! servicing reactor events. Portable filesystem operations are blocking,
+//! however. This module offers adapters which use a [`blocking`] annotation
+//! to inform the runtime that a blocking operation is required. When
+//! necessary, this allows the runtime to convert the current thread from a
+//! *worker* to a *backup* thread, where blocking is acceptable.
 //!
-//! [blocking]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool/fn.blocking.html
+//! ## Usage
+//!
+//! Where possible, users should prefer the provided asynchronous-specific
+//! traits such as [`AsyncRead`], or methods returning a `Future` or `Poll`
+//! type. Adaptions also extend to traits like `std::io::Read` where methods
+//! return `std::io::Result`.  Be warned that these adapted methods may return
+//! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
+//! to a *backup* thread immediately. See [tokio-threadpool] for more details
+//! of the threading model and [`blocking`].
+//!
+//! [`blocking`]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool/fn.blocking.html
+//! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
+//! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
 #![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.1")]
