@@ -71,21 +71,17 @@ pub use self::runtime::{Runtime, Handle};
 
 use futures::Future;
 
-/// Run the provided future to completion with a runtime running on the current
-/// thread.
+/// Run the provided future to completion using a runtime running on the current thread.
 ///
-/// This creates a new [`Runtime`], and calls [`Runtime::block_on`] with the
-/// provided future, which blocks the current thread until the provided future
-/// completes.
-///
-/// Note that this function will **also** execute any spawned futures on the
-/// current thread, but will **not** block until these other spawned futures
-/// have completed. Once the function returns, any uncompleted futures are
-/// dropped.
-pub fn block_on<F>(future: F) -> Result<F::Item, F::Error>
+/// This first creates a new [`Runtime`], and calls [`Runtime::block_on`] with the provided future,
+/// which blocks the current thread until the provided future completes. It then calls
+/// [`Runtime::run`] to wait for any other spawned futures to resolve.
+pub fn block_on_all<F>(future: F) -> Result<F::Item, F::Error>
 where
     F: Future,
 {
     let mut r = Runtime::new().expect("failed to start runtime on current thread");
-    r.block_on(future)
+    let v = r.block_on(future)?;
+    r.run().expect("failed to resolve remaining futures");
+    Ok(v)
 }
