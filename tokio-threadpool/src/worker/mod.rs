@@ -377,16 +377,13 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     fn try_run_owned_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
-        use deque::Steal::*;
-
         // Poll the internal queue for a task to run
         match self.entry().pop_task() {
-            Data(task) => {
+            Some(task) => {
                 self.run_task(task, notify, sender);
                 true
             }
-            Empty => false,
-            Retry => true,
+            None => false,
         }
     }
 
@@ -394,36 +391,29 @@ impl Worker {
     ///
     /// Returns `true` if work was found
     fn try_steal_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
-        use deque::Steal::*;
-
         debug_assert!(!self.is_blocking.get());
 
         let len = self.inner.workers.len();
         let mut idx = self.inner.rand_usize() % len;
-        let mut found_work = false;
         let start = idx;
 
         loop {
             if idx < len {
-                match self.inner.workers[idx].steal_task() {
-                    Data(task) => {
-                        trace!("stole task");
+                if let Some(task) = self.inner.workers[idx].steal_task() {
+                    trace!("stole task");
 
-                        self.run_task(task, notify, sender);
+                    self.run_task(task, notify, sender);
 
-                        trace!("try_steal_task -- signal_work; self={}; from={}",
-                               self.id.0, idx);
+                    trace!("try_steal_task -- signal_work; self={}; from={}",
+                           self.id.0, idx);
 
-                        // Signal other workers that work is available
-                        //
-                        // TODO: Should this be called here or before
-                        // `run_task`?
-                        self.inner.signal_work(&self.inner);
+                    // Signal other workers that work is available
+                    //
+                    // TODO: Should this be called here or before
+                    // `run_task`?
+                    self.inner.signal_work(&self.inner);
 
-                        return true;
-                    }
-                    Empty => {}
-                    Retry => found_work = true,
+                    return true;
                 }
 
                 idx += 1;
@@ -436,7 +426,7 @@ impl Worker {
             }
         }
 
-        found_work
+        false
     }
 
     fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>, sender: &mut Sender) {
