@@ -4,7 +4,7 @@ use futures::{Future, Poll};
 
 use std::io;
 
-/// Future returned by `File::seek`
+/// Future returned by `File::seek`.
 #[derive(Debug)]
 pub struct SeekFuture {
     inner: Option<File>,
