@@ -74,58 +74,8 @@
 //! thread has no additional work and is inserted into the backup pool. This
 //! makes it available to other workers that encounter a [`blocking`] call.
 //!
-//! ## Implementaton notes
-//!
-//! The primary type, `Pool`, holds the majority of a thread pool's state,
-//! including the state for each worker. Each worker's state is maintained in an
-//! instance of `worker::Entry`.
-//!
-//! `Worker` contains the logic that runs on each worker thread. It holds an
-//! `Arc` to `Pool` and is able to access its state from `Pool`.
-//!
-//! `Task` is a harness around an individual future. It manages polling and
-//! scheduling that future.
-//!
-//! ### Sleeping workers
-//!
-//! Sleeping workers are tracked using a [treiber stack]. This results in the
-//! thread that most recently went to sleep getting woken up first. When the pool
-//! is not under load, this helps threads shutdown faster.
-//!
-//! Sleeping is done by using `tokio_executor::Park` implementations. This allows
-//! the user of the thread pool to customize the work that is performed to sleep.
-//! This is how injecting timers and other functionality into the thread pool is
-//! done.
-//!
-//! ### Notifying workers
-//!
-//! When there is work to be done, workers must be notified. However, notifying a
-//! worker requires cross thread coordination. Ideally, a worker would only be
-//! notified when it is sleeping, but there is no way to know if a worker is
-//! sleeping without cross thread communication.
-//!
-//! The two cases when a worker might need to be notified are:
-//!
-//! 1. A task is externally submitted to a worker via the mpsc channel.
-//! 2. A worker has a back log of work and needs other workers to steal from it.
-//!
-//! In the first case, the worker will always be notified. However, it could be
-//! possible to avoid the notification if the mpsc channel has two or greater
-//! number of tasks *after* the task is submitted. In this case, we are able to
-//! assume that the worker has previously been notified.
-//!
-//! The second case is trickier. Currently, whenever a worker spawns a new future
-//! (pushing it onto its deque) and when it pops a future from its mpsc, it tries
-//! to notify a sleeping worker to wake up and start stealing. This is a lot of
-//! notification and it **might** be possible to reduce it.
-//!
-//! Also, whenever a worker is woken up via a signal and it does find work, it,
-//! in turn, will try to wake up a new worker.
-//!
 //! [`blocking`]: fn.blocking.html
 //! [`runtime`]: https://docs.rs/tokio/0.1/tokio/runtime/
-//! [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
-
 
 extern crate tokio_executor;
 
@@ -140,6 +90,56 @@ extern crate log;
 
 #[cfg(feature = "unstable-futures")]
 extern crate futures2;
+
+// ## Crate layout
+//
+// The primary type, `Pool`, holds the majority of a thread pool's state,
+// including the state for each worker. Each worker's state is maintained in an
+// instance of `worker::Entry`.
+//
+// `Worker` contains the logic that runs on each worker thread. It holds an
+// `Arc` to `Pool` and is able to access its state from `Pool`.
+//
+// `Task` is a harness around an individual future. It manages polling and
+// scheduling that future.
+//
+// ## Sleeping workers
+//
+// Sleeping workers are tracked using a [treiber stack]. This results in the
+// thread that most recently went to sleep getting woken up first. When the pool
+// is not under load, this helps threads shutdown faster.
+//
+// Sleeping is done by using `tokio_executor::Park` implementations. This allows
+// the user of the thread pool to customize the work that is performed to sleep.
+// This is how injecting timers and other functionality into the thread pool is
+// done.
+//
+// ## Notifying workers
+//
+// When there is work to be done, workers must be notified. However, notifying a
+// worker requires cross thread coordination. Ideally, a worker would only be
+// notified when it is sleeping, but there is no way to know if a worker is
+// sleeping without cross thread communication.
+//
+// The two cases when a worker might need to be notified are:
+//
+// 1. A task is externally submitted to a worker via the mpsc channel.
+// 2. A worker has a back log of work and needs other workers to steal from it.
+//
+// In the first case, the worker will always be notified. However, it could be
+// possible to avoid the notification if the mpsc channel has two or greater
+// number of tasks *after* the task is submitted. In this case, we are able to
+// assume that the worker has previously been notified.
+//
+// The second case is trickier. Currently, whenever a worker spawns a new future
+// (pushing it onto its deque) and when it pops a future from its mpsc, it tries
+// to notify a sleeping worker to wake up and start stealing. This is a lot of
+// notification and it **might** be possible to reduce it.
+//
+// Also, whenever a worker is woken up via a signal and it does find work, it,
+// in turn, will try to wake up a new worker.
+//
+// [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
 
 pub mod park;
 
