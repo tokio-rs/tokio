@@ -29,9 +29,8 @@ enum State<A> {
 /// object `A` into the buffer provided.
 ///
 /// In the case of an error the buffer and the object will be discarded, with
-/// the error yielded. In the case of success the object will be destroyed and
-/// the buffer will be returned, with all data read from the stream appended to
-/// the buffer.
+/// the error yielded. In the case of success both the object and the buffer
+/// will be returned, with all data read from the stream appended to the buffer.
 pub fn read_to_end<A>(a: A, buf: Vec<u8>) -> ReadToEnd<A>
     where A: AsyncRead,
 {
