@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 
+use crossbeam_utils::cache_padded::CachePadded;
 use deque;
 
 // TODO: None of the fields should be public
@@ -19,7 +20,7 @@ pub(crate) struct WorkerEntry {
     //
     // The `usize` value is deserialized to a `worker::State` instance. See
     // comments on that type.
-    pub state: AtomicUsize,
+    pub state: CachePadded<AtomicUsize>,
 
     // Next entry in the parked Trieber stack
     next_sleeper: UnsafeCell<usize>,
@@ -45,7 +46,7 @@ impl WorkerEntry {
         let (w, s) = deque::fifo();
 
         WorkerEntry {
-            state: AtomicUsize::new(State::default().into()),
+            state: CachePadded::new(AtomicUsize::new(State::default().into())),
             next_sleeper: UnsafeCell::new(0),
             worker: w,
             stealer: s,

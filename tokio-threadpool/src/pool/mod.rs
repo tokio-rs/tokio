@@ -28,6 +28,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 
+use crossbeam_utils::cache_padded::CachePadded;
 use rand;
 
 #[derive(Debug)]
@@ -40,10 +41,10 @@ pub(crate) struct Pool {
     //
     // The value of this atomic is deserialized into a `pool::State` instance.
     // See comments for that type.
-    pub state: AtomicUsize,
+    pub state: CachePadded<AtomicUsize>,
 
     // Stack tracking sleeping workers.
-    sleep_stack: worker::Stack,
+    sleep_stack: CachePadded<worker::Stack>,
 
     // Number of workers that haven't reached the final state of shutdown
     //
@@ -107,8 +108,8 @@ impl Pool {
         let blocking = Blocking::new(max_blocking);
 
         let ret = Pool {
-            state: AtomicUsize::new(State::new().into()),
-            sleep_stack: worker::Stack::new(),
+            state: CachePadded::new(AtomicUsize::new(State::new().into())),
+            sleep_stack: CachePadded::new(worker::Stack::new()),
             num_workers: AtomicUsize::new(0),
             workers,
             backup,
