@@ -17,7 +17,7 @@ matrix:
         - travis-cargo --only nightly doc-upload
 
 script:
-  - cargo test
+  - cargo test --no-fail-fast
   - rustdoc --test README.md -L target/debug/deps
 
 env:
