@@ -19,8 +19,8 @@ impl MetadataFuture {
         MetadataFuture { file: Some(file) }
     }
 
-    fn std(&mut self) -> &mut StdFile {
-        self.file.as_mut().expect(POLL_AFTER_RESOLVE).std()
+    fn std_mut(&mut self) -> &mut StdFile {
+        self.file.as_mut().expect(POLL_AFTER_RESOLVE).std_mut()
     }
 }
 
@@ -30,7 +30,7 @@ impl Future for MetadataFuture {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let metadata = try_ready!(::blocking_io(|| {
-            StdFile::metadata(self.std())
+            StdFile::metadata(self.std_mut())
         }));
 
         let file = self.file.take().expect(POLL_AFTER_RESOLVE);

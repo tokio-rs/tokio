@@ -20,6 +20,10 @@ use futures::Poll;
 
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Write, Seek};
+#[cfg(unix)]
+use std::os::unix::fs::{FileExt as StdUnixFileExt};
+#[cfg(windows)]
+use std::os::windows::fs::{FileExt as StdWindowsFileExt};
 use std::path::Path;
 
 /// A reference to an open file on the filesystem.
@@ -99,7 +103,7 @@ impl File {
     ///
     /// Seeking to a negative offset is considered an error.
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
-        ::blocking_io(|| self.std().seek(pos))
+        ::blocking_io(|| self.std_mut().seek(pos))
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -117,7 +121,7 @@ impl File {
     /// This function will attempt to ensure that all in-core data reaches the
     /// filesystem before returning.
     pub fn poll_sync_all(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().sync_all())
+        ::blocking_io(|| self.std_mut().sync_all())
     }
 
     /// This function is similar to `poll_sync_all`, except that it may not
@@ -129,7 +133,7 @@ impl File {
     ///
     /// Note that some platforms may simply implement this in terms of `poll_sync_all`.
     pub fn poll_sync_data(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().sync_data())
+        ::blocking_io(|| self.std_mut().sync_data())
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -144,7 +148,7 @@ impl File {
     /// This function will return an error if the file is not opened for
     /// writing.
     pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().set_len(size))
+        ::blocking_io(|| self.std_mut().set_len(size))
     }
 
     /// Queries metadata about the underlying file.
@@ -154,7 +158,7 @@ impl File {
 
     /// Queries metadata about the underlying file.
     pub fn poll_metadata(&mut self) -> Poll<Metadata, io::Error> {
-        ::blocking_io(|| self.std().metadata())
+        ::blocking_io(|| self.std_mut().metadata())
     }
 
     /// Create a new `File` instance that shares the same underlying file handle
@@ -162,7 +166,7 @@ impl File {
     /// File instances simultaneously.
     pub fn poll_try_clone(&mut self) -> Poll<File, io::Error> {
         ::blocking_io(|| {
-            let std = self.std().try_clone()?;
+            let std = self.std_mut().try_clone()?;
             Ok(File::from_std(std))
         })
     }
@@ -195,14 +199,18 @@ impl File {
         self.std.take().expect("`File` instance already shutdown")
     }
 
-    fn std(&mut self) -> &mut StdFile {
+    fn std_mut(&mut self) -> &mut StdFile {
         self.std.as_mut().expect("`File` instance already shutdown")
+    }
+
+    fn std(&self) -> & StdFile {
+        self.std.as_ref().expect("`File` instance already shutdown")
     }
 }
 
 impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().read(buf))
+        ::would_block(|| self.std_mut().read(buf))
     }
 }
 
@@ -214,11 +222,11 @@ impl AsyncRead for File {
 
 impl Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().write(buf))
+        ::would_block(|| self.std_mut().write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        ::would_block(|| self.std().flush())
+        ::would_block(|| self.std_mut().flush())
     }
 }
 
@@ -237,5 +245,27 @@ impl Drop for File {
             // This is probably fine as closing a file *shouldn't* be a blocking
             // operation. That said, ideally `shutdown` is called first.
         }
+    }
+}
+
+#[cfg(unix)]
+impl StdUnixFileExt for File {
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        ::would_block(|| self.std().read_at(buf, offset))
+    }
+
+    fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        ::would_block(|| self.std().write_at(buf, offset))
+    }
+}
+
+#[cfg(windows)]
+impl StdWindowsFileExt for File {
+    fn seek_read(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        ::would_block(|| self.std().seek_read(buf, offset))
+    }
+
+    fn seek_write(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        ::would_block(|| self.std().seek_write(buf, offset))
     }
 }
