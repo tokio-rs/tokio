@@ -417,6 +417,8 @@ impl Pool {
                     break;
                 }
 
+                debug_assert!(!inner.backup[backup_id.0].is_pushed());
+
                 // Push the thread back onto the backup stack. This makes it
                 // available for future handoffs.
                 //
@@ -437,20 +439,14 @@ impl Pool {
 
                 // Wait for a handoff
                 let handoff = inner.backup[backup_id.0]
-                    .wait_for_handoff(true);
+                    .wait_for_handoff(inner.config.keep_alive);
 
                 match handoff {
                     Handoff::Worker(id) => {
                         debug_assert!(inner.backup[backup_id.0].is_running());
                         worker_id = id;
                     }
-                    Handoff::Idle => {
-                        // Worker is idle
-                        break;
-                    }
-                    Handoff::Terminated => {
-                        // TODO: When wait_for_handoff supports blocking with a
-                        // timeout, this will have to be smarter
+                    Handoff::Idle | Handoff::Terminated => {
                         break;
                     }
                 }
