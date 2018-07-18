@@ -7,4 +7,5 @@
 //! the context of the Tokio runtime as they require Tokio specific features to
 //! function.
 
-pub use tokio_fs::{create_dir, create_dir_all, file, hard_link, metadata, File, OpenOptions};
+pub use tokio_fs::{create_dir, create_dir_all, file, hard_link, metadata, read_dir, File};
+pub use tokio_fs::OpenOptions;
