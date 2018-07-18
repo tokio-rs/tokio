@@ -47,6 +47,7 @@ mod set_permissions;
 mod stdin;
 mod stdout;
 mod stderr;
+mod symlink_metadata;
 
 pub use create_dir::{create_dir, CreateDirFuture};
 pub use create_dir_all::{create_dir_all, CreateDirAllFuture};
@@ -63,6 +64,7 @@ pub use set_permissions::{set_permissions, SetPermissionsFuture};
 pub use stdin::{stdin, Stdin};
 pub use stdout::{stdout, Stdout};
 pub use stderr::{stderr, Stderr};
+pub use symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
 
 use futures::Poll;
 use futures::Async::*;
