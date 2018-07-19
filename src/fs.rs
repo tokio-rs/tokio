@@ -8,4 +8,4 @@
 //! function.
 
 pub use tokio_fs::{create_dir, create_dir_all, file, hard_link, metadata, read_dir, read_link};
-pub use tokio_fs::{remove_dir, remove_file, File, OpenOptions};
+pub use tokio_fs::{remove_dir, remove_file, rename, File, OpenOptions};
