@@ -85,7 +85,7 @@ pub mod impl_macos {
     }
 }
 
-// Note that SO_PEERCRED is not supported on DragonFly (yet). So do not run tests.
+// Note that LOCAL_PEERCRED is not supported on DragonFly (yet). So do not run tests.
 #[cfg(not(target_os = "dragonfly"))]
 #[cfg(test)]
 mod test {
@@ -94,6 +94,7 @@ mod test {
     use libc::getegid;
 
     #[test]
+    #[cfg_attr(target_os = "freebsd", ignore = "Requires FreeBSD 12.0 or later. https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=176419")]
     fn test_socket_pair() {
         let (a, b) = UnixStream::pair().unwrap();
         let cred_a = a.peer_cred().unwrap();
