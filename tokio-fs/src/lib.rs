@@ -38,6 +38,7 @@ mod create_dir_all;
 pub mod file;
 mod hard_link;
 mod metadata;
+pub mod os;
 mod read_dir;
 mod read_link;
 mod remove_dir;
