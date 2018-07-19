@@ -33,12 +33,14 @@ extern crate futures;
 extern crate tokio_io;
 extern crate tokio_threadpool;
 
+mod create_dir;
 pub mod file;
 mod metadata;
 mod stdin;
 mod stdout;
 mod stderr;
 
+pub use create_dir::{create_dir, CreateDirFuture};
 pub use file::File;
 pub use file::OpenOptions;
 pub use metadata::{metadata, MetadataFuture};
