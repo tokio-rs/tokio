@@ -85,7 +85,7 @@ impl super::Executor for DefaultExecutor {
         EXECUTOR.with(|current_executor| {
             match current_executor.get() {
                 Some(executor) => {
-                    let executor = unsafe { &mut *executor };
+                    let executor = unsafe { &*executor };
                     executor.status()
                 }
                 None => {

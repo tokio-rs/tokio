@@ -66,6 +66,40 @@ fn runtime_single_threaded() {
 }
 
 #[test]
+fn runtime_single_threaded_block_on() {
+    let _ = env_logger::init();
+
+    tokio::runtime::current_thread::block_on_all(create_client_server_future()).unwrap();
+}
+
+#[test]
+fn runtime_single_threaded_block_on_all() {
+    let cnt = Arc::new(Mutex::new(0));
+    let c = cnt.clone();
+
+    let msg = tokio::runtime::current_thread::block_on_all(lazy(move || {
+        {
+            let mut x = c.lock().unwrap();
+            *x = 1 + *x;
+        }
+
+        // Spawn!
+        tokio::spawn(lazy(move || {
+            {
+                let mut x = c.lock().unwrap();
+                *x = 1 + *x;
+            }
+            Ok::<(), ()>(())
+        }));
+
+        Ok::<_, ()>("hello")
+    })).unwrap();
+
+    assert_eq!(2, *cnt.lock().unwrap());
+    assert_eq!(msg, "hello");
+}
+
+#[test]
 fn runtime_multi_threaded() {
     let _ = env_logger::init();
 

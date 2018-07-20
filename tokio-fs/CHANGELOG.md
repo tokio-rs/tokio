@@ -1,4 +1,4 @@
-# 0.1.2 (Unreleased)
+# 0.1.2 (July 11, 2018)
 
 * Add `metadata` and `File::metadata` ([#433](https://github.com/tokio-rs/tokio/pull/433), [#385](https://github.com/tokio-rs/tokio/pull/385))
 * Add `File::seek` ([#434](https://github.com/tokio-rs/tokio/pull/434))

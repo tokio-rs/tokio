@@ -6,12 +6,14 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering::{Acquire, Release, AcqRel, Relaxed};
 
+use crossbeam_utils::cache_padded::CachePadded;
+
 #[derive(Debug)]
 pub(crate) struct Queue {
     /// Queue head.
     ///
     /// This is a strong reference to `Task` (i.e, `Arc<Task>`)
-    head: AtomicPtr<Task>,
+    head: CachePadded<AtomicPtr<Task>>,
 
     /// Tail pointer. This is `Arc<Task>` unless it points to `stub`.
     tail: UnsafeCell<*mut Task>,
@@ -37,7 +39,7 @@ impl Queue {
         let ptr = &*stub as *const _ as *mut _;
 
         Queue {
-            head: AtomicPtr::new(ptr),
+            head: CachePadded::new(AtomicPtr::new(ptr)),
             tail: UnsafeCell::new(ptr),
             stub: stub,
         }
