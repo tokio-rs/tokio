@@ -65,9 +65,11 @@
 
 mod builder;
 mod runtime;
+mod run_error;
 
 pub use self::builder::Builder;
 pub use self::runtime::{Runtime, Handle};
+pub use self::run_error::RunError;
 
 use futures::Future;
 
