@@ -1,6 +1,6 @@
 use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_current_thread::Handle as ExecutorHandle;
-use runtime::current_thread::Builder;
+use runtime::current_thread::{Builder, RunError};
 
 use tokio_reactor::{self, Reactor};
 use tokio_timer::clock::{self, Clock};
@@ -40,12 +40,6 @@ impl Handle {
     where F: Future<Item = (), Error = ()> + Send + 'static {
         self.0.spawn(future)
     }
-}
-
-/// Error returned by the `run` function.
-#[derive(Debug)]
-pub struct RunError {
-    inner: current_thread::RunError,
 }
 
 impl Runtime {
