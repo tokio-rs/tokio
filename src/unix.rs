@@ -267,10 +267,10 @@ impl Future for Driver {
 
     fn poll(&mut self) -> Poll<(), ()> {
         // Drain the data from the pipe and maintain interest in getting more
-        let any_wakeup = self.drain();
-        if any_wakeup {
-            self.broadcast();
-        }
+        self.drain();
+        // Broadcast any signals which were received
+        self.broadcast();
+
         // This task just lives until the end of the event loop
         Ok(Async::NotReady)
     }
@@ -283,23 +283,21 @@ impl Driver {
         })
     }
 
-    /// Drain all data in the global receiver, returning whether data was to be
-    /// had.
+    /// Drain all data in the global receiver, ensuring we'll get woken up when
+    /// there is a write on the other end.
     ///
-    /// If this function returns `true` then some signal has been received since
-    /// we last checked, otherwise `false` indicates that no signal has been
-    /// received.
-    fn drain(&mut self) -> bool {
-        let mut received = false;
+    /// We do *NOT* use the existence of any read bytes as evidence a sigal was
+    /// received since the `pending` flags would have already been set if that
+    /// was the case. See #38 for more info.
+    fn drain(&mut self) {
         loop {
             match self.wakeup.read(&mut [0; 128]) {
                 Ok(0) => panic!("EOF on self-pipe"),
-                Ok(_) => received = true,
+                Ok(_) => {},
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
                 Err(e) => panic!("Bad read on self-pipe: {}", e),
             }
         }
-        received
     }
 
     /// Go through all the signals and broadcast everything.
