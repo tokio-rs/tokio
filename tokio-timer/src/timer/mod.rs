@@ -26,6 +26,7 @@
 //! [`Delay`]: ../struct.Delay.html
 //! [`Now`]: trait.Now.html
 //! [`Now::now`]: trait.Now.html#method.now
+//! [`SystemNow`]: struct.SystemNow.html
 
 // This allows the usage of the old `Now` trait.
 #![allow(deprecated)]

@@ -53,7 +53,7 @@ These components provide the runtime components necessary for building
 an asynchronous application.
 
 [net]: https://docs.rs/tokio/0.1/tokio/net/index.html
-[reactor]: https://docs.rs/tokio/0.1.1/tokio/reactor/index.html
+[reactor]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
 [scheduler]: https://tokio-rs.github.io/tokio/tokio/runtime/index.html
 
 ## Example

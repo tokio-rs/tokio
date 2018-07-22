@@ -5,7 +5,7 @@
 //! provides a few major components:
 //!
 //! * A multi threaded, work-stealing based task [scheduler][runtime].
-//! * A [reactor][reactor] backed by the operating system's event queue (epoll, kqueue,
+//! * A [reactor] backed by the operating system's event queue (epoll, kqueue,
 //!   IOCP, etc...).
 //! * Asynchronous [TCP and UDP][net] sockets.
 //! * Asynchronous [filesystem][fs] operations.
@@ -17,7 +17,7 @@
 //! Guide level documentation is found on the [website].
 //!
 //! [website]: https://tokio.rs/docs/getting-started/hello-world/
-//! [futures]: http://docs.rs/futures
+//! [futures]: http://docs.rs/futures/0.1
 //!
 //! # Examples
 //!

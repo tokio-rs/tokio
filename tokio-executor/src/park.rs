@@ -42,7 +42,7 @@
 //! [`park_timeout`]: trait.Park.html#tymethod.park_timeout
 //! [`unpark`]: trait.Unpark.html#tymethod.unpark
 //! [up]: trait.Unpark.html
-//! [mio]: https://docs.rs/mio/0.6.13/mio/struct.Poll.html
+//! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
 use std::marker::PhantomData;
 use std::rc::Rc;
