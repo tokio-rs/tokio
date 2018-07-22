@@ -10,6 +10,8 @@ use futures::Future;
 use tokio_signal::unix::Signal;
 use std::time::{Duration, Instant};
 
+const TEST_SIGNAL: libc::c_int = libc::SIGUSR1;
+
 #[test]
 fn dropping_signal_does_not_deregister_any_other_instances() {
     // NB: Deadline requires a timer registration which is provided by
@@ -18,23 +20,18 @@ fn dropping_signal_does_not_deregister_any_other_instances() {
     let mut rt = tokio::runtime::current_thread::Runtime::new()
         .expect("failed to init runtime");
 
-    // FIXME(38): there appears to be a bug with the order these are created/destroyed
-    // If the duplicate signal is created first and dropped, it appears that `signal`
-    // will starve. This ordering also appears to be OS specific...
-    let first_signal = rt.block_on(Signal::new(libc::SIGUSR1))
-        .expect("failed to register duplicate signal");
-    let second_signal = rt.block_on(Signal::new(libc::SIGUSR1))
+    // NB: Testing for issue #38: signals should not starve based on ordering
+    let first_duplicate_signal = rt.block_on(Signal::new(TEST_SIGNAL))
+        .expect("failed to register first duplicate signal");
+    let signal = rt.block_on(Signal::new(TEST_SIGNAL))
         .expect("failed to register signal");
-    let (duplicate, signal) = if cfg!(target_os = "linux") {
-        (second_signal, first_signal)
-    } else {
-        // macOS
-        (first_signal, second_signal)
-    };
+    let second_duplicate_signal = rt.block_on(Signal::new(TEST_SIGNAL))
+        .expect("failed to register second duplicate signal");
 
-    drop(duplicate);
+    drop(first_duplicate_signal);
+    drop(second_duplicate_signal);
 
-    unsafe { assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0); }
+    unsafe { assert_eq!(libc::kill(libc::getpid(), TEST_SIGNAL), 0); }
 
     let signal_future = signal.into_future()
         .map_err(|(e, _)| e);
