@@ -9,6 +9,8 @@ use tokio_executor;
 
 use futures::Future;
 
+use std::fmt;
+use std::error::Error;
 use std::io;
 
 /// Single-threaded runtime provides a way to start reactor
@@ -46,6 +48,21 @@ impl Handle {
 #[derive(Debug)]
 pub struct RunError {
     inner: current_thread::RunError,
+}
+
+impl fmt::Display for RunError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.inner)
+    }
+}
+
+impl Error for RunError {
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+    fn cause(&self) -> Option<&Error> {
+        self.inner.cause()
+    }
 }
 
 impl Runtime {

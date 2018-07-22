@@ -40,6 +40,7 @@ use futures::future::{Executor, ExecuteError, ExecuteErrorKind};
 
 use std::fmt;
 use std::cell::Cell;
+use std::error::Error;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use std::sync::mpsc;
@@ -103,10 +104,38 @@ pub struct RunError {
     _p: (),
 }
 
+impl fmt::Display for RunError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for RunError {
+    fn description(&self) -> &str {
+        "Run error"
+    }
+}
+
 /// Error returned by the `run_timeout` function.
 #[derive(Debug)]
 pub struct RunTimeoutError {
     timeout: bool,
+}
+
+impl fmt::Display for RunTimeoutError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for RunTimeoutError {
+    fn description(&self) -> &str {
+        if self.timeout {
+            "Run timeout error (timeout)"
+        } else {
+            "Run timeout error (not timeout)"
+        }
+    }
 }
 
 /// Error returned by the `turn` function.
@@ -115,10 +144,34 @@ pub struct TurnError {
     _p: (),
 }
 
+impl fmt::Display for TurnError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for TurnError {
+    fn description(&self) -> &str {
+        "Turn error"
+    }
+}
+
 /// Error returned by the `block_on` function.
 #[derive(Debug)]
 pub struct BlockError<T> {
     inner: Option<T>,
+}
+
+impl<T> fmt::Display for BlockError<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Block error")
+    }
+}
+
+impl<T: fmt::Debug> Error for BlockError<T> {
+    fn description(&self) -> &str {
+        "Block error"
+    }
 }
 
 /// This is mostly split out to make the borrow checker happy.
