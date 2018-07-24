@@ -10,7 +10,7 @@ use std::fmt::{self, Debug};
 use std::mem;
 use std::ptr;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst, Acquire, Release, AcqRel};
-use std::sync::atomic::{AtomicPtr, AtomicBool, AtomicUsize};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
 use std::sync::{Arc, Weak};
 use std::usize;
 use std::thread;
@@ -210,7 +210,7 @@ where U: Unpark,
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick(&mut self, enter: &mut Enter, num_futures: &mut usize) -> bool
+    pub fn tick(&mut self, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
     {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst)
@@ -330,7 +330,8 @@ where U: Unpark,
                     };
 
                     if borrow.enter(enter, || scheduled.tick()) {
-                        *borrow.num_futures -= 1;
+                        // we have a borrow of the Runtime, so we know it's not shut down
+                        borrow.num_futures.fetch_sub(2, SeqCst);
                     }
                 }
 
