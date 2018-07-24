@@ -1,5 +1,7 @@
 use Delay;
 
+use clock;
+
 use futures::{Future, Stream, Poll};
 
 use std::time::{Instant, Duration};
@@ -18,6 +20,8 @@ impl Interval {
     /// Create a new `Interval` that starts at `at` and yields every `duration`
     /// interval after that.
     ///
+    /// Note that when it starts, it produces item too.
+    ///
     /// The `duration` argument must be a non-zero duration.
     ///
     /// # Panics
@@ -27,6 +31,19 @@ impl Interval {
         assert!(duration > Duration::new(0, 0), "`duration` must be non-zero.");
 
         Interval::new_with_delay(Delay::new(at), duration)
+    }
+
+    /// Creates new `Interval` that yields with interval of `duration`.
+    ///
+    /// The function is shortcut for `Interval::new(Instant::now() + duration, duration)`.
+    ///
+    /// The `duration` argument must be a non-zero duration.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `duration` is zero.
+    pub fn new_interval(duration: Duration) -> Interval {
+        Interval::new(clock::now() + duration, duration)
     }
 
     pub(crate) fn new_with_delay(delay: Delay, duration: Duration) -> Interval {
