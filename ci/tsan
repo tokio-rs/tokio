@@ -3,7 +3,7 @@
 # TSAN does not understand fences and `Arc::drop` is implemented using a fence.
 # This causes many false positives.
 race:Arc*drop
-race:arc*Weak*drop
+race:Weak*drop
 
 # `std` mpsc is not used in any Tokio code base. This race is triggered by some
 # rust runtime logic.
