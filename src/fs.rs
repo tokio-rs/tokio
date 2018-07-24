@@ -7,8 +7,4 @@
 //! the context of the Tokio runtime as they require Tokio specific features to
 //! function.
 
-pub use tokio_fs::{
-    file,
-    File,
-    OpenOptions, 
-};
+pub use tokio_fs::{file, metadata, File, OpenOptions};
