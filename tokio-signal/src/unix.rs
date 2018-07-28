@@ -19,8 +19,8 @@ use self::libc::c_int;
 use self::mio_uds::UnixStream;
 use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
-use futures::{Async, AsyncSink, Future};
-use futures::{Poll, Sink, Stream};
+use futures::{Async, Future};
+use futures::{Poll, Stream};
 use tokio_reactor::{Handle, PollEvented};
 use tokio_io::IoFuture;
 
@@ -256,17 +256,19 @@ impl Driver {
             // worry about it as everything is coalesced anyway. If the channel
             // has gone away then we can remove that slot.
             for i in (0..recipients.len()).rev() {
-                // TODO: This thing probably generates unnecessary wakups of
-                //       this task when `NotReady` is received because we don't
-                //       actually want to get woken up to continue sending a
-                //       message. Let's optimise it later on though, as we know
-                //       this works.
-                match recipients[i].start_send(signum) {
-                    Ok(AsyncSink::Ready) => {}
-                    Ok(AsyncSink::NotReady(_)) => {}
-                    Err(_) => {
+                match recipients[i].try_send(signum) {
+                    Ok(()) => {},
+                    Err(ref e) if e.is_disconnected() => {
                         recipients.swap_remove(i);
-                    }
+                    },
+
+                    // Channel is full, ignore the error since the
+                    // receiver has already been woken up
+                    Err(e) => {
+                        // Sanity check in case this error type ever gets
+                        // additional variants we have not considered.
+                        debug_assert!(e.is_full());
+                    },
                 }
             }
         }

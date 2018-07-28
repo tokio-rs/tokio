@@ -2,6 +2,10 @@
 ### Changed
 * `unix::Signal` now implements `Sync`
 
+### Fixes
+* `unix::Signal` now avoids extraneous wakeups generated as a result of
+dropping other instances
+
 ## 0.2.6 - (October 26, 2018)
 ### Changed
 * Use the `signal-hook` crate for managing signal registrations
