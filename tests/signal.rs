@@ -1,26 +1,20 @@
 #![cfg(unix)]
 
-extern crate futures;
 extern crate libc;
-extern crate tokio;
-extern crate tokio_core;
-extern crate tokio_signal;
 
-use futures::stream::Stream;
-use futures::{Future, IntoFuture};
-use tokio_signal::unix::Signal;
+pub mod support;
+use support::*;
 
 #[test]
 fn tokio_simple() {
-    tokio::run(
-        Signal::new(libc::SIGUSR1)
-            .into_future()
-            .and_then(|signal| {
-                unsafe {
-                    assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
-                }
-                signal.into_future().map(|_| ()).map_err(|(err, _)| err)
-            })
-            .map_err(|err| panic!("{}", err)),
-    )
+    let signal_future = Signal::new(libc::SIGUSR1)
+        .and_then(|signal| {
+            send_signal(libc::SIGUSR1);
+            signal.into_future().map(|_| ()).map_err(|(err, _)| err)
+        });
+
+    let mut rt = CurrentThreadRuntime::new()
+        .expect("failed to init runtime");
+    run_with_timeout(&mut rt, signal_future)
+        .expect("failed");
 }

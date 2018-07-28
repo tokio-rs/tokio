@@ -1,17 +1,12 @@
 #![cfg(unix)]
 
-extern crate futures;
 extern crate libc;
-extern crate tokio;
-extern crate tokio_core;
-extern crate tokio_signal;
 
 use std::sync::mpsc::channel;
 use std::thread;
 
-use futures::stream::Stream;
-use tokio_core::reactor::Core;
-use tokio_signal::unix::Signal;
+pub mod support;
+use support::*;
 
 #[test]
 fn multi_loop() {
@@ -27,7 +22,7 @@ fn multi_loop() {
                     let mut lp = Core::new().unwrap();
                     let signal = lp.run(Signal::new(libc::SIGHUP)).unwrap();
                     sender.send(()).unwrap();
-                    lp.run(signal.into_future()).ok().unwrap();
+                    run_core_with_timeout(&mut lp, signal.into_future()).ok().unwrap();
                 })
             })
             .collect();
@@ -36,9 +31,7 @@ fn multi_loop() {
             receiver.recv().unwrap();
         }
         // Send a signal
-        unsafe {
-            assert_eq!(libc::kill(libc::getpid(), libc::SIGHUP), 0);
-        }
+        send_signal(libc::SIGHUP);
         // Make sure the threads terminated correctly
         for t in threads {
             t.join().unwrap();

@@ -1,28 +1,28 @@
 #![cfg(unix)]
 
-extern crate futures;
 extern crate libc;
-extern crate tokio;
-extern crate tokio_core;
-extern crate tokio_signal;
 
-use std::time::Duration;
-
-use tokio_core::reactor::{Core, Timeout};
-use tokio_signal::unix::Signal;
+pub mod support;
+use support::*;
 
 #[test]
 fn drop_then_get_a_signal() {
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
-    let signal = lp.run(Signal::with_handle(
+
+    let signal = run_core_with_timeout(&mut lp, Signal::with_handle(
         libc::SIGUSR1,
         &handle.new_tokio_handle(),
-    )).unwrap();
+    )).expect("failed to create first signal");
     drop(signal);
-    unsafe {
-        assert_eq!(libc::kill(libc::getpid(), libc::SIGUSR1), 0);
-    }
-    let timeout = Timeout::new(Duration::from_millis(1), &lp.handle()).unwrap();
-    lp.run(timeout).unwrap();
+
+    send_signal(libc::SIGUSR1);
+    let signal = lp.run(Signal::with_handle(libc::SIGUSR1, &handle.new_tokio_handle()))
+        .expect("failed to create signal")
+        .into_future()
+        .map(|_| ())
+        .map_err(|(e, _)| panic!("{}", e));
+
+    run_core_with_timeout(&mut lp, signal)
+        .expect("failed to get signal");
 }
