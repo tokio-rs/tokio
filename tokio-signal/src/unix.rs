@@ -347,8 +347,9 @@ impl Signal {
                 let driver = try!(Driver::new(&handle));
 
                 // One wakeup in a queue is enough, no need for us to buffer up any
-                // more.
-                let (tx, rx) = channel(1);
+                // more. NB: channels always guarantee at least one slot per sender,
+                // so we don't need additional slots
+                let (tx, rx) = channel(0);
                 let tx = Box::new(tx);
                 let id: *const _ = &*tx;
                 let idx = signal as usize;
