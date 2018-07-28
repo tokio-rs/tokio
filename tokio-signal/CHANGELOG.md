@@ -1,4 +1,6 @@
 ## Unreleased
+### Changed
+* `unix::Signal` now implements `Sync`
 
 ## 0.2.6 - (October 26, 2018)
 ### Changed
