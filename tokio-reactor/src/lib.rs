@@ -49,7 +49,7 @@ mod registration;
 
 // ===== Public re-exports =====
 
-pub use self::background::Background;
+pub use self::background::{Background, Shutdown};
 pub use self::registration::Registration;
 pub use self::poll_evented::PollEvented;
 
