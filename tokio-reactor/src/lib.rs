@@ -353,7 +353,6 @@ impl Reactor {
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return Ok(()),
             Err(e) => return Err(e),
         }
 
