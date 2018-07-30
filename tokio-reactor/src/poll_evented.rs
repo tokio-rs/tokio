@@ -342,7 +342,7 @@ where E: Evented
     /// cannot be cleared as it is a final state.
     ///
     /// After calling this function, `poll_write_ready(Ready::writable())` will
-    /// return `NotReady` until a new read readiness event has been received.
+    /// return `NotReady` until a new write readiness event has been received.
     ///
     /// # Panics
     ///
