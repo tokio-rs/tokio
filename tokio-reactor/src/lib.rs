@@ -61,7 +61,7 @@ use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
 
 use std::{fmt, usize};
-use std::io::{self, ErrorKind};
+use std::io;
 use std::mem;
 use std::cell::RefCell;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
