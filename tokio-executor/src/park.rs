@@ -288,10 +288,12 @@ impl Inner {
         // The other half is sleeping, this requires a lock
         let _m = self.mutex.lock().unwrap();
 
-        // Transition from SLEEP -> NOTIFY
-        match self.state.compare_and_swap(SLEEP, NOTIFY, Ordering::SeqCst) {
+        // Transition to NOTIFY
+        match self.state.swap(NOTIFY, Ordering::SeqCst) {
             SLEEP => {}
-            _ => return,
+            NOTIFY => return,
+            IDLE => return,
+            _ => unreachable!(),
         }
 
         // Wakeup the sleeper
