@@ -49,7 +49,7 @@ mod registration;
 
 // ===== Public re-exports =====
 
-pub use self::background::Background;
+pub use self::background::{Background, Shutdown};
 pub use self::registration::Registration;
 pub use self::poll_evented::PollEvented;
 
@@ -61,7 +61,7 @@ use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
 
 use std::{fmt, usize};
-use std::io::{self, ErrorKind};
+use std::io;
 use std::mem;
 use std::cell::RefCell;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -353,7 +353,6 @@ impl Reactor {
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => return Ok(()),
             Err(e) => return Err(e),
         }
 

@@ -81,7 +81,7 @@
 //! ## Implementation
 //!
 //! The reactor implementation uses [`mio`] to interface with the operating
-//! system's event queue. A call to [`Reactor::poll`] results in in a single
+//! system's event queue. A call to [`Reactor::poll`] results in a single
 //! call to [`Poll::poll`] which in turn results in a single call to the
 //! operating system's selector.
 //!
@@ -107,8 +107,8 @@
 //! There are a couple of ways to do this.
 //!
 //! If the custom I/O resource implements [`mio::Evented`] and implements
-//! [`std::Read`] and / or [`std::Write`], then [`PollEvented`] is the most
-//! suited.
+//! [`std::io::Read`] and / or [`std::io::Write`], then [`PollEvented`] is the
+//! most suited.
 //!
 //! Otherwise, [`Registration`] can be used directly. This provides the lowest
 //! level primitive needed for integrating with the reactor: a stream of

@@ -52,7 +52,7 @@ use std::sync::atomic::Ordering::Relaxed;
 ///
 /// This allows the caller to implement additional functions. For example,
 /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
-/// [`clear_write_ready`].
+/// [`clear_read_ready`].
 ///
 /// ```rust,ignore
 /// pub fn poll_accept(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
@@ -85,7 +85,7 @@ use std::sync::atomic::Ordering::Relaxed;
 /// [`Registration`]: struct.Registration.html
 /// [`TcpListener`]: ../net/struct.TcpListener.html
 /// [`clear_read_ready`]: #method.clear_read_ready
-/// [`clear_write_ready`]: #method.clear_write_ready
+/// [`clear_read_ready`]: #method.clear_read_ready
 /// [`poll_read_ready`]: #method.poll_read_ready
 /// [`poll_write_ready`]: #method.poll_write_ready
 pub struct PollEvented<E: Evented> {
@@ -342,7 +342,7 @@ where E: Evented
     /// cannot be cleared as it is a final state.
     ///
     /// After calling this function, `poll_write_ready(Ready::writable())` will
-    /// return `NotReady` until a new read readiness event has been received.
+    /// return `NotReady` until a new write readiness event has been received.
     ///
     /// # Panics
     ///
