@@ -61,6 +61,7 @@ use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
 
 use std::{fmt, usize};
+use std::error::Error;
 use std::io;
 use std::mem;
 use std::cell::RefCell;
@@ -769,5 +770,19 @@ fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
     match new {
         futures2::Async::Ready(x) => futures::Async::Ready(x),
         futures2::Async::Pending => futures::Async::NotReady,
+    }
+}
+
+// ===== impl SetFallbackError =====
+
+impl fmt::Display for SetFallbackError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for SetFallbackError {
+    fn description(&self) -> &str {
+        "attempted to set fallback reactor while already configured"
     }
 }

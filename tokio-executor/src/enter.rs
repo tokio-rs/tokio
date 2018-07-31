@@ -1,5 +1,6 @@
 use std::prelude::v1::*;
 use std::cell::Cell;
+use std::error::Error;
 use std::fmt;
 
 #[cfg(feature = "unstable-futures")]
@@ -27,8 +28,20 @@ pub struct EnterError {
 impl fmt::Debug for EnterError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EnterError")
-            .field("reason", &"attempted to run an executor while another executor is already running")
+            .field("reason", &self.description())
             .finish()
+    }
+}
+
+impl fmt::Display for EnterError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for EnterError {
+    fn description(&self) -> &str {
+        "attempted to run an executor while another executor is already running"
     }
 }
 

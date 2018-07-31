@@ -52,6 +52,9 @@ pub use global::spawn2;
 
 use futures::Future;
 
+use std::error::Error;
+use std::fmt;
+
 /// A value that executes futures.
 ///
 /// The [`spawn`] function is used to submit a future to an executor. Once
@@ -236,5 +239,17 @@ impl SpawnError {
     /// Returns `true` if the error reflects an executor at capacity failure.
     pub fn is_at_capacity(&self) -> bool {
         !self.is_shutdown
+    }
+}
+
+impl fmt::Display for SpawnError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for SpawnError {
+    fn description(&self) -> &str {
+        "attempted to spawn task while the executor is at capacity or shut down"
     }
 }
