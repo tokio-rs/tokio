@@ -40,10 +40,35 @@ impl DefaultExecutor {
             _dummy: (),
         }
     }
+
+    #[inline]
+    fn with_current<F: FnOnce(&mut Executor) -> R, R>(f: F) -> Option<R> {
+        EXECUTOR.with(|current_executor| {
+            match current_executor.replace(State::Active) {
+                State::Ready(executor_ptr) => {
+                    let executor = unsafe { &mut *executor_ptr };
+                    let result = f(executor);
+                    current_executor.set(State::Ready(executor_ptr));
+                    Some(result)
+                },
+                State::Empty | State::Active => None,
+            }
+        })
+    }
 }
 
+#[derive(Clone, Copy)]
+enum State {
+    // default executor not defined
+    Empty,
+    // default executor is defined and ready to be used
+    Ready(*mut Executor),
+    // default executor is currently active (used to detect recursive calls)
+    Active
+} 
+
 /// Thread-local tracking the current executor
-thread_local!(static EXECUTOR: Cell<Option<*mut Executor>> = Cell::new(None));
+thread_local!(static EXECUTOR: Cell<State> = Cell::new(State::Empty));
 
 // ===== impl DefaultExecutor =====
 
@@ -51,48 +76,21 @@ impl super::Executor for DefaultExecutor {
     fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
         -> Result<(), SpawnError>
     {
-        EXECUTOR.with(|current_executor| {
-            match current_executor.get() {
-                Some(executor) => {
-                    let executor = unsafe { &mut *executor };
-                    executor.spawn(future)
-                }
-                None => {
-                    Err(SpawnError::shutdown())
-                }
-            }
-        })
+        DefaultExecutor::with_current(|executor| executor.spawn(future))
+            .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
 
     #[cfg(feature = "unstable-futures")]
     fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
              -> Result<(), futures2::executor::SpawnError>
     {
-        EXECUTOR.with(|current_executor| {
-            match current_executor.get() {
-                Some(executor) => {
-                    let executor = unsafe { &mut *executor };
-                    executor.spawn2(future)
-                }
-                None => {
-                    Err(futures2::executor::SpawnError::shutdown())
-                }
-            }
-        })
+        DefaultExecutor::with_current(|executor| executor.spawn2(future))
+            .unwrap_or_else(|| Err(futures2::executor::SpawnError::shutdown()))
     }
 
     fn status(&self) -> Result<(), SpawnError> {
-        EXECUTOR.with(|current_executor| {
-            match current_executor.get() {
-                Some(executor) => {
-                    let executor = unsafe { &*executor };
-                    executor.status()
-                }
-                None => {
-                    Err(SpawnError::shutdown())
-                }
-            }
-        })
+        DefaultExecutor::with_current(|executor| executor.status())
+            .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
 }
 
@@ -163,15 +161,19 @@ where T: Executor,
       F: FnOnce(&mut Enter) -> R
 {
     EXECUTOR.with(|cell| {
-        assert!(cell.get().is_none(), "default executor already set for execution context");
+        match cell.get() {
+            State::Ready(_) | State::Active =>
+                panic!("default executor already set for execution context"),
+            _ => {}
+        }
 
         // Ensure that the executor is removed from the thread-local context
         // when leaving the scope. This handles cases that involve panicking.
-        struct Reset<'a>(&'a Cell<Option<*mut Executor>>);
+        struct Reset<'a>(&'a Cell<State>);
 
         impl<'a> Drop for Reset<'a> {
             fn drop(&mut self) {
-                self.0.set(None);
+                self.0.set(State::Empty);
             }
         }
 
@@ -186,7 +188,7 @@ where T: Executor,
         // cells require.
         let executor = unsafe { hide_lt(executor as &mut _ as *mut _) };
 
-        cell.set(Some(executor));
+        cell.set(State::Ready(executor));
 
         f(enter)
     })
@@ -199,12 +201,24 @@ unsafe fn hide_lt<'a>(p: *mut (Executor + 'a)) -> *mut (Executor + 'static) {
 
 #[cfg(test)]
 mod tests {
-    use super::DefaultExecutor;
+    use super::{Executor, DefaultExecutor, with_default};
 
     #[test]
     fn default_executor_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
 
         assert_send_sync::<DefaultExecutor>();
+    }
+
+    #[test]
+    fn nested_default_executor_status() {
+        let mut enter = super::super::enter().unwrap();
+        let mut executor = DefaultExecutor::current();
+
+        let result = with_default(&mut executor, &mut enter, |_| {
+            DefaultExecutor::current().status()
+        });
+
+        assert!(result.err().unwrap().is_shutdown())
     }
 }
