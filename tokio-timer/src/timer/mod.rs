@@ -335,13 +335,9 @@ where T: Park,
     }
 
     fn set_elapsed(&mut self, when: u64) {
-        assert!(self.elapsed <= when, "elapsed={:?}; when={:?}", self.elapsed, when);
-
         if when > self.elapsed {
             self.elapsed = when;
             self.inner.elapsed.store(when, SeqCst);
-        } else {
-            assert_eq!(self.elapsed, when);
         }
     }
 
