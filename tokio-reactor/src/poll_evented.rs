@@ -85,7 +85,7 @@ use std::sync::atomic::Ordering::Relaxed;
 /// [`Registration`]: struct.Registration.html
 /// [`TcpListener`]: ../net/struct.TcpListener.html
 /// [`clear_read_ready`]: #method.clear_read_ready
-/// [`clear_read_ready`]: #method.clear_read_ready
+/// [`clear_write_ready`]: #method.clear_write_ready
 /// [`poll_read_ready`]: #method.poll_read_ready
 /// [`poll_write_ready`]: #method.poll_write_ready
 pub struct PollEvented<E: Evented> {
