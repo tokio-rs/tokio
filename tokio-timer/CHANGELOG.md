@@ -1,3 +1,7 @@
+# 0.2.5 (August 6, 2018)
+
+* Add `Interval::interval` shortcut (#492).
+
 # 0.2.4 (June 6, 2018)
 
 * Add `sleep` function for easy interval delays (#347).

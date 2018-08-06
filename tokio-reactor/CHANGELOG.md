@@ -1,3 +1,7 @@
+# 0.1.3 (August 6, 2018)
+
+* Misc small fixes (#508)
+
 # 0.1.2 (June 13, 2018)
 
 * Fix deadlock that can happen when shutting down (#409)

@@ -22,7 +22,7 @@
 //! [`block_on_all`]: fn.block_on_all.html
 //! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
 
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.1")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 extern crate futures;
