@@ -249,6 +249,43 @@ impl UdpSocket {
         RecvDgram::new(self, buf)
     }
 
+    /// Check the UDP socket's read readiness state.
+    ///
+    /// The mask argument allows specifying what readiness to notify on. This
+    /// can be any value, including platform specific readiness, **except**
+    /// `writable`.
+    ///
+    /// If the socket is not ready for receiving then `Async::NotReady` is
+    /// returned and the current task is notified once a new event is received.
+    ///
+    /// The socket will remain in a read-ready state until calls to `poll_recv`
+    /// return `NotReady`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if:
+    ///
+    /// * `ready` includes writable.
+    /// * called from outside of a task context.
+    pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
+        self.io.poll_read_ready(mask)
+    }
+
+    /// Check the UDP socket's write readiness state.
+    ///
+    /// If the socket is not ready for sending then `Async::NotReady` is
+    /// returned and the current task is notified once a new event is received.
+    ///
+    /// The I/O resource will remain in a write-ready state until calls to
+    /// `poll_send` return `NotReady`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called from outside of a task context.
+    pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
+        self.io.poll_write_ready()
+    }
+
     /// Gets the value of the `SO_BROADCAST` option for this socket.
     ///
     /// For more information about this option, see [`set_broadcast`].
