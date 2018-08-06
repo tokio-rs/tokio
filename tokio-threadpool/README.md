@@ -30,12 +30,13 @@ use futures::*;
 use futures::sync::oneshot;
 
 pub fn main() {
-    let (tx, _pool) = ThreadPool::new();
+    let pool = ThreadPool::new();
+    let sender = pool.sender();
 
     let res = oneshot::spawn(future::lazy(|| {
         println!("Running on the pool");
         Ok::<_, ()>("complete")
-    }), &tx);
+    }), sender);
 
     println!("Result: {:?}", res.wait());
 }
