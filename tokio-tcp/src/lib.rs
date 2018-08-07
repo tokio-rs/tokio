@@ -19,7 +19,7 @@
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
 
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.1")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;

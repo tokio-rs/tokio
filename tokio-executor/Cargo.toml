@@ -5,7 +5,7 @@ name = "tokio-executor"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.2"
+version = "0.1.3"
 documentation = "https://docs.rs/tokio-executor"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
