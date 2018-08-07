@@ -259,7 +259,7 @@ impl Inner {
             Err(NOTIFY) => {
                 // Notified before we could sleep, consume the notification and
                 // exit
-                self.state.store(IDLE, SeqCst);
+                self.state.swap(IDLE, SeqCst);
                 return Ok(());
             }
             _ => unreachable!(),
