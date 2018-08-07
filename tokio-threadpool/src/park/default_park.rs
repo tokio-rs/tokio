@@ -99,10 +99,8 @@ impl Inner {
     fn park(&self, timeout: Option<Duration>) {
         // If currently notified, then we skip sleeping. This is checked outside
         // of the lock to avoid acquiring a mutex if not necessary.
-        match self.state.compare_and_swap(NOTIFY, IDLE, SeqCst) {
-            NOTIFY => return,
-            IDLE => {},
-            _ => unreachable!(),
+        if self.state.compare_exchange(NOTIFY, IDLE, SeqCst, SeqCst).is_ok() {
+            return;
         }
 
         // If the duration is zero, then there is no need to actually block
@@ -117,25 +115,39 @@ impl Inner {
         let mut m = self.mutex.lock().unwrap();
 
         // Transition to sleeping
-        match self.state.compare_and_swap(IDLE, SLEEP, SeqCst) {
-            NOTIFY => {
+        match self.state.compare_exchange(IDLE, SLEEP, SeqCst, SeqCst) {
+            Ok(_) => {}
+            Err(NOTIFY) => {
                 // Notified before we could sleep, consume the notification and
                 // exit
                 self.state.store(IDLE, SeqCst);
                 return;
             }
-            IDLE => {},
             _ => unreachable!(),
         }
 
-        m = match timeout {
-            Some(timeout) => self.condvar.wait_timeout(m, timeout).unwrap().0,
-            None => self.condvar.wait(m).unwrap(),
-        };
+        match timeout {
+            Some(timeout) => {
+                m = self.condvar.wait_timeout(m, timeout).unwrap().0;
 
-        // Transition back to idle. If the state has transitioned to `NOTIFY`,
-        // this will consume that notification.
-        self.state.store(IDLE, SeqCst);
+                // Transition back to idle. If the state has transitioned to `NOTIFY`,
+                // this will consume that notification.
+                match self.state.swap(IDLE, SeqCst) {
+                    NOTIFY => {}, // Got a notification
+                    SLEEP => {}, // No notification, timed out
+                    _ => unreachable!(),
+                }
+            }
+            None => {
+                loop {
+                    m = self.condvar.wait(m).unwrap();
+                    match self.state.compare_exchange(NOTIFY, IDLE, SeqCst, SeqCst) {
+                        Ok(_) => break, // Got a notification
+                        Err(_) => {} // Spurious wakeup, go back to sleep
+                    }
+                }
+            }
+        };
 
         // Explicitly drop the mutex guard. There is no real point in doing it
         // except that I find it helpful to make it explicit where we want the
@@ -144,27 +156,31 @@ impl Inner {
     }
 
     fn unpark(&self) {
-        // First, try transitioning from IDLE -> NOTIFY, this does not require a
-        // lock.
-        match self.state.compare_and_swap(IDLE, NOTIFY, SeqCst) {
-            IDLE | NOTIFY => return,
-            SLEEP => {}
-            _ => unreachable!(),
+        loop {
+            // First, try transitioning from IDLE -> NOTIFY, this does not require a
+            // lock.
+            match self.state.compare_exchange(IDLE, NOTIFY, SeqCst, SeqCst) {
+                Ok(_) => return, // No one was waiting
+                Err(NOTIFY) => return, // Already unparked
+                Err(SLEEP) => {} // Gotta wake up
+                _ => unreachable!(),
+            }
+
+            // The other half is sleeping, this requires a lock
+            let _m = self.mutex.lock().unwrap();
+
+            // Transition to NOTIFY
+            match self.state.compare_exchange(SLEEP, NOTIFY, SeqCst, SeqCst) {
+                Ok(_) => {
+                    // Wakeup the sleeper
+                    self.condvar.notify_one();
+                    return;
+                }
+                Err(NOTIFY) => return, // A different thread unparked
+                Err(IDLE) => {} // Parked thread went away, try again
+                _ => unreachable!(),
+            }
         }
-
-        // The other half is sleeping, this requires a lock
-        let _m = self.mutex.lock().unwrap();
-
-        // Transition to NOTIFY
-        match self.state.swap(NOTIFY, SeqCst) {
-            SLEEP => {}
-            NOTIFY => return,
-            IDLE => return,
-            _ => unreachable!(),
-        }
-
-        // Wakeup the sleeper
-        self.condvar.notify_one();
     }
 }
 
