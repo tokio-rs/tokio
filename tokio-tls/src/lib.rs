@@ -16,7 +16,7 @@
 //! `native-tls` crate.
 
 #![deny(missing_docs)]
-#![doc(html_root_url = "https://docs.rs/tokio-tls/0.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-tls/0.2.0")]
 
 extern crate futures;
 extern crate native_tls;
