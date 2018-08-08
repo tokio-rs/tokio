@@ -13,12 +13,12 @@ use std::io::{self, Read, Write};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
-/// Associates an I/O resource that implements the [`std::Read`] and / or
-/// [`std::Write`] traits with the reactor that drives it.
+/// Associates an I/O resource that implements the [`std::io::Read`] and/or
+/// [`std::io::Write`] traits with the reactor that drives it.
 ///
 /// `PollEvented` uses [`Registration`] internally to take a type that
-/// implements [`mio::Evented`] as well as [`std::Read`] and or [`std::Write`]
-/// and associate it with a reactor that will drive it.
+/// implements [`mio::Evented`] as well as [`std::io::Read`] and or
+/// [`std::io::Write`] and associate it with a reactor that will drive it.
 ///
 /// Once the [`mio::Evented`] type is wrapped by `PollEvented`, it can be
 /// used from within the future's execution model. As such, the `PollEvented`
@@ -77,15 +77,15 @@ use std::sync::atomic::Ordering::Relaxed;
 /// These events are included as part of the read readiness event stream. The
 /// write readiness event stream is only for `Ready::writable()` events.
 ///
-/// [`std::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-/// [`std::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+/// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+/// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 /// [`AsyncRead`]: ../io/trait.AsyncRead.html
 /// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
 /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
 /// [`Registration`]: struct.Registration.html
 /// [`TcpListener`]: ../net/struct.TcpListener.html
 /// [`clear_read_ready`]: #method.clear_read_ready
-/// [`clear_read_ready`]: #method.clear_read_ready
+/// [`clear_write_ready`]: #method.clear_write_ready
 /// [`poll_read_ready`]: #method.poll_read_ready
 /// [`poll_write_ready`]: #method.poll_write_ready
 pub struct PollEvented<E: Evented> {

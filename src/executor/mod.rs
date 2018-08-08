@@ -13,7 +13,7 @@
 //!
 //! The specific strategy used to manage the tasks is left up to the
 //! executor. There are two main flavors of executors: single-threaded and
-//! multithreaded. Tokio provides implementation for both of these in the
+//! multi-threaded. Tokio provides implementation for both of these in the
 //! [`runtime`] module.
 //!
 //! # `Executor` trait.
