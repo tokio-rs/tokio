@@ -23,6 +23,7 @@ use futures::{Poll, Async};
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::sync::atomic;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 use std::thread;
@@ -217,7 +218,8 @@ impl Worker {
     ///
     /// This function blocks until the worker is shutting down.
     pub fn run(&self) {
-        const MAX_SPINS: usize = 60;
+        const CPU_YIELD_LIMIT: usize = 6;
+        const THREAD_YIELD_LIMIT: usize = 10;
         const LIGHT_SLEEP_INTERVAL: usize = 32;
 
         // Get the notifier.
@@ -256,15 +258,21 @@ impl Worker {
             }
 
             if !consistent {
-                thread::yield_now();
                 spin_cnt = 0;
                 continue;
             }
 
             spin_cnt += 1;
 
-            if spin_cnt < MAX_SPINS {
-                thread::yield_now();
+            if spin_cnt < THREAD_YIELD_LIMIT {
+                if spin_cnt <= CPU_YIELD_LIMIT {
+                    for _ in 0 .. (1 << spin_cnt) {
+                        atomic::spin_loop_hint();
+                    }
+                } else {
+                    thread::yield_now();
+                }
+
                 continue;
             }
 
@@ -384,13 +392,16 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     fn try_run_owned_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
+        use deque::Pop;
+
         // Poll the internal queue for a task to run
         match self.entry().pop_task() {
-            Some(task) => {
+            Pop::Data(task) => {
                 self.run_task(task, notify, sender);
                 true
             }
-            None => false,
+            Pop::Empty => false,
+            Pop::Retry => true,
         }
     }
 

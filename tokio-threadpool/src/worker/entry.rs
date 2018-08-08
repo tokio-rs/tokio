@@ -188,7 +188,7 @@ impl WorkerEntry {
     ///
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
-    pub fn pop_task(&self) -> Option<Arc<Task>> {
+    pub fn pop_task(&self) -> deque::Pop<Arc<Task>> {
         self.worker.pop()
     }
 
@@ -208,7 +208,14 @@ impl WorkerEntry {
     ///
     /// This is called when the pool is shutting down.
     pub fn drain_tasks(&self) {
-        while let Some(_) = self.worker.pop() {
+        use deque::Pop;
+
+        loop {
+            match self.worker.pop() {
+                Pop::Data(_) => {}
+                Pop::Empty => break,
+                Pop::Retry => {}
+            }
         }
     }
 
