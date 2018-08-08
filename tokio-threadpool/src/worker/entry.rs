@@ -192,12 +192,16 @@ impl WorkerEntry {
         self.worker.pop()
     }
 
-    /// Steal a task
+    /// Steal tasks
     ///
     /// This is called by *other* workers to steal a task for processing. This
     /// function is `Sync`.
-    pub fn steal_task(&self) -> Option<Arc<Task>> {
-        self.stealer.steal()
+    ///
+    /// At the same time, this method steals some additional tasks and moves
+    /// them into `dest` in order to balance the work distribution among
+    /// workers.
+    pub fn steal_tasks(&self, dest: &Self) -> deque::Steal<Arc<Task>> {
+        self.stealer.steal_many(&dest.worker)
     }
 
     /// Drain (and drop) all tasks that are queued for work.
