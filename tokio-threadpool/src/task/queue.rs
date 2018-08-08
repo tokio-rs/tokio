@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering::{Acquire, Release, AcqRel, Relaxed};
 
-use crossbeam_utils::cache_padded::CachePadded;
+use crossbeam_utils::CachePadded;
 
 #[derive(Debug)]
 pub(crate) struct Queue {

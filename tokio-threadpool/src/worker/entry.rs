@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 
-use crossbeam_utils::cache_padded::CachePadded;
+use crossbeam_utils::CachePadded;
 use deque;
 
 // TODO: None of the fields should be public

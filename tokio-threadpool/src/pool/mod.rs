@@ -28,7 +28,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 
-use crossbeam_utils::cache_padded::CachePadded;
+use crossbeam_utils::CachePadded;
 use rand;
 
 #[derive(Debug)]
