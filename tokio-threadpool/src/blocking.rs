@@ -29,8 +29,8 @@ pub struct BlockingError {
 ///
 /// # Return
 ///
-/// When the blocking closure is executed, `Ok(T)` is returned, where `T` is the
-/// closure's return value.
+/// When the blocking closure is executed, `Ok(Ready(T))` is returned, where
+/// `T` is the closure's return value.
 ///
 /// If the thread pool has shutdown, `Err` is returned.
 ///
