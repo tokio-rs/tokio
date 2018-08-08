@@ -27,7 +27,7 @@ tokio-io = { version = "0.1.7", path = "../tokio-io" }
 [dev-dependencies]
 tokio = { version = "0.1", path = "../" }
 cfg-if = "0.1"
-env_logger = { version = "0.4", default-features = false }
+env_logger = { version = "0.5", default-features = false }
 
 [target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]
 openssl = "0.10"

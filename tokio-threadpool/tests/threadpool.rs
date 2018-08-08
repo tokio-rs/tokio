@@ -21,7 +21,7 @@ fn ignore_results<F: Future + Send + 'static>(f: F) -> Box<Future<Item = (), Err
 
 #[test]
 fn natural_shutdown_simple_futures() {
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     for _ in 0..1_000 {
         let num_inc = Arc::new(AtomicUsize::new(0));
@@ -90,7 +90,7 @@ fn natural_shutdown_simple_futures() {
 
 #[test]
 fn force_shutdown_drops_futures() {
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     for _ in 0..1_000 {
         let num_inc = Arc::new(AtomicUsize::new(0));
@@ -147,7 +147,7 @@ fn force_shutdown_drops_futures() {
 
 #[test]
 fn drop_threadpool_drops_futures() {
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     for _ in 0..1_000 {
         let num_inc = Arc::new(AtomicUsize::new(0));
@@ -208,7 +208,7 @@ fn drop_threadpool_drops_futures() {
 fn thread_shutdown_timeout() {
     use std::sync::Mutex;
 
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     let (shutdown_tx, shutdown_rx) = mpsc::channel();
     let (complete_tx, complete_rx) = mpsc::channel();
@@ -252,7 +252,7 @@ fn thread_shutdown_timeout() {
 fn many_oneshot_futures() {
     const NUM: usize = 10_000;
 
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     for _ in 0..50 {
         let pool = ThreadPool::new();
@@ -283,7 +283,7 @@ fn many_multishot_futures() {
     const CYCLES: usize = 5;
     const TRACKS: usize = 50;
 
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     for _ in 0..50 {
         let pool = ThreadPool::new();

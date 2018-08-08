@@ -50,14 +50,14 @@ fn create_client_server_future() -> Box<Future<Item=(), Error=()> + Send> {
 
 #[test]
 fn runtime_tokio_run() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     tokio::run(create_client_server_future());
 }
 
 #[test]
 fn runtime_single_threaded() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let mut runtime = tokio::runtime::current_thread::Runtime::new()
         .unwrap();
@@ -67,7 +67,7 @@ fn runtime_single_threaded() {
 
 #[test]
 fn runtime_single_threaded_block_on() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     tokio::runtime::current_thread::block_on_all(create_client_server_future()).unwrap();
 }
@@ -135,7 +135,7 @@ fn runtime_single_threaded_racy_spawn() {
 
 #[test]
 fn runtime_multi_threaded() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let mut runtime = tokio::runtime::Builder::new()
         .build()

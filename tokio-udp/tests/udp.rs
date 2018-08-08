@@ -218,7 +218,7 @@ impl Encoder for ByteCodec {
 
 #[test]
 fn send_framed() {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
 
     let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
     let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));

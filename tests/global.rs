@@ -21,7 +21,7 @@ macro_rules! t {
 
 #[test]
 fn hammer_old() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let threads = (0..10).map(|_| {
         thread::spawn(|| {
@@ -77,7 +77,7 @@ fn hammer_split() {
     const N: usize = 100;
     const ITER: usize = 10;
 
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     for _ in 0..ITER {
         let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));

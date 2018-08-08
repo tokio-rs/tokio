@@ -25,4 +25,4 @@ iovec = "0.1"
 futures = "0.1.19"
 
 [dev-dependencies]
-env_logger = { version = "0.4", default-features = false }
+env_logger = { version = "0.5", default-features = false }
