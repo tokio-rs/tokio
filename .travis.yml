@@ -64,8 +64,8 @@ script:
     if [[ "$TARGET" ]]
     then
         rustup target add $TARGET
-        cargo check --all --target $TARGET
-        cargo check --tests --all --target $TARGET
+        cargo check --all --exclude tokio-tls --target $TARGET
+        cargo check --tests --all --exclude tokio-tls --target $TARGET
     else
         cargo test --all
         # Disable these tests for now as they are buggy

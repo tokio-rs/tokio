@@ -1,0 +1,50 @@
+[package]
+name = "tokio-tls"
+version = "0.2.0"
+authors = ["Carl Lerche <me@carllerche.com>",
+           "Alex Crichton <alex@alexcrichton.com>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-tls"
+description = """
+An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
+for nonblocking I/O streams.
+"""
+categories = ["asynchronous", "network-programming"]
+
+[badges]
+travis-ci = { repository = "tokio-rs/tokio-tls" }
+
+[dependencies]
+futures = "0.1.23"
+native-tls = "0.2"
+tokio-io = { version = "0.1", path = "../tokio-io" }
+
+[dev-dependencies]
+tokio = { version = "0.1", path = "../" }
+cfg-if = "0.1"
+env_logger = { version = "0.4", default-features = false }
+
+[target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]
+openssl = "0.10"
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dev-dependencies]
+security-framework = "0.2"
+
+[target.'cfg(windows)'.dev-dependencies]
+schannel = "0.1"
+
+[target.'cfg(windows)'.dev-dependencies.winapi]
+version = "0.3"
+features = [
+  "lmcons",
+  "basetsd",
+  "minwinbase",
+  "minwindef",
+  "ntdef",
+  "sysinfoapi",
+  "timezoneapi",
+  "wincrypt",
+  "winerror",
+]
