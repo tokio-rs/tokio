@@ -10,6 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
+use std::cmp::max;
 
 use num_cpus;
 use tokio_executor::Enter;
@@ -92,7 +93,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn new() -> Builder {
-        let num_cpus = num_cpus::get();
+        let num_cpus = max(1, num_cpus::get());
 
         let new_park = Box::new(|_: &WorkerId| {
             Box::new(BoxedPark::new(DefaultPark::new()))
@@ -136,7 +137,7 @@ impl Builder {
     /// ```
     pub fn pool_size(&mut self, val: usize) -> &mut Self {
         assert!(val >= 1, "at least one thread required");
-        assert!(val <= MAX_WORKERS, "max value is {}", 32768);
+        assert!(val <= MAX_WORKERS, "max value is {}", MAX_WORKERS);
 
         self.pool_size = val;
         self
