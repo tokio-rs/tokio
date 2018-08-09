@@ -46,18 +46,15 @@ script:
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
 
-        # TODO: Uncomment the sanitizer tests once the fence in steal issue is
-        #       resolved: https://github.com/tokio-rs/tokio/issues/329
-        #
-        # # === tokio-threadpool ====
-        #
-        # # Run address sanitizer
-        # RUSTFLAGS="-Z sanitizer=address" \
-        # cargo test -p tokio-threadpool --tests
-        #
-        # # Run thread sanitizer
-        # RUSTFLAGS="-Z sanitizer=thread" \
-        # cargo test -p tokio-threadpool --tests
+        # === tokio-threadpool ====
+
+        # Run address sanitizer
+        RUSTFLAGS="-Z sanitizer=address" \
+        cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
+
+        # Run thread sanitizer
+        RUSTFLAGS="-Z sanitizer=thread" \
+        cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
     fi
   - |
     set -e
