@@ -3,9 +3,6 @@ use {Handle, HandlePriv, Direction, Task};
 use futures::{Async, Poll, task};
 use mio::{self, Evented};
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 use std::{io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
@@ -279,23 +276,10 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Read, true, || Task::Futures1(task::current()))
+        self.poll_ready(Direction::Read, true, || task::current())
             .map(|v| match v {
                 Some(v) => Async::Ready(v),
                 _ => Async::NotReady,
-            })
-    }
-
-    /// Like `poll_ready_ready`, but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        use futures2::Async as Async2;
-        self.poll_ready(Direction::Read, true, || Task::Futures2(cx.waker().clone()))
-            .map(|v| match v {
-                Some(v) => Async2::Ready(v),
-                _ => Async2::Pending,
             })
     }
 
@@ -344,23 +328,10 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Write, true, || Task::Futures1(task::current()))
+        self.poll_ready(Direction::Write, true, || task::current())
             .map(|v| match v {
                 Some(v) => Async::Ready(v),
                 _ => Async::NotReady,
-            })
-    }
-
-    /// Like `poll_write_ready`, but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
-                            -> futures2::Poll<mio::Ready, io::Error>
-    {
-        use futures2::Async as Async2;
-        self.poll_ready(Direction::Write, true, || Task::Futures2(cx.waker().clone()))
-            .map(|v| match v {
-                Some(v) => Async2::Ready(v),
-                _ => Async2::Pending,
             })
     }
 

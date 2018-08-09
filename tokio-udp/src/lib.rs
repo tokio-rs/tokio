@@ -29,9 +29,6 @@ extern crate tokio_codec;
 extern crate tokio_io;
 extern crate tokio_reactor;
 
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
-
 mod frame;
 mod socket;
 mod send_dgram;

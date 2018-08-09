@@ -5,9 +5,6 @@ use mio;
 use mio::event::Evented;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::sync::atomic::AtomicUsize;
@@ -228,19 +225,6 @@ where E: Evented
         )
     }
 
-    /// Like `poll_read_ready` but compatible with futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context, mask: mio::Ready)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        assert!(!mask.is_writable(), "cannot poll for write readiness");
-        let mut res = || poll_ready!(
-            self, mask, read_readiness, take_read_ready,
-            self.inner.registration.poll_read_ready2(cx).map(::lower_async)
-        );
-        res().map(::lift_async)
-    }
-
     /// Clears the I/O resource's read readiness state and registers the current
     /// task to be notified once a read readiness event is received.
     ///
@@ -266,25 +250,6 @@ where E: Evented
         if self.poll_read_ready(ready)?.is_ready() {
             // Notify the current task
             task::current().notify();
-        }
-
-        Ok(())
-    }
-
-    /// Like `clear_read_ready` but compatible with futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn clear_read_ready2(&self, cx: &mut futures2::task::Context, ready: mio::Ready)
-        -> io::Result<()>
-    {
-        // Cannot clear write readiness
-        assert!(!ready.is_writable(), "cannot clear write readiness");
-        assert!(!::platform::is_hup(&ready), "cannot clear HUP readiness");
-
-        self.inner.read_readiness.fetch_and(!ready.as_usize(), Relaxed);
-
-        if self.poll_read_ready2(cx, ready)?.is_ready() {
-            // Notify the current task
-            cx.waker().wake()
         }
 
         Ok(())
@@ -319,22 +284,6 @@ where E: Evented
         )
     }
 
-    /// Like `poll_write_ready` but compatible with futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        let mut res = || poll_ready!(
-            self,
-            mio::Ready::writable(),
-            write_readiness,
-            take_write_ready,
-            self.inner.registration.poll_write_ready2(cx).map(::lower_async)
-        );
-        res().map(::lift_async)
-    }
-
-
     /// Resets the I/O resource's write readiness state and registers the current
     /// task to be notified once a write readiness event is received.
     ///
@@ -355,21 +304,6 @@ where E: Evented
         if self.poll_write_ready()?.is_ready() {
             // Notify the current task
             task::current().notify();
-        }
-
-        Ok(())
-    }
-
-    /// Like `clear_write_ready`, but compatible with futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn clear_write_ready2(&self, cx: &mut futures2::task::Context) -> io::Result<()> {
-        let ready = mio::Ready::writable();
-
-        self.inner.write_readiness.fetch_and(!ready.as_usize(), Relaxed);
-
-        if self.poll_write_ready2(cx)?.is_ready() {
-            // Notify the current task
-            cx.waker().wake()
         }
 
         Ok(())
@@ -399,28 +333,6 @@ where E: Evented + Read,
         }
 
         return r
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl<E> futures2::io::AsyncRead for PollEvented<E>
-    where E: Evented, E: Read,
-{
-    fn poll_read(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-                 -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.get_mut().read(buf) {
-            Ok(n) => Ok(futures2::Async::Ready(n)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
     }
 }
 
@@ -456,48 +368,6 @@ where E: Evented + Write,
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl<E> futures2::io::AsyncWrite for PollEvented<E>
-    where E: Evented, E: Write,
-{
-    fn poll_write(&mut self, cx: &mut futures2::task::Context, buf: &[u8])
-                  -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.poll_write_ready2(cx)? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.get_mut().write(buf) {
-            Ok(n) => Ok(futures2::Async::Ready(n)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.clear_write_ready2(cx)?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        if let futures2::Async::Pending = self.poll_write_ready2(cx)? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.get_mut().flush() {
-            Ok(_) => Ok(futures2::Async::Ready(())),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.clear_write_ready2(cx)?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn poll_close(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_flush(self, cx)
-    }
-}
-
-
 impl<E> AsyncRead for PollEvented<E>
 where E: Evented + Read,
 {
@@ -531,28 +401,6 @@ where E: Evented, &'a E: Read,
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl<'a, E> futures2::io::AsyncRead for &'a PollEvented<E>
-    where E: Evented, &'a E: Read,
-{
-    fn poll_read(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-                 -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.get_ref().read(buf) {
-            Ok(n) => Ok(futures2::Async::Ready(n)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-}
-
 impl<'a, E> Write for &'a PollEvented<E>
 where E: Evented, &'a E: Write,
 {
@@ -582,47 +430,6 @@ where E: Evented, &'a E: Write,
         }
 
         return r
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl<'a, E> futures2::io::AsyncWrite for &'a PollEvented<E>
-    where E: Evented, &'a E: Write,
-{
-    fn poll_write(&mut self, cx: &mut futures2::task::Context, buf: &[u8])
-                  -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.poll_write_ready2(cx)? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.get_ref().write(buf) {
-            Ok(n) => Ok(futures2::Async::Ready(n)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.clear_write_ready2(cx)?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        if let futures2::Async::Pending = self.poll_write_ready2(cx)? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.get_ref().flush() {
-            Ok(_) => Ok(futures2::Async::Ready(())),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.clear_write_ready2(cx)?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn poll_close(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_flush(self, cx)
     }
 }
 

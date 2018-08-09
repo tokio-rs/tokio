@@ -9,9 +9,6 @@ use futures::{Poll, Async};
 use mio;
 use tokio_reactor::{Handle, PollEvented};
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
 /// This object can be converted into a stream of incoming connections for
@@ -66,22 +63,6 @@ impl TcpListener {
         Ok((io, addr).into())
     }
 
-    /// Like `poll_accept`, but for futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_accept2(&mut self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<(TcpStream, SocketAddr), io::Error>
-    {
-        let (io, addr) = match self.poll_accept_std2(cx)? {
-            futures2::Async::Ready(x) => x,
-            futures2::Async::Pending => return Ok(futures2::Async::Pending),
-        };
-
-        let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io);
-
-        Ok((io, addr).into())
-    }
-
     #[deprecated(since = "0.1.2", note = "use poll_accept_std instead")]
     #[doc(hidden)]
     pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
@@ -118,25 +99,6 @@ impl TcpListener {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Like `poll_accept_std`, but for futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_accept_std2(&mut self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<(net::TcpStream, SocketAddr), io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.io.get_ref().accept_std() {
-            Ok(pair) => Ok(pair.into()),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
             }
             Err(e) => Err(e),
         }

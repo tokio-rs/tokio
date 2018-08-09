@@ -2,8 +2,6 @@
 use tokio_threadpool::Sender;
 
 use futures::future::{self, Future};
-#[cfg(feature = "unstable-futures")]
-use futures2;
 
 /// Executes futures on the runtime
 ///
@@ -73,26 +71,5 @@ impl ::executor::Executor for TaskExecutor {
         -> Result<(), ::executor::SpawnError>
     {
         self.inner.spawn(future)
-    }
-
-    #[cfg(feature = "unstable-futures")]
-    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
-        -> Result<(), futures2::executor::SpawnError>
-    {
-        self.inner.spawn2(future)
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-type Task2 = Box<futures2::Future<Item = (), Error = futures2::Never> + Send>;
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::executor::Executor for TaskExecutor {
-    fn spawn(&mut self, f: Task2) -> Result<(), futures2::executor::SpawnError> {
-        futures2::executor::Executor::spawn(&mut self.inner, f)
-    }
-
-    fn status(&self) -> Result<(), futures2::executor::SpawnError> {
-        futures2::executor::Executor::status(&self.inner)
     }
 }

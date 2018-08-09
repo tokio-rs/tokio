@@ -2,8 +2,6 @@ use pool::Pool;
 use sender::Sender;
 
 use futures::{Future, Poll, Async};
-#[cfg(feature = "unstable-futures")]
-use futures2;
 
 /// Future that resolves when the thread pool is shutdown.
 ///
@@ -34,28 +32,10 @@ impl Future for Shutdown {
     fn poll(&mut self) -> Poll<(), ()> {
         use futures::task;
 
-        self.inner().shutdown_task.task1.register_task(task::current());
+        self.inner().shutdown_task.task.register_task(task::current());
 
         if !self.inner().is_shutdown() {
             return Ok(Async::NotReady);
-        }
-
-        Ok(().into())
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::Future for Shutdown {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), ()> {
-        trace!("Shutdown::poll");
-
-        self.inner().shutdown_task.task2.register(cx.waker());
-
-        if 0 != self.inner().num_workers.load(Acquire) {
-            return Ok(futures2::Async::Pending);
         }
 
         Ok(().into())

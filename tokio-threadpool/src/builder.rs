@@ -16,9 +16,6 @@ use num_cpus;
 use tokio_executor::Enter;
 use tokio_executor::park::Park;
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 /// Builds a thread pool with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The thread

@@ -80,9 +80,6 @@ extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
 
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
-
 pub mod clock;
 pub mod executor;
 pub mod fs;
@@ -93,9 +90,6 @@ pub mod timer;
 pub mod util;
 
 pub use executor::spawn;
-#[cfg(feature = "unstable-futures")]
-pub use executor::spawn2;
-
 pub use runtime::run;
 
 pub mod io {

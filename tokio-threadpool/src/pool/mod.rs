@@ -116,9 +116,7 @@ impl Pool {
             backup_stack,
             blocking,
             shutdown_task: ShutdownTask {
-                task1: AtomicTask::new(),
-                #[cfg(feature = "unstable-futures")]
-                task2: futures2::task::AtomicWaker::new(),
+                task: AtomicTask::new(),
             },
             config,
         };
