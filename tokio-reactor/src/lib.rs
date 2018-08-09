@@ -30,11 +30,16 @@
 #![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.3")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
+extern crate crossbeam_utils;
 #[macro_use]
 extern crate futures;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate mio;
+extern crate num_cpus;
+extern crate parking_lot;
 extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
@@ -46,6 +51,7 @@ mod atomic_task;
 pub(crate) mod background;
 mod poll_evented;
 mod registration;
+mod sharded_rwlock;
 
 // ===== Public re-exports =====
 
@@ -56,6 +62,7 @@ pub use self::poll_evented::PollEvented;
 // ===== Private imports =====
 
 use atomic_task::AtomicTask;
+use sharded_rwlock::RwLock;
 
 use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
@@ -67,7 +74,7 @@ use std::mem;
 use std::cell::RefCell;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
-use std::sync::{Arc, Weak, RwLock};
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use log::Level;
@@ -335,7 +342,7 @@ impl Reactor {
     /// either successfully or with an error.
     pub fn is_idle(&self) -> bool {
         self.inner.io_dispatch
-            .read().unwrap()
+            .read()
             .is_empty()
     }
 
@@ -398,7 +405,7 @@ impl Reactor {
         // Create a scope to ensure that notifying the tasks stays out of the
         // lock's critical section.
         {
-            let io_dispatch = self.inner.io_dispatch.read().unwrap();
+            let io_dispatch = self.inner.io_dispatch.read();
 
             let io = match io_dispatch.get(token) {
                 Some(io) => io,
@@ -642,7 +649,7 @@ impl Inner {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
-        let mut io_dispatch = self.io_dispatch.write().unwrap();
+        let mut io_dispatch = self.io_dispatch.write();
 
         if io_dispatch.len() == MAX_SOURCES {
             return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
@@ -672,13 +679,13 @@ impl Inner {
 
     fn drop_source(&self, token: usize) {
         debug!("dropping I/O source: {}", token);
-        self.io_dispatch.write().unwrap().remove(token);
+        self.io_dispatch.write().remove(token);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
     fn register(&self, token: usize, dir: Direction, t: Task) {
         debug!("scheduling direction for: {}", token);
-        let io_dispatch = self.io_dispatch.read().unwrap();
+        let io_dispatch = self.io_dispatch.read();
         let sched = io_dispatch.get(token).unwrap();
 
         let (task, ready) = match dir {
@@ -699,7 +706,7 @@ impl Drop for Inner {
         // When a reactor is dropped it needs to wake up all blocked tasks as
         // they'll never receive a notification, and all connected I/O objects
         // will start returning errors pretty quickly.
-        let io = self.io_dispatch.read().unwrap();
+        let io = self.io_dispatch.read();
         for (_, io) in io.iter() {
             io.writer.notify();
             io.reader.notify();
