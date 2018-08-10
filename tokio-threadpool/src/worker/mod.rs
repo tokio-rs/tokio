@@ -224,7 +224,6 @@ impl Worker {
         let notify = Arc::new(Notifier {
             inner: Arc::downgrade(&self.inner),
         });
-        let mut sender = Sender { inner: self.inner.clone() };
 
         let mut first = true;
         let mut spin_cnt = 0;
@@ -238,7 +237,7 @@ impl Worker {
             let consistent = self.drain_inbound();
 
             // Run the next available task
-            if self.try_run_task(&notify, &mut sender) {
+            if self.try_run_task(&notify) {
                 if self.is_blocking.get() {
                     // Exit out of the run state
                     return;
@@ -296,12 +295,12 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     #[inline]
-    fn try_run_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
-        if self.try_run_owned_task(notify, sender) {
+    fn try_run_task(&self, notify: &Arc<Notifier>) -> bool {
+        if self.try_run_owned_task(notify) {
             return true;
         }
 
-        self.try_steal_task(notify, sender)
+        self.try_steal_task(notify)
     }
 
     /// Checks the worker's current state, updating it as needed.
@@ -383,13 +382,13 @@ impl Worker {
     /// Runs the next task on this worker's queue.
     ///
     /// Returns `true` if work was found.
-    fn try_run_owned_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
+    fn try_run_owned_task(&self, notify: &Arc<Notifier>) -> bool {
         use deque::Pop;
 
         // Poll the internal queue for a task to run
         match self.entry().pop_task() {
             Pop::Data(task) => {
-                self.run_task(task, notify, sender);
+                self.run_task(task, notify);
                 true
             }
             Pop::Empty => false,
@@ -400,7 +399,7 @@ impl Worker {
     /// Tries to steal a task from another worker.
     ///
     /// Returns `true` if work was found
-    fn try_steal_task(&self, notify: &Arc<Notifier>, sender: &mut Sender) -> bool {
+    fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
         use deque::Steal;
 
         debug_assert!(!self.is_blocking.get());
@@ -416,7 +415,7 @@ impl Worker {
                     Steal::Data(task) => {
                         trace!("stole task");
 
-                        self.run_task(task, notify, sender);
+                        self.run_task(task, notify);
 
                         trace!("try_steal_task -- signal_work; self={}; from={}",
                                self.id.0, idx);
@@ -446,10 +445,10 @@ impl Worker {
         found_work
     }
 
-    fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>, sender: &mut Sender) {
+    fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>) {
         use task::Run::*;
 
-        let run = self.run_task2(&task, notify, sender);
+        let run = self.run_task2(&task, notify);
 
         // TODO: Try to claim back the worker state in case the backup thread
         // did not start up fast enough. This is a performance optimization.
@@ -512,8 +511,7 @@ impl Worker {
     /// function.
     fn run_task2(&self,
                  task: &Arc<Task>,
-                 notify: &Arc<Notifier>,
-                 sender: &mut Sender)
+                 notify: &Arc<Notifier>)
         -> task::Run
     {
         struct Guard<'a> {
@@ -549,7 +547,7 @@ impl Worker {
             allocated_at_run: can_block == CanBlock::Allocated
         };
 
-        task.run(notify, sender)
+        task.run(notify)
     }
 
     /// Drains all tasks on the extern queue and pushes them onto the internal

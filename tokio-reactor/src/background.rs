@@ -1,4 +1,4 @@
-use {Reactor, Handle, Task};
+use {Reactor, Handle};
 use atomic_task::AtomicTask;
 
 use futures::{Future, Async, Poll, task};
@@ -136,7 +136,7 @@ impl Future for Shutdown {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
-        let task = Task::Futures1(task::current());
+        let task = task::current();
         self.inner.shared.shutdown_task.register_task(task);
 
         if !self.inner.is_shutdown() {

@@ -129,8 +129,6 @@ use tokio_threadpool as threadpool;
 
 use futures;
 use futures::future::Future;
-#[cfg(feature = "unstable-futures")]
-use futures2;
 
 /// Handle to the Tokio runtime.
 ///
@@ -212,18 +210,6 @@ where F: Future<Item = (), Error = ()> + Send + 'static,
 {
     let mut runtime = Runtime::new().unwrap();
     runtime.spawn(future);
-    runtime.shutdown_on_idle().wait().unwrap();
-}
-
-/// Start the Tokio runtime using the supplied future to bootstrap execution.
-///
-/// Identical to `run` but works with futures 0.2-style futures.
-#[cfg(feature = "unstable-futures")]
-pub fn run2<F>(future: F)
-    where F: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
-{
-    let mut runtime = Runtime::new().unwrap();
-    runtime.spawn2(future);
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
@@ -350,19 +336,6 @@ impl Runtime {
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
         self.inner_mut().pool.sender().spawn(future).unwrap();
-        self
-    }
-
-    /// Spawn a futures 0.2-style future onto the Tokio runtime.
-    ///
-    /// Otherwise identical to `spawn`
-    #[cfg(feature = "unstable-futures")]
-    pub fn spawn2<F>(&mut self, future: F) -> &mut Self
-        where F: futures2::Future<Item = (), Error = futures2::Never> + Send + 'static,
-    {
-        futures2::executor::Executor::spawn(
-            self.inner_mut().pool.sender_mut(), Box::new(future)
-        ).unwrap();
         self
     }
 

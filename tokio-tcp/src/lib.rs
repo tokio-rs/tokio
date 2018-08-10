@@ -30,9 +30,6 @@ extern crate mio;
 extern crate tokio_io;
 extern crate tokio_reactor;
 
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
-
 mod incoming;
 mod listener;
 mod stream;
@@ -41,19 +38,3 @@ pub use self::incoming::Incoming;
 pub use self::listener::TcpListener;
 pub use self::stream::TcpStream;
 pub use self::stream::ConnectFuture;
-
-#[cfg(feature = "unstable-futures")]
-fn lift_async<T>(old: futures::Async<T>) -> futures2::Async<T> {
-    match old {
-        futures::Async::Ready(x) => futures2::Async::Ready(x),
-        futures::Async::NotReady => futures2::Async::Pending,
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
-    match new {
-        futures2::Async::Ready(x) => futures::Async::Ready(x),
-        futures2::Async::Pending => futures::Async::NotReady,
-    }
-}

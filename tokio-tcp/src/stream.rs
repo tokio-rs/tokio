@@ -11,9 +11,6 @@ use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_reactor::{Handle, PollEvented};
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 /// An I/O object representing a TCP stream connected to a remote endpoint.
 ///
 /// A TCP stream can either be created by connecting to an endpoint, via the
@@ -138,14 +135,6 @@ impl TcpStream {
         self.io.poll_read_ready(mask)
     }
 
-    /// Like `poll_read_ready`, but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context, mask: mio::Ready)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        self.io.poll_read_ready2(cx, mask)
-    }
-
     /// Check the TCP stream's write readiness state.
     ///
     /// This always checks for writable readiness and also checks for HUP
@@ -162,14 +151,6 @@ impl TcpStream {
     /// This function panics if called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.io.poll_write_ready()
-    }
-
-    /// Like `poll_write_ready`, but compatible with futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        self.io.poll_write_ready2(cx)
     }
 
     /// Returns the local address that this stream is bound to.
@@ -217,25 +198,6 @@ impl TcpStream {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Like `poll_peek` but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_peek2(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.io.get_ref().peek(buf) {
-            Ok(ret) => Ok(ret.into()),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
             }
             Err(e) => Err(e),
         }
@@ -411,25 +373,6 @@ impl AsyncRead for TcpStream {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl futures2::io::AsyncRead for TcpStream {
-    fn poll_read(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncRead::poll_read(&mut self.io, cx, buf)
-    }
-
-    fn poll_vectored_read(&mut self, cx: &mut futures2::task::Context, vec: &mut [&mut IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncRead::poll_vectored_read(&mut &*self, cx, vec)
-    }
-
-    unsafe fn initializer(&self) -> futures2::io::Initializer {
-        futures2::io::Initializer::nop()
-    }
-}
-
 impl AsyncWrite for TcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         <&TcpStream>::shutdown(&mut &*self)
@@ -437,29 +380,6 @@ impl AsyncWrite for TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         <&TcpStream>::write_buf(&mut &*self, buf)
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::io::AsyncWrite for TcpStream {
-    fn poll_write(&mut self, cx: &mut futures2::task::Context, buf: &[u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncWrite::poll_write(&mut self.io, cx, buf)
-    }
-
-    fn poll_vectored_write(&mut self, cx: &mut futures2::task::Context, vec: &[&IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncWrite::poll_vectored_write(&mut &*self, cx, vec)
-    }
-
-    fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_flush(&mut self.io, cx)
-    }
-
-    fn poll_close(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_close(&mut self.io, cx)
     }
 }
 
@@ -535,40 +455,6 @@ impl<'a> AsyncRead for &'a TcpStream {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl<'a> futures2::io::AsyncRead for &'a TcpStream {
-    fn poll_read(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncRead::poll_read(&mut &self.io, cx, buf)
-    }
-
-    fn poll_vectored_read(&mut self, cx: &mut futures2::task::Context, vec: &mut [&mut IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending)
-        }
-
-        let r = self.io.get_ref().read_bufs(vec);
-
-        match r {
-            Ok(n) => {
-                Ok(futures2::Async::Ready(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    unsafe fn initializer(&self) -> futures2::io::Initializer {
-        futures2::io::Initializer::nop()
-    }
-}
-
 impl<'a> AsyncWrite for &'a TcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
@@ -603,44 +489,6 @@ impl<'a> AsyncWrite for &'a TcpStream {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl<'a> futures2::io::AsyncWrite for &'a TcpStream {
-    fn poll_write(&mut self, cx: &mut futures2::task::Context, buf: &[u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncWrite::poll_write(&mut &self.io, cx, buf)
-    }
-
-    fn poll_vectored_write(&mut self, cx: &mut futures2::task::Context, vec: &[&IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_write_ready2(cx)? {
-            return Ok(futures2::Async::Pending)
-        }
-
-        let r = self.io.get_ref().write_bufs(vec);
-
-        match r {
-            Ok(n) => {
-                Ok(futures2::Async::Ready(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready2(cx)?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_flush(&mut &self.io, cx)
-    }
-
-    fn poll_close(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_close(&mut &self.io, cx)
-    }
-}
-
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
@@ -653,16 +501,6 @@ impl Future for ConnectFuture {
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
         self.inner.poll()
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::Future for ConnectFuture {
-    type Item = TcpStream;
-    type Error = io::Error;
-
-    fn poll(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<TcpStream, io::Error> {
-        futures2::Future::poll(&mut self.inner, cx)
     }
 }
 
@@ -711,17 +549,6 @@ impl Future for ConnectFutureState {
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
         self.poll_inner(|io| io.poll_write_ready())
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::Future for ConnectFutureState {
-    type Item = TcpStream;
-    type Error = io::Error;
-
-    fn poll(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<TcpStream, io::Error> {
-        self.poll_inner(|io| io.poll_write_ready2(cx).map(::lower_async))
-            .map(::lift_async)
     }
 }
 

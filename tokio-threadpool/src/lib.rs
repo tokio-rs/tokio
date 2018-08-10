@@ -89,9 +89,6 @@ extern crate rand;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
-
 // ## Crate layout
 //
 // The primary type, `Pool`, holds the majority of a thread pool's state,
@@ -148,8 +145,6 @@ mod blocking;
 mod builder;
 mod callback;
 mod config;
-#[cfg(feature = "unstable-futures")]
-mod futures2_wake;
 mod notifier;
 mod pool;
 mod sender;
