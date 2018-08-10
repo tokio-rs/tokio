@@ -1,6 +1,6 @@
 extern crate futures;
 extern crate rand;
-extern crate tempdir;
+extern crate tempfile;
 extern crate tokio_fs;
 extern crate tokio_io;
 extern crate tokio_threadpool;
@@ -13,7 +13,7 @@ use futures::Future;
 use futures::future::poll_fn;
 use futures::sync::oneshot;
 use rand::{thread_rng, Rng};
-use tempdir::TempDir;
+use tempfile::Builder as TmpBuilder;
 
 use std::fs::File as StdFile;
 use std::io::{Read, SeekFrom};
@@ -22,7 +22,7 @@ use std::io::{Read, SeekFrom};
 fn read_write() {
     const NUM_CHARS: usize = 16 * 1_024;
 
-    let dir = TempDir::new("tokio-fs-tests").unwrap();
+    let dir = TmpBuilder::new().prefix("tokio-fs-tests").tempdir().unwrap();
     let file_path = dir.path().join("read_write.txt");
 
     let contents: Vec<u8> = thread_rng().gen_ascii_chars()
@@ -81,7 +81,7 @@ fn read_write() {
 
 #[test]
 fn metadata() {
-    let dir = TempDir::new("tokio-fs-tests").unwrap();
+    let dir = TmpBuilder::new().prefix("tokio-fs-tests").tempdir().unwrap();
     let file_path = dir.path().join("metadata.txt");
 
     let pool = Builder::new().pool_size(1).build();
@@ -111,7 +111,7 @@ fn metadata() {
 
 #[test]
 fn seek() {
-    let dir = TempDir::new("tokio-fs-tests").unwrap();
+    let dir = TmpBuilder::new().prefix("tokio-fs-tests").tempdir().unwrap();
     let file_path = dir.path().join("seek.txt");
 
     let pool = Builder::new().pool_size(1).build();

@@ -89,7 +89,7 @@ cfg_if! {
 }
 
 fn get_host(host: &'static str) -> Error {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
 
     let addr = format!("{}:443", host);
     let addr = t!(addr.to_socket_addrs()).next().unwrap();

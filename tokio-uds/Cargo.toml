@@ -28,4 +28,4 @@ tokio-io = { version = "0.1.6", path = "../tokio-io" }
 
 [dev-dependencies]
 tokio = { version = "0.1.6", path = "../" }
-tempdir = "0.3.7"
+tempfile = "3"

@@ -4,7 +4,7 @@ extern crate futures;
 extern crate tokio;
 extern crate tokio_uds;
 
-extern crate tempdir;
+extern crate tempfile;
 
 use tokio_uds::*;
 
@@ -13,7 +13,7 @@ use tokio::runtime::current_thread::Runtime;
 
 use futures::{Future, Stream};
 use futures::sync::oneshot;
-use tempdir::TempDir;
+use tempfile::Builder;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -24,7 +24,7 @@ macro_rules! t {
 
 #[test]
 fn echo() {
-    let dir = TempDir::new("tokio-uds-tests").unwrap();
+    let dir = Builder::new().prefix("tokio-uds-tests").tempdir().unwrap();
     let sock_path = dir.path().join("connect.sock");
 
     let mut rt = Runtime::new().unwrap();
