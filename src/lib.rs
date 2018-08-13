@@ -73,7 +73,7 @@
 //! # fn main() {}
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/tokio-signal/0.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-signal/0.2")]
 #![deny(missing_docs)]
 
 extern crate futures;
