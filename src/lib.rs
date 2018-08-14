@@ -73,6 +73,7 @@ extern crate mio;
 extern crate tokio_current_thread;
 extern crate tokio_io;
 extern crate tokio_executor;
+extern crate tokio_codec;
 extern crate tokio_fs;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
@@ -91,6 +92,29 @@ pub mod util;
 
 pub use executor::spawn;
 pub use runtime::run;
+
+pub mod codec {
+    //! Utilities for encoding and decoding frames.
+    //!
+    //! Contains adapters to go from streams of bytes, [`AsyncRead`] and
+    //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
+    //! Framed streams are also known as [transports].
+    //!
+    //! [`AsyncRead`]: #
+    //! [`AsyncWrite`]: #
+    //! [`Sink`]: #
+    //! [`Stream`]: #
+    //! [transports]: #
+
+    pub use tokio_codec::{
+        Decoder,
+        Encoder,
+        Framed,
+        FramedParts,
+        FramedRead,
+        FramedWrite,
+    };
+}
 
 pub mod io {
     //! Asynchronous I/O.

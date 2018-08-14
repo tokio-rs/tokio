@@ -21,7 +21,6 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate time;
 extern crate tokio;
-extern crate tokio_codec;
 extern crate tokio_io;
 
 use std::{env, fmt, io};
@@ -29,8 +28,7 @@ use std::net::SocketAddr;
 
 use tokio::net::{TcpStream, TcpListener};
 use tokio::prelude::*;
-
-use tokio_codec::{Encoder, Decoder};
+use tokio::codec::{Encoder, Decoder};
 
 use bytes::BytesMut;
 use http::header::HeaderValue;

@@ -17,7 +17,6 @@
 #![deny(warnings)]
 
 extern crate tokio;
-extern crate tokio_codec;
 extern crate tokio_io;
 extern crate futures;
 extern crate bytes;
@@ -83,7 +82,7 @@ fn main() {
 mod codec {
     use std::io;
     use bytes::{BufMut, BytesMut};
-    use tokio_codec::{Encoder, Decoder};
+    use tokio::codec::{Encoder, Decoder};
 
     /// A simple `Codec` implementation that just ships bytes around.
     ///
@@ -121,9 +120,9 @@ mod codec {
 
 mod tcp {
     use tokio;
-    use tokio_codec::Decoder;
     use tokio::net::TcpStream;
     use tokio::prelude::*;
+    use tokio::codec::Decoder;
 
     use bytes::BytesMut;
     use codec::Bytes;
