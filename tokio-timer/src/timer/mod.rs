@@ -311,7 +311,7 @@ where T: Park,
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = ms(self.now.now() - self.inner.start, Round::Down);
+        let now = ::ms(self.now.now() - self.inner.start, ::Round::Down);
 
         loop {
             let expiration = match self.next_expiration() {
@@ -585,7 +585,7 @@ impl Inner {
             return 0;
         }
 
-        ms(deadline - self.start, Round::Up)
+        ::ms(deadline - self.start, ::Round::Up)
     }
 }
 
@@ -594,30 +594,6 @@ impl fmt::Debug for Inner {
         fmt.debug_struct("Inner")
             .finish()
     }
-}
-
-enum Round {
-    Up,
-    Down,
-}
-
-/// Convert a `Duration` to milliseconds, rounding up and saturating at
-/// `u64::MAX`.
-///
-/// The saturating is fine because `u64::MAX` milliseconds are still many
-/// million years.
-#[inline]
-fn ms(duration: Duration, round: Round) -> u64 {
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
-
-    // Round up.
-    let millis = match round {
-        Round::Up => (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI,
-        Round::Down => duration.subsec_nanos() / NANOS_PER_MILLI,
-    };
-
-    duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
 }
 
 #[cfg(test)]
