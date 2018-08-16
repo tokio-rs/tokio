@@ -81,6 +81,9 @@ extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
 
+#[cfg(unix)]
+extern crate tokio_uds;
+
 pub mod clock;
 pub mod executor;
 pub mod fs;
