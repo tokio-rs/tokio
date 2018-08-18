@@ -275,6 +275,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::timer::DelayQueue;
     /// use std::time::{Instant, Duration};
     ///
+    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
     ///     "foo", Instant::now() + Duration::from_secs(5));
@@ -282,6 +283,7 @@ impl<T> DelayQueue<T> {
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
     /// assert_eq!(*item.get_ref(), "foo");
+    /// # }
     /// ```
     ///
     /// [`poll`]: #method.poll
@@ -342,12 +344,14 @@ impl<T> DelayQueue<T> {
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
+    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
     /// assert_eq!(*item.get_ref(), "foo");
+    /// # }
     /// ```
     ///
     /// [`poll`]: #method.poll
@@ -395,12 +399,14 @@ impl<T> DelayQueue<T> {
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
+    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
     /// assert_eq!(*item.get_ref(), "foo");
+    /// # }
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
         use wheel::Stack;
@@ -444,6 +450,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::timer::DelayQueue;
     /// use std::time::{Duration, Instant};
     ///
+    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
@@ -451,7 +458,8 @@ impl<T> DelayQueue<T> {
     ///
     /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
-    /// // "foo"isnow scheduledto be returned in 10 seconds
+    /// // "foo"is now scheduledto be returned in 10 seconds
+    /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
         self.wheel.remove(&key.index, &mut self.slab);
@@ -498,6 +506,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
+    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
@@ -505,7 +514,8 @@ impl<T> DelayQueue<T> {
     ///
     /// delay_queue.reset(&key, Duration::from_secs(10));
     ///
-    /// // "foo"isnow scheduledto be returned in 10 seconds
+    /// // "foo"is now scheduledto be returned in 10 seconds
+    /// # }
     /// ```
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
         self.reset_at(key, now() + timeout);
@@ -526,6 +536,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
+    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
     /// delay_queue.insert("foo", Duration::from_secs(5));
@@ -535,6 +546,7 @@ impl<T> DelayQueue<T> {
     /// delay_queue.clear();
     ///
     /// assert!(delay_queue.is_empty());
+    /// # }
     /// ```
     pub fn clear(&mut self) {
         self.slab.clear();
