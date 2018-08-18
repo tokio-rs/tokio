@@ -180,7 +180,7 @@ fn reset_entry() {
 
         turn(timer, ms(1));
 
-        queue.reset(&key, now + ms(10));
+        queue.reset_at(&key, now + ms(10));
 
         task.enter(|| {
             assert_not_ready!(queue);
@@ -204,4 +204,20 @@ fn reset_entry() {
         let entry = assert_ready!(queue);
         assert!(entry.is_none())
     });
+}
+
+#[test]
+fn remove_expired_item() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+
+        let now = time.now();
+
+        turn(timer, ms(10));
+
+        let key = queue.insert_at("foo", now);
+
+        let entry = queue.remove(&key);
+        assert_eq!(entry.into_inner(), "foo");
+    })
 }

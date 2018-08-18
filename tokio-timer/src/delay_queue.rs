@@ -34,7 +34,7 @@ use std::time::{Duration, Instant};
 ///
 /// # `Stream` implementation
 ///
-/// TODO: Notes on `None`.
+/// TODO: Notes on `None` and on ordering.
 ///
 /// # Implementation
 ///
@@ -169,6 +169,9 @@ struct Data<T> {
     /// The instant at which the item is returned.
     when: u64,
 
+    /// Set to true when stored in the `expired` queue
+    expired: bool,
+
     /// Next entry in the stack
     next: Option<usize>,
 
@@ -182,6 +185,8 @@ const MAX_ENTRIES: usize = (1 << 30) - 1;
 impl<T> DelayQueue<T> {
     /// Create a new, empty, `DelayQueue`
     ///
+    /// The queue will not allocate storage until items are inserted into it.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -189,9 +194,34 @@ impl<T> DelayQueue<T> {
     /// let delay_queue: DelayQueue<u32> = DelayQueue::new();
     /// ```
     pub fn new() -> DelayQueue<T> {
+        DelayQueue::with_capacity(0)
+    }
+
+    /// Create a new, empty, `DelayQueue` with the specified capacity.
+    ///
+    /// The queue will be able to hold at least `capacity` elements without
+    /// reallocating. If `capacity` is 0, the queue will not allocate for
+    /// storage.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use tokio_timer::DelayQueue;
+    /// # use std::time::Duration;
+    /// let mut delay_queue = DelayQueue::with_capacity(10);
+    ///
+    /// // These insertions are done without further allocation
+    /// for i in 0..10 {
+    ///     delay_queue.insert(i, Duration::from_secs(i));
+    /// }
+    ///
+    /// // This will make the queue allocate additional storage
+    /// delay_queue.insert(11, Duration::from_secs(11));
+    /// ```
+    pub fn with_capacity(capacity: usize) -> DelayQueue<T> {
         DelayQueue {
             wheel: Wheel::new(),
-            slab: Slab::new(),
+            slab: Slab::with_capacity(capacity),
             expired: Stack::default(),
             delay: None,
             poll: wheel::Poll::new(0),
@@ -218,6 +248,10 @@ impl<T> DelayQueue<T> {
     ///
     /// See [type] level documentation for more details.
     ///
+    /// # Panics
+    ///
+    /// This function panics if `when` is too far in the future.
+    ///
     /// # Examples
     ///
     /// Basic usage
@@ -225,10 +259,11 @@ impl<T> DelayQueue<T> {
     /// ```rust
     /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
-    /// use std::time::Instant;
+    /// use std::time::{Instant, Duration};
     ///
     /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert_at("foo", Instant::now());
+    /// let key = delay_queue.insert_at(
+    ///     "foo", Instant::now() + Duration::from_secs(5));
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
@@ -250,6 +285,7 @@ impl<T> DelayQueue<T> {
         let key = self.slab.insert(Data {
             inner: value,
             when,
+            expired: false,
             next: None,
             prev: None,
         });
@@ -278,6 +314,11 @@ impl<T> DelayQueue<T> {
     ///
     /// See [type] level documentation for more details.
     ///
+    /// # Panics
+    ///
+    /// This function panics if `timeout` is greater than the maximum supported
+    /// duration.
+    ///
     /// # Examples
     ///
     /// Basic usage
@@ -285,10 +326,10 @@ impl<T> DelayQueue<T> {
     /// ```rust
     /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
-    /// use std::time::Instant;
+    /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert_at("foo", Instant::now());
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
@@ -311,6 +352,7 @@ impl<T> DelayQueue<T> {
         match self.wheel.insert(when, key, &mut self.slab) {
             Ok(_) => {}
             Err((_, InsertError::Elapsed)) => {
+                self.slab[key].expired = true;
                 // The delay is already expired, store it in the expired queue
                 self.expired.push(key, &mut self.slab);
             }
@@ -320,9 +362,42 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// TODO: Dox
+    /// Remove the item associated with `key` from the queue.
+    ///
+    /// There must be an item associated with `key`. The function returns the
+    /// removed item as well as the `Instant` at which it will the delay will
+    /// have expired.
+    ///
+    /// # Panics
+    ///
+    /// The function panics if `key` is not contained by the queue.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// use tokio::timer::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    ///
+    /// // Remove the entry
+    /// let item = delay_queue.remove(&key);
+    /// assert_eq!(*item.get_ref(), "foo");
+    /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
-        self.wheel.remove(&key.index, &mut self.slab);
+        use wheel::Stack;
+
+        // Special case the `expired` queue
+        if self.slab[key.index].expired {
+            self.expired.remove(&key.index, &mut self.slab);
+        } else {
+            self.wheel.remove(&key.index, &mut self.slab);
+        }
+
         let data = self.slab.remove(key.index);
 
         Expired {
@@ -332,8 +407,39 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// TODO: Dox
-    pub fn reset(&mut self, key: &Key, when: Instant) {
+    /// Sets the delay of the item associated with `key` to expire at `when`.
+    ///
+    /// This function is identical to `reset` but takes an `Instant` instead of
+    /// a `Duration`.
+    ///
+    /// The item remains in the queue but the delay is set to expire at `when`.
+    /// If `when` is in the past, then the item is immediately made available to
+    /// the caller.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `when` is too far in the future or if `key` is
+    /// not contained by the queue.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// use tokio::timer::DelayQueue;
+    /// use std::time::{Duration, Instant};
+    ///
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    ///
+    /// // "foo" is scheduled to be returned in 5 seconds
+    ///
+    /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
+    ///
+    /// // "foo"isnow scheduledto be returned in 10 seconds
+    /// ```
+    pub fn reset_at(&mut self, key: &Key, when: Instant) {
         self.wheel.remove(&key.index, &mut self.slab);
 
         // Normalize the deadline. Values cannot be set to expire in the past.
@@ -354,30 +460,137 @@ impl<T> DelayQueue<T> {
         self.insert_idx(when, key.index);
     }
 
-    /// TODO: Dox
+    /// Sets the delay of the item associated with `key` to expire after
+    /// `timeout`.
+    ///
+    /// This function is identical to `reset_at` but takes a `Duration` instead
+    /// of an `Instant`.
+    ///
+    /// The item remains in the queue but the delay is set to expire after
+    /// `timeout`.  If `timeout` is zero, then the item is immediately made
+    /// available to the caller.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `timeout` is greater than the maximum supported
+    /// duration or if `key` is not contained by the queue.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// use tokio::timer::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    ///
+    /// // "foo" is scheduled to be returned in 5 seconds
+    ///
+    /// delay_queue.reset(&key, Duration::from_secs(10));
+    ///
+    /// // "foo"isnow scheduledto be returned in 10 seconds
+    /// ```
+    pub fn reset(&mut self, key: &Key, timeout: Duration) {
+        self.reset_at(key, now() + timeout);
+    }
+
+    /// Clears the queue, removing all items.
+    ///
+    /// After calling `clear`, [`poll`] will return `Ok(Ready(None))`.
+    ///
+    /// Note that this method has no effect on the allocated capacity.
+    ///
+    /// [`poll`]: #method.poll
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// use tokio::timer::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// let mut delay_queue = DelayQueue::new();
+    ///
+    /// delay_queue.insert("foo", Duration::from_secs(5));
+    ///
+    /// assert!(!delay_queue.is_empty());
+    ///
+    /// delay_queue.clear();
+    ///
+    /// assert!(delay_queue.is_empty());
+    /// ```
     pub fn clear(&mut self) {
-        unimplemented!();
+        self.slab.clear();
+        self.expired = Stack::default();
+        self.wheel = Wheel::new();
+        self.delay = None;
     }
 
-    /// TODO: Dox
-    pub fn new_with_capacity() -> DelayQueue<T> {
-        unimplemented!();
-    }
-
-    /// TODO: Dox
+    /// Returns the number of elements the queue can hold without reallocating.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use tokio_timer::DelayQueue;
+    /// let delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
+    /// assert_eq!(delay_queue.capacity(), 10);
+    /// ```
     pub fn capacity(&self) -> usize {
-        unimplemented!();
+        self.slab.capacity()
     }
 
-    /// TODO: Dox
+    /// Reserve capacity for at least `additional` more items to be queued
+    /// without allocating.
+    ///
+    /// `reserve` does nothing if the queue already has sufficient capacity for
+    /// `additional` more values. If more capacity is required, a new segment of
+    /// memory will be allocated and all existing values will be copied into it.
+    /// As such, if the queue is already very large, a call to `reserve` can end
+    /// up being expensive.
+    ///
+    /// The queue may reserve more than `additional` extra space in order to
+    /// avoid frequent reallocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the new capacity exceeds the maximum number of entries the
+    /// queue can contain.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio_timer::DelayQueue;
+    /// # use std::time::Duration;
+    /// let mut delay_queue = DelayQueue::new();
+    /// delay_queue.insert("hello", Duration::from_secs(10));
+    /// delay_queue.reserve(10);
+    /// assert!(delay_queue.capacity() >= 11);
+    /// ```
     pub fn reserve(&mut self, additional: usize) {
-        drop(additional);
-        unimplemented!();
+        self.slab.reserve(additional);
     }
 
-    /// TODO: Dox
+    /// Returns `true` if there are no items in the queue.
+    ///
+    /// Note that this function returns `false` even if all items have not yet
+    /// expired and a call to `poll` will return `NotReady`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio_timer::DelayQueue;
+    /// use std::time::Duration;
+    /// let mut delay_queue = DelayQueue::new();
+    /// assert!(delay_queue.is_empty());
+    ///
+    /// delay_queue.insert("hello", Duration::from_secs(5));
+    /// assert!(!delay_queue.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
-        unimplemented!();
+        self.slab.is_empty()
     }
 
     /// Polls the queue, returning the index of the next slot in the slab that
