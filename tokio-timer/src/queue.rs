@@ -45,6 +45,59 @@ use std::time::{Duration, Instant};
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
 ///
+/// # Usage
+///
+/// Using `DelayQueue` to manage cache entries.
+///
+/// ```rust
+/// #[macro_use]
+/// extern crate futures;
+/// # extern crate tokio_timer;
+/// # type CacheKey = String;
+/// # type Value = String;
+/// # use tokio_timer::{queue, DelayQueue, Error};
+/// use futures::{Async, Poll, Stream};
+/// use std::collections::HashMap;
+/// use std::time::{Duration, Instant};
+///
+/// struct Cache {
+///     entries: HashMap<CacheKey, (Value, queue::Key)>,
+///     expirations: DelayQueue<CacheKey>,
+/// }
+///
+/// const TTL_SECS: u64 = 30;
+///
+/// impl Cache {
+///     fn insert(&mut self, key: CacheKey, value: Value) {
+///         let expiration = Instant::now() + Duration::from_secs(TTL_SECS);
+///         let delay = self.expirations
+///             .insert(key.clone(), expiration);
+///
+///         self.entries.insert(key, (value, delay));
+///     }
+///
+///     fn get(&self, key: &CacheKey) -> Option<&Value> {
+///         self.entries.get(key)
+///             .map(|&(ref v, _)| v)
+///     }
+///
+///     fn remove(&mut self, key: &CacheKey) {
+///         if let Some((_, cache_key)) = self.entries.remove(key) {
+///             self.expirations.remove(&cache_key);
+///         }
+///     }
+///
+///     fn poll_purge(&mut self) -> Poll<(), Error> {
+///         while let Some(entry) = try_ready!(self.expirations.poll()) {
+///             self.entries.remove(entry.get_ref());
+///         }
+///
+///         Ok(Async::Ready(()))
+///     }
+/// }
+/// # fn main() {}
+/// ```
+///
 /// [`insert`]: #
 /// [`Key`]: #
 /// [`Stream`]: #
