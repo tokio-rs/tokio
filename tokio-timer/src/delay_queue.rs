@@ -52,10 +52,10 @@ use std::time::{Duration, Instant};
 /// ```rust
 /// #[macro_use]
 /// extern crate futures;
-/// # extern crate tokio_timer;
+/// extern crate tokio;
 /// # type CacheKey = String;
 /// # type Value = String;
-/// # use tokio_timer::{delay_queue, DelayQueue, Error};
+/// use tokio::timer::{delay_queue, DelayQueue, Error};
 /// use futures::{Async, Poll, Stream};
 /// use std::collections::HashMap;
 /// use std::time::{Duration, Instant};
@@ -98,14 +98,14 @@ use std::time::{Duration, Instant};
 /// # fn main() {}
 /// ```
 ///
-/// [`insert`]: #
-/// [`Key`]: #
-/// [`Stream`]: #
-/// [`poll`]: #
-/// [`Timer`]: #
-/// [`slab`]: #
-/// [`capacity`]: #
-/// [`reserve`]: #
+/// [`insert`]: #method.insert
+/// [`Key`]: struct.Key.html
+/// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+/// [`poll`]: #method.poll
+/// [`Timer`]: ../struct.Timer.html
+/// [`slab`]: https://docs.rs/slab
+/// [`capacity`]: #method.capacity
+/// [`reserve`]: #method.reserve
 #[derive(Debug)]
 pub struct DelayQueue<T> {
     /// Stores data associated with entries
@@ -128,7 +128,9 @@ pub struct DelayQueue<T> {
     start: Instant,
 }
 
-/// TOOD: Dox
+/// An entry in `DelayQueue` that has expired and removed.
+///
+/// Values are returned by `DelayQueue::poll`.
 #[derive(Debug)]
 pub struct Entry<T> {
     /// The data stored in the queue
@@ -174,7 +176,14 @@ struct Data<T> {
 const MAX_ENTRIES: usize = (1 << 30) - 1;
 
 impl<T> DelayQueue<T> {
-    /// TODO: Dox
+    /// Create a new, empty, `DelayQueue`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// #use tokio_timer::DelayQueue;
+    /// let delay_queue: DelayQueue<u32> = DelayQueue::new();
+    /// ```
     pub fn new() -> DelayQueue<T> {
         DelayQueue {
             wheel: Wheel::new(),
@@ -184,11 +193,6 @@ impl<T> DelayQueue<T> {
             poll: wheel::Poll::new(0),
             start: now(),
         }
-    }
-
-    /// TODO: Delete
-    pub fn start(&self) -> Instant {
-        self.start
     }
 
     /// TODO: Dox

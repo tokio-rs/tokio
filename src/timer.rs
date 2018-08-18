@@ -81,8 +81,10 @@
 //! [Interval]: struct.Interval.html
 
 pub use tokio_timer::{
+    delay_queue,
     Deadline,
     DeadlineError,
+    DelayQueue,
     Error,
     Interval,
     Delay,
