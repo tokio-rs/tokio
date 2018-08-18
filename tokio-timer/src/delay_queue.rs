@@ -22,15 +22,19 @@ use std::time::{Duration, Instant};
 ///
 /// # Usage
 ///
-/// Elements are inserted into `DelayQueue` using the [`insert`] method. A
-/// deadline is provided with the item. A [`Key`] is returned by [`insert`]. The
-/// key is used to remove the entry or to change the deadline at which it should
-/// be yielded back.
+/// Elements are inserted into `DelayQueue` using the [`insert`] or
+/// [`insert_at`] methods. A deadline is provided with the item and a [`Key`] is
+/// returned. The key is used to remove the entry or to change the deadline at
+/// which it should be yielded back.
 ///
 /// Once delays have been configured, the `DelayQueue` is used via its
 /// [`Stream`] implementation. [`poll`] is called. If an entry has reached its
 /// deadline, it is returned. If not, `Async::NotReady` indicating that the
 /// current task will be notified once the deadline has been reached.
+///
+/// # `Stream` implementation
+///
+/// TODO: Notes on `None`.
 ///
 /// # Implementation
 ///
@@ -58,7 +62,7 @@ use std::time::{Duration, Instant};
 /// use tokio::timer::{delay_queue, DelayQueue, Error};
 /// use futures::{Async, Poll, Stream};
 /// use std::collections::HashMap;
-/// use std::time::{Duration, Instant};
+/// use std::time::Duration;
 ///
 /// struct Cache {
 ///     entries: HashMap<CacheKey, (Value, delay_queue::Key)>,
@@ -69,9 +73,8 @@ use std::time::{Duration, Instant};
 ///
 /// impl Cache {
 ///     fn insert(&mut self, key: CacheKey, value: Value) {
-///         let expiration = Instant::now() + Duration::from_secs(TTL_SECS);
 ///         let delay = self.expirations
-///             .insert(key.clone(), expiration);
+///             .insert(key.clone(), Duration::from_secs(TTL_SECS));
 ///
 ///         self.entries.insert(key, (value, delay));
 ///     }
@@ -99,6 +102,7 @@ use std::time::{Duration, Instant};
 /// ```
 ///
 /// [`insert`]: #method.insert
+/// [`insert_at`]: #method.insert_at
 /// [`Key`]: struct.Key.html
 /// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
 /// [`poll`]: #method.poll
@@ -195,7 +199,11 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// Insert `value` into the queue.
+    /// Insert `value` into the queue set to expire at a specific instant in
+    /// time.
+    ///
+    /// This function is identical to `insert`, but takes an `Instant` instead
+    /// of a `Duration`.
     ///
     /// `value` is stored in the queue until `when` is reached. At which point,
     /// `value` will be returned from [`poll`]. If `when` has already been
@@ -220,7 +228,7 @@ impl<T> DelayQueue<T> {
     /// use std::time::Instant;
     ///
     /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert("foo", Instant::now());
+    /// let key = delay_queue.insert_at("foo", Instant::now());
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
@@ -232,7 +240,7 @@ impl<T> DelayQueue<T> {
     /// [`reset`]: #method.reset
     /// [`Key`]: struct.Key.html
     /// [type]: #
-    pub fn insert(&mut self, value: T, when: Instant) -> Key {
+    pub fn insert_at(&mut self, value: T, when: Instant) -> Key {
         assert!(self.slab.len() < MAX_ENTRIES, "max entries exceeded");
 
         // Normalize the deadline. Values cannot be set to expire in the past.
@@ -249,6 +257,51 @@ impl<T> DelayQueue<T> {
         self.insert_idx(when, key);
 
         Key::new(key)
+    }
+
+    /// Insert `value` into the queue set to expire after the requested duration
+    /// elapses.
+    ///
+    /// This function is identical to `insert_at`, but takes a `Duration`
+    /// instead of an `Instant`.
+    ///
+    /// `value` is stored in the queue until `when` is reached. At which point,
+    /// `value` will be returned from [`poll`]. If `when` has already been
+    /// reached, then `value` is immediately made available to poll.
+    ///
+    /// The return value represents the insertion and is used at an argument to
+    /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
+    /// `value` is removed from the queue eitheer by calling [`poll`] after
+    /// `when` is reached or by calling [`remove`]. At this point, the caller
+    /// must take care to not use the returned [`Key`] again as it may reference
+    /// a different item in the queue.
+    ///
+    /// See [type] level documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// use tokio::timer::DelayQueue;
+    /// use std::time::Instant;
+    ///
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert_at("foo", Instant::now());
+    ///
+    /// // Remove the entry
+    /// let item = delay_queue.remove(&key);
+    /// assert_eq!(*item.get_ref(), "foo");
+    /// ```
+    ///
+    /// [`poll`]: #method.poll
+    /// [`remove`]: #method.remove
+    /// [`reset`]: #method.reset
+    /// [`Key`]: struct.Key.html
+    /// [type]: #
+    pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
+        self.insert_at(value, now() + timeout)
     }
 
     fn insert_idx(&mut self, when: u64, key: usize) {

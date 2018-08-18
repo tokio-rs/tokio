@@ -9,6 +9,9 @@
 //! * [`Deadline`]: Wraps a future, requiring it to complete before a specified
 //!   instant in time, erroring if the future takes too long.
 //!
+//! * [`DelayQueue`]: A queue where items are returned once the requested delay
+//!   has expired.
+//!
 //! These three types are backed by a [`Timer`] instance. In order for
 //! [`Delay`], [`Interval`], and [`Deadline`] to function, the associated
 //! [`Timer`] instance must be running on some thread.
@@ -39,10 +42,12 @@ mod interval;
 mod wheel;
 
 pub use self::deadline::{Deadline, DeadlineError};
+#[doc(inline)]
 pub use self::delay_queue::DelayQueue;
 pub use self::delay::Delay;
 pub use self::error::Error;
 pub use self::interval::Interval;
+#[doc(inline)]
 pub use self::timer::{with_default, Timer};
 
 use std::time::{Duration, Instant};

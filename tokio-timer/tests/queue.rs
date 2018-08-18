@@ -16,7 +16,7 @@ use futures::Stream;
 fn single_immediate_delay() {
     mocked(|_timer, time| {
         let mut queue = DelayQueue::new();
-        let _key = queue.insert("foo", time.now());
+        let _key = queue.insert_at("foo", time.now());
 
         let entry = assert_ready!(queue).unwrap();
         assert_eq!(*entry.get_ref(), "foo");
@@ -31,9 +31,9 @@ fn multi_immediate_delays() {
     mocked(|_timer, time| {
         let mut queue = DelayQueue::new();
 
-        let _k = queue.insert("1", time.now());
-        let _k = queue.insert("2", time.now());
-        let _k = queue.insert("3", time.now());
+        let _k = queue.insert_at("1", time.now());
+        let _k = queue.insert_at("2", time.now());
+        let _k = queue.insert_at("3", time.now());
 
         let mut res = vec![];
 
@@ -57,7 +57,7 @@ fn multi_immediate_delays() {
 fn single_short_delay() {
     mocked(|timer, time| {
         let mut queue = DelayQueue::new();
-        let _key = queue.insert("foo", time.now() + ms(5));
+        let _key = queue.insert_at("foo", time.now() + ms(5));
 
         let mut task = MockTask::new();
 
@@ -92,7 +92,7 @@ fn multi_delay_at_start() {
 
         // Setup the delays
         for &i in delays {
-            let _key = queue.insert(i, time.now() + ms(i));
+            let _key = queue.insert_at(i, time.now() + ms(i));
         }
 
         task.enter(|| {
@@ -135,7 +135,7 @@ fn insert_in_past_fires_immediately() {
 
         turn(timer, ms(10));
 
-        queue.insert("foo", now);
+        queue.insert_at("foo", now);
 
         assert_ready!(queue);
     });
@@ -147,7 +147,7 @@ fn remove_entry() {
         let mut queue = DelayQueue::new();
         let mut task = MockTask::new();
 
-        let key = queue.insert("foo", time.now() + ms(5));
+        let key = queue.insert_at("foo", time.now() + ms(5));
 
         task.enter(|| {
             assert_not_ready!(queue);
@@ -172,7 +172,7 @@ fn reset_entry() {
         let mut task = MockTask::new();
 
         let now = time.now();
-        let key = queue.insert("foo", now + ms(5));
+        let key = queue.insert_at("foo", now + ms(5));
 
         task.enter(|| {
             assert_not_ready!(queue);
