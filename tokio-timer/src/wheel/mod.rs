@@ -8,6 +8,17 @@ use self::level::Level;
 use std::borrow::Borrow;
 use std::usize;
 
+/// Timing wheel implementation.
+///
+/// This type provides the hashed timing wheel implementation that backs `Timer`
+/// and `DelayQueue`.
+///
+/// The structure is generic over `T: Stack`. This allows handling timeout data
+/// being stored on the heap or in a slab. In order to support the latter case,
+/// the slab must be passed into each function allowing the implementation to
+/// lookup timer entries.
+///
+/// See `Timer` documentation for some implementation notes.
 #[derive(Debug)]
 pub(crate) struct Wheel<T> {
     /// The number of milliseconds elapsed since the wheel started.
@@ -51,6 +62,7 @@ impl<T> Wheel<T>
 where
     T: Stack,
 {
+    /// Create a new timing wheel
     pub fn new() -> Wheel<T> {
         let levels = (0..NUM_LEVELS)
             .map(Level::new)
@@ -62,10 +74,33 @@ where
         }
     }
 
+    /// Return the number of milliseconds that have elapsed since the timing
+    /// wheele's creation.
     pub fn elapsed(&self) -> u64 {
         self.elapsed
     }
 
+    /// Insert an entry into the timing wheel.
+    ///
+    /// # Arguments
+    ///
+    /// * `when`: is the instant at which the the entry should be fired. It is
+    ///           represented as the number of milliseconds since the creation
+    ///           of the timing wheel.
+    ///
+    /// * `item`: The item to insert into the wheel.
+    ///
+    /// * `store`: The slab or `()` when using heap storage.
+    ///
+    /// # Return
+    ///
+    /// Returns `Ok` when the item is successfully inserted, `Err` otherwise.
+    ///
+    /// `Err(Elapsed)` indicates that `when` represents an instant that has
+    /// already passed. In this case, the caller should fire the timeout
+    /// immediateely.
+    ///
+    /// `Err(Invalid)` indicates an invalid `when` argumeent as been supplied.
     pub fn insert(&mut self, when: u64, item: T::Owned, store: &mut T::Store)
         -> Result<(), (T::Owned, InsertError)>
     {
@@ -89,6 +124,7 @@ where
         Ok(())
     }
 
+    /// Remove `item` from thee timing wheel.
     pub fn remove(&mut self, item: &T::Borrowed, store: &mut T::Store) {
         let when = T::when(item, store);
         let level = self.level_for(when);

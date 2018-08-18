@@ -1,4 +1,8 @@
-//! TODO: Dox
+//! A queue of delayed elements.
+//!
+//! See [`DelayQueue`] for more details.
+//!
+//! [`DelayQueue`]: struct.DelayQueue.html
 
 use {Error, Delay};
 use clock::now;
@@ -11,7 +15,44 @@ use std::cmp;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
-/// TODO: Dox
+/// A queue of delayed elements.
+///
+/// Once an element is inserted into the `DelayQueue`, it is yielded once the
+/// specified deadline has been reached.
+///
+/// # Usage
+///
+/// Elements are inserted into `DelayQueue` using the [`insert`] method. A
+/// deadline is provided with the item. A [`Key`] is returned by [`insert`]. The
+/// key is used to remove the entry or to change the deadline at which it should
+/// be yielded back.
+///
+/// Once delays have been configured, the `DelayQueue` is used via its
+/// [`Stream`] implementation. [`poll`] is called. If an entry has reached its
+/// deadline, it is returned. If not, `Async::NotReady` indicating that the
+/// current task will be notified once the deadline has been reached.
+///
+/// # Implementation
+///
+/// The `DelayQueue` is backed by the same hashed timing wheel implementation as
+/// [`Timer`] as such, it offers the same performance benefits. See [`Timer`]
+/// for further implementation notes.
+///
+/// State associated with each entry is stored in a [`slab`]. This allows
+/// amortizing the cost of allocation. Space created for expired entries is
+/// reused when inserting new entries.
+///
+/// Capacity can be checked using [`capacity`] and allocated preemptively by using
+/// the [`reserve`] method.
+///
+/// [`insert`]: #
+/// [`Key`]: #
+/// [`Stream`]: #
+/// [`poll`]: #
+/// [`Timer`]: #
+/// [`slab`]: #
+/// [`capacity`]: #
+/// [`reserve`]: #
 #[derive(Debug)]
 pub struct DelayQueue<T> {
     /// Stores data associated with entries
