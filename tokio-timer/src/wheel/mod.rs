@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 mod level;
 mod stack;
 
@@ -35,9 +33,6 @@ const NUM_LEVELS: usize = 6;
 
 /// The maximum duration of a delay
 const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
-
-/// Maximum number of timeouts the system can handle concurrently.
-const MAX_TIMEOUTS: usize = usize::MAX >> 1;
 
 #[derive(Debug)]
 pub(crate) enum InsertError {
@@ -222,10 +217,6 @@ impl Poll {
             now,
             expiration: None,
         }
-    }
-
-    pub fn now(&self) -> u64 {
-        self.now
     }
 }
 

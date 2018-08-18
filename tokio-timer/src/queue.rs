@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 //! TODO: Dox
 
 use {Error, Delay};
@@ -78,6 +76,9 @@ struct Data<T> {
     prev: Option<usize>,
 }
 
+/// Maximum number of entries the queue can handle
+const MAX_ENTRIES: usize = (1 << 30) - 1;
+
 impl<T> DelayQueue<T> {
     /// TODO: Dox
     pub fn new() -> DelayQueue<T> {
@@ -98,6 +99,8 @@ impl<T> DelayQueue<T> {
 
     /// TODO: Dox
     pub fn insert(&mut self, value: T, when: Instant) -> Key {
+        assert!(self.slab.len() < MAX_ENTRIES, "max entries exceeded");
+
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
 
@@ -181,6 +184,7 @@ impl<T> DelayQueue<T> {
 
     /// TODO: Dox
     pub fn reserve(&mut self, additional: usize) {
+        drop(additional);
         unimplemented!();
     }
 
