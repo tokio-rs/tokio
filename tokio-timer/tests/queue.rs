@@ -90,8 +90,6 @@ fn multi_delay_at_start() {
         let mut queue = DelayQueue::new();
         let mut task = MockTask::new();
 
-        assert_eq!(time.now(), queue.start());
-
         // Setup the delays
         for &i in delays {
             let _key = queue.insert(i, time.now() + ms(i));

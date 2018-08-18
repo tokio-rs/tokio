@@ -132,7 +132,7 @@ pub struct DelayQueue<T> {
 ///
 /// Values are returned by `DelayQueue::poll`.
 #[derive(Debug)]
-pub struct Entry<T> {
+pub struct Expired<T> {
     /// The data stored in the queue
     data: T,
 
@@ -181,7 +181,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// #use tokio_timer::DelayQueue;
+    /// # use tokio_timer::DelayQueue;
     /// let delay_queue: DelayQueue<u32> = DelayQueue::new();
     /// ```
     pub fn new() -> DelayQueue<T> {
@@ -195,7 +195,43 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// TODO: Dox
+    /// Insert `value` into the queue.
+    ///
+    /// `value` is stored in the queue until `when` is reached. At which point,
+    /// `value` will be returned from [`poll`]. If `when` has already been
+    /// reached, then `value` is immediately made available to poll.
+    ///
+    /// The return value represents the insertion and is used at an argument to
+    /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
+    /// `value` is removed from the queue eitheer by calling [`poll`] after
+    /// `when` is reached or by calling [`remove`]. At this point, the caller
+    /// must take care to not use the returned [`Key`] again as it may reference
+    /// a different item in the queue.
+    ///
+    /// See [type] level documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// # extern crate tokio;
+    /// use tokio::timer::DelayQueue;
+    /// use std::time::Instant;
+    ///
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Instant::now());
+    ///
+    /// // Remove the entry
+    /// let item = delay_queue.remove(&key);
+    /// assert_eq!(*item.get_ref(), "foo");
+    /// ```
+    ///
+    /// [`poll`]: #method.poll
+    /// [`remove`]: #method.remove
+    /// [`reset`]: #method.reset
+    /// [`Key`]: struct.Key.html
+    /// [type]: #
     pub fn insert(&mut self, value: T, when: Instant) -> Key {
         assert!(self.slab.len() < MAX_ENTRIES, "max entries exceeded");
 
@@ -232,11 +268,11 @@ impl<T> DelayQueue<T> {
     }
 
     /// TODO: Dox
-    pub fn remove(&mut self, key: &Key) -> Entry<T> {
+    pub fn remove(&mut self, key: &Key) -> Expired<T> {
         self.wheel.remove(&key.index, &mut self.slab);
         let data = self.slab.remove(key.index);
 
-        Entry {
+        Expired {
             key: Key::new(key.index),
             data: data.inner,
             deadline: self.start + Duration::from_millis(data.when),
@@ -344,7 +380,7 @@ impl<T> DelayQueue<T> {
 }
 
 impl<T> Stream for DelayQueue<T> {
-    type Item = Entry<T>;
+    type Item = Expired<T>;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Error> {
@@ -354,7 +390,7 @@ impl<T> Stream for DelayQueue<T> {
                 debug_assert!(data.next.is_none());
                 debug_assert!(data.prev.is_none());
 
-                Entry {
+                Expired {
                     key: Key::new(idx),
                     data: data.inner,
                     deadline: self.start + Duration::from_millis(data.when),
@@ -462,7 +498,7 @@ impl Key {
     }
 }
 
-impl<T> Entry<T> {
+impl<T> Expired<T> {
     /// TODO: Dox
     pub fn get_ref(&self) -> &T {
         &self.data
