@@ -28,7 +28,7 @@ extern crate futures;
 extern crate slab;
 
 pub mod clock;
-pub mod queue;
+pub mod delay_queue;
 pub mod timer;
 
 mod atomic;
@@ -39,10 +39,10 @@ mod interval;
 mod wheel;
 
 pub use self::deadline::{Deadline, DeadlineError};
+pub use self::delay_queue::DelayQueue;
 pub use self::delay::Delay;
 pub use self::error::Error;
 pub use self::interval::Interval;
-pub use self::queue::DelayQueue;
 pub use self::timer::{with_default, Timer};
 
 use std::time::{Duration, Instant};

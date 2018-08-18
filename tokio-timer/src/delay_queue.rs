@@ -55,13 +55,13 @@ use std::time::{Duration, Instant};
 /// # extern crate tokio_timer;
 /// # type CacheKey = String;
 /// # type Value = String;
-/// # use tokio_timer::{queue, DelayQueue, Error};
+/// # use tokio_timer::{delay_queue, DelayQueue, Error};
 /// use futures::{Async, Poll, Stream};
 /// use std::collections::HashMap;
 /// use std::time::{Duration, Instant};
 ///
 /// struct Cache {
-///     entries: HashMap<CacheKey, (Value, queue::Key)>,
+///     entries: HashMap<CacheKey, (Value, delay_queue::Key)>,
 ///     expirations: DelayQueue<CacheKey>,
 /// }
 ///
