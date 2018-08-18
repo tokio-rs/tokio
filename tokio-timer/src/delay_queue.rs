@@ -161,7 +161,12 @@ pub struct Expired<T> {
     key: Key,
 }
 
-/// TODO: Dox
+/// Token to a value stored in a `DelayQueue`.
+///
+/// Instances of `Key` are returned by `DelayQueue::insert`. See [`DelayQueue`]
+/// documentation for more details.
+///
+/// [`DelayQueue`]: struct.DelayQueue.html
 #[derive(Debug)]
 pub struct Key {
     index: usize,
@@ -791,17 +796,17 @@ impl Key {
 }
 
 impl<T> Expired<T> {
-    /// TODO: Dox
+    /// Returns a reference to the inner value.
     pub fn get_ref(&self) -> &T {
         &self.data
     }
 
-    /// TODO: Dox
+    /// Returns a mutable reference to the inner value.
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.data
     }
 
-    /// TODO: Dox
+    /// Consumes `self` and returns the inner value.
     pub fn into_inner(self) -> T {
         self.data
     }
