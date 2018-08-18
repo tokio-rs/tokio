@@ -34,7 +34,20 @@ use std::time::{Duration, Instant};
 ///
 /// # `Stream` implementation
 ///
-/// TODO: Notes on `None` and on ordering.
+/// Items are retrieved from the queue via [`Stream::poll`]. If no delays have
+/// expired, no items are returned. In this case, `NotReady` is returned and the
+/// current task is registered to be notified once the next item's delay has
+/// expired.
+///
+/// If no items are in the queue, i.e. `is_empty()` returns `true`, then `poll`
+/// returns `Ready(None)`. This indicates that the stream has reached an end.
+/// However, if a new item is inserted *after*, `poll` will once again start
+/// returning items or `NotReady.
+///
+/// Items are returned ordered by their expirations. Items that are configured
+/// to expire first will be returned first. There are no ordering guarantees
+/// for items configured to expire the same instant. Also note that delays are
+/// rounded to the closest millisecond.
 ///
 /// # Implementation
 ///
@@ -106,6 +119,7 @@ use std::time::{Duration, Instant};
 /// [`Key`]: struct.Key.html
 /// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
 /// [`poll`]: #method.poll
+/// [`Stream::poll`]: #method.poll
 /// [`Timer`]: ../struct.Timer.html
 /// [`slab`]: https://docs.rs/slab
 /// [`capacity`]: #method.capacity
