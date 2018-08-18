@@ -35,8 +35,10 @@ mod entry;
 mod handle;
 mod now;
 mod registration;
+mod stack;
 
-use self::entry::{Entry, Stack};
+use self::entry::Entry;
+use self::stack::Stack;
 
 pub use self::handle::{Handle, with_default};
 pub use self::now::{Now, SystemNow};
