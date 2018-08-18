@@ -1,6 +1,7 @@
 use Error;
 use atomic::AtomicU64;
 use timer::{Handle, Inner};
+use wheel;
 
 use futures::Poll;
 use futures::task::AtomicTask;
@@ -92,6 +93,7 @@ pub(crate) struct Entry {
 }
 
 /// A doubly linked stack
+#[derive(Debug)]
 pub(crate) struct Stack {
     head: Option<Arc<Entry>>,
 }
@@ -352,17 +354,22 @@ unsafe impl Sync for Entry {}
 
 // ===== impl Stack =====
 
-impl Stack {
-    pub fn new() -> Stack {
+impl Default for Stack {
+    fn default() -> Stack {
         Stack { head: None }
     }
+}
 
-    pub fn is_empty(&self) -> bool {
+impl wheel::Stack for Stack {
+    type Owned = Arc<Entry>;
+    type Borrowed = Entry;
+    type Store = ();
+
+    fn is_empty(&self) -> bool {
         self.head.is_none()
     }
 
-    /// Push an entry to the head of the linked list
-    pub fn push(&mut self, entry: Arc<Entry>) {
+    fn push(&mut self, entry: Self::Owned, _: &mut Self::Store) {
         // Get a pointer to the entry to for the prev link
         let ptr: *const Entry = &*entry as *const _;
 
@@ -393,8 +400,8 @@ impl Stack {
         self.head = Some(entry);
     }
 
-    /// Pop the head of the linked list
-    pub fn pop(&mut self) -> Option<Arc<Entry>> {
+    /// Pop an item from the stack
+    fn pop(&mut self, _: &mut ()) -> Option<Arc<Entry>> {
         let entry = self.head.take();
 
         unsafe {
@@ -412,10 +419,7 @@ impl Stack {
         entry
     }
 
-    /// Remove the entry from the linked list
-    ///
-    /// The caller must ensure that the entry actually is contained by the list.
-    pub fn remove(&mut self, entry: &Entry) {
+    fn remove(&mut self, entry: &Entry, _: &mut ()) {
         unsafe {
             // Ensure that the entry is in fact contained by the stack
             debug_assert!({
@@ -453,7 +457,12 @@ impl Stack {
 
             // Unset the prev pointer
             *entry.prev_stack.get() = ptr::null();
-        }
+}
+    }
+
+    fn when(item: &Entry, _: &()) -> u64 {
+        item.when_internal()
+            .expect("invalid internal state")
     }
 }
 

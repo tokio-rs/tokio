@@ -219,7 +219,7 @@ impl<T> DelayQueue<T> {
                 return Ok(Some(idx).into());
             }
 
-            let deadline = match self.wheel.poll_at(&self.poll) {
+            let deadline = match self.wheel.poll_at() {
                 Some(poll_at) => {
                     self.start + Duration::from_millis(poll_at)
                 }

@@ -143,20 +143,6 @@ impl<T: Stack> Level<T> {
     }
 }
 
-/*
-impl Drop for Level {
-    fn drop(&mut self) {
-        while let Some(slot) = self.next_occupied_slot(0) {
-            // This should always have one
-            let entry = self.pop_entry_slot(slot)
-                .expect("occupied bit set invalid");
-
-            entry.error();
-        }
-    }
-}
-*/
-
 impl<T> fmt::Debug for Level<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Level")

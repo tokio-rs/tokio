@@ -102,8 +102,8 @@ where
     }
 
     /// Instant at which to poll
-    pub fn poll_at(&self, poll: &Poll) -> Option<u64> {
-        self.next_expiration(poll.now)
+    pub fn poll_at(&self) -> Option<u64> {
+        self.next_expiration()
             .map(|expiration| expiration.deadline)
     }
 
@@ -112,7 +112,7 @@ where
     {
         loop {
             if poll.expiration.is_none() {
-                poll.expiration = self.next_expiration(poll.now)
+                poll.expiration = self.next_expiration()
                     .and_then(|expiration| {
                         if expiration.deadline > poll.now {
                             None
@@ -141,7 +141,7 @@ where
     }
 
     /// Returns the instant at which the next timeout expires.
-    fn next_expiration(&self, now: u64) -> Option<Expiration> {
+    fn next_expiration(&self) -> Option<Expiration> {
         // Check all levels
         for level in 0..NUM_LEVELS {
             if let Some(expiration) = self.levels[level].next_expiration(self.elapsed) {
@@ -221,6 +221,42 @@ impl Poll {
         Poll {
             now,
             expiration: None,
+        }
+    }
+
+    pub fn now(&self) -> u64 {
+        self.now
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_level_for() {
+        for pos in 1..64 {
+            assert_eq!(0, level_for(0, pos), "level_for({}) -- binary = {:b}", pos, pos);
+        }
+
+        for level in 1..5 {
+            for pos in level..64 {
+                let a = pos * 64_usize.pow(level as u32);
+                assert_eq!(level, level_for(0, a as u64),
+                           "level_for({}) -- binary = {:b}", a, a);
+
+                if pos > level {
+                    let a = a - 1;
+                    assert_eq!(level, level_for(0, a as u64),
+                               "level_for({}) -- binary = {:b}", a, a);
+                }
+
+                if pos < 64 {
+                    let a = a + 1;
+                    assert_eq!(level, level_for(0, a as u64),
+                               "level_for({}) -- binary = {:b}", a, a);
+                }
+            }
         }
     }
 }
