@@ -31,12 +31,14 @@
 // This allows the usage of the old `Now` trait.
 #![allow(deprecated)]
 
+mod atomic_stack;
 mod entry;
 mod handle;
 mod now;
 mod registration;
 mod stack;
 
+use self::atomic_stack::AtomicStack;
 use self::entry::Entry;
 use self::stack::Stack;
 
@@ -154,7 +156,7 @@ pub(crate) struct Inner {
     num: AtomicUsize,
 
     /// Head of the "process" linked list.
-    process: entry::AtomicStack,
+    process: AtomicStack,
 
     /// Unparks the timer thread.
     unpark: Box<Unpark>,
@@ -423,7 +425,7 @@ impl Inner {
         Inner {
             num: AtomicUsize::new(0),
             elapsed: AtomicU64::new(0),
-            process: entry::AtomicStack::new(),
+            process: AtomicStack::new(),
             start,
             unpark,
         }
