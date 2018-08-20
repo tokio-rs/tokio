@@ -7,6 +7,7 @@
 use {Error, Delay};
 use clock::now;
 use wheel::{self, Wheel};
+use timer::Handle;
 
 use futures::{Future, Stream, Poll};
 use slab::Slab;
@@ -126,6 +127,9 @@ use std::time::{Duration, Instant};
 /// [`reserve`]: #method.reserve
 #[derive(Debug)]
 pub struct DelayQueue<T> {
+    /// Handle to the timer driving the `DelayQueue`
+    handle: Handle,
+
     /// Stores data associated with entries
     slab: Slab<Data<T>>,
 
@@ -216,6 +220,31 @@ impl<T> DelayQueue<T> {
         DelayQueue::with_capacity(0)
     }
 
+    /// Create a new, empty, `DelayQueue` backed by the specified timer.
+    ///
+    /// The queue will not allocate storage until items are inserted into it.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use tokio_timer::DelayQueue;
+    /// use tokio_timer::timer::Handle;
+    ///
+    /// let handle = Handle::default();
+    /// let deplay_queue: DelayQueue<u32> = DelayQueue::with_capacity_and_handle(0, &handle);
+    /// ```
+    pub fn with_capacity_and_handle(capacity: usize, handle: &Handle) -> DelayQueue<T> {
+        DelayQueue {
+            handle: handle.clone(),
+            wheel: Wheel::new(),
+            slab: Slab::with_capacity(capacity),
+            expired: Stack::default(),
+            delay: None,
+            poll: wheel::Poll::new(0),
+            start: now(),
+        }
+    }
+
     /// Create a new, empty, `DelayQueue` with the specified capacity.
     ///
     /// The queue will be able to hold at least `capacity` elements without
@@ -238,14 +267,7 @@ impl<T> DelayQueue<T> {
     /// delay_queue.insert(11, Duration::from_secs(11));
     /// ```
     pub fn with_capacity(capacity: usize) -> DelayQueue<T> {
-        DelayQueue {
-            wheel: Wheel::new(),
-            slab: Slab::with_capacity(capacity),
-            expired: Stack::default(),
-            delay: None,
-            poll: wheel::Poll::new(0),
-            start: now(),
-        }
+        DelayQueue::with_capacity_and_handle(capacity, &Handle::default())
     }
 
     /// Insert `value` into the queue set to expire at a specific instant in
@@ -661,7 +683,7 @@ impl<T> DelayQueue<T> {
                 None => return Ok(None.into()),
             };
 
-            self.delay = Some(Delay::new(deadline));
+            self.delay = Some(self.handle.delay(deadline));
         }
     }
 
