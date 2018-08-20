@@ -38,6 +38,7 @@ mod now;
 mod registration;
 
 use self::entry::Entry;
+use self::handle::HandlePriv;
 use self::level::{Level, Expiration};
 
 pub use self::handle::{Handle, with_default};
