@@ -7,6 +7,7 @@ mod support;
 use support::*;
 
 use tokio_timer::*;
+use tokio_timer::timer::Handle;
 
 use futures::Future;
 
@@ -482,6 +483,22 @@ fn reset_future_delay_after_fire() {
 
         turn(timer, ms(1000));
         assert_eq!(time.advanced(), ms(110));
+
+        assert_ready!(delay);
+    });
+}
+
+#[test]
+fn delay_with_default_handle() {
+    let handle = Handle::default();
+    let now = Instant::now();
+
+    let mut delay = handle.delay(now + ms(1));
+
+    mocked_with_now(now, |timer, _time| {
+        assert_not_ready!(delay);
+
+        turn(timer, ms(1));
 
         assert_ready!(delay);
     });
