@@ -57,20 +57,12 @@ fn lines_decoder() {
 
 #[test]
 fn lines_encoder() {
-    let mut codec = BytesCodec::new();
-
-    // Default capacity of BytesMut
-    #[cfg(target_pointer_width = "64")]
-    const INLINE_CAP: usize = 4 * 8 - 1;
-    #[cfg(target_pointer_width = "32")]
-    const INLINE_CAP: usize = 4 * 4 - 1;
-
+    let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();
-    codec.encode(Bytes::from_static(&[b'a'; INLINE_CAP + 1]), &mut buf).unwrap();
 
-    // Default capacity of Framed Read
-    const INITIAL_CAPACITY: usize = 8 * 1024;
+    codec.encode(String::from("line 1"), &mut buf).unwrap();
+    assert_eq!("line 1\n", buf);
 
-    let mut buf = BytesMut::with_capacity(INITIAL_CAPACITY);
-    codec.encode(Bytes::from_static(&[b'a'; INITIAL_CAPACITY + 1]), &mut buf).unwrap();
+    codec.encode(String::from("line 2"), &mut buf).unwrap();
+    assert_eq!("line 1\nline 2\n", buf);
 }

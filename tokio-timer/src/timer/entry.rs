@@ -1,6 +1,6 @@
 use Error;
 use atomic::AtomicU64;
-use timer::{Handle, Inner};
+use timer::{HandlePriv, Inner};
 
 use futures::Poll;
 use futures::task::AtomicTask;
@@ -100,7 +100,7 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub fn new(when: u64, handle: Handle) -> Entry {
+    pub fn new(when: u64, handle: HandlePriv) -> Entry {
         assert!(when > 0 && when < u64::MAX);
 
         Entry {
@@ -116,7 +116,7 @@ impl Entry {
         }
     }
 
-    pub fn new_elapsed(handle: Handle) -> Entry {
+    pub fn new_elapsed(handle: HandlePriv) -> Entry {
         Entry {
             inner: handle.into_inner(),
             task: AtomicTask::new(),

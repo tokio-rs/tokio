@@ -39,3 +39,16 @@
 pub use tokio_tcp::{TcpStream, ConnectFuture};
 pub use tokio_tcp::{TcpListener, Incoming};
 pub use tokio_udp::{UdpSocket, UdpFramed, SendDgram, RecvDgram};
+
+#[cfg(unix)]
+pub mod unix {
+    //! Unix domain socket bindings for `tokio`.
+
+    pub use tokio_uds::{
+        ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixListener,
+        UnixStream,
+    };
+}
+
+#[cfg(unix)]
+pub use self::unix::{UnixListener, UnixStream};

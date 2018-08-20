@@ -81,6 +81,9 @@ extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
 
+#[cfg(unix)]
+extern crate tokio_uds;
+
 pub mod clock;
 pub mod executor;
 pub mod fs;
@@ -100,11 +103,11 @@ pub mod codec {
     //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
     //! Framed streams are also known as [transports].
     //!
-    //! [`AsyncRead`]: #
-    //! [`AsyncWrite`]: #
-    //! [`Sink`]: #
-    //! [`Stream`]: #
-    //! [transports]: #
+    //! [`AsyncRead`]: ../io/trait.AsyncRead.html
+    //! [`AsyncWrite`]: ../io/trait.AsyncWrite.html
+    //! [`Sink`]: https://docs.rs/futures/0.1/futures/sink/trait.Sink.html
+    //! [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+    //! [transports]: https://tokio.rs/docs/going-deeper/frames/
 
     pub use tokio_codec::{
         Decoder,
@@ -113,6 +116,8 @@ pub mod codec {
         FramedParts,
         FramedRead,
         FramedWrite,
+        BytesCodec,
+        LinesCodec,
     };
 }
 

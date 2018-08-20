@@ -41,6 +41,7 @@ mod stack;
 use self::atomic_stack::AtomicStack;
 use self::entry::Entry;
 use self::stack::Stack;
+use self::handle::HandlePriv;
 
 pub use self::handle::{Handle, with_default};
 pub use self::now::{Now, SystemNow};

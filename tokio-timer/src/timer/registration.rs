@@ -1,5 +1,5 @@
 use Error;
-use timer::{Handle, Entry};
+use timer::{HandlePriv, Entry};
 
 use futures::Poll;
 
@@ -20,13 +20,13 @@ impl Registration {
         fn is_send<T: Send + Sync>() {}
         is_send::<Registration>();
 
-        match Handle::try_current() {
+        match HandlePriv::try_current() {
             Ok(handle) => Registration::new_with_handle(deadline, handle),
             Err(_) => Registration::new_error(),
         }
     }
 
-    pub fn new_with_handle(deadline: Instant, handle: Handle) -> Registration {
+    pub fn new_with_handle(deadline: Instant, handle: HandlePriv) -> Registration {
         let inner = match handle.inner() {
             Some(inner) => inner,
             None => return Registration::new_error(),
