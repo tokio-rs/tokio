@@ -3,7 +3,7 @@
 //! This crate provides APIs for using Unix Domain Sockets with Tokio.
 
 #![cfg(unix)]
-#![doc(html_root_url = "https://docs.rs/tokio-uds/0.2.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-uds/0.2.1")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;
