@@ -19,5 +19,10 @@ Timer facilities for Tokio
 futures = "0.1.19"
 tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
 
+# Backs `DelayQueue`
+slab = "0.4.1"
+
 [dev-dependencies]
 rand = "0.5"
+tokio-mock-task = "0.1.0"
+tokio = { version = "0.1.7", path = "../" }

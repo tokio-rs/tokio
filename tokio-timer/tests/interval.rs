@@ -24,23 +24,23 @@ fn usage() {
         let start = time.now();
         let mut int = Interval::new(start, ms(300));
 
-        assert_ready!(int, Some(start));
+        assert_ready_eq!(int, Some(start));
         assert_not_ready!(int);
 
         advance(timer, ms(100));
         assert_not_ready!(int);
 
         advance(timer, ms(200));
-        assert_ready!(int, Some(start + ms(300)));
+        assert_ready_eq!(int, Some(start + ms(300)));
         assert_not_ready!(int);
 
         advance(timer, ms(400));
-        assert_ready!(int, Some(start + ms(600)));
+        assert_ready_eq!(int, Some(start + ms(600)));
         assert_not_ready!(int);
 
         advance(timer, ms(500));
-        assert_ready!(int, Some(start + ms(900)));
-        assert_ready!(int, Some(start + ms(1200)));
+        assert_ready_eq!(int, Some(start + ms(900)));
+        assert_ready_eq!(int, Some(start + ms(1200)));
         assert_not_ready!(int);
     });
 }
