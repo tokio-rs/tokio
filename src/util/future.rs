@@ -1,4 +1,6 @@
-use tokio_timer::{Deadline, Timeout};
+#[allow(deprecated)]
+use tokio_timer::Deadline;
+use tokio_timer::Timeout;
 
 use futures::Future;
 
@@ -57,6 +59,7 @@ pub trait FutureExt: Future {
     }
 
     #[deprecated(since = "0.1.8", note = "use `timeout` instead")]
+    #[allow(deprecated)]
     #[doc(hidden)]
     fn deadline(self, deadline: Instant) -> Deadline<Self>
     where Self: Sized,

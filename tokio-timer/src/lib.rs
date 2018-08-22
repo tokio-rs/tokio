@@ -46,6 +46,7 @@ mod wheel;
 
 #[deprecated(since = "0.2.6", note = "use Timeout instead")]
 #[doc(hidden)]
+#[allow(deprecated)]
 pub use self::deadline::{Deadline, DeadlineError};
 #[doc(inline)]
 pub use self::delay_queue::DelayQueue;
