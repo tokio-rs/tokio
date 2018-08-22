@@ -1,5 +1,5 @@
 use {Error, Delay, Deadline, Interval};
-use timer::{Registration, Inner};
+use timer::Inner;
 
 use tokio_executor::Enter;
 
@@ -128,11 +128,7 @@ impl Handle {
     pub fn delay(&self, deadline: Instant) -> Delay {
         match self.inner {
             Some(ref handle_priv) => {
-                let registration = Registration::new_with_handle(
-                    deadline,
-                    handle_priv.clone());
-
-                Delay::new_with_registration(deadline, registration)
+                Delay::new_with_handle(deadline, handle_priv.clone())
             }
             None => {
                 Delay::new(deadline)
