@@ -1,10 +1,9 @@
-use timer::{entry, Entry};
+use wheel::Stack;
 
 use std::fmt;
-use std::sync::Arc;
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
-pub(crate) struct Level {
+pub(crate) struct Level<T> {
     level: usize,
 
     /// Bit field tracking which slots currently contain entries.
@@ -17,12 +16,12 @@ pub(crate) struct Level {
     occupied: u64,
 
     /// Slots
-    slot: [entry::Stack; LEVEL_MULT],
+    slot: [T; LEVEL_MULT],
 }
 
 /// Indicates when a slot must be processed next.
 #[derive(Debug)]
-pub struct Expiration {
+pub(crate) struct Expiration {
     /// The level containing the slot.
     pub level: usize,
 
@@ -38,13 +37,13 @@ pub struct Expiration {
 /// Being a power of 2 is very important.
 const LEVEL_MULT: usize = 64;
 
-impl Level {
-    pub fn new(level: usize) -> Level {
+impl<T: Stack> Level<T> {
+    pub fn new(level: usize) -> Level<T> {
         // Rust's derived implementations for arrays require that the value
         // contained by the array be `Copy`. So, here we have to manually
         // initialize every single slot.
         macro_rules! s {
-            () => { entry::Stack::new() };
+            () => { T::default() };
         };
 
         Level {
@@ -109,17 +108,17 @@ impl Level {
         Some(slot)
     }
 
-    pub fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
+    pub fn add_entry(&mut self, when: u64, item: T::Owned, store: &mut T::Store) {
         let slot = slot_for(when, self.level);
 
-        self.slot[slot].push(entry);
+        self.slot[slot].push(item, store);
         self.occupied |= occupied_bit(slot);
     }
 
-    pub fn remove_entry(&mut self, entry: &Entry, when: u64) {
+    pub fn remove_entry(&mut self, when: u64, item: &T::Borrowed, store: &mut T::Store) {
         let slot = slot_for(when, self.level);
 
-        self.slot[slot].remove(entry);
+        self.slot[slot].remove(item, store);
 
         if self.slot[slot].is_empty() {
             // The bit is currently set
@@ -130,8 +129,8 @@ impl Level {
         }
     }
 
-    pub fn pop_entry_slot(&mut self, slot: usize) -> Option<Arc<Entry>> {
-        let ret = self.slot[slot].pop();
+    pub fn pop_entry_slot(&mut self, slot: usize, store: &mut T::Store) -> Option<T::Owned> {
+        let ret = self.slot[slot].pop(store);
 
         if ret.is_some() && self.slot[slot].is_empty() {
             // The bit is currently set
@@ -144,19 +143,7 @@ impl Level {
     }
 }
 
-impl Drop for Level {
-    fn drop(&mut self) {
-        while let Some(slot) = self.next_occupied_slot(0) {
-            // This should always have one
-            let entry = self.pop_entry_slot(slot)
-                .expect("occupied bit set invalid");
-
-            entry.error();
-        }
-    }
-}
-
-impl fmt::Debug for Level {
+impl<T> fmt::Debug for Level<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Level")
             .field("occupied", &self.occupied)
@@ -181,6 +168,7 @@ fn slot_for(duration: u64, level: usize) -> usize {
     ((duration >> (level * 6)) % LEVEL_MULT as u64) as usize
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -199,3 +187,4 @@ mod test {
         }
     }
 }
+*/

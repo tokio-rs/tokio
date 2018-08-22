@@ -14,6 +14,9 @@
 //!   a specified `Instant` in time. If the future does not complete in time,
 //!   then it is canceled and an error is returned.
 //!
+//! * [`DelayQueue`]: A queue where items are returned once the requested delay
+//!   has expired.
+//!
 //! These types are sufficient for handling a large number of scenarios
 //! involving time.
 //!
@@ -79,10 +82,13 @@
 //! [Deadline]: struct.Deadline.html
 //! [Delay]: struct.Delay.html
 //! [Interval]: struct.Interval.html
+//! [`DelayQueue`]: struct.DelayQueue.html
 
 pub use tokio_timer::{
+    delay_queue,
     Deadline,
     DeadlineError,
+    DelayQueue,
     Error,
     Interval,
     Delay,
