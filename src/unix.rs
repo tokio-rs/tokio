@@ -116,11 +116,14 @@ extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc:
         if fnptr == 0 || fnptr == libc::SIG_DFL || fnptr == libc::SIG_IGN {
             return;
         }
-        #[cfg(all(target_os = "android", target_pointer_width = "64"))]
-        let contains_siginfo = (*slot.prev.get()).sa_flags & libc::SA_SIGINFO as libc::c_uint;
-        #[cfg(not(all(target_os = "android", target_pointer_width = "64")))]
-        let contains_siginfo = (*slot.prev.get()).sa_flags & libc::SA_SIGINFO;
-        if contains_siginfo == 0 {
+        let mut sa_flags = (*slot.prev.get()).sa_flags;
+        // android defines SIGINFO with a different type than sa_flags,
+        // this ensures that the variables are of the same type regardless of platform
+        #[allow(unused_assignments)]
+        let mut siginfo = sa_flags;
+        siginfo = libc::SA_SIGINFO as _;
+        sa_flags &= siginfo;
+        if sa_flags == 0 {
             let action = mem::transmute::<usize, FnHandler>(fnptr);
             action(signum)
         } else {
@@ -141,25 +144,18 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
     };
     unsafe {
-        #[cfg(all(target_os = "android", target_pointer_width = "32"))]
-        fn flags() -> libc::c_ulong {
-            (libc::SA_RESTART as libc::c_ulong) | libc::SA_SIGINFO
-                | (libc::SA_NOCLDSTOP as libc::c_ulong)
-        }
-        #[cfg(all(target_os = "android", target_pointer_width = "64"))]
-        fn flags() -> libc::c_uint {
-            (libc::SA_RESTART as libc::c_uint) | (libc::SA_SIGINFO as libc::c_uint)
-                | (libc::SA_NOCLDSTOP as libc::c_uint)
-        }
-        #[cfg(not(target_os = "android"))]
-        fn flags() -> c_int {
-            libc::SA_RESTART | libc::SA_SIGINFO | libc::SA_NOCLDSTOP
-        }
         let mut err = None;
         siginfo.init.call_once(|| {
             let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = handler as usize;
-            new.sa_flags = flags();
+            let flags = libc::SA_RESTART | libc::SA_NOCLDSTOP;;
+            // android defines SIGINFO with a different type than sa_flags,
+            // this ensures that the variables are of the same type regardless of platform
+            #[allow(unused_assignments)]
+            let mut sa_siginfo = flags;
+            sa_siginfo = libc::SA_SIGINFO as _;
+            let flags = flags | sa_siginfo;
+            new.sa_flags = flags as _;
             if libc::sigaction(signal, &new, &mut *siginfo.prev.get()) != 0 {
                 err = Some(io::Error::last_os_error());
             } else {
