@@ -1,3 +1,11 @@
+# 0.1.6 (August 23, 2018)
+
+* Misc performance improvements (#466, #468, #470, #475, #534)
+* Documentation improvements (#450)
+* Shutdown backup threads when idle (#489)
+* Implement std::error::Error for error types (#511)
+* Bugfix: handle num_cpus returning zero (#530).
+
 # 0.1.5 (July 3, 2018)
 
 * Fix race condition bug when threads are woken up (#459).

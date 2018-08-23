@@ -1,3 +1,6 @@
+#![deny(missing_docs, missing_debug_implementations, warnings)]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.4")]
+
 //! Task execution related traits and utilities.
 //!
 //! In the Tokio execution model, futures are lazy. When a future is created, no
@@ -31,9 +34,6 @@
 //! [`DefaultExecutor`]: struct.DefaultExecutor.html
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
-
-#![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.3")]
 
 extern crate futures;
 

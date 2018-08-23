@@ -4,14 +4,15 @@ name = "tokio-reactor"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update CHANGELOG.md.
+# - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-reactor/0.1"
+documentation = "https://docs.rs/tokio-reactor/0.1.4/tokio_reactor"
 description = """
 Event loop that drives Tokio I/O resources.
 """

@@ -4,14 +4,15 @@ name = "tokio"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update CHANGELOG.md.
+# - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
+documentation = "https://docs.rs/tokio/0.1.8/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio/0.1"
 description = """
 An event-driven, non-blocking I/O platform for writing asynchronous I/O
 backed applications.

@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.6")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! Utilities for tracking time.
 //!
 //! This crate provides a number of utilities for working with periods of time:
@@ -21,9 +24,6 @@
 //! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
-
-#![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.5")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate tokio_executor;
 
