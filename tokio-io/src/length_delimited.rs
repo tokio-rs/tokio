@@ -16,6 +16,8 @@ use std::io::{self, Cursor};
 /// `Builder` enables constructing configured length delimited framers. Note
 /// that not all configuration settings apply to both encoding and decoding. See
 /// the documentation for specific methods for more detail.
+#[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
 pub struct Builder {
     // Maximum frame length
@@ -44,6 +46,8 @@ pub struct Builder {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
+#[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
+#[doc(hidden)]
 pub struct Framed<T, B: IntoBuf = BytesMut> {
     inner: FramedRead<FramedWrite<T, B>>,
 }
@@ -53,12 +57,16 @@ pub struct Framed<T, B: IntoBuf = BytesMut> {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
+#[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
+#[doc(hidden)]
 #[derive(Debug)]
 pub struct FramedRead<T> {
     inner: codec::FramedRead<T, Decoder>,
 }
 
 /// An error when the number of bytes read is more than max frame length.
+#[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
+#[doc(hidden)]
 pub struct FrameTooBig {
     _priv: (),
 }
@@ -83,6 +91,8 @@ enum DecodeState {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
+#[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
+#[doc(hidden)]
 pub struct FramedWrite<T, B: IntoBuf = BytesMut> {
     // I/O type
     inner: T,
