@@ -15,12 +15,9 @@
 
 extern crate bytes;
 extern crate tokio_io;
-#[macro_use]
-extern crate futures;
 
 mod bytes_codec;
 mod lines_codec;
-pub mod length_delimited;
 
 pub use tokio_io::_tokio_codec::{
     Decoder,
