@@ -140,6 +140,7 @@ pub mod codec {
         //! configuration values.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! use tokio_io::{AsyncRead, AsyncWrite};
         //! use tokio_io::codec::length_delimited;
         //!
@@ -204,6 +205,7 @@ pub mod codec {
         //! frame head in the yielded `BytesMut`.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! # use tokio_io::AsyncRead;
         //! # use tokio_io::codec::length_delimited;
         //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -237,6 +239,7 @@ pub mod codec {
         //! frame head in the yielded `BytesMut`.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! # use tokio_io::AsyncRead;
         //! # use tokio_io::codec::length_delimited;
         //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -268,6 +271,7 @@ pub mod codec {
         //! **includes** the frame head length.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! # use tokio_io::AsyncRead;
         //! # use tokio_io::codec::length_delimited;
         //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -301,6 +305,7 @@ pub mod codec {
         //! frame head, including the frame head in the yielded `BytesMut`.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! # use tokio_io::AsyncRead;
         //! # use tokio_io::codec::length_delimited;
         //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -344,6 +349,7 @@ pub mod codec {
         //! included.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! # use tokio_io::AsyncRead;
         //! # use tokio_io::codec::length_delimited;
         //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -389,6 +395,7 @@ pub mod codec {
         //! length.
         //!
         //! ```
+        //! # extern crate tokio_io;
         //! # use tokio_io::AsyncRead;
         //! # use tokio_io::codec::length_delimited;
         //! # fn bind_read<T: AsyncRead>(io: T) {
