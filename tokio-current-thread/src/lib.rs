@@ -44,6 +44,7 @@ use std::error::Error;
 use std::rc::Rc;
 use std::sync::{atomic, mpsc, Arc};
 use std::time::{Duration, Instant};
+use std::thread;
 
 /// Executes tasks on the current thread
 pub struct CurrentThread<P: Park = ParkThread> {
@@ -256,6 +257,7 @@ impl<P: Park> CurrentThread<P> {
         let unpark = park.unpark();
 
         let (spawn_sender, spawn_receiver) = mpsc::channel();
+        let thread = thread::current().id();
 
         let scheduler = Scheduler::new(unpark);
         let notify = scheduler.notify();
@@ -271,6 +273,7 @@ impl<P: Park> CurrentThread<P> {
                 num_futures: num_futures,
                 notify: notify,
                 shut_down: Cell::new(false),
+                thread: thread,
             },
             spawn_receiver: spawn_receiver,
         }
@@ -602,6 +605,7 @@ pub struct Handle {
     num_futures: Arc<atomic::AtomicUsize>,
     shut_down: Cell<bool>,
     notify: executor::NotifyHandle,
+    thread: thread::ThreadId,
 }
 
 // Manual implementation because the Sender does not implement Debug
@@ -640,11 +644,14 @@ impl Handle {
             return Err(SpawnError::shutdown());
         }
 
-        self.sender
-            .send(Box::new(future))
-            .expect("CurrentThread does not exist anymore");
-        // use 0 for the id, CurrentThread does not make use of it
-        self.notify.notify(0);
+        if thread::current().id() == self.thread {
+            TaskExecutor::current().spawn_local(Box::new(future))?;
+        } else {
+            self.sender.send(Box::new(future))
+                .expect("CurrentThread does not exist anymore");
+            // use 0 for the id, CurrentThread does not make use of it
+            self.notify.notify(0);
+        }
 
         Ok(())
     }
