@@ -1,4 +1,4 @@
-//! Utilities for scheduling work to happen after a period of time.
+//! Utilities for tracking time.
 //!
 //! This crate provides a number of utilities for working with periods of time:
 //!
@@ -6,18 +6,19 @@
 //!
 //! * [`Interval`] A stream that yields at fixed time intervals.
 //!
-//! * [`Deadline`]: Wraps a future, requiring it to complete before a specified
-//!   instant in time, erroring if the future takes too long.
+//! * [`Timeout`]: Wraps a future or stream, setting an upper bound to the
+//!   amount of time it is allowed to execute. If the future or stream does not
+//!   completee in time, then it is canceled and an error is returned.
 //!
 //! * [`DelayQueue`]: A queue where items are returned once the requested delay
 //!   has expired.
 //!
 //! These three types are backed by a [`Timer`] instance. In order for
-//! [`Delay`], [`Interval`], and [`Deadline`] to function, the associated
+//! [`Delay`], [`Interval`], and [`Timeout`] to function, the associated
 //! [`Timer`] instance must be running on some thread.
 //!
 //! [`Delay`]: struct.Delay.html
-//! [`Deadline`]: struct.Deadline.html
+//! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
 
@@ -33,6 +34,7 @@ extern crate slab;
 
 pub mod clock;
 pub mod delay_queue;
+pub mod timeout;
 pub mod timer;
 
 mod atomic;
@@ -42,6 +44,9 @@ mod error;
 mod interval;
 mod wheel;
 
+#[deprecated(since = "0.2.6", note = "use Timeout instead")]
+#[doc(hidden)]
+#[allow(deprecated)]
 pub use self::deadline::{Deadline, DeadlineError};
 #[doc(inline)]
 pub use self::delay_queue::DelayQueue;
@@ -49,6 +54,7 @@ pub use self::delay::Delay;
 pub use self::error::Error;
 pub use self::interval::Interval;
 #[doc(inline)]
+pub use self::timeout::Timeout;
 pub use self::timer::{with_default, Timer};
 
 use std::time::{Duration, Instant};

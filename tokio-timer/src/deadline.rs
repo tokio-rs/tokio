@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use Delay;
 
 use futures::{Future, Poll, Async};
@@ -6,21 +8,16 @@ use std::error;
 use std::fmt;
 use std::time::Instant;
 
-/// Allows a given `Future` to execute until the specified deadline.
-///
-/// If the inner future completes before the deadline is reached, then
-/// `Deadline` completes with that value. Otherwise, `Deadline` completes with a
-/// [`DeadlineError`].
-///
-/// [`DeadlineError`]: struct.DeadlineError.html
-#[must_use = "futures do nothing unless polled"]
+#[deprecated(since = "0.2.6", note = "use Timeout instead")]
+#[doc(hidden)]
 #[derive(Debug)]
 pub struct Deadline<T> {
     future: T,
     delay: Delay,
 }
 
-/// Error returned by `Deadline` future.
+#[deprecated(since = "0.2.6", note = "use Timeout instead")]
+#[doc(hidden)]
 #[derive(Debug)]
 pub struct DeadlineError<T>(Kind<T>);
 

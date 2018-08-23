@@ -1,10 +1,11 @@
 use Error;
+use clock::now;
 use timer::{HandlePriv, Entry};
 
 use futures::Poll;
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 /// Registration with a timer.
 ///
@@ -16,11 +17,11 @@ pub(crate) struct Registration {
 }
 
 impl Registration {
-    pub fn new(deadline: Instant) -> Registration {
+    pub fn new(deadline: Instant, duration: Duration) -> Registration {
         fn is_send<T: Send + Sync>() {}
         is_send::<Registration>();
 
-        Registration { entry: Arc::new(Entry::new(deadline)) }
+        Registration { entry: Arc::new(Entry::new(deadline, duration)) }
     }
 
     pub fn deadline(&self) -> Instant {
@@ -38,6 +39,12 @@ impl Registration {
     }
 
     pub fn reset(&mut self, deadline: Instant) {
+        self.entry.time_mut().deadline = deadline;
+        Entry::reset(&mut self.entry);
+    }
+
+    pub fn reset_timeout(&mut self) {
+        let deadline = now() + self.entry.time_ref().duration;
         self.entry.time_mut().deadline = deadline;
         Entry::reset(&mut self.entry);
     }

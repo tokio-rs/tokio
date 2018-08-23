@@ -3,7 +3,7 @@ use timer::{Registration, HandlePriv};
 
 use futures::{Future, Poll};
 
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 /// A future that completes at a specified instant in time.
 ///
@@ -12,6 +12,11 @@ use std::time::Instant;
 ///
 /// `Delay` has a resolution of one millisecond and should not be used for tasks
 /// that require high-resolution timers.
+///
+/// # Cancellation
+///
+/// Canceling a `Delay` is done by dropping the value. No additional cleanup or
+/// other work is required.
 ///
 /// [`new`]: #method.new
 #[derive(Debug)]
@@ -29,13 +34,18 @@ impl Delay {
     /// as to how the sub-millisecond portion of `deadline` will be handled.
     /// `Delay` should not be used for high-resolution timer use cases.
     pub fn new(deadline: Instant) -> Delay {
-        let registration = Registration::new(deadline);
+        let registration = Registration::new(deadline, Duration::from_millis(0));
 
         Delay { registration }
     }
 
+    pub(crate) fn new_timeout(deadline: Instant, duration: Duration) -> Delay {
+        let registration = Registration::new(deadline, duration);
+        Delay { registration }
+    }
+
     pub(crate) fn new_with_handle(deadline: Instant, handle: HandlePriv) -> Delay {
-        let mut registration = Registration::new(deadline);
+        let mut registration = Registration::new(deadline, Duration::from_millis(0));
         registration.register_with(handle);
 
         Delay { registration }
@@ -62,6 +72,10 @@ impl Delay {
     /// completed.
     pub fn reset(&mut self, deadline: Instant) {
         self.registration.reset(deadline);
+    }
+
+    pub(crate) fn reset_timeout(&mut self) {
+        self.registration.reset_timeout();
     }
 
     /// Register the delay with the timer instance for the current execution

@@ -10,9 +10,9 @@
 //!   is initialized with a `Duration` and repeatedly yields each time the
 //!   duration elapses.
 //!
-//! * [`Deadline`][Deadline] wraps a future, requiring that it completes before
-//!   a specified `Instant` in time. If the future does not complete in time,
-//!   then it is canceled and an error is returned.
+//! * [`Timeout`][Timeeout]: Wraps a future or stream, setting an upper bound to the
+//!   amount of time it is allowed to execute. If the future or stream does not
+//!   completee in time, then it is canceled and an error is returned.
 //!
 //! * [`DelayQueue`]: A queue where items are returned once the requested delay
 //!   has expired.
@@ -48,7 +48,7 @@
 //! ```
 //!
 //! Require that an operation takes no more than 300ms. Note that this uses the
-//! [`deadline`][ext] function on the [`FutureExt`][ext] trait. This trait is
+//! [`timeout`][ext] function on the [`FutureExt`][ext] trait. This trait is
 //! included in the prelude.
 //!
 //! ```
@@ -64,11 +64,9 @@
 //! }
 //!
 //! # fn main() {
-//! let when = Instant::now()  + Duration::from_millis(300);
-//!
 //! tokio::run({
 //!     long_op()
-//!         .deadline(when)
+//!         .timeout(Duration::from_millis(300))
 //!         .map_err(|e| {
 //!             println!("operation timed out");
 //!         })
@@ -78,18 +76,27 @@
 //!
 //! [runtime]: ../runtime/struct.Runtime.html
 //! [tokio-timer]: https://docs.rs/tokio-timer
-//! [ext]: ../util/trait.FutureExt.html#method.deadline
-//! [Deadline]: struct.Deadline.html
+//! [ext]: ../util/trait.FutureExt.html#method.timeout
+//! [Timeout]: struct.Timeout.html
 //! [Delay]: struct.Delay.html
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
 pub use tokio_timer::{
     delay_queue,
-    Deadline,
-    DeadlineError,
     DelayQueue,
     Error,
     Interval,
     Delay,
+    Timeout,
+    timeout,
 };
+
+#[deprecated(since = "0.1.8", note = "use Timeout instead")]
+#[allow(deprecated)]
+#[doc(hidden)]
+pub type Deadline<T> = ::tokio_timer::Deadline<T>;
+#[deprecated(since = "0.1.8", note = "use Timeout instead")]
+#[allow(deprecated)]
+#[doc(hidden)]
+pub type DeadlineError<T> = ::tokio_timer::DeadlineError<T>;

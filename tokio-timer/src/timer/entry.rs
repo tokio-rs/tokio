@@ -11,7 +11,7 @@ use std::ptr;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{SeqCst, Relaxed};
-use std::time::Instant;
+use std::time::{Instant, Duration};
 use std::u64;
 
 /// Internal state shared between a `Delay` instance and the timer.
@@ -95,6 +95,7 @@ pub(crate) struct Entry {
 #[derive(Debug)]
 pub(crate) struct Time {
     pub(crate) deadline: Instant,
+    pub(crate) duration: Duration,
 }
 
 /// Flag indicating a timer entry has elapsed
@@ -106,10 +107,11 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub fn new(deadline: Instant) -> Entry {
+    pub fn new(deadline: Instant, duration: Duration) -> Entry {
         Entry {
             time: CachePadded::new(UnsafeCell::new(Time {
                 deadline,
+                duration,
             })),
             inner: None,
             task: AtomicTask::new(),

@@ -1,14 +1,16 @@
+#[allow(deprecated)]
 use tokio_timer::Deadline;
+use tokio_timer::Timeout;
 
 use futures::Future;
 
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 
 /// An extension trait for `Future` that provides a variety of convenient
 /// combinator functions.
 ///
-/// Currently, there only is a [`deadline`] function, but this will increase
+/// Currently, there only is a [`timeout`] function, but this will increase
 /// over time.
 ///
 /// Users are not expected to implement this trait. All types that implement
@@ -17,18 +19,17 @@ use std::time::Instant;
 /// This trait can be imported directly or via the Tokio prelude: `use
 /// tokio::prelude::*`.
 ///
-/// [`deadline`]: #method.deadline
+/// [`timeout`]: #method.timeout
 pub trait FutureExt: Future {
 
-    /// Creates a new future which allows `self` until `deadline`.
+    /// Creates a new future which allows `self` until `timeout`.
     ///
     /// This combinator creates a new future which wraps the receiving future
-    /// with a deadline. The returned future is allowed to execute until it
-    /// completes or `deadline` is reached, whichever happens first.
+    /// with a timeout. The returned future is allowed to execute until it
+    /// completes or `timeout` has elapsed, whichever happens first.
     ///
-    /// If the future completes before `deadline` then the future will resolve
-    /// with that item. Otherwise the future will resolve to an error once
-    /// `deadline` is reached.
+    /// If the future completes before `timeout` then the future will resolve
+    /// with that item. Otherwise the future will resolve to an error.
     ///
     /// # Examples
     ///
@@ -36,7 +37,7 @@ pub trait FutureExt: Future {
     /// # extern crate tokio;
     /// # extern crate futures;
     /// use tokio::prelude::*;
-    /// use std::time::{Duration, Instant};
+    /// use std::time::Duration;
     /// # use futures::future::{self, FutureResult};
     ///
     /// # fn long_future() -> FutureResult<(), ()> {
@@ -45,12 +46,21 @@ pub trait FutureExt: Future {
     /// #
     /// # fn main() {
     /// let future = long_future()
-    ///     .deadline(Instant::now() + Duration::from_secs(1))
+    ///     .timeout(Duration::from_secs(1))
     ///     .map_err(|e| println!("error = {:?}", e));
     ///
     /// tokio::run(future);
     /// # }
     /// ```
+    fn timeout(self, timeout: Duration) -> Timeout<Self>
+    where Self: Sized,
+    {
+        Timeout::new(self, timeout)
+    }
+
+    #[deprecated(since = "0.1.8", note = "use `timeout` instead")]
+    #[allow(deprecated)]
+    #[doc(hidden)]
     fn deadline(self, deadline: Instant) -> Deadline<Self>
     where Self: Sized,
     {
