@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [0.2.2] -
+## [0.2.2] - 2018-08-14
 ### Fixes
 * Fix starvation of `Signal`s whenever a `Signal` instance is dropped
 * Fix starvation of individual `Signal`s based on their creation order
