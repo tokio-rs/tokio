@@ -43,6 +43,7 @@ travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
+bytes = "0.4"
 tokio-codec = { version = "0.1.0", path = "tokio-codec" }
 tokio-current-thread = { version = "0.1.1", path = "tokio-current-thread" }
 tokio-io = { version = "0.1.6", path = "tokio-io" }
@@ -63,7 +64,6 @@ mio = "0.6.14"
 tokio-uds = { version = "0.2.0", path = "tokio-uds" }
 
 [dev-dependencies]
-bytes = "0.4"
 env_logger = { version = "0.5", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
 futures-cpupool = "0.1"
