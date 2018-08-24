@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.2")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! UDP bindings for `tokio`.
 //!
 //! This module contains the UDP networking types, similar to the standard
@@ -15,9 +18,6 @@
 //! [`SendDgram`]: struct.SendDgram.html
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`framed`]: struct.UdpSocket.html#method.framed
-
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.1")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;
 #[macro_use]

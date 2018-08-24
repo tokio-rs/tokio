@@ -1,3 +1,9 @@
+# 0.1.4 (August 23, 2018)
+
+* Use a scalable RW lock (#517)
+* Implement std::error::Error for error types (#511)
+* Documentation improvements
+
 # 0.1.3 (August 6, 2018)
 
 * Misc small fixes (#508)

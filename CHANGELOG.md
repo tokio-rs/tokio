@@ -1,3 +1,14 @@
+This changelog only applies to the `tokio` crate proper. Each sub crate
+maintains its own changelog tracking changes made in each respective sub crate.
+
+# 0.1.8 (August 23, 2018)
+
+* Extract tokio::executor::current_thread to a sub crate (#370)
+* Add `Runtime::block_on` (#398)
+* Add `runtime::current_thread::block_on_all` (#477)
+* Misc documentation improvements (#450)
+* Implement `std::error::Error` for error types (#501)
+
 # 0.1.7 (June 6, 2018)
 
 * Add `Runtime::block_on` for concurrent runtime (#391).

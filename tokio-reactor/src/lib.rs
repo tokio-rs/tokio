@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.4")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! Event loop that drives Tokio I/O resources.
 //!
 //! The reactor is the engine that drives asynchronous I/O resources (like TCP and
@@ -26,9 +29,6 @@
 //! [`Registration`]: struct.Registration.html
 //! [`PollEvented`]: struct.PollEvented.html
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
-
-#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.3")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate crossbeam_utils;
 #[macro_use]

@@ -1,3 +1,10 @@
+# 0.2.6 (August 23, 2018)
+
+* Implement `Default` for `timer::Handle` (#553)
+* Provide `DelayQueue` utility (#550)
+* Reduce size of `Delay` struct (#554)
+* Introduce `Timeout`, deprecate `Deadline` (#558)
+
 # 0.2.5 (August 6, 2018)
 
 * Add `Interval::interval` shortcut (#492).

@@ -4,9 +4,10 @@ name = "tokio-executor"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update CHANGELOG.md.
+# - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.3"
-documentation = "https://docs.rs/tokio-executor"
+version = "0.1.4"
+documentation = "https://docs.rs/tokio-executor/0.1.4/tokio_executor"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"

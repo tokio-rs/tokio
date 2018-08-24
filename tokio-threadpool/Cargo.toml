@@ -3,9 +3,10 @@ name = "tokio-threadpool"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update CHANGELOG.md.
+# - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.5"
-documentation = "https://docs.rs/tokio-threadpool"
+version = "0.1.6"
+documentation = "https://docs.rs/tokio-threadpool/0.1.6/tokio_threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
