@@ -103,6 +103,24 @@ fn main() {
 
 More examples can be found [here](examples).
 
+## Getting Help
+
+First, see if the answer to your question can be found in the [Guides] or the
+[API documentation]. If the answer is not there, there is an active community in
+the [Tokio Gitter channel][chat]. We would be happy to try to answer your
+question.  Last, if that doesn't work, try opening an [issue] with the question.
+
+[chat]: https://gitter.im/tokio-rs/tokio
+[issue]: https://github.com/tokio-rs/tokio/issues/new
+
+## Contributing
+
+:balloon: Thanks for your help improving the project! We are so happy to have
+you! We have a [contributing guide][guide] to help you get involved in the Tokio
+project.
+
+[guide]: CONTRIBUTING.md
+
 ## Project layout
 
 The `tokio` crate, found at the root, is primarily intended for use by
