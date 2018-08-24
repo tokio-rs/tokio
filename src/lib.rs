@@ -599,6 +599,7 @@ pub mod prelude {
 
     pub use util::{
         FutureExt,
+        StreamExt,
     };
 
     pub use ::std::io::{
