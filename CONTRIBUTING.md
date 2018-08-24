@@ -56,65 +56,10 @@ PR that helps others avoid the problems that you encountered.
 ### Submitting a Bug Report
 
 When opening a new issue in the Tokio issue tracker, users will be presented
-with a basic template that should be filled in.
-
-```
-<!--
-Thank you for reporting an issue.
-
-Please fill in as much of the template below as you're able.
--->
-
-## Version
-
-<!--
-List the versions of all `tokio` crates you are using. The easiest way to get
-this information is using `cargo-tree`.
-
-`cargo install cargo-tree`
-(see install here: https://github.com/sfackler/cargo-tree)
-
-Then:
-
-`cargo tree | grep tokio`
--->
-
-## Platform
-
-<!---
-Output of `uname -a` (UNIX), or version and 32 or 64-bit (Windows)
--->
-
-## Subcrates
-
-<!--
-If known, please specify the affected Tokio sub crates. Otherwise, delete this
-section.
--->
-
-## Description
-
-<!--
-
-Enter your issue details below this comment.
-
-One way to structure the description:
-
-<short summary of the bug>
-
-I tried this code:
-
-<code sample that causes the bug>
-
-I expected to see this happen: <explanation>
-
-Instead, this happened: <explanation>
--->
-```
-
-If you believe that you have uncovered a bug, please fill out this form,
-following the template to the best of your ability. Do not worry if you
-cannot answer every detail, just fill in what you can.
+with a [basic template][template] that should be filled in. If you believe that you have
+uncovered a bug, please fill out this form, following the template to the best
+of your ability. Do not worry if you cannot answer every detail, just fill in
+what you can.
 
 The two most important pieces of information we need in order to properly
 evaluate the report is a description of the behavior you are seeing and a simple
@@ -127,6 +72,7 @@ cases should be limited, as much as possible, to using only Tokio APIs.
 See [How to create a Minimal, Complete, and Verifiable example][mcve].
 
 [mcve]: https://stackoverflow.com/help/mcve
+[template]: .github/PULL_REQUEST_TEMPLATE.md
 
 ### Triaging a Bug Report
 
@@ -157,11 +103,14 @@ functional guidelines of the Tokio project.
 
 ## Pull Requests
 
-TODO: Overview
+Pull Requests are the way concrete changes are made to the code, documentation,
+and dependencies in the Tokio repository.
 
-Before making a large change, it is usually a good idea to first open an issue
-describing the change to solicit feedback and guidance. This will increasethe
-likelihood of the PR getting merged.
+Even tiny pull requests (e.g., one character pull request fixing a typo in API
+documentation) are greatly appreciated. Before making a large change, it is
+usually a good idea to first open an issue describing the change to solicit
+feedback and guidance. This will increasethe likelihood of the PR getting
+merged.
 
 ### Commits
 
@@ -227,37 +176,11 @@ Refs: #453, #154
 
 ### Opening the Pull Request
 
-From within GitHub, opening a new Pull Request will present you with a template
-that should be filled out:
+From within GitHub, opening a new Pull Request will present you with a
+[template] that should be filled out. Please try to do your best at filling out
+the details, but feel free to skip parts if you're not sure what to put.
 
-```
-<!--
-Thank you for your Pull Request. Please provide a description above and review
-the requirements below.
-
-Bug fixes and new features should include tests.
-
-Contributors guide: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
--->
-
-## Motivation
-
-<!--
-Explain the context and why you're making that change. What is the problem
-you're trying to solve? In some cases there is not a problem and this can be
-thought of as being the motivation for your change.
--->
-
-## Solution
-
-<!--
-Summarize the solution and provide any necessary context needed to understand
-the code change.
--->
-```
-
-Please try to do your best at filling out the details, but feel free to skip
-parts if you're not sure what to put.
+[template]: .github/PULL_REQUEST_TEMPLATE.md
 
 ### Discuss and update
 
