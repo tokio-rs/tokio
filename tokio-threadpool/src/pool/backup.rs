@@ -40,7 +40,7 @@ pub(crate) struct Backup {
     /// * If the thread is running
     state: AtomicUsize,
 
-    /// Next entry in the treiber stack.
+    /// Next entry in the Treiber stack.
     next_sleeper: UnsafeCell<BackupId>,
 
     /// Used to put the thread to sleep

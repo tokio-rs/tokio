@@ -73,7 +73,7 @@ struct Inner<U> {
     head_readiness: AtomicPtr<Node<U>>,
     tail_readiness: UnsafeCell<*const Node<U>>,
 
-    // Used as part of the MPSC queue algorithm
+    // Used as part of the mpsc queue algorithm
     stub: Arc<Node<U>>,
 }
 
@@ -242,7 +242,7 @@ where U: Unpark,
                     // being released, another thread notified it, which
                     // resulted in it getting pushed into the mpsc channel.
                     //
-                    // In this case, we just dec the ref count.
+                    // In this case, we just decrement the ref count.
                     let node = ptr2arc(node);
                     assert!((*node.next_all.get()).is_null());
                     assert!((*node.prev_all.get()).is_null());

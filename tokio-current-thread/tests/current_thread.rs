@@ -428,7 +428,7 @@ fn turn_has_polled() {
 }
 
 // Our own mock Park that is never really waiting and the only
-// thing it does is to send, on request, something (once) to a onshot
+// thing it does is to send, on request, something (once) to a oneshot
 // channel
 struct MyPark {
     sender: Option<oneshot::Sender<()>>,

@@ -1,6 +1,6 @@
 //! An UDP echo server that just sends back everything that it receives.
 //!
-//! If you're on unix you can test this out by in one terminal executing:
+//! If you're on Unix you can test this out by in one terminal executing:
 //!
 //!     cargo run --example echo-udp
 //!

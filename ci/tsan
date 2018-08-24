@@ -21,7 +21,7 @@ race:crossbeam_epoch
 race:crossbeam_deque*push
 race:crossbeam_deque*steal
 
-# This filters out expected data race in the treiber stack implementations.
+# This filters out expected data race in the Treiber stack implementations.
 # Treiber stacks are inherently racy. The pop operation will attempt to access
 # the "next" pointer on the node it is attempting to pop. However, at this
 # point it has not gained ownership of the node and another thread might beat

@@ -345,7 +345,7 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
-    /// This method should not be called from an asynchrounous context.
+    /// This method should not be called from an asynchronous context.
     ///
     /// # Panics
     ///
@@ -370,7 +370,7 @@ impl Runtime {
     /// its resolved result. Any tasks or timers which the future spawns
     /// internally will be executed on the runtime and waited for completion.
     ///
-    /// This method should not be called from an asynchrounous context.
+    /// This method should not be called from an asynchronous context.
     ///
     /// # Panics
     ///

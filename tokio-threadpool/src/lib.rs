@@ -103,7 +103,7 @@ extern crate log;
 //
 // ## Sleeping workers
 //
-// Sleeping workers are tracked using a [treiber stack]. This results in the
+// Sleeping workers are tracked using a [Treiber stack]. This results in the
 // thread that most recently went to sleep getting woken up first. When the pool
 // is not under load, this helps threads shutdown faster.
 //
@@ -137,7 +137,7 @@ extern crate log;
 // Also, whenever a worker is woken up via a signal and it does find work, it,
 // in turn, will try to wake up a new worker.
 //
-// [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
+// [Treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
 
 pub mod park;
 

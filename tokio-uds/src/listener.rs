@@ -12,7 +12,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 
-/// A Unix socket which can accept connections from other unix sockets.
+/// A Unix socket which can accept connections from other Unix sockets.
 pub struct UnixListener {
     io: PollEvented<mio_uds::UnixListener>,
 }

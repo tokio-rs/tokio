@@ -84,7 +84,7 @@ where
     ///
     /// # Arguments
     ///
-    /// * `when`: is the instant at which the the entry should be fired. It is
+    /// * `when`: is the instant at which the entry should be fired. It is
     ///           represented as the number of milliseconds since the creation
     ///           of the timing wheel.
     ///
@@ -98,9 +98,9 @@ where
     ///
     /// `Err(Elapsed)` indicates that `when` represents an instant that has
     /// already passed. In this case, the caller should fire the timeout
-    /// immediateely.
+    /// immediately.
     ///
-    /// `Err(Invalid)` indicates an invalid `when` argumeent as been supplied.
+    /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
     pub fn insert(&mut self, when: u64, item: T::Owned, store: &mut T::Store)
         -> Result<(), (T::Owned, InsertError)>
     {

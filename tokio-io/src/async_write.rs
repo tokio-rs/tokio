@@ -82,7 +82,7 @@ pub trait AsyncWrite: std_io::Write {
     /// appropriate. This method is the hook for such protocols to implement the
     /// graceful shutdown logic.
     ///
-    /// This `shutdown` method is required by implementors of the
+    /// This `shutdown` method is required by implementers of the
     /// `AsyncWrite` trait. Wrappers typically just want to proxy this call
     /// through to the wrapped type, and base types will typically implement
     /// shutdown logic here or just return `Ok(().into())`. Note that if you're
