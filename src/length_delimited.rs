@@ -583,6 +583,7 @@ impl Builder {
     ///     .num_skip(0)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn new() -> Builder {
         Builder {
@@ -624,6 +625,7 @@ impl Builder {
     ///     .big_endian()
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn big_endian(&mut self) -> &mut Self {
         self.length_field_is_big_endian = true;
@@ -648,6 +650,7 @@ impl Builder {
     ///     .little_endian()
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn little_endian(&mut self) -> &mut Self {
         self.length_field_is_big_endian = false;
@@ -672,6 +675,7 @@ impl Builder {
     ///     .native_endian()
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn native_endian(&mut self) -> &mut Self {
         if cfg!(target_endian = "big") {
@@ -706,6 +710,7 @@ impl Builder {
     ///     .max_frame_length(8 * 1024)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn max_frame_length(&mut self, val: usize) -> &mut Self {
         self.max_frame_len = val;
@@ -730,6 +735,7 @@ impl Builder {
     ///     .length_field_length(4)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn length_field_length(&mut self, val: usize) -> &mut Self {
         assert!(val > 0 && val <= 8, "invalid length field length");
@@ -753,6 +759,7 @@ impl Builder {
     ///     .length_field_offset(1)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn length_field_offset(&mut self, val: usize) -> &mut Self {
         self.length_field_offset = val;
@@ -774,6 +781,7 @@ impl Builder {
     ///     .length_adjustment(-2)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn length_adjustment(&mut self, val: isize) -> &mut Self {
         self.length_adjustment = val;
@@ -798,6 +806,7 @@ impl Builder {
     ///     .num_skip(4)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn num_skip(&mut self, val: usize) -> &mut Self {
         self.num_skip = Some(val);
@@ -821,6 +830,7 @@ impl Builder {
     ///     .num_skip(0)
     ///     .new_read(io);
     /// # }
+    /// # pub fn main() {}
     /// ```
     pub fn new_read<T>(&self, upstream: T) -> FramedRead<T>
         where T: AsyncRead,
