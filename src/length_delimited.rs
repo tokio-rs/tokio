@@ -1,8 +1,11 @@
 #![allow(deprecated)]
 
-use {codec::{self, Decoder}, io::{AsyncRead, AsyncWrite}};
+use {
+    codec::{self, Decoder, Encoder},
+    io::{AsyncRead, AsyncWrite},
+};
 
-use bytes::{Buf, BufMut, BytesMut, IntoBuf};
+use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
 use bytes::buf::Chain;
 
 use futures::{Async, AsyncSink, Stream, Sink, StartSend, Poll};
@@ -375,6 +378,44 @@ impl Decoder for Codec {
             }
             None => Ok(None),
         }
+    }
+}
+
+impl Encoder for Codec {
+    type Item = Bytes;
+    type Error = io::Error;
+
+    fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
+        let n = (&data).into_buf().remaining();
+
+        if n > self.builder.max_frame_len {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, FrameTooBig {
+                _priv: (),
+            }));
+        }
+
+        // Adjust `n` with bounds checking
+        let n = if self.builder.length_adjustment < 0 {
+            n.checked_add(-self.builder.length_adjustment as usize)
+        } else {
+            n.checked_sub(self.builder.length_adjustment as usize)
+        };
+
+        let n = n.ok_or_else(|| io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "provided length would overflow after adjustment",
+        ))?;
+
+        if self.builder.length_field_is_big_endian {
+            dst.put_uint_be(n as u64, self.builder.length_field_len);
+        } else {
+            dst.put_uint_le(n as u64, self.builder.length_field_len);
+        }
+
+        // Write the frame to the buffer
+        dst.extend_from_slice(&data[..]);
+
+        Ok(())
     }
 }
 
