@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use {
     codec::{self, Decoder, Encoder},
     io::{AsyncRead, AsyncWrite},
