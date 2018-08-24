@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use tokio_io::{codec, AsyncRead, AsyncWrite};
+use {codec::{self, Decoder}, io::{AsyncRead, AsyncWrite}};
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
 use bytes::buf::Chain;
@@ -55,7 +55,7 @@ pub struct Framed<T, B: IntoBuf = BytesMut> {
 /// [module level]: index.html
 #[derive(Debug)]
 pub struct FramedRead<T> {
-    inner: codec::FramedRead<T, Decoder>,
+    inner: codec::FramedRead<T, Codec>,
 }
 
 /// An error when the number of bytes read is more than max frame length.
@@ -64,7 +64,7 @@ pub struct FrameTooBig {
 }
 
 #[derive(Debug)]
-struct Decoder {
+struct Codec {
     // Configuration values
     builder: Builder,
 
@@ -273,9 +273,9 @@ impl<T: AsyncWrite> AsyncWrite for FramedRead<T> {
     }
 }
 
-// ===== impl Decoder ======
+// ===== impl Codec ======
 
-impl Decoder {
+impl Codec {
     fn decode_head(&mut self, src: &mut BytesMut) -> io::Result<Option<usize>> {
         let head_len = self.builder.num_head_bytes();
         let field_len = self.builder.length_field_len;
@@ -345,7 +345,7 @@ impl Decoder {
     }
 }
 
-impl codec::Decoder for Decoder {
+impl Decoder for Codec {
     type Item = BytesMut;
     type Error = io::Error;
 
@@ -836,7 +836,7 @@ impl Builder {
         where T: AsyncRead,
     {
         FramedRead {
-            inner: codec::FramedRead::new(upstream, Decoder {
+            inner: codec::FramedRead::new(upstream, Codec {
                 builder: *self,
                 state: DecodeState::Head,
             }),
