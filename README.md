@@ -107,10 +107,10 @@ More examples can be found [here](examples).
 
 First, see if the answer to your question can be found in the [Guides] or the
 [API documentation]. If the answer is not there, there is an active community in
-the [Tokio Gitter channel]. We would be happy to try to answer your question.
-Last, if that doesn't work, try opening an [issue] with the question.
+the [Tokio Gitter channel][chat]. We would be happy to try to answer your
+question.  Last, if that doesn't work, try opening an [issue] with the question.
 
-[Gitter]: https://gitter.im/tokio-rs/tokio
+[chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
 ## Contributing
