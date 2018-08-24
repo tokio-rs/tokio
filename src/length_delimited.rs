@@ -14,9 +14,9 @@ use std::{cmp, fmt};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 
-/// Configure length delimited `FramedRead`, `FramedWrite`, and `Framed` values.
+/// Configure length delimited `Codec`s.
 ///
-/// `Builder` enables constructing configured length delimited framers. Note
+/// `Builder` enables constructing configured length delimited codecs. Note
 /// that not all configuration settings apply to both encoding and decoding. See
 /// the documentation for specific methods for more detail.
 #[derive(Debug, Clone, Copy)]
@@ -67,7 +67,7 @@ pub struct FrameTooBig {
 }
 
 #[derive(Debug)]
-struct Codec {
+pub struct Codec {
     // Configuration values
     builder: Builder,
 
@@ -279,6 +279,14 @@ impl<T: AsyncWrite> AsyncWrite for FramedRead<T> {
 // ===== impl Codec ======
 
 impl Codec {
+    /// Creates a new length-delimited `Codec` with the default configuration values.
+    pub fn new() -> Self {
+        Self {
+            builder: Builder::new(),
+            state: DecodeState::Head,
+        }
+    }
+
     fn decode_head(&mut self, src: &mut BytesMut) -> io::Result<Option<usize>> {
         let head_len = self.builder.num_head_bytes();
         let field_len = self.builder.length_field_len;
@@ -606,7 +614,7 @@ impl<T, B: IntoBuf> fmt::Debug for FramedWrite<T, B>
 // ===== impl Builder =====
 
 impl Builder {
-    /// Creates a new length delimited framer builder with default configuration
+    /// Creates a new length delimited codec builder with default configuration
     /// values.
     ///
     /// # Examples
@@ -852,6 +860,30 @@ impl Builder {
     pub fn num_skip(&mut self, val: usize) -> &mut Self {
         self.num_skip = Some(val);
         self
+    }
+
+    /// Create a configured length delimited `Codec`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # use tokio::io::AsyncRead;
+    /// use tokio::codec::length_delimited::Builder;
+    /// # pub fn main() {
+    /// Builder::new()
+    ///     .length_field_offset(0)
+    ///     .length_field_length(2)
+    ///     .length_adjustment(0)
+    ///     .num_skip(0)
+    ///     .new_codec();
+    /// #}
+    /// ```
+    pub fn new_codec(&self) -> Codec {
+        Codec {
+            builder: *self,
+            state: DecodeState::Head,
+        }
     }
 
     /// Create a configured length delimited `FramedRead`
