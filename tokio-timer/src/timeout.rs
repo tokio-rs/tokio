@@ -15,7 +15,7 @@ use std::time::{Instant, Duration};
 
 /// Allows a `Future` or `Stream` to execute for a limited amount of time.
 ///
-/// If thee future or stream completes before the timeout has expired, then
+/// If the future or stream completes before the timeout has expired, then
 /// `Timeout` returns the completed value. Otherwise, `Timeout` returns an
 /// [`Error`].
 ///
@@ -43,7 +43,7 @@ use std::time::{Instant, Duration};
 /// # tx.unbounded_send(()).unwrap();
 /// # drop(tx);
 /// let process = rx.for_each(|item| {
-///     // do something with `iteem`
+///     // do something with `item`
 /// # drop(item);
 /// # Ok(())
 /// });
@@ -55,7 +55,7 @@ use std::time::{Instant, Duration};
 /// # Cancelation
 ///
 /// Cancelling a `Timeout` is done by dropping the value. No additional cleanup
-/// or otheer work is required.
+/// or other work is required.
 ///
 /// The original future or stream may be obtained by calling [`into_inner`]. This
 /// consumes the `Timeout`.
