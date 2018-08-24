@@ -204,34 +204,34 @@ fn read_max_frame_len() {
     assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
 }
 
-// #[test]
-// fn read_update_max_frame_len_at_rest() {
-//     let mut io = length_delimited::Builder::new()
-//         .new_read(mock! {
-//             Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
-//             Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
-//         });
+#[test]
+fn read_update_max_frame_len_at_rest() {
+    let mut io = length_delimited::Builder::new()
+        .new_read(mock! {
+            Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+            Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+        });
 
-//     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-//     io.set_max_frame_length(5);
-//     assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
-// }
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+    io.decoder_mut().set_max_frame_length(5);
+    assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
+}
 
-// #[test]
-// fn read_update_max_frame_len_in_flight() {
-//     let mut io = length_delimited::Builder::new()
-//         .new_read(mock! {
-//             Ok(b"\x00\x00\x00\x09abcd"[..].into()),
-//             Err(would_block()),
-//             Ok(b"efghi"[..].into()),
-//             Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
-//         });
+#[test]
+fn read_update_max_frame_len_in_flight() {
+    let mut io = length_delimited::Builder::new()
+        .new_read(mock! {
+            Ok(b"\x00\x00\x00\x09abcd"[..].into()),
+            Err(would_block()),
+            Ok(b"efghi"[..].into()),
+            Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+        });
 
-//     assert_eq!(io.poll().unwrap(), NotReady);
-//     io.set_max_frame_length(5);
-//     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-//     assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
-// }
+    assert_eq!(io.poll().unwrap(), NotReady);
+    io.decoder_mut().set_max_frame_length(5);
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+    assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
+}
 
 #[test]
 fn read_one_byte_length_field() {
@@ -438,40 +438,40 @@ fn write_max_frame_len() {
     assert!(io.get_ref().calls.is_empty());
 }
 
-// #[test]
-// fn write_update_max_frame_len_at_rest() {
-//     let mut io = length_delimited::Builder::new()
-//         .new_write(mock! {
-//             Ok(b"\x00\x00\x00\x06"[..].into()),
-//             Ok(b"abcdef"[..].into()),
-//             Ok(Flush),
-//         });
+#[test]
+fn write_update_max_frame_len_at_rest() {
+    let mut io = length_delimited::Builder::new()
+        .new_write(mock! {
+            Ok(b"\x00\x00\x00\x06"[..].into()),
+            Ok(b"abcdef"[..].into()),
+            Ok(Flush),
+        });
 
-//     assert!(io.start_send(Bytes::from("abcdef").unwrap().is_ready());
-//     assert!(io.poll_complete().unwrap().is_ready());
-//     io.set_max_frame_length(5);
-//     assert_eq!(io.start_send(Bytes::from("abcdef").unwrap_err().kind(), io::ErrorKind::InvalidInput);
-//     assert!(io.get_ref().calls.is_empty());
-// }
+    assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
+    assert!(io.poll_complete().unwrap().is_ready());
+    io.encoder_mut().set_max_frame_length(5);
+    assert_eq!(io.start_send(Bytes::from("abcdef")).unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    assert!(io.get_ref().calls.is_empty());
+}
 
-// #[test]
-// fn write_update_max_frame_len_in_flight() {
-//     let mut io = length_delimited::Builder::new()
-//         .new_write(mock! {
-//             Ok(b"\x00\x00\x00\x06"[..].into()),
-//             Ok(b"ab"[..].into()),
-//             Err(would_block()),
-//             Ok(b"cdef"[..].into()),
-//             Ok(Flush),
-//         });
+#[test]
+fn write_update_max_frame_len_in_flight() {
+    let mut io = length_delimited::Builder::new()
+        .new_write(mock! {
+            Ok(b"\x00\x00\x00\x06"[..].into()),
+            Ok(b"ab"[..].into()),
+            Err(would_block()),
+            Ok(b"cdef"[..].into()),
+            Ok(Flush),
+        });
 
-//     assert!(io.start_send(Bytes::from("abcdef").unwrap().is_ready());
-//     assert!(!io.poll_complete().unwrap().is_ready());
-//     io.set_max_frame_length(5);
-//     assert!(io.poll_complete().unwrap().is_ready());
-//     assert_eq!(io.start_send(Bytes::from("abcdef").unwrap_err().kind(), io::ErrorKind::InvalidInput);
-//     assert!(io.get_ref().calls.is_empty());
-// }
+    assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
+    assert!(!io.poll_complete().unwrap().is_ready());
+    io.encoder_mut().set_max_frame_length(5);
+    assert!(io.poll_complete().unwrap().is_ready());
+    assert_eq!(io.start_send(Bytes::from("abcdef")).unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    assert!(io.get_ref().calls.is_empty());
+}
 
 // ===== Test utils =====
 
