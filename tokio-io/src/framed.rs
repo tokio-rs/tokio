@@ -99,7 +99,7 @@ impl<T, U> Framed<T, U> {
     /// being worked with.
     pub fn into_parts(self) -> FramedParts<T> {
         let (inner, readbuf) = self.inner.into_parts();
-	    let (inner, writebuf) = inner.into_parts();
+        let (inner, writebuf) = inner.into_parts();
         FramedParts { inner: inner.0, readbuf: readbuf, writebuf: writebuf }
     }
 

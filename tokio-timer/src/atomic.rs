@@ -45,7 +45,7 @@ mod imp {
 mod imp {
     use std::sync::Mutex;
     use std::sync::atomic::Ordering;
-    
+
     #[derive(Debug)]
     pub struct AtomicU64 {
         inner: Mutex<u64>,
