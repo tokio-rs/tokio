@@ -6,9 +6,6 @@ use {
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
-use bytes::buf::Chain;
-
-use futures::{Async, AsyncSink, Stream, Sink, StartSend, Poll};
 
 use std::{cmp, fmt};
 use std::error::Error as StdError;
@@ -47,25 +44,36 @@ pub struct Builder {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-pub struct Framed<T, B: IntoBuf = BytesMut> {
-    inner: FramedRead<FramedWrite<T, B>>,
-}
+pub type Framed<T> = codec::Framed<T, Codec>;
 
 /// Adapts a byte stream to a `Stream` yielding entire frame values.
 ///
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-#[derive(Debug)]
-pub struct FramedRead<T> {
-    inner: codec::FramedRead<T, Codec>,
-}
+pub type FramedRead<T> = codec::FramedRead<T, Codec>;
+
+
+/// Adapts a byte stream to a `Sink` accepting entire frame values.
+///
+/// See [module level] documentation for more detail.
+///
+/// [module level]: index.html
+pub type FramedWrite<T> = codec::FramedWrite<T, Codec>;
 
 /// An error when the number of bytes read is more than max frame length.
 pub struct FrameTooBig {
     _priv: (),
 }
 
+/// A codec for frames delimited by a frame head specifying their lengths.
+///
+/// This allows the consumer to work with entire frames without having to worry
+/// about buffering or other framing logic.
+///
+/// See [module level] documentation for more detail.
+///
+/// [module level]: index.html
 #[derive(Debug)]
 pub struct Codec {
     // Configuration values
@@ -79,201 +87,6 @@ pub struct Codec {
 enum DecodeState {
     Head,
     Data(usize),
-}
-
-/// Adapts a byte stream to a `Sink` accepting entire frame values.
-///
-/// See [module level] documentation for more detail.
-///
-/// [module level]: index.html
-pub struct FramedWrite<T, B: IntoBuf = BytesMut> {
-    // I/O type
-    inner: T,
-
-    // Configuration values
-    builder: Builder,
-
-    // Current frame being written
-    frame: Option<Chain<Cursor<BytesMut>, B::Buf>>,
-}
-
-// ===== impl Framed =====
-
-impl<T: AsyncRead + AsyncWrite, B: IntoBuf> Framed<T, B> {
-    /// Creates a new `Framed` with default configuration values.
-    pub fn new(inner: T) -> Framed<T, B> {
-        Builder::new().new_framed(inner)
-    }
-}
-
-impl<T, B: IntoBuf> Framed<T, B> {
-    /// Returns a reference to the underlying I/O stream wrapped by `Framed`.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise
-    /// being worked with.
-    pub fn get_ref(&self) -> &T {
-        self.inner.get_ref().get_ref()
-    }
-
-    /// Returns a mutable reference to the underlying I/O stream wrapped by
-    /// `Framed`.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
-    pub fn get_mut(&mut self) -> &mut T {
-        self.inner.get_mut().get_mut()
-    }
-
-    /// Consumes the `Framed`, returning its underlying I/O stream.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
-    pub fn into_inner(self) -> T {
-        self.inner.into_inner().into_inner()
-    }
-}
-
-impl<T: AsyncRead, B: IntoBuf> Stream for Framed<T, B> {
-    type Item = BytesMut;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<BytesMut>, io::Error> {
-        self.inner.poll()
-    }
-}
-
-impl<T: AsyncWrite, B: IntoBuf> Sink for Framed<T, B> {
-    type SinkItem = B;
-    type SinkError = io::Error;
-
-    fn start_send(&mut self, item: B) -> StartSend<B, io::Error> {
-        self.inner.start_send(item)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), io::Error> {
-        self.inner.poll_complete()
-    }
-
-    fn close(&mut self) -> Poll<(), io::Error> {
-        self.inner.close()
-    }
-}
-
-impl<T, B: IntoBuf> fmt::Debug for Framed<T, B>
-    where T: fmt::Debug,
-          B::Buf: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Framed")
-            .field("inner", &self.inner)
-            .finish()
-    }
-}
-
-// ===== impl FramedRead =====
-
-impl<T: AsyncRead> FramedRead<T> {
-    /// Creates a new `FramedRead` with default configuration values.
-    pub fn new(inner: T) -> FramedRead<T> {
-        Builder::new().new_read(inner)
-    }
-}
-
-impl<T> FramedRead<T> {
-    /// Returns the current max frame setting
-    ///
-    /// This is the largest size this codec will accept from the wire. Larger
-    /// frames will be rejected.
-    pub fn max_frame_length(&self) -> usize {
-        self.inner.decoder().builder.max_frame_len
-    }
-
-    /// Updates the max frame setting.
-    ///
-    /// The change takes effect the next time a frame is decoded. In other
-    /// words, if a frame is currently in process of being decoded with a frame
-    /// size greater than `val` but less than the max frame length in effect
-    /// before calling this function, then the frame will be allowed.
-    pub fn set_max_frame_length(&mut self, val: usize) {
-        self.inner.decoder_mut().builder.max_frame_length(val);
-    }
-
-    /// Returns a reference to the underlying I/O stream wrapped by `FramedRead`.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise
-    /// being worked with.
-    pub fn get_ref(&self) -> &T {
-        self.inner.get_ref()
-    }
-
-    /// Returns a mutable reference to the underlying I/O stream wrapped by
-    /// `FramedRead`.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
-    pub fn get_mut(&mut self) -> &mut T {
-        self.inner.get_mut()
-    }
-
-    /// Consumes the `FramedRead`, returning its underlying I/O stream.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
-    pub fn into_inner(self) -> T {
-        self.inner.into_inner()
-    }
-}
-
-impl<T: AsyncRead> Stream for FramedRead<T> {
-    type Item = BytesMut;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<BytesMut>, io::Error> {
-        self.inner.poll()
-    }
-}
-
-impl<T: Sink> Sink for FramedRead<T> {
-    type SinkItem = T::SinkItem;
-    type SinkError = T::SinkError;
-
-    fn start_send(&mut self, item: T::SinkItem) -> StartSend<T::SinkItem, T::SinkError> {
-        self.inner.start_send(item)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), T::SinkError> {
-        self.inner.poll_complete()
-    }
-
-    fn close(&mut self) -> Poll<(), T::SinkError> {
-        self.inner.close()
-    }
-}
-
-impl<T: io::Write> io::Write for FramedRead<T> {
-    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        self.inner.get_mut().write(src)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.get_mut().flush()
-    }
-}
-
-impl<T: AsyncWrite> AsyncWrite for FramedRead<T> {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        self.inner.get_mut().shutdown()
-    }
-
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        self.inner.get_mut().write_buf(buf)
-    }
 }
 
 // ===== impl Codec ======
@@ -424,190 +237,6 @@ impl Encoder for Codec {
         dst.extend_from_slice(&data[..]);
 
         Ok(())
-    }
-}
-
-// ===== impl FramedWrite =====
-
-impl<T: AsyncWrite, B: IntoBuf> FramedWrite<T, B> {
-    /// Creates a new `FramedWrite` with default configuration values.
-    pub fn new(inner: T) -> FramedWrite<T, B> {
-        Builder::new().new_write(inner)
-    }
-}
-
-impl<T, B: IntoBuf> FramedWrite<T, B> {
-    /// Returns the current max frame setting
-    ///
-    /// This is the largest size this codec will write to the wire. Larger
-    /// frames will be rejected.
-    pub fn max_frame_length(&self) -> usize {
-        self.builder.max_frame_len
-    }
-
-    /// Updates the max frame setting.
-    ///
-    /// The change takes effect the next time a frame is encoded. In other
-    /// words, if a frame is currently in process of being encoded with a frame
-    /// size greater than `val` but less than the max frame length in effect
-    /// before calling this function, then the frame will be allowed.
-    pub fn set_max_frame_length(&mut self, val: usize) {
-        self.builder.max_frame_length(val);
-    }
-
-    /// Returns a reference to the underlying I/O stream wrapped by
-    /// `FramedWrite`.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise
-    /// being worked with.
-    pub fn get_ref(&self) -> &T {
-        &self.inner
-    }
-
-    /// Returns a mutable reference to the underlying I/O stream wrapped by
-    /// `FramedWrite`.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    /// Consumes the `FramedWrite`, returning its underlying I/O stream.
-    ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise being
-    /// worked with.
-    pub fn into_inner(self) -> T {
-        self.inner
-    }
-}
-
-impl<T: AsyncWrite, B: IntoBuf> FramedWrite<T, B> {
-    // If there is a buffered frame, try to write it to `T`
-    fn do_write(&mut self) -> Poll<(), io::Error> {
-        if self.frame.is_none() {
-            return Ok(Async::Ready(()));
-        }
-
-        loop {
-            let frame = self.frame.as_mut().unwrap();
-            try_ready!(self.inner.write_buf(frame));
-
-            if !frame.has_remaining() {
-                break;
-            }
-        }
-
-        self.frame = None;
-
-        Ok(Async::Ready(()))
-    }
-
-    fn set_frame(&mut self, buf: B::Buf) -> io::Result<()> {
-        let mut head = BytesMut::with_capacity(8);
-        let n = buf.remaining();
-
-        if n > self.builder.max_frame_len {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, FrameTooBig {
-                _priv: (),
-            }));
-        }
-
-        // Adjust `n` with bounds checking
-        let n = if self.builder.length_adjustment < 0 {
-            n.checked_add(-self.builder.length_adjustment as usize)
-        } else {
-            n.checked_sub(self.builder.length_adjustment as usize)
-        };
-
-        // Error handling
-        let n = match n {
-            Some(n) => n,
-            None => return Err(io::Error::new(io::ErrorKind::InvalidInput, "provided length would overflow after adjustment")),
-        };
-
-        if self.builder.length_field_is_big_endian {
-            head.put_uint_be(n as u64, self.builder.length_field_len);
-        } else {
-            head.put_uint_le(n as u64, self.builder.length_field_len);
-        }
-
-        debug_assert!(self.frame.is_none());
-
-        self.frame = Some(head.into_buf().chain(buf));
-
-        Ok(())
-    }
-}
-
-impl<T: AsyncWrite, B: IntoBuf> Sink for FramedWrite<T, B> {
-    type SinkItem = B;
-    type SinkError = io::Error;
-
-    fn start_send(&mut self, item: B) -> StartSend<B, io::Error> {
-        if !try!(self.do_write()).is_ready() {
-            return Ok(AsyncSink::NotReady(item));
-        }
-
-        try!(self.set_frame(item.into_buf()));
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), io::Error> {
-        // Write any buffered frame to T
-        try_ready!(self.do_write());
-
-        // Try flushing the underlying IO
-        try_ready!(self.inner.poll_flush());
-
-        return Ok(Async::Ready(()));
-    }
-
-    fn close(&mut self) -> Poll<(), io::Error> {
-        try_ready!(self.poll_complete());
-        self.inner.shutdown()
-    }
-}
-
-impl<T: Stream, B: IntoBuf> Stream for FramedWrite<T, B> {
-    type Item = T::Item;
-    type Error = T::Error;
-
-    fn poll(&mut self) -> Poll<Option<T::Item>, T::Error> {
-        self.inner.poll()
-    }
-}
-
-impl<T: io::Read, B: IntoBuf> io::Read for FramedWrite<T, B> {
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        self.get_mut().read(dst)
-    }
-}
-
-impl<T: AsyncRead, U: IntoBuf> AsyncRead for FramedWrite<T, U> {
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        self.get_mut().read_buf(buf)
-    }
-
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.get_ref().prepare_uninitialized_buffer(buf)
-    }
-}
-
-impl<T, B: IntoBuf> fmt::Debug for FramedWrite<T, B>
-    where T: fmt::Debug,
-          B::Buf: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FramedWrite")
-            .field("inner", &self.inner)
-            .field("builder", &self.builder)
-            .field("frame", &self.frame)
-            .finish()
     }
 }
 
@@ -877,7 +506,7 @@ impl Builder {
     ///     .length_adjustment(0)
     ///     .num_skip(0)
     ///     .new_codec();
-    /// #}
+    /// # }
     /// ```
     pub fn new_codec(&self) -> Codec {
         Codec {
@@ -908,12 +537,7 @@ impl Builder {
     pub fn new_read<T>(&self, upstream: T) -> FramedRead<T>
         where T: AsyncRead,
     {
-        FramedRead {
-            inner: codec::FramedRead::new(upstream, Codec {
-                builder: *self,
-                state: DecodeState::Head,
-            }),
-        }
+        codec::FramedRead::new(upstream, self.new_codec())
     }
 
     /// Create a configured length delimited `FramedWrite`
@@ -927,22 +551,16 @@ impl Builder {
     /// # use tokio::codec::length_delimited;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncWrite>(io: T) {
-    /// # let _: length_delimited::FramedWrite<T, BytesMut> =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_write(io);
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_write<T, B>(&self, inner: T) -> FramedWrite<T, B>
+    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T>
         where T: AsyncWrite,
-              B: IntoBuf,
     {
-        FramedWrite {
-            inner: inner,
-            builder: *self,
-            frame: None,
-        }
+        codec::FramedWrite::new(inner, self.new_codec())
     }
 
     /// Create a configured length delimited `Framed`
@@ -956,19 +574,17 @@ impl Builder {
     /// # use tokio::codec::length_delimited;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
-    /// # let _: length_delimited::Framed<T, BytesMut> =
+    /// # let _: length_delimited::Framed<T> =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_framed(io);
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_framed<T, B>(&self, inner: T) -> Framed<T, B>
+    pub fn new_framed<T>(&self, inner: T) -> Framed<T>
         where T: AsyncRead + AsyncWrite,
-              B: IntoBuf
     {
-        let inner = self.new_read(self.new_write(inner));
-        Framed { inner: inner }
+        codec::Framed::new(inner, self.new_codec())
     }
 
     fn num_head_bytes(&self) -> usize {

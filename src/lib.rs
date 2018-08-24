@@ -135,19 +135,20 @@ pub mod codec {
         //! # Getting started
         //!
         //! If implementing a protocol from scratch, using length delimited framing
-        //! is an easy way to get started. [`Framed::new()`] will adapt a
-        //! full-duplex byte stream with a length delimited framer using default
-        //! configuration values.
+        //! is an easy way to get started. [`Codec::new()`] will return a length
+        //! delimited codec using default configuration values. This can then be
+        //! used to construct a framer to adapt a full-duplex byte stream into a
+        //! stream of frames.
         //!
         //! ```
         //! # extern crate tokio;
         //! use tokio::io::{AsyncRead, AsyncWrite};
-        //! use tokio::codec::length_delimited;
+        //! use tokio::codec::{self, length_delimited};
         //!
         //! fn bind_transport<T: AsyncRead + AsyncWrite>(io: T)
         //!     -> length_delimited::Framed<T>
         //! {
-        //!     length_delimited::Framed::new(io)
+        //!     codec::Framed::new(io, length_delimited::Codec::new())
         //! }
         //! # pub fn main() {}
         //! ```
@@ -170,13 +171,13 @@ pub mod codec {
         //! # extern crate futures;
         //! #
         //! use tokio::io::{AsyncRead, AsyncWrite};
-        //! use tokio::codec::length_delimited;
-        //! use bytes::BytesMut;
+        //! use tokio::codec::{self, length_delimited};
+        //! use bytes::Bytes;
         //! use futures::{Sink, Future};
         //!
         //! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
-        //!     let mut transport = length_delimited::Framed::new(io);
-        //!     let frame = BytesMut::from("hello world");
+        //!     let mut transport = codec::Framed::new(io, length_delimited::Codec::new());
+        //!     let frame = Bytes::from("hello world");
         //!
         //!     transport.send(frame).wait().unwrap();
         //! }
@@ -454,7 +455,7 @@ pub mod codec {
         //! # use tokio::codec::length_delimited;
         //! # use bytes::BytesMut;
         //! # fn write_frame<T: AsyncWrite>(io: T) {
-        //! # let _: length_delimited::FramedWrite<T, BytesMut> =
+        //! # let _: length_delimited::FramedWrite<T> =
         //! length_delimited::Builder::new()
         //!     .length_field_length(2)
         //!     .new_write(io);
