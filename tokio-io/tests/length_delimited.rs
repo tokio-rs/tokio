@@ -434,6 +434,16 @@ fn write_max_frame_len() {
 }
 
 #[test]
+fn write_zero() {
+    let mut io = Builder::new()
+        .new_write(mock! { });
+
+    assert!(io.start_send("abcdef").unwrap().is_ready());
+    assert_eq!(io.poll_complete().unwrap_err().kind(), io::ErrorKind::WriteZero);
+    assert!(io.get_ref().calls.is_empty());
+}
+
+#[test]
 fn write_update_max_frame_len_at_rest() {
     let mut io = Builder::new()
         .new_write(mock! {
