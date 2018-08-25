@@ -15,6 +15,12 @@
 //! Note that [`current_thread::Runtime`][rt] does not implement `Send` itself
 //! and cannot be safely moved to other threads.
 //!
+//! # Spawning futures that are not `Send`.
+//!
+//! The runtime uses the [`tokio-current-thread`](https://docs.rs/tokio-current-thread) under the
+//! hood. Use the functions from there, specifically
+//! [`tokio_current_thread::spawn`](https://docs.rs/tokio-current-thread/*/tokio_current_thread/fn.spawn.html).
+//!
 //! # Spawning from other threads
 //!
 //! While [`current_thread::Runtime`][rt] does not implement `Send` and cannot
