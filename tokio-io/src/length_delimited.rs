@@ -455,7 +455,12 @@ impl<T: AsyncWrite, B: IntoBuf> FramedWrite<T, B> {
 
         loop {
             let frame = self.frame.as_mut().unwrap();
-            try_ready!(self.inner.write_buf(frame));
+            if try_ready!(self.inner.write_buf(frame)) == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    "failed to write frame to transport",
+                ));
+            }
 
             if !frame.has_remaining() {
                 break;
