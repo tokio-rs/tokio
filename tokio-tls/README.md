@@ -26,7 +26,7 @@ extern crate tokio_tls;
 use tokio_tls::{TlsConnector, TlsAcceptor};
 ```
 
-You can find few examples how to use this crate in examples directory (using TLS in 
+You can find few examples how to use this crate in examples directory (using TLS in
 hyper server or client).
 
 By default the `native-tls` crate currently uses the "platform appropriate"

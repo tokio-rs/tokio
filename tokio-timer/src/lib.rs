@@ -11,7 +11,7 @@
 //!
 //! * [`Timeout`]: Wraps a future or stream, setting an upper bound to the
 //!   amount of time it is allowed to execute. If the future or stream does not
-//!   completee in time, then it is canceled and an error is returned.
+//!   complete in time, then it is canceled and an error is returned.
 //!
 //! * [`DelayQueue`]: A queue where items are returned once the requested delay
 //!   has expired.

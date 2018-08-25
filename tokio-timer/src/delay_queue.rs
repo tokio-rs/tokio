@@ -198,7 +198,7 @@ struct Data<T> {
     /// Next entry in the stack
     next: Option<usize>,
 
-    /// Previous entry in the stac
+    /// Previous entry in the stack
     prev: Option<usize>,
 }
 
@@ -231,7 +231,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_timer::timer::Handle;
     ///
     /// let handle = Handle::default();
-    /// let deplay_queue: DelayQueue<u32> = DelayQueue::with_capacity_and_handle(0, &handle);
+    /// let delay_queue: DelayQueue<u32> = DelayQueue::with_capacity_and_handle(0, &handle);
     /// ```
     pub fn with_capacity_and_handle(capacity: usize, handle: &Handle) -> DelayQueue<T> {
         DelayQueue {
@@ -282,7 +282,7 @@ impl<T> DelayQueue<T> {
     ///
     /// The return value represents the insertion and is used at an argument to
     /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
-    /// `value` is removed from the queue eitheer by calling [`poll`] after
+    /// `value` is removed from the queue either by calling [`poll`] after
     /// `when` is reached or by calling [`remove`]. At this point, the caller
     /// must take care to not use the returned [`Key`] again as it may reference
     /// a different item in the queue.
@@ -350,7 +350,7 @@ impl<T> DelayQueue<T> {
     ///
     /// The return value represents the insertion and is used at an argument to
     /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
-    /// `value` is removed from the queue eitheer by calling [`poll`] after
+    /// `value` is removed from the queue either by calling [`poll`] after
     /// `when` is reached or by calling [`remove`]. At this point, the caller
     /// must take care to not use the returned [`Key`] again as it may reference
     /// a different item in the queue.
@@ -485,7 +485,7 @@ impl<T> DelayQueue<T> {
     ///
     /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
-    /// // "foo"is now scheduledto be returned in 10 seconds
+    /// // "foo"is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
@@ -541,7 +541,7 @@ impl<T> DelayQueue<T> {
     ///
     /// delay_queue.reset(&key, Duration::from_secs(10));
     ///
-    /// // "foo"is now scheduledto be returned in 10 seconds
+    /// // "foo"is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
     pub fn reset(&mut self, key: &Key, timeout: Duration) {

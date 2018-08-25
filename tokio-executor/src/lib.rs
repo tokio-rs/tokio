@@ -20,7 +20,7 @@
 //! * The [`Executor`] trait describes the API for spawning a future onto an
 //!   executor.
 //!
-//! * [`enter`] marks that the the current thread is entering an execution
+//! * [`enter`] marks that the current thread is entering an execution
 //!   context. This prevents a second executor from accidentally starting from
 //!   within the context of one that is already running.
 //!
@@ -114,7 +114,7 @@ pub trait Executor {
     ///
     /// # Panics
     ///
-    /// Implementors are encouraged to avoid panics. However, a panic is
+    /// Implementers are encouraged to avoid panics. However, a panic is
     /// permitted and the caller should check the implementation specific
     /// documentation for more details on possible panics.
     ///
@@ -148,7 +148,7 @@ pub trait Executor {
     ///
     /// # Panics
     ///
-    /// This function must not panic. Implementors must ensure that panics do
+    /// This function must not panic. Implementers must ensure that panics do
     /// not happen.
     ///
     /// # Examples

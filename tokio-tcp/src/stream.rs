@@ -44,7 +44,7 @@ impl TcpStream {
     ///
     /// This function will create a new TCP socket and attempt to connect it to
     /// the `addr` provided. The returned future will be resolved once the
-    /// stream has successfully connected, or it wil return an error if one
+    /// stream has successfully connected, or it will return an error if one
     /// occurs.
     pub fn connect(addr: &SocketAddr) -> ConnectFuture {
         use self::ConnectFutureState::*;

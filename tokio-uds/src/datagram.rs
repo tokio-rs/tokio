@@ -30,7 +30,7 @@ impl UnixDatagram {
 
     /// Creates an unnamed pair of connected sockets.
     ///
-    /// This function will create a pair of interconnected unix sockets for
+    /// This function will create a pair of interconnected Unix sockets for
     /// communicating back and forth between one another. Each socket will be
     /// associated with the event loop whose handle is also provided.
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {

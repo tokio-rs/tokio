@@ -732,7 +732,7 @@ impl Worker {
                     }
                 }
                 Shutdown | Running => {
-                    // To get here, the block above transitioned the tate to
+                    // To get here, the block above transitioned the state to
                     // `Sleeping`. No other thread can concurrently
                     // transition to `Shutdown` or `Running`.
                     unreachable!();
@@ -805,7 +805,7 @@ impl Worker {
                         }
                     }
                     Shutdown | Running => {
-                        // To get here, the block above transitioned the tate to
+                        // To get here, the block above transitioned the state to
                         // `Sleeping`. No other thread can concurrently
                         // transition to `Shutdown` or `Running`.
                         unreachable!();
