@@ -41,7 +41,7 @@ pub use self::libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
         target_os = "netbsd",
         target_os = "openbsd",
 ))]
-mod bsd {
+pub mod bsd {
     #[cfg(any(target_os = "dragonfly", target_os = "freebsd",
               target_os = "macos", target_os = "netbsd",
               target_os = "openbsd"))]
