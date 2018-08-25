@@ -12,7 +12,7 @@ First, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tokio-signal = "0.1"
+tokio-signal = "0.2"
 ```
 
 Next you can use this in conjunction with the `tokio` and `futures` crates:
