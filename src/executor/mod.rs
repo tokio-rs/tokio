@@ -39,7 +39,10 @@
 //! [`Executor`]: trait.Executor.html
 //! [`spawn`]: fn.spawn.html
 
-#[deprecated(since = "0.1.8", note = "use tokio-current-thread crate instead")]
+#[deprecated(
+    since = "0.1.8",
+    note = "use tokio-current-thread crate or functions in tokio::runtime::current_thread instead",
+)]
 #[doc(hidden)]
 pub mod current_thread;
 
