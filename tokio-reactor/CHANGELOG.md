@@ -1,3 +1,7 @@
+# 0.1.5 (August 27, 2018)
+
+* Experimental async / await support.
+
 # 0.1.4 (August 23, 2018)
 
 * Use a scalable RW lock (#517)

@@ -6,13 +6,12 @@ edition = "2018"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-# - Update CHANGELOG.md.
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-async-await/0.0.1"
+documentation = "https://docs.rs/tokio-async-await/0.1.0"
 description = """
 Experimental async/await support for Tokio
 """
