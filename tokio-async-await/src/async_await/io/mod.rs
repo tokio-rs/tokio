@@ -16,8 +16,8 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.
 pub trait AsyncReadExt: AsyncRead {
-    /// Tries to read some bytes directly into the given `buf` in asynchronous
-    /// manner, returning a future.
+    /// Tries to read some bytes directly into the given `buf` in an
+    /// asynchronous manner, returning a future.
     ///
     /// The returned future will resolve to the number of bytes read once the read
     /// operation is completed.

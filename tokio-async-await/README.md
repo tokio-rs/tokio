@@ -4,11 +4,11 @@ This crate provides a preview of Tokio with async / await support. It is a shim
 layer on top of `tokio`.
 
 **This crate requires Rust nightly and does not provide API stability
-guarantees. You are living on the here.**
+guarantees. You are living on the edge here.**
 
 ## Usage
 
-To use this crate, you need need to start with a Rust 2018 edition crate.
+To use this crate, you need to start with a Rust 2018 edition crate.
 
 Add this to your `Cargo.toml`:
 
