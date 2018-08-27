@@ -18,6 +18,11 @@ Event loop that drives Tokio I/O resources.
 """
 categories = ["asynchronous", "network-programming"]
 
+[features]
+# This feature comes with no promise of stability. Things will break with each
+# patch release. Use at your own risk.
+async-await-preview = []
+
 [dependencies]
 crossbeam-utils = "0.5.0"
 futures = "0.1.19"

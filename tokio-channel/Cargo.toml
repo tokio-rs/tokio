@@ -1,0 +1,25 @@
+[package]
+name = "tokio-channel"
+
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Create "v0.1.x" git tag.
+version = "0.1.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-channel/0.1.0"
+description = """
+Channels for asynchronous communication using Tokio.
+"""
+categories = ["asynchronous"]
+
+[features]
+# This feature comes with no promise of stability. Things will break with each
+# patch release. Use at your own risk.
+async-await-preview = []
+
+[dependencies]
+futures = "0.1.23"
