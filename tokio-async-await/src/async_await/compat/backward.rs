@@ -27,7 +27,7 @@ impl<T> Compat<T> {
     }
 }
 
-/// Convert a valuee into one that can be used with `await!`.
+/// Convert a value into one that can be used with `await!`.
 pub trait IntoAwaitable {
     type Awaitable;
 

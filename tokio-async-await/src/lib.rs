@@ -11,7 +11,7 @@ extern crate futures_core;
 extern crate futures_util;
 
 // Re-export all of Tokio
-pub use tokio_main::{
+pub use tokio::{
     // Modules
     clock,
     codec,
@@ -53,7 +53,7 @@ pub mod prelude {
     //!
     //! The prelude may grow over time as additional items see ubiquitous use.
 
-    pub use tokio_main::prelude::*;
+    pub use tokio::prelude::*;
 
     #[doc(inline)]
     pub use crate::async_await::{
