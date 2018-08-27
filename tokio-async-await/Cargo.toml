@@ -1,0 +1,45 @@
+cargo-features = ["edition", "rename-dependency"]
+
+[package]
+name = "tokio-async-await"
+edition = "2018"
+
+# When releasing to crates.io:
+# - Update html_root_url.
+version = "0.1.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-async-await/0.1.0"
+description = """
+Experimental async/await support for Tokio
+"""
+categories = ["asynchronous"]
+
+[workspace]
+
+[lib]
+name = "tokio"
+
+[dependencies]
+futures = "0.1.23"
+tokio_main = { package = "tokio", version = "0.1.7", path = ".." }
+tokio-io = { version = "0.1.7", path = "../tokio-io" }
+tokio-channel = { version = "0.1.0", path = "../tokio-channel", features = ["async-await-preview"] }
+tokio-reactor = { version = "0.1.5", path = "../tokio-reactor", features = ["async-await-preview"] }
+futures-core-preview = { version = "0.3.0-alpha.2" }
+futures-util-preview = { version = "0.3.0-alpha.2" }
+
+[dev-dependencies]
+bytes = "0.4.9"
+tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
+hyper = "0.12.8"
+
+[patch.crates-io]
+tokio = { path = "../" }
+tokio-executor = { path = "../tokio-executor" }
+tokio-io = { path = "../tokio-io" }
+tokio-reactor = { path = "../tokio-reactor" }
+tokio-tcp = { path = "../tokio-tcp" }
+tokio-timer = { path = "../tokio-timer" }
