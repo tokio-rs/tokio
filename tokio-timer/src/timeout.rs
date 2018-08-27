@@ -70,11 +70,7 @@ pub struct Timeout<T> {
 
 /// Error returned by `Timeout`.
 #[derive(Debug)]
-pub struct Error<T>(Kind<T>);
-
-/// Timeout error variants
-#[derive(Debug)]
-enum Kind<T> {
+pub enum Error<T> {
     /// Inner value returned an error
     Inner(T),
 
@@ -197,22 +193,22 @@ where T: Stream,
 impl<T> Error<T> {
     /// Create a new `Error` representing the inner value completing with `Err`.
     pub fn inner(err: T) -> Error<T> {
-        Error(Kind::Inner(err))
+        Error::Inner(err)
     }
 
     /// Returns `true` if the error was caused by the inner value completing
     /// with `Err`.
     pub fn is_inner(&self) -> bool {
-        match self.0 {
-            Kind::Inner(_) => true,
+        match self {
+            Error::Inner(_) => true,
             _ => false,
         }
     }
 
     /// Consumes `self`, returning the inner future error.
     pub fn into_inner(self) -> Option<T> {
-        match self.0 {
-            Kind::Inner(err) => Some(err),
+        match self {
+            Error::Inner(err) => Some(err),
             _ => None,
         }
     }
@@ -220,14 +216,14 @@ impl<T> Error<T> {
     /// Create a new `Error` representing the inner value not completing before
     /// the deadline is reached.
     pub fn elapsed() -> Error<T> {
-        Error(Kind::Elapsed)
+        Error::Elapsed
     }
 
     /// Returns `true` if the error was caused by the inner value not completing
     /// before the deadline is reached.
     pub fn is_elapsed(&self) -> bool {
-        match self.0 {
-            Kind::Elapsed => true,
+        match self {
+            Error::Elapsed => true,
             _ => false,
         }
     }
@@ -235,21 +231,21 @@ impl<T> Error<T> {
     /// Creates a new `Error` representing an error encountered by the timer
     /// implementation
     pub fn timer(err: ::Error) -> Error<T> {
-        Error(Kind::Timer(err))
+        Error::Timer(err)
     }
 
     /// Returns `true` if the error was caused by the timer.
     pub fn is_timer(&self) -> bool {
-        match self.0 {
-            Kind::Timer(_) => true,
+        match self {
+            Error::Timer(_) => true,
             _ => false,
         }
     }
 
     /// Consumes `self`, returning the error raised by the timer implementation.
     pub fn into_timer(self) -> Option<::Error> {
-        match self.0 {
-            Kind::Timer(err) => Some(err),
+        match self {
+            Error::Timer(err) => Some(err),
             _ => None,
         }
     }
@@ -257,9 +253,9 @@ impl<T> Error<T> {
 
 impl<T: error::Error> error::Error for Error<T> {
     fn description(&self) -> &str {
-        use self::Kind::*;
+        use self::Error::*;
 
-        match self.0 {
+        match self {
             Inner(ref e) => e.description(),
             Elapsed => "deadline has elapsed",
             Timer(ref e) => e.description(),
@@ -269,9 +265,9 @@ impl<T: error::Error> error::Error for Error<T> {
 
 impl<T: fmt::Display> fmt::Display for Error<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        use self::Kind::*;
+        use self::Error::*;
 
-        match self.0 {
+        match self {
             Inner(ref e) => e.fmt(fmt),
             Elapsed => "deadline has elapsed".fmt(fmt),
             Timer(ref e) => e.fmt(fmt),
