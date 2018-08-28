@@ -13,7 +13,7 @@ mod prelude {
     pub use futures::*;
     pub use tokio::reactor::Reactor;
     pub use tokio::net::{TcpListener, TcpStream};
-    pub use tokio_io::io::read_to_end;
+    pub use tokio::io::read_to_end;
 
     pub use test::{self, Bencher};
     pub use std::thread;

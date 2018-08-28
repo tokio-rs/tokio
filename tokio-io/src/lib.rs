@@ -43,6 +43,8 @@ macro_rules! try_nb {
     })
 }
 
+#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
+#[doc(hidden)]
 pub mod io;
 pub mod codec;
 

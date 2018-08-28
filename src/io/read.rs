@@ -3,7 +3,7 @@ use std::mem;
 
 use futures::{Future, Poll};
 
-use AsyncRead;
+use tokio_io::AsyncRead;
 
 #[derive(Debug)]
 enum State<R, T> {
@@ -19,8 +19,6 @@ enum State<R, T> {
 ///
 /// The returned future will resolve to both the I/O stream and the buffer
 /// as well as the number of bytes read once the read operation is completed.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn read<R, T>(rd: R, buf: T) -> Read<R, T>
     where R: AsyncRead,
           T: AsMut<[u8]>
@@ -32,8 +30,6 @@ pub fn read<R, T>(rd: R, buf: T) -> Read<R, T>
 /// a buffer.
 ///
 /// Created by the [`read`] function.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 #[derive(Debug)]
 pub struct Read<R, T> {
     state: State<R, T>,

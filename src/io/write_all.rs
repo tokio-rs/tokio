@@ -3,15 +3,13 @@ use std::mem;
 
 use futures::{Poll, Future};
 
-use AsyncWrite;
+use tokio_io::AsyncWrite;
 
 /// A future used to write the entire contents of some data to a stream.
 ///
 /// This is created by the [`write_all`] top-level method.
 ///
 /// [`write_all`]: fn.write_all.html
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 #[derive(Debug)]
 pub struct WriteAll<A, T> {
     state: State<A, T>,
@@ -41,8 +39,6 @@ enum State<A, T> {
 /// be broadly applicable to accepting data which can be converted to a slice.
 /// The `Window` struct is also available in this crate to provide a different
 /// window into a slice if necessary.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn write_all<A, T>(a: A, buf: T) -> WriteAll<A, T>
     where A: AsyncWrite,
           T: AsRef<[u8]>,

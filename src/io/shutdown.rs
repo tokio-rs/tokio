@@ -2,7 +2,7 @@ use std::io;
 
 use futures::{Poll, Future, Async};
 
-use AsyncWrite;
+use tokio_io::AsyncWrite;
 
 /// A future used to fully shutdown an I/O object.
 ///
@@ -13,8 +13,6 @@ use AsyncWrite;
 ///
 /// [`shutdown`]: fn.shutdown.html
 #[derive(Debug)]
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub struct Shutdown<A> {
     a: Option<A>,
 }
@@ -25,8 +23,6 @@ pub struct Shutdown<A> {
 /// This function will consume the object provided if an error happens, and
 /// otherwise it will repeatedly call `shutdown` until it sees `Ok(())`,
 /// scheduling a retry if `WouldBlock` is seen along the way.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn shutdown<A>(a: A) -> Shutdown<A>
     where A: AsyncWrite,
 {

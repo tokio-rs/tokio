@@ -2,11 +2,11 @@ extern crate futures;
 extern crate rand;
 extern crate tempfile;
 extern crate tokio_fs;
-extern crate tokio_io;
+extern crate tokio;
 extern crate tokio_threadpool;
 
 use tokio_fs::*;
-use tokio_io::io;
+use tokio::io;
 use tokio_threadpool::*;
 
 use futures::Future;

@@ -3,7 +3,7 @@ use std::mem;
 
 use futures::{Poll, Future};
 
-use AsyncRead;
+use tokio_io::AsyncRead;
 
 /// A future which can be used to easily read the contents of a stream into a
 /// vector until the delimiter is reached.
@@ -11,8 +11,6 @@ use AsyncRead;
 /// Created by the [`read_until`] function.
 ///
 /// [`read_until`]: fn.read_until.html
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 #[derive(Debug)]
 pub struct ReadUntil<A> {
     state: State<A>,
@@ -38,8 +36,6 @@ enum State<A> {
 /// (if found).
 ///
 /// [`BufRead::read_until`]: https://doc.rust-lang.org/std/io/trait.BufRead.html#method.read_until
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn read_until<A>(a: A, byte: u8, buf: Vec<u8>) -> ReadUntil<A>
     where A: AsyncRead + BufRead,
 {

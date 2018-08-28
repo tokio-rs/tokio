@@ -1,16 +1,12 @@
-#![allow(deprecated)]
-
 use std::io::{self, BufRead};
 use std::mem;
 
 use futures::{Poll, Stream};
 
-use AsyncRead;
+use tokio_io::AsyncRead;
 
 /// Combinator created by the top-level `lines` method which is a stream over
 /// the lines of text on an I/O object.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 #[derive(Debug)]
 pub struct Lines<A> {
     io: A,
@@ -23,8 +19,6 @@ pub struct Lines<A> {
 /// This method takes an asynchronous I/O object, `a`, and returns a `Stream` of
 /// lines that the object contains. The returned stream will reach its end once
 /// `a` reaches EOF.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn lines<A>(a: A) -> Lines<A>
     where A: AsyncRead + BufRead,
 {

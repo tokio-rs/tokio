@@ -5,7 +5,6 @@ extern crate futures;
 extern crate libc;
 extern crate mio;
 extern crate tokio;
-extern crate tokio_io;
 
 use std::fs::File;
 use std::io::{self, Write};
@@ -17,7 +16,7 @@ use mio::event::Evented;
 use mio::unix::{UnixReady, EventedFd};
 use mio::{PollOpt, Ready, Token};
 use tokio::reactor::{Handle, PollEvented2};
-use tokio_io::io::read_to_end;
+use tokio::io::read_to_end;
 use futures::Future;
 
 macro_rules! t {

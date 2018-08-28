@@ -1,6 +1,6 @@
 extern crate futures;
 extern crate tokio_tcp;
-extern crate tokio_io;
+extern crate tokio;
 
 use std::net::TcpStream;
 use std::thread;
@@ -8,7 +8,7 @@ use std::io::{Write, Read};
 
 use futures::Future;
 use futures::stream::Stream;
-use tokio_io::io::read_to_end;
+use tokio::io::read_to_end;
 use tokio_tcp::TcpListener;
 
 macro_rules! t {
