@@ -20,6 +20,15 @@ pub struct LinesCodec {
 
 impl LinesCodec {
     /// Returns a `LinesCodec` for splitting up data into lines.
+    ///
+    /// # Note
+    ///
+    /// The returned `LinesCodec` will not have an upper bound on the length
+    /// of a buffered line. See the documentation for
+    /// [`set_decode_max_line_length`] for information on why this could be
+    /// a potential security risk.
+    ///
+    /// [`set_decode_max_line_length`]: #method.set_decode_max_line_length
     pub fn new() -> LinesCodec {
         LinesCodec {
             next_index: 0,
@@ -32,6 +41,14 @@ impl LinesCodec {
     /// If this is set, lines will be ended when a `\n` character is read, _or_
     /// when they reach the provided number of bytes. Otherwise, lines will
     /// only be ended when a `\n` character is read.
+    ///
+    /// # Note
+    ///
+    /// Setting a length limit is highly recommended for any `LinesCodec` which
+    /// will be exposed to untrusted input. Otherwise, the size of the buffer
+    /// that holds the line currently being read is unbounded. An attacker could
+    /// exploit this unbounded buffer by sending an unbounded amount of input
+    /// without any `\n` characters, causing unbounded memory consumption.
     pub fn set_decode_max_line_length(&mut self, limit: usize) -> &mut Self {
         self.max_length = Some(limit);
         self
