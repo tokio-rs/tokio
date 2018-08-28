@@ -210,7 +210,7 @@ where U: Unpark,
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick(&mut self, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
+    pub fn tick(&mut self, eid: usize, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
     {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst)
@@ -271,7 +271,8 @@ where U: Unpark,
                 impl<'a, U: Unpark> Drop for Bomb<'a, U> {
                     fn drop(&mut self) {
                         if let Some(node) = self.node.take() {
-                            self.borrow.enter(self.enter, || release_node(node))
+                            let eid = self.borrow.id;
+                            self.borrow.enter(self.enter, eid, || release_node(node))
                         }
                     }
                 }
@@ -279,6 +280,7 @@ where U: Unpark,
                 let node = self.nodes.remove(node);
 
                 let mut borrow = Borrow {
+                    id: eid,
                     scheduler: self,
                     num_futures,
                 };
@@ -329,7 +331,7 @@ where U: Unpark,
                         done: &mut done,
                     };
 
-                    if borrow.enter(enter, || scheduled.tick()) {
+                    if borrow.enter(enter, eid, || scheduled.tick()) {
                         // we have a borrow of the Runtime, so we know it's not shut down
                         borrow.num_futures.fetch_sub(2, SeqCst);
                     }
