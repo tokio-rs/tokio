@@ -146,9 +146,9 @@ pub mod codec {
         //! use tokio::codec::*;
         //!
         //! fn bind_transport<T: AsyncRead + AsyncWrite>(io: T)
-        //!     -> length_delimited::Framed<T>
+        //!     -> Framed<T, LengthDelimitedCodec>
         //! {
-        //!     codec::Framed::new(io, LengthDelimitedCodec::new())
+        //!     Framed::new(io, LengthDelimitedCodec::new())
         //! }
         //! # pub fn main() {}
         //! ```
@@ -176,7 +176,7 @@ pub mod codec {
         //! use futures::{Sink, Future};
         //!
         //! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
-        //!     let mut transport = codec::Framed::new(io, LengthDelimitedCodec::new());
+        //!     let mut transport = Framed::new(io, LengthDelimitedCodec::new());
         //!     let frame = Bytes::from("hello world");
         //!
         //!     transport.send(frame).wait().unwrap();
@@ -455,7 +455,7 @@ pub mod codec {
         //! # use tokio::codec::length_delimited;
         //! # use bytes::BytesMut;
         //! # fn write_frame<T: AsyncWrite>(io: T) {
-        //! # let _: length_delimited::FramedWrite<T> =
+        //! # let _ =
         //! length_delimited::Builder::new()
         //!     .length_field_length(2)
         //!     .new_write(io);

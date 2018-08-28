@@ -316,7 +316,7 @@ fn write_single_frame_length_adjusted() {
 
 #[test]
 fn write_nothing_yields_nothing() {
-    let mut io: length_delimited::FramedWrite<_> = FramedWrite::new(
+    let mut io = FramedWrite::new(
         mock!(),
         LengthDelimitedCodec::new()
     );

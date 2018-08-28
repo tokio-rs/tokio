@@ -1,5 +1,5 @@
 use {
-    codec::{self, Decoder, Encoder},
+    codec::{Decoder, Encoder, FramedRead, FramedWrite, Framed},
     io::{AsyncRead, AsyncWrite},
 };
 
@@ -35,29 +35,6 @@ pub struct Builder {
     // Length field byte order (little or big endian)
     length_field_is_big_endian: bool,
 }
-
-/// Adapts a byte stream into a unified `Stream` and `Sink` that works over
-/// entire frame values.
-///
-/// See [module level] documentation for more detail.
-///
-/// [module level]: index.html
-pub type Framed<T> = codec::Framed<T, LengthDelimitedCodec>;
-
-/// Adapts a byte stream to a `Stream` yielding entire frame values.
-///
-/// See [module level] documentation for more detail.
-///
-/// [module level]: index.html
-pub type FramedRead<T> = codec::FramedRead<T, LengthDelimitedCodec>;
-
-
-/// Adapts a byte stream to a `Sink` accepting entire frame values.
-///
-/// See [module level] documentation for more detail.
-///
-/// [module level]: index.html
-pub type FramedWrite<T> = codec::FramedWrite<T, LengthDelimitedCodec>;
 
 /// An error when the number of bytes read is more than max frame length.
 pub struct FrameTooBig {
@@ -550,10 +527,10 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_read<T>(&self, upstream: T) -> FramedRead<T>
+    pub fn new_read<T>(&self, upstream: T) -> FramedRead<T, LengthDelimitedCodec>
         where T: AsyncRead,
     {
-        codec::FramedRead::new(upstream, self.new_codec())
+        FramedRead::new(upstream, self.new_codec())
     }
 
     /// Create a configured length delimited `FramedWrite`
@@ -573,10 +550,10 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T>
+    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedCodec>
         where T: AsyncWrite,
     {
-        codec::FramedWrite::new(inner, self.new_codec())
+        FramedWrite::new(inner, self.new_codec())
     }
 
     /// Create a configured length delimited `Framed`
@@ -590,17 +567,17 @@ impl Builder {
     /// # use tokio::codec::length_delimited;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
-    /// # let _: length_delimited::Framed<T> =
+    /// # let _ =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_framed(io);
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_framed<T>(&self, inner: T) -> Framed<T>
+    pub fn new_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedCodec>
         where T: AsyncRead + AsyncWrite,
     {
-        codec::Framed::new(inner, self.new_codec())
+        Framed::new(inner, self.new_codec())
     }
 
     fn num_head_bytes(&self) -> usize {
