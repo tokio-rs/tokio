@@ -9,19 +9,14 @@ pub extern crate libc;
 extern crate mio;
 extern crate mio_uds;
 
-use std::collections::hash_map::HashMap;
 use std::cell::UnsafeCell;
 use std::io;
 use std::io::prelude::*;
 use std::mem;
-use std::os::unix::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
 use self::libc::c_int;
-use self::mio::unix::EventedFd;
-use self::mio::Poll as MioPoll;
-use self::mio::{Evented, PollOpt, Ready, Token};
 use self::mio_uds::UnixStream;
 use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
@@ -66,9 +61,6 @@ struct Globals {
     sender: UnixStream,
     receiver: UnixStream,
     signals: Vec<SignalInfo>,
-    // A count of how many signal streams are registered on the same event loop instance
-    // so that we can avoid deregistering our receiver stream prematurely
-    pollfd_register_count: Mutex<HashMap<RawFd, usize>>,
 }
 
 impl Default for SignalInfo {
@@ -95,7 +87,6 @@ fn globals() -> &'static Globals {
                 sender: sender,
                 receiver: receiver,
                 signals: (0..SIGNUM).map(|_| Default::default()).collect(),
-                pollfd_register_count: Mutex::new(HashMap::new()),
             };
             GLOBALS = Box::into_raw(Box::new(globals));
         });
@@ -191,85 +182,8 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     }
 }
 
-/// A helper struct to register our global receiving end of the signal pipe on
-/// multiple event loops.
-///
-/// This structure represents registering the receiving end on all event loops,
-/// and uses `EventedFd` in mio to do so. It's stored in each driver task and is
-/// used to read data and register interest in new signals coming in.
-struct EventedReceiver;
-
-impl Evented for EventedReceiver {
-    fn register(
-        &self,
-        poll: &MioPoll,
-        token: Token,
-        events: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        let globals = globals();
-        let fd = globals.receiver.as_raw_fd();
-
-        // NB: we must try registering with the event loop regardless of our
-        // reference count. If the event loop descriptor is closed, we won't
-        // get any notifications to clean up our map, so if a new event loop
-        // descriptor collides with an entry in our map, we want to make sure
-        // we don't accidentally skip the registration.
-        match EventedFd(&fd).register(poll, token, events, opts) {
-            Ok(()) => {}
-            // Due to tokio-rs/tokio-core#307
-            Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {},
-            Err(e) => return Err(e),
-        }
-
-        *globals.pollfd_register_count
-            .lock()
-            .expect("poisoned")
-            .entry(poll.as_raw_fd())
-            .or_insert(0) += 1;
-
-        Ok(())
-    }
-
-    fn reregister(
-        &self,
-        poll: &MioPoll,
-        token: Token,
-        events: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        let fd = globals().receiver.as_raw_fd();
-        EventedFd(&fd).reregister(poll, token, events, opts)
-    }
-    fn deregister(&self, poll: &MioPoll) -> io::Result<()> {
-        let globals = globals();
-
-        let mut guard = globals.pollfd_register_count
-            .lock()
-            .expect("poisoned");
-        let ref_count = guard.entry(poll.as_raw_fd()).or_insert(1);
-        *ref_count -= 1;
-
-        // Only deregister if we're the last stream listening for this signal
-        // on this event loop. Otherwise, if multiple streams are opened for
-        // the same signal and one of them is closed, the remainder will starve.
-        if *ref_count == 0 {
-            let fd = globals.receiver.as_raw_fd();
-            EventedFd(&fd).deregister(poll)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl Read for EventedReceiver {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&globals().receiver).read(buf)
-    }
-}
-
 struct Driver {
-    wakeup: PollEvented<EventedReceiver>,
+    wakeup: PollEvented<UnixStream>,
 }
 
 impl Future for Driver {
@@ -289,8 +203,24 @@ impl Future for Driver {
 
 impl Driver {
     fn new(handle: &Handle) -> io::Result<Driver> {
+        // NB: We give each driver a "fresh" reciever file descriptor to avoid
+        // the issues described in alexcrichton/tokio-process#42.
+        //
+        // In the past we would reuse the actual receiver file descriptor and
+        // swallow any errors around double registration of the same descriptor.
+        // I'm not sure if the second (failed) registration simply doesn't end up
+        // receiving wake up notifications, or there could be some race condition
+        // when consuming readiness events, but having distinct descriptors for
+        // distinct PollEvented instances appears to mitigate this.
+        //
+        // Unfortunately we cannot just use a single global PollEvented instance
+        // either, since we can't compare Handles or assume they will always
+        // point to the exact same reactor.
+        let stream = globals().receiver.try_clone()?;
+        let wakeup = PollEvented::new_with_handle(stream, handle)?;
+
         Ok(Driver {
-            wakeup: try!(PollEvented::new_with_handle(EventedReceiver, handle)),
+            wakeup: wakeup,
         })
     }
 
