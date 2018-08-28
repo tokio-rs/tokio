@@ -3,7 +3,7 @@ use std::mem;
 
 use futures::{Poll, Future};
 
-use AsyncRead;
+use tokio_io::AsyncRead;
 
 /// A future which can be used to easily read exactly enough bytes to fill
 /// a buffer.
@@ -12,8 +12,6 @@ use AsyncRead;
 ///
 /// [`read_exact`]: fn.read_exact.html
 #[derive(Debug)]
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub struct ReadExact<A, T> {
     state: State<A, T>,
 }
@@ -38,8 +36,6 @@ enum State<A, T> {
 /// the error yielded. In the case of success the object will be destroyed and
 /// the buffer will be returned, with all data read from the stream appended to
 /// the buffer.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn read_exact<A, T>(a: A, buf: T) -> ReadExact<A, T>
     where A: AsyncRead,
           T: AsMut<[u8]>,

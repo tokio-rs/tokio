@@ -2,7 +2,7 @@ use std::io;
 
 use futures::{Future, Poll};
 
-use {AsyncRead, AsyncWrite};
+use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A future which will copy all data from a reader into a writer.
 ///
@@ -10,8 +10,6 @@ use {AsyncRead, AsyncWrite};
 /// bytes copied or an error if one happens.
 ///
 /// [`copy`]: fn.copy.html
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 #[derive(Debug)]
 pub struct Copy<R, W> {
     reader: Option<R>,
@@ -34,8 +32,6 @@ pub struct Copy<R, W> {
 /// On success the number of bytes is returned and the `reader` and `writer` are
 /// consumed. On error the error is returned and the I/O objects are consumed as
 /// well.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn copy<R, W>(reader: R, writer: W) -> Copy<R, W>
     where R: AsyncRead,
           W: AsyncWrite,

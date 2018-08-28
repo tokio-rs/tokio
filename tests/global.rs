@@ -72,7 +72,7 @@ impl tokio_io::AsyncWrite for Wr {
 
 #[test]
 fn hammer_split() {
-    use tokio_io::io;
+    use tokio::io;
 
     const N: usize = 100;
     const ITER: usize = 10;

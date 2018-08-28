@@ -2,7 +2,7 @@ use std::io;
 
 use futures::{Poll, Future, Async};
 
-use AsyncWrite;
+use tokio_io::AsyncWrite;
 
 /// A future used to fully flush an I/O object.
 ///
@@ -12,8 +12,6 @@ use AsyncWrite;
 ///
 /// [`flush`]: fn.flush.html
 #[derive(Debug)]
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub struct Flush<A> {
     a: Option<A>,
 }
@@ -24,8 +22,6 @@ pub struct Flush<A> {
 /// This function will consume the object provided if an error happens, and
 /// otherwise it will repeatedly call `flush` until it sees `Ok(())`, scheduling
 /// a retry if `WouldBlock` is seen along the way.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn flush<A>(a: A) -> Flush<A>
     where A: AsyncWrite,
 {

@@ -14,7 +14,7 @@ use std::process::Command;
 use futures::{Future, Poll};
 use futures::stream::Stream;
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_io::io::{read_to_end, copy, shutdown};
+use tokio::io::{read_to_end, copy, shutdown};
 use tokio::runtime::Runtime;
 use tokio::net::{TcpListener, TcpStream};
 use native_tls::{TlsConnector, TlsAcceptor, Identity};

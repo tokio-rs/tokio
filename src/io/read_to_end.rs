@@ -3,7 +3,7 @@ use std::mem;
 
 use futures::{Poll, Future};
 
-use AsyncRead;
+use tokio_io::AsyncRead;
 
 /// A future which can be used to easily read the entire contents of a stream
 /// into a vector.
@@ -12,8 +12,6 @@ use AsyncRead;
 ///
 /// [`read_to_end`]: fn.read_to_end.html
 #[derive(Debug)]
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub struct ReadToEnd<A> {
     state: State<A>,
 }
@@ -33,8 +31,6 @@ enum State<A> {
 /// In the case of an error the buffer and the object will be discarded, with
 /// the error yielded. In the case of success both the object and the buffer
 /// will be returned, with all data read from the stream appended to the buffer.
-#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
-#[doc(hidden)]
 pub fn read_to_end<A>(a: A, buf: Vec<u8>) -> ReadToEnd<A>
     where A: AsyncRead,
 {

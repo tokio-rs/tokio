@@ -8,6 +8,7 @@
 //!
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
+#![allow(deprecated)]
 
 mod copy;
 mod flush;
@@ -18,9 +19,13 @@ mod read_until;
 mod shutdown;
 mod write_all;
 
+#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
+#[doc(hidden)]
 pub use allow_std::AllowStdIo;
 pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
+#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
+#[doc(hidden)]
 pub use lines::{lines, Lines};
 pub use self::read::{read, Read};
 pub use self::read_exact::{read_exact, ReadExact};
@@ -28,5 +33,7 @@ pub use self::read_to_end::{read_to_end, ReadToEnd};
 pub use self::read_until::{read_until, ReadUntil};
 pub use self::shutdown::{shutdown, Shutdown};
 pub use split::{ReadHalf, WriteHalf};
+#[deprecated(since = "0.1.8", note = "Moved to tokio::io")]
+#[doc(hidden)]
 pub use window::Window;
 pub use self::write_all::{write_all, WriteAll};

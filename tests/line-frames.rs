@@ -2,7 +2,6 @@ extern crate env_logger;
 extern crate futures;
 extern crate tokio;
 extern crate tokio_codec;
-extern crate tokio_io;
 extern crate tokio_threadpool;
 extern crate bytes;
 
@@ -13,7 +12,7 @@ use bytes::{BytesMut, BufMut};
 use futures::{Future, Stream, Sink};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::{Encoder, Decoder};
-use tokio_io::io::{write_all, read};
+use tokio::io::{write_all, read};
 use tokio_threadpool::Builder;
 
 pub struct LineCodec;
