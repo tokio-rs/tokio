@@ -62,7 +62,7 @@ futures = "0.1.20"
 mio = "0.6.14"
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.2.0", path = "tokio-uds" }
+tokio-uds = { version = "0.2.1", path = "tokio-uds" }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
