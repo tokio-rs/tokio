@@ -56,6 +56,48 @@ fn lines_decoder() {
 }
 
 #[test]
+fn lines_decoder_max_length() {
+    let mut codec = LinesCodec::new();
+    codec.set_decode_max_line_length(5);
+    let buf = &mut BytesMut::new();
+    buf.reserve(200);
+    buf.put("line 1 is too long\nline 2\r\nline 3\n\r\n\r");
+    assert_eq!("line 1", codec.decode(buf).unwrap().unwrap());
+    assert_eq!(" is to", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("o long", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("line 3", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("", codec.decode(buf).unwrap().unwrap());
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+    buf.put("k");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!("\rk", codec.decode_eof(buf).unwrap().unwrap());
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+}
+
+#[test]
+fn lines_decoder_max_length_in_flight() {
+    let mut codec = LinesCodec::new();
+    let buf = &mut BytesMut::new();
+    buf.reserve(200);
+    buf.put("line 1 is too long\nline 2 is too long\r\nline 3 is too long\n\r\n\r");
+
+    assert_eq!("line 1 is too long", codec.decode(buf).unwrap().unwrap());
+
+    codec.set_decode_max_line_length(5);
+    assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
+    assert_eq!(" is to", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("o long", codec.decode(buf).unwrap().unwrap());
+
+    codec.set_decode_max_line_length(256);
+    assert_eq!("line 3 is too long", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("", codec.decode(buf).unwrap().unwrap());
+
+}
+
+#[test]
 fn lines_encoder() {
     let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();
