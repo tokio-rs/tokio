@@ -75,7 +75,7 @@ where
     }
 
     /// Return the number of milliseconds that have elapsed since the timing
-    /// wheele's creation.
+    /// wheel's creation.
     pub fn elapsed(&self) -> u64 {
         self.elapsed
     }
