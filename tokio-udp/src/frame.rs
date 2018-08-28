@@ -111,7 +111,7 @@ impl<C: Encoder> Sink for UdpFramed<C> {
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
 const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
-impl<C> UdpFramed<C> {
+impl<C: Encoder + Decoder> UdpFramed<C> {
     /// Create a new `UdpFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
