@@ -143,12 +143,12 @@ pub mod codec {
         //! ```
         //! # extern crate tokio;
         //! use tokio::io::{AsyncRead, AsyncWrite};
-        //! use tokio::codec::{self, length_delimited};
+        //! use tokio::codec::*;
         //!
         //! fn bind_transport<T: AsyncRead + AsyncWrite>(io: T)
         //!     -> length_delimited::Framed<T>
         //! {
-        //!     codec::Framed::new(io, length_delimited::Codec::new())
+        //!     codec::Framed::new(io, LengthDelimitedCodec::new())
         //! }
         //! # pub fn main() {}
         //! ```
@@ -171,12 +171,12 @@ pub mod codec {
         //! # extern crate futures;
         //! #
         //! use tokio::io::{AsyncRead, AsyncWrite};
-        //! use tokio::codec::{self, length_delimited};
+        //! use tokio::codec::*;
         //! use bytes::Bytes;
         //! use futures::{Sink, Future};
         //!
         //! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
-        //!     let mut transport = codec::Framed::new(io, length_delimited::Codec::new());
+        //!     let mut transport = codec::Framed::new(io, LengthDelimitedCodec::new());
         //!     let frame = Bytes::from("hello world");
         //!
         //!     transport.send(frame).wait().unwrap();
@@ -479,6 +479,8 @@ pub mod codec {
         //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
         pub use ::length_delimited::*;
     }
+
+    pub use self::length_delimited::LengthDelimitedCodec;
 }
 
 pub mod io {

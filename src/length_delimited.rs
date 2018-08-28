@@ -9,7 +9,7 @@ use std::{cmp, fmt};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 
-/// Configure length delimited `Codec`s.
+/// Configure length delimited `LengthDelimitedCodec`s.
 ///
 /// `Builder` enables constructing configured length delimited codecs. Note
 /// that not all configuration settings apply to both encoding and decoding. See
@@ -42,14 +42,14 @@ pub struct Builder {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-pub type Framed<T> = codec::Framed<T, Codec>;
+pub type Framed<T> = codec::Framed<T, LengthDelimitedCodec>;
 
 /// Adapts a byte stream to a `Stream` yielding entire frame values.
 ///
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-pub type FramedRead<T> = codec::FramedRead<T, Codec>;
+pub type FramedRead<T> = codec::FramedRead<T, LengthDelimitedCodec>;
 
 
 /// Adapts a byte stream to a `Sink` accepting entire frame values.
@@ -57,7 +57,7 @@ pub type FramedRead<T> = codec::FramedRead<T, Codec>;
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-pub type FramedWrite<T> = codec::FramedWrite<T, Codec>;
+pub type FramedWrite<T> = codec::FramedWrite<T, LengthDelimitedCodec>;
 
 /// An error when the number of bytes read is more than max frame length.
 pub struct FrameTooBig {
@@ -73,7 +73,7 @@ pub struct FrameTooBig {
 ///
 /// [module level]: index.html
 #[derive(Debug)]
-pub struct Codec {
+pub struct LengthDelimitedCodec {
     // Configuration values
     builder: Builder,
 
@@ -87,10 +87,10 @@ enum DecodeState {
     Data(usize),
 }
 
-// ===== impl Codec ======
+// ===== impl LengthDelimitedCodec ======
 
-impl Codec {
-    /// Creates a new length-delimited `Codec` with the default configuration values.
+impl LengthDelimitedCodec {
+    /// Creates a new `LengthDelimitedCodec` with the default configuration values.
     pub fn new() -> Self {
         Self {
             builder: Builder::new(),
@@ -185,7 +185,7 @@ impl Codec {
     }
 }
 
-impl Decoder for Codec {
+impl Decoder for LengthDelimitedCodec {
     type Item = BytesMut;
     type Error = io::Error;
 
@@ -218,7 +218,7 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder for Codec {
+impl Encoder for LengthDelimitedCodec {
     type Item = Bytes;
     type Error = io::Error;
 
@@ -507,7 +507,7 @@ impl Builder {
         self
     }
 
-    /// Create a configured length delimited `Codec`
+    /// Create a configured length delimited `LengthDelimitedCodec`
     ///
     /// # Examples
     ///
@@ -524,8 +524,8 @@ impl Builder {
     ///     .new_codec();
     /// # }
     /// ```
-    pub fn new_codec(&self) -> Codec {
-        Codec {
+    pub fn new_codec(&self) -> LengthDelimitedCodec {
+        LengthDelimitedCodec {
             builder: *self,
             state: DecodeState::Head,
         }

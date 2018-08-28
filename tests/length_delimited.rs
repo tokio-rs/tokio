@@ -23,7 +23,7 @@ macro_rules! mock {
 
 #[test]
 fn read_empty_io_yields_nothing() {
-    let mut io = FramedRead::new(mock!(), length_delimited::Codec::new());
+    let mut io = FramedRead::new(mock!(), LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), Ready(None));
 }
@@ -32,7 +32,7 @@ fn read_empty_io_yields_nothing() {
 fn read_single_frame_one_packet() {
     let mut io = FramedRead::new(mock! {
         Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(None));
@@ -76,7 +76,7 @@ fn read_single_multi_frame_one_packet() {
 
     let mut io = FramedRead::new(mock! {
         Ok(data.into()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
@@ -90,7 +90,7 @@ fn read_single_frame_multi_packet() {
         Ok(b"\x00\x00"[..].into()),
         Ok(b"\x00\x09abc"[..].into()),
         Ok(b"defghi"[..].into()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(None));
@@ -104,7 +104,7 @@ fn read_multi_frame_multi_packet() {
         Ok(b"defghi"[..].into()),
         Ok(b"\x00\x00\x00\x0312"[..].into()),
         Ok(b"3\x00\x00\x00\x0bhello world"[..].into()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
@@ -121,7 +121,7 @@ fn read_single_frame_multi_packet_wait() {
         Err(would_block()),
         Ok(b"defghi"[..].into()),
         Err(would_block()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), NotReady);
     assert_eq!(io.poll().unwrap(), NotReady);
@@ -143,7 +143,7 @@ fn read_multi_frame_multi_packet_wait() {
         Err(would_block()),
         Ok(b"3\x00\x00\x00\x0bhello world"[..].into()),
         Err(would_block()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
 
     assert_eq!(io.poll().unwrap(), NotReady);
@@ -161,7 +161,7 @@ fn read_multi_frame_multi_packet_wait() {
 fn read_incomplete_head() {
     let mut io = FramedRead::new(mock! {
         Ok(b"\x00\x00"[..].into()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert!(io.poll().is_err());
 }
@@ -172,7 +172,7 @@ fn read_incomplete_head_multi() {
         Err(would_block()),
         Ok(b"\x00"[..].into()),
         Err(would_block()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), NotReady);
     assert_eq!(io.poll().unwrap(), NotReady);
@@ -186,7 +186,7 @@ fn read_incomplete_payload() {
         Err(would_block()),
         Ok(b"cd"[..].into()),
         Err(would_block()),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert_eq!(io.poll().unwrap(), NotReady);
     assert_eq!(io.poll().unwrap(), NotReady);
@@ -318,7 +318,7 @@ fn write_single_frame_length_adjusted() {
 fn write_nothing_yields_nothing() {
     let mut io: length_delimited::FramedWrite<_> = FramedWrite::new(
         mock!(),
-        length_delimited::Codec::new()
+        LengthDelimitedCodec::new()
     );
     assert!(io.poll_complete().unwrap().is_ready());
 }
@@ -329,7 +329,7 @@ fn write_single_frame_one_packet() {
         Ok(b"\x00\x00\x00\x09"[..].into()),
         Ok(b"abcdefghi"[..].into()),
         Ok(Flush),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
     assert!(io.poll_complete().unwrap().is_ready());
@@ -346,7 +346,7 @@ fn write_single_multi_frame_one_packet() {
         Ok(b"\x00\x00\x00\x0b"[..].into()),
         Ok(b"hello world"[..].into()),
         Ok(Flush),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
     assert!(io.start_send(Bytes::from("123")).unwrap().is_ready());
@@ -367,7 +367,7 @@ fn write_single_multi_frame_multi_packet() {
         Ok(b"\x00\x00\x00\x0b"[..].into()),
         Ok(b"hello world"[..].into()),
         Ok(Flush),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
     assert!(io.poll_complete().unwrap().is_ready());
@@ -387,7 +387,7 @@ fn write_single_frame_would_block() {
         Ok(b"\x00\x09"[..].into()),
         Ok(b"abcdefghi"[..].into()),
         Ok(Flush),
-    }, length_delimited::Codec::new());
+    }, LengthDelimitedCodec::new());
 
     assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
     assert!(!io.poll_complete().unwrap().is_ready());
