@@ -2,6 +2,20 @@
 //!
 //! This module contains the TCP/UDP/Unix networking types, similar to the standard
 //! library, which can be used to implement networking protocols.
+//!
+//! # Organization
+//!
+//! * [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
+//! * [`UdpSocket`] and [`UdpFramed`] provide functionality for communication over UDP
+//! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
+//! Unix Domain Socket **(available on Unix only)**
+//!
+//! [`TcpListener`]: struct.TcpListener.html
+//! [`TcpStream`]: struct.TcpStream.html
+//! [`UdpSocket`]: struct.UdpSocket.html
+//! [`UdpFramed`]: struct.UdpFramed.html
+//! [`UnixListener`]: struct.UnixListener.html
+//! [`UnixStream`]: struct.UnixStream.html
 
 pub mod tcp {
     //! TCP bindings for `tokio`.
@@ -26,10 +40,10 @@ pub mod tcp {
 pub use self::tcp::{TcpListener, TcpStream};
 
 #[deprecated(note = "use `tokio::net::tcp::ConnectFuture` instead")]
-/// Convenience re-export of [`tcp::ConnectFuture`](tcp/struct.ConnectFuture.html). Will be removed in a future release.
+#[doc(hidden)]
 pub type ConnectFuture = self::tcp::ConnectFuture;
 #[deprecated(note = "use `tokio::net::tcp::Incoming` instead")]
-/// Convenience re-export of [`tcp::Incoming`](tcp/struct.Incoming.html). Will be removed in a future release.
+#[doc(hidden)]
 pub type Incoming = self::tcp::Incoming;
 
 pub mod udp {
@@ -52,16 +66,16 @@ pub mod udp {
 pub use self::udp::{UdpFramed, UdpSocket};
 
 #[deprecated(note = "use `tokio::net::udp::RecvDgram` instead")]
-/// Convenience re-export of [`udp::RecvDgram`](udp/struct.RecvDgram.html). Will be removed in a future release.
+#[doc(hidden)]
 pub type RecvDgram<T> = self::udp::RecvDgram<T>;
 #[deprecated(note = "use `tokio::net::udp::SendDgram` instead")]
-/// Convenience re-export of [`udp::SendDgram`](udp/struct.SendDgram.html). Will be removed in a future release.
+#[doc(hidden)]
 pub type SendDgram<T> = self::udp::SendDgram<T>;
 
+#[cfg(unix)]
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
 
-    #[cfg(unix)]
     pub use tokio_uds::{
         ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixListener,
         UnixStream,
