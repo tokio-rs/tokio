@@ -8,11 +8,10 @@
 pub extern crate libc;
 extern crate mio;
 extern crate mio_uds;
+extern crate signal_hook;
 
-use std::cell::UnsafeCell;
-use std::io;
+use std::io::{self, Error, ErrorKind};
 use std::io::prelude::*;
-use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
@@ -53,8 +52,7 @@ struct SignalInfo {
     recipients: Mutex<Vec<Box<Sender<c_int>>>>,
 
     init: Once,
-    initialized: UnsafeCell<bool>,
-    prev: UnsafeCell<libc::sigaction>,
+    initialized: AtomicBool,
 }
 
 struct Globals {
@@ -68,9 +66,8 @@ impl Default for SignalInfo {
         SignalInfo {
             pending: AtomicBool::new(false),
             init: ONCE_INIT,
-            initialized: UnsafeCell::new(false),
+            initialized: AtomicBool::new(false),
             recipients: Mutex::new(Vec::new()),
-            prev: UnsafeCell::new(unsafe { mem::zeroed() }),
         }
     }
 }
@@ -101,42 +98,13 @@ fn globals() -> &'static Globals {
 /// 1. Flag that our specific signal was received (e.g. store an atomic flag)
 /// 2. Wake up driver tasks by writing a byte to a pipe
 ///
-/// Those two operations shoudl both be async-signal safe. After that's done we
-/// just try to call a previous signal handler, if any, to be "good denizens of
-/// the internet"
-extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc::c_void) {
-    type FnSigaction = extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
-    type FnHandler = extern "C" fn(c_int);
-    unsafe {
-        let slot = match (*GLOBALS).signals.get(signum as usize) {
-            Some(slot) => slot,
-            None => return,
-        };
-        slot.pending.store(true, Ordering::SeqCst);
+/// Those two operations shoudl both be async-signal safe.
+fn action(slot: &SignalInfo, mut sender: &UnixStream) {
+    slot.pending.store(true, Ordering::SeqCst);
 
-        // Send a wakeup, ignore any errors (anything reasonably possible is
-        // full pipe and then it will wake up anyway).
-        drop((*GLOBALS).sender.write(&[1]));
-
-        let fnptr = (*slot.prev.get()).sa_sigaction;
-        if fnptr == 0 || fnptr == libc::SIG_DFL || fnptr == libc::SIG_IGN {
-            return;
-        }
-        let mut sa_flags = (*slot.prev.get()).sa_flags;
-        // android defines SIGINFO with a different type than sa_flags,
-        // this ensures that the variables are of the same type regardless of platform
-        #[allow(unused_assignments)]
-        let mut siginfo = sa_flags;
-        siginfo = libc::SA_SIGINFO as _;
-        sa_flags &= siginfo;
-        if sa_flags == 0 {
-            let action = mem::transmute::<usize, FnHandler>(fnptr);
-            action(signum)
-        } else {
-            let action = mem::transmute::<usize, FnSigaction>(fnptr);
-            action(signum, info, ptr)
-        }
-    }
+    // Send a wakeup, ignore any errors (anything reasonably possible is
+    // full pipe and then it will wake up anyway).
+    drop(sender.write(&[1]));
 }
 
 /// Enable this module to receive signal notifications for the `signal`
@@ -145,40 +113,31 @@ extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc:
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
 fn signal_enable(signal: c_int) -> io::Result<()> {
-    let siginfo = match globals().signals.get(signal as usize) {
+    if signal_hook::FORBIDDEN.contains(&signal) {
+        return Err(Error::new(ErrorKind::Other, format!("Refusing to register signal {}", signal)));
+    }
+
+    let globals = globals();
+    let siginfo = match globals.signals.get(signal as usize) {
         Some(slot) => slot,
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
     };
-    unsafe {
-        let mut err = None;
-        siginfo.init.call_once(|| {
-            let mut new: libc::sigaction = mem::zeroed();
-            new.sa_sigaction = handler as usize;
-            let flags = libc::SA_RESTART | libc::SA_NOCLDSTOP;;
-            // android defines SIGINFO with a different type than sa_flags,
-            // this ensures that the variables are of the same type regardless of platform
-            #[allow(unused_assignments)]
-            let mut sa_siginfo = flags;
-            sa_siginfo = libc::SA_SIGINFO as _;
-            let flags = flags | sa_siginfo;
-            new.sa_flags = flags as _;
-            if libc::sigaction(signal, &new, &mut *siginfo.prev.get()) != 0 {
-                err = Some(io::Error::last_os_error());
-            } else {
-                *siginfo.initialized.get() = true;
-            }
-        });
-        if let Some(err) = err {
-            return Err(err);
+    let mut registered = Ok(());
+    siginfo.init.call_once(|| {
+        registered = unsafe {
+            signal_hook::register(signal, move || action(siginfo, &globals.sender)).map(|_| ())
+        };
+        if registered.is_ok() {
+            siginfo.initialized.store(true, Ordering::Relaxed);
         }
-        if *siginfo.initialized.get() {
-            Ok(())
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to register signal handler",
-            ))
-        }
+    });
+    registered?;
+    // If the call_once failed, it won't be retried on the next attempt to register the signal. In
+    // such case it is not run, registered is still `Ok(())`, initialized is still false.
+    if siginfo.initialized.load(Ordering::Relaxed) {
+        Ok(())
+    } else {
+        Err(Error::new(ErrorKind::Other, "Failed to register signal handler"))
     }
 }
 
@@ -347,6 +306,13 @@ impl Signal {
     /// A `Signal` stream can be created for a particular signal number
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
+    ///
+    /// # Errors
+    ///
+    /// * If the lower-level C functions fail for some reason.
+    /// * If the previous initialization of this specific signal failed.
+    /// * If the signal is one of
+    ///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
     pub fn new(signal: c_int) -> IoFuture<Signal> {
         Signal::with_handle(signal, &Handle::current())
     }
