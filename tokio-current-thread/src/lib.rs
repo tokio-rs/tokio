@@ -67,7 +67,7 @@ pub struct CurrentThread<P: Park = ParkThread> {
     spawn_receiver: mpsc::Receiver<Box<Future<Item = (), Error = ()> + Send + 'static>>,
 
     /// The thread-local ID assigned to this executor.
-    id: usize,
+    id: u64,
 }
 
 /// Executes futures on the current thread.
@@ -180,7 +180,7 @@ impl<T: fmt::Debug> Error for BlockError<T> {
 
 /// This is mostly split out to make the borrow checker happy.
 struct Borrow<'a, U: 'a> {
-    id: usize,
+    id: u64,
     scheduler: &'a mut Scheduler<U>,
     num_futures: &'a atomic::AtomicUsize,
 }
@@ -191,7 +191,7 @@ trait SpawnLocal {
 
 struct CurrentRunner {
     spawn: Cell<Option<*mut SpawnLocal>>,
-    id: Cell<Option<usize>>,
+    id: Cell<Option<u64>>,
 }
 
 /// Current thread's task runner. This is set in `TaskRunner::with`
@@ -204,7 +204,7 @@ thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
 ///
 /// The unique ID is used to determine if the currently running executor matches the one referred
 /// to by a `Handle` so that direct task dispatch can be used.
-thread_local!(static EXECUTOR_ID: Cell<usize> = Cell::new(0));
+thread_local!(static EXECUTOR_ID: Cell<u64> = Cell::new(0));
 
 /// Run the executor bootstrapping the execution with the provided future.
 ///
@@ -630,7 +630,7 @@ pub struct Handle {
     thread: thread::ThreadId,
 
     /// The thread-local ID assigned to this Handle's executor.
-    id: usize,
+    id: u64,
 }
 
 // Manual implementation because the Sender does not implement Debug
@@ -700,7 +700,7 @@ impl TaskExecutor {
     }
 
     /// Get the current executor's thread-local ID.
-    fn id(&self) -> Option<usize> {
+    fn id(&self) -> Option<u64> {
         CURRENT.with(|current| {
             current.id.get()
         })

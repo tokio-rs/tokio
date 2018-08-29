@@ -210,7 +210,7 @@ where U: Unpark,
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick(&mut self, eid: usize, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
+    pub fn tick(&mut self, eid: u64, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
     {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst)
