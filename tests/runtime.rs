@@ -11,6 +11,12 @@ use tokio::prelude::future::lazy;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
 
+// this import is used in all child modules that have it in scope
+// from importing super::*, but the compiler doesn't realise that
+// and warns about it.
+#[allow(unused_imports)]
+use futures::future::Executor;
+
 macro_rules! t {
     ($e:expr) => (match $e {
         Ok(e) => e,
@@ -72,77 +78,162 @@ fn runtime_single_threaded_block_on() {
     tokio::runtime::current_thread::block_on_all(create_client_server_future()).unwrap();
 }
 
-#[test]
-fn runtime_single_threaded_block_on_all() {
-    let cnt = Arc::new(Mutex::new(0));
-    let c = cnt.clone();
+mod runtime_single_threaded_block_on_all {
+    use super::*;
 
-    let msg = tokio::runtime::current_thread::block_on_all(lazy(move || {
-        {
-            let mut x = c.lock().unwrap();
-            *x = 1 + *x;
-        }
+    #[test]
+    fn spawn() {
+        let cnt = Arc::new(Mutex::new(0));
+        let c = cnt.clone();
 
-        // Spawn!
-        tokio::spawn(lazy(move || {
+        let msg = tokio::runtime::current_thread::block_on_all(lazy(move || {
             {
                 let mut x = c.lock().unwrap();
                 *x = 1 + *x;
             }
-            Ok::<(), ()>(())
-        }));
 
-        Ok::<_, ()>("hello")
-    })).unwrap();
+            // Spawn!
+            tokio::spawn(lazy(move || {
+                {
+                    let mut x = c.lock().unwrap();
+                    *x = 1 + *x;
+                }
+                Ok::<(), ()>(())
+            }));
 
-    assert_eq!(2, *cnt.lock().unwrap());
-    assert_eq!(msg, "hello");
+            Ok::<_, ()>("hello")
+        })).unwrap();
+
+        assert_eq!(2, *cnt.lock().unwrap());
+        assert_eq!(msg, "hello");
+    }
+
+    #[test]
+    fn execute() {
+        let cnt = Arc::new(Mutex::new(0));
+        let c = cnt.clone();
+        let msg = tokio::runtime::current_thread::block_on_all(lazy(move || {
+            {
+                let mut x = c.lock().unwrap();
+                *x = 1 + *x;
+            }
+
+            // Spawn!
+            tokio::executor::DefaultExecutor::current()
+                .execute(lazy(move || {
+                    {
+                        let mut x = c.lock().unwrap();
+                        *x = 1 + *x;
+                    }
+                    Ok::<(), ()>(())
+                }))
+                .unwrap();
+
+            Ok::<_, ()>("hello")
+        })).unwrap();
+
+        assert_eq!(2, *cnt.lock().unwrap());
+        assert_eq!(msg, "hello");
+    }
 }
 
-#[test]
-fn runtime_single_threaded_racy_spawn() {
-    let (trigger, exit) = futures::sync::oneshot::channel();
-    let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
-    let jh = ::std::thread::spawn(move || {
-        let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-        handle_tx.send(rt.handle()).unwrap();
+mod runtime_single_threaded_racy {
+    use super::*;
+    #[test]
+    fn spawn() {
+        let (trigger, exit) = futures::sync::oneshot::channel();
+        let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
+        let jh = ::std::thread::spawn(move || {
+            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+            handle_tx.send(rt.handle()).unwrap();
 
-        // don't exit until we are told to
-        rt.block_on(exit.map_err(|_| ())).unwrap();
+            // don't exit until we are told to
+            rt.block_on(exit.map_err(|_| ())).unwrap();
 
-        // run until all spawned futures (incl. the "exit" signal future) have completed.
-        rt.run().unwrap();
-    });
+            // run until all spawned futures (incl. the "exit" signal future) have completed.
+            rt.run().unwrap();
+        });
 
-    let (tx, rx) = futures::sync::oneshot::channel();
+        let (tx, rx) = futures::sync::oneshot::channel();
 
-    let handle = handle_rx.recv().unwrap();
-    handle
-        .spawn(futures::future::lazy(move || {
-            tx.send(()).unwrap();
-            Ok(())
-        }))
-        .unwrap();
+        let handle = handle_rx.recv().unwrap();
+        handle
+            .spawn(futures::future::lazy(move || {
+                tx.send(()).unwrap();
+                Ok(())
+            }))
+            .unwrap();
 
-    // signal runtime thread to exit
-    trigger.send(()).unwrap();
+        // signal runtime thread to exit
+        trigger.send(()).unwrap();
 
-    // wait for runtime thread to exit
-    jh.join().unwrap();
+        // wait for runtime thread to exit
+        jh.join().unwrap();
 
-    assert_eq!(rx.wait().unwrap(), ());
+        assert_eq!(rx.wait().unwrap(), ());
+    }
+
+    #[test]
+    fn execute() {
+        let (trigger, exit) = futures::sync::oneshot::channel();
+        let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
+        let jh = ::std::thread::spawn(move || {
+            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+            handle_tx.send(rt.handle()).unwrap();
+
+            // don't exit until we are told to
+            rt.block_on(exit.map_err(|_| ())).unwrap();
+
+            // run until all spawned futures (incl. the "exit" signal future) have completed.
+            rt.run().unwrap();
+        });
+
+        let (tx, rx) = futures::sync::oneshot::channel();
+
+        let handle = handle_rx.recv().unwrap();
+        handle
+            .execute(futures::future::lazy(move || {
+                tx.send(()).unwrap();
+                Ok(())
+            }))
+            .unwrap();
+
+        // signal runtime thread to exit
+        trigger.send(()).unwrap();
+
+        // wait for runtime thread to exit
+        jh.join().unwrap();
+
+        assert_eq!(rx.wait().unwrap(), ());
+    }
 }
 
-#[test]
-fn runtime_multi_threaded() {
-    let _ = env_logger::try_init();
+mod runtime_multi_threaded {
+    use super::*;
 
-    let mut runtime = tokio::runtime::Builder::new()
-        .build()
-        .unwrap();
-    runtime.spawn(create_client_server_future());
-    runtime.shutdown_on_idle().wait().unwrap();
+    #[test]
+    fn spawn() {
+        let _ = env_logger::try_init();
+
+        let mut runtime = tokio::runtime::Builder::new()
+            .build()
+            .unwrap();
+        runtime.spawn(create_client_server_future());
+        runtime.shutdown_on_idle().wait().unwrap();
+    }
+
+    #[test]
+    fn execute() {
+        let _ = env_logger::try_init();
+
+        let runtime = tokio::runtime::Builder::new()
+            .build()
+            .unwrap();
+        runtime.executor().execute(create_client_server_future()).unwrap();
+        runtime.shutdown_on_idle().wait().unwrap();
+    }
 }
+
 
 #[test]
 fn block_on_timer() {
@@ -161,35 +252,71 @@ fn block_on_timer() {
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
-#[test]
-fn spawn_from_block_on() {
-    let cnt = Arc::new(Mutex::new(0));
-    let c = cnt.clone();
+mod from_block_on {
+    use super::*;
 
-    let mut runtime = Runtime::new().unwrap();
-    let msg = runtime
-        .block_on(lazy(move || {
-            {
-                let mut x = c.lock().unwrap();
-                *x = 1 + *x;
-            }
+    #[test]
+    fn execute() {
+        let cnt = Arc::new(Mutex::new(0));
+        let c = cnt.clone();
 
-            // Spawn!
-            tokio::spawn(lazy(move || {
+        let mut runtime = Runtime::new().unwrap();
+        let msg = runtime
+            .block_on(lazy(move || {
                 {
                     let mut x = c.lock().unwrap();
                     *x = 1 + *x;
                 }
-                Ok::<(), ()>(())
-            }));
 
-            Ok::<_, ()>("hello")
-        }))
-        .unwrap();
+                // Spawn!
+                tokio::executor::DefaultExecutor::current()
+                    .execute(lazy(move || {
+                        {
+                            let mut x = c.lock().unwrap();
+                            *x = 1 + *x;
+                        }
+                        Ok::<(), ()>(())
+                    })).unwrap();
 
-    runtime.shutdown_on_idle().wait().unwrap();
-    assert_eq!(2, *cnt.lock().unwrap());
-    assert_eq!(msg, "hello");
+                Ok::<_, ()>("hello")
+            }))
+            .unwrap();
+
+        runtime.shutdown_on_idle().wait().unwrap();
+        assert_eq!(2, *cnt.lock().unwrap());
+        assert_eq!(msg, "hello");
+    }
+
+    #[test]
+    fn spawn() {
+        let cnt = Arc::new(Mutex::new(0));
+        let c = cnt.clone();
+
+        let mut runtime = Runtime::new().unwrap();
+        let msg = runtime
+            .block_on(lazy(move || {
+                {
+                    let mut x = c.lock().unwrap();
+                    *x = 1 + *x;
+                }
+
+                // Spawn!
+                tokio::spawn(lazy(move || {
+                    {
+                        let mut x = c.lock().unwrap();
+                        *x = 1 + *x;
+                    }
+                    Ok::<(), ()>(())
+                }));
+
+                Ok::<_, ()>("hello")
+            }))
+            .unwrap();
+
+        runtime.shutdown_on_idle().wait().unwrap();
+        assert_eq!(2, *cnt.lock().unwrap());
+        assert_eq!(msg, "hello");
+    }
 }
 
 #[test]
@@ -220,54 +347,118 @@ fn block_waits() {
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
-#[test]
-fn spawn_many() {
+mod many {
+    use super::*;
+
     const ITER: usize = 200;
 
-    let cnt = Arc::new(Mutex::new(0));
-    let mut runtime = Runtime::new().unwrap();
+    #[test]
+    fn spawn() {
 
-    for _ in 0..ITER {
-        let c = cnt.clone();
-        runtime.spawn(lazy(move || {
-            {
-                let mut x = c.lock().unwrap();
-                *x = 1 + *x;
-            }
-            Ok::<(), ()>(())
-        }));
-    }
+        let cnt = Arc::new(Mutex::new(0));
+        let mut runtime = Runtime::new().unwrap();
 
-    runtime.shutdown_on_idle().wait().unwrap();
-    assert_eq!(ITER, *cnt.lock().unwrap());
-}
-
-#[test]
-fn spawn_from_block_on_all() {
-    let cnt = Arc::new(Mutex::new(0));
-    let c = cnt.clone();
-
-    let runtime = Runtime::new().unwrap();
-    let msg = runtime
-        .block_on_all(lazy(move || {
-            {
-                let mut x = c.lock().unwrap();
-                *x = 1 + *x;
-            }
-
-            // Spawn!
-            tokio::spawn(lazy(move || {
+        for _ in 0..ITER {
+            let c = cnt.clone();
+            runtime.spawn(lazy(move || {
                 {
                     let mut x = c.lock().unwrap();
                     *x = 1 + *x;
                 }
                 Ok::<(), ()>(())
             }));
+        }
 
-            Ok::<_, ()>("hello")
-        }))
-        .unwrap();
+        runtime.shutdown_on_idle().wait().unwrap();
+        assert_eq!(ITER, *cnt.lock().unwrap());
+    }
 
-    assert_eq!(2, *cnt.lock().unwrap());
-    assert_eq!(msg, "hello");
+    #[test]
+    fn execute() {
+
+        let cnt = Arc::new(Mutex::new(0));
+        let runtime = Runtime::new().unwrap();
+
+        for _ in 0..ITER {
+            let c = cnt.clone();
+            runtime.executor()
+                .execute(lazy(move || {
+                    {
+                        let mut x = c.lock().unwrap();
+                        *x = 1 + *x;
+                    }
+                    Ok::<(), ()>(())
+                }))
+                .unwrap();
+        }
+
+        runtime.shutdown_on_idle().wait().unwrap();
+        assert_eq!(ITER, *cnt.lock().unwrap());
+    }
+}
+
+
+mod from_block_on_all {
+    use super::*;
+
+    #[test]
+    fn execute() {
+        let cnt = Arc::new(Mutex::new(0));
+        let c = cnt.clone();
+
+        let runtime = Runtime::new().unwrap();
+        let msg = runtime
+            .block_on_all(lazy(move || {
+                {
+                    let mut x = c.lock().unwrap();
+                    *x = 1 + *x;
+                }
+
+                // Spawn!
+                tokio::executor::DefaultExecutor::current()
+                    .execute(lazy(move || {
+                        {
+                            let mut x = c.lock().unwrap();
+                            *x = 1 + *x;
+                        }
+                        Ok::<(), ()>(())
+                    })).unwrap();
+
+                Ok::<_, ()>("hello")
+            }))
+            .unwrap();
+
+        assert_eq!(2, *cnt.lock().unwrap());
+        assert_eq!(msg, "hello");
+    }
+
+    #[test]
+    fn spawn() {
+        let cnt = Arc::new(Mutex::new(0));
+        let c = cnt.clone();
+
+        let runtime = Runtime::new().unwrap();
+        let msg = runtime
+            .block_on_all(lazy(move || {
+                {
+                    let mut x = c.lock().unwrap();
+                    *x = 1 + *x;
+                }
+
+                // Spawn!
+                tokio::spawn(lazy(move || {
+                    {
+                        let mut x = c.lock().unwrap();
+                        *x = 1 + *x;
+                    }
+                    Ok::<(), ()>(())
+                }));
+
+                Ok::<_, ()>("hello")
+            }))
+            .unwrap();
+
+        assert_eq!(2, *cnt.lock().unwrap());
+        assert_eq!(msg, "hello");
+    }
 }
