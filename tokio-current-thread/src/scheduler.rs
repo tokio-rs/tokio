@@ -271,8 +271,7 @@ where U: Unpark,
                 impl<'a, U: Unpark> Drop for Bomb<'a, U> {
                     fn drop(&mut self) {
                         if let Some(node) = self.node.take() {
-                            let eid = self.borrow.id;
-                            self.borrow.enter(self.enter, eid, || release_node(node))
+                            self.borrow.enter(self.enter, || release_node(node))
                         }
                     }
                 }
@@ -331,7 +330,7 @@ where U: Unpark,
                         done: &mut done,
                     };
 
-                    if borrow.enter(enter, eid, || scheduled.tick()) {
+                    if borrow.enter(enter, || scheduled.tick()) {
                         // we have a borrow of the Runtime, so we know it's not shut down
                         borrow.num_futures.fetch_sub(2, SeqCst);
                     }

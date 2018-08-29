@@ -475,8 +475,7 @@ impl<'a, P: Park> Entered<'a, P> {
         let notify = self.executor.scheduler.notify();
 
         loop {
-            let id = self.executor.id;
-            let res = self.executor.borrow().enter(self.enter, id, || {
+            let res = self.executor.borrow().enter(self.enter, || {
                 future.poll_future_notify(&notify, 0)
             });
 
@@ -754,11 +753,11 @@ where F: Future<Item = (), Error = ()> + 'static
 // ===== impl Borrow =====
 
 impl<'a, U: Unpark> Borrow<'a, U> {
-    fn enter<F, R>(&mut self, _: &mut Enter, id: usize, f: F) -> R
+    fn enter<F, R>(&mut self, _: &mut Enter, f: F) -> R
     where F: FnOnce() -> R,
     {
         CURRENT.with(|current| {
-            current.id.set(Some(id));
+            current.id.set(Some(self.id));
             current.set_spawn(self, || {
                 f()
             })
