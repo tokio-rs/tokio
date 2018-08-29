@@ -94,7 +94,7 @@ impl Decoder for LinesCodec {
         for (offset, b) in buf[self.next_index..].iter().enumerate() {
            trim_and_offset = match (b, self.max_length) {
                 // The current character is a newline, split here.
-                (b'\n', _) => Some((1, offset)),
+                (&b'\n', _) => Some((1, offset)),
                 // There's a maximum line length set, and we've reached it.
                 (_, Some(max_len)) if offset == max_len =>
                     // If we're at the line length limit, check if the next
