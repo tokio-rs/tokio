@@ -132,7 +132,7 @@ integration tests in the crate and following the style.
 
 #### Documentation tests
 
-Ideally, every API has at least one documentation test that demonstrates how to
+Ideally, every API has at least one [documentation test] that demonstrates how to
 use the API. Documentation tests are run with `cargo test --doc`. This ensures
 that the example is correct and provides additional test coverage.
 
@@ -384,3 +384,4 @@ _Adapted from the [Node.js contributing guide][node]_
 
 [node]: https://github.com/nodejs/node/blob/master/CONTRIBUTING.md.
 [hiding-a-comment]: https://help.github.com/articles/managing-disruptive-comments/#hiding-a-comment
+[documentation test]: https://doc.rust-lang.org/rustdoc/documentation-tests.html
