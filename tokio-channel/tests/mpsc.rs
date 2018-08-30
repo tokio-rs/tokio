@@ -411,16 +411,18 @@ fn stress_poll_ready() {
 // close/drops don't appear as successful sends.
 #[test]
 fn stress_try_send_as_receiver_closes() {
-    // How many times will we run the test before giving up?
-    const AMT: usize = 1000000;
+    const AMT: usize = 10000;
 
-    // To provide variable timing characteristics (in the hopes of reproducing the collision that
-    // leads to a race), we busy-re-poll the test MPSC receiver a variable number of times before
-    // actually stopping.  We vary this countdown between 1 and the following value.
+    // To provide variable timing characteristics (in the hopes of
+    // reproducing the collision that leads to a race), we busy-re-poll
+    // the test MPSC receiver a variable number of times before actually
+    // stopping.  We vary this countdown between 1 and the following
+    // value.
     const MAX_COUNTDOWN: usize = 20;
 
-    // When we detect that a successfully sent item is still in the queue after a disconnect, we spin
-    // for up to 100ms to confirm that it is a persistent condition and not a concurrency illusion.
+    // When we detect that a successfully sent item is still in the
+    // queue after a disconnect, we spin for up to 100ms to confirm that
+    // it is a persistent condition and not a concurrency illusion.
     const SPIN_TIMEOUT: Duration = Duration::from_millis(100);
 
     struct TestRx {
@@ -469,19 +471,16 @@ fn stress_try_send_as_receiver_closes() {
             match self.command_rx.poll()? {
                 Async::Ready(Some(TestRx { rx, poll_count })) => {
                     self.test_rx = Some(rx);
-                    self.countdown = poll_count + 1;
+                    self.countdown = poll_count;
 
-                    // We're technically obligated to poll command_rx until it returns NotReady.  Instead,
-                    // we'll just arrange to be polled again immediately as long as command_rx is Ready.
                     task::current().notify();
                 },
                 Async::Ready(None) => return Ok(Async::Ready(())),
                 _ => {},
             }
 
-            if self.countdown == 1 {
+            if self.countdown == 0 {
                 // Countdown complete -- drop the Receiver.
-                self.countdown = 0;
                 self.test_rx = None;
             }
 
@@ -490,17 +489,16 @@ fn stress_try_send_as_receiver_closes() {
     }
 
     let (f, mut cmd_tx) = TestTask::new();
-    thread::spawn(move || f.wait());
+    let bg = thread::spawn(move || f.wait());
 
     for i in 0..AMT {
         let (mut test_tx, rx) = mpsc::channel(0);
         let poll_count = i % MAX_COUNTDOWN;
 
         cmd_tx.try_send(TestRx { rx, poll_count }).unwrap();
-        // Busy-loop sending items to the test MPSC channel until it is disconnected.
         let mut prev_weak: Option<Weak<()>> = None;
-        let mut attempted_sends: usize = 0;
-        let mut successful_sends: usize = 0;
+        let mut attempted_sends = 0;
+        let mut successful_sends = 0;
         loop {
             // Create a test item.
             let item = Arc::new(());
@@ -516,19 +514,22 @@ fn stress_try_send_as_receiver_closes() {
                     // Test for evidence of the race condition.
                     if let Some(prev_weak) = prev_weak {
                         if prev_weak.upgrade().is_some() {
-                            // The previously sent item is still allocated.  However, there appears
-                            // to be some aspect of the concurrency that can legitimately cause the
-                            // Arc to be momentarily valid.  Spin for up to 100ms waiting for the
-                            // previously sent item to be dropped.
+                            // The previously sent item is still allocated.
+                            // However, there appears to be some aspect of the
+                            // concurrency that can legitimately cause the Arc
+                            // to be momentarily valid.  Spin for up to 100ms
+                            // waiting for the previously sent item to be
+                            // dropped.
                             let t0 = Instant::now();
-                            let mut spins = 0usize;
+                            let mut spins = 0;
                             loop {
                                 if prev_weak.upgrade().is_none() {
                                     break;
                                 }
 
                                 assert!(t0.elapsed() < SPIN_TIMEOUT,
-                                    "item not dropped on iteration {} after {} sends ({} successful). spin=({})",
+                                    "item not dropped on iteration {} after \
+                                     {} sends ({} successful). spin=({})",
                                     i, attempted_sends, successful_sends, spins
                                 );
                                 spins += 1;
@@ -542,6 +543,9 @@ fn stress_try_send_as_receiver_closes() {
             attempted_sends += 1;
         }
     }
+    bg.join()
+        .expect("background thread join")
+        .expect("background thread result");
 
 }
 
