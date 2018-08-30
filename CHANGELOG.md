@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.5] - 2018-08-29
 ### Fixes
 * Fix a possible starvation when polling multiple `Signal` instances outside of
 a tokio reactor (e.g. by using `Future::wait`)
@@ -31,7 +33,8 @@ a tokio reactor (e.g. by using `Future::wait`)
  * Uses `tokio` instead of `tokio_core` (#24)
  * Supports all 33 signals on FreeBSD (#27)
 
-[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.2.4...HEAD
+[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.2.5...HEAD
+[0.2.5]: https://github.com/alexcrichton/tokio-signal/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/alexcrichton/tokio-signal/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/alexcrichton/tokio-signal/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/alexcrichton/tokio-signal/compare/0.2.1...0.2.2
