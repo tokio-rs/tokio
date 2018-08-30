@@ -6,24 +6,6 @@ use shutdown::Shutdown;
 use futures::{Future, Poll};
 use futures::sync::oneshot;
 
-/// Handle returned from ThreadPool::spawn_handle.
-/// 
-/// This handle is a future representing the completion of a different future 
-/// spawned on to the thread pool. Created through the ThreadPool::spawn_handle 
-/// function this handle will resolve when the future provided resolves on the 
-/// thread pool.
-#[derive(Debug)]
-pub struct SpawnHandle<T, E>(oneshot::SpawnHandle<T, E>);
-
-impl<T, E> Future for SpawnHandle<T, E> {
-    type Item = T;
-    type Error = E;
-
-    fn poll(&mut self) -> Poll<T, E> {
-        self.0.poll()
-    }
-}
-
 /// Work-stealing based thread pool for executing futures.
 ///
 /// If a `ThreadPool` instance is dropped without explicitly being shutdown,
@@ -102,9 +84,7 @@ impl ThreadPool {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = ThreadPool::new();
     ///
-    /// let handle = thread_pool.spawn_handle(lazy(|| -> Result<_, ()> {
-    ///     Ok(42)
-    /// }));
+    /// let handle = thread_pool.spawn_handle(lazy(|| Ok::<_, ()>(42)));
     /// 
     /// let value = handle.wait().unwrap();
     /// assert_eq!(value, 42);
@@ -192,5 +172,23 @@ impl Drop for ThreadPool {
             let shutdown = Shutdown { inner: sender };
             let _ = shutdown.wait();
         }
+    }
+}
+
+/// Handle returned from ThreadPool::spawn_handle.
+/// 
+/// This handle is a future representing the completion of a different future 
+/// spawned on to the thread pool. Created through the ThreadPool::spawn_handle 
+/// function this handle will resolve when the future provided resolves on the 
+/// thread pool.
+#[derive(Debug)]
+pub struct SpawnHandle<T, E>(oneshot::SpawnHandle<T, E>);
+
+impl<T, E> Future for SpawnHandle<T, E> {
+    type Item = T;
+    type Error = E;
+
+    fn poll(&mut self) -> Poll<T, E> {
+        self.0.poll()
     }
 }
