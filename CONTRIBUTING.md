@@ -112,6 +112,104 @@ usually a good idea to first open an issue describing the change to solicit
 feedback and guidance. This will increasethe likelihood of the PR getting
 merged.
 
+### Tests
+
+If the change being proposed alters code (as opposed to only documentation for
+example), it is either adding new functionality to Tokio or it is fixing
+existing, broken functionality. In both of these cases, the pull request should
+include one or more tests to ensure that Tokio does not regress in the future.
+There are two ways to write tests: integration tests and documentation tests
+(Tokio avoids unit tests as much as possible).
+
+#### Integration tests
+
+Integration tests go in the same crate as the code they are testing. Each sub
+crate should have a `dev-dependency` on `tokio` itself. This makes all Tokio
+utilities available to use in tests, no matter the crate being tested.
+
+The best strategy for writing a new integration test is to look at existing
+integration tests in the crate and following the style.
+
+#### Documentation tests
+
+Ideally, every API has at least one [documentation test] that demonstrates how to
+use the API. Documentation tests are run with `cargo test --doc`. This ensures
+that the example is correct and provides additional test coverage.
+
+The trick to documentation tests is striking a balance between being succinct
+for a reader to understand and actually testing the API.
+
+Same as with integration tests, when writing a documentation test, the full
+`tokio` crate is available. This is especially useful for getting access to the
+runtime to run the example.
+
+The documentation tests will be visible from both the crate specific
+documentation **and** the `tokio` facade documentation via the re-export. The
+example should be written from the point of view of a user that is using the
+`tokio` crate. As such, the example should use the API via the facade and not by
+directly referencing the crate.
+
+The type level example for `tokio_timer::Timeout` provides a good example of a
+documentation test:
+
+```
+/// # extern crate futures;
+/// # extern crate tokio;
+/// // import the `timeout` function, usually this is done
+/// // with `use tokio::prelude::*`
+/// use tokio::prelude::FutureExt;
+/// use futures::Stream;
+/// use futures::sync::mpsc;
+/// use std::time::Duration;
+///
+/// # fn main() {
+/// let (tx, rx) = mpsc::unbounded();
+/// # tx.unbounded_send(()).unwrap();
+/// # drop(tx);
+///
+/// let process = rx.for_each(|item| {
+///     // do something with `item`
+/// # drop(item);
+/// # Ok(())
+/// });
+///
+/// # tokio::runtime::current_thread::block_on_all(
+/// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
+/// process.timeout(Duration::from_millis(10))
+/// # ).unwrap();
+/// # }
+```
+
+Given that this is a *type* level documentation test and the primary way users
+of `tokio` will create an instance of `Timeout` is by using
+`FutureExt::timeout`, this is how the documentation test is structured.
+
+Lines that start with `/// #` are removed when the documentation is generated.
+They are only there to get the test to run. The `block_on_all` function is the
+easiest way to execute a future from a test.
+
+If this were a documentation test for the `Timeout::new` function, then the
+example would explicitly use `Timeout::new`. For example:
+
+```
+/// # extern crate futures;
+/// # extern crate tokio;
+/// use tokio::timer::Timeout;
+/// use futures::Future;
+/// use futures::sync::oneshot;
+/// use std::time::Duration;
+///
+/// # fn main() {
+/// let (tx, rx) = oneshot::channel();
+/// # tx.send(()).unwrap();
+///
+/// # tokio::runtime::current_thread::block_on_all(
+/// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
+/// Timeout::new(rx, Duration::from_millis(10))
+/// # ).unwrap();
+/// # }
+```
+
 ### Commits
 
 It is a recommended best practice to keep your changes as logically grouped as
@@ -286,3 +384,4 @@ _Adapted from the [Node.js contributing guide][node]_
 
 [node]: https://github.com/nodejs/node/blob/master/CONTRIBUTING.md.
 [hiding-a-comment]: https://help.github.com/articles/managing-disruptive-comments/#hiding-a-comment
+[documentation test]: https://doc.rust-lang.org/rustdoc/documentation-tests.html
