@@ -9,10 +9,11 @@ use tokio_channel::mpsc;
 use tokio_channel::oneshot;
 
 use futures::prelude::*;
-use futures::future::lazy;
+use futures::{future::lazy, task};
 
 use std::thread;
-use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 trait AssertSend: Send {}
@@ -404,6 +405,144 @@ fn stress_poll_ready() {
     stress(1);
     stress(8);
     stress(16);
+}
+
+// Stress test that `try_send()`s occurring concurrently with receiver
+// close/drops don't appear as successful sends.
+#[test]
+fn stress_try_send_as_receiver_closes() {
+    // How many times will we run the test before giving up?
+    const AMT: usize = 1000000;
+
+    // To provide variable timing characteristics (in the hopes of reproducing the collision that
+    // leads to a race), we busy-re-poll the test MPSC receiver a variable number of times before
+    // actually stopping.  We vary this countdown between 1 and the following value.
+    const MAX_COUNTDOWN: usize = 20;
+
+    // When we detect that a successfully sent item is still in the queue after a disconnect, we spin
+    // for up to 100ms to confirm that it is a persistent condition and not a concurrency illusion.
+    const SPIN_TIMEOUT: Duration = Duration::from_millis(100);
+
+    struct TestRx {
+        rx: mpsc::Receiver<Arc<()>>,
+        // The number of times to query `rx` before dropping it.
+        poll_count: usize
+    }
+
+    struct TestTask {
+        command_rx: mpsc::Receiver<TestRx>,
+        test_rx: Option<mpsc::Receiver<Arc<()>>>,
+        countdown: usize,
+    }
+
+    impl TestTask {
+        /// Create a new TestTask
+        fn new() -> (TestTask, mpsc::Sender<TestRx>) {
+            let (command_tx, command_rx) = mpsc::channel::<TestRx>(0);
+            (
+                TestTask {
+                    command_rx,
+                    test_rx: None,
+                    countdown: 0, // 0 means no countdown is in progress.
+                },
+                command_tx,
+            )
+        }
+    }
+
+    impl Future for TestTask {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            // Poll the test channel, if one is present.
+            if let Some(ref mut rx) = self.test_rx {
+                if let Ok(Async::Ready(v)) = rx.poll() {
+                   let _ = v.expect("test finished unexpectedly!");
+                }
+                self.countdown -= 1;
+                // Busy-poll until the countdown is finished.
+                task::current().notify();
+            }
+
+            // Accept any newly submitted MPSC channels for testing.
+            match self.command_rx.poll()? {
+                Async::Ready(Some(TestRx { rx, poll_count })) => {
+                    self.test_rx = Some(rx);
+                    self.countdown = poll_count + 1;
+
+                    // We're technically obligated to poll command_rx until it returns NotReady.  Instead,
+                    // we'll just arrange to be polled again immediately as long as command_rx is Ready.
+                    task::current().notify();
+                },
+                Async::Ready(None) => return Ok(Async::Ready(())),
+                _ => {},
+            }
+
+            if self.countdown == 1 {
+                // Countdown complete -- drop the Receiver.
+                self.countdown = 0;
+                self.test_rx = None;
+            }
+
+            Ok(Async::NotReady)
+        }
+    }
+
+    let (f, mut cmd_tx) = TestTask::new();
+    thread::spawn(move || f.wait());
+
+    for i in 0..AMT {
+        let (mut test_tx, rx) = mpsc::channel(0);
+        let poll_count = i % MAX_COUNTDOWN;
+
+        cmd_tx.try_send(TestRx { rx, poll_count }).unwrap();
+        // Busy-loop sending items to the test MPSC channel until it is disconnected.
+        let mut prev_weak: Option<Weak<()>> = None;
+        let mut attempted_sends: usize = 0;
+        let mut successful_sends: usize = 0;
+        loop {
+            // Create a test item.
+            let item = Arc::new(());
+            let weak = Arc::downgrade(&item);
+
+            match test_tx.try_send(item) {
+                Ok(_) => {
+                    prev_weak = Some(weak);
+                    successful_sends += 1;
+                }
+                Err(ref e) if e.is_full() => {}
+                Err(ref e) if e.is_disconnected() => {
+                    // Test for evidence of the race condition.
+                    if let Some(prev_weak) = prev_weak {
+                        if prev_weak.upgrade().is_some() {
+                            // The previously sent item is still allocated.  However, there appears
+                            // to be some aspect of the concurrency that can legitimately cause the
+                            // Arc to be momentarily valid.  Spin for up to 100ms waiting for the
+                            // previously sent item to be dropped.
+                            let t0 = Instant::now();
+                            let mut spins = 0usize;
+                            loop {
+                                if prev_weak.upgrade().is_none() {
+                                    break;
+                                }
+
+                                assert!(t0.elapsed() < SPIN_TIMEOUT,
+                                    "item not dropped on iteration {} after {} sends ({} successful). spin=({})",
+                                    i, attempted_sends, successful_sends, spins
+                                );
+                                spins += 1;
+                            }
+                        }
+                    }
+                    break;
+                }
+                Err(ref e) => panic!("unexpected error: {}", e),
+            }
+            attempted_sends += 1;
+        }
+    }
+
 }
 
 fn is_ready<T>(res: &AsyncSink<T>) -> bool {
