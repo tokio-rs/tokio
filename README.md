@@ -167,10 +167,6 @@ The crates included as part of Tokio are:
 [`tokio-udp`]: tokio-udp
 [`tokio-uds`]: tokio-uds
 
-## License
-
-This project is licensed under the [MIT license](LICENSE).
-
 ## Supported Rust Versions
 
 Tokio is built against the latest stable, nightly, and beta Rust releases. The
@@ -178,6 +174,10 @@ minimum version supported is the stable release from three months before the
 current stable release version. For example, if the latest stable Rust is 1.29,
 the minimum version supported is 1.26. The current Tokio version is not
 guaranteed to build on Rust versions earlier than the minimum supported version.
+
+## License
+
+This project is licensed under the [MIT license](LICENSE).
 
 ### Contribution
 
