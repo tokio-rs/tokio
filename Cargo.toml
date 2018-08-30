@@ -25,6 +25,7 @@ tokio-io = "0.1"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 mio-uds = "0.6"
+signal-hook = "0.1"
 
 [dev-dependencies]
 tokio-core = "0.1.17"
