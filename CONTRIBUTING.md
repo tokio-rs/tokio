@@ -123,9 +123,9 @@ There are two ways to write tests: integration tests and documentation tests
 
 #### Integration tests
 
-Integration tests go in the crate that they are test. Each sub crate should have
-a `dev-dependency` on `tokio` itself. This makes all Tokio utilities available
-to use in tests, no matter the crate being tested.
+Integration tests go in the same crate as the code they are testing. Each sub
+crate should have a `dev-dependency` on `tokio` itself. This makes all Tokio
+utilities available to use in tests, no matter the crate being tested.
 
 The best strategy for writing a new integration test is to look at existing
 integration tests in the crate and following the style.
@@ -136,7 +136,7 @@ Ideally, every API has at least one documentation test that demonstrates how to
 use the API. Documentation tests are run with `cargo test --doc`. This ensures
 that the example is correct and provides additional test coverage.
 
-The trick to documentation tests is stricking a balance between being susinct
+The trick to documentation tests is striking a balance between being succinct
 for a reader to understand and actually testing the API.
 
 Same as with integration tests, when writing a documentation test, the full
@@ -185,7 +185,7 @@ of `tokio` will create an instance of `Timeout` is by using
 `FutureExt::timeout`, this is how the documentation test is structured.
 
 Lines that start with `/// #` are removed when the documentation is generated.
-They are onlly there to get the test to run. The `block_on_all` function is the
+They are only there to get the test to run. The `block_on_all` function is the
 easiest way to execute a future from a test.
 
 If this were a documentation test for the `Timeout::new` function, then the
