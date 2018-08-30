@@ -15,7 +15,7 @@ matrix:
   # This represents the minimum Rust version supported by Tokio. Updating this
   # should be done in a dedicated PR and cannot be greater than two 0.x
   # releases prior to the current stable.
-  - rust: 1.25.0
+  - rust: 1.26.0
   - rust: stable
   - rust: beta
   - rust: nightly
