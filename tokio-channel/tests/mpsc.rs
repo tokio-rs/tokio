@@ -423,7 +423,8 @@ fn stress_try_send_as_receiver_closes() {
     // When we detect that a successfully sent item is still in the
     // queue after a disconnect, we spin for up to 100ms to confirm that
     // it is a persistent condition and not a concurrency illusion.
-    const SPIN_TIMEOUT: Duration = Duration::from_millis(100);
+    const SPIN_TIMEOUT: Duration = Duration::from_secs(10);
+    const SPIN_SLEEP: Duration = Duration::from_millis(10);
 
     struct TestRx {
         rx: mpsc::Receiver<Arc<()>>,
@@ -533,6 +534,7 @@ fn stress_try_send_as_receiver_closes() {
                                     i, attempted_sends, successful_sends, spins
                                 );
                                 spins += 1;
+                                thread::sleep(SPIN_SLEEP);
                             }
                         }
                     }
