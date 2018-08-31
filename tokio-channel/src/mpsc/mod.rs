@@ -804,6 +804,13 @@ impl<T> Receiver<T> {
         loop {
             match unsafe { self.inner.message_queue.pop() } {
                 PopResult::Data(msg) => {
+                    // If there are any parked task handles in the parked queue,
+                    // pop one and unpark it.
+                    self.unpark_one();
+
+                    // Decrement number of messages
+                    self.dec_num_messages();
+
                     return Async::Ready(msg);
                 }
                 PopResult::Empty => {
@@ -854,7 +861,7 @@ impl<T> Receiver<T> {
         let state = decode_state(curr);
 
         // If the channel is closed, then there is no need to park.
-        if !state.is_open && state.num_messages == 0 {
+        if state.is_closed() {
             return TryPark::Closed;
         }
 
@@ -895,8 +902,8 @@ impl<T> Stream for Receiver<T> {
     fn poll(&mut self) -> Poll<Option<T>, ()> {
         loop {
             // Try to read a message off of the message queue.
-            let msg = match self.next_message() {
-                Async::Ready(msg) => msg,
+            match self.next_message() {
+                Async::Ready(msg) => return Ok(Async::Ready(msg)),
                 Async::NotReady => {
                     // There are no messages to read, in this case, attempt to
                     // park. The act of parking will verify that the channel is
@@ -920,17 +927,7 @@ impl<T> Stream for Receiver<T> {
                         }
                     }
                 }
-            };
-
-            // If there are any parked task handles in the parked queue, pop
-            // one and unpark it.
-            self.unpark_one();
-
-            // Decrement number of messages
-            self.dec_num_messages();
-
-            // Return the message
-            return Ok(Async::Ready(msg));
+            }
         }
     }
 }
@@ -939,8 +936,24 @@ impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         // Drain the channel of all pending messages
         self.close();
-        while self.next_message().is_ready() {
-            // ...
+
+        loop {
+            match self.next_message() {
+                Async::Ready(_) => {}
+                Async::NotReady => {
+                    let curr = self.inner.state.load(SeqCst);
+                    let state = decode_state(curr);
+
+                    // If the channel is closed, then there is no need to park.
+                    if state.is_closed() {
+                        return;
+                    }
+
+                    // TODO: Spinning isn't ideal, it might be worth using a
+                    // condvar to block here.
+                    thread::yield_now();
+                }
+            }
         }
     }
 }
@@ -964,6 +977,12 @@ impl<T> Inner<T> {
 
 unsafe impl<T: Send> Send for Inner<T> {}
 unsafe impl<T: Send> Sync for Inner<T> {}
+
+impl State {
+    fn is_closed(&self) -> bool {
+        !self.is_open && self.num_messages == 0
+    }
+}
 
 /*
  *

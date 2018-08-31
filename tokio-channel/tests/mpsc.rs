@@ -543,6 +543,9 @@ fn stress_try_send_as_receiver_closes() {
             attempted_sends += 1;
         }
     }
+
+    drop(cmd_tx);
+
     bg.join()
         .expect("background thread join")
         .expect("background thread result");
