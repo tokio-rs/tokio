@@ -24,7 +24,7 @@ name = "tokio"
 
 [dependencies]
 futures = "0.1.23"
-tokio = { version = "0.1.7", path = ".." }
+tokio = { version = "0.1.8", path = ".." }
 tokio-io = { version = "0.1.7", path = "../tokio-io" }
 tokio-channel = { version = "0.1.0", path = "../tokio-channel", features = ["async-await-preview"] }
 tokio-reactor = { version = "0.1.5", path = "../tokio-reactor", features = ["async-await-preview"] }
