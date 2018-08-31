@@ -26,10 +26,15 @@ matrix:
 
   # Test the async / await preview. We don't want to block PRs on this failing
   # though.
-    - rust: nightly
-    - script: |
+  - rust: nightly
+    env: ALLOW_FAILURES=true
+    script: |
       cd tokio-async-await
       cargo check --all
+  allow_failures:
+    - rust: nightly
+      env: ALLOW_FAILURES=true
+
 
 script:
   - |
