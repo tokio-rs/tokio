@@ -189,7 +189,7 @@ impl<T> Sink for FramedWrite2<T>
             let n = try_ready!(self.inner.poll_write(&self.buffer));
 
             if n == 0 {
-                return Err(io::Error::new(io::ErrorKind::WriteZero, "failed to
+                return Err(io::Error::new(io::ErrorKind::WriteZero, "failed to \
                                           write frame to transport").into());
             }
 
