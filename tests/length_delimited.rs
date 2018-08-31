@@ -473,6 +473,16 @@ fn write_update_max_frame_len_in_flight() {
     assert!(io.get_ref().calls.is_empty());
 }
 
+#[test]
+fn write_zero() {
+    let mut io = length_delimited::Builder::new()
+        .new_write(mock! { });
+
+    assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
+    assert_eq!(io.poll_complete().unwrap_err().kind(), io::ErrorKind::WriteZero);
+    assert!(io.get_ref().calls.is_empty());
+}
+
 // ===== Test utils =====
 
 fn would_block() -> io::Error {
