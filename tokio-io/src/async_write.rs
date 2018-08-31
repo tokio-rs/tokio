@@ -13,14 +13,15 @@ use AsyncRead;
 /// Specifically, this means that the `write` function will return one of the
 /// following:
 ///
-/// * `Ok(n)` means that `n` bytes of data was immediately written .
+/// * `Ok(Async::Ready(n))` means that `n` bytes of data was immediately
+///   written.
 ///
-/// * `Err(e) if e.kind() == ErrorKind::WouldBlock` means that no data was
-///   written from the buffer provided. The I/O object is not currently
-///   writable but may become writable in the future. Most importantly, **the
-///   current future's task is scheduled to get unparked when the object is
-///   readable**. This means that like `Future::poll` you'll receive a
-///   notification when the I/O object is writable again.
+/// * `Ok(Async::NotReady)` means that no data was written from the buffer
+///   provided. The I/O object is not currently writable but may become writable
+///   in the future. Most importantly, **the current future's task is scheduled
+///   to get unparked when the object is readable**. This means that like
+///   `Future::poll` you'll receive a notification when the I/O object is
+///   writable again.
 ///
 /// * `Err(e)` for other errors are standard I/O errors coming from the
 ///   underlying object.
