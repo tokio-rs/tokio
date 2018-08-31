@@ -20,7 +20,7 @@ use split::{ReadHalf, WriteHalf};
 ///   and placed into the output buffer, where `n` == 0 implies that EOF has
 ///   been reached.
 ///
-/// * `Ok(Async::WouldBlock)` means that no data was read into the buffer 
+/// * `Ok(Async::NotReady)` means that no data was read into the buffer 
 ///   provided. The I/O object is not currently readable but may become readable
 ///   in the future. Most importantly, **the current future's task is scheduled
 ///   to get unparked when the object is readable**. This means that like 

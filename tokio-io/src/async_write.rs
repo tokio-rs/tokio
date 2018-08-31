@@ -16,7 +16,7 @@ use AsyncRead;
 /// * `Ok(Async::Ready(n))` means that `n` bytes of data was immediately
 ///   written.
 ///
-/// * `Ok(Async::WouldBlock)` means that no data was written from the buffer
+/// * `Ok(Async::NotReady)` means that no data was written from the buffer
 ///   provided. The I/O object is not currently writable but may become writable
 ///   in the future. Most importantly, **the current future's task is scheduled
 ///   to get unparked when the object is readable**. This means that like
