@@ -1,0 +1,35 @@
+[package]
+name = "tokio-threadpool"
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Update doc URL.
+# - Create "v0.1.x" git tag.
+version = "0.1.6"
+documentation = "https://docs.rs/tokio-threadpool/0.1.6/tokio_threadpool"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://github.com/tokio-rs/tokio"
+license = "MIT"
+authors = ["Carl Lerche <me@carllerche.com>"]
+description = """
+A task scheduler backed by a work-stealing thread pool.
+"""
+keywords = ["futures", "tokio"]
+categories = ["concurrency", "asynchronous"]
+
+[dependencies]
+tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
+futures = "0.1.19"
+crossbeam-deque = "0.6.1"
+crossbeam-utils = "0.5.0"
+num_cpus = "1.2"
+rand = "0.5"
+log = "0.4"
+
+[dev-dependencies]
+tokio-timer = "0.1"
+env_logger = "0.5"
+
+# For comparison benchmarks
+futures-cpupool = "0.1.7"
+threadpool = "1.7.1"

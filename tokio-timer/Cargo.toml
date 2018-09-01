@@ -1,0 +1,30 @@
+[package]
+name = "tokio-timer"
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update CHANGELOG.md.
+# - Update doc URL.
+# - Create "v0.2.x" git tag.
+version = "0.2.6"
+authors = ["Carl Lerche <me@carllerche.com>"]
+license = "MIT"
+readme = "README.md"
+documentation = "https://docs.rs/tokio-timer/0.2.6/tokio_timer"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://github.com/tokio-rs/tokio"
+description = """
+Timer facilities for Tokio
+"""
+
+[dependencies]
+futures = "0.1.19"
+tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
+crossbeam-utils = "0.5.0"
+
+# Backs `DelayQueue`
+slab = "0.4.1"
+
+[dev-dependencies]
+rand = "0.5"
+tokio-mock-task = "0.1.0"
+tokio = { version = "0.1.7", path = "../" }
