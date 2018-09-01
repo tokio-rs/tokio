@@ -29,6 +29,7 @@ members = [
   "tokio-fs",
   "tokio-io",
   "tokio-reactor",
+  "tokio-signal",
   "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
