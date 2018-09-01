@@ -2,7 +2,13 @@
 
 An implementation of Unix signal handling for Tokio
 
-[![Build Status](https://travis-ci.org/alexcrichton/tokio-signal.svg?branch=master)](https://travis-ci.org/alexcrichton/tokio-signal)
+[![Travis Build Status][travis-badge]][travis-url]
+[![Appveyor Build Status][appveyor-badge]][appveyor-url]
+
+[travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
+[travis-url]: https://travis-ci.org/tokio-rs/tokio
+[appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7/branch/master?svg=true
+[appveyor-url]: https://ci.appveyor.com/project/carllerche/tokio/branch/master
 
 [Documentation](https://docs.rs/tokio-signal)
 
