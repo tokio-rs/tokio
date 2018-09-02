@@ -19,15 +19,12 @@
 //!
 //! ```rust,no_run
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_signal;
 //!
-//! use tokio_core::reactor::Core;
 //! use futures::{Future, Stream};
 //!
 //! fn main() {
-//!     let mut core = Core::new().unwrap();
-//!
 //!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
 //!     // on this stream may represent multiple ctrl-c signals.
 //!     let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
@@ -38,7 +35,7 @@
 //!         Ok(())
 //!     });
 //!
-//!     core.run(prog).unwrap();
+//!     tokio::runtime::current_thread::block_on_all(prog).unwrap();
 //! }
 //! ```
 //!
@@ -46,28 +43,25 @@
 //!
 //! ```rust,no_run
 //! # extern crate futures;
-//! # extern crate tokio_core;
+//! # extern crate tokio;
 //! # extern crate tokio_signal;
 //! # #[cfg(unix)]
 //! # mod foo {
 //! #
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_signal;
 //!
-//! use tokio_core::reactor::Core;
 //! use futures::{Future, Stream};
 //! use tokio_signal::unix::{Signal, SIGHUP};
 //!
 //! fn main() {
-//!     let mut core = Core::new().unwrap();
-//!
 //!     // Like the previous example, this is an infinite stream of signals
 //!     // being received, and signals may be coalesced while pending.
 //!     let stream = Signal::new(SIGHUP).flatten_stream();
 //!
 //!     // Convert out stream into a future and block the program
-//!     core.run(stream.into_future()).ok().unwrap();
+//!     tokio::runtime::current_thread::block_on_all(stream.into_future()).ok().unwrap();
 //! }
 //! # }
 //! # fn main() {}
