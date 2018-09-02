@@ -19,10 +19,10 @@ fn multi_loop() {
             .map(|_| {
                 let sender = sender.clone();
                 thread::spawn(move || {
-                    let mut lp = Core::new().unwrap();
-                    let signal = lp.run(Signal::new(libc::SIGHUP)).unwrap();
+                    let mut rt = CurrentThreadRuntime::new().unwrap();
+                    let signal = run_with_timeout(&mut rt, Signal::new(libc::SIGHUP)).unwrap();
                     sender.send(()).unwrap();
-                    run_core_with_timeout(&mut lp, signal.into_future()).ok().unwrap();
+                    run_with_timeout(&mut rt, signal.into_future()).ok().unwrap();
                 })
             })
             .collect();
