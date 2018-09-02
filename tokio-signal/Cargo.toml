@@ -28,8 +28,7 @@ mio-uds = "0.6"
 signal-hook = "0.1"
 
 [dev-dependencies]
-tokio-core = "0.1.17"
-tokio = { version = "0.1.6", path = ".." }
+tokio = { version = "0.1.8", path = ".." }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
