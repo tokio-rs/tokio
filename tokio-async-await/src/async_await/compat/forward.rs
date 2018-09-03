@@ -4,7 +4,7 @@ use futures_core::future::Future as Future03;
 use futures_core::task::Poll as Poll03;
 
 use std::marker::Unpin;
-use std::mem::PinMut;
+use std::pin::PinMut;
 use std::task::Context;
 
 /// Converts an 0.1 `Future` into an 0.3 `Future`.

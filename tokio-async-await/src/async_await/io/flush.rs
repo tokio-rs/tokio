@@ -5,7 +5,7 @@ use futures_core::task::{self, Poll};
 
 use std::io;
 use std::marker::Unpin;
-use std::mem::PinMut;
+use std::pin::PinMut;
 
 /// A future used to fully flush an I/O object.
 #[derive(Debug)]

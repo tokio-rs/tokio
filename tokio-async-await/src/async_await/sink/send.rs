@@ -4,7 +4,7 @@ use futures_core::future::Future;
 use futures_core::task::{self, Poll};
 
 use std::marker::Unpin;
-use std::mem::PinMut;
+use std::pin::PinMut;
 
 /// Future for the `SinkExt::send_async` combinator, which sends a value to a
 /// sink and then waits until the sink has fully flushed.
