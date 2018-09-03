@@ -12,7 +12,7 @@ use your help.
 This guide will help you get started. **Do not let this guide intimidate you**.
 It should be considered a map to help you navigate the process.
 
-You may also find get help contributing in the [dev channel][dev], please join
+You may also get help with contributing in the [dev channel][dev], please join
 us!
 
 [dev]: https://gitter.im/tokio-rs/dev
@@ -128,7 +128,7 @@ crate should have a `dev-dependency` on `tokio` itself. This makes all Tokio
 utilities available to use in tests, no matter the crate being tested.
 
 The best strategy for writing a new integration test is to look at existing
-integration tests in the crate and following the style.
+integration tests in the crate and follow the style.
 
 #### Documentation tests
 
