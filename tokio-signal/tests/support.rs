@@ -24,10 +24,6 @@ pub fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error =
         })
 }
 
-pub fn run_with_timeout_default<F: Future>(future: F) -> Result<F::Item, F::Error> {
-    current_thread::block_on_all(with_timeout(future))
-}
-
 pub fn run_with_timeout<F>(rt: &mut CurrentThreadRuntime, future: F) -> Result<F::Item, F::Error>
     where F: Future
 {
