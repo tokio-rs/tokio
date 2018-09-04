@@ -284,9 +284,9 @@ executor.
 
 The notify handle is an implementation of [`Notify`][`Notify`] and the identifier
 is a value that the executor uses to look up the current task. When
-[`Task::notify`] is called, the [`notify`][Notify::notify] function on the
-notify handle is called with the supplied identifier. The implementation of this
-function is responsible for performing the scheduling logic.
+[`Task::notify`][notify] is called, the [`notify`][Notify::notify] function on
+the notify handle is called with the supplied identifier. The implementation of
+this function is responsible for performing the scheduling logic.
 
 One strategy for implementing an executor is to store each task in a `Box` and
 to use a linked list to track tasks that are scheduled for execution. When
@@ -308,7 +308,7 @@ current thread and drains the `scheduled` linked list.
 [current]: https://docs.rs/futures/0.1/futures/task/fn.current.html
 [notify]: https://docs.rs/futures/0.1/futures/task/struct.Task.html#method.notify
 [`Notify`]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html
-[Notiy::Notify] https://docs.rs/futures/0.1/futures/executor/trait.Notify.html#tymethod.notify
+[Notify::notify]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html#tymethod.notify
 
 ### Future
 
