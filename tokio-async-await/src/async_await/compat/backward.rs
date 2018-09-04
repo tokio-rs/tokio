@@ -4,7 +4,7 @@ use futures::{
 };
 use futures_core::{Future as Future03};
 
-use std::boxed::PinBox;
+use std::pin::PinBox;
 use std::future::FutureObj;
 use std::ptr::NonNull;
 use std::task::{

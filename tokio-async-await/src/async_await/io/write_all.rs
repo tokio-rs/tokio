@@ -6,7 +6,9 @@ use futures_util::try_ready;
 
 use std::io;
 use std::marker::Unpin;
-use std::mem::{self, PinMut};
+use std::mem;
+
+use core::pin::PinMut;
 
 /// A future used to write the entire contents of a buffer.
 #[derive(Debug)]

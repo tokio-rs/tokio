@@ -3,7 +3,7 @@ use futures_core::future::Future;
 use futures_core::task::{self, Poll};
 
 use std::marker::Unpin;
-use std::mem::PinMut;
+use std::pin::PinMut;
 
 /// A future of the next element of a stream.
 #[derive(Debug)]
