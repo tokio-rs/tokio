@@ -2,8 +2,8 @@ use futures::Stream;
 use futures_core::future::Future;
 use futures_core::task::{self, Poll};
 
+use alloc::pin::PinMut;
 use std::marker::Unpin;
-use std::mem::PinMut;
 
 /// A future of the next element of a stream.
 #[derive(Debug)]

@@ -3,9 +3,9 @@ use tokio_io::AsyncWrite;
 use futures_core::future::Future;
 use futures_core::task::{self, Poll};
 
+use alloc::pin::PinMut;
 use std::io;
 use std::marker::Unpin;
-use std::mem::PinMut;
 
 /// A future used to fully flush an I/O object.
 #[derive(Debug)]

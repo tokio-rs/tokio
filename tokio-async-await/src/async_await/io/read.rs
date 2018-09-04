@@ -3,9 +3,9 @@ use tokio_io::AsyncRead;
 use futures_core::future::Future;
 use futures_core::task::{self, Poll};
 
+use alloc::pin::PinMut;
 use std::io;
 use std::marker::Unpin;
-use std::mem::PinMut;
 
 /// A future which can be used to read bytes.
 #[derive(Debug)]

@@ -4,9 +4,10 @@ use futures_core::future::Future;
 use futures_core::task::{self, Poll};
 use futures_util::try_ready;
 
+use alloc::pin::PinMut;
 use std::io;
 use std::marker::Unpin;
-use std::mem::{self, PinMut};
+use std::mem;
 
 /// A future used to write the entire contents of a buffer.
 #[derive(Debug)]
