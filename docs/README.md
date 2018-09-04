@@ -83,6 +83,23 @@ returned from `my_resource.poll()` and the task is able to complete.
 
 [Future]: https://docs.rs/futures/0.1/futures/future/trait.Future.html
 
+#### Cooperative scheduling
+
+Cooperative scheduling is used to schedule tasks on executors. A single executor
+is expected to manage many tasks across a small set of threads. There will be
+a far greater number of tasks then threads. There also is no pre-emption. This
+means that when a task is scheduled to execute, it blocks the current thread
+until the `poll` function returns.
+
+Because of this, it is important for implementations of `poll` to only execute
+for very short periods of time. For I/O bound applications, this usually happens
+automatically. However, if a task must run a longer computation, it should defer
+work to a [blocking pool] or breakup the computation into smaller chunks and
+[yield] back to the executor after each chunk.
+
+[blocking pool]: #
+[yield]: #
+
 ### Task system
 
 The task system is the system by which resources notify executors of readiness
@@ -126,16 +143,175 @@ its value. At that point, the logic that readies `my_resource` will call
 signals the readiness change to the executor, which then schedules the task for
 execution.
 
-[current]: https://docs.rs/futures/0.1/futures/task/fn.current.html
-[notify]: https://docs.rs/futures/0.1/futures/task/struct.Task.html#method.notify
+#### `Async::Ready`
+
+Any function that returns `Async` must adheare to the [contract][contract]. When
+`NotReady` is returned, the current task **must** have been registered for
+notification on readiness change. The implication for resources is discussed in
+the above section. For task logic, this means that `NotReady` cannot be returned
+unless a resource has returned `NotReady`. By doing this, the
+[contract][contract] transitively upheld. The current task is registered for
+notification because `NotReady` has been received from the resource.
+
+Great care must be taken to avoiding returning `NotReady` without having
+received `NotReady` from a resource. For example, the following task
+implementation results in the task never completing.
+
+```rust
+
+enum BadTask {
+    First(Resource1),
+    Second(Resource2),
+}
+
+impl Future for BadTask {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        use self::BadTask::*;
+
+        match *self {
+            First(ref mut resource) => {
+                let value = try_ready!(resource.poll());
+                *self = Second(Resource2::new(value));
+                Ok(Async::NotReady)
+            }
+            Second(ref mut resource) => {
+                try_ready!(resource.poll());
+                Ok(Async::Ready(()))
+            }
+        }
+    }
+}
+```
+
+The problem with the above implementation is that `Ok(Async::NotReady)` is
+returned right after transitioning the state to `Second`. During this
+transition, no resource has returned `NotReady`. When the task itself returns
+`NotReady`, it has violated the [contract][contract] as the task will **not** be
+notified in the future.
+
+This situation is generally resolved by adding a loop:
+
+```rust
+fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    use self::BadTask::*;
+
+    loop {
+        match *self {
+            First(ref mut resource) => {
+                let value = try_ready!(resource.poll());
+                *self = Second(Resource2::new(value));
+            }
+            Second(ref mut resource) => {
+                try_ready!(resource.poll());
+                return Ok(Async::Ready(()));
+            }
+        }
+    }
+}
+```
+
+One way to think about it is that a task's `poll` function **must not**
+returned until it is unable to make any further progress due to its resources
+not being ready.
+
+##### Yielding
+
+Somtimes a task must return `NotReady` without being blocked on a resource. This
+usually happens when computation to run is large and the task wants to return
+control to the executor to allow it to execute other futures.
+
+Yielding is done by notifying the current task and returning `NotReady`:
+
+```rust
+task::current().notify();
+return Ok(Async::NotReady);
+```
+
+Yield can be used to break up a CPU expensive computation:
+
+```rust
+struct Count {
+  remaining: usize,
+}
+
+impl Future for Count {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        while self.count > 0 {
+            self.count -= 1;
+
+            // Yield every 10 iterations
+            if self.count % 10 == 0 {
+                task::current().notify();
+                return Ok(Async::NotReady);
+            }
+        }
+
+        Ok(Async::Ready(()))
+    }
+}
+```
+
+[contract]: https://docs.rs/futures/0.1.23/futures/future/trait.Future.html#tymethod.poll
 
 ### Executors
 
 Executors are responsible for driving many tasks to completion. A task is
 spawned onto an executor, at which point the executor calls its `poll` function
-when needed.
+when needed. The executor hooks into the task system to receive resource
+readiness notifications.
 
-The specific execution and scheduling logic is left to the executor
-implementation.
+By decoupling the task system with the executor implementation, the specific
+execution and scheduling logic can be left to the executor implementation. Tokio
+provides two executor implementations, each with unique characteristics:
+[`current_thread`] and [`thread_pool`].
+
+When a task is first spawned onto the executor, the executor wraps it w/
+[`Spawn`][Spawn]. This binds the task logic with the task state (this is mostly
+required for legacy reasons). When the executor picks a task for execution, it
+calls [`Spawn::poll_future_notify`][poll_future_notify]. This function ensures
+that the task context is set to the thread-local variable such that
+[`task::current`][current] is able to read it. When calling
+[`poll_future_notify`][poll_future_notify], the executor also passes in a notify
+handle and an identifier. These arguments are included in the task handle
+returned by [`task::current`][current] and is how the task is linked to the
+executor.
+
+The notify handle is an implementation of [`Notify`][`Notify`] and the identifier
+is a value that the executor uses to look up the current task. When
+[`Task::notify`] is called, the [`notify`][Notify::notify] function on the
+notify handle is called with the supplied identifier. The implementation of this
+function is responsible for performing the scheduling logic.
+
+One strategy for implementing an executor is to store each task in a `Box` and
+to use a linked list to track tasks that are scheduled for execution. When
+[`Notify::notify`][Notify::notify] is called, then the task associated with the
+identifier is pushed at the end of the `scheduled` linked list. When the
+executor runs, it pops from the front of the linked list and executes the task
+as described above.
+
+Note that this section does not describe how the executor is run. The details of
+this are left to the executor implementation. One option is for the executor to
+spawn one or more threads and dedicate these threads to draining the `scheduled`
+linked list. Another is to provide a `MyExecutor::run` function that blocks the
+current thread and drains the `scheduled` linked list.
+
+[`current_thread`]: #
+[`thread_pool`]: #
+[Spawn]: https://docs.rs/futures/0.1/futures/executor/struct.Spawn.html
+[poll_future_notify]: https://docs.rs/futures/0.1/futures/executor/struct.Spawn.html#method.poll_future_notify
+[current]: https://docs.rs/futures/0.1/futures/task/fn.current.html
+[notify]: https://docs.rs/futures/0.1/futures/task/struct.Task.html#method.notify
+[`Notify`]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html
+[Notiy::Notify] https://docs.rs/futures/0.1/futures/executor/trait.Notify.html#tymethod.notify
 
 ### Future
+
+## Reactor
+
+## Runtime
