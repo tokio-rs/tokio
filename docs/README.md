@@ -312,6 +312,22 @@ current thread and drains the `scheduled` linked list.
 
 ### Future
 
+As mentioned above, tasks are implemented using the [`Future`] trait. This trait
+is not limited to implementing tasks. A [`Future`] is a value that represents a
+non-blocking computation that will complete sometime in the future. A task is a
+computation with no output. Many resources in Tokio are represented with
+[`Future`] implementations. For example, a timeout is a [`Future`] that
+completes once the deadline has been reached.
+
+The trait includes a number of combinators that are useful for working with
+future values.
+
+Applications are built by either implementing `Future` for application specific
+types or defining application logic using combinators. Often, a mix of both
+strategies is most successful.
+
+[`Future`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html
+
 ## Reactor
 
 ## Runtime
