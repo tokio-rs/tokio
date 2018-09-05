@@ -11,8 +11,8 @@ is provided on the website.
 
 <!-- TODO: Fill out as sections are written -->
 
-* [Runtime model][runtime-model.md]
-* [Non-blocking I/O][net.md]
+* [Runtime model](runtime-model.md)
+* [Non-blocking I/O](net.md)
 
 <!--
 ## Overview
