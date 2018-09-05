@@ -367,6 +367,9 @@ strategies is most successful.
 
 [`Future`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html
 
-## Reactor
+## Network Resources and Driver
 
-## Runtime
+This section describes the network resources and driver provided by Tokio. This
+module provide one of Tokio's primary functions: non-blocking, event-driven,
+networking provided by the appropriate operating system primitives (epoll,
+kqueue, IOCP, etc...).
