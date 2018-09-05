@@ -96,11 +96,33 @@ impl Future for ConnectAndProcess {
 }
 ```
 
-## Readiness notifications
+## Registering the resource with the driver
 
-wut wut wut
+When using [`TcpListener::poll_accept`][poll_accept] (or any `poll_*` function),
+if the resource is ready to return immediately then it will do so. In the case
+of [`poll_accept`][poll_accept], being ready means that there is a socket
+waiting to be accepted in the queue. If the resource is **not** ready, i.e.
+there is no pending socket to accept, then the resource asks the driver to
+notify the current task once it becomes ready.
+
+The first time `NotReady` is returned by a resource, if the resource was not
+explicity assigned a driver using a [`Handle`] argument, the resource will register
+itself with a driver instance. This is done by looking at the network driver
+associated with the current execution context.
+
+The default driver for the execution context is stored using a thread-local, set
+using [`with_default`], and accessed using [`Handle::current`]. It is the
+runtime's responsibility to ensure that the task is polled from within the
+closure passed to [`with_default`]. A call to [`Handle::current`] accesses the
+thread-local set by [`with_default`] in order to return the handle to the
+driver for the curreent execution context.
+
+### `Handle::current` vs `Handle::default`
 
 
 [`TcpStream`]: https://docs.rs/tokio/0.1/tokio/net/struct.TcpStream.html
 [`TcpListener`]: https://docs.rs/tokio/0.1/tokio/net/struct.TcpListener.html
 [`Handle`]: https://docs.rs/tokio-reactor/0.1/tokio_reactor/struct.Handle.html
+[poll_accept]: http://docs.rs/tokio/0.1.8/tokio/net/struct.TcpListener.html#method.poll_accept
+[`with_default`]: https://docs.rs/tokio-reactor/0.1.5/tokio_reactor/fn.with_default.html
+[`Handle::default`]: https://docs.rs/tokio-reactor/0.1.5/tokio_reactor/struct.Handle.html#method.default
