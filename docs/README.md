@@ -310,6 +310,43 @@ current thread and drains the `scheduled` linked list.
 [`Notify`]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html
 [Notify::notify]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html#tymethod.notify
 
+### Resources, Drivers, and Runtimes
+
+Resources are leaf futures, i.e. futures that are not implemented in terms of
+other futures. They are the types that use the task system described above to
+interact with the executor. Resource types include TCP and UDP sockets, timers,
+channels, file handles, etc. Tokio applications rarely need to implement
+resources. Instead, they use resources provided by Tokio or third party crates.
+
+Often times, a resource cannot function by itself and requires a driver. For
+example, Tokio TCP sockets are backed by a [`Reactor`]. The reactor is the
+socket resource driver. A single driver may power large numbers of resource
+instances. In order to use the resource, the driver must be running somewhere in
+the process. Tokio provides drivers for network resources ([`tokio-reactor`]),
+file resources ([`tokio-fs`]), and timers ([`tokio-timer]`). Providing decoupled
+driver components allows useers to pick and choose which components they wish to
+use. Each driver can be used standalone or combined with other drivers.
+
+Because of this, in order to use Tokio and successfully execute tasks, an
+application must start an executor and the necessary drivers for the resources
+that the application's tasks depend on. This requires significant boilerplate.
+To manage the boilerplate, Tokio offers a couple runtime options. A runtime is
+an executor bundled with all necessary drivers to power Tokio's resources.
+Instead of managing all the various Tokio components individually, a runtime is
+created and started in a single call.
+
+Tokio offers a [concurrent runtime][concurrent], backed by a multi-threaded, work-stealing,
+executor as well as a runtime that runs the executor and all drivers on the
+[current thread][current_thread]. This allows the user to pick the runtime
+characteristics best suited for the application.
+
+[`Reactor]: https://docs.rs/tokio-reactor/0.1.5/tokio_reactor/
+[`tokio-reactor`]: https://docs.rs/tokio-reactor
+[`tokio-fs`]: https://docs.rs/tokio-fs
+[`tokio-timer`]: https://docs.rs/tokio-timer
+[concurrent]: https://docs.rs/tokio/0.1.8/tokio/runtime/index.html
+[current_thread]: https://docs.rs/tokio/0.1.8/tokio/runtime/current_thread/index.html
+
 ### Future
 
 As mentioned above, tasks are implemented using the [`Future`] trait. This trait
@@ -325,6 +362,8 @@ future values.
 Applications are built by either implementing `Future` for application specific
 types or defining application logic using combinators. Often, a mix of both
 strategies is most successful.
+
+<!-- TODO: Expand -->
 
 [`Future`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html
 
