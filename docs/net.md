@@ -1,4 +1,4 @@
-# Network resources and driver
+# Non-blocking I/O
 
 This section describes the network resources and driver provided by Tokio. This
 component provide one of Tokio's primary functions: non-blocking, event-driven,
