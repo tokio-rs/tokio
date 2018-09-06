@@ -1,12 +1,12 @@
 use park::{BoxPark, BoxUnpark};
-use task::{Task, Queue};
+use task::Task;
 use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 use crossbeam_utils::CachePadded;
 use deque;
@@ -36,9 +36,6 @@ pub(crate) struct WorkerEntry {
 
     // Thread unparker
     pub unpark: BoxUnpark,
-
-    // MPSC queue of jobs submitted to the worker from an external source.
-    pub inbound: Queue,
 }
 
 impl WorkerEntry {
@@ -50,19 +47,9 @@ impl WorkerEntry {
             next_sleeper: UnsafeCell::new(0),
             worker: w,
             stealer: s,
-            inbound: Queue::new(),
             park: UnsafeCell::new(park),
             unpark,
         }
-    }
-
-    /// Atomically load the worker's state
-    ///
-    /// # Ordering
-    ///
-    /// An `Acquire` ordering is established on the entry's state variable.
-    pub fn load_state(&self) -> State {
-        self.state.load(Acquire).into()
     }
 
     /// Atomically unset the pushed flag.
@@ -83,51 +70,6 @@ impl WorkerEntry {
     #[inline]
     pub fn submit_internal(&self, task: Arc<Task>) {
         self.push_internal(task);
-    }
-
-    /// Submits a task to the worker. This assumes that the caller is external
-    /// to the worker. Internal submissions go through another path.
-    ///
-    /// Returns `false` if the worker needs to be spawned.
-    ///
-    /// # Ordering
-    ///
-    /// The `state` must have been obtained with an `Acquire` ordering.
-    pub fn submit_external(&self, task: Arc<Task>, mut state: State) -> bool {
-        use worker::Lifecycle::*;
-
-        // Push the task onto the external queue
-        self.push_external(task);
-
-        loop {
-            let mut next = state;
-            next.notify();
-
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(),
-                AcqRel).into();
-
-            if state == actual {
-                break;
-            }
-
-            state = actual;
-        }
-
-        match state.lifecycle() {
-            Sleeping => {
-                // The worker is currently sleeping, the condition variable must
-                // be signaled
-                self.wakeup();
-                true
-            }
-            Shutdown => false,
-            Running | Notified | Signaled => {
-                // In these states, the worker is active and will eventually see
-                // the task that was just submitted.
-                true
-            }
-        }
     }
 
     /// Signals to the worker that it should stop
@@ -204,6 +146,11 @@ impl WorkerEntry {
         self.stealer.steal_many(&dest.worker)
     }
 
+    /// Returns `true` if this worker's queue contains tasks.
+    pub fn has_tasks(&self) -> bool {
+        !self.stealer.is_empty()
+    }
+
     /// Drain (and drop) all tasks that are queued for work.
     ///
     /// This is called when the pool is shutting down.
@@ -217,11 +164,6 @@ impl WorkerEntry {
                 Pop::Retry => {}
             }
         }
-    }
-
-    #[inline]
-    fn push_external(&self, task: Arc<Task>) {
-        self.inbound.push(task);
     }
 
     #[inline]
@@ -254,7 +196,6 @@ impl fmt::Debug for WorkerEntry {
             .field("stealer", &self.stealer)
             .field("park", &"UnsafeCell<BoxPark>")
             .field("unpark", &"BoxUnpark")
-            .field("inbound", &self.inbound)
             .finish()
     }
 }

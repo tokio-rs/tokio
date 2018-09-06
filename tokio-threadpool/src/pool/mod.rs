@@ -28,6 +28,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 
+use crossbeam::queue::SegQueue;
 use crossbeam_utils::CachePadded;
 use rand;
 
@@ -59,6 +60,9 @@ pub(crate) struct Pool {
     //
     // This will *usually* be a small number.
     pub workers: Box<[worker::Entry]>,
+
+    // External queue of tasks
+    pub external_queue: SegQueue<Arc<Task>>,
 
     // Backup thread state
     //
@@ -112,6 +116,7 @@ impl Pool {
             sleep_stack: CachePadded::new(worker::Stack::new()),
             num_workers: AtomicUsize::new(0),
             workers,
+            external_queue: SegQueue::new(),
             backup,
             backup_stack,
             blocking,
@@ -189,6 +194,10 @@ impl Pool {
         }
 
         self.terminate_sleeping_workers();
+
+        if purge_queue {
+            while self.external_queue.try_pop().is_some() {}
+        }
     }
 
     pub fn is_shutdown(&self) -> bool {
@@ -305,40 +314,8 @@ impl Pool {
     pub fn submit_external(&self, task: Arc<Task>, inner: &Arc<Pool>) {
         debug_assert_eq!(*self, **inner);
 
-        use worker::Lifecycle::Notified;
-
-        // First try to get a handle to a sleeping worker. This ensures that
-        // sleeping tasks get woken up
-        if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Notified, false) {
-            trace!("submit to existing worker; idx={}; state={:?}", idx, worker_state);
-            self.submit_to_external(idx, task, worker_state, inner);
-            return;
-        }
-
-        // All workers are active, so pick a random worker and submit the
-        // task to it.
-        let len = self.workers.len();
-        let idx = self.rand_usize() % len;
-
-        trace!("  -> submitting to random; idx={}", idx);
-
-        let state = self.workers[idx].load_state();
-        self.submit_to_external(idx, task, state, inner);
-    }
-
-    fn submit_to_external(&self,
-                          idx: usize,
-                          task: Arc<Task>,
-                          state: worker::State,
-                          inner: &Arc<Pool>)
-    {
-        debug_assert_eq!(*self, **inner);
-
-        let entry = &self.workers[idx];
-
-        if !entry.submit_external(task, state) {
-            self.spawn_thread(WorkerId::new(idx), inner);
-        }
+        self.external_queue.push(task);
+        self.signal_work(inner);
     }
 
     pub fn release_backup(&self, backup_id: BackupId) -> Result<(), ()> {
@@ -462,7 +439,7 @@ impl Pool {
         }
     }
 
-    /// If there are any other workers currently relaxing, signal them that work
+    /// If there are any other workers currently sleeping, signal them that work
     /// is available so that they can try to find more work to process.
     pub fn signal_work(&self, inner: &Arc<Pool>) {
         debug_assert_eq!(*self, **inner);

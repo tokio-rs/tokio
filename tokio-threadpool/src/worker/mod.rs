@@ -232,10 +232,6 @@ impl Worker {
         while self.check_run_state(first) {
             first = false;
 
-            // Poll inbound until empty, transferring all tasks to the internal
-            // queue.
-            let consistent = self.drain_inbound();
-
             // Run the next available task
             if self.try_run_task(&notify) {
                 if self.is_blocking.get() {
@@ -251,11 +247,6 @@ impl Worker {
                 spin_cnt = 0;
 
                 // As long as there is work, keep looping.
-                continue;
-            }
-
-            if !consistent {
-                spin_cnt = 0;
                 continue;
             }
 
@@ -396,6 +387,21 @@ impl Worker {
         }
     }
 
+    /// Returns `true` if any worker's queue or the external queue has tasks.
+    fn check_available_tasks(&self) -> bool {
+        if !self.inner.external_queue.is_empty() {
+            return true;
+        }
+
+        for worker in self.inner.workers.iter() {
+            if worker.has_tasks() {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Tries to steal a task from another worker.
     ///
     /// Returns `true` if work was found
@@ -440,6 +446,21 @@ impl Worker {
             if idx == start {
                 break;
             }
+        }
+
+        // Try stealing from the external queue.
+        if let Some(task) = self.inner.external_queue.try_pop() {
+            trace!("stole task from external queue");
+
+            self.run_task(task, notify);
+
+            // Signal other workers that work is available
+            //
+            // TODO: Should this be called here or before
+            // `run_task`?
+            self.inner.signal_work(&self.inner);
+
+            return true;
         }
 
         found_work
@@ -550,48 +571,6 @@ impl Worker {
         task.run(notify)
     }
 
-    /// Drains all tasks on the extern queue and pushes them onto the internal
-    /// queue.
-    ///
-    /// Returns `true` if the operation was able to complete in a consistent
-    /// state.
-    #[inline]
-    fn drain_inbound(&self) -> bool {
-        use task::Poll::*;
-
-        let mut found_work = false;
-
-        loop {
-            let task = unsafe { self.entry().inbound.poll() };
-
-            match task {
-                Empty => {
-                    if found_work {
-                        // TODO: Why is this called on every iteration? Would it
-                        // not be better to only signal when work was found
-                        // after waking up?
-                        trace!("found work while draining; signal_work");
-                        self.inner.signal_work(&self.inner);
-                    }
-
-                    return true;
-                }
-                Inconsistent => {
-                    if found_work {
-                        trace!("found work while draining; signal_work");
-                        self.inner.signal_work(&self.inner);
-                    }
-
-                    return false;
-                }
-                Data(task) => {
-                    found_work = true;
-                    self.entry().push_internal(task);
-                }
-            }
-        }
-    }
-
     /// Put the worker to sleep
     ///
     /// Returns `true` if woken up due to new work arriving.
@@ -675,6 +654,23 @@ impl Worker {
         // spuriously.
         'sleep:
         loop {
+            // If there are tasks available in any queue, transition back to running
+            if self.check_available_tasks() {
+                loop {
+                    let mut next = state;
+                    next.set_lifecycle(Running);
+
+                    let actual = self.entry().state.compare_and_swap(
+                        state.into(), next.into(), AcqRel).into();
+
+                    if actual == state {
+                        return true;
+                    }
+
+                    state = actual;
+                }
+            }
+
             let mut drop_thread = false;
 
             match sleep_until {
@@ -837,10 +833,6 @@ impl Drop for Worker {
         trace!("shutting down thread; idx={}", self.id.0);
 
         if self.should_finalize.get() {
-            // Get all inbound work and push it onto the work queue. The work
-            // queue is drained in the next step.
-            self.drain_inbound();
-
             // Drain the work queue
             self.entry().drain_tasks();
 
