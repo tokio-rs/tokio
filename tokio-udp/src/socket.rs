@@ -10,6 +10,12 @@ use mio;
 use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
+///
+/// **Note**: Well `UdpSocket` is `Sync`, the caller must ensure that there are
+/// at most two tasks that use a `UdpSocket` concurrently, one for receiving and
+/// one for sending. While violating this requirement is "safe" from a Rust
+/// memory model point of view, it will result in unexpected behavior in the
+/// form of lost notifications and tasks hanging.
 pub struct UdpSocket {
     io: PollEvented<mio::net::UdpSocket>,
 }
@@ -59,7 +65,7 @@ impl UdpSocket {
 
     #[deprecated(since = "0.1.2", note = "use poll_send instead")]
     #[doc(hidden)]
-    pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         match self.poll_send(buf)? {
             Async::Ready(n) => Ok(n),
             Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
@@ -84,7 +90,7 @@ impl UdpSocket {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_send(&mut self, buf: &[u8]) -> Poll<usize, io::Error> {
+    pub fn poll_send(&self, buf: &[u8]) -> Poll<usize, io::Error> {
         try_ready!(self.io.poll_write_ready());
 
         match self.io.get_ref().send(buf) {
@@ -99,7 +105,7 @@ impl UdpSocket {
 
     #[deprecated(since = "0.1.2", note = "use poll_recv instead")]
     #[doc(hidden)]
-    pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         match self.poll_recv(buf)? {
             Async::Ready(n) => Ok(n),
             Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
@@ -129,7 +135,7 @@ impl UdpSocket {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_recv(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
+    pub fn poll_recv(&self, buf: &mut [u8]) -> Poll<usize, io::Error> {
         try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().recv(buf) {
@@ -144,7 +150,7 @@ impl UdpSocket {
 
     #[deprecated(since = "0.1.2", note = "use poll_send_to instead")]
     #[doc(hidden)]
-    pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         match self.poll_send_to(buf, target)? {
             Async::Ready(n) => Ok(n),
             Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
@@ -168,7 +174,7 @@ impl UdpSocket {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_send_to(&mut self, buf: &[u8], target: &SocketAddr) -> Poll<usize, io::Error> {
+    pub fn poll_send_to(&self, buf: &[u8], target: &SocketAddr) -> Poll<usize, io::Error> {
         try_ready!(self.io.poll_write_ready());
 
         match self.io.get_ref().send_to(buf, target) {
@@ -203,7 +209,7 @@ impl UdpSocket {
 
     #[deprecated(since = "0.1.2", note = "use poll_recv_from instead")]
     #[doc(hidden)]
-    pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         match self.poll_recv_from(buf)? {
             Async::Ready(ret) => Ok(ret),
             Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
@@ -217,7 +223,7 @@ impl UdpSocket {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn poll_recv_from(&mut self, buf: &mut [u8]) -> Poll<(usize, SocketAddr), io::Error> {
+    pub fn poll_recv_from(&self, buf: &mut [u8]) -> Poll<(usize, SocketAddr), io::Error> {
         try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().recv_from(buf) {
