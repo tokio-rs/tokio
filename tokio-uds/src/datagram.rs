@@ -15,7 +15,7 @@ use std::path::Path;
 
 /// An I/O object representing a Unix datagram socket.
 ///
-/// **Note**: Well `UnixDatagram` is `Sync`, the caller must ensure that there
+/// **Note**: While `UnixDatagram` is `Sync`, the caller must ensure that there
 /// are at most two tasks that use a `UnixDatagram` concurrently, one for
 /// receiving and one for sending. While violating this requirement is "safe"
 /// from a Rust memory model point of view, it will result in unexpected

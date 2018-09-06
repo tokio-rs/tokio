@@ -11,7 +11,7 @@ use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
 ///
-/// **Note**: Well `UdpSocket` is `Sync`, the caller must ensure that there are
+/// **Note**: While `UdpSocket` is `Sync`, the caller must ensure that there are
 /// at most two tasks that use a `UdpSocket` concurrently, one for receiving and
 /// one for sending. While violating this requirement is "safe" from a Rust
 /// memory model point of view, it will result in unexpected behavior in the
