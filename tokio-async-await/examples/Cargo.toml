@@ -1,0 +1,28 @@
+cargo-features = ["edition"]
+
+[package]
+name = "examples"
+edition = "2018"
+
+# When releasing to crates.io:
+# - Update html_root_url.
+version = "0.1.1"
+authors = ["Carl Lerche <me@carllerche.com>"]
+license = "MIT"
+
+[[bin]]
+name = "hyper"
+path = "src/hyper.rs"
+
+[dependencies]
+tokio-async-await = { version = "0.1.0", path = "../" }
+bytes = "0.4.9"
+hyper = "0.12.8"
+
+[patch.crates-io]
+tokio = { path = "../.." }
+tokio-executor = { path = "../../tokio-executor" }
+tokio-io = { path = "../../tokio-io" }
+tokio-reactor = { path = "../../tokio-reactor" }
+tokio-tcp = { path = "../../tokio-tcp" }
+tokio-timer = { path = "../../tokio-timer" }

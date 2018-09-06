@@ -18,6 +18,10 @@ Experimental async/await support for Tokio
 categories = ["asynchronous"]
 
 [workspace]
+members = [
+  "./",
+  "examples",
+]
 
 [lib]
 name = "tokio"

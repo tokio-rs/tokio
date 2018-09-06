@@ -24,6 +24,18 @@ matrix:
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
 
+  # Test the async / await preview. We don't want to block PRs on this failing
+  # though.
+  - rust: nightly
+    env: ALLOW_FAILURES=true
+    script: |
+      cd tokio-async-await
+      cargo check --all
+  allow_failures:
+    - rust: nightly
+      env: ALLOW_FAILURES=true
+
+
 script:
   - |
     set -e
