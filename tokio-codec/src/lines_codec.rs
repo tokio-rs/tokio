@@ -92,7 +92,7 @@ impl Decoder for LinesCodec {
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
         let mut trim_and_offset = None;
         for (offset, b) in buf[self.next_index..].iter().enumerate() {
-           trim_and_offset = match (b, self.max_length) {
+            trim_and_offset = match (b, self.max_length) {
                 // The current character is a newline, split here.
                 (&b'\n', _) => Some((1, offset)),
                 // There's a maximum line length set, and we've reached it.
@@ -101,11 +101,10 @@ impl Decoder for LinesCodec {
                     // character(s) is a newline --- if so, slice that off
                     // as well, so that the next call to `decode` doesn't
                     // return an empty line.
-                    match buf[offset + 1] {
-                        b'\r' if buf[offset + 2] == b'\n' =>
-                            Some((2, offset + 2)),
-                        b'\n' => Some((1, offset + 1)),
-                        _ => Some((0, offset)),
+                    match &buf[offset + 1..=offset + 2] {
+                        &[b'\n', _] => Some((1, offset + 1)),
+                        &[b'\r', b'\n'] => Some((2, offset + 2)),
+                        _ => Some((0, offset))
                     },
                 // The current character isn't a newline, and we aren't at the
                 // length limit, so keep going.
