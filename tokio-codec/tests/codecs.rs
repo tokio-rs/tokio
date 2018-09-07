@@ -95,9 +95,9 @@ fn lines_decoder_max_length() {
     buf.put("k");
     assert_eq!(None, codec.decode(buf).unwrap());
 
-    let line = codec.decode(buf).unwrap().unwrap();
+    let line = codec.decode_eof(buf).unwrap().unwrap();
     assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
-    assert_eq!("\rk", codec.decode_eof(buf).unwrap().unwrap());
+    assert_eq!("\rk", line);
 
     assert_eq!(None, codec.decode(buf).unwrap());
     assert_eq!(None, codec.decode_eof(buf).unwrap());
