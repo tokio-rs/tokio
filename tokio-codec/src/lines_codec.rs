@@ -50,7 +50,7 @@ impl LinesCodec {
     /// exploit this unbounded buffer by sending an unbounded amount of input
     /// without any `\n` characters, causing unbounded memory consumption.
     pub fn set_decode_max_line_length(&mut self, limit: usize) -> &mut Self {
-        self.max_length = Some(limit);
+        self.max_length = Some(limit - 1);
         self
     }
 
