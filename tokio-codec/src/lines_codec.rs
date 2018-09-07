@@ -66,7 +66,7 @@ impl LinesCodec {
     /// assert_eq!(codec.decode_max_line_length(), Some(256));
     /// ```
     pub fn decode_max_line_length(&self) -> Option<usize> {
-        self.max_length
+        self.max_length.map(|len| len + 1)
     }
 }
 
