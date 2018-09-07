@@ -61,7 +61,12 @@ pub(crate) struct Pool {
     // This will *usually* be a small number.
     pub workers: Box<[worker::Entry]>,
 
-    // External queue of tasks
+    // Queue of tasks spawned outside the scheduler
+    //
+    // Tasks spawned inside the scheduler get pushed into the current worker's
+    // queue. However, tasks spawned outside the scheduler are not associated
+    // with any worker so they get pushed into the external queue where they
+    // reside until workers pick them up.
     pub external_queue: SegQueue<Arc<Task>>,
 
     // Backup thread state

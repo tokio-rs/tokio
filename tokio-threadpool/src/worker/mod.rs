@@ -389,17 +389,7 @@ impl Worker {
 
     /// Returns `true` if any worker's queue or the external queue has tasks.
     fn check_available_tasks(&self) -> bool {
-        if !self.inner.external_queue.is_empty() {
-            return true;
-        }
-
-        for worker in self.inner.workers.iter() {
-            if worker.has_tasks() {
-                return true;
-            }
-        }
-
-        false
+        self.inner.workers.iter().any(Entry::has_tasks) || !self.inner.external_queue.is_empty()
     }
 
     /// Tries to steal a task from another worker.
