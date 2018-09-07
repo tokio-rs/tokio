@@ -180,6 +180,10 @@ cell sharing state, similar to:
 
 ```rust
 struct Registration {
+    // The registration needs to know its ID. This allows it to remove state
+    // from the reactor when it is droppeed.
+    id: Id,
+
     // The task that owns the resource and is registered to receive readiness
     // notifications from the driver.
     //
@@ -198,6 +202,7 @@ struct TcpListener {
 }
 
 struct Reactor {
+    poll: mio::Poll,
     resources: HashMap<Id, Arc<Mutex<Registration>>>,
 }
 ```
@@ -247,5 +252,92 @@ fn poll_accept(&mut self) -> Poll<TcpStream, io::Error> {
 ```
 
 Note that there is only a single `task` field per resource. The implications are
-that a resource can only be used from a single task at a time. <!-- TODO: Expand
--->
+that a resource can only be used from a single task at a time. If
+`TcpListener::poll_accept` returns `NotReady`, registering the current task and
+the listener is then sent to a different task which calls `poll_accept` and sees
+`NotReady`, then the second task is the only one that will receive a
+notification once a socket is ready to be accepted. Resources may support
+tracking different tasks for different operations. For example, `TcpStream`
+internally has two task fields: one for notifying on read ready and one for
+notifying on write ready. This allows `TcpStream::poll_read` and
+`TcpStream::poll_write` to be called from different tasks.
+
+The evented types are registered with the driver's mio::Poll instance as part of
+the `register` function used above (again, this guide uses a **simplified**
+implementation which does not match the actual one in `tokio-reactor` but is
+sufficient for understanding how `tokio-reactor` behaves).
+
+```rust
+fn register<T: mio::Evented>(&mut self, evented: &T) -> Arc<Mutex<Registration>> {
+    // Generate a unique identifier for this registration. This identifier
+    // can be converted to and from a Mio Token.
+    let id = generate_unique_identifier();
+
+    // Register the I/O type with Mio
+    self.poll.register(
+        evented, id.into_token(),
+        mio::Ready::all(),
+        mio::PollOpt::edge());
+
+    let registration = Arc::new(Mutex::new(Registration {
+        id,
+        task: None,
+    }));
+
+    self.resources.insert(id, registration.clone());
+
+    registration
+}
+```
+
+### Running the driver
+
+The driver needs to run in order for its associated resources to function. If
+the driver does not run, the resources will never become ready. Running the
+driver is handled automatically when using a Runtime, but it is useful to
+understand how it works. If you are interested in the real implementation, the
+`tokio-reactor` source is the best reference.
+
+When resources are registered with the driver, they are also registered with
+Mio. Running the driver performs the following steps in a loop:
+
+1) Call `Poll::poll` to get operating system events.
+2) Dispatch all events to the appropriate resources via the registration.
+
+The steps above are done by calling `Reactor::turn`. The looping part is up to
+us.
+
+```rust
+loop {
+    // `None` means never timeout, blocking until we receive an operating system
+    // event.
+    reactor.turn(None);
+}
+```
+
+The implementation of `turn` does the following:
+
+```rust
+fn turn(&mut self) {
+    // Create storage for operating system events. This shouldn't be created
+    // each time `turn` is called, but doing so does not impact behavior.
+    let mut events = mio::Events::with_capacity(1024);
+
+    self.poll.poll(&mut events, timeout);
+
+    for event in &events {
+        let id = Id::from_token(event.token());
+
+        if let Some(registration) = self.resources.get(&id) {
+            if let Some(task) = registration.lock().unwrap().task.take() {
+                task.notify();
+            }
+        }
+    }
+}
+```
+
+Notifying the task results in the task getting scheduled on its executor. When
+the task runs again, it will call the `poll_accept` function again. This time,
+the `task` slot will be `None`. This means the syscall should be attempted, and
+this time `poll_accept` will return an accepted socket (probably, spurious events are permitted).

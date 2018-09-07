@@ -11,8 +11,10 @@ is provided on the website.
 
 <!-- TODO: Fill out as sections are written -->
 
-* [Runtime model](runtime-model.md)
-* [Non-blocking I/O](net.md)
+* [Runtime model](runtime-model.md) - An overview of Tokio's asynchronous
+  runtime model.
+* [Non-blocking I/O](net.md) - Implementation details of Tokio's network related
+  types (TCP, UDP, ...).
 
 <!--
 ## Overview
