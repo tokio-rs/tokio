@@ -99,46 +99,41 @@ fn spawn_many() {
 
 mod does_not_set_global_executor_by_default {
     use super::*;
+
+    fn test<F: Fn(Box<Future<Item=(), Error=()> + Send>) -> Result<(), E> + 'static, E>(spawn: F) {
+        block_on_all(lazy(|| {
+            spawn(Box::new(lazy(|| ok()))).unwrap_err();
+            ok()
+        })).unwrap()
+    }
+
     #[test]
     fn spawn() {
         use tokio_executor::Executor;
-
-        block_on_all(lazy(|| {
-            tokio_executor::DefaultExecutor::current()
-                .spawn(Box::new(lazy(|| ok())))
-                .unwrap_err();
-
-            ok()
-        })).unwrap();
+        test(|f| tokio_executor::DefaultExecutor::current().spawn(f))
     }
 
     #[test]
     fn execute() {
-        block_on_all(lazy(|| {
-            tokio_executor::DefaultExecutor::current()
-                .execute(Box::new(lazy(|| ok())))
-                .unwrap_err();
-
-            ok()
-        })).unwrap();
+        test(|f| tokio_executor::DefaultExecutor::current().execute(f))
     }
 }
 
 mod from_block_on_future {
     use super::*;
-    #[test]
-    fn spawn() {
-        let cnt = Rc::new(Cell::new(0));
+
+    fn test<F: Fn(Box<Future<Item = (), Error = ()>>)>(spawn: F) {
+         let cnt = Rc::new(Cell::new(0));
 
         let mut tokio_current_thread = CurrentThread::new();
 
         tokio_current_thread.block_on(lazy(|| {
             let cnt = cnt.clone();
 
-            tokio_current_thread::spawn(lazy(move || {
+            spawn(Box::new(lazy(move || {
                 cnt.set(1 + cnt.get());
                 Ok(())
-            }));
+            })));
 
             Ok::<_, ()>(())
         })).unwrap();
@@ -149,25 +144,13 @@ mod from_block_on_future {
     }
 
     #[test]
+    fn spawn() {
+        test(tokio_current_thread::spawn);
+    }
+
+    #[test]
     fn execute() {
-        let cnt = Rc::new(Cell::new(0));
-
-        let mut tokio_current_thread = CurrentThread::new();
-
-        tokio_current_thread.block_on(lazy(|| {
-            let cnt = cnt.clone();
-
-            tokio_current_thread::TaskExecutor::current().execute(lazy(move || {
-                cnt.set(1 + cnt.get());
-                Ok(())
-            })).unwrap();
-
-            Ok::<_, ()>(())
-        })).unwrap();
-
-        tokio_current_thread.run().unwrap();
-
-        assert_eq!(1, cnt.get());
+        test(|f| { tokio_current_thread::TaskExecutor::current().execute(f).unwrap(); });
     }
 }
 
@@ -185,12 +168,15 @@ impl Future for Never {
 mod outstanding_tasks_are_dropped_when_executor_is_dropped {
     use super::*;
 
-    #[test]
-    fn spawn() {
+    fn test<F, G>(spawn: F, dotspawn: G)
+    where
+        F: Fn(Box<Future<Item=(), Error=()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<Future<Item=(), Error=()>>)
+    {
         let mut rc = Rc::new(());
 
         let mut tokio_current_thread = CurrentThread::new();
-        tokio_current_thread.spawn(Never(rc.clone()));
+        dotspawn(&mut tokio_current_thread, Box::new(Never(rc.clone())));
 
         drop(tokio_current_thread);
 
@@ -204,7 +190,7 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
         let mut tokio_current_thread = CurrentThread::new();
 
         tokio_current_thread.block_on(lazy(|| {
-            tokio_current_thread::spawn(Never(rc.clone()));
+            spawn(Box::new(Never(rc.clone())));
             Ok::<_, ()>(())
         })).unwrap();
 
@@ -215,34 +201,23 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
     }
 
     #[test]
+    fn spawn() {
+        test(tokio_current_thread::spawn, |rt, f| { rt.spawn(f); })
+    }
+
+    #[test]
     fn execute() {
-        let mut rc = Rc::new(());
-
-        let mut tokio_current_thread = CurrentThread::new();
-        tokio_current_thread.spawn(Never(rc.clone()));
-
-        drop(tokio_current_thread);
-
-        // Ensure the daemon is dropped
-        assert!(Rc::get_mut(&mut rc).is_some());
-
-        // Using the global spawn fn
-
-        let mut rc = Rc::new(());
-
-        let mut tokio_current_thread = CurrentThread::new();
-
-        tokio_current_thread.block_on(lazy(|| {
-            tokio_current_thread::TaskExecutor::current()
-                .execute(Never(rc.clone()))
-                .unwrap();
-            Ok::<_, ()>(())
-        })).unwrap();
-
-        drop(tokio_current_thread);
-
-        // Ensure the daemon is dropped
-        assert!(Rc::get_mut(&mut rc).is_some());
+        test(|f| {
+                tokio_current_thread::TaskExecutor::current()
+                    .execute(f)
+                    .unwrap();
+            },
+            // Note: `CurrentThread` doesn't currently implement
+            // `futures::Executor`, so we'll call `.spawn(...)` rather than
+            // `.execute(...)` for now. If `CurrentThread` is changed to
+            // implement Executor, change this to `.execute(...).unwrap()`.
+            |rt, f| { rt.spawn(f); }
+        );
     }
 }
 
