@@ -116,9 +116,9 @@ impl Decoder for LinesCodec {
                     // If we're at the line length limit, check if the next
                     // character(s) is a newline before we decide to return an
                     // error.
-                    match (buf[offset + 1], buf[offset + 2]) {
-                        (b'\n', _) => Some((1, offset + 1)),
-                        (b'\r', b'\n') => Some((2, offset + 2)),
+                    match (buf.get(offset + 1), buf.get(offset + 2)) {
+                        (Some(&b'\n'), _) => Some((1, offset + 1)),
+                        (Some(&b'\r'), Some(&b'\n')) => Some((2, offset + 2)),
                         _ => {
                             // We've reached the length limit, and we're not at
                             // the end of a line. Subsequent calls to decode
