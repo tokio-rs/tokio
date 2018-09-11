@@ -24,11 +24,10 @@ impl LinesCodec {
     /// # Note
     ///
     /// The returned `LinesCodec` will not have an upper bound on the length
-    /// of a buffered line. See the documentation for
-    /// [`set_decode_max_line_length`] for information on why this could be
-    /// a potential security risk.
+    /// of a buffered line. See the documentation for [`with_max_length`]
+    /// for information on why this could be a potential security risk.
     ///
-    /// [`set_decode_max_line_length`]: #method.set_decode_max_line_length
+    /// [`with_max_length`]: #method.with_max_length
     pub fn new() -> LinesCodec {
         LinesCodec {
             next_index: 0,
@@ -36,7 +35,7 @@ impl LinesCodec {
         }
     }
 
-    /// Sets a limit on the maximum line length when decoding.
+    /// Returns a `LinesCodec` with a maximum line length limit.
     ///
     /// If this is set, lines will be ended when a `\n` character is read, _or_
     /// when they reach the provided number of bytes. Otherwise, lines will
@@ -49,9 +48,11 @@ impl LinesCodec {
     /// that holds the line currently being read is unbounded. An attacker could
     /// exploit this unbounded buffer by sending an unbounded amount of input
     /// without any `\n` characters, causing unbounded memory consumption.
-    pub fn set_decode_max_line_length(&mut self, limit: usize) -> &mut Self {
-        self.max_length = Some(limit - 1);
-        self
+    pub fn with_max_length(limit: usize) -> Self {
+        LinesCodec {
+            max_length: Some(limit - 1),
+            ..LinesCodec::new()
+        }
     }
 
     /// Returns the current maximum line length when decoding, if one is set.
@@ -59,13 +60,16 @@ impl LinesCodec {
     /// ```
     /// use tokio_codec::LinesCodec;
     ///
-    /// let mut codec = LinesCodec::new();
-    /// assert_eq!(codec.decode_max_line_length(), None);
-    ///
-    /// codec.set_decode_max_line_length(256);
-    /// assert_eq!(codec.decode_max_line_length(), Some(256));
+    /// let codec = LinesCodec::new();
+    /// assert_eq!(codec.decode_max_length(), None);
     /// ```
-    pub fn decode_max_line_length(&self) -> Option<usize> {
+    /// ```
+    /// use tokio_codec::LinesCodec;
+    ///
+    /// let codec = LinesCodec::with_max_length(256);
+    /// assert_eq!(codec.decode_max_length(), Some(256));
+    /// ```
+    pub fn decode_max_length(&self) -> Option<usize> {
         self.max_length.map(|len| len + 1)
     }
 }
