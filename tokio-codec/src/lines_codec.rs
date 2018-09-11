@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use tokio_io::_tokio_codec::{Encoder, Decoder};
-use std::{io, str};
+use std::{error, fmt, io, str};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -16,6 +16,16 @@ pub struct LinesCodec {
     /// The maximum length for a given line. If `None`, lines will be read
     /// until a `\n` character is reached.
     max_length: Option<usize>,
+
+    /// Are we currently discarding the remainder of a line which was over
+    /// the length limit?
+    is_discarding: bool,
+}
+
+/// Error indicating that the maximum line length was reached.
+#[derive(Debug)]
+pub struct LengthError {
+    limit: usize,
 }
 
 impl LinesCodec {
@@ -32,6 +42,7 @@ impl LinesCodec {
         LinesCodec {
             next_index: 0,
             max_length: None,
+            is_discarding: false,
         }
     }
 
@@ -100,16 +111,25 @@ impl Decoder for LinesCodec {
                 // The current character is a newline, split here.
                 (&b'\n', _) => Some((1, offset)),
                 // There's a maximum line length set, and we've reached it.
-                (_, Some(max_len)) if offset == max_len =>
+                (_, Some(max_len))
+                    if offset.saturating_sub(self.next_index) == max_len => {
                     // If we're at the line length limit, check if the next
-                    // character(s) is a newline --- if so, slice that off
-                    // as well, so that the next call to `decode` doesn't
-                    // return an empty line.
+                    // character(s) is a newline before we decide to return an
+                    // error.
                     match &buf[offset + 1..=offset + 2] {
                         &[b'\n', _] => Some((1, offset + 1)),
                         &[b'\r', b'\n'] => Some((2, offset + 2)),
-                        _ => Some((0, offset))
-                    },
+                        _ => {
+                            // We've reached the length limit, and we're
+                            self.is_discarding = true;
+                            self.next_index += offset;
+                            return Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                LengthError { limit: max_len + 1 },
+                            ));
+                        }
+                    }
+                },
                 // The current character isn't a newline, and we aren't at the
                 // length limit, so keep going.
                 _ => continue,
@@ -119,10 +139,15 @@ impl Decoder for LinesCodec {
         if let Some((trim_amt, offset)) = trim_and_offset {
             let newline_index = offset + self.next_index;
             let line = buf.split_to(newline_index + 1);
+            self.next_index = 0;
+            if self.is_discarding {
+                self.is_discarding = false;
+                return self.decode(buf);
+            }
             let line = &line[..line.len() - trim_amt];
             let line = without_carriage_return(line);
             let line = utf8(line)?;
-            self.next_index = 0;
+
             Ok(Some(line.to_string()))
         } else {
             self.next_index = buf.len();
@@ -160,3 +185,11 @@ impl Encoder for LinesCodec {
         Ok(())
     }
 }
+
+impl fmt::Display for LengthError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "reached maximum line length ({} characters)", self.limit)
+    }
+}
+
+impl error::Error for LengthError { }
