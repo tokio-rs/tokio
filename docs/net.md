@@ -23,7 +23,18 @@ may be `None`:
 [`Evented`]: #
 
 ```rust
+<!--
+#![deny(deprecated)]
+extern crate tokio;
+
+use tokio::net::TcpListener;
+use std::net::SocketAddr;
+
+fn main() {
+let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+-->
 let listener = TcpListener::bind(&addr).unwrap();
+<!-- } -->
 ```
 
 In this case, the reference to the driver is not yet set. However, if a
@@ -31,7 +42,19 @@ constructor that takes a [`Handle`] reference is used, then the driver reference
 will be set to driver represented by the given handle:
 
 ```rust
+<!--
+#![deny(deprecated)]
+extern crate tokio;
+
+use tokio::net::TcpListener;
+use std::net::SocketAddr;
+
+fn main() {
+let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+let std_listener = ::std::net::Listener::bind(&addr).unwrap();
+-->
 let listener = TcpListener::from_std(std_listener, &my_reactor_handle);
+<!-- } -->
 ```
 
 Once a driver is associated with a resource, it is set for the lifetime of the
