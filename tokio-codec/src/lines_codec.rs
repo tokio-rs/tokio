@@ -122,7 +122,8 @@ impl Decoder for LinesCodec {
                         _ => {
                             // We've reached the length limit, and we're not at
                             // the end of a line. Subsequent calls to decode
-                            // will now discard from the buffer until
+                            // will now discard from the buffer until we reach
+                            // a new line.
                             self.is_discarding = true;
                             self.next_index += offset;
                             return Err(io::Error::new(
