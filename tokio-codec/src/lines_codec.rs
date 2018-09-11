@@ -116,11 +116,13 @@ impl Decoder for LinesCodec {
                     // If we're at the line length limit, check if the next
                     // character(s) is a newline before we decide to return an
                     // error.
-                    match &buf[offset + 1..=offset + 2] {
-                        &[b'\n', _] => Some((1, offset + 1)),
-                        &[b'\r', b'\n'] => Some((2, offset + 2)),
+                    match (buf[offset + 1], buf[offset + 2]) {
+                        (b'\n', _) => Some((1, offset + 1)),
+                        (b'\r', b'\n') => Some((2, offset + 2)),
                         _ => {
-                            // We've reached the length limit, and we're
+                            // We've reached the length limit, and we're not at
+                            // the end of a line. Subsequent calls to decode
+                            // will now discard from the buffer until
                             self.is_discarding = true;
                             self.next_index += offset;
                             return Err(io::Error::new(
@@ -192,4 +194,8 @@ impl fmt::Display for LengthError {
     }
 }
 
-impl error::Error for LengthError { }
+impl error::Error for LengthError {
+    fn description(&self) -> &str {
+        "reached maximum line length"
+    }
+}
