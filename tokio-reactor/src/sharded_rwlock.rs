@@ -150,11 +150,12 @@ impl<'a, T> DerefMut for RwLockWriteGuard<'a, T> {
 
 /// Returns a `usize` that identifies the current thread.
 ///
-/// Each thread is associated with an 'index'. While there are no particular guarantees, indices
-/// usually tend to be consecutive numbers between 0 and the number of running threads.
+/// Each thread is associated with an 'index'. Indices usually tend to be consecutive numbers
+/// between 0 and the number of running threads, but there are no guarantees. During TLS teardown
+/// the associated index might change.
 #[inline]
 pub fn thread_index() -> usize {
-    REGISTRATION.with(|reg| reg.index)
+    REGISTRATION.try_with(|reg| reg.index).unwrap_or(0)
 }
 
 /// The global registry keeping track of registered threads and indices.
