@@ -91,6 +91,11 @@ fn lines_decoder_max_length() {
 
     assert_eq!(None, codec.decode(buf).unwrap());
     assert_eq!(None, codec.decode_eof(buf).unwrap());
+
+    // Line that's one character too long. This could cause an out of bounds
+    // error if we peek at the next characters using slice indexing.
+    buf.put("aaabbbc");
+    assert!(codec.decode(buf).is_err());
 }
 
 #[test]
