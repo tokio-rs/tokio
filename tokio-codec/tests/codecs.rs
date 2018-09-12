@@ -66,7 +66,7 @@ fn lines_decoder_max_length() {
     buf.put("line 1 is too long\nline 2\r\nline 3\n\r\n\r");
 
     assert!(codec.decode(buf).is_err());
-    assert!(codec.decode(buf).is_err());
+    assert_eq!(None, codec.decode(buf).unwrap());
 
     let line = codec.decode(buf).unwrap().unwrap();
     assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);

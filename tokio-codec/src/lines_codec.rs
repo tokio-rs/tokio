@@ -136,6 +136,10 @@ impl Decoder for LinesCodec {
                                 "buf.get(i) should not return `None` before the \
                                  end of the buffer"
                             ),
+                        (Some(_), _) if self.is_discarding => {
+                            self.next_index += offset;
+                            return Ok(None);
+                        },
                         (Some(_), _) => {
                             // We've reached the length limit, and we're not at
                             // the end of a line. Subsequent calls to decode
