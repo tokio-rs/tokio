@@ -97,6 +97,7 @@ fn lines_decoder_max_length() {
     buf.put("aaabbbc");
     assert!(codec.decode(buf).is_err());
 }
+
 #[test]
 fn lines_decoder_max_length_underrun() {
     const MAX_LENGTH: usize = 6;
@@ -110,6 +111,19 @@ fn lines_decoder_max_length_underrun() {
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("ong\n");
     assert_eq!("line too long", codec.decode(buf).unwrap().unwrap());
+}
+
+#[test]
+fn lines_decoder_max_length_newline_between_decodes() {
+    const MAX_LENGTH: usize = 5;
+
+    let mut codec = LinesCodec::with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+    buf.put("hello");
+    assert_eq!(None, codec.decode(buf).unwrap());
+
+    buf.put("\nworld");
+    assert_eq!("hello", codec.decode(buf).unwrap().unwrap());
 }
 
 #[test]
