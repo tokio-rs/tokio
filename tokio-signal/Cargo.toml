@@ -1,0 +1,36 @@
+[package]
+name = "tokio-signal"
+version = "0.2.5"
+authors = ["Alex Crichton <alex@alexcrichton.com>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/alexcrichton/tokio-signal"
+homepage = "https://github.com/alexcrichton/tokio-signal"
+documentation = "https://docs.rs/tokio-signal/0.2"
+description = """
+An implementation of an asynchronous Unix signal handling backed futures.
+"""
+categories = ["asynchronous"]
+
+[badges]
+travis-ci = { repository = "alexcrichton/tokio-signal" }
+appveyor = { repository = "alexcrichton/tokio-signal" }
+
+[dependencies]
+futures = "0.1.11"
+mio = "0.6.14"
+tokio-reactor = "0.1.0"
+tokio-executor = "0.1.0"
+tokio-io = "0.1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+mio-uds = "0.6"
+signal-hook = "0.1"
+
+[dev-dependencies]
+tokio-core = "0.1.17"
+tokio = "0.1.6"
+
+[target.'cfg(windows)'.dependencies.winapi]
+version = "0.3"
+features = ["minwindef", "wincon"]
