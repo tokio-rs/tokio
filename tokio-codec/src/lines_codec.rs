@@ -34,10 +34,10 @@ impl LinesCodec {
     /// # Note
     ///
     /// The returned `LinesCodec` will not have an upper bound on the length
-    /// of a buffered line. See the documentation for [`with_max_length`]
+    /// of a buffered line. See the documentation for [`new_with_max_length`]
     /// for information on why this could be a potential security risk.
     ///
-    /// [`with_max_length`]: #method.with_max_length
+    /// [`new_with_max_length`]: #method.new_with_max_length
     pub fn new() -> LinesCodec {
         LinesCodec {
             next_index: 0,
@@ -59,7 +59,7 @@ impl LinesCodec {
     /// that holds the line currently being read is unbounded. An attacker could
     /// exploit this unbounded buffer by sending an unbounded amount of input
     /// without any `\n` characters, causing unbounded memory consumption.
-    pub fn with_max_length(limit: usize) -> Self {
+    pub fn new_with_max_length(limit: usize) -> Self {
         LinesCodec {
             max_length: Some(limit - 1),
             ..LinesCodec::new()
@@ -72,15 +72,15 @@ impl LinesCodec {
     /// use tokio_codec::LinesCodec;
     ///
     /// let codec = LinesCodec::new();
-    /// assert_eq!(codec.decode_max_length(), None);
+    /// assert_eq!(codec.max_length(), None);
     /// ```
     /// ```
     /// use tokio_codec::LinesCodec;
     ///
-    /// let codec = LinesCodec::with_max_length(256);
-    /// assert_eq!(codec.decode_max_length(), Some(256));
+    /// let codec = LinesCodec::new_with_max_length(256);
+    /// assert_eq!(codec.max_length(), Some(256));
     /// ```
-    pub fn decode_max_length(&self) -> Option<usize> {
+    pub fn max_length(&self) -> Option<usize> {
         self.max_length.map(|len| len + 1)
     }
 }
@@ -210,5 +210,9 @@ impl fmt::Display for LengthError {
 impl error::Error for LengthError {
     fn description(&self) -> &str {
         "reached maximum line length"
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        Some(self)
     }
 }

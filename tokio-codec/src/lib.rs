@@ -29,4 +29,4 @@ pub use tokio_io::_tokio_codec::{
 };
 
 pub use bytes_codec::BytesCodec;
-pub use lines_codec::LinesCodec;
+pub use lines_codec::{LinesCodec, LengthError};

@@ -59,7 +59,7 @@ fn lines_decoder() {
 fn lines_decoder_max_length() {
     const MAX_LENGTH: usize = 6;
 
-    let mut codec = LinesCodec::with_max_length(MAX_LENGTH);
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -102,7 +102,7 @@ fn lines_decoder_max_length() {
 fn lines_decoder_max_length_underrun() {
     const MAX_LENGTH: usize = 6;
 
-    let mut codec = LinesCodec::with_max_length(MAX_LENGTH);
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
     buf.put("line ");
     assert_eq!(None, codec.decode(buf).unwrap());
@@ -117,7 +117,7 @@ fn lines_decoder_max_length_underrun() {
 fn lines_decoder_max_length_newline_between_decodes() {
     const MAX_LENGTH: usize = 5;
 
-    let mut codec = LinesCodec::with_max_length(MAX_LENGTH);
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
     buf.put("hello");
     assert_eq!(None, codec.decode(buf).unwrap());
