@@ -119,7 +119,19 @@ impl Decoder for LinesCodec {
                     match (buf.get(offset + 1), buf.get(offset + 2)) {
                         (Some(&b'\n'), _) => Some((1, offset + 1)),
                         (Some(&b'\r'), Some(&b'\n')) => Some((2, offset + 2)),
-                        _ => {
+                        (None, None) =>
+                            // We are at the length limit exactly, but we are
+                            // at the end of the buffer. The next character to
+                            // be added to the buffer may be a newline, so just
+                            // return `None` here rather than an error, and try
+                            // again if `decode` is called again.
+                            return Ok(None),
+                        (None, Some(_)) =>
+                            unreachable!(
+                                "buf.get(i) should not return `None` before the \
+                                 end of the buffer"
+                            ),
+                        (Some(_), _) => {
                             // We've reached the length limit, and we're not at
                             // the end of a line. Subsequent calls to decode
                             // will now discard from the buffer until we reach
