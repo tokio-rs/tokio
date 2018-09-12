@@ -48,9 +48,12 @@ impl LinesCodec {
 
     /// Returns a `LinesCodec` with a maximum line length limit.
     ///
-    /// If this is set, lines will be ended when a `\n` character is read, _or_
-    /// when they reach the provided number of bytes. Otherwise, lines will
-    /// only be ended when a `\n` character is read.
+    /// If this is set, calls to `LinesCodec::decode` will return a
+    /// [`LengthError`] when a line exceeds the length limit. Subsequent calls
+    /// will discard up to `limit` bytes from that line until a newline
+    /// character is reached, returning `None` until the line over the limit
+    /// has been fully discarded. After that point, calls to `decode` will
+    /// function as normal.
     ///
     /// # Note
     ///
@@ -59,6 +62,8 @@ impl LinesCodec {
     /// that holds the line currently being read is unbounded. An attacker could
     /// exploit this unbounded buffer by sending an unbounded amount of input
     /// without any `\n` characters, causing unbounded memory consumption.
+    ///
+    /// [`LengthError`]: ../struct.LengthError
     pub fn new_with_max_length(limit: usize) -> Self {
         LinesCodec {
             max_length: Some(limit - 1),
