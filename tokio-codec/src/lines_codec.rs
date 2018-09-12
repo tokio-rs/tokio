@@ -111,71 +111,87 @@ impl Decoder for LinesCodec {
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
         let mut trim_and_offset = None;
-        for (offset, b) in buf[self.next_index..].iter().enumerate() {
-            trim_and_offset = match (b, self.max_length) {
-                // The current character is a newline, split here.
-                (&b'\n', _) => Some((1, offset)),
-                // There's a maximum line length set, and we've reached it.
-                (_, Some(max_len))
-                    if offset.saturating_sub(self.next_index) == max_len => {
-                    // If we're at the line length limit, check if the next
-                    // character(s) is a newline before we decide to return an
-                    // error.
-                    match (buf.get(offset + 1), buf.get(offset + 2)) {
-                        (Some(&b'\n'), _) => Some((1, offset + 1)),
-                        (Some(&b'\r'), Some(&b'\n')) => Some((2, offset + 2)),
-                        (None, None) =>
-                            // We are at the length limit exactly, but we are
-                            // at the end of the buffer. The next character to
-                            // be added to the buffer may be a newline, so just
-                            // return `None` here rather than an error, and try
-                            // again if `decode` is called again.
-                            return Ok(None),
-                        (None, Some(_)) =>
-                            unreachable!(
-                                "buf.get(i) should not return `None` before the \
-                                 end of the buffer"
-                            ),
-                        (Some(_), _) if self.is_discarding => {
-                            self.next_index += offset;
-                            return Ok(None);
-                        },
-                        (Some(_), _) => {
-                            // We've reached the length limit, and we're not at
-                            // the end of a line. Subsequent calls to decode
-                            // will now discard from the buffer until we reach
-                            // a new line.
-                            self.is_discarding = true;
-                            self.next_index += offset;
-                            return Err(io::Error::new(
-                                io::ErrorKind::Other,
-                                LengthError { limit: max_len + 1 },
-                            ));
+        loop {
+            'inner: for (offset, b) in buf[self.next_index..].iter().enumerate() {
+                let should_discard = self.is_discarding;
+                trim_and_offset = match (b, self.max_length) {
+                    // The current character is a newline, split here.
+                    (&b'\n', _) => {
+                        self.is_discarding = false;
+                        Some((1, offset, should_discard))
+                    },
+                    // There's a maximum line length set, and we've reached it.
+                    (_, Some(max_len))
+                        if offset.saturating_sub(self.next_index) == max_len => {
+                        // If we're at the line length limit, check if the next
+                        // character(s) is a newline before we decide to return an
+                        // error.
+                        match (buf.get(offset + 1), buf.get(offset + 2)) {
+                            (Some(&b'\n'), _) => {
+                                self.is_discarding = false;
+                                Some((1, offset + 1, should_discard))
+                            },
+                            (Some(&b'\r'), Some(&b'\n')) => {
+                                self.is_discarding = false;
+                                Some((2, offset + 2, should_discard))
+                            },
+                            (None, None) =>
+                                // We are at the length limit exactly, but we are
+                                // at the end of the buffer. The next character to
+                                // be added to the buffer may be a newline, so just
+                                // return `None` here rather than an error, and try
+                                // again if `decode` is called again.
+                                return Ok(None),
+                            (None, Some(_)) =>
+                                unreachable!(
+                                    "buf.get(i) should not return `None` before the \
+                                    end of the buffer"
+                                ),
+                            (Some(_), _) => {
+                                // We've reached the length limit, and we're not at
+                                // the end of a line. Subsequent calls to decode
+                                // will now discard from the buffer until we reach
+                                // a new line.
+                                self.is_discarding = true;
+                                Some((0, offset, true))
+                            }
                         }
+                    },
+                    // The current character isn't a newline, and we aren't at the
+                    // length limit, so keep going.
+                    _ => continue 'inner,
+                };
+                break 'inner;
+            };
+            match trim_and_offset {
+                Some((_, offset, true)) => {
+                    let discard_index = offset + self.next_index;
+                    self.next_index = 0;
+                    buf.advance(discard_index + 1);
+                    if !self.is_discarding {
+                        let limit = self.max_length
+                            .expect("max length should be set if discarding");
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            LengthError { limit: limit + 1 },
+                        ));
                     }
                 },
-                // The current character isn't a newline, and we aren't at the
-                // length limit, so keep going.
-                _ => continue,
-            };
-            break;
-        };
-        if let Some((trim_amt, offset)) = trim_and_offset {
-            let newline_index = offset + self.next_index;
-            let line = buf.split_to(newline_index + 1);
-            self.next_index = 0;
-            if self.is_discarding {
-                self.is_discarding = false;
-                return self.decode(buf);
-            }
-            let line = &line[..line.len() - trim_amt];
-            let line = without_carriage_return(line);
-            let line = utf8(line)?;
+                Some((trim_amt, offset, false)) => {
+                    let newline_index = offset + self.next_index;
+                    self.next_index = 0;
+                    let line = buf.split_to(newline_index + 1);
+                    let line = &line[..line.len() - trim_amt];
+                    let line = without_carriage_return(line);
+                    let line = utf8(line)?;
 
-            Ok(Some(line.to_string()))
-        } else {
-            self.next_index = buf.len();
-            Ok(None)
+                    return Ok(Some(line.to_string()))
+                },
+                None => {
+                    self.next_index = buf.len();
+                    return Ok(None)
+                },
+            }
         }
     }
 
