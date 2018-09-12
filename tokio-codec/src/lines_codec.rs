@@ -117,6 +117,7 @@ impl Decoder for LinesCodec {
                 trim_and_offset = match (b, self.max_length) {
                     // The current character is a newline, split here.
                     (&b'\n', _) => {
+                        // Stop discarding on subsequent reads.
                         self.is_discarding = false;
                         Some((1, offset, should_discard))
                     },
@@ -128,6 +129,7 @@ impl Decoder for LinesCodec {
                         // error.
                         match (buf.get(offset + 1), buf.get(offset + 2)) {
                             (Some(&b'\n'), _) => {
+                                // Found a newline, stop discarding.
                                 self.is_discarding = false;
                                 Some((1, offset + 1, should_discard))
                             },
