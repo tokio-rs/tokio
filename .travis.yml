@@ -76,7 +76,7 @@ script:
         cargo check --all --exclude tokio-tls --target $TARGET
         cargo check --tests --all --exclude tokio-tls --target $TARGET
     else
-        cargo test --all
+        cargo test --all --no-fail-fast
         # Disable these tests for now as they are buggy
         #
         # cargo test --features unstable-futures
