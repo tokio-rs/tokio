@@ -16,4 +16,4 @@ install:
 build: false
 
 test_script:
-  - cargo test --all --target %TARGET%
+  - cargo test --all --no-fail-fast --target %TARGET%
