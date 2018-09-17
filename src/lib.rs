@@ -94,7 +94,12 @@ pub mod runtime;
 pub mod timer;
 pub mod util;
 
-pub use executor::{spawn, spawn_handle};
+pub use executor::{
+    spawn,
+    spawn_handle,
+    SpawnHandle,
+    SpawnHandleError,
+};
 pub use runtime::run;
 
 mod length_delimited;

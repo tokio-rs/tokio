@@ -59,8 +59,10 @@ pub mod thread_pool {
     };
 }
 
+/// BLORF
+pub use tokio_executor::spawn_handle;
+
 pub use tokio_executor::{
-    spawn_handle,
     Executor,
     DefaultExecutor,
     SpawnHandle,
