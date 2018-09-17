@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use tokio_io::_tokio_codec::{Encoder, Decoder};
-use std::{error, fmt, io, str};
+use std::{cmp, error, fmt, io, str};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -66,7 +66,7 @@ impl LinesCodec {
     /// [`LengthError`]: ../struct.LengthError
     pub fn new_with_max_length(limit: usize) -> Self {
         LinesCodec {
-            max_length: Some(limit - 1),
+            max_length: Some(limit),
             ..LinesCodec::new()
         }
     }
@@ -86,7 +86,7 @@ impl LinesCodec {
     /// assert_eq!(codec.max_length(), Some(256));
     /// ```
     pub fn max_length(&self) -> Option<usize> {
-        self.max_length.map(|len| len + 1)
+        self.max_length
     }
 }
 
@@ -110,80 +110,43 @@ impl Decoder for LinesCodec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
-        let mut trim_and_offset = None;
         loop {
-            'inner: for (offset, b) in buf[self.next_index..].iter().enumerate() {
-                let should_discard = self.is_discarding;
-                trim_and_offset = match (b, self.max_length) {
-                    // The current character is a newline, split here.
-                    (&b'\n', _) => {
-                        // Stop discarding on subsequent reads.
-                        self.is_discarding = false;
-                        Some((1, offset, should_discard))
-                    },
-                    // There's a maximum line length set, and we've reached it.
-                    (_, Some(max_len))
-                        if offset.saturating_sub(self.next_index) == max_len => {
-                        // If we're at the line length limit, check if the next
-                        // character(s) is a newline before we decide to return an
-                        // error.
-                        match buf.get(offset + 1) {
-                            Some(&b'\n')  => {
-                                // Found a newline, stop discarding.
-                                self.is_discarding = false;
-                                Some((1, offset + 1, should_discard))
-                            },
-                            None =>
-                                // We are at the length limit exactly, but we are
-                                // at the end of the buffer. The next character to
-                                // be added to the buffer may be a newline, so just
-                                // return `None` here rather than an error, and try
-                                // again if `decode` is called again.
-                                return Ok(None),
-                            Some(_) => {
-                                // We've reached the length limit, and we're not at
-                                // the end of a line. Subsequent calls to decode
-                                // will now discard from the buffer until we reach
-                                // a new line.
-                                self.is_discarding = true;
-                                Some((0, offset, true))
-                            }
-                        }
-                    },
-                    // The current character isn't a newline, and we aren't at the
-                    // length limit, so keep going.
-                    _ => continue 'inner,
-                };
-                break 'inner;
-            };
-            match trim_and_offset {
-                Some((_, offset, true)) => {
-                    let discard_index = offset + self.next_index;
-                    self.next_index = 0;
-                    buf.advance(discard_index + 1);
-                    if !self.is_discarding {
-                        let limit = self.max_length
-                            .expect("max length should be set if discarding");
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            LengthError { limit: limit + 1 },
-                        ));
-                    }
-                },
-                Some((trim_amt, offset, false)) => {
+            let max_len = self.max_length.unwrap_or(buf.len());
+            let read_to = cmp::min(max_len + 1 + self.next_index, buf.len());
+            let newline_offset = buf[self.next_index..read_to]
+                .iter()
+                .position(|b| *b == b'\n');
+            if self.is_discarding {
+               let discard_to = if let Some(offset) = newline_offset {
+                    self.is_discarding = false;
+                    offset + self.next_index + 1
+               } else {
+                   read_to
+               };
+               buf.advance(discard_to);
+               self.next_index = 0;
+            } else {
+                return if let Some(offset) = newline_offset {
                     let newline_index = offset + self.next_index;
                     self.next_index = 0;
                     let line = buf.split_to(newline_index + 1);
-                    let line = &line[..line.len() - trim_amt];
+                    let line = &line[..line.len() - 1];
                     let line = without_carriage_return(line);
                     let line = utf8(line)?;
 
-                    return Ok(Some(line.to_string()))
-                },
-                None => {
-                    self.next_index = buf.len();
+                    Ok(Some(line.to_string()))
+                } else if buf.len().saturating_sub(self.next_index) > max_len {
+                    // Reached the maximum length without finding a newline,
+                    // return an error and start discarding.
+                    self.is_discarding = true;
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        LengthError { limit: max_len },
+                    ))
+                } else {
+                    self.next_index = read_to;
                     return Ok(None)
-                },
+                }
             }
         }
     }
