@@ -4,13 +4,17 @@ extern crate tokio_io;
 extern crate env_logger;
 
 use std::{io, thread};
+use std::time::{Duration, Instant};
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::atomic::Ordering::Relaxed;
 
 use futures::prelude::*;
+use futures::future::lazy;
+use futures::sync::oneshot;
 use tokio::net::{TcpStream, TcpListener};
 use tokio::runtime::Runtime;
+use tokio::timer::Delay;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -133,4 +137,88 @@ fn hammer_split() {
         rt.shutdown_on_idle().wait().unwrap();
         assert_eq!(N * 4, cnt.load(Relaxed));
     }
+}
+
+#[test]
+fn spawn_handle() {
+    let f = lazy(|| {
+        Ok::<_, ()>("hello from the future")
+    });
+
+    let res = tokio::run(lazy(move || {
+        tokio::spawn_handle(f)
+            .then(|res| {
+                assert_eq!(res.unwrap(), "hello from the future");
+                Ok(())
+            })
+    }));
+
+}
+
+#[test]
+fn spawn_handle_error() {
+    let f = lazy(|| {
+        Err::<(), _>("something is wrong")
+    });
+
+    tokio::run(lazy(move || {
+        tokio::spawn_handle(f)
+            .or_else(|e| {
+                assert_eq!(e.into_inner(), Some("something is wrong"));
+                Ok::<_, ()>(())
+            })
+    }));
+}
+
+#[test]
+fn spawn_handle_across_threads() {
+    let (tx, rx) = oneshot::channel();
+
+    let join = thread::spawn(move || {;
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let f = lazy(|| {
+            Ok::<_, ()>("hello from the future in the other thread")
+        });
+
+        rt.block_on(lazy(move || {
+            let handle = tokio::spawn_handle(f);
+            tx.send(handle);
+            Ok::<(), ()>(())
+        })).unwrap();
+
+        rt.shutdown_on_idle().wait().unwrap();
+    });
+
+    tokio::run(rx
+        .map_err(|e| panic!("{:?}", e))
+        .and_then(|handle| handle)
+        .then(|res| {
+            assert_eq!(res.unwrap(), "hello from the future in the other thread");
+            Ok(())
+        })
+    );
+
+    join.join().unwrap();
+}
+
+#[test]
+fn spawn_handle_cancel() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let done = Arc::new(AtomicBool::new(false));
+    let done2 = done.clone();
+
+    let f = Delay::new(Instant::now() + Duration::from_millis(500))
+        .then(move |_| {
+            done2.store(true, Relaxed);
+            Ok::<_, ()>(())
+        });
+
+    rt.block_on(lazy(move || {
+        let handle = tokio::spawn_handle(f);
+        handle.cancel();
+        Ok::<(), ()>(())
+    })).unwrap();
+
+    rt.shutdown_on_idle().wait().unwrap();
+    assert_eq!(done.load(Relaxed), false);
 }
