@@ -111,11 +111,13 @@ pub use tokio_current_thread::{
     Handle,
     RunError,
     RunTimeoutError,
+    SpawnHandle,
     TaskExecutor,
     Turn,
     TurnError,
     block_on_all,
     spawn,
+    spawn_handle,
 };
 
 use std::cell::Cell;
