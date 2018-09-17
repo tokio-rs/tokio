@@ -111,22 +111,41 @@ impl Decoder for LinesCodec {
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
         loop {
-            let max_len = self.max_length.unwrap_or(buf.len());
-            let read_to = cmp::min(max_len + 1 + self.next_index, buf.len());
+            // Determine how far into the buffer we'll search for a newline. If
+            // there's no max_length set, we'll read to the end of the buffer.
+            let read_to = if let Some(limit) = self.max_length {
+                // If a max length is set, read max_length bytes from the
+                // *current* offset into the buffer (which may not be 0).
+                let read_to = limit + self.next_index + 1;
+                // Clamp to buf.len(), so we don't go out of bounds.
+                cmp::min(read_to, buf.len())
+            } else {
+                buf.len()
+            };
+
             let newline_offset = buf[self.next_index..read_to]
                 .iter()
                 .position(|b| *b == b'\n');
+
             if self.is_discarding {
-               let discard_to = if let Some(offset) = newline_offset {
+                let discard_to = if let Some(offset) = newline_offset {
+                    // If we found a newline, discard up to that offset and
+                    // then stop discarding. On the next iteration, we'll try
+                    // to read a line normally.
                     self.is_discarding = false;
                     offset + self.next_index + 1
                } else {
+                   // Otherwise, we didn't find a newline, so we'll discard
+                   // everything we read. On the next iteration, we'll continue
+                   // discarding up to max_len bytes unless we find a newline.
                    read_to
                };
                buf.advance(discard_to);
                self.next_index = 0;
+               continue;
             } else {
-                return if let Some(offset) = newline_offset {
+                if let Some(offset) = newline_offset {
+                    // Found a line!
                     let newline_index = offset + self.next_index;
                     self.next_index = 0;
                     let line = buf.split_to(newline_index + 1);
@@ -134,19 +153,23 @@ impl Decoder for LinesCodec {
                     let line = without_carriage_return(line);
                     let line = utf8(line)?;
 
-                    Ok(Some(line.to_string()))
-                } else if buf.len().saturating_sub(self.next_index) > max_len {
-                    // Reached the maximum length without finding a newline,
-                    // return an error and start discarding.
-                    self.is_discarding = true;
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        LengthError { limit: max_len },
-                    ))
-                } else {
-                    self.next_index = read_to;
-                    return Ok(None)
-                }
+                    return Ok(Some(line.to_string()));
+                } else if let Some(limit) = self.max_length {
+                    if buf.len().saturating_sub(self.next_index) > limit {
+                        // Reached the maximum length without finding a
+                        // newline, return an error and start discarding on the
+                        // next call.
+                        self.is_discarding = true;
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            LengthError { limit },
+                        ));
+                    }
+                };
+                // We didn't find a line or reach the length limit, so the next
+                // call will resume searching at the current offset.
+                self.next_index = read_to;
+                return Ok(None);
             }
         }
     }
