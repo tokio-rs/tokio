@@ -14,8 +14,7 @@ use tokio::runtime::Runtime;
 // this import is used in all child modules that have it in scope
 // from importing super::*, but the compiler doesn't realise that
 // and warns about it.
-#[allow(unused_imports)]
-use futures::future::Executor;
+pub use futures::future::Executor;
 
 macro_rules! t {
     ($e:expr) => (match $e {
