@@ -42,7 +42,14 @@ mod global;
 pub mod park;
 
 pub use enter::{enter, Enter, EnterError};
-pub use global::{spawn, with_default, DefaultExecutor};
+pub use global::{
+    spawn,
+    spawn_handle,
+    with_default,
+    DefaultExecutor,
+    SpawnHandle,
+    SpawnHandleError
+};
 
 use futures::Future;
 

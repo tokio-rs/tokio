@@ -1,6 +1,7 @@
 use super::{Executor, Enter, SpawnError};
 
-use futures::Future;
+use futures::{Async, Future, Poll};
+use futures::sync::oneshot;
 
 use std::cell::Cell;
 
@@ -17,6 +18,45 @@ use std::cell::Cell;
 #[derive(Debug, Clone)]
 pub struct DefaultExecutor {
     _dummy: (),
+}
+
+
+/// Future returned by the [`spawn_handle`] function.
+///
+/// A `SpawnHandle` will finish with either the `Item` type of the spawned
+/// future or a [`SpawnHandleError`] which either contains the spawned future's
+/// `Error` type or indicates that the spawned future was canceled before it
+/// completed.
+///
+/// In addition, the [`cancel`] method will cancel the spawned future, causing
+/// it to finish executing the next time it is polled.
+///
+/// [`spawn_handle`]: fn.spawn_handle.html
+/// [`SpawnHandleError`]: struct.SpawnHandleError.html
+/// [`cancel`]: #method.cancel
+#[derive(Debug)]
+pub struct SpawnHandle<T, E> {
+    cancel_tx: oneshot::Sender<()>,
+    rx: oneshot::Receiver<Result<T, E>>,
+}
+
+/// Errors returned by `SpawnHandle`.
+#[derive(Debug)]
+pub struct SpawnHandleError<E> {
+    kind: SpawnHandleErrorKind<E>,
+}
+
+#[derive(Debug)]
+enum SpawnHandleErrorKind<E> {
+    Inner(E),
+    Canceled,
+}
+
+#[derive(Debug)]
+struct SpawnedWithHandle<F: Future> {
+    cancel_rx: oneshot::Receiver<()>,
+    tx: Option<oneshot::Sender<Result<F::Item, F::Error>>>,
+    future: F,
 }
 
 impl DefaultExecutor {
@@ -131,6 +171,67 @@ pub fn spawn<T>(future: T)
         .unwrap()
 }
 
+/// Submits a future for execution on the default executor, returning a
+/// [`SpawnHandle`] that allows access to the result of the spawned future
+/// and can cancel it if it is no longer necessary.
+///
+/// Spawning the future behaves similarly to the [`spawn`] function, but with
+/// the addition of returning a `SpawnHandle`. A `SpawnHandle` is itself a
+/// future which will eventually complete with the value returned by the
+/// spawned future.
+///
+/// If the spawned future is no longer needed, the [`SpawnHandle::cancel`]
+/// method will cancel it. Dropping the `SpawnHandle` will *not* cancel the
+/// spawned future, but will result in the item returned by the spawned future
+/// being discarded.
+///
+/// # Panics
+///
+/// This function will panic if the default executor is not set or if spawning
+/// onto the default executor returns an error.
+///
+/// # Examples
+///
+/// ```rust
+/// # extern crate futures;
+/// # extern crate tokio_executor;
+/// # use tokio_executor::{spawn_handle, SpawnHandle};
+/// use futures::Future;
+/// use futures::future::lazy;
+///
+/// # pub fn dox() {
+/// let handle: SpawnHandle<&'static str, ()> = spawn_handle(lazy(|| {
+///     Ok("hello from the future!")
+/// }));
+/// assert_eq!(handle.wait().unwrap(), "hello from the future!");
+/// # }
+/// # pub fn main() {}
+/// ```
+///
+/// [`SpawnHandle`]: struct.SpawnHandle.html
+/// [`spawn`]: fn.spawn.html
+/// [`SpawnHandle::cancel`]: struct.SpawnHandle.html#method.cancel
+pub fn spawn_handle<T>(future: T) -> SpawnHandle<T::Item, T::Error>
+where
+    T: Future + Send + 'static,
+    T::Item: Send,
+    T::Error: Send,
+{
+    let (tx, rx) = oneshot::channel();
+    let (cancel_tx, cancel_rx) = oneshot::channel();
+    let f = SpawnedWithHandle {
+        cancel_rx,
+        tx: Some(tx),
+        future,
+    };
+    spawn(f);
+    SpawnHandle {
+        cancel_tx,
+        rx,
+    }
+
+}
+
 /// Set the default executor for the duration of the closure
 ///
 /// # Panics
@@ -178,6 +279,95 @@ unsafe fn hide_lt<'a>(p: *mut (Executor + 'a)) -> *mut (Executor + 'static) {
     use std::mem;
     mem::transmute(p)
 }
+
+
+// ===== impl SpawnHandle =====
+
+impl<T, E> Future for SpawnHandle<T, E> {
+    type Item = T;
+    type Error = SpawnHandleError<E>;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        match self.rx.poll() {
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Ok(Async::Ready(i)) => Ok(Async::Ready(i?)),
+            Err(oneshot::Canceled) => Err(SpawnHandleError {
+                kind: SpawnHandleErrorKind::Canceled,
+            }),
+        }
+    }
+}
+
+impl<T, E> SpawnHandle<T, E> {
+    /// Cancel the spawned future.
+    pub fn cancel(self) {
+        let _ = self.cancel_tx.send(());
+    }
+}
+
+impl<F: Future> Future for SpawnedWithHandle<F> {
+    type Item = ();
+    type Error = ();
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        // First, check if the task has been canceled.  If `cancel_rx.poll()`
+        // returns an error, that indicates that the `SpawnHandle` has been
+        // dropped, which is fine.
+        if let Ok(Async::Ready(())) = self.cancel_rx.poll() {
+            return Ok(Async::Ready(()));
+        }
+        // Otherwise, poll the wrapped future.
+        let (result, retval) = match self.future.poll() {
+            Ok(Async::NotReady) => return Ok(Async::NotReady),
+            Ok(Async::Ready(i)) => (Ok(i), Ok(Async::Ready(()))),
+            Err(e) => (Err(e), Err(())),
+        };
+        // If `send` returns an error, that is because the `SpawnHandle` was
+        // dropped, canceling the receiver. This is fine.
+        let _ = self.tx.take()
+            .expect("polled after ready")
+            .send(result);
+        retval
+    }
+}
+
+// ===== impl SpawnHandleError =====
+
+impl<E> From<E> for SpawnHandleError<E> {
+    fn from(err: E) -> Self {
+        SpawnHandleError {
+            kind: SpawnHandleErrorKind::Inner(err),
+        }
+    }
+}
+
+impl<E> SpawnHandleError<E> {
+    /// Returns true if the error was caused by the spawned future being canceled.
+    pub fn is_canceled(&self) -> bool {
+        match self.kind {
+            SpawnHandleErrorKind::Canceled => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if the error was caused by the spawned future completing
+    /// with an error.
+    pub fn is_inner(&self) -> bool {
+        match self.kind {
+            SpawnHandleErrorKind::Inner(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Consumes self, returning the inner error if this error was caused by the
+    /// spawned future failing, or `None` if it was not.
+    pub fn into_inner(self) -> Option<E> {
+        match self.kind {
+            SpawnHandleErrorKind::Inner(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
