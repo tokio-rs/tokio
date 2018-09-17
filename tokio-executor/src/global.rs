@@ -229,7 +229,6 @@ where
         cancel_tx,
         rx,
     }
-
 }
 
 /// Set the default executor for the duration of the closure
@@ -291,9 +290,7 @@ impl<T, E> Future for SpawnHandle<T, E> {
         match self.rx.poll() {
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Ok(Async::Ready(i)) => Ok(Async::Ready(i?)),
-            Err(oneshot::Canceled) => Err(SpawnHandleError {
-                kind: SpawnHandleErrorKind::Canceled,
-            }),
+            Err(oneshot::Canceled) => Err(SpawnHandleError::canceled()),
         }
     }
 }
@@ -346,6 +343,14 @@ impl<E> SpawnHandleError<E> {
         match self.kind {
             SpawnHandleErrorKind::Canceled => true,
             _ => false,
+        }
+    }
+
+    /// Returns a new `SpawnHandleError` indicating that the spawned future was
+    /// canceled.
+    pub fn canceled() -> Self {
+        SpawnHandleError {
+            kind: SpawnHandleErrorKind::Canceled,
         }
     }
 
