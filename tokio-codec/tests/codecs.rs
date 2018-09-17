@@ -63,7 +63,7 @@ fn lines_decoder_max_length() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("line 1 is too long\nline 2\r\nline 3\n\r\n\r");
+    buf.put("line 1 is too long\nline 2\nline 3\r\nline 4\n\r\n\r");
 
     assert!(codec.decode(buf).is_err());
 
@@ -71,9 +71,11 @@ fn lines_decoder_max_length() {
     assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
     assert_eq!("line 2", line);
 
+    assert!(codec.decode(buf).is_err());
+
     let line = codec.decode(buf).unwrap().unwrap();
     assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
-    assert_eq!("line 3", line);
+    assert_eq!("line 4", line);
 
     let line = codec.decode(buf).unwrap().unwrap();
     assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
