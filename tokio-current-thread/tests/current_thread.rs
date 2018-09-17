@@ -615,6 +615,76 @@ fn spawn_from_other_thread_unpark() {
     ).unwrap();
 }
 
+#[test]
+fn spawn_handle() {
+    let mut current_thread = CurrentThread::new();
+    let f = lazy(|| {
+        Ok::<_, ()>("hello from the future")
+    });
+
+    let res = current_thread
+        .block_on(lazy(|| {
+            tokio_current_thread::spawn_handle(f)
+        }))
+        .unwrap();
+    assert_eq!(res, "hello from the future");
+
+    let f = lazy(|| {
+        Err::<(), _>("something is wrong")
+    });
+
+    current_thread.block_on(lazy(|| {
+        tokio_current_thread::spawn_handle(f)
+    }))
+    .unwrap_err();
+}
+
+#[test]
+fn spawn_handle_across_threads() {
+    let mut current_thread = CurrentThread::new();
+    let (tx, rx) = oneshot::channel();
+
+    let join = thread::spawn(move || {
+        let mut current_thread = CurrentThread::new();
+        let f = lazy(|| {
+            Ok::<_, ()>("hello from the future in the other thread")
+        });
+        current_thread.block_on(lazy(move || {
+            let handle = tokio_current_thread::spawn_handle(f);
+            tx.send(handle);
+            Ok::<(), ()>(())
+        })).unwrap();
+        current_thread.run().unwrap();
+    });
+
+    let handle = current_thread.block_on(rx).unwrap();
+    let res = current_thread.block_on(handle).unwrap();
+    assert_eq!(res, "hello from the future in the other thread");
+
+    join.join().unwrap();
+}
+
+#[test]
+fn spawn_handle_cancel() {
+    let mut current_thread = CurrentThread::new();
+    let done = Rc::new(Cell::new(false));
+    let done2 = done.clone();
+
+    let f = lazy(move || {
+        done2.set(true);
+        Ok::<_, ()>(())
+    });
+
+    current_thread.block_on(lazy(move || {
+        let handle = tokio_current_thread::spawn_handle(f);
+        handle.cancel();
+        Ok::<(), ()>(())
+    })).unwrap();
+
+    current_thread.run().unwrap();
+    assert_eq!(done.get(), false);
+}
+
 fn ok() -> future::FutureResult<(), ()> {
     future::ok(())
 }
