@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use tokio_io::_tokio_codec::{Encoder, Decoder};
-use std::{cmp, error, fmt, io, str};
+use std::{cmp, io, str};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -107,6 +107,8 @@ fn without_carriage_return(s: &[u8]) -> &[u8] {
 
 impl Decoder for LinesCodec {
     type Item = String;
+    // TODO: in the next breaking change, this should be changed to a custom
+    // error type that indicates the "max length exceeded" condition better.
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
@@ -162,7 +164,7 @@ impl Decoder for LinesCodec {
                         self.is_discarding = true;
                         return Err(io::Error::new(
                             io::ErrorKind::Other,
-                            LengthError { limit },
+                            "line length limit exceeded"
                         ));
                     }
                 };
@@ -202,21 +204,5 @@ impl Encoder for LinesCodec {
         buf.put(line);
         buf.put_u8(b'\n');
         Ok(())
-    }
-}
-
-impl fmt::Display for LengthError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "reached maximum line length ({} characters)", self.limit)
-    }
-}
-
-impl error::Error for LengthError {
-    fn description(&self) -> &str {
-        "reached maximum line length"
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        Some(self)
     }
 }
