@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use tokio_io::_tokio_codec::{Encoder, Decoder};
-use std::{cmp, io, str};
+use std::{cmp, io, str, usize};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -13,9 +13,9 @@ pub struct LinesCodec {
     // only look at `de\n` before returning.
     next_index: usize,
 
-    /// The maximum length for a given line. If `None`, lines will be read
-    /// until a `\n` character is reached.
-    max_length: Option<usize>,
+    /// The maximum length for a given line. If `usize::MAX`, lines will be
+    /// read until a `\n` character is reached.
+    max_length: usize,
 
     /// Are we currently discarding the remainder of a line which was over
     /// the length limit?
@@ -35,7 +35,7 @@ impl LinesCodec {
     pub fn new() -> LinesCodec {
         LinesCodec {
             next_index: 0,
-            max_length: None,
+            max_length: usize::MAX,
             is_discarding: false,
         }
     }
@@ -58,28 +58,29 @@ impl LinesCodec {
     /// without any `\n` characters, causing unbounded memory consumption.
     ///
     /// [`LengthError`]: ../struct.LengthError
-    pub fn new_with_max_length(limit: usize) -> Self {
+    pub fn new_with_max_length(max_length: usize) -> Self {
         LinesCodec {
-            max_length: Some(limit),
+            max_length,
             ..LinesCodec::new()
         }
     }
 
-    /// Returns the current maximum line length when decoding, if one is set.
+    /// Returns the maximum line length when decoding.
     ///
     /// ```
+    /// use std::usize;
     /// use tokio_codec::LinesCodec;
     ///
     /// let codec = LinesCodec::new();
-    /// assert_eq!(codec.max_length(), None);
+    /// assert_eq!(codec.max_length(), usize::MAX);
     /// ```
     /// ```
     /// use tokio_codec::LinesCodec;
     ///
     /// let codec = LinesCodec::new_with_max_length(256);
-    /// assert_eq!(codec.max_length(), Some(256));
+    /// assert_eq!(codec.max_length(), 256);
     /// ```
-    pub fn max_length(&self) -> Option<usize> {
+    pub fn max_length(&self) -> usize {
         self.max_length
     }
 
@@ -126,11 +127,7 @@ impl Decoder for LinesCodec {
         loop {
             // Determine how far into the buffer we'll search for a newline. If
             // there's no max_length set, we'll read to the end of the buffer.
-            let read_to = if let Some(limit) = self.max_length {
-                cmp::min(limit + 1, buf.len())
-            } else {
-                buf.len()
-            };
+            let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
             let newline_offset = buf[self.next_index..read_to]
                 .iter()
@@ -139,7 +136,7 @@ impl Decoder for LinesCodec {
             if self.is_discarding {
                 self.discard(newline_offset, read_to, buf);
             } else {
-                if let Some(offset) = newline_offset {
+                return if let Some(offset) = newline_offset {
                     // Found a line!
                     let newline_index = offset + self.next_index;
                     self.next_index = 0;
@@ -148,23 +145,22 @@ impl Decoder for LinesCodec {
                     let line = without_carriage_return(line);
                     let line = utf8(line)?;
 
-                    return Ok(Some(line.to_string()));
-                } else if let Some(limit) = self.max_length {
-                    if buf.len() - self.next_index > limit {
-                        // Reached the maximum length without finding a
-                        // newline, return an error and start discarding on the
-                        // next call.
-                        self.is_discarding = true;
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            "line length limit exceeded"
-                        ));
-                    }
+                    Ok(Some(line.to_string()))
+                } else if buf.len() - self.next_index > self.max_length {
+                    // Reached the maximum length without finding a
+                    // newline, return an error and start discarding on the
+                    // next call.
+                    self.is_discarding = true;
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "line length limit exceeded"
+                    ))
+                } else {
+                    // We didn't find a line or reach the length limit, so the next
+                    // call will resume searching at the current offset.
+                    self.next_index = read_to;
+                    Ok(None)
                 };
-                // We didn't find a line or reach the length limit, so the next
-                // call will resume searching at the current offset.
-                self.next_index = read_to;
-                return Ok(None);
             }
         }
     }
