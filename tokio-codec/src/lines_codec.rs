@@ -22,12 +22,6 @@ pub struct LinesCodec {
     is_discarding: bool,
 }
 
-/// Error indicating that the maximum line length was reached.
-#[derive(Debug)]
-pub struct LengthError {
-    limit: usize,
-}
-
 impl LinesCodec {
     /// Returns a `LinesCodec` for splitting up data into lines.
     ///
@@ -144,7 +138,6 @@ impl Decoder for LinesCodec {
                };
                buf.advance(discard_to);
                self.next_index = 0;
-               continue;
             } else {
                 if let Some(offset) = newline_offset {
                     // Found a line!
@@ -157,7 +150,7 @@ impl Decoder for LinesCodec {
 
                     return Ok(Some(line.to_string()));
                 } else if let Some(limit) = self.max_length {
-                    if buf.len().saturating_sub(self.next_index) > limit {
+                    if buf.len() - self.next_index > limit {
                         // Reached the maximum length without finding a
                         // newline, return an error and start discarding on the
                         // next call.
