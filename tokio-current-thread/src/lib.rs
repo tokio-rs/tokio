@@ -122,10 +122,10 @@ pub struct SpawnHandle<T, E> {
 }
 
 #[derive(Debug)]
-struct SpawnedWithHandle<F: Future> {
+struct SpawnedWithHandle<T: Future> {
     cancel_rx: oneshot::Receiver<()>,
-    tx: Option<oneshot::Sender<Result<F::Item, F::Error>>>,
-    future: F,
+    tx: Option<oneshot::Sender<Result<T::Item, T::Error>>>,
+    future: T,
 }
 
 /// Error returned by the `run` function.
@@ -920,7 +920,7 @@ impl<T, E> SpawnHandle<T, E> {
     }
 }
 
-impl<F: Future> Future for SpawnedWithHandle<F> {
+impl<T: Future> Future for SpawnedWithHandle<T> {
     type Item = ();
     type Error = ();
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
