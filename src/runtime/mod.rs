@@ -125,6 +125,7 @@ use reactor::{Background, Handle};
 
 use std::io;
 
+use tokio_executor::enter;
 use tokio_threadpool as threadpool;
 
 use futures;
@@ -208,6 +209,7 @@ struct Inner {
 pub fn run<F>(future: F)
 where F: Future<Item = (), Error = ()> + Send + 'static,
 {
+    enter().expect("nested tokio::run");
     let mut runtime = Runtime::new().unwrap();
     runtime.spawn(future);
     runtime.shutdown_on_idle().wait().unwrap();
