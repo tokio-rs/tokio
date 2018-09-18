@@ -76,6 +76,11 @@ impl Builder {
     }
 
     /// Set builder to set up the thread pool instance.
+    #[deprecated(
+        since="0.1.9",
+        note="use the `core_threads`, `blocking_threads`, `name_prefix`, \
+              and `stack_size` functions on `runtime::Builder`, instead")]
+    #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
         self
