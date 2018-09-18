@@ -682,6 +682,23 @@ impl Handle {
         self.notify.notify(0);
         Ok(())
     }
+
+    /// Provides a best effort **hint** to whether or not `spawn` will succeed.
+    ///
+    /// This function may return both false positives **and** false negatives.
+    /// If `status` returns `Ok`, then a call to `spawn` will *probably*
+    /// succeed, but may fail. If `status` returns `Err`, a call to `spawn` will
+    /// *probably* fail, but may succeed.
+    ///
+    /// This allows a caller to avoid creating the task if the call to `spawn`
+    /// has a high likelihood of failing.
+    pub fn status(&self) -> Result<(), SpawnError> {
+        if self.shut_down.get() {
+            return Err(SpawnError::shutdown());
+        }
+
+        Ok(())
+    }
 }
 
 // ===== impl TaskExecutor =====
