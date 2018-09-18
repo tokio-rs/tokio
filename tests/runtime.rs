@@ -390,3 +390,15 @@ mod from_block_on_all {
         test(|f| { tokio::spawn(f); })
     }
 }
+
+#[test]
+fn run_in_run() {
+    use std::panic;
+
+    tokio::run(lazy(|| {
+        panic::catch_unwind(|| {
+            tokio::run(lazy(|| { Ok::<(), ()>(()) }))
+        }).unwrap_err();
+        Ok::<(), ()>(())
+    }));
+}
