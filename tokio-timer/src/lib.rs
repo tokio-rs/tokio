@@ -1,5 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.6")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
+#![allow(intra_doc_link_resolution_failure)]
 
 //! Utilities for tracking time.
 //!

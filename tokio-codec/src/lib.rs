@@ -12,6 +12,7 @@
 
 #![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-codec/0.1.0")]
+#![allow(intra_doc_link_resolution_failure)]
 
 extern crate bytes;
 extern crate tokio_io;

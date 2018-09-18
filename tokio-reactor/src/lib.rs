@@ -3,6 +3,8 @@
 #![cfg_attr(feature = "async-await-preview", feature(
         pin,
         ))]
+#![allow(intra_doc_link_resolution_failure)]
+
 
 //! Event loop that drives Tokio I/O resources.
 //!
