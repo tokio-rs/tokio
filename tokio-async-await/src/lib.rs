@@ -1,6 +1,6 @@
 #![feature(futures_api, await_macro, pin, arbitrary_self_types)]
 
-#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.2")]
+#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.3")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
 
@@ -76,7 +76,6 @@ use futures_core::{
 
 // Rename the `await` macro in `std`
 #[doc(hidden)]
-#[macro_export]
 pub use std::await as std_await;
 
 /// Like `tokio::run`, but takes an `async` block

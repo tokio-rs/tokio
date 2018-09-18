@@ -1,4 +1,4 @@
-cargo-features = ["edition", "rename-dependency"]
+cargo-features = ["rename-dependency"]
 
 [package]
 name = "tokio-async-await"
@@ -6,12 +6,12 @@ edition = "2018"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-async-await/0.1.1"
+documentation = "https://docs.rs/tokio-async-await/0.1.3"
 description = """
 Experimental async/await support for Tokio
 """
@@ -32,8 +32,8 @@ tokio = { version = "0.1.8", path = ".." }
 tokio-io = { version = "0.1.7", path = "../tokio-io" }
 tokio-channel = { version = "0.1.0", path = "../tokio-channel", features = ["async-await-preview"] }
 tokio-reactor = { version = "0.1.5", path = "../tokio-reactor", features = ["async-await-preview"] }
-futures-core-preview = { version = "0.3.0-alpha.2" }
-futures-util-preview = { version = "0.3.0-alpha.2" }
+futures-core-preview = { version = "0.3.0-alpha.6" }
+futures-util-preview = { version = "0.3.0-alpha.6" }
 
 [dev-dependencies]
 bytes = "0.4.9"
