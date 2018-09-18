@@ -82,6 +82,23 @@ impl LinesCodec {
     pub fn max_length(&self) -> Option<usize> {
         self.max_length
     }
+
+    fn discard(&mut self, newline_offset: Option<usize>, read_to: usize, buf: &mut BytesMut) {
+        let discard_to = if let Some(offset) = newline_offset {
+            // If we found a newline, discard up to that offset and
+            // then stop discarding. On the next iteration, we'll try
+            // to read a line normally.
+            self.is_discarding = false;
+            offset + self.next_index + 1
+        } else {
+            // Otherwise, we didn't find a newline, so we'll discard
+            // everything we read. On the next iteration, we'll continue
+            // discarding up to max_len bytes unless we find a newline.
+            read_to
+        };
+        buf.advance(discard_to);
+        self.next_index = 0;
+    }
 }
 
 fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
@@ -124,20 +141,7 @@ impl Decoder for LinesCodec {
                 .position(|b| *b == b'\n');
 
             if self.is_discarding {
-                let discard_to = if let Some(offset) = newline_offset {
-                    // If we found a newline, discard up to that offset and
-                    // then stop discarding. On the next iteration, we'll try
-                    // to read a line normally.
-                    self.is_discarding = false;
-                    offset + self.next_index + 1
-               } else {
-                   // Otherwise, we didn't find a newline, so we'll discard
-                   // everything we read. On the next iteration, we'll continue
-                   // discarding up to max_len bytes unless we find a newline.
-                   read_to
-               };
-               buf.advance(discard_to);
-               self.next_index = 0;
+                self.discard(newline_offset, read_to, buf);
             } else {
                 if let Some(offset) = newline_offset {
                     // Found a line!
