@@ -127,11 +127,7 @@ impl Decoder for LinesCodec {
             // Determine how far into the buffer we'll search for a newline. If
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = if let Some(limit) = self.max_length {
-                // If a max length is set, read max_length bytes from the
-                // *current* offset into the buffer (which may not be 0).
-                let read_to = limit + self.next_index + 1;
-                // Clamp to buf.len(), so we don't go out of bounds.
-                cmp::min(read_to, buf.len())
+                cmp::min(limit + 1, buf.len())
             } else {
                 buf.len()
             };
