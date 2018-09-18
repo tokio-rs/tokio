@@ -232,10 +232,6 @@ impl Worker {
         while self.check_run_state(first) {
             first = false;
 
-            // Poll inbound until empty, transferring all tasks to the internal
-            // queue.
-            let consistent = self.drain_inbound();
-
             // Run the next available task
             if self.try_run_task(&notify) {
                 if self.is_blocking.get() {
@@ -251,11 +247,6 @@ impl Worker {
                 spin_cnt = 0;
 
                 // As long as there is work, keep looping.
-                continue;
-            }
-
-            if !consistent {
-                spin_cnt = 0;
                 continue;
             }
 
@@ -396,6 +387,11 @@ impl Worker {
         }
     }
 
+    /// Returns `true` if any worker's queue or the external queue has tasks.
+    fn check_available_tasks(&self) -> bool {
+        self.inner.workers.iter().any(Entry::has_tasks) || !self.inner.external_queue.is_empty()
+    }
+
     /// Tries to steal a task from another worker.
     ///
     /// Returns `true` if work was found
@@ -440,6 +436,21 @@ impl Worker {
             if idx == start {
                 break;
             }
+        }
+
+        // Try stealing from the external queue.
+        if let Some(task) = self.inner.external_queue.try_pop() {
+            trace!("stole task from external queue");
+
+            self.run_task(task, notify);
+
+            // Signal other workers that work is available
+            //
+            // TODO: Should this be called here or before
+            // `run_task`?
+            self.inner.signal_work(&self.inner);
+
+            return true;
         }
 
         found_work
@@ -550,48 +561,6 @@ impl Worker {
         task.run(notify)
     }
 
-    /// Drains all tasks on the extern queue and pushes them onto the internal
-    /// queue.
-    ///
-    /// Returns `true` if the operation was able to complete in a consistent
-    /// state.
-    #[inline]
-    fn drain_inbound(&self) -> bool {
-        use task::Poll::*;
-
-        let mut found_work = false;
-
-        loop {
-            let task = unsafe { self.entry().inbound.poll() };
-
-            match task {
-                Empty => {
-                    if found_work {
-                        // TODO: Why is this called on every iteration? Would it
-                        // not be better to only signal when work was found
-                        // after waking up?
-                        trace!("found work while draining; signal_work");
-                        self.inner.signal_work(&self.inner);
-                    }
-
-                    return true;
-                }
-                Inconsistent => {
-                    if found_work {
-                        trace!("found work while draining; signal_work");
-                        self.inner.signal_work(&self.inner);
-                    }
-
-                    return false;
-                }
-                Data(task) => {
-                    found_work = true;
-                    self.entry().push_internal(task);
-                }
-            }
-        }
-    }
-
     /// Put the worker to sleep
     ///
     /// Returns `true` if woken up due to new work arriving.
@@ -665,6 +634,23 @@ impl Worker {
             state = actual;
         }
 
+        // If there are tasks available in any queue, transition back to running
+        if self.check_available_tasks() {
+            loop {
+                let mut next = state;
+                next.set_lifecycle(Running);
+
+                let actual = self.entry().state.compare_and_swap(
+                    state.into(), next.into(), AcqRel).into();
+
+                if actual == state {
+                    return true;
+                }
+
+                state = actual;
+            }
+        }
+
         trace!("    -> starting to sleep; idx={}", self.id.0);
 
         let sleep_until = self.inner.config.keep_alive
@@ -673,7 +659,6 @@ impl Worker {
         // The state has been transitioned to sleeping, we can now wait by
         // calling the parker. This is done in a loop as condvars can wakeup
         // spuriously.
-        'sleep:
         loop {
             let mut drop_thread = false;
 
@@ -710,9 +695,8 @@ impl Worker {
             // If the worker has been notified, transition back to running.
             match state.lifecycle() {
                 Sleeping => {
-                    if !drop_thread {
-                        // This goes back to the outer loop.
-                        continue 'sleep;
+                    if drop_thread {
+                        break;
                     }
                 }
                 Notified | Signaled => {
@@ -738,78 +722,78 @@ impl Worker {
                     unreachable!();
                 }
             }
+        }
 
-            // The thread has reached the maximum permitted sleep duration.
-            // It is now going to begin to shutdown.
-            //
-            // Doing this requires first releasing the thread to the backup
-            // stack. Because the moment the worker state is transitioned to
-            // `Shutdown`, other threads **expect** the thread's backup
-            // entry to be available on the backup stack.
-            //
-            // However, it is possible that the worker is notified between
-            // us pushing the backup entry onto the backup stack and
-            // transitioning the worker to `Shutdown`. If this happens, the
-            // current thread lost the token to run the backup entry and has
-            // to shutdown no matter what.
-            //
-            // To deal with this, the worker is transitioned to another
-            // thread. This is a pretty rare condition.
-            //
-            // If pushing on the backup stack fails, then the pool is being
-            // terminated and the thread should just shutdown
-            let backup_push_err = self.inner.release_backup(self.backup_id).is_err();
+        // The thread has reached the maximum permitted sleep duration.
+        // It is now going to begin to shutdown.
+        //
+        // Doing this requires first releasing the thread to the backup
+        // stack. Because the moment the worker state is transitioned to
+        // `Shutdown`, other threads **expect** the thread's backup
+        // entry to be available on the backup stack.
+        //
+        // However, it is possible that the worker is notified between
+        // us pushing the backup entry onto the backup stack and
+        // transitioning the worker to `Shutdown`. If this happens, the
+        // current thread lost the token to run the backup entry and has
+        // to shutdown no matter what.
+        //
+        // To deal with this, the worker is transitioned to another
+        // thread. This is a pretty rare condition.
+        //
+        // If pushing on the backup stack fails, then the pool is being
+        // terminated and the thread should just shutdown
+        let backup_push_err = self.inner.release_backup(self.backup_id).is_err();
 
-            if backup_push_err {
-                debug_assert!({
-                    let state: State = self.entry().state.load(Acquire).into();
-                    state.lifecycle() != Sleeping
-                });
+        if backup_push_err {
+            debug_assert!({
+                let state: State = self.entry().state.load(Acquire).into();
+                state.lifecycle() != Sleeping
+            });
 
-                self.should_finalize.set(true);
+            self.should_finalize.set(true);
 
-                return true;
+            return true;
+        }
+
+        loop {
+            let mut next = state;
+            next.set_lifecycle(Shutdown);
+
+            let actual: State = self.entry().state.compare_and_swap(
+                state.into(), next.into(), AcqRel).into();
+
+            if actual == state {
+                // Transitioned to a shutdown state
+                return false;
             }
 
-            loop {
-                let mut next = state;
-                next.set_lifecycle(Shutdown);
-
-                let actual: State = self.entry().state.compare_and_swap(
-                    state.into(), next.into(), AcqRel).into();
-
-                if actual == state {
-                    // Transitioned to a shutdown state
-                    return false;
+            match actual.lifecycle() {
+                Sleeping => {
+                    state = actual;
                 }
+                Notified | Signaled => {
+                    // Transition back to running
+                    loop {
+                        let mut next = state;
+                        next.set_lifecycle(Running);
 
-                match actual.lifecycle() {
-                    Sleeping => {
+                        let actual = self.entry().state.compare_and_swap(
+                            state.into(), next.into(), AcqRel).into();
+
+                        if actual == state {
+                            self.inner.spawn_thread(self.id.clone(), &self.inner);
+                            return false;
+                        }
+
                         state = actual;
                     }
-                    Notified | Signaled => {
-                        // Transition back to running
-                        loop {
-                            let mut next = state;
-                            next.set_lifecycle(Running);
-
-                            let actual = self.entry().state.compare_and_swap(
-                                state.into(), next.into(), AcqRel).into();
-
-                            if actual == state {
-                                self.inner.spawn_thread(self.id.clone(), &self.inner);
-                                return false;
-                            }
-
-                            state = actual;
-                        }
-                    }
-                    Shutdown | Running => {
-                        // To get here, the block above transitioned the state to
-                        // `Sleeping`. No other thread can concurrently
-                        // transition to `Shutdown` or `Running`.
-                        unreachable!();
-                    }
+                }
+                Shutdown | Running => {
+                    // To get here, the block above transitioned the state to
+                    // `Sleeping`. No other thread can concurrently
+                    // transition to `Shutdown` or `Running`.
+                    unreachable!();
                 }
             }
         }
@@ -837,10 +821,6 @@ impl Drop for Worker {
         trace!("shutting down thread; idx={}", self.id.0);
 
         if self.should_finalize.get() {
-            // Get all inbound work and push it onto the work queue. The work
-            // queue is drained in the next step.
-            self.drain_inbound();
-
             // Drain the work queue
             self.entry().drain_tasks();
 
