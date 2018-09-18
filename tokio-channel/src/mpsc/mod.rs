@@ -640,7 +640,8 @@ impl<T> Sink for Sender<T> {
     }
 
     fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        Ok(Async::Ready(()))
+        self.poll_ready()
+            .or_else(|_| Ok(().into()))
     }
 
     fn close(&mut self) -> Poll<(), SendError<T>> {
