@@ -209,10 +209,10 @@ struct Inner {
 pub fn run<F>(future: F)
 where F: Future<Item = (), Error = ()> + Send + 'static,
 {
-    enter().expect("nested tokio::run");
+    let mut enter = enter().expect("nested tokio::run");
     let mut runtime = Runtime::new().unwrap();
     runtime.spawn(future);
-    runtime.shutdown_on_idle().wait().unwrap();
+    enter.block_on(runtime.shutdown_on_idle()).unwrap();
 }
 
 impl Runtime {
