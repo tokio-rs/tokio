@@ -72,6 +72,7 @@ mod runtime;
 pub use self::builder::Builder;
 pub use self::runtime::{Runtime, Handle};
 pub use tokio_current_thread::spawn;
+pub use tokio_current_thread::TaskExecutor;
 
 use futures::Future;
 
