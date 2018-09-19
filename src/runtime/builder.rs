@@ -76,8 +76,121 @@ impl Builder {
     }
 
     /// Set builder to set up the thread pool instance.
+    #[deprecated(
+        since="0.1.9",
+        note="use the `core_threads`, `blocking_threads`, `name_prefix`, \
+              and `stack_size` functions on `runtime::Builder`, instead")]
+    #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
+        self
+    }
+
+    /// Set the maximum number of worker threads for the `Runtime`'s thread pool.
+    ///
+    /// This must be a number between 1 and 32,768 though it is advised to keep
+    /// this value on the smaller side.
+    ///
+    /// The default value is the number of cores available to the system.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .core_threads(4)
+    ///     .build()
+    ///     .unwrap();
+    /// # }
+    /// ```
+    pub fn core_threads(&mut self, val: usize) -> &mut Self {
+        self.threadpool_builder.pool_size(val);
+        self
+    }
+
+    /// Set the maximum number of concurrent blocking sections in the `Runtime`'s
+    /// thread pool.
+    ///
+    /// When the maximum concurrent `blocking` calls is reached, any further
+    /// calls to `blocking` will return `NotReady` and the task is notified once
+    /// previously in-flight calls to `blocking` return.
+    ///
+    /// This must be a number between 1 and 32,768 though it is advised to keep
+    /// this value on the smaller side.
+    ///
+    /// The default value is 100.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .blocking_threads(200)
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn blocking_threads(&mut self, val: usize) -> &mut Self {
+        self.threadpool_builder.max_blocking(val);
+        self
+    }
+
+    /// Set name prefix of threads spawned by the `Runtime`'s thread pool.
+    ///
+    /// Thread name prefix is used for generating thread names. For example, if
+    /// prefix is `my-pool-`, then threads in the pool will get names like
+    /// `my-pool-1` etc.
+    ///
+    /// The default prefix is "tokio-runtime-worker-".
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .name_prefix("my-pool-")
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn name_prefix<S: Into<String>>(&mut self, val: S) -> &mut Self {
+        self.threadpool_builder.name_prefix(val);
+        self
+    }
+
+    /// Set the stack size (in bytes) for worker threads.
+    ///
+    /// The actual stack size may be greater than this value if the platform
+    /// specifies minimal stack size.
+    ///
+    /// The default stack size for spawned threads is 2 MiB, though this
+    /// particular stack size is subject to change in the future.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .stack_size(32 * 1024)
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn stack_size(&mut self, val: usize) -> &mut Self {
+        self.threadpool_builder.stack_size(val);
         self
     }
 
