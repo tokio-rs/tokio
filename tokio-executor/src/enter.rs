@@ -3,6 +3,8 @@ use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
 
+use futures::{self, Future};
+
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
 /// Represents an executor context.
@@ -80,6 +82,13 @@ impl Enter {
     pub fn make_permanent(mut self) {
         self.permanent = true;
     }
+
+    /// Blocks the thread on the specified future, returning the value with
+    /// which that future completes.
+    pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
+        futures::executor::spawn(f).wait_future()
+    }
+
 }
 
 impl fmt::Debug for Enter {
