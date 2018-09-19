@@ -214,6 +214,7 @@ where T: Stream,
         match self.delay.poll() {
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Ok(Async::Ready(_)) => {
+                self.delay.reset_timeout();
                 Err(Error::elapsed())
             },
             Err(e) => Err(Error::timer(e)),
