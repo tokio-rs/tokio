@@ -152,3 +152,28 @@ fn stream_and_timeout_in_future() {
         assert!(item.is_some());
     });
 }
+
+#[test]
+fn idle_stream_timesout_periodically() {
+    mocked(|timer, _time| {
+        // Not yet complete
+        let (_tx, rx) = mpsc::unbounded::<()>();
+
+        // Wrap it with a deadline
+        let mut stream = Timeout::new(rx, ms(100));
+
+        // Not ready
+        assert_not_ready!(stream);
+
+        // Turn the timer, it runs for the elapsed time
+        advance(timer, ms(100));
+
+        assert_elapsed!(stream);
+        // Stream's timeout should reset
+        assert_not_ready!(stream);
+
+        // Turn the timer, it runs for the elapsed time
+        advance(timer, ms(100));
+        assert_elapsed!(stream);
+    });
+}
