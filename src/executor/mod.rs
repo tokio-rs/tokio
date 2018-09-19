@@ -47,6 +47,7 @@
 pub mod current_thread;
 
 #[deprecated(since = "0.1.8", note = "use tokio-threadpool crate instead")]
+#[doc(hidden)]
 /// Re-exports of [`tokio-threadpool`], deprecated in favor of the crate.
 ///
 /// [`tokio-threadpool`]: https://docs.rs/tokio-threadpool/0.1
