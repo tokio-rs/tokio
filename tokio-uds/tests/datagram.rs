@@ -63,7 +63,7 @@ fn framed_echo() {
 
         let (sink, stream) = server.split();
 
-        let echo_stream = stream.map(|(msg, addr)| (msg, addr.as_pathname().unwrap().into()));
+        let echo_stream = stream.map(|(msg, addr)| (msg, addr.as_pathname().unwrap().to_path_buf()));
 
         // spawn echo server
         rt.spawn(echo_stream.forward(sink)
