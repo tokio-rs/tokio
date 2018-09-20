@@ -107,7 +107,6 @@ fn lines_decoder_max_length_underrun() {
     let buf = &mut BytesMut::new();
     buf.put("line ");
     assert_eq!(None, codec.decode(buf).unwrap());
-
     buf.put("too l");
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("ong\n");
@@ -116,7 +115,35 @@ fn lines_decoder_max_length_underrun() {
     buf.put("line 2");
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("\n");
-    assert_eq!("line 2",  codec.decode(buf).unwrap().unwrap());
+    assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
+}
+
+#[test]
+fn lines_decoder_max_length_bursts() {
+    const MAX_LENGTH: usize = 10;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.put("line ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("too l");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("ong\n");
+    assert!(codec.decode(buf).is_err());
+}
+
+#[test]
+fn lines_decoder_max_length_big_burst() {
+    const MAX_LENGTH: usize = 10;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.put("line ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("too long!\n");
+    assert!(codec.decode(buf).is_err());
 }
 
 #[test]
