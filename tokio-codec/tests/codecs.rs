@@ -110,9 +110,9 @@ fn lines_decoder_max_length_underrun() {
     buf.put("line ");
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("too l");
-    assert_eq!(None, codec.decode(buf).unwrap());
-    buf.put("ong\n");
     assert!(codec.decode(buf).is_err());
+    buf.put("ong\n");
+    assert_eq!(None, codec.decode(buf).unwrap());
 
     buf.put("line 2");
     assert_eq!(None, codec.decode(buf).unwrap());
