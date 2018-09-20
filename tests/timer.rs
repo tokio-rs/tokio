@@ -80,6 +80,7 @@ fn deadline() {
     let when = Instant::now() + Duration::from_millis(20);
     let (tx, rx) = mpsc::channel();
 
+    #[allow(deprecated)]
     tokio::run({
         future::empty::<(), ()>()
             .deadline(when)
