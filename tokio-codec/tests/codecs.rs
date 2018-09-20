@@ -105,6 +105,8 @@ fn lines_decoder_max_length_underrun() {
 
     let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
     buf.put("line ");
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("too l");
@@ -125,6 +127,7 @@ fn lines_decoder_max_length_bursts() {
     let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
+    buf.reserve(200);
     buf.put("line ");
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("too l");
@@ -140,6 +143,7 @@ fn lines_decoder_max_length_big_burst() {
     let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
+    buf.reserve(200);
     buf.put("line ");
     assert_eq!(None, codec.decode(buf).unwrap());
     buf.put("too long!\n");
@@ -152,6 +156,8 @@ fn lines_decoder_max_length_newline_between_decodes() {
 
     let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
     let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
     buf.put("hello");
     assert_eq!(None, codec.decode(buf).unwrap());
 
