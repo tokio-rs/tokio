@@ -10,6 +10,7 @@ use self::state::State;
 
 use notifier::Notifier;
 use pool::Pool;
+use worker::WorkerId;
 
 use futures::{self, Future, Async};
 use futures::executor::{self, Spawn};
@@ -18,7 +19,7 @@ use std::{fmt, panic, ptr};
 use std::cell::{UnsafeCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
-use std::sync::atomic::Ordering::{AcqRel, Release, Relaxed};
+use std::sync::atomic::Ordering::{Acquire, AcqRel, Release, Relaxed};
 
 /// Harness around a future.
 ///
@@ -37,13 +38,16 @@ pub(crate) struct Task {
     /// Next pointer in the queue of tasks pending blocking capacity.
     next_blocking: AtomicPtr<Task>,
 
+    /// TODO
+    pub(crate) home_worker_id: AtomicUsize,
+
     /// Store the future at the head of the struct
     ///
     /// The future is dropped immediately when it transitions to Complete
     future: UnsafeCell<Option<Spawn<BoxFuture>>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub(crate) enum Run {
     Idle,
     Schedule,
@@ -65,6 +69,7 @@ impl Task {
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next: AtomicPtr::new(ptr::null_mut()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
+            home_worker_id: AtomicUsize::new(!0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -80,6 +85,7 @@ impl Task {
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next: AtomicPtr::new(ptr::null_mut()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
+            home_worker_id: AtomicUsize::new(!0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -223,6 +229,42 @@ impl Task {
         // This flag is the primary point of coordination. The queued flag
         // happens "around" setting the blocking capacity.
         BlockingState::consume_allocation(&self.blocking, AcqRel)
+    }
+
+    pub(crate) fn home_worker_id(&self) -> Option<WorkerId> {
+        let current = self.home_worker_id.load(Acquire);
+        if current == !0 {
+            None
+        } else {
+            Some(WorkerId(current))
+        }
+    }
+
+    /// TODO
+    pub(crate) fn home_worker_id_or_assign<F>(&self, f: F) -> WorkerId
+    where
+        F: FnOnce() -> WorkerId,
+    {
+        let mut current = self.home_worker_id.load(Acquire);
+        if current != !0 {
+            return WorkerId(current);
+        }
+
+        let new_id = f();
+
+        loop {
+            let actual = self.home_worker_id
+                .compare_and_swap(current, new_id.0, AcqRel);
+
+            if actual == current {
+                return new_id;
+            }
+            current = actual;
+
+            if current != !0 {
+                return WorkerId(current);
+            }
+        }
     }
 
     /// Drop the future
