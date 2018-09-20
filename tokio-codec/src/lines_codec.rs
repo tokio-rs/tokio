@@ -146,7 +146,7 @@ impl Decoder for LinesCodec {
                     let line = utf8(line)?;
 
                     Ok(Some(line.to_string()))
-                } else if buf.len() - self.next_index > self.max_length {
+                } else if buf.len() > self.max_length {
                     // Reached the maximum length without finding a
                     // newline, return an error and start discarding on the
                     // next call.
