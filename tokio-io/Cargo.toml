@@ -21,3 +21,6 @@ categories = ["asynchronous"]
 bytes = "0.4.7"
 futures = "0.1.18"
 log = "0.4"
+
+[dev-dependencies]
+tokio-current-thread = { version = "0.1.1", path = "../tokio-current-thread" }
