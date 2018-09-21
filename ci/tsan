@@ -29,4 +29,5 @@ race:crossbeam_deque*steal
 # original pop operation will fail due to the ABA guard, but tsan still picks
 # up the access on the next pointer.
 race:Backup::next_sleeper
+race:Backup::set_next_sleeper
 race:WorkerEntry::set_next_sleeper
