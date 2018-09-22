@@ -275,6 +275,8 @@ impl Pool {
 
         Worker::with_current(|worker| {
             if let Some(worker) = worker {
+                let home_worker_id = task.home_worker_id_or_assign(|| worker.id().clone());
+
                 // If the worker is in blocking mode, then even though the
                 // thread-local variable is set, the current thread does not
                 // have ownership of that worker entry. This is because the
@@ -283,7 +285,10 @@ impl Pool {
                 // The second check handles the case where the current thread is
                 // part of a different threadpool than the one being submitted
                 // to.
-                if !worker.is_blocking() && *self == *worker.inner {
+                if !worker.is_blocking()
+                    && *self == *worker.inner
+                    && home_worker_id == worker.id
+                {
                     let idx = worker.id.0;
 
                     trace!("    -> submit internal; idx={}", idx);
@@ -307,20 +312,24 @@ impl Pool {
 
         use worker::Lifecycle::Notified;
 
-        // First try to get a handle to a sleeping worker. This ensures that
-        // sleeping tasks get woken up
-        if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Notified, false) {
-            trace!("submit to existing worker; idx={}; state={:?}", idx, worker_state);
-            self.submit_to_external(idx, task, worker_state, inner);
-            return;
-        }
+        let idx = task.home_worker_id_or_assign(|| {
+            // First try to get a handle to a sleeping worker. This ensures that
+            // sleeping tasks get woken up
+            if let Some((idx, worker_state))
+                = self.sleep_stack.pop(&self.workers, Notified, false)
+            {
+                trace!("submit to existing worker; idx={}; state={:?}", idx, worker_state);
+                WorkerId(idx)
+            } else {
+                // All workers are active, so pick a random worker and submit the
+                // task to it.
+                let len = self.workers.len();
+                let idx = self.rand_usize() % len;
 
-        // All workers are active, so pick a random worker and submit the
-        // task to it.
-        let len = self.workers.len();
-        let idx = self.rand_usize() % len;
-
-        trace!("  -> submitting to random; idx={}", idx);
+                trace!("  -> submitting to random; idx={}", idx);
+                WorkerId(idx)
+            }
+        }).0;
 
         let state = self.workers[idx].load_state();
         self.submit_to_external(idx, task, state, inner);

@@ -11,19 +11,9 @@ pub struct Shutdown {
 
 impl Shutdown {
     pub(super) fn shutdown_now(inner: Inner) -> Self {
-        let inner = Box::new({
-            let pool = inner.pool;
-            let reactor = inner.reactor;
-
-            pool.shutdown_now().and_then(|_| {
-                reactor.shutdown_now()
-                    .then(|_| {
-                        Ok(())
-                    })
-            })
-        });
-
-        Shutdown { inner }
+        Shutdown {
+            inner: Box::new(inner.pool.shutdown_on_idle())
+        }
     }
 }
 

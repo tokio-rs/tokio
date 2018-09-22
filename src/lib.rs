@@ -65,7 +65,7 @@
 //! ```
 
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.5")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+// #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;
 #[macro_use]

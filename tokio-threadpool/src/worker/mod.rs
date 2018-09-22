@@ -16,7 +16,7 @@ use notifier::Notifier;
 use sender::Sender;
 use task::{self, Task, CanBlock};
 
-use tokio_executor;
+use tokio_executor::{self, Enter};
 
 use futures::{Poll, Async};
 
@@ -27,6 +27,13 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
+
+enum GrabTask {
+    Owned(Arc<Task>),
+    Stolen(Arc<Task>),
+    Empty,
+    Retry,
+}
 
 /// Thread worker
 ///
@@ -71,8 +78,13 @@ struct CurrentTask {
     /// when this is set.
     task: Cell<Option<*const Arc<Task>>>,
 
+    notify: Cell<Option<*const Arc<Notifier>>>,
+
     /// Tracks the blocking capacity allocation state.
     can_block: Cell<CanBlock>,
+
+    /// TODO
+    run_result: Cell<Option<task::Run>>,
 }
 
 /// Identifies a thread pool worker.
@@ -80,7 +92,7 @@ struct CurrentTask {
 /// This identifier is unique scoped by the thread pool. It is possible that
 /// different thread pool instances share worker identifier values.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct WorkerId(pub(crate) usize);
+pub struct WorkerId(pub usize);
 
 // Pointer to the current worker info
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
@@ -118,11 +130,7 @@ impl Worker {
             let mut enter = tokio_executor::enter().unwrap();
 
             tokio_executor::with_default(&mut sender, &mut enter, |enter| {
-                if let Some(ref callback) = self.inner.config.around_worker {
-                    callback.call(self, enter);
-                } else {
-                    self.run();
-                }
+                self.main_loop(enter);
             });
         });
 
@@ -209,14 +217,63 @@ impl Worker {
     ///
     /// This identifier is unique scoped by the thread pool. It is possible that
     /// different thread pool instances share worker identifier values.
-    pub fn id(&self) -> &WorkerId {
-        &self.id
+    pub fn id(&self) -> WorkerId {
+        self.current_task.get_ref().home_worker_id().unwrap()
+    }
+
+    fn grab_task(&self) -> GrabTask {
+        use deque::{Pop, Steal};
+
+        // Poll the internal queue for a task to run
+        match self.entry().pop_task() {
+            Pop::Data(task) => return GrabTask::Owned(task),
+            Pop::Retry => return GrabTask::Retry,
+            Pop::Empty => {}
+        }
+
+        debug_assert!(!self.is_blocking.get());
+
+        let len = self.inner.workers.len();
+        let mut idx = self.inner.rand_usize() % len;
+        let mut retry = false;
+        let start = idx;
+
+        loop {
+            if idx < len {
+                match self.inner.workers[idx].steal_tasks(self.entry()) {
+                    Steal::Data(task) => {
+                        trace!("stole task");
+                        trace!("grab_task -- signal_work; self={}; from={}",
+                               self.id.0, idx);
+                        self.inner.signal_work(&self.inner);
+
+                        return GrabTask::Stolen(task);
+                    }
+                    Steal::Empty => {}
+                    Steal::Retry => retry = true,
+                }
+
+                idx += 1;
+            } else {
+                idx = 0;
+            }
+
+            if idx == start {
+                break;
+            }
+        }
+
+        if retry {
+            GrabTask::Retry
+        } else {
+            GrabTask::Empty
+        }
     }
 
     /// Run the worker
     ///
     /// This function blocks until the worker is shutting down.
-    pub fn run(&self) {
+    pub fn main_loop(&self, enter: &mut Enter) {
         const MAX_SPINS: usize = 3;
         const LIGHT_SLEEP_INTERVAL: usize = 32;
 
@@ -236,8 +293,30 @@ impl Worker {
             // queue.
             let consistent = self.drain_inbound();
 
-            // Run the next available task
-            if self.try_run_task(&notify) {
+            let found_work = match self.grab_task() {
+                GrabTask::Owned(task) => {
+                    self.run_task(task, &notify, enter);
+                    true
+                }
+                GrabTask::Stolen(task) => {
+                    self.run_task(task, &notify, enter);
+
+                    // trace!("try_steal_task -- signal_work; self={}; from={}",
+                    //        self.id.0, idx);
+
+                    // Signal other workers that work is available
+                    //
+                    // TODO: Should this be called here or before
+                    // `run_task`?
+                    self.inner.signal_work(&self.inner);
+                    true
+                }
+                GrabTask::Retry => true,
+                GrabTask::Empty => false,
+            };
+
+            // If found any work, run the next available task
+            if found_work {
                 if self.is_blocking.get() {
                     // Exit out of the run state
                     return;
@@ -289,18 +368,6 @@ impl Worker {
         let _ = self.inner.release_backup(self.backup_id);
 
         self.should_finalize.set(true);
-    }
-
-    /// Try to run a task
-    ///
-    /// Returns `true` if work was found.
-    #[inline]
-    fn try_run_task(&self, notify: &Arc<Notifier>) -> bool {
-        if self.try_run_owned_task(notify) {
-            return true;
-        }
-
-        self.try_steal_task(notify)
     }
 
     /// Checks the worker's current state, updating it as needed.
@@ -379,76 +446,10 @@ impl Worker {
         true
     }
 
-    /// Runs the next task on this worker's queue.
-    ///
-    /// Returns `true` if work was found.
-    fn try_run_owned_task(&self, notify: &Arc<Notifier>) -> bool {
-        use deque::Pop;
-
-        // Poll the internal queue for a task to run
-        match self.entry().pop_task() {
-            Pop::Data(task) => {
-                self.run_task(task, notify);
-                true
-            }
-            Pop::Empty => false,
-            Pop::Retry => true,
-        }
-    }
-
-    /// Tries to steal a task from another worker.
-    ///
-    /// Returns `true` if work was found
-    fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
-        use deque::Steal;
-
-        debug_assert!(!self.is_blocking.get());
-
-        let len = self.inner.workers.len();
-        let mut idx = self.inner.rand_usize() % len;
-        let mut found_work = false;
-        let start = idx;
-
-        loop {
-            if idx < len {
-                match self.inner.workers[idx].steal_tasks(self.entry()) {
-                    Steal::Data(task) => {
-                        trace!("stole task");
-
-                        self.run_task(task, notify);
-
-                        trace!("try_steal_task -- signal_work; self={}; from={}",
-                               self.id.0, idx);
-
-                        // Signal other workers that work is available
-                        //
-                        // TODO: Should this be called here or before
-                        // `run_task`?
-                        self.inner.signal_work(&self.inner);
-
-                        return true;
-                    }
-                    Steal::Empty => {}
-                    Steal::Retry => found_work = true,
-                }
-
-                idx += 1;
-            } else {
-                idx = 0;
-            }
-
-            if idx == start {
-                break;
-            }
-        }
-
-        found_work
-    }
-
-    fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>) {
+    fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>, enter: &mut Enter) {
         use task::Run::*;
 
-        let run = self.run_task2(&task, notify);
+        let run = self.run_task2(&task, notify, enter);
 
         // TODO: Try to claim back the worker state in case the backup thread
         // did not start up fast enough. This is a performance optimization.
@@ -509,11 +510,12 @@ impl Worker {
     ///
     /// Great care is needed to ensure that `current_task` is unset in this
     /// function.
-    fn run_task2(&self,
-                 task: &Arc<Task>,
-                 notify: &Arc<Notifier>)
-        -> task::Run
-    {
+    fn run_task2(
+        &self,
+        task: &Arc<Task>,
+        notify: &Arc<Notifier>,
+        enter: &mut Enter,
+    ) -> task::Run {
         struct Guard<'a> {
             worker: &'a Worker,
             allocated_at_run: bool
@@ -538,7 +540,7 @@ impl Worker {
         let can_block = task.consume_blocking_allocation();
 
         // Set `current_task`
-        self.current_task.set(task, can_block);
+        self.current_task.set(task, notify, can_block);
 
         // Create the guard, this ensures that `current_task` is unset when the
         // function returns, even if the return is caused by a panic.
@@ -547,7 +549,20 @@ impl Worker {
             allocated_at_run: can_block == CanBlock::Allocated
         };
 
-        task.run(notify)
+        if let Some(ref callback) = self.inner.config.around_worker {
+            callback.call(self, enter);
+        } else {
+            self.run();
+        }
+
+        self.current_task.run_result().unwrap()
+    }
+
+    /// Runs the current task.
+    pub fn run(&self) {
+        let notify = self.current_task.get_notify();
+        let res = self.current_task.get_ref().run(notify);
+        self.current_task.set_run_result(res);
     }
 
     /// Drains all tasks on the extern queue and pushes them onto the internal
@@ -856,6 +871,8 @@ impl CurrentTask {
     fn new() -> CurrentTask {
         CurrentTask {
             task: Cell::new(None),
+            notify: Cell::new(None),
+            run_result: Cell::new(None),
             can_block: Cell::new(CanBlock::CanRequest),
         }
     }
@@ -863,6 +880,10 @@ impl CurrentTask {
     /// Returns a reference to the task.
     fn get_ref(&self) -> &Arc<Task> {
         unsafe { &*self.task.get().unwrap() }
+    }
+
+    fn get_notify(&self) -> &Arc<Notifier> {
+        unsafe { &*self.notify.get().unwrap() }
     }
 
     fn can_block(&self) -> CanBlock {
@@ -873,8 +894,18 @@ impl CurrentTask {
         self.can_block.set(can_block);
     }
 
-    fn set(&self, task: &Arc<Task>, can_block: CanBlock) {
+    fn run_result(&self) -> Option<task::Run> {
+        self.run_result.get()
+    }
+
+    fn set_run_result(&self, run_result: task::Run) {
+        self.run_result.set(Some(run_result));
+    }
+
+    fn set(&self, task: &Arc<Task>, notify: &Arc<Notifier>, can_block: CanBlock) {
         self.task.set(Some(task as *const _));
+        self.notify.set(Some(notify as *const _));
+        self.run_result.set(None);
         self.can_block.set(can_block);
     }
 
