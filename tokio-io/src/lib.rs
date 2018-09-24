@@ -1,4 +1,5 @@
 #![deny(missing_docs, missing_debug_implementations, warnings)]
+#![allow(intra_doc_link_resolution_failure)]
 #![doc(html_root_url = "https://docs.rs/tokio-io/0.1.8")]
 
 //! Core I/O traits and combinators when working with Tokio.
