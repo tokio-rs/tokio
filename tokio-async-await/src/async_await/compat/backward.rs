@@ -1,29 +1,24 @@
-use futures::{
-    Future as Future01,
-    Poll as Poll01,
-};
-use futures_core::{Future as Future03};
+use futures::{Future, Poll};
 
-use std::pin::PinBox;
-use std::future::FutureObj;
+use std::pin::Pin;
+use std::future::{
+    Future as StdFuture,
+};
 use std::ptr::NonNull;
 use std::task::{
-    Context,
-    Spawn,
-    UnsafeWake,
     LocalWaker,
-    Poll as Poll03,
+    Poll as StdPoll,
+    UnsafeWake,
     Waker,
-    SpawnObjError,
 };
 
 /// Convert an 0.3 `Future` to an 0.1 `Future`.
 #[derive(Debug)]
-pub struct Compat<T>(PinBox<T>);
+pub struct Compat<T>(Pin<Box<T>>);
 
 impl<T> Compat<T> {
     pub fn new(data: T) -> Compat<T> {
-        Compat(PinBox::new(data))
+        Compat(Box::pinned(data))
     }
 }
 
@@ -35,7 +30,7 @@ pub trait IntoAwaitable {
 }
 
 impl<T> IntoAwaitable for T
-where T: Future03,
+where T: StdFuture,
 {
     type Awaitable = Self;
 
@@ -44,26 +39,23 @@ where T: Future03,
     }
 }
 
-impl<T, Item, Error> Future01 for Compat<T>
-where T: Future03<Output = Result<Item, Error>>,
+impl<T, Item, Error> Future for Compat<T>
+where T: StdFuture<Output = Result<Item, Error>>,
 {
     type Item = Item;
     type Error = Error;
 
-    fn poll(&mut self) -> Poll01<Item, Error> {
+    fn poll(&mut self) -> Poll<Item, Error> {
         use futures::Async::*;
 
         let local_waker = noop_local_waker();
-        let mut executor = NoopExecutor;
 
-        let mut cx = Context::new(&local_waker, &mut executor);
-
-        let res = self.0.as_pin_mut().poll(&mut cx);
+        let res = self.0.as_mut().poll(&local_waker);
 
         match res {
-            Poll03::Ready(Ok(val)) => Ok(Ready(val)),
-            Poll03::Ready(Err(err)) => Err(err),
-            Poll03::Pending => Ok(NotReady),
+            StdPoll::Ready(Ok(val)) => Ok(Ready(val)),
+            StdPoll::Ready(Err(err)) => Err(err),
+            StdPoll::Pending => Ok(NotReady),
         }
     }
 }
@@ -92,21 +84,5 @@ unsafe impl UnsafeWake for NoopWaker {
 
     unsafe fn wake(&self) {
         panic!("NoopWake cannot wake");
-    }
-}
-
-// ===== NoopExecutor =====
-
-struct NoopExecutor;
-
-impl Spawn for NoopExecutor {
-    fn spawn_obj(&mut self, future: FutureObj<'static, ()>) -> Result<(), SpawnObjError> {
-        use std::task::SpawnErrorKind;
-
-        // NoopExecutor cannot execute
-        Err(SpawnObjError {
-            kind: SpawnErrorKind::shutdown(),
-            future,
-        })
     }
 }

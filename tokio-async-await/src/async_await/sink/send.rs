@@ -1,10 +1,10 @@
 use futures::Sink;
 
-use futures_core::future::Future;
-use futures_core::task::{self, Poll};
+use std::future::Future;
+use std::task::{self, Poll};
 
 use std::marker::Unpin;
-use std::pin::PinMut;
+use std::pin::Pin;
 
 /// Future for the `SinkExt::send_async` combinator, which sends a value to a
 /// sink and then waits until the sink has fully flushed.
@@ -28,12 +28,9 @@ impl<'a, T: Sink + Unpin + ?Sized> Send<'a, T> {
 impl<T: Sink + Unpin + ?Sized> Future for Send<'_, T> {
     type Output = Result<(), T::SinkError>;
 
-    fn poll(mut self: PinMut<Self>, _cx: &mut task::Context) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
         use crate::async_await::compat::forward::convert_poll;
         use futures::AsyncSink::{Ready, NotReady};
-        use futures_util::try_ready;
-
-        // use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
 

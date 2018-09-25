@@ -1,4 +1,4 @@
-#![feature(futures_api, await_macro, pin, arbitrary_self_types)]
+#![feature(arbitrary_self_types, async_await, await_macro, futures_api, pin)]
 
 #![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.3")]
 #![deny(missing_docs, missing_debug_implementations)]
@@ -7,8 +7,21 @@
 //! A preview of Tokio w/ `async` / `await` support.
 
 extern crate futures;
-extern crate futures_core;
-extern crate futures_util;
+
+/// Extracts the successful type of a `Poll<Result<T, E>>`.
+///
+/// This macro bakes in propagation of `Pending` and `Err` signals by returning early.
+macro_rules! try_ready {
+    ($x:expr) => {
+        match $x {
+            std::task::Poll::Ready(Ok(x)) => x,
+            std::task::Poll::Ready(Err(e)) =>
+                return std::task::Poll::Ready(Err(e.into())),
+            std::task::Poll::Pending =>
+                return std::task::Poll::Pending,
+        }
+    }
+}
 
 // Re-export all of Tokio
 pub use tokio_main::{
@@ -70,9 +83,7 @@ pub mod prelude {
     };
 }
 
-use futures_core::{
-    Future as Future03,
-};
+use std::future::{Future as StdFuture};
 
 // Rename the `await` macro in `std`
 #[doc(hidden)]
@@ -80,22 +91,24 @@ pub use std::await as std_await;
 
 /// Like `tokio::run`, but takes an `async` block
 pub fn run_async<F>(future: F)
-where F: Future03<Output = ()> + Send + 'static,
+where F: StdFuture<Output = ()> + Send + 'static,
 {
-    use futures_util::future::FutureExt;
     use crate::async_await::compat::backward;
 
-    let future = future.map(|_| Ok(()));
-    run(backward::Compat::new(future))
+    run(backward::Compat::new(async move {
+        let _ = await!(future);
+        Ok(())
+    }))
 }
 
 /// Like `tokio::spawn`, but takes an `async` block
 pub fn spawn_async<F>(future: F)
-where F: Future03<Output = ()> + Send + 'static,
+where F: StdFuture<Output = ()> + Send + 'static,
 {
-    use futures_util::future::FutureExt;
     use crate::async_await::compat::backward;
 
-    let future = future.map(|_| Ok(()));
-    spawn(backward::Compat::new(future));
+    spawn(backward::Compat::new(async move {
+        let _ = await!(future);
+        Ok(())
+    }));
 }

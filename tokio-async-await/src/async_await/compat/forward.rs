@@ -1,36 +1,35 @@
 
 use futures::{Future, Async};
-use futures_core::future::Future as Future03;
-use futures_core::task::Poll as Poll03;
 
 use std::marker::Unpin;
-use std::pin::PinMut;
-use std::task::Context;
+use std::future::Future as StdFuture;
+use std::pin::Pin;
+use std::task::{LocalWaker, Poll as StdPoll};
 
 /// Converts an 0.1 `Future` into an 0.3 `Future`.
 #[derive(Debug)]
 pub struct Compat<T>(T);
 
-pub(crate) fn convert_poll<T, E>(poll: Result<Async<T>, E>) -> Poll03<Result<T, E>> {
+pub(crate) fn convert_poll<T, E>(poll: Result<Async<T>, E>) -> StdPoll<Result<T, E>> {
     use futures::Async::{Ready, NotReady};
 
     match poll {
-        Ok(Ready(val)) => Poll03::Ready(Ok(val)),
-        Ok(NotReady) => Poll03::Pending,
-        Err(err) => Poll03::Ready(Err(err)),
+        Ok(Ready(val)) => StdPoll::Ready(Ok(val)),
+        Ok(NotReady) => StdPoll::Pending,
+        Err(err) => StdPoll::Ready(Err(err)),
     }
 }
 
 pub(crate) fn convert_poll_stream<T, E>(
-    poll: Result<Async<Option<T>>, E>) -> Poll03<Option<Result<T, E>>>
+    poll: Result<Async<Option<T>>, E>) -> StdPoll<Option<Result<T, E>>>
 {
     use futures::Async::{Ready, NotReady};
 
     match poll {
-        Ok(Ready(Some(val))) => Poll03::Ready(Some(Ok(val))),
-        Ok(Ready(None)) => Poll03::Ready(None),
-        Ok(NotReady) => Poll03::Pending,
-        Err(err) => Poll03::Ready(Some(Err(err))),
+        Ok(Ready(Some(val))) => StdPoll::Ready(Some(Ok(val))),
+        Ok(Ready(None)) => StdPoll::Ready(None),
+        Ok(NotReady) => StdPoll::Pending,
+        Err(err) => StdPoll::Ready(Some(Err(err))),
     }
 }
 
@@ -50,20 +49,20 @@ impl<T: Future + Unpin> IntoAwaitable for T {
     }
 }
 
-impl<T> Future03 for Compat<T>
+impl<T> StdFuture for Compat<T>
 where T: Future + Unpin
 {
     type Output = Result<T::Item, T::Error>;
 
-    fn poll(self: PinMut<Self>, _cx: &mut Context) -> Poll03<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _lw: &LocalWaker) -> StdPoll<Self::Output> {
         use futures::Async::{Ready, NotReady};
 
         // TODO: wire in cx
 
-        match PinMut::get_mut(self).0.poll() {
-            Ok(Ready(val)) => Poll03::Ready(Ok(val)),
-            Ok(NotReady) => Poll03::Pending,
-            Err(e) => Poll03::Ready(Err(e)),
+        match self.0.poll() {
+            Ok(Ready(val)) => StdPoll::Ready(Ok(val)),
+            Ok(NotReady) => StdPoll::Pending,
+            Err(e) => StdPoll::Ready(Err(e)),
         }
     }
 }
