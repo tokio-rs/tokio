@@ -6,7 +6,6 @@ use std::io;
 
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
-use tokio_threadpool::park::DefaultPark;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
@@ -217,17 +216,18 @@ impl Builder {
         let clock1 = self.clock.clone();
         let clock2 = clock1.clone();
 
+        let reactors = Arc::new(Mutex::new(HashMap::<_, tokio_reactor::Handle>::new()));
+        let r1 = reactors.clone();
+
         let timers = Arc::new(Mutex::new(HashMap::<_, timer::Handle>::new()));
         let t1 = timers.clone();
 
-        // Spawn a reactor on a background thread.
-        let reactor = Reactor::new()?.background()?;
-
-        // Get a handle to the reactor.
-        let reactor_handle = reactor.handle().clone();
-
         let pool = self.threadpool_builder
             .around_worker(move |w, enter| {
+                let reactor_handle = r1.lock().unwrap()
+                    .get(w.id()).unwrap()
+                    .clone();
+
                 let timer_handle = t1.lock().unwrap()
                     .get(w.id()).unwrap()
                     .clone();
@@ -241,8 +241,14 @@ impl Builder {
                 });
             })
             .custom_park(move |worker_id| {
+                // Create a new reactor
+                let reactor = Reactor::new().unwrap(); // TODO(stjepang): remove unwrap
+
+                reactors.lock().unwrap()
+                    .insert(worker_id.clone(), reactor.handle());
+
                 // Create a new timer
-                let timer = Timer::new_with_now(DefaultPark::new(), clock2.clone());
+                let timer = Timer::new_with_now(reactor, clock2.clone());
 
                 timers.lock().unwrap()
                     .insert(worker_id.clone(), timer.handle());
@@ -253,7 +259,6 @@ impl Builder {
 
         Ok(Runtime {
             inner: Some(Inner {
-                reactor,
                 pool,
             }),
         })

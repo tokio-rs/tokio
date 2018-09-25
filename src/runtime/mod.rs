@@ -121,8 +121,6 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::{Background, Handle};
-
 use std::io;
 
 use tokio_executor::enter;
@@ -152,9 +150,6 @@ pub struct Runtime {
 
 #[derive(Debug)]
 struct Inner {
-    /// Reactor running on a background thread.
-    reactor: Background,
-
     /// Task execution pool.
     pool: threadpool::ThreadPool,
 }
@@ -249,34 +244,6 @@ impl Runtime {
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         Builder::new().build()
-    }
-
-    #[deprecated(since = "0.1.5", note = "use `reactor` instead")]
-    #[doc(hidden)]
-    pub fn handle(&self) -> &Handle {
-        self.reactor()
-    }
-
-    /// Return a reference to the reactor handle for this runtime instance.
-    ///
-    /// The returned handle reference can be cloned in order to get an owned
-    /// value of the handle. This handle can be used to initialize I/O resources
-    /// (like TCP or UDP sockets) that will not be used on the runtime.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    ///
-    /// let rt = Runtime::new()
-    ///     .unwrap();
-    ///
-    /// let reactor_handle = rt.reactor().clone();
-    ///
-    /// // use `reactor_handle`
-    /// ```
-    pub fn reactor(&self) -> &Handle {
-        self.inner().reactor.handle()
     }
 
     /// Return a handle to the runtime's executor.
@@ -424,16 +391,7 @@ impl Runtime {
     /// [mod]: index.html
     pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
-
-        let inner = Box::new({
-            let pool = inner.pool;
-            let reactor = inner.reactor;
-
-            pool.shutdown_on_idle().and_then(|_| {
-                reactor.shutdown_on_idle()
-            })
-        });
-
+        let inner = Box::new(inner.pool.shutdown_on_idle());
         Shutdown { inner }
     }
 
