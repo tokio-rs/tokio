@@ -36,4 +36,5 @@ tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 
 [dev-dependencies]
+num_cpus = "1.8.0"
 tokio = { version = "0.1.7", path = ".." }
