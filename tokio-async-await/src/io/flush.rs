@@ -26,7 +26,7 @@ impl<'a, T: AsyncWrite + ?Sized> Future for Flush<'a, T> {
     type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, _wx: &LocalWaker) -> Poll<Self::Output> {
-        use crate::async_await::compat::forward::convert_poll;
+        use crate::compat::forward::convert_poll;
         convert_poll(self.writer.poll_flush())
     }
 }

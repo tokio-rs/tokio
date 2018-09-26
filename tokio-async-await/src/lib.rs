@@ -1,4 +1,12 @@
-#![feature(arbitrary_self_types, async_await, await_macro, futures_api, pin)]
+#![cfg(feature = "async-await-preview")]
+#![feature(
+    rust_2018_preview,
+    arbitrary_self_types,
+    async_await,
+    await_macro,
+    futures_api,
+    pin,
+    )]
 
 #![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.3")]
 #![deny(missing_docs, missing_debug_implementations)]
@@ -7,6 +15,7 @@
 //! A preview of Tokio w/ `async` / `await` support.
 
 extern crate futures;
+extern crate tokio_io;
 
 /// Extracts the successful type of a `Poll<Result<T, E>>`.
 ///
@@ -23,36 +32,14 @@ macro_rules! try_ready {
     }
 }
 
-// Re-export all of Tokio
-pub use tokio_main::{
-    // Modules
-    clock,
-    codec,
-    executor,
-    fs,
-    io,
-    net,
-    reactor,
-    runtime,
-    timer,
-    util,
+#[macro_use]
+mod await;
+pub mod compat;
+pub mod io;
+pub mod sink;
+pub mod stream;
 
-    // Functions
-    run,
-    spawn,
-};
-
-pub mod sync {
-    //! Asynchronous aware synchronization
-
-    pub use tokio_channel::{
-        mpsc,
-        oneshot,
-    };
-}
-
-pub mod async_await;
-
+/*
 pub mod prelude {
     //! A "prelude" for users of the `tokio` crate.
     //!
@@ -82,33 +69,47 @@ pub mod prelude {
         },
     };
 }
+*/
 
-use std::future::{Future as StdFuture};
-
-// Rename the `await` macro in `std`
+// Rename the `await` macro in `std`. This is used by the redefined
+// `await` macro in this crate.
 #[doc(hidden)]
 pub use std::await as std_await;
+
+/*
+use std::future::{Future as StdFuture};
+
+fn run<T: futures::Future<Item = (), Error = ()>>(t: T) {
+    drop(t);
+}
+
+async fn map_ok<T: StdFuture>(future: T) -> Result<(), ()> {
+    let _ = await!(future);
+    Ok(())
+}
 
 /// Like `tokio::run`, but takes an `async` block
 pub fn run_async<F>(future: F)
 where F: StdFuture<Output = ()> + Send + 'static,
 {
-    use crate::async_await::compat::backward;
+    use async_await::compat::backward;
+    let future = backward::Compat::new(map_ok(future));
 
-    run(backward::Compat::new(async move {
-        let _ = await!(future);
-        Ok(())
-    }))
+    run(future);
+    unimplemented!();
 }
+*/
 
+/*
 /// Like `tokio::spawn`, but takes an `async` block
 pub fn spawn_async<F>(future: F)
 where F: StdFuture<Output = ()> + Send + 'static,
 {
     use crate::async_await::compat::backward;
 
-    spawn(backward::Compat::new(async move {
+    spawn(backward::Compat::new(async || {
         let _ = await!(future);
         Ok(())
     }));
 }
+*/

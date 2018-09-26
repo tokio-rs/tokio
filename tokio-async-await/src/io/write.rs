@@ -30,7 +30,7 @@ impl<'a, T: AsyncWrite + ?Sized> Future for Write<'a, T> {
     type Output = io::Result<usize>;
 
     fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<io::Result<usize>> {
-        use crate::async_await::compat::forward::convert_poll;
+        use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
         convert_poll(this.writer.poll_write(this.buf))

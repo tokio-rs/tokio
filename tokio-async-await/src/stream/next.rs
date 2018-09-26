@@ -23,7 +23,7 @@ impl<'a, T: Stream + Unpin> Future for Next<'a, T> {
     type Output = Option<Result<T::Item, T::Error>>;
 
     fn poll(mut self: Pin<&mut Self>, _lw: &LocalWaker) -> Poll<Self::Output> {
-        use crate::async_await::compat::forward::convert_poll_stream;
+        use crate::compat::forward::convert_poll_stream;
 
         convert_poll_stream(self.stream.poll())
     }

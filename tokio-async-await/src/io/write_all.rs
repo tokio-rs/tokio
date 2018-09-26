@@ -6,8 +6,7 @@ use std::task::{self, Poll};
 use std::io;
 use std::marker::Unpin;
 use std::mem;
-
-use core::pin::Pin;
+use std::pin::Pin;
 
 /// A future used to write the entire contents of a buffer.
 #[derive(Debug)]
@@ -36,7 +35,7 @@ impl<'a, T: AsyncWrite + ?Sized> Future for WriteAll<'a, T> {
     type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<io::Result<()>> {
-        use crate::async_await::compat::forward::convert_poll;
+        use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
 

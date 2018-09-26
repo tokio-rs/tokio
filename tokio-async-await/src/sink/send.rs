@@ -29,13 +29,11 @@ impl<T: Sink + Unpin + ?Sized> Future for Send<'_, T> {
     type Output = Result<(), T::SinkError>;
 
     fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
-        use crate::async_await::compat::forward::convert_poll;
+        use crate::compat::forward::convert_poll;
         use futures::AsyncSink::{Ready, NotReady};
 
-        let this = &mut *self;
-
-        if let Some(item) = this.item.take() {
-            match this.sink.start_send(item) {
+        if let Some(item) = self.item.take() {
+            match self.sink.start_send(item) {
                 Ok(Ready) => {}
                 Ok(NotReady(val)) => {
                     self.item = Some(val);
@@ -49,7 +47,7 @@ impl<T: Sink + Unpin + ?Sized> Future for Send<'_, T> {
 
         // we're done sending the item, but want to block on flushing the
         // sink
-        try_ready!(convert_poll(this.sink.poll_complete()));
+        try_ready!(convert_poll(self.sink.poll_complete()));
 
         Poll::Ready(Ok(()))
     }

@@ -30,7 +30,7 @@ impl<'a, T: AsyncRead + ?Sized> Future for Read<'a, T> {
     type Output = io::Result<usize>;
 
     fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
-        use crate::async_await::compat::forward::convert_poll;
+        use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
         convert_poll(this.reader.poll_read(this.buf))
