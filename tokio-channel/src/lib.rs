@@ -1,8 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-channel/0.1.0")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
-#![cfg_attr(feature = "async-await-preview", feature(
-        pin,
-        ))]
 
 //! Asynchronous channels.
 //!
@@ -15,8 +12,3 @@ pub mod mpsc;
 pub mod oneshot;
 
 mod lock;
-
-// ===== EXPERIMENTAL async / await support =====
-
-#[cfg(feature = "async-await-preview")]
-mod async_await;

@@ -17,8 +17,9 @@ use std::task::{
 pub struct Compat<T>(Pin<Box<T>>);
 
 impl<T> Compat<T> {
-    pub fn new(data: T) -> Compat<T> {
-        Compat(Box::pinned(data))
+    /// Create a new `Compat` backed by `future`.
+    pub fn new(future: T) -> Compat<T> {
+        Compat(Box::pinned(future))
     }
 }
 
