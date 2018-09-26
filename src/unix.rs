@@ -195,6 +195,12 @@ impl<T: io::Write> io::Write for Fd<T> {
     }
 }
 
+impl<T> AsRawFd for Fd<T> where T: AsRawFd {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0.as_raw_fd()
+    }
+}
+
 pub type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
 pub type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
 pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
@@ -206,10 +212,10 @@ impl<T> Evented for Fd<T> where T: AsRawFd {
                 interest: Ready,
                 opts: PollOpt)
                 -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).register(poll,
-                                                token,
-                                                interest | UnixReady::hup(),
-                                                opts)
+        EventedFd(&self.as_raw_fd()).register(poll,
+                                              token,
+                                              interest | UnixReady::hup(),
+                                              opts)
     }
 
     fn reregister(&self,
@@ -218,14 +224,14 @@ impl<T> Evented for Fd<T> where T: AsRawFd {
                   interest: Ready,
                   opts: PollOpt)
                   -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).reregister(poll,
-                                                  token,
-                                                  interest | UnixReady::hup(),
-                                                  opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll,
+                                                token,
+                                                interest | UnixReady::hup(),
+                                                opts)
     }
 
     fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
-        EventedFd(&self.0.as_raw_fd()).deregister(poll)
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
 
