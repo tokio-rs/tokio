@@ -24,6 +24,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 members = [
   "./",
+  "tokio-async-await",
   "tokio-channel",
   "tokio-codec",
   "tokio-current-thread",
@@ -38,6 +39,13 @@ members = [
   "tokio-tls",
   "tokio-udp",
   "tokio-uds",
+]
+
+[features]
+# This feature comes with no promise of stability. Things will
+# break with each patch release. Use at your own risk.
+async-await-preview = [
+  "tokio-async-await/async-await-preview",
 ]
 
 [badges]
@@ -64,6 +72,9 @@ mio = "0.6.14"
 
 [target.'cfg(unix)'.dependencies]
 tokio-uds = { version = "0.2.1", path = "tokio-uds" }
+
+# Needed for async/await preview support
+tokio-async-await = { version = "0.1.0", path = "tokio-async-await", optional = true }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }

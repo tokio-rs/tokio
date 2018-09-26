@@ -66,6 +66,11 @@
 
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.5")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
+#![cfg_attr(feature = "async-await-preview", feature(
+        async_await,
+        await_macro,
+        futures_api,
+        ))]
 
 extern crate bytes;
 #[macro_use]
@@ -81,6 +86,9 @@ extern crate tokio_threadpool;
 extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
+
+#[cfg(feature = "async-await-preview")]
+extern crate tokio_async_await;
 
 #[cfg(unix)]
 extern crate tokio_uds;
@@ -619,4 +627,28 @@ pub mod prelude {
         Poll,
         task,
     };
+
+    #[cfg(feature = "async-await-preview")]
+    #[doc(inline)]
+    pub use tokio_async_await::{
+        io::{
+            AsyncReadExt,
+            AsyncWriteExt,
+        },
+        sink::{
+            SinkExt,
+        },
+        stream::{
+            StreamExt as StreamAsyncExt,
+        },
+    };
 }
+
+#[cfg(feature = "async-await-preview")]
+mod async_await;
+
+#[cfg(feature = "async-await-preview")]
+pub use async_await::{run_async, spawn_async};
+
+#[cfg(feature = "async-await-preview")]
+pub use tokio_async_await::await;

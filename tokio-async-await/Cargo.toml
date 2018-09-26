@@ -1,8 +1,5 @@
-cargo-features = ["rename-dependency"]
-
 [package]
 name = "tokio-async-await"
-edition = "2018"
 
 # When releasing to crates.io:
 # - Update html_root_url.
@@ -17,25 +14,17 @@ Experimental async/await support for Tokio
 """
 categories = ["asynchronous"]
 
-[workspace]
-members = [
-  "./",
-  "examples",
-]
-
-[lib]
-name = "tokio"
+[features]
+# This feature comes with no promise of stability. Things will
+# break with each patch release. Use at your own risk.
+async-await-preview = ["futures/nightly"]
 
 [dependencies]
 futures = "0.1.23"
-tokio_main = { package = "tokio", version = "0.1.8", path = ".." }
 tokio-io = { version = "0.1.7", path = "../tokio-io" }
-tokio-channel = { version = "0.1.0", path = "../tokio-channel", features = ["async-await-preview"] }
-tokio-reactor = { version = "0.1.5", path = "../tokio-reactor", features = ["async-await-preview"] }
-futures-core-preview = { version = "0.3.0-alpha.6" }
-futures-util-preview = { version = "0.3.0-alpha.6" }
 
 [dev-dependencies]
 bytes = "0.4.9"
-tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
+tokio = { version = "0.1.8", path = ".." }
+# tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
 hyper = "0.12.8"

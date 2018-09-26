@@ -2,11 +2,13 @@
 
 #[macro_use]
 extern crate tokio;
+extern crate futures; // v0.1
 
 use tokio::codec::{LinesCodec, Decoder};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use tokio::sync::mpsc;
+
+use futures::sync::mpsc;
 
 use std::collections::HashMap;
 use std::io;
