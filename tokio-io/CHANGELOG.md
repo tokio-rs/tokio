@@ -1,3 +1,8 @@
+# 0.1.9 (September 27, 2018)
+
+* Fix bug in `AsyncRead::split()` (#655).
+* Fix non-terminating loop in `length_delimited::FramedWrite` (#576).
+
 # 0.1.8 (August 23, 2018)
 
 * Documentation improvements

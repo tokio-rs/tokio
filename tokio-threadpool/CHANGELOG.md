@@ -1,3 +1,8 @@
+# 0.1.7 (September 27, 2018)
+
+* Add ThreadPool::spawn_handle (#602, #604).
+* Fix spawned future leak (#649).
+
 # 0.1.6 (August 23, 2018)
 
 * Misc performance improvements (#466, #468, #470, #475, #534)

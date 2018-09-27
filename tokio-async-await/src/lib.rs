@@ -8,7 +8,7 @@
     pin,
     )]
 
-#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.3")]
+#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.4")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
 

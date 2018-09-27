@@ -1,3 +1,7 @@
+# 0.1.6 (September 27, 2018)
+
+* Fix panic when reactor is stored in a thread-local (#628).
+
 # 0.1.5 (August 27, 2018)
 
 * Experimental async / await support.

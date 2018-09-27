@@ -1,3 +1,8 @@
+# 0.1.5 (September 26, 2018)
+
+* Implement `futures::Executor` for `DefaultExecutor` (#563).
+* Add `Enter::block_on(future)` (#646)
+
 # 0.1.4 (August 23, 2018)
 
 * Implement `std::error::Error` for error types (#511).
