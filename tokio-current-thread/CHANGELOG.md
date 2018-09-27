@@ -1,3 +1,7 @@
+# 0.1.3 (September 27, 2018)
+
+* Fix minimal versions
+
 # 0.1.2 (September 26, 2018)
 
 * Implement `futures::Executor` for executor types (#563)
