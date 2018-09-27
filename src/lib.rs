@@ -619,3 +619,27 @@ impl Read for ChildStderr {
 
 impl AsyncRead for ChildStderr {
 }
+
+#[cfg(unix)]
+mod sys {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use super::{ChildStdin, ChildStdout, ChildStderr};
+
+    impl AsRawFd for ChildStdin {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.get_ref().as_raw_fd()
+        }
+    }
+
+    impl AsRawFd for ChildStdout {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.get_ref().as_raw_fd()
+        }
+    }
+
+    impl AsRawFd for ChildStderr {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.get_ref().as_raw_fd()
+        }
+    }
+}
