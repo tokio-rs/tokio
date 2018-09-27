@@ -1,3 +1,11 @@
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.9")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![cfg_attr(feature = "async-await-preview", feature(
+        async_await,
+        await_macro,
+        futures_api,
+        ))]
+
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
 //! Tokio is an event-driven, non-blocking I/O platform for writing asynchronous
@@ -63,14 +71,6 @@
 //!     tokio::run(server);
 //! }
 //! ```
-
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.5")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
-#![cfg_attr(feature = "async-await-preview", feature(
-        async_await,
-        await_macro,
-        futures_api,
-        ))]
 
 extern crate bytes;
 #[macro_use]

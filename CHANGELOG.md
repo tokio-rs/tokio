@@ -1,6 +1,19 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.9 (September 27, 2018)
+
+* Experimental async/await improvements (#661).
+* Re-export `TaskExecutor` from `tokio-current-thread` (#652).
+* Improve `Runtime` builder API (#645).
+* `tokio::run` panics when called from the context of an executor
+  (#646).
+* Introduce `StreamExt` with a `timeout` helper (#573).
+* Move `length_delimited` into `tokio` (#575).
+* Re-organize `tokio::net` module (#548).
+* Re-export `tokio-current-thread::spawn` in current_thread runtime
+  (#579).
+
 # 0.1.8 (August 23, 2018)
 
 * Extract tokio::executor::current_thread to a sub crate (#370)

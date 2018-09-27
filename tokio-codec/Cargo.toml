@@ -3,14 +3,15 @@ name = "tokio-codec"
 
 # When releasing to crates.io:
 # - Update html_root_url.
+# - Update doc URL.
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Carl Lerche <me@carllerche.com>", "Bryan Burgers <bryan@burgers.io>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-codec/0.1"
+documentation = "https://docs.rs/tokio-codec/0.1.1/tokio_codec"
 description = """
 Utilities for encoding and decoding frames.
 """
