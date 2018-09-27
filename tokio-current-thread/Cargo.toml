@@ -6,8 +6,8 @@ name = "tokio-current-thread"
 # - Update doc URL
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.2"
-documentation = "https://docs.rs/tokio-current-thread/0.1.2/tokio_current_thread"
+version = "0.1.3"
+documentation = "https://docs.rs/tokio-current-thread/0.1.3/tokio_current_thread"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
@@ -19,5 +19,5 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
+tokio-executor = { version = "0.1.5", path = "../tokio-executor" }
 futures = "0.1.19"

@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.2")]
+#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.3")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 //! A single-threaded executor which executes tasks on the same thread from which
