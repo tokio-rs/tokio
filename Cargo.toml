@@ -6,11 +6,11 @@ name = "tokio"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.10"
+version = "0.1.11"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.1.10/tokio/"
+documentation = "https://docs.rs/tokio/0.1.11/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -70,11 +70,11 @@ futures = "0.1.20"
 # Needed until `reactor` is removed from `tokio`.
 mio = "0.6.14"
 
-[target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.2.1", path = "tokio-uds" }
-
 # Needed for async/await preview support
 tokio-async-await = { version = "0.1.0", path = "tokio-async-await", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+tokio-uds = { version = "0.2.1", path = "tokio-uds" }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }

@@ -1,6 +1,10 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.11 (September 28, 2018)
+
+* Fix `tokio-async-await` dependency (#675).
+
 # 0.1.10 (September 27, 2018)
 
 * Fix minimal versions
