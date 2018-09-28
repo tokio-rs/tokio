@@ -3,6 +3,7 @@ use runtime::{Inner, Runtime};
 use reactor::Reactor;
 
 use std::io;
+use std::time::Duration;
 
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
@@ -79,7 +80,8 @@ impl Builder {
     #[deprecated(
         since="0.1.9",
         note="use the `core_threads`, `blocking_threads`, `name_prefix`, \
-              and `stack_size` functions on `runtime::Builder`, instead")]
+              `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
+              instead")]
     #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
@@ -139,6 +141,37 @@ impl Builder {
     /// ```
     pub fn blocking_threads(&mut self, val: usize) -> &mut Self {
         self.threadpool_builder.max_blocking(val);
+        self
+    }
+
+    /// Set the worker thread keep alive duration for threads in the `Runtime`'s
+    /// thread pool.
+    ///
+    /// If set, a worker thread will wait for up to the specified duration for
+    /// work, at which point the thread will shutdown. When work becomes
+    /// available, a new thread will eventually be spawned to replace the one
+    /// that shut down.
+    ///
+    /// When the value is `None`, the thread will wait for work forever.
+    ///
+    /// The default value is `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    /// use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .keep_alive(Some(Duration::from_secs(30)))
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn keep_alive(&mut self, val: Option<Duration>) -> &mut Self {
+        self.threadpool_builder.keep_alive(val);
         self
     }
 
