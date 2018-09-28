@@ -1,4 +1,5 @@
 use runtime::Inner;
+use tokio_threadpool as threadpool;
 
 use std::fmt;
 
@@ -6,12 +7,12 @@ use futures::{Future, Poll};
 
 /// A future that resolves when the Tokio `Runtime` is shut down.
 pub struct Shutdown {
-    pub(super) inner: Box<Future<Item = (), Error = ()> + Send>,
+    pub(super) inner: threadpool::Shutdown,
 }
 
 impl Shutdown {
     pub(super) fn shutdown_now(inner: Inner) -> Self {
-        let inner = Box::new(inner.pool.shutdown_now());
+        let inner = inner.pool.shutdown_now();
         Shutdown { inner }
     }
 }

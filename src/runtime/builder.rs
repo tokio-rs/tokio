@@ -3,7 +3,9 @@ use runtime::{Inner, Runtime};
 use reactor::Reactor;
 
 use std::io;
+use std::sync::Mutex;
 
+use num_cpus;
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
@@ -49,6 +51,9 @@ pub struct Builder {
     /// Thread pool specific builder
     threadpool_builder: ThreadPoolBuilder,
 
+    /// The number of worker threads
+    core_threads: usize,
+
     /// The clock to use
     clock: Clock,
 }
@@ -59,11 +64,15 @@ impl Builder {
     ///
     /// Configuration methods can be chained on the return value.
     pub fn new() -> Builder {
+        let core_threads = num_cpus::get().max(1);
+
         let mut threadpool_builder = ThreadPoolBuilder::new();
         threadpool_builder.name_prefix("tokio-runtime-worker-");
+        threadpool_builder.pool_size(core_threads);
 
         Builder {
             threadpool_builder,
+            core_threads,
             clock: Clock::new(),
         }
     }
@@ -107,6 +116,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn core_threads(&mut self, val: usize) -> &mut Self {
+        self.core_threads = val;
         self.threadpool_builder.pool_size(val);
         self
     }
@@ -209,56 +219,54 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        use std::collections::HashMap;
-        use std::sync::{Arc, Mutex};
+        // TODO(stjepang): Once we remove the `threadpool_builder` method, remove this line too.
+        self.threadpool_builder.pool_size(self.core_threads);
+
+        let mut reactor_handles = Vec::new();
+        let mut timer_handles = Vec::new();
+        let mut timers = Vec::new();
+
+        for _ in 0..self.core_threads {
+            // Create a new reactor.
+            let reactor = Reactor::new()?;
+            reactor_handles.push(reactor.handle());
+
+            // Create a new timer.
+            let timer = Timer::new_with_now(reactor, self.clock.clone());
+            timer_handles.push(timer.handle());
+            timers.push(Mutex::new(Some(timer)));
+        }
 
         // Get a handle to the clock for the runtime.
-        let clock1 = self.clock.clone();
-        let clock2 = clock1.clone();
+        let clock = self.clock.clone();
 
-        let reactors = Arc::new(Mutex::new(HashMap::<_, tokio_reactor::Handle>::new()));
-        let r1 = reactors.clone();
-
-        let timers = Arc::new(Mutex::new(HashMap::<_, timer::Handle>::new()));
-        let t1 = timers.clone();
+        // Get a handle to the first reactor.
+        let reactor = reactor_handles[0].clone();
 
         let pool = self.threadpool_builder
             .around_worker(move |w, enter| {
-                let reactor_handle = r1.lock().unwrap()
-                    .get(w.id()).unwrap()
-                    .clone();
+                let index = w.id().0;
 
-                let timer_handle = t1.lock().unwrap()
-                    .get(w.id()).unwrap()
-                    .clone();
-
-                tokio_reactor::with_default(&reactor_handle, enter, |enter| {
-                    clock::with_default(&clock1, enter, |enter| {
-                        timer::with_default(&timer_handle, enter, |_| {
+                tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
+                    clock::with_default(&clock, enter, |enter| {
+                        timer::with_default(&timer_handles[index], enter, |_| {
                             w.run();
                         });
                     })
                 });
             })
             .custom_park(move |worker_id| {
-                // Create a new reactor
-                let reactor = Reactor::new().unwrap(); // TODO(stjepang): remove unwrap
-
-                reactors.lock().unwrap()
-                    .insert(worker_id.clone(), reactor.handle());
-
-                // Create a new timer
-                let timer = Timer::new_with_now(reactor, clock2.clone());
-
-                timers.lock().unwrap()
-                    .insert(worker_id.clone(), timer.handle());
-
-                timer
+                timers[worker_id.0]
+                    .lock()
+                    .unwrap()
+                    .take()
+                    .unwrap()
             })
             .build();
 
         Ok(Runtime {
             inner: Some(Inner {
+                reactor,
                 pool,
             }),
         })

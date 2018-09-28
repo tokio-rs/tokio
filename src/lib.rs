@@ -71,6 +71,7 @@ extern crate bytes;
 #[macro_use]
 extern crate futures;
 extern crate mio;
+extern crate num_cpus;
 extern crate tokio_current_thread;
 extern crate tokio_io;
 extern crate tokio_executor;

@@ -79,8 +79,11 @@ struct CurrentTask {
 ///
 /// This identifier is unique scoped by the thread pool. It is possible that
 /// different thread pool instances share worker identifier values.
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct WorkerId(pub(crate) usize);
+///
+/// Worker identifiers in a single thread pool are guaranteed to be integers in
+/// the range `0..pool_size`.
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+pub struct WorkerId(pub usize);
 
 // Pointer to the current worker info
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
