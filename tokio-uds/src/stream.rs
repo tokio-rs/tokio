@@ -196,7 +196,7 @@ impl<'a> AsyncRead for &'a UnixStream {
             if r == -1 {
                 let e = io::Error::last_os_error();
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.clear_write_ready()?;
+                    self.io.clear_read_ready(Ready::readable())?;
                     Ok(Async::NotReady)
                 } else {
                     Err(e)
