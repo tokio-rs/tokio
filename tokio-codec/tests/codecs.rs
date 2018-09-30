@@ -56,6 +56,116 @@ fn lines_decoder() {
 }
 
 #[test]
+fn lines_decoder_max_length() {
+    const MAX_LENGTH: usize = 6;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("line 1 is too long\nline 2\nline 3\r\nline 4\n\r\n\r");
+
+    assert!(codec.decode(buf).is_err());
+
+    let line = codec.decode(buf).unwrap().unwrap();
+    assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
+    assert_eq!("line 2", line);
+
+    assert!(codec.decode(buf).is_err());
+
+    let line = codec.decode(buf).unwrap().unwrap();
+    assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
+    assert_eq!("line 4", line);
+
+    let line = codec.decode(buf).unwrap().unwrap();
+    assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
+    assert_eq!("", line);
+
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+    buf.put("k");
+    assert_eq!(None, codec.decode(buf).unwrap());
+
+    let line = codec.decode_eof(buf).unwrap().unwrap();
+    assert!(line.len() <= MAX_LENGTH, "{:?}.len() <= {:?}", line, MAX_LENGTH);
+    assert_eq!("\rk", line);
+
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+
+    // Line that's one character too long. This could cause an out of bounds
+    // error if we peek at the next characters using slice indexing.
+    // buf.put("aaabbbc");
+    // assert!(codec.decode(buf).is_err());
+}
+
+#[test]
+fn lines_decoder_max_length_underrun() {
+    const MAX_LENGTH: usize = 6;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("line ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("too l");
+    assert!(codec.decode(buf).is_err());
+    buf.put("ong\n");
+    assert_eq!(None, codec.decode(buf).unwrap());
+
+    buf.put("line 2");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("\n");
+    assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
+}
+
+#[test]
+fn lines_decoder_max_length_bursts() {
+    const MAX_LENGTH: usize = 10;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("line ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("too l");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("ong\n");
+    assert!(codec.decode(buf).is_err());
+}
+
+#[test]
+fn lines_decoder_max_length_big_burst() {
+    const MAX_LENGTH: usize = 10;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("line ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put("too long!\n");
+    assert!(codec.decode(buf).is_err());
+}
+
+#[test]
+fn lines_decoder_max_length_newline_between_decodes() {
+    const MAX_LENGTH: usize = 5;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("hello");
+    assert_eq!(None, codec.decode(buf).unwrap());
+
+    buf.put("\nworld");
+    assert_eq!("hello", codec.decode(buf).unwrap().unwrap());
+}
+
+#[test]
 fn lines_encoder() {
     let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();

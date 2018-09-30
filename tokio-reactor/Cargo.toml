@@ -6,22 +6,17 @@ name = "tokio-reactor"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-reactor/0.1.5/tokio_reactor"
+documentation = "https://docs.rs/tokio-reactor/0.1.6/tokio_reactor"
 description = """
 Event loop that drives Tokio I/O resources.
 """
 categories = ["asynchronous", "network-programming"]
-
-[features]
-# This feature comes with no promise of stability. Things will break with each
-# patch release. Use at your own risk.
-async-await-preview = []
 
 [dependencies]
 crossbeam-utils = "0.5.0"
@@ -36,4 +31,5 @@ tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 
 [dev-dependencies]
+num_cpus = "1.8.0"
 tokio = { version = "0.1.7", path = ".." }

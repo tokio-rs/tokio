@@ -5,11 +5,11 @@ name = "tokio-timer"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create "v0.2.x" git tag.
-version = "0.2.6"
+version = "0.2.7"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio-timer/0.2.6/tokio_timer"
+documentation = "https://docs.rs/tokio-timer/0.2.7/tokio_timer"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 description = """

@@ -16,10 +16,5 @@ Channels for asynchronous communication using Tokio.
 """
 categories = ["asynchronous"]
 
-[features]
-# This feature comes with no promise of stability. Things will break with each
-# patch release. Use at your own risk.
-async-await-preview = []
-
 [dependencies]
 futures = "0.1.23"

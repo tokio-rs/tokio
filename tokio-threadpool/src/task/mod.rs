@@ -173,7 +173,7 @@ impl Task {
 
     /// Notify the task
     pub fn notify(me: Arc<Task>, pool: &Arc<Pool>) {
-        if me.schedule(){
+        if me.schedule() {
             let _ = pool.submit(me, pool);
         }
     }

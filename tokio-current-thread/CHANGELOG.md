@@ -1,3 +1,12 @@
+# 0.1.3 (September 27, 2018)
+
+* Fix minimal versions
+
+# 0.1.2 (September 26, 2018)
+
+* Implement `futures::Executor` for executor types (#563)
+* Spawning performance improvements (#565)
+
 # 0.1.1 (August 6, 2018)
 
 * Implement `std::Error` for misc error types (#501)

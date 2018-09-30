@@ -1,9 +1,9 @@
 use futures::Stream;
-use futures_core::future::Future;
-use futures_core::task::{self, Poll};
 
+use std::future::Future;
 use std::marker::Unpin;
-use std::pin::PinMut;
+use std::pin::Pin;
+use std::task::{LocalWaker, Poll};
 
 /// A future of the next element of a stream.
 #[derive(Debug)]
@@ -22,10 +22,9 @@ impl<'a, T: Stream + Unpin> Next<'a, T> {
 impl<'a, T: Stream + Unpin> Future for Next<'a, T> {
     type Output = Option<Result<T::Item, T::Error>>;
 
-    fn poll(self: PinMut<Self>, _cx: &mut task::Context) -> Poll<Self::Output> {
-        use crate::async_await::compat::forward::convert_poll_stream;
+    fn poll(mut self: Pin<&mut Self>, _lw: &LocalWaker) -> Poll<Self::Output> {
+        use crate::compat::forward::convert_poll_stream;
 
-        convert_poll_stream(
-            PinMut::get_mut(self).stream.poll())
+        convert_poll_stream(self.stream.poll())
     }
 }

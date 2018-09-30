@@ -1,3 +1,8 @@
+# 0.2.7 (September 27, 2018)
+
+* Fix `Timeout` on error bug (#648).
+* Miscellaneous documentation improvements.
+
 # 0.2.6 (August 23, 2018)
 
 * Implement `Default` for `timer::Handle` (#553)

@@ -80,9 +80,31 @@ fn deadline() {
     let when = Instant::now() + Duration::from_millis(20);
     let (tx, rx) = mpsc::channel();
 
+    #[allow(deprecated)]
     tokio::run({
         future::empty::<(), ()>()
             .deadline(when)
+            .then(move |res| {
+                assert!(res.is_err());
+                tx.send(()).unwrap();
+                Ok(())
+            })
+    });
+
+    rx.recv().unwrap();
+}
+
+#[test]
+fn timeout() {
+    use futures::future;
+
+    let _ = env_logger::try_init();
+
+    let (tx, rx) = mpsc::channel();
+
+    tokio::run({
+        future::empty::<(), ()>()
+            .timeout(Duration::from_millis(20))
             .then(move |res| {
                 assert!(res.is_err());
                 tx.send(()).unwrap();
