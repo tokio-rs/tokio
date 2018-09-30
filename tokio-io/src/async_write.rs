@@ -172,17 +172,22 @@ impl AsyncWrite for std_io::Sink {
     }
 }
 
-// TODO: Implement `prepare_uninitialized_buffer` for `io::Take`.
-// This is blocked on rust-lang/rust#27269
 impl<T: AsyncRead> AsyncRead for std_io::Take<T> {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        self.get_ref().prepare_uninitialized_buffer(buf)
+    }
 }
 
-// TODO: Implement `prepare_uninitialized_buffer` when upstream exposes inner
-// parts
 impl<T, U> AsyncRead for std_io::Chain<T, U>
     where T: AsyncRead,
           U: AsyncRead,
 {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        let (t, u) = self.get_ref();
+        // We don't need to execute the second initializer if the first one
+        // already zeroed the buffer out.
+        t.prepare_uninitialized_buffer(buf) || u.prepare_uninitialized_buffer(buf)
+    }
 }
 
 impl<T: AsyncWrite> AsyncWrite for std_io::BufWriter<T> {
