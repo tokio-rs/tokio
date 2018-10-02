@@ -578,6 +578,12 @@ impl Encoder for LengthDelimitedCodec {
             "provided length would overflow after adjustment",
         ))?;
 
+        // If there's no room to write the length field in `dst`, reserve more
+        // capacity so we don't overflow the buffer.
+        if dst.remaining_mut() < self.builder.length_field_len {
+            dst.reserve(self.builder.length_field_len);
+        }
+
         if self.builder.length_field_is_big_endian {
             dst.put_uint_be(n as u64, self.builder.length_field_len);
         } else {
