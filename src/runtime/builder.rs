@@ -278,7 +278,7 @@ impl Builder {
 
         let pool = self.threadpool_builder
             .around_worker(move |w, enter| {
-                let index = w.id().into_usize();
+                let index = w.id().to_usize();
 
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
@@ -289,7 +289,7 @@ impl Builder {
                 });
             })
             .custom_park(move |worker_id| {
-                let index = worker_id.into_usize();
+                let index = worker_id.to_usize();
 
                 timers[index]
                     .lock()

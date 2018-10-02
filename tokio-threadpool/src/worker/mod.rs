@@ -79,7 +79,7 @@ struct CurrentTask {
 ///
 /// This identifier is unique scoped by the thread pool. It is possible that
 /// different thread pool instances share worker identifier values.
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct WorkerId(pub(crate) usize);
 
 // Pointer to the current worker info
@@ -897,7 +897,7 @@ impl WorkerId {
     ///
     /// Worker identifiers in a single thread pool are guaranteed to correspond to integers in the
     /// range `0..pool_size`.
-    pub fn into_usize(&self) -> usize {
+    pub fn to_usize(&self) -> usize {
         self.0
     }
 }
