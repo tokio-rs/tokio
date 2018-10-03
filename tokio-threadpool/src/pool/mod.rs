@@ -317,6 +317,16 @@ impl Pool {
 
         // All workers are active, so pick a random worker and submit the
         // task to it.
+        self.submit_to_random(task, inner);
+    }
+
+    /// Submit a task to a random worker
+    ///
+    /// Called from outside of the scheduler, this function is how new tasks
+    /// enter the system.
+    pub fn submit_to_random(&self, task: Arc<Task>, inner: &Arc<Pool>) {
+        debug_assert_eq!(*self, **inner);
+
         let len = self.workers.len();
         let idx = self.rand_usize() % len;
 
