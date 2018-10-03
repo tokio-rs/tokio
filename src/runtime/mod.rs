@@ -121,7 +121,7 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::{Background, Handle};
+use reactor::Handle;
 
 use std::io;
 
@@ -152,8 +152,8 @@ pub struct Runtime {
 
 #[derive(Debug)]
 struct Inner {
-    /// Reactor running on a background thread.
-    reactor: Background,
+    /// A handle to one of the per-worker reactors.
+    reactor: Handle,
 
     /// Task execution pool.
     pool: threadpool::ThreadPool,
@@ -254,6 +254,7 @@ impl Runtime {
     #[deprecated(since = "0.1.5", note = "use `reactor` instead")]
     #[doc(hidden)]
     pub fn handle(&self) -> &Handle {
+        #[allow(deprecated)]
         self.reactor()
     }
 
@@ -275,8 +276,9 @@ impl Runtime {
     ///
     /// // use `reactor_handle`
     /// ```
+    #[deprecated(since = "0.1.11", note = "there is now a reactor per worker thread")]
     pub fn reactor(&self) -> &Handle {
-        self.inner().reactor.handle()
+        &self.inner().reactor
     }
 
     /// Return a handle to the runtime's executor.
@@ -424,16 +426,7 @@ impl Runtime {
     /// [mod]: index.html
     pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
-
-        let inner = Box::new({
-            let pool = inner.pool;
-            let reactor = inner.reactor;
-
-            pool.shutdown_on_idle().and_then(|_| {
-                reactor.shutdown_on_idle()
-            })
-        });
-
+        let inner = inner.pool.shutdown_on_idle();
         Shutdown { inner }
     }
 

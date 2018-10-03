@@ -54,6 +54,7 @@ appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
 bytes = "0.4"
+num_cpus = "1.8.0"
 tokio-codec = { version = "0.1.0", path = "tokio-codec" }
 tokio-current-thread = { version = "0.1.3", path = "tokio-current-thread" }
 tokio-io = { version = "0.1.6", path = "tokio-io" }
