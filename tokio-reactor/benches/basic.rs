@@ -6,56 +6,134 @@ extern crate mio;
 extern crate num_cpus;
 extern crate test;
 extern crate tokio;
+extern crate tokio_io_pool;
 extern crate tokio_reactor;
 
-use std::sync::mpsc;
+const NUM_YIELD: usize = 500;
+const TASKS_PER_CPU: usize = 100;
 
-use futures::{future, Async};
-use self::test::Bencher;
-use tokio_reactor::Registration;
+mod threadpool {
+    use super::*;
+    use std::sync::mpsc;
 
-const NUM_YIELD: usize = 1_000;
-const TASKS_PER_CPU: usize = 50;
+    use test::Bencher;
+    use futures::{future, Async};
+    use tokio_reactor::Registration;
+    use tokio::runtime::Runtime;
 
-#[bench]
-fn notify_many(b: &mut Bencher) {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    #[bench]
+    fn notify_many(b: &mut Bencher) {
+        let mut rt = Runtime::new().unwrap();
+        let tasks = TASKS_PER_CPU * num_cpus::get();
 
-    let tasks = TASKS_PER_CPU * num_cpus::get();
-    let (tx, rx) = mpsc::channel();
+        b.iter(|| {
+            let (tx, rx) = mpsc::channel();
 
-    b.iter(|| {
-        for _ in 0..tasks {
-            let (r, s) = mio::Registration::new2();
-            let registration = Registration::new();
-            registration.register(&r).unwrap();
+            rt.block_on::<_, (), ()>(future::lazy(move || {
+                for _ in 0..tasks {
+                    let tx = tx.clone();
 
-            let mut rem = NUM_YIELD;
-            let mut r = Some(r);
-            let tx = tx.clone();
+                    tokio::spawn(future::lazy(move || {
+                        let (r, s) = mio::Registration::new2();
+                        let registration = Registration::new();
+                        registration.register(&r).unwrap();
 
-            rt.spawn(future::poll_fn(move || {
-                loop {
-                    let is_ready = registration.poll_read_ready().unwrap().is_ready();
+                        let mut rem = NUM_YIELD;
+                        let mut r = Some(r);
+                        let tx = tx.clone();
 
-                    if is_ready {
-                        rem -= 1;
+                        tokio::spawn(future::poll_fn(move || {
+                            loop {
+                                let is_ready = registration.poll_read_ready().unwrap().is_ready();
 
-                        if rem == 0 {
-                            r.take().unwrap();
-                            tx.send(()).unwrap();
-                            return Ok(Async::Ready(()));
-                        }
-                    } else {
-                        s.set_readiness(mio::Ready::readable()).unwrap();
-                        return Ok(Async::NotReady);
-                    }
+                                if is_ready {
+                                    rem -= 1;
+
+                                    if rem == 0 {
+                                        r.take().unwrap();
+                                        tx.send(()).unwrap();
+                                        return Ok(Async::Ready(()));
+                                    }
+                                } else {
+                                    s.set_readiness(mio::Ready::readable()).unwrap();
+                                    return Ok(Async::NotReady);
+                                }
+                            }
+                        }));
+
+                        Ok(())
+                    }));
                 }
-            }));
-        }
 
-        for _ in 0..tasks {
-            rx.recv().unwrap();
-        }
-    });
+                Ok(())
+            })).unwrap();
+
+            for _ in 0..tasks {
+                rx.recv().unwrap();
+            }
+        })
+    }
+}
+
+mod io_pool {
+    use super::*;
+    use std::sync::mpsc;
+
+    use futures::{future, Async};
+    use test::Bencher;
+    use tokio_io_pool::Runtime;
+    use tokio_reactor::Registration;
+
+    #[bench]
+    fn notify_many(b: &mut Bencher) {
+        let mut rt = Runtime::new();
+        let tasks = TASKS_PER_CPU * num_cpus::get();
+
+        b.iter(|| {
+            let (tx, rx) = mpsc::channel();
+
+            rt.block_on::<_, (), ()>(future::lazy(move || {
+                for _ in 0..tasks {
+                    let tx = tx.clone();
+
+                    tokio::spawn(future::lazy(move || {
+                        let (r, s) = mio::Registration::new2();
+                        let registration = Registration::new();
+                        registration.register(&r).unwrap();
+
+                        let mut rem = NUM_YIELD;
+                        let mut r = Some(r);
+                        let tx = tx.clone();
+
+                        tokio::spawn(future::poll_fn(move || {
+                            loop {
+                                let is_ready = registration.poll_read_ready().unwrap().is_ready();
+
+                                if is_ready {
+                                    rem -= 1;
+
+                                    if rem == 0 {
+                                        r.take().unwrap();
+                                        tx.send(()).unwrap();
+                                        return Ok(Async::Ready(()));
+                                    }
+                                } else {
+                                    s.set_readiness(mio::Ready::readable()).unwrap();
+                                    return Ok(Async::NotReady);
+                                }
+                            }
+                        }));
+
+                        Ok(())
+                    }));
+                }
+
+                Ok(())
+            })).unwrap();
+
+            for _ in 0..tasks {
+                rx.recv().unwrap();
+            }
+        })
+    }
 }
