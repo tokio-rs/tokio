@@ -18,9 +18,8 @@ pub use tokio_codec::{
     FramedRead,
     FramedWrite,
     BytesCodec,
+    LengthDelimitedCodec,
     LinesCodec,
 };
 
-pub mod length_delimited;
-
-pub use self::length_delimited::LengthDelimitedCodec;
+pub use tokio_codec::length_delimited;

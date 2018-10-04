@@ -18,6 +18,7 @@ extern crate tokio_io;
 
 mod bytes_codec;
 mod lines_codec;
+pub mod length_delimited;
 
 pub use tokio_io::_tokio_codec::{
     Decoder,
@@ -29,4 +30,5 @@ pub use tokio_io::_tokio_codec::{
 };
 
 pub use bytes_codec::BytesCodec;
+pub use length_delimited::LengthDelimitedCodec;
 pub use lines_codec::LinesCodec;
