@@ -6,7 +6,11 @@ use futures::{Future, Poll};
 ///
 /// `Collect` values are produced by `BufStream::collect`.
 #[derive(Debug)]
-pub struct Collect<T, U: FromBufStream> {
+pub struct Collect<T, U>
+where
+    T: BufStream,
+    U: FromBufStream<T::Item>,
+{
     stream: T,
     builder: Option<U::Builder>,
 }
@@ -14,7 +18,7 @@ pub struct Collect<T, U: FromBufStream> {
 impl<T, U> Collect<T, U>
 where
     T: BufStream,
-    U: FromBufStream,
+    U: FromBufStream<T::Item>,
 {
     pub(crate) fn new(stream: T) -> Collect<T, U> {
         let builder = U::builder(&stream.size_hint());
@@ -29,7 +33,7 @@ where
 impl<T, U> Future for Collect<T, U>
 where
     T: BufStream,
-    U: FromBufStream,
+    U: FromBufStream<T::Item>,
 {
     type Item = U;
     type Error = T::Error;

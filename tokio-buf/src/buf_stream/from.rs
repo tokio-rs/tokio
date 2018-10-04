@@ -10,7 +10,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 ///
 /// `FromBufStream` is rarely called explicitly, and it is instead used through
 /// `BufStream`'s `collect` method.
-pub trait FromBufStream {
+pub trait FromBufStream<T: Buf> {
     /// Type that is used to build `Self` while the `BufStream` is being
     /// consumed.
     type Builder;
@@ -23,7 +23,7 @@ pub trait FromBufStream {
     ///
     /// This method is called whenever a new `Buf` value is obtained from the
     /// buf stream.
-    fn extend<T: Buf>(builder: &mut Self::Builder, buf: &mut T);
+    fn extend(builder: &mut Self::Builder, buf: &mut T);
 
     /// Finalize the building of `Self`.
     ///
@@ -31,14 +31,14 @@ pub trait FromBufStream {
     fn build(builder: Self::Builder) -> Self;
 }
 
-impl FromBufStream for Vec<u8> {
+impl<T: Buf> FromBufStream<T> for Vec<u8> {
     type Builder = Vec<u8>;
 
     fn builder(hint: &SizeHint) -> Vec<u8> {
         Vec::with_capacity(hint.lower())
     }
 
-    fn extend<T: Buf>(builder: &mut Self, buf: &mut T) {
+    fn extend(builder: &mut Self, buf: &mut T) {
         builder.put(buf);
     }
 
@@ -47,14 +47,14 @@ impl FromBufStream for Vec<u8> {
     }
 }
 
-impl FromBufStream for Bytes {
+impl<T: Buf> FromBufStream<T> for Bytes {
     type Builder = BytesMut;
 
     fn builder(hint: &SizeHint) -> BytesMut {
         BytesMut::with_capacity(hint.lower())
     }
 
-    fn extend<T: Buf>(builder: &mut Self::Builder, buf: &mut T) {
+    fn extend(builder: &mut Self::Builder, buf: &mut T) {
         builder.put(buf);
     }
 

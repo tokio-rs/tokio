@@ -105,7 +105,7 @@ pub trait BufStream {
     fn collect<T>(self) -> Collect<Self, T>
     where
         Self: Sized,
-        T: FromBufStream,
+        T: FromBufStream<Self::Item>,
     {
         Collect::new(self)
     }
