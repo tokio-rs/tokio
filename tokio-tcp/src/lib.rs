@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.2")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! TCP bindings for `tokio`.
 //!
 //! This module contains the TCP networking types, similar to the standard
@@ -18,9 +21,6 @@
 //! [`TcpListener`]: struct.TcpListener.html
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
-
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.1")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;
 #[macro_use]

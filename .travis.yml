@@ -15,7 +15,7 @@ matrix:
   # This represents the minimum Rust version supported by Tokio. Updating this
   # should be done in a dedicated PR and cannot be greater than two 0.x
   # releases prior to the current stable.
-  - rust: 1.25.0
+  - rust: 1.26.0
   - rust: stable
   - rust: beta
   - rust: nightly
@@ -23,6 +23,18 @@ matrix:
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
+
+  # Test the async / await preview. We don't want to block PRs on this failing
+  # though.
+  - rust: nightly
+    env: ALLOW_FAILURES=true
+    script: |
+      cd tokio-async-await
+      cargo check --all
+  allow_failures:
+    - rust: nightly
+      env: ALLOW_FAILURES=true
+
 
 script:
   - |
@@ -64,7 +76,7 @@ script:
         cargo check --all --exclude tokio-tls --target $TARGET
         cargo check --tests --all --exclude tokio-tls --target $TARGET
     else
-        cargo test --all
+        cargo test --all --no-fail-fast
         # Disable these tests for now as they are buggy
         #
         # cargo test --features unstable-futures

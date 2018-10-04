@@ -1,45 +1,45 @@
-#![feature(futures_api, await_macro, pin, arbitrary_self_types)]
+#![cfg(feature = "async-await-preview")]
+#![feature(
+    rust_2018_preview,
+    arbitrary_self_types,
+    async_await,
+    await_macro,
+    futures_api,
+    pin,
+    )]
 
-#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.4")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
 
 //! A preview of Tokio w/ `async` / `await` support.
 
 extern crate futures;
-extern crate futures_core;
-extern crate futures_util;
+extern crate tokio_io;
 
-// Re-export all of Tokio
-pub use tokio::{
-    // Modules
-    clock,
-    codec,
-    executor,
-    fs,
-    io,
-    net,
-    reactor,
-    runtime,
-    timer,
-    util,
-
-    // Functions
-    run,
-    spawn,
-};
-
-pub mod sync {
-    //! Asynchronous aware synchronization
-
-    pub use tokio_channel::{
-        mpsc,
-        oneshot,
-    };
+/// Extracts the successful type of a `Poll<Result<T, E>>`.
+///
+/// This macro bakes in propagation of `Pending` and `Err` signals by returning early.
+macro_rules! try_ready {
+    ($x:expr) => {
+        match $x {
+            std::task::Poll::Ready(Ok(x)) => x,
+            std::task::Poll::Ready(Err(e)) =>
+                return std::task::Poll::Ready(Err(e.into())),
+            std::task::Poll::Pending =>
+                return std::task::Poll::Pending,
+        }
+    }
 }
 
-pub mod async_await;
+#[macro_use]
+mod await;
+pub mod compat;
+pub mod io;
+pub mod sink;
+pub mod stream;
 
+/*
 pub mod prelude {
     //! A "prelude" for users of the `tokio` crate.
     //!
@@ -53,7 +53,7 @@ pub mod prelude {
     //!
     //! The prelude may grow over time as additional items see ubiquitous use.
 
-    pub use tokio::prelude::*;
+    pub use tokio_main::prelude::*;
 
     #[doc(inline)]
     pub use crate::async_await::{
@@ -69,34 +69,47 @@ pub mod prelude {
         },
     };
 }
+*/
 
-use futures_core::{
-    Future as Future03,
-};
-
-// Rename the `await` macro in `std`
+// Rename the `await` macro in `std`. This is used by the redefined
+// `await` macro in this crate.
 #[doc(hidden)]
-#[macro_export]
 pub use std::await as std_await;
+
+/*
+use std::future::{Future as StdFuture};
+
+fn run<T: futures::Future<Item = (), Error = ()>>(t: T) {
+    drop(t);
+}
+
+async fn map_ok<T: StdFuture>(future: T) -> Result<(), ()> {
+    let _ = await!(future);
+    Ok(())
+}
 
 /// Like `tokio::run`, but takes an `async` block
 pub fn run_async<F>(future: F)
-where F: Future03<Output = ()> + Send + 'static,
+where F: StdFuture<Output = ()> + Send + 'static,
 {
-    use futures_util::future::FutureExt;
-    use crate::async_await::compat::backward;
+    use async_await::compat::backward;
+    let future = backward::Compat::new(map_ok(future));
 
-    let future = future.map(|_| Ok(()));
-    run(backward::Compat::new(future))
+    run(future);
+    unimplemented!();
 }
+*/
 
+/*
 /// Like `tokio::spawn`, but takes an `async` block
 pub fn spawn_async<F>(future: F)
-where F: Future03<Output = ()> + Send + 'static,
+where F: StdFuture<Output = ()> + Send + 'static,
 {
-    use futures_util::future::FutureExt;
     use crate::async_await::compat::backward;
 
-    let future = future.map(|_| Ok(()));
-    spawn(backward::Compat::new(future));
+    spawn(backward::Compat::new(async || {
+        let _ = await!(future);
+        Ok(())
+    }));
 }
+*/

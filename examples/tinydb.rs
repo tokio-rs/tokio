@@ -56,7 +56,7 @@ use tokio::prelude::*;
 /// The in-memory database shared amongst all clients.
 ///
 /// This database will be shared via `Arc`, so to mutate the internal map we're
-/// also going to use a `RefCell` for interior mutability.
+/// going to use a `Mutex` for interior mutability.
 struct Database {
     map: Mutex<HashMap<String, String>>,
 }

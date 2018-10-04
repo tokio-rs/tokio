@@ -3,7 +3,8 @@ use pool::Pool;
 use sender::Sender;
 use shutdown::Shutdown;
 
-use futures::Future;
+use futures::{Future, Poll};
+use futures::sync::oneshot;
 
 /// Work-stealing based thread pool for executing futures.
 ///
@@ -62,6 +63,47 @@ impl ThreadPool {
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
         self.sender().spawn(future).unwrap();
+    }
+
+    /// Spawn a future on to the thread pool, return a future representing 
+    /// the produced value.
+    /// 
+    /// The SpawnHandle returned is a future that is a proxy for future itself. 
+    /// When future completes on this thread pool then the SpawnHandle will itself 
+    /// be resolved.
+    /// 
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::ThreadPool;
+    /// use futures::future::{Future, lazy};
+    ///
+    /// # pub fn main() {
+    /// // Create a thread pool with default configuration values
+    /// let thread_pool = ThreadPool::new();
+    ///
+    /// let handle = thread_pool.spawn_handle(lazy(|| Ok::<_, ()>(42)));
+    /// 
+    /// let value = handle.wait().unwrap();
+    /// assert_eq!(value, 42);
+    ///
+    /// // Gracefully shutdown the threadpool
+    /// thread_pool.shutdown().wait().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. 
+    pub fn spawn_handle<F>(&self, future: F) -> SpawnHandle<F::Item, F::Error>
+    where 
+        F: Future + Send + 'static,
+        F::Item: Send + 'static,
+        F::Error: Send + 'static,
+    {
+        SpawnHandle(oneshot::spawn(future, self.sender()))
     }
 
     /// Return a reference to the sender handle
@@ -130,5 +172,23 @@ impl Drop for ThreadPool {
             let shutdown = Shutdown { inner: sender };
             let _ = shutdown.wait();
         }
+    }
+}
+
+/// Handle returned from ThreadPool::spawn_handle.
+/// 
+/// This handle is a future representing the completion of a different future 
+/// spawned on to the thread pool. Created through the ThreadPool::spawn_handle 
+/// function this handle will resolve when the future provided resolves on the 
+/// thread pool.
+#[derive(Debug)]
+pub struct SpawnHandle<T, E>(oneshot::SpawnHandle<T, E>);
+
+impl<T, E> Future for SpawnHandle<T, E> {
+    type Item = T;
+    type Error = E;
+
+    fn poll(&mut self) -> Poll<T, E> {
+        self.0.poll()
     }
 }

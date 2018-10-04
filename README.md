@@ -129,6 +129,8 @@ have greater guarantees of stability.
 
 The crates included as part of Tokio are:
 
+* [`tokio-async-await`]: Experimental `async` / `await` support.
+
 * [`tokio-codec`]: Utilities for encoding and decoding protocol frames.
 
 * [`tokio-current-thread`]: Schedule the execution of futures on the current
@@ -155,6 +157,7 @@ The crates included as part of Tokio are:
 * [`tokio-uds`]: Unix Domain Socket bindings for use with `tokio-io` and
   `tokio-reactor`.
 
+[`tokio-async-await`]: tokio-async-await
 [`tokio-codec`]: tokio-codec
 [`tokio-current-thread`]: tokio-current-thread
 [`tokio-executor`]: tokio-executor
@@ -166,6 +169,14 @@ The crates included as part of Tokio are:
 [`tokio-timer`]: tokio-timer
 [`tokio-udp`]: tokio-udp
 [`tokio-uds`]: tokio-uds
+
+## Supported Rust Versions
+
+Tokio is built against the latest stable, nightly, and beta Rust releases. The
+minimum version supported is the stable release from three months before the
+current stable release version. For example, if the latest stable Rust is 1.29,
+the minimum version supported is 1.26. The current Tokio version is not
+guaranteed to build on Rust versions earlier than the minimum supported version.
 
 ## License
 

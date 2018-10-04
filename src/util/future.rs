@@ -31,6 +31,9 @@ pub trait FutureExt: Future {
     /// If the future completes before `timeout` then the future will resolve
     /// with that item. Otherwise the future will resolve to an error.
     ///
+    /// The future is guaranteed to be polled at least once, even if `timeout`
+    /// is set to zero.
+    ///
     /// # Examples
     ///
     /// ```
@@ -69,3 +72,16 @@ pub trait FutureExt: Future {
 }
 
 impl<T: ?Sized> FutureExt for T where T: Future {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use prelude::future;
+
+    #[test]
+    fn timeout_polls_at_least_once() {
+        let base_future = future::result::<(), ()>(Ok(()));
+        let timeouted_future = base_future.timeout(Duration::new(0, 0));
+        assert!(timeouted_future.wait().is_ok());
+    }
+}

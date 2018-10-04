@@ -1,6 +1,6 @@
 use super::{Executor, Enter, SpawnError};
 
-use futures::Future;
+use futures::{future, Future};
 
 use std::cell::Cell;
 
@@ -80,6 +80,25 @@ impl super::Executor for DefaultExecutor {
     fn status(&self) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.status())
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
+    }
+}
+
+impl<T> future::Executor<T> for DefaultExecutor
+where T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
+        if let Err(e) = super::Executor::status(self) {
+            let kind = if e.is_at_capacity() {
+                future::ExecuteErrorKind::NoCapacity
+            } else {
+                future::ExecuteErrorKind::Shutdown
+            };
+
+            return Err(future::ExecuteError::new(kind, future));
+        }
+
+        let _ = DefaultExecutor::with_current(|executor| executor.spawn(Box::new(future)));
+        Ok(())
     }
 }
 

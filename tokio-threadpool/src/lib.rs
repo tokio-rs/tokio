@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.6")]
+#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.7")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 //! A work-stealing based thread pool for executing futures.
@@ -158,5 +158,5 @@ pub use blocking::{blocking, BlockingError};
 pub use builder::Builder;
 pub use sender::Sender;
 pub use shutdown::Shutdown;
-pub use thread_pool::ThreadPool;
+pub use thread_pool::{ThreadPool, SpawnHandle};
 pub use worker::{Worker, WorkerId};

@@ -892,4 +892,12 @@ impl WorkerId {
     pub(crate) fn new(idx: usize) -> WorkerId {
         WorkerId(idx)
     }
+
+    /// Returns this identifier represented as an integer.
+    ///
+    /// Worker identifiers in a single thread pool are guaranteed to correspond to integers in the
+    /// range `0..pool_size`.
+    pub fn to_usize(&self) -> usize {
+        self.0
+    }
 }
