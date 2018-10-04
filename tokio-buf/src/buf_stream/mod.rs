@@ -60,19 +60,21 @@ pub trait BufStream {
     /// size hint to pre-allocate enough capacity to store the entirety of the
     /// data received from the byte stream.
     ///
+    /// When `SizeHint::upper()` returns `Some` with a value equal to
+    /// `SizeHint::lower()`, this represents the exact number of bytes that will
+    /// be yielded by the `BufStream`.
+    ///
     /// # Implementation notes
     ///
-    /// It is not enforced that a `BufStreaam` yields the declared amount of
-    /// data. A buggy implementation may yield less than the lower bound or more
-    /// than the upper bound.
+    /// While not enforced, implementations are expected to respect the values
+    /// returned from `SizeHint`. Any deviation is considered an implementation
+    /// bug. Consumers may rely on correctness in order to use the value as part
+    /// of protocol impelmentations. For example, an HTTP library may use the
+    /// size hint to set the `content-length` header.
     ///
-    /// `size_hint()` is primarily intended to be used for optimizations such as
-    /// reserving space for the data, but must not be trusted to e.g. omit
-    /// bounds checks in unsafe code. An incorrect implemeentation of
-    /// `size_hint()` should not lead to memory safety violations.
-    ///
-    /// That said, the implementation should provide a correct estimation,
-    /// because otherwise it would be a violation of the trait's protocol.
+    /// However, `size_hint` must not be trusted to omit bounds checks in unsafe
+    /// code. An incorrect implementation of `size_hint()` must not lead to
+    /// memory safety violations.
     fn size_hint(&self) -> SizeHint {
         SizeHint::default()
     }
