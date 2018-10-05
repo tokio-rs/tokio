@@ -67,6 +67,10 @@ script:
         # Run thread sanitizer
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
+
+        # Build with minimal versions
+        cargo update -Zminimal-versions
+        cargo build --all
     fi
   - |
     set -e
