@@ -2,9 +2,9 @@ extern crate tokio_buf;
 extern crate bytes;
 extern crate futures;
 
-use tokio_buf::BufStream;
+use tokio_buf::buf_stream::{BufStream, SizeHint};
 use bytes::Buf;
-use futures::Poll;
+use futures::{Future, Poll};
 use futures::Async::*;
 
 use std::collections::VecDeque;
@@ -42,25 +42,27 @@ macro_rules! assert_not_ready {
     }
 }
 
+// ===== test `chain()` =====
+
 #[test]
 fn chain() {
     // Chain one with one
     //
     let mut bs = one("hello").chain(one("world"));
 
-    assert_buf_eq!(bs.poll(), "hello");
-    assert_buf_eq!(bs.poll(), "world");
-    assert_none!(bs.poll());
+    assert_buf_eq!(bs.poll_buf(), "hello");
+    assert_buf_eq!(bs.poll_buf(), "world");
+    assert_none!(bs.poll_buf());
 
     // Chain multi with multi
     let mut bs = list(&["foo", "bar"])
         .chain(list(&["baz", "bok"]));
 
-    assert_buf_eq!(bs.poll(), "foo");
-    assert_buf_eq!(bs.poll(), "bar");
-    assert_buf_eq!(bs.poll(), "baz");
-    assert_buf_eq!(bs.poll(), "bok");
-    assert_none!(bs.poll());
+    assert_buf_eq!(bs.poll_buf(), "foo");
+    assert_buf_eq!(bs.poll_buf(), "bar");
+    assert_buf_eq!(bs.poll_buf(), "baz");
+    assert_buf_eq!(bs.poll_buf(), "bok");
+    assert_none!(bs.poll_buf());
 
     // Chain includes a not ready call
     //
@@ -70,11 +72,60 @@ fn chain() {
         Ok(Ready("bar"))
     ]).chain(one("baz"));
 
-    assert_buf_eq!(bs.poll(), "foo");
-    assert_not_ready!(bs.poll());
-    assert_buf_eq!(bs.poll(), "bar");
-    assert_buf_eq!(bs.poll(), "baz");
-    assert_none!(bs.poll());
+    assert_buf_eq!(bs.poll_buf(), "foo");
+    assert_not_ready!(bs.poll_buf());
+    assert_buf_eq!(bs.poll_buf(), "bar");
+    assert_buf_eq!(bs.poll_buf(), "baz");
+    assert_none!(bs.poll_buf());
+}
+
+// ===== Test `collect()` =====
+
+#[test]
+fn collect_vec() {
+    // While unfortunate, this test makes some assumptions on vec's resizing
+    // behavior.
+    //
+    // Collect one
+    //
+    let bs = one("hello world");
+
+    let vec: Vec<u8> = bs.collect()
+        .wait().unwrap();
+
+    assert_eq!(vec, b"hello world");
+    assert_eq!(vec.capacity(), 64);
+
+    // Collect one, with size hint
+    //
+    let mut bs = one("hello world");
+    bs.size_hint.set_lower(11);
+
+    let vec: Vec<u8> = bs.collect()
+        .wait().unwrap();
+
+    assert_eq!(vec, b"hello world");
+    assert_eq!(vec.capacity(), 11);
+
+    // Collect one, with size hint
+    //
+    let mut bs = one("hello world");
+    bs.size_hint.set_lower(10);
+
+    let vec: Vec<u8> = bs.collect()
+        .wait().unwrap();
+
+    assert_eq!(vec, b"hello world");
+    assert_eq!(vec.capacity(), 74);
+
+    // Collect many
+    //
+    let bs = list(&["hello", " ", "world", ", one two three"]);
+
+    let vec: Vec<u8> = bs.collect()
+        .wait().unwrap();
+
+    assert_eq!(vec, b"hello world, one two three");
 }
 
 // ===== Test utils =====
@@ -90,7 +141,10 @@ fn list(bufs: &[&'static str]) -> Mock {
         polls.push_back(Ok(Ready(buf.as_bytes())));
     }
 
-    Mock { polls }
+    Mock {
+        polls,
+        size_hint: SizeHint::default(),
+    }
 }
 
 fn new_mock(values: &[Poll<&'static str, ()>]) -> Mock {
@@ -104,12 +158,16 @@ fn new_mock(values: &[Poll<&'static str, ()>]) -> Mock {
         });
     }
 
-    Mock { polls }
+    Mock {
+        polls,
+        size_hint: SizeHint::default(),
+    }
 }
 
 #[derive(Debug)]
 struct Mock {
     polls: VecDeque<Poll<&'static [u8], ()>>,
+    size_hint: SizeHint,
 }
 
 #[derive(Debug)]
@@ -121,13 +179,17 @@ impl BufStream for Mock {
     type Item = MockBuf;
     type Error = ();
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match self.polls.pop_front() {
             Some(Ok(Ready(value))) => Ok(Ready(Some(MockBuf::new(value)))),
             Some(Ok(NotReady)) => Ok(NotReady),
             Some(Err(e)) => Err(e),
             None => Ok(Ready(None)),
         }
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.size_hint.clone()
     }
 }
 
