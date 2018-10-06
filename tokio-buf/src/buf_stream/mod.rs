@@ -42,16 +42,16 @@ pub trait BufStream {
     ///
     /// - `Ok(Async::Ready(Some(buf)))` means that the stream has successfully
     /// produced a value, `buf`, and may produce further values on subsequent
-    /// `poll` calls.
+    /// `poll_buf` calls.
     ///
     /// - `Ok(Async::Ready(None))` means that the stream has terminated, and
-    /// `poll` should not be invoked again.
+    /// `poll_buf` should not be invoked again.
     ///
     /// # Panics
     ///
     /// Once a stream is finished, i.e. `Ready(None)` has been returned, further
-    /// calls to `poll` may result in a panic or other "bad behavior".
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error>;
+    /// calls to `poll_buf` may result in a panic or other "bad behavior".
+    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error>;
 
     /// Returns the bounds on the remaining length of the iterator.
     ///

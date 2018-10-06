@@ -29,9 +29,9 @@ where
     type Item = Either<T::Item, U::Item>;
     type Error = T::Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         if let Some(ref mut stream) = self.left {
-            let res = try_ready!(stream.poll());
+            let res = try_ready!(stream.poll_buf());
 
             if res.is_some() {
                 return Ok(res.map(Either::Left).into());
@@ -40,7 +40,7 @@ where
 
         self.left = None;
 
-        let res = try_ready!(self.right.poll());
+        let res = try_ready!(self.right.poll_buf());
         Ok(res.map(Either::Right).into())
     }
 

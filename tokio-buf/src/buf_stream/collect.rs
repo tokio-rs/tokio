@@ -40,7 +40,7 @@ where
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            match try_ready!(self.stream.poll()) {
+            match try_ready!(self.stream.poll_buf()) {
                 Some(mut buf) => {
                     let builder = self.builder.as_mut().expect("cannot poll after done");
 
