@@ -53,7 +53,7 @@ pub trait BufStream {
     /// calls to `poll_buf` may result in a panic or other "bad behavior".
     fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error>;
 
-    /// Returns the bounds on the remaining length of the iterator.
+    /// Returns the bounds on the remaining length of the stream.
     ///
     /// The size hint allows the caller to perform certain optimizations that
     /// are dependent on the byte stream size. For example, `collect` uses the
