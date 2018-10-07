@@ -3,11 +3,13 @@
 mod chain;
 mod collect;
 mod from;
+mod limit;
 mod size_hint;
 
 pub use self::chain::Chain;
 pub use self::collect::Collect;
 pub use self::from::FromBufStream;
+pub use self::limit::Limit;
 pub use self::size_hint::SizeHint;
 
 pub mod errors {
@@ -15,6 +17,7 @@ pub mod errors {
 
     pub use super::collect::CollectError;
     pub use super::from::CollectVecError;
+    pub use super::limit::LimitError;
 }
 
 use bytes::Buf;
@@ -115,5 +118,13 @@ pub trait BufStream {
         T: FromBufStream<Self::Item>,
     {
         Collect::new(self)
+    }
+
+    /// Limit the number of bytes that the stream can yield.
+    fn limit(self, amount: u64) -> Limit<Self>
+    where
+        Self: Sized,
+    {
+        Limit::new(self, amount)
     }
 }
