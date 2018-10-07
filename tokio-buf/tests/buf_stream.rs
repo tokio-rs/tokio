@@ -105,7 +105,7 @@ fn collect_vec() {
         .wait().unwrap();
 
     assert_eq!(vec, b"hello world");
-    assert_eq!(vec.capacity(), 11);
+    assert_eq!(vec.capacity(), 64);
 
     // Collect one, with size hint
     //
@@ -116,7 +116,7 @@ fn collect_vec() {
         .wait().unwrap();
 
     assert_eq!(vec, b"hello world");
-    assert_eq!(vec.capacity(), 74);
+    assert_eq!(vec.capacity(), 64);
 
     // Collect many
     //

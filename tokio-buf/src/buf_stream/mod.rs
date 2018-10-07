@@ -10,6 +10,13 @@ pub use self::collect::Collect;
 pub use self::from::FromBufStream;
 pub use self::size_hint::SizeHint;
 
+pub mod errors {
+    //! Error types
+
+    pub use super::collect::CollectError;
+    pub use super::from::CollectVecError;
+}
+
 use bytes::Buf;
 use futures::Poll;
 
