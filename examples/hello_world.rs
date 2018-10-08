@@ -1,58 +1,44 @@
 //! Hello world server.
 //!
-//! A simple server that accepts connections, writes "hello world\n", and closes
+//! A simple client that opens a TCP stream, writes "hello world\n", and closes
 //! the connection.
 //!
 //! You can test this out by running:
 //!
-//!     cargo run --example hello_world
+//!     ncat -l 6142
 //!
 //! And then in another terminal run:
 //!
-//!     telnet localhost 6142
-//!
+//!     cargo run --example hello_world
 
 #![deny(warnings)]
 
 extern crate tokio;
 
 use tokio::io;
-use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 pub fn main() {
     let addr = "127.0.0.1:6142".parse().unwrap();
 
-    // Bind a TCP listener to the socket address.
+    // Open a TCP stream to the socket address.
     //
-    // Note that this is the Tokio TcpListener, which is fully async.
-    let listener = TcpListener::bind(&addr).unwrap();
-
-    // The server task asynchronously iterates over and processes each
-    // incoming connection.
-    let server = listener.incoming().for_each(|socket| {
-        println!("accepted socket; addr={:?}", socket.peer_addr().unwrap());
-
-        let connection = io::write_all(socket, "hello world\n")
-            .then(|res| {
-                println!("wrote message; success={:?}", res.is_ok());
-                Ok(())
-            });
-
-        // Spawn a new task that processes the socket:
-        tokio::spawn(connection);
-
-        Ok(())
+    // Note that this is the Tokio TcpStream, which is fully async.
+    let client = TcpStream::connect(&addr).and_then(|stream| {
+        println!("created stream");
+        io::write_all(stream, "hello world\n").then(|result| {
+            println!("wrote to stream; success={:?}", result.is_ok());
+            Ok(())
+        })
     })
     .map_err(|err| {
         // All tasks must have an `Error` type of `()`. This forces error
         // handling and helps avoid silencing failures.
         //
         // In our example, we are only going to log the error to STDOUT.
-        println!("accept error = {:?}", err);
+        println!("connection error = {:?}", err);
     });
-
-    println!("server running on localhost:6142");
 
     // Start the Tokio runtime.
     //
@@ -63,8 +49,7 @@ pub fn main() {
     // This function blocks until the runtime reaches an idle state. Idle is
     // defined as all spawned tasks have completed and all I/O resources (TCP
     // sockets in our case) have been dropped.
-    //
-    // In our example, we have not defined a shutdown strategy, so this will
-    // block until `ctrl-c` is pressed at the terminal.
-    tokio::run(server);
+    println!("About to create the stream and write to it...");
+    tokio::run(client);
+    println!("Stream has been created and written to.");
 }
