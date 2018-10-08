@@ -94,7 +94,7 @@ pub trait BufStream {
     ///
     /// The consume hint allows the stream to perform certain optimizations that
     /// are dependent on the consumer's readiness. For example, the consume hint
-    /// may be used to request a remote peer to start sneding up to `amount`
+    /// may be used to request a remote peer to start sending up to `amount`
     /// data.
     ///
     /// Calling `consume_hint` is not a requirement. If `consume_hint` is never
