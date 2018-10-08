@@ -91,6 +91,30 @@ pub trait BufStream {
 
     /// Indicates to the `BufStream` how much data the consumer is currently
     /// able to process.
+    ///
+    /// The consume hint allows the stream to perform certain optimizations that
+    /// are dependent on the consumer's readiness. For example, the consume hint
+    /// may be used to request a remote peer to start sneding up to `amount`
+    /// data.
+    ///
+    /// Calling `consume_hint` is not a requirement. If `consume_hint` is never
+    /// called, the stream should assume a default behavior. When `consume_hint`
+    /// is called, the stream should make a best effort to honor by the request.
+    ///
+    /// `amount` represents the number of bytes that the caller would like to
+    /// receive at the time the function is called. For example, if
+    /// `consume_hint` is called with 20, the consumer requests 20 bytes. The
+    /// stream may yield less than that. If the next call to `poll_buf` returns
+    /// 5 bytes, the consumer still has 15 bytes requested. At this point,
+    /// invoking `consume_hint` again with 20 resets the amount requested back
+    /// to 20 bytes.
+    ///
+    /// Calling `consume_hint` with 0 as the argument informs the stream that
+    /// the caller does not intend to call `poll_buf`. If `poll_buf` **is**
+    /// called, the stream may, but is not obligated to, return `NotReady` even
+    /// if it could produce data at that point. If it chooses to return
+    /// `NotReady`, when `consume_hint` is called with a non-zero argument, the
+    /// task must be notified in order to respect the `poll_buf` contract.
     fn consume_hint(&mut self, amount: usize) {
         // By default, this function does nothing
         drop(amount);
