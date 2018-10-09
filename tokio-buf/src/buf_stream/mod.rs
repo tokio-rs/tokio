@@ -123,7 +123,7 @@ pub trait BufStream {
     /// Takes two buf streams and creates a new buf stream over both in
     /// sequence.
     ///
-    /// `chain()` will return a new `BufStream` value which will first yield all
+    /// `chain()` returns a new `BufStream` value which will first yield all
     /// data from `self` then all data from `other`.
     ///
     /// In other words, it links two buf streams together, in a chain.
@@ -136,6 +136,14 @@ pub trait BufStream {
     }
 
     /// Consumes all data from `self`, storing it in byte storage of type `T`.
+    ///
+    /// `collect()` returns a future that buffers all data yielded from `self`
+    /// into storage of type of `T`. The future completes once `self` yield
+    /// `None`, returning the buffered data.
+    ///
+    /// The collect future will yield an error if `self` yields an error or if
+    /// the collect operation errors. The collect error cases are dependent on
+    /// the target storage type.
     fn collect<T>(self) -> Collect<Self, T>
     where
         Self: Sized,
@@ -145,6 +153,12 @@ pub trait BufStream {
     }
 
     /// Limit the number of bytes that the stream can yield.
+    ///
+    /// `limit()` returns a new `BufStream` value which yields all the data from
+    /// `self` while ensuring that at most `amount` bytes are yielded.
+    ///
+    /// If `self` can yield greater than `amount` bytes, the returned stream
+    /// will yield an error.
     fn limit(self, amount: u64) -> Limit<Self>
     where
         Self: Sized,

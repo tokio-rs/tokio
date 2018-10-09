@@ -42,6 +42,47 @@ macro_rules! assert_not_ready {
     }
 }
 
+// ===== test `SizeHint` =====
+
+#[test]
+fn size_hint() {
+    let hint = SizeHint::new();
+    assert_eq!(hint.lower(), 0);
+    assert!(hint.upper().is_none());
+
+    let mut hint = SizeHint::new();
+    hint.set_lower(100);
+    assert_eq!(hint.lower(), 100);
+    assert!(hint.upper().is_none());
+
+    let mut hint = SizeHint::new();
+    hint.set_upper(200);
+    assert_eq!(hint.lower(), 0);
+    assert_eq!(hint.upper(), Some(200));
+
+    let mut hint = SizeHint::new();
+    hint.set_lower(100);
+    hint.set_upper(100);
+    assert_eq!(hint.lower(), 100);
+    assert_eq!(hint.upper(), Some(100));
+}
+
+#[test]
+#[should_panic]
+fn size_hint_lower_bigger_than_upper() {
+    let mut hint = SizeHint::new();
+    hint.set_upper(100);
+    hint.set_lower(200);
+}
+
+#[test]
+#[should_panic]
+fn size_hint_upper_less_than_lower() {
+    let mut hint = SizeHint::new();
+    hint.set_lower(200);
+    hint.set_upper(100);
+}
+
 // ===== test `chain()` =====
 
 #[test]
@@ -126,6 +167,63 @@ fn collect_vec() {
         .wait().unwrap();
 
     assert_eq!(vec, b"hello world, one two three");
+}
+
+// ===== Test limit() =====
+
+#[test]
+fn limit() {
+    // Not limited
+
+    let res = one("hello world")
+        .limit(100)
+        .collect::<Vec<_>>()
+        .wait().unwrap();
+
+    assert_eq!(res, b"hello world");
+
+    let res = list(&["hello", " ", "world"])
+        .limit(100)
+        .collect::<Vec<_>>()
+        .wait().unwrap();
+
+    assert_eq!(res, b"hello world");
+
+    let res = list(&["hello", " ", "world"])
+        .limit(11)
+        .collect::<Vec<_>>()
+        .wait().unwrap();
+
+    assert_eq!(res, b"hello world");
+
+    // Limited
+
+    let res = one("hello world")
+        .limit(5)
+        .collect::<Vec<_>>()
+        .wait();
+
+    assert!(res.is_err());
+
+    let res = one("hello world")
+        .limit(10)
+        .collect::<Vec<_>>()
+        .wait();
+
+    assert!(res.is_err());
+
+    let mut bs = list(&["hello", " ", "world"])
+        .limit(9);
+
+    assert_buf_eq!(bs.poll_buf(), "hello");
+    assert_buf_eq!(bs.poll_buf(), " ");
+    assert!(bs.poll_buf().is_err());
+
+    let mut bs = list(&["hello", " ", "world"]);
+    bs.size_hint.set_lower(11);
+    let mut bs = bs.limit(9);
+
+    assert!(bs.poll_buf().is_err());
 }
 
 // ===== Test utils =====

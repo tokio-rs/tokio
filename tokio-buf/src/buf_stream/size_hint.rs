@@ -1,3 +1,5 @@
+use std::u64;
+
 /// A `BufStream` size hint
 ///
 /// The default implementation returns:
@@ -7,7 +9,6 @@
 /// * `None` for `upper`.
 #[derive(Debug, Default, Clone)]
 pub struct SizeHint {
-    available: u64,
     lower: u64,
     upper: Option<u64>,
 }
@@ -16,30 +17,6 @@ impl SizeHint {
     /// Returns a new `SizeHint` with default values
     pub fn new() -> SizeHint {
         SizeHint::default()
-    }
-
-    /// Returns the **lower bound** of the amount of data that can be read from
-    /// the `BufStream` without `NotReady` being returned.
-    ///
-    /// It is possible that more data is currently available.
-    pub fn available(&self) -> u64 {
-        self.available
-    }
-
-    /// Set the value of the `available` hint.
-    pub fn set_available(&mut self, value: u64) {
-        self.available = value;
-
-        if self.lower < value {
-            self.lower = value;
-
-            match self.upper {
-                Some(ref mut upper) if *upper < value => {
-                    *upper = value;
-                }
-                _ => {}
-            }
-        }
     }
 
     /// Returns the lower bound of data that the `BufStream` will yield before
@@ -52,9 +29,9 @@ impl SizeHint {
     ///
     /// # Panics
     ///
-    /// This function panics if `value` is less than `available`.
+    /// The function panics if `value` is less than `upper`.
     pub fn set_lower(&mut self, value: u64) {
-        assert!(value >= self.available);
+        assert!(value <= self.upper.unwrap_or(u64::MAX));
         self.lower = value;
     }
 

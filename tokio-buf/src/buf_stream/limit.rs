@@ -36,6 +36,10 @@ where
     fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         use futures::Async::Ready;
 
+        if self.stream.size_hint().lower() > self.remaining {
+            return Err(LimitError { inner: None });
+        }
+
         let res = self.stream.poll_buf()
             .map_err(|err| {
                 LimitError { inner: Some(err) }
@@ -47,6 +51,8 @@ where
                     self.remaining = 0;
                     return Err(LimitError { inner: None });
                 }
+
+                self.remaining -= buf.remaining() as u64;
             }
             _ => {}
         }
