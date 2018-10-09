@@ -1,24 +1,19 @@
-//! TODO: Dox
+//! Types and utilities for working with `BufStream`.
 
+mod bytes;
 mod chain;
 mod collect;
+pub mod errors;
 mod from;
 mod limit;
 mod size_hint;
+mod str;
 
 pub use self::chain::Chain;
 pub use self::collect::Collect;
 pub use self::from::FromBufStream;
 pub use self::limit::Limit;
 pub use self::size_hint::SizeHint;
-
-pub mod errors {
-    //! Error types
-
-    pub use super::collect::CollectError;
-    pub use super::from::CollectVecError;
-    pub use super::limit::LimitError;
-}
 
 use bytes::Buf;
 use futures::Poll;

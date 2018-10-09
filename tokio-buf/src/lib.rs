@@ -16,4 +16,5 @@ extern crate futures;
 
 pub mod buf_stream;
 
+#[doc(inline)]
 pub use buf_stream::BufStream;

@@ -226,6 +226,21 @@ fn limit() {
     assert!(bs.poll_buf().is_err());
 }
 
+// ===== BufStream impelmentations for misc types =====
+
+#[test]
+fn str_buf_stream() {
+    let mut bs = "hello world".to_string();
+    assert_buf_eq!(bs.poll_buf(), "hello world");
+    assert!(bs.is_empty());
+    assert_none!(bs.poll_buf());
+
+    let mut bs = "hello world";
+    assert_buf_eq!(bs.poll_buf(), "hello world");
+    assert!(bs.is_empty());
+    assert_none!(bs.poll_buf());
+}
+
 // ===== Test utils =====
 
 fn one(buf: &'static str) -> Mock {
