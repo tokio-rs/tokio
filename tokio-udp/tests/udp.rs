@@ -232,7 +232,7 @@ fn send_framed() {
         let msg = b"4567".to_vec();
 
         let send = a.send((msg.clone(), b_addr));
-        let recv = b.into_future().map_err(|e| e.0);
+        let recv = b.into_future().map_err(|e| (e.0).0);
         let (sendt, received) = t!(send.join(recv).wait());
 
         let (data, addr) = received.0.unwrap();
@@ -250,7 +250,7 @@ fn send_framed() {
         let msg = b"".to_vec();
 
         let send = a.send((msg.clone(), b_addr));
-        let recv = b.into_future().map_err(|e| e.0);
+        let recv = b.into_future().map_err(|e| (e.0).0);
         let received = t!(send.join(recv).wait()).1;
 
         let (data, addr) = received.0.unwrap();

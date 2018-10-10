@@ -37,21 +37,25 @@ pub struct UdpFramed<C> {
 
 impl<C: Decoder> Stream for UdpFramed<C> {
     type Item = (C::Item, SocketAddr);
-    type Error = C::Error;
+    type Error = (C::Error, Option<SocketAddr>);
 
     fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
         self.rd.reserve(INITIAL_RD_CAPACITY);
 
         let (n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
-            let (n, addr) = try_ready!(self.socket.poll_recv_from(self.rd.bytes_mut()));
+            let (n, addr) = try_ready!(
+                self.socket
+                    .poll_recv_from(self.rd.bytes_mut())
+                    .map_err(|e| (e.into(), None))
+            );
             self.rd.advance_mut(n);
             (n, addr)
         };
         trace!("received {} bytes, decoding", n);
         let frame_res = self.codec.decode(&mut self.rd);
         self.rd.clear();
-        let frame = frame_res?;
+        let frame = frame_res.map_err(|e| (e, Some(addr)))?;
         let result = frame.map(|frame| (frame, addr)); // frame -> (frame, addr)
         trace!("frame decoded from buffer");
         Ok(Async::Ready(result))

@@ -216,7 +216,7 @@ mod udp {
             } else {
                 None
             }
-        });
+        }).map_err(|(e, _)| e);
 
         Box::new(future::lazy(|| {
             tokio::spawn(forward_stdin);

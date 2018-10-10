@@ -43,7 +43,7 @@ fn main() {
             i += 1;
             println!("[a] recv: {}", String::from_utf8_lossy(&msg));
             (format!("PING {}", i).into(), addr)
-        });
+        }).map_err(|(e, _)| e);
         a_sink.send_all(a_stream)
     });
 
@@ -52,7 +52,7 @@ fn main() {
     let b_stream = b_stream.map(|(msg, addr)| {
         println!("[b] recv: {}", String::from_utf8_lossy(&msg));
         ("PONG".into(), addr)
-    });
+    }).map_err(|(e, _)| e);;
     let b = b_sink.send_all(b_stream);
 
     // Spawn the sender of pongs and then wait for our pinger to finish.
