@@ -32,6 +32,7 @@
 extern crate futures;
 extern crate tokio_io;
 extern crate tokio_threadpool;
+extern crate positioned_io;
 
 mod create_dir;
 mod create_dir_all;

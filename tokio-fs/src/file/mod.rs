@@ -16,6 +16,8 @@ pub use self::seek::SeekFuture;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
+use positioned_io::{ReadAt, WriteAt};
+
 use futures::Poll;
 
 use std::fs::{File as StdFile, Metadata, Permissions};
@@ -99,7 +101,7 @@ impl File {
     ///
     /// Seeking to a negative offset is considered an error.
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
-        ::blocking_io(|| self.std().seek(pos))
+        ::blocking_io(|| self.std_mut().seek(pos))
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -117,7 +119,7 @@ impl File {
     /// This function will attempt to ensure that all in-core data reaches the
     /// filesystem before returning.
     pub fn poll_sync_all(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().sync_all())
+        ::blocking_io(|| self.std_mut().sync_all())
     }
 
     /// This function is similar to `poll_sync_all`, except that it may not
@@ -129,7 +131,7 @@ impl File {
     ///
     /// Note that some platforms may simply implement this in terms of `poll_sync_all`.
     pub fn poll_sync_data(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().sync_data())
+        ::blocking_io(|| self.std_mut().sync_data())
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -144,7 +146,7 @@ impl File {
     /// This function will return an error if the file is not opened for
     /// writing.
     pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().set_len(size))
+        ::blocking_io(|| self.std_mut().set_len(size))
     }
 
     /// Queries metadata about the underlying file.
@@ -154,7 +156,7 @@ impl File {
 
     /// Queries metadata about the underlying file.
     pub fn poll_metadata(&mut self) -> Poll<Metadata, io::Error> {
-        ::blocking_io(|| self.std().metadata())
+        ::blocking_io(|| self.std_mut().metadata())
     }
 
     /// Create a new `File` instance that shares the same underlying file handle
@@ -162,7 +164,7 @@ impl File {
     /// File instances simultaneously.
     pub fn poll_try_clone(&mut self) -> Poll<File, io::Error> {
         ::blocking_io(|| {
-            let std = self.std().try_clone()?;
+            let std = self.std_mut().try_clone()?;
             Ok(File::from_std(std))
         })
     }
@@ -183,7 +185,7 @@ impl File {
     /// attributes on the underlying file. It may also return an error in other
     /// os-specific unspecified cases.
     pub fn poll_set_permissions(&mut self, perm: Permissions) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().set_permissions(perm))
+        ::blocking_io(|| self.std_mut().set_permissions(perm))
     }
 
     /// Destructures the `tokio_fs::File` into a [`std::fs::File`][std].
@@ -197,14 +199,28 @@ impl File {
         self.std.take().expect("`File` instance already shutdown")
     }
 
-    fn std(&mut self) -> &mut StdFile {
+    fn std_mut(&mut self) -> &mut StdFile {
         self.std.as_mut().expect("`File` instance already shutdown")
+    }
+
+    fn std(&self) -> &StdFile {
+        self.std.as_ref().expect("`File` instance already shutdown")
     }
 }
 
 impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().read(buf))
+        ::would_block(|| self.std_mut().read(buf))
+    }
+}
+
+impl ReadAt for File {
+    fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
+        ::would_block(|| self.std().read_at(pos, buf))
+    }
+
+    fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<()> {
+        ::would_block(|| self.std().read_exact_at(pos, buf))
     }
 }
 
@@ -216,11 +232,25 @@ impl AsyncRead for File {
 
 impl Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().write(buf))
+        ::would_block(|| self.std_mut().write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        ::would_block(|| self.std().flush())
+        ::would_block(|| Write::flush(self.std_mut()))
+    }
+}
+
+impl WriteAt for File {
+    fn write_at(&mut self, pos: u64, buf: &[u8]) -> io::Result<usize> {
+        ::would_block(|| self.std_mut().write_at(pos, buf))
+    }
+
+    fn write_all_at(&mut self, pos: u64, buf: &[u8]) -> io::Result<()> {
+        ::would_block(|| self.std_mut().write_all_at(pos, buf))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        ::would_block(|| WriteAt::flush(self.std_mut()))
     }
 }
 

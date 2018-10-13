@@ -22,6 +22,7 @@ categories = ["asynchronous", "network-programming", "filesystem"]
 futures = "0.1.21"
 tokio-threadpool = { version = "0.1.3", path = "../tokio-threadpool" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
+positioned-io = "0.2.2"
 
 [dev-dependencies]
 rand = "0.5"
