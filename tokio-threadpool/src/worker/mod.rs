@@ -222,7 +222,7 @@ impl Worker {
 
         // Get the notifier.
         let notify = Arc::new(Notifier {
-            inner: Arc::downgrade(&self.inner),
+            inner: self.inner.clone(),
         });
 
         let mut first = true;
