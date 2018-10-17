@@ -209,11 +209,13 @@ struct Inner {
 pub fn run<F>(future: F)
 where F: Future<Item = (), Error = ()> + Send + 'static,
 {
-    let mut runtime = Runtime::new().unwrap();
+    // Check enter before creating a new Runtime...
+    let mut entered = enter().expect("nested tokio::run");
+    let mut runtime = Runtime::new().expect("failed to start new Runtime");
     runtime.spawn(future);
-    enter().expect("nested tokio::run")
+    entered
         .block_on(runtime.shutdown_on_idle())
-        .unwrap();
+        .expect("shutdown cannot error")
 }
 
 impl Runtime {
@@ -362,9 +364,10 @@ impl Runtime {
         R: Send + 'static,
         E: Send + 'static,
     {
+        let mut entered = enter().expect("nested block_on");
         let (tx, rx) = futures::sync::oneshot::channel();
         self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        rx.wait().unwrap()
+        entered.block_on(rx).unwrap()
     }
 
     /// Run a future to completion on the Tokio runtime, then wait for all
@@ -387,9 +390,16 @@ impl Runtime {
         R: Send + 'static,
         E: Send + 'static,
     {
-        let res = self.block_on(future);
-        self.shutdown_on_idle().wait().unwrap();
-        res
+        let mut entered = enter().expect("nested block_on_all");
+        let (tx, rx) = futures::sync::oneshot::channel();
+        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
+        let block = rx
+            .map_err(|_| unreachable!())
+            .and_then(move |r| {
+                self.shutdown_on_idle()
+                    .map(move |()| r)
+            });
+        entered.block_on(block).unwrap()
     }
 
     /// Signals the runtime to shutdown once it becomes idle.
