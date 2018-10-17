@@ -391,14 +391,78 @@ mod from_block_on_all {
     }
 }
 
-#[test]
-fn run_in_run() {
+mod nested_enter {
+    use super::*;
+    use tokio::runtime::current_thread;
     use std::panic;
 
-    tokio::run(lazy(|| {
-        panic::catch_unwind(|| {
-            tokio::run(lazy(|| { Ok::<(), ()>(()) }))
-        }).unwrap_err();
-        Ok::<(), ()>(())
-    }));
+    fn test<F1, F2>(first: F1, nested: F2)
+    where
+        F1: Fn(Box<Future<Item=(), Error=()> + Send>) + Send + 'static,
+        F2: Fn(Box<Future<Item=(), Error=()> + Send>) + panic::UnwindSafe + Send + 'static,
+    {
+        let panicked = Arc::new(Mutex::new(false));
+        let panicked2 = panicked.clone();
+
+        // Since this is testing panics in other threads, printing about panics
+        // is noisy and can give the impression that the test is ignoring panics.
+        //
+        // It *is* ignoring them, but on purpose.
+        let prev_hook = panic::take_hook();
+        panic::set_hook(Box::new(|info| {
+            let s = info.to_string();
+            if s.starts_with("panicked at 'nested ")
+                || s.starts_with("panicked at 'Multiple executors at once")
+            {
+                // expected, noop
+            } else {
+                println!("{}", s);
+            }
+        }));
+
+        first(Box::new(lazy(move || {
+            panic::catch_unwind(move || {
+                nested(Box::new(lazy(|| { Ok::<(), ()>(()) })))
+            }).expect_err("nested should panic");
+            *panicked2.lock().unwrap() = true;
+            Ok::<(), ()>(())
+        })));
+
+        panic::set_hook(prev_hook);
+
+        assert!(*panicked.lock().unwrap(), "nested call should have panicked");
+    }
+
+    fn threadpool_new() -> Runtime {
+        Runtime::new().expect("rt new")
+    }
+
+    #[test]
+    fn run_in_run() {
+        test(tokio::run, tokio::run);
+    }
+
+    #[test]
+    fn threadpool_block_on_in_run() {
+        test(tokio::run, |fut| {
+            let mut rt = threadpool_new();
+            rt.block_on(fut).unwrap();
+        });
+    }
+
+    #[test]
+    fn threadpool_block_on_all_in_run() {
+        test(tokio::run, |fut| {
+            let rt = threadpool_new();
+            rt.block_on_all(fut).unwrap();
+        });
+    }
+
+    #[test]
+    fn current_thread_block_on_all_in_run() {
+        test(tokio::run, |fut| {
+            current_thread::block_on_all(fut).unwrap();
+        });
+    }
 }
+
