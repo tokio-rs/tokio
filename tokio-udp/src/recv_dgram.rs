@@ -30,6 +30,30 @@ impl<T> RecvDgram<T> {
         let inner = RecvDgramInner { socket: socket, buffer: buffer };
         RecvDgram { state: Some(inner) }
     }
+
+    /// Consume the `RecvDgram`, returning the socket.
+    ///
+    /// # Panics
+    ///
+    /// If called after the future has completed.
+    pub fn into_inner(mut self) -> UdpSocket {
+        let state = self.state
+            .take()
+            .expect("into_inner called after completion");
+        state.socket
+    }
+
+    /// Consume the `RecvDgram`, returning the socket and buffer.
+    ///
+    /// # Panics
+    ///
+    /// If called after the future has completed.
+    pub fn into_parts(mut self) -> (UdpSocket, T) {
+        let state = self.state
+            .take()
+            .expect("into_parts called after completion");
+        (state.socket, state.buffer)
+    }
 }
 
 impl<T> Future for RecvDgram<T>
@@ -50,3 +74,4 @@ impl<T> Future for RecvDgram<T>
         Ok(Async::Ready((inner.socket, inner.buffer, n, addr)))
     }
 }
+
