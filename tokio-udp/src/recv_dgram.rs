@@ -33,6 +33,25 @@ impl<T> RecvDgram<T> {
 
     /// Consume the `RecvDgram`, returning the socket.
     ///
+    /// ```
+    /// # extern crate tokio_udp;
+    ///
+    /// use tokio_udp::UdpSocket;
+    ///
+    /// # pub fn main() {
+    ///
+    /// let socket = UdpSocket::bind(&([127, 0, 0, 1], 0).into()).unwrap();
+    /// let mut buffer = vec![0; 4096];
+    ///
+    /// let future = socket.recv_dgram(buffer);
+    ///
+    /// // ... polling `future` ... giving up (e.g. after timeout)
+    ///
+    /// let socket = future.into_inner();
+    ///
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// If called after the future has completed.
@@ -45,6 +64,24 @@ impl<T> RecvDgram<T> {
 
     /// Consume the `RecvDgram`, returning the socket and buffer.
     ///
+    /// ```
+    /// # extern crate tokio_udp;
+    ///
+    /// use tokio_udp::UdpSocket;
+    ///
+    /// # pub fn main() {
+    ///
+    /// let socket = UdpSocket::bind(&([127, 0, 0, 1], 0).into()).unwrap();
+    /// let mut buffer = vec![0; 4096];
+    ///
+    /// let future = socket.recv_dgram(buffer);
+    ///
+    /// // ... polling `future` ... giving up (e.g. after timeout)
+    ///
+    /// let (socket, buffer) = future.into_parts();
+    ///
+    /// # }
+    /// ```
     /// # Panics
     ///
     /// If called after the future has completed.
