@@ -109,7 +109,7 @@ and dependencies in the Tokio repository.
 Even tiny pull requests (e.g., one character pull request fixing a typo in API
 documentation) are greatly appreciated. Before making a large change, it is
 usually a good idea to first open an issue describing the change to solicit
-feedback and guidance. This will increasethe likelihood of the PR getting
+feedback and guidance. This will increase the likelihood of the PR getting
 merged.
 
 ### Tests
