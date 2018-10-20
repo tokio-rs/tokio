@@ -12,7 +12,7 @@ const NUM_FUTURES: usize = 1000;
 const NUM_STEPS: usize = 1000;
 
 fn main() {
-    tokio::run(future::lazy(|| {
+    tokio::run(future::lazy(|| -> Result<(), Box<std::error::Error + Send>> {
         for _ in 0..NUM_FUTURES {
             let (r, s) = mio::Registration::new2();
             let registration = Registration::new();
@@ -41,5 +41,5 @@ fn main() {
         }
 
         Ok(())
-    }));
+    }).map_err(|err| println!("Error: {:?}", err)));
 }

@@ -35,29 +35,27 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::prelude::*;
 
-fn get_stdin_data() -> Vec<u8> {
+fn get_stdin_data() -> Result<Vec<u8>, Box<std::error::Error>> {
     let mut buf = Vec::new();
-    stdin().read_to_end(&mut buf).unwrap();
-    buf
+    stdin().read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     let remote_addr: SocketAddr = env::args()
         .nth(1)
         .unwrap_or("127.0.0.1:8080".into())
-        .parse()
-        .unwrap();
+        .parse()?;
     // We use port 0 to let the operating system allocate an available port for us.
     let local_addr: SocketAddr = if remote_addr.is_ipv4() {
         "0.0.0.0:0"
     } else {
         "[::]:0"
-    }.parse()
-        .unwrap();
-    let socket = UdpSocket::bind(&local_addr).unwrap();
+    }.parse()?;
+    let socket = UdpSocket::bind(&local_addr)?;
     const MAX_DATAGRAM_SIZE: usize = 65_507;
-    let processing = socket
-        .send_dgram(get_stdin_data(), &remote_addr)
+    socket
+        .send_dgram(get_stdin_data()?, &remote_addr)
         .and_then(|(socket, _)| socket.recv_dgram(vec![0u8; MAX_DATAGRAM_SIZE]))
         .map(|(_, data, len, _)| {
             println!(
@@ -66,9 +64,6 @@ fn main() {
                 String::from_utf8_lossy(&data[..len])
             )
         })
-        .wait();
-    match processing {
-        Ok(_) => {}
-        Err(e) => eprintln!("Encountered an error: {}", e),
-    }
+        .wait()?;
+    Ok(())
 }

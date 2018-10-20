@@ -20,18 +20,18 @@ use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
-pub fn main() {
-    let addr = "127.0.0.1:6142".parse().unwrap();
+pub fn main() -> Result<(), Box<std::error::Error>> {
+    let addr = "127.0.0.1:6142".parse()?;
 
     // Bind a TCP listener to the socket address.
     //
     // Note that this is the Tokio TcpListener, which is fully async.
-    let listener = TcpListener::bind(&addr).unwrap();
+    let listener = TcpListener::bind(&addr)?;
 
     // The server task asynchronously iterates over and processes each
     // incoming connection.
     let server = listener.incoming().for_each(|socket| {
-        println!("accepted socket; addr={:?}", socket.peer_addr().unwrap());
+        println!("accepted socket; addr={:?}", socket.peer_addr()?);
 
         let connection = io::write_all(socket, "hello world\n")
             .then(|res| {
@@ -67,4 +67,5 @@ pub fn main() {
     // In our example, we have not defined a shutdown strategy, so this will
     // block until `ctrl-c` is pressed at the terminal.
     tokio::run(server);
+    Ok(())
 }
