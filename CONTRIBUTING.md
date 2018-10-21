@@ -380,8 +380,8 @@ left). When doing so, it is courteous to give the original contributor credit
 for the work they started (either by preserving their name and email address in
 the commit log, or by using an `Author: ` meta-data tag in the commit.
 
-_Adapted from the [Node.js contributing guide][node]_
+_Adapted from the [Node.js contributing guide][node]_.
 
-[node]: https://github.com/nodejs/node/blob/master/CONTRIBUTING.md.
+[node]: https://github.com/nodejs/node/blob/master/CONTRIBUTING.md
 [hiding-a-comment]: https://help.github.com/articles/managing-disruptive-comments/#hiding-a-comment
 [documentation test]: https://doc.rust-lang.org/rustdoc/documentation-tests.html
