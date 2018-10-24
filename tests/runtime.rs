@@ -466,3 +466,30 @@ mod nested_enter {
     }
 }
 
+#[test]
+fn runtime_reactor_handle() {
+    #![allow(deprecated)]
+
+    use futures::Stream;
+    use std::net::{
+        TcpListener as StdListener,
+        TcpStream as StdStream,
+    };
+
+    let rt = Runtime::new().unwrap();
+
+    let std_listener = StdListener::bind("127.0.0.1:0").unwrap();
+    let tk_listener = TcpListener::from_std(std_listener, rt.handle()).unwrap();
+
+    let addr = tk_listener.local_addr().unwrap();
+
+    // Spawn a thread since we are avoiding the runtime
+    let th = thread::spawn(|| {
+        for _ in tk_listener.incoming().take(1).wait() {
+        }
+    });
+
+    let _ = StdStream::connect(&addr).unwrap();
+
+    th.join().unwrap();
+}
