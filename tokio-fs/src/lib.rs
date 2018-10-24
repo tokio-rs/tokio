@@ -1,3 +1,6 @@
+#![deny(missing_docs, missing_debug_implementations, warnings)]
+#![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.4")]
+
 //! Asynchronous file and standard stream adaptation.
 //!
 //! This module contains utility methods and adapter types for input/output to
@@ -24,9 +27,6 @@
 //! [`blocking`]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool/fn.blocking.html
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
-
-#![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.3")]
 
 #[macro_use]
 extern crate futures;

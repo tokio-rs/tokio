@@ -1,3 +1,9 @@
+# 0.1.8 (October 23, 2018)
+
+* Assign spawned tasks to random worker (#660).
+* Worker threads no longer shutdown (#692).
+* Reduce atomic ops in notifier (#702).
+
 # 0.1.7 (September 27, 2018)
 
 * Add ThreadPool::spawn_handle (#602, #604).

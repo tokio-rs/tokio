@@ -5,12 +5,12 @@ name = "tokio-uds"
 # - Update doc url
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-uds/0.2.2/tokio_uds/"
+documentation = "https://docs.rs/tokio-uds/0.2.3/tokio_uds/"
 description = """
 Unix Domain sockets for Tokio
 """

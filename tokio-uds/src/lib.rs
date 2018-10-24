@@ -1,10 +1,10 @@
+#![cfg(unix)]
+#![doc(html_root_url = "https://docs.rs/tokio-uds/0.2.3")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! Unix Domain Sockets for Tokio.
 //!
 //! This crate provides APIs for using Unix Domain Sockets with Tokio.
-
-#![cfg(unix)]
-#![doc(html_root_url = "https://docs.rs/tokio-uds/0.2.2")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
 
 extern crate bytes;
 #[macro_use]
