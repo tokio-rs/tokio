@@ -1,6 +1,6 @@
 [package]
 name = "tokio-signal"
-version = "0.2.5"
+version = "0.2.6"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
