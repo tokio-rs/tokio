@@ -153,7 +153,7 @@ pub struct Runtime {
 
 #[derive(Debug)]
 struct Inner {
-    /// A handle to one of the per-worker reactors.
+     /// A handle to the reactor in the background thread.
     reactor_handle: Handle,
 
     // TODO: This should go away in 0.2
