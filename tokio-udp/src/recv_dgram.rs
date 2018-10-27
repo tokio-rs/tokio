@@ -31,37 +31,6 @@ impl<T> RecvDgram<T> {
         RecvDgram { state: Some(inner) }
     }
 
-    /// Consume the `RecvDgram`, returning the socket.
-    ///
-    /// ```
-    /// # extern crate tokio_udp;
-    ///
-    /// use tokio_udp::UdpSocket;
-    ///
-    /// # pub fn main() {
-    ///
-    /// let socket = UdpSocket::bind(&([127, 0, 0, 1], 0).into()).unwrap();
-    /// let mut buffer = vec![0; 4096];
-    ///
-    /// let future = socket.recv_dgram(buffer);
-    ///
-    /// // ... polling `future` ... giving up (e.g. after timeout)
-    ///
-    /// let socket = future.into_inner();
-    ///
-    /// # }
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// If called after the future has completed.
-    pub fn into_inner(mut self) -> UdpSocket {
-        let state = self.state
-            .take()
-            .expect("into_inner called after completion");
-        state.socket
-    }
-
     /// Consume the `RecvDgram`, returning the socket and buffer.
     ///
     /// ```
@@ -111,4 +80,3 @@ impl<T> Future for RecvDgram<T>
         Ok(Async::Ready((inner.socket, inner.buffer, n, addr)))
     }
 }
-
