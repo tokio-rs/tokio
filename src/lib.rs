@@ -643,3 +643,27 @@ mod sys {
         }
     }
 }
+
+#[cfg(windows)]
+mod sys {
+    use std::os::windows::io::{AsRawHandle, RawHandle};
+    use super::{ChildStdin, ChildStdout, ChildStderr};
+
+    impl AsRawHandle for ChildStdin {
+        fn as_raw_handle(&self) -> RawHandle {
+            self.inner.get_ref().as_raw_handle()
+        }
+    }
+
+    impl AsRawHandle for ChildStdout {
+        fn as_raw_handle(&self) -> RawHandle {
+            self.inner.get_ref().as_raw_handle()
+        }
+    }
+
+    impl AsRawHandle for ChildStderr {
+        fn as_raw_handle(&self) -> RawHandle {
+            self.inner.get_ref().as_raw_handle()
+        }
+    }
+}
