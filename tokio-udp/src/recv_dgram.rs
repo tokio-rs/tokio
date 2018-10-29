@@ -24,6 +24,17 @@ struct RecvDgramInner<T> {
     buffer: T
 }
 
+/// Components of a `RecvDgram` future, returned from `into_parts`.
+#[derive(Debug)]
+pub struct Parts<T> {
+    /// The socket
+    pub socket: UdpSocket,
+    /// The buffer
+    pub buffer: T,
+
+    _priv: ()
+}
+
 impl<T> RecvDgram<T> {
     /// Create a new future to receive UDP Datagram
     pub(crate) fn new(socket: UdpSocket, buffer: T) -> RecvDgram<T> {
@@ -47,18 +58,26 @@ impl<T> RecvDgram<T> {
     ///
     /// // ... polling `future` ... giving up (e.g. after timeout)
     ///
-    /// let (socket, buffer) = future.into_parts();
+    /// let parts = future.into_parts();
+    ///
+    /// let socket = parts.socket; // extract the socket
+    /// let buffer = parts.buffer; // extract the buffer
     ///
     /// # }
     /// ```
     /// # Panics
     ///
     /// If called after the future has completed.
-    pub fn into_parts(mut self) -> (UdpSocket, T) {
+    pub fn into_parts(mut self) -> Parts<T> {
         let state = self.state
             .take()
             .expect("into_parts called after completion");
-        (state.socket, state.buffer)
+
+        Parts {
+            socket: state.socket,
+            buffer: state.buffer,
+            _priv: ()
+        }
     }
 }
 
