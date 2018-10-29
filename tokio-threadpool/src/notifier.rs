@@ -3,7 +3,7 @@ use task::Task;
 
 use std::mem;
 use std::ops;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use futures::executor::Notify;
 
@@ -13,7 +13,7 @@ use futures::executor::Notify;
 /// to poll the future again.
 #[derive(Debug)]
 pub(crate) struct Notifier {
-    pub inner: Weak<Pool>,
+    pub inner: Arc<Pool>,
 }
 
 /// A guard that ensures that the inner value gets forgotten.
@@ -38,9 +38,7 @@ impl Notify for Notifier {
                 // Bump the ref count
                 let task = task.clone();
 
-                if let Some(inner) = self.inner.upgrade() {
-                    let _ = inner.submit(task, &inner);
-                }
+                let _ = self.inner.submit(task, &self.inner);
             }
         }
     }

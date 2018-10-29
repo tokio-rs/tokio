@@ -1,6 +1,14 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.12 (October 23, 2018)
+
+* runtime: expose `keep_alive` on runtime builder (#676).
+* runtime: create a reactor per worker thread (#660).
+* codec: fix panic in `LengthDelimitedCodec` (#682).
+* io: re-export `tokio_io::io::read` function (#689).
+* runtime: check for executor re-entry in more places (#708).
+
 # 0.1.11 (September 28, 2018)
 
 * Fix `tokio-async-await` dependency (#675).

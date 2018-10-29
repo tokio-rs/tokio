@@ -1,41 +1,32 @@
-# Changelog
-All notable changes to this project will be documented in this file.
+## Unreleased
 
-The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
-and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+## 0.2.6 - (October 26, 2018)
+### Changed
+* Use the `signal-hook` crate for managing signal registrations
 
-## [Unreleased]
-
-## [0.2.5] - 2018-08-29
+## 0.2.5 - (September 29, 2018)
 ### Fixes
 * Fix a possible starvation when polling multiple `Signal` instances outside of
 a tokio reactor (e.g. by using `Future::wait`)
 
-## [0.2.4] - 2018-08-25
+## 0.2.4 - (August 25, 2018)
 ### Fixes
 * Actually make `unix::bsd` public
 
-## [0.2.3] - 2018-08-25
+## 0.2.3 - (August 25, 2018)
 ### Features
-* Exposes `SIGINFO` on BSD-based operating systems. (#46)
+* Exposes `SIGINFO` on BSD-based operating systems.
 
-## [0.2.2] - 2018-08-14
+## 0.2.2 - (August 14, 2018)
 ### Fixes
 * Fix starvation of `Signal`s whenever a `Signal` instance is dropped
 * Fix starvation of individual `Signal`s based on their creation order
 
-## [0.2.1] - 2018-05-27
+## 0.2.1 - (May 27, 2018)
 ### Fixes
 * Bump minimum supported version of `mio` to 0.6.14
 
-## 0.2.0 - 2018-05-07
+## 0.2.0 - (May 7, 2018)
 #### Features
- * Uses `tokio` instead of `tokio_core` (#24)
- * Supports all 33 signals on FreeBSD (#27)
-
-[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.2.5...HEAD
-[0.2.5]: https://github.com/alexcrichton/tokio-signal/compare/0.2.4...0.2.5
-[0.2.4]: https://github.com/alexcrichton/tokio-signal/compare/0.2.3...0.2.4
-[0.2.3]: https://github.com/alexcrichton/tokio-signal/compare/0.2.2...0.2.3
-[0.2.2]: https://github.com/alexcrichton/tokio-signal/compare/0.2.1...0.2.2
-[0.2.1]: https://github.com/alexcrichton/tokio-signal/compare/0.2.0...0.2.1
+ * Uses `tokio` instead of `tokio_core`
+ * Supports all 33 signals on FreeBSD

@@ -68,6 +68,7 @@ pub use tokio_io::io::{
     Flush,
     lines,
     Lines,
+    read,
     read_exact,
     ReadExact,
     read_to_end,
