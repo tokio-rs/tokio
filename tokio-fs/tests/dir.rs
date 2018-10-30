@@ -6,7 +6,6 @@ extern crate tokio_threadpool;
 use futures::sync::oneshot;
 use futures::{Future, Stream};
 use std::fs;
-use std::io;
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
 use tokio_fs::*;
@@ -23,48 +22,45 @@ where
 }
 
 #[test]
-fn create() -> io::Result<()> {
-    let base_dir = TempDir::new("base")?;
+fn create() {
+    let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
 
     run_in_pool({ create_dir(new_dir.clone()) });
 
     assert!(new_dir.is_dir());
-    Ok(())
 }
 
 #[test]
-fn create_all() -> io::Result<()> {
-    let base_dir = TempDir::new("base")?;
+fn create_all() {
+    let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo").join("bar");
 
     run_in_pool({ create_dir_all(new_dir.clone()) });
 
     assert!(new_dir.is_dir());
-    Ok(())
 }
 
 #[test]
-fn remove() -> io::Result<()> {
-    let base_dir = TempDir::new("base")?;
+fn remove() {
+    let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
 
-    fs::create_dir(new_dir.clone())?;
+    fs::create_dir(new_dir.clone()).unwrap();
 
     run_in_pool({ remove_dir(new_dir.clone()) });
 
     assert!(!new_dir.exists());
-    Ok(())
 }
 
 #[test]
-fn read() -> io::Result<()> {
-    let base_dir = TempDir::new("base")?;
+fn read() {
+    let base_dir = TempDir::new("base").unwrap();
 
     let p = base_dir.path();
-    fs::create_dir(p.join("aa"))?;
-    fs::create_dir(p.join("bb"))?;
-    fs::create_dir(p.join("cc"))?;
+    fs::create_dir(p.join("aa")).unwrap();
+    fs::create_dir(p.join("bb")).unwrap();
+    fs::create_dir(p.join("cc")).unwrap();
 
     let files = Arc::new(Mutex::new(Vec::new()));
 
@@ -84,6 +80,4 @@ fn read() -> io::Result<()> {
         *files,
         vec!["aa".to_string(), "bb".to_string(), "cc".to_string()]
     );
-
-    Ok(())
 }
