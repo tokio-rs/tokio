@@ -1,6 +1,10 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.13 (October 30, 2018)
+
+* runtime: fix `reactor()` function when no tasks are spawned (#721).
+
 # 0.1.12 (October 23, 2018)
 
 * runtime: expose `keep_alive` on runtime builder (#676).
