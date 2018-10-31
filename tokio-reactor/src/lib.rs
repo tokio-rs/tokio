@@ -376,7 +376,7 @@ impl Reactor {
 
         if let Some(start) = start {
             let dur = start.elapsed();
-            debug!("loop process - {} events, {}.{:03}s",
+            trace!("loop process - {} events, {}.{:03}s",
                    events,
                    dur.as_secs(),
                    dur.subsec_nanos() / 1_000_000);
