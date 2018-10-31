@@ -36,6 +36,7 @@ extern crate futures;
 extern crate slab;
 
 pub mod clock;
+pub mod debounce;
 pub mod delay_queue;
 pub mod throttle;
 pub mod timeout;
