@@ -273,9 +273,6 @@ impl Builder {
         // Get a handle to the clock for the runtime.
         let clock = self.clock.clone();
 
-        // Get a handle to the first reactor.
-        let reactor = reactor_handles[0].clone();
-
         let pool = self.threadpool_builder
             .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
@@ -299,9 +296,14 @@ impl Builder {
             })
             .build();
 
+        // To support deprecated `reactor()` function
+        let reactor = Reactor::new()?;
+        let reactor_handle = reactor.handle();
+
         Ok(Runtime {
             inner: Some(Inner {
-                reactor,
+                reactor_handle,
+                reactor: Mutex::new(Some(reactor)),
                 pool,
             }),
         })

@@ -121,9 +121,10 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::Handle;
+use reactor::{Handle, Reactor};
 
 use std::io;
+use std::sync::Mutex;
 
 use tokio_executor::enter;
 use tokio_threadpool as threadpool;
@@ -152,8 +153,11 @@ pub struct Runtime {
 
 #[derive(Debug)]
 struct Inner {
-    /// A handle to one of the per-worker reactors.
-    reactor: Handle,
+     /// A handle to the reactor in the background thread.
+    reactor_handle: Handle,
+
+    // TODO: This should go away in 0.2
+    reactor: Mutex<Option<Reactor>>,
 
     /// Task execution pool.
     pool: threadpool::ThreadPool,
@@ -280,7 +284,14 @@ impl Runtime {
     /// ```
     #[deprecated(since = "0.1.11", note = "there is now a reactor per worker thread")]
     pub fn reactor(&self) -> &Handle {
-        &self.inner().reactor
+        let mut reactor = self.inner().reactor.lock().unwrap();
+        if let Some(reactor) = reactor.take() {
+            if let Ok(background) = reactor.background() {
+                background.forget();
+            }
+        }
+
+        &self.inner().reactor_handle
     }
 
     /// Return a handle to the runtime's executor.
