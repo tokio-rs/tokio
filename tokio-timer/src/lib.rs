@@ -33,6 +33,7 @@ extern crate futures;
 extern crate slab;
 
 pub mod clock;
+pub mod debounce;
 pub mod delay_queue;
 pub mod timeout;
 pub mod timer;
@@ -48,6 +49,7 @@ mod wheel;
 #[doc(hidden)]
 #[allow(deprecated)]
 pub use self::deadline::{Deadline, DeadlineError};
+pub use self::debounce::{DebounceLeading, DebounceTrailing};
 #[doc(inline)]
 pub use self::delay_queue::DelayQueue;
 pub use self::delay::Delay;
