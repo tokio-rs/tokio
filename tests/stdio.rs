@@ -1,5 +1,6 @@
 extern crate futures;
 extern crate tokio;
+extern crate tokio_current_thread;
 extern crate tokio_io;
 extern crate tokio_process;
 #[macro_use]
@@ -9,14 +10,12 @@ extern crate env_logger;
 use std::io;
 use std::process::{Stdio, ExitStatus, Command};
 use std::time::Duration;
-use std::time::Instant;
 
 use futures::future::Future;
 use futures::stream::{self, Stream};
-use tokio::executor::current_thread;
 use tokio_io::io::{read_until, write_all, read_to_end};
 use tokio_process::{CommandExt, Child};
-use tokio::timer::Deadline;
+use tokio::timer::Timeout;
 
 mod support;
 
@@ -87,7 +86,7 @@ fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = i
 /// - The child does produce EOF on stdout after the last line.
 fn feed_a_lot() {
     let child = cat().spawn_async().unwrap();
-    let status = current_thread::block_on_all(feed_cat(child, 10000)).unwrap();
+    let status = tokio_current_thread::block_on_all(feed_cat(child, 10000)).unwrap();
     assert_eq!(status.code(), Some(0));
 }
 
@@ -104,7 +103,7 @@ fn drop_kills() {
 
     let future = writer.join(reader).map(|(_, (_, out))| out);
 
-    let output = current_thread::block_on_all(future).unwrap();
+    let output = tokio_current_thread::block_on_all(future).unwrap();
     assert_eq!(output.len(), 0);
 }
 
@@ -114,7 +113,8 @@ fn wait_with_output_captures() {
     let stdin = child.stdin().take().unwrap();
     let out = child.wait_with_output();
 
-    let ret = current_thread::block_on_all(write_all(stdin, b"1234").map(|p| p.1).join(out)).unwrap();
+    let future = write_all(stdin, b"1234").map(|p| p.1).join(out);
+    let ret = tokio_current_thread::block_on_all(future).unwrap();
     let (written, output) = ret;
 
     assert!(output.status.success());
@@ -133,6 +133,6 @@ fn status_closes_any_pipes() {
     // tokio's `current_thread::Runtime`, but isn't available by just using
     // tokio's default CurrentThread executor which powers `current_thread::block_on_all`.
     let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-    rt.block_on(Deadline::new(child, Instant::now() + Duration::from_secs(1)))
+    rt.block_on(Timeout::new(child, Duration::from_secs(1)))
         .expect("time out exceeded! did we get stuck waiting on the child?");
 }

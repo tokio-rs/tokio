@@ -29,6 +29,7 @@ tokio-reactor = "0.1"
 env_logger = { version = "0.4", default-features = false }
 log = "0.4"
 tokio = "0.1"
+tokio-current-thread = "0.1"
 
 [target.'cfg(windows)'.dependencies]
 mio-named-pipes = "0.1"
