@@ -4,7 +4,7 @@ name = "tokio-process"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Create "X.Y.Z" git tag.
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/alexcrichton/tokio-process"
