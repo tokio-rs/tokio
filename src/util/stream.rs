@@ -1,4 +1,4 @@
-use tokio_timer::Timeout;
+use tokio_timer::{Throttle, Timeout};
 
 use futures::Stream;
 
@@ -19,6 +19,26 @@ use std::time::Duration;
 ///
 /// [`timeout`]: #method.timeout
 pub trait StreamExt: Stream {
+    /// Throttle down the stream by enforcing a fixed delay between items.
+    ///
+    /// Errors are also delayed.
+    fn throttle(self, duration: Duration) -> Throttle<Self>
+    where Self: Sized
+    {
+        Throttle::new(self, duration)
+    }
+
+    /// Throttle down the stream by enforcing that a maximum of `rate_per_sec`
+    /// items will be passed through per second.
+    ///
+    /// Errors are also delayed.
+    fn rate_limit(self, max_per_sec: f64) -> Throttle<Self>
+    where Self: Sized
+    {
+        let pause = 1_000_000_000f64 / max_per_sec;
+
+        Throttle::new(self, Duration::from_nanos(pause as u64))
+    }
 
     /// Creates a new stream which allows `self` until `timeout`.
     ///
