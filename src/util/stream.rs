@@ -37,7 +37,7 @@ pub trait StreamExt: Stream {
     {
         const NANOS_PER_SEC: f64 = 1000_000_000f64;
 
-        Throttle::new(self, Duration::new(
+        self.throttle(Duration::new(
             (1f64 / max_per_sec) as u64,
             (NANOS_PER_SEC / max_per_sec % NANOS_PER_SEC) as u32,
         ))
