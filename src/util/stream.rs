@@ -35,9 +35,12 @@ pub trait StreamExt: Stream {
     fn rate_limit(self, max_per_sec: f64) -> Throttle<Self>
     where Self: Sized
     {
-        let pause = 1_000_000_000f64 / max_per_sec;
+        const NANOS_PER_SEC: f64 = 1000_000_000f64;
 
-        Throttle::new(self, Duration::from_nanos(pause as u64))
+        Throttle::new(self, Duration::new(
+            (1f64 / max_per_sec) as u64,
+            (NANOS_PER_SEC / max_per_sec % NANOS_PER_SEC) as u32,
+        ))
     }
 
     /// Creates a new stream which allows `self` until `timeout`.
