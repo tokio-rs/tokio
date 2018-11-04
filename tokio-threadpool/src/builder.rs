@@ -170,14 +170,14 @@ impl Builder {
         self
     }
 
-    /// Set the worker thread keep alive duration
+    /// Set the thread keep alive duration
     ///
-    /// If set, a worker thread will wait for up to the specified duration for
-    /// work, at which point the thread will shutdown. When work becomes
-    /// available, a new thread will eventually be spawned to replace the one
-    /// that shut down.
+    /// If set, a thread that has completed a `blocking` call will wait for up
+    /// to the specified duration to become a worker thread again. Once the
+    /// duration elapses, the thread will shutdown.
     ///
-    /// When the value is `None`, the thread will wait for work forever.
+    /// When the value is `None`, the thread will wait to become a worker
+    /// thread forever.
     ///
     /// The default value is `None`.
     ///

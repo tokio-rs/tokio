@@ -5,7 +5,7 @@ extern crate bytes;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::codec::*;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut, BufMut};
 use futures::{Stream, Sink, Poll};
 use futures::Async::*;
 
@@ -481,6 +481,22 @@ fn write_zero() {
     assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
     assert_eq!(io.poll_complete().unwrap_err().kind(), io::ErrorKind::WriteZero);
     assert!(io.get_ref().calls.is_empty());
+}
+
+#[test]
+fn encode_overflow() {
+    // Test reproducing tokio-rs/tokio#681.
+    let mut codec = length_delimited::Builder::new().new_codec();
+    let mut buf = BytesMut::with_capacity(1024);
+
+    // Put some data into the buffer without resizing it to hold more.
+    let some_as = std::iter::repeat(b'a')
+        .take(1024)
+        .collect::<Vec<_>>();
+    buf.put_slice(&some_as[..]);
+
+    // Trying to encode the length header should resize the buffer if it won't fit.
+    codec.encode(Bytes::from("hello"), &mut buf).unwrap();
 }
 
 // ===== Test utils =====

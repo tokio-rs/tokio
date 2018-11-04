@@ -161,7 +161,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         // Create a new task for the future
         let task = Arc::new(Task::new(future));
 
-        self.inner.submit(task, &self.inner);
+        self.inner.submit_to_random(task, &self.inner);
 
         Ok(())
     }

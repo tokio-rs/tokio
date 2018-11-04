@@ -109,7 +109,7 @@ and dependencies in the Tokio repository.
 Even tiny pull requests (e.g., one character pull request fixing a typo in API
 documentation) are greatly appreciated. Before making a large change, it is
 usually a good idea to first open an issue describing the change to solicit
-feedback and guidance. This will increasethe likelihood of the PR getting
+feedback and guidance. This will increase the likelihood of the PR getting
 merged.
 
 ### Tests
@@ -380,8 +380,8 @@ left). When doing so, it is courteous to give the original contributor credit
 for the work they started (either by preserving their name and email address in
 the commit log, or by using an `Author: ` meta-data tag in the commit.
 
-_Adapted from the [Node.js contributing guide][node]_
+_Adapted from the [Node.js contributing guide][node]_.
 
-[node]: https://github.com/nodejs/node/blob/master/CONTRIBUTING.md.
+[node]: https://github.com/nodejs/node/blob/master/CONTRIBUTING.md
 [hiding-a-comment]: https://help.github.com/articles/managing-disruptive-comments/#hiding-a-comment
 [documentation test]: https://doc.rust-lang.org/rustdoc/documentation-tests.html

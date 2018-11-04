@@ -121,9 +121,10 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::{Background, Handle};
+use reactor::{Handle, Reactor};
 
 use std::io;
+use std::sync::Mutex;
 
 use tokio_executor::enter;
 use tokio_threadpool as threadpool;
@@ -152,8 +153,11 @@ pub struct Runtime {
 
 #[derive(Debug)]
 struct Inner {
-    /// Reactor running on a background thread.
-    reactor: Background,
+     /// A handle to the reactor in the background thread.
+    reactor_handle: Handle,
+
+    // TODO: This should go away in 0.2
+    reactor: Mutex<Option<Reactor>>,
 
     /// Task execution pool.
     pool: threadpool::ThreadPool,
@@ -209,11 +213,13 @@ struct Inner {
 pub fn run<F>(future: F)
 where F: Future<Item = (), Error = ()> + Send + 'static,
 {
-    let mut runtime = Runtime::new().unwrap();
+    // Check enter before creating a new Runtime...
+    let mut entered = enter().expect("nested tokio::run");
+    let mut runtime = Runtime::new().expect("failed to start new Runtime");
     runtime.spawn(future);
-    enter().expect("nested tokio::run")
+    entered
         .block_on(runtime.shutdown_on_idle())
-        .unwrap();
+        .expect("shutdown cannot error")
 }
 
 impl Runtime {
@@ -254,6 +260,7 @@ impl Runtime {
     #[deprecated(since = "0.1.5", note = "use `reactor` instead")]
     #[doc(hidden)]
     pub fn handle(&self) -> &Handle {
+        #[allow(deprecated)]
         self.reactor()
     }
 
@@ -275,8 +282,16 @@ impl Runtime {
     ///
     /// // use `reactor_handle`
     /// ```
+    #[deprecated(since = "0.1.11", note = "there is now a reactor per worker thread")]
     pub fn reactor(&self) -> &Handle {
-        self.inner().reactor.handle()
+        let mut reactor = self.inner().reactor.lock().unwrap();
+        if let Some(reactor) = reactor.take() {
+            if let Ok(background) = reactor.background() {
+                background.forget();
+            }
+        }
+
+        &self.inner().reactor_handle
     }
 
     /// Return a handle to the runtime's executor.
@@ -360,9 +375,10 @@ impl Runtime {
         R: Send + 'static,
         E: Send + 'static,
     {
+        let mut entered = enter().expect("nested block_on");
         let (tx, rx) = futures::sync::oneshot::channel();
         self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        rx.wait().unwrap()
+        entered.block_on(rx).unwrap()
     }
 
     /// Run a future to completion on the Tokio runtime, then wait for all
@@ -385,9 +401,16 @@ impl Runtime {
         R: Send + 'static,
         E: Send + 'static,
     {
-        let res = self.block_on(future);
-        self.shutdown_on_idle().wait().unwrap();
-        res
+        let mut entered = enter().expect("nested block_on_all");
+        let (tx, rx) = futures::sync::oneshot::channel();
+        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
+        let block = rx
+            .map_err(|_| unreachable!())
+            .and_then(move |r| {
+                self.shutdown_on_idle()
+                    .map(move |()| r)
+            });
+        entered.block_on(block).unwrap()
     }
 
     /// Signals the runtime to shutdown once it becomes idle.
@@ -424,16 +447,7 @@ impl Runtime {
     /// [mod]: index.html
     pub fn shutdown_on_idle(mut self) -> Shutdown {
         let inner = self.inner.take().unwrap();
-
-        let inner = Box::new({
-            let pool = inner.pool;
-            let reactor = inner.reactor;
-
-            pool.shutdown_on_idle().and_then(|_| {
-                reactor.shutdown_on_idle()
-            })
-        });
-
+        let inner = inner.pool.shutdown_on_idle();
         Shutdown { inner }
     }
 

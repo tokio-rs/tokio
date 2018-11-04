@@ -205,50 +205,6 @@ fn drop_threadpool_drops_futures() {
 }
 
 #[test]
-fn thread_shutdown_timeout() {
-    use std::sync::Mutex;
-
-    let _ = ::env_logger::try_init();
-
-    let (shutdown_tx, shutdown_rx) = mpsc::channel();
-    let (complete_tx, complete_rx) = mpsc::channel();
-
-    let t = Mutex::new(shutdown_tx);
-
-    let pool = Builder::new()
-        .keep_alive(Some(Duration::from_millis(200)))
-        .around_worker(move |w, _| {
-            w.run();
-            // There could be multiple threads here
-            let _ = t.lock().unwrap().send(());
-        })
-        .build();
-    let tx = pool.sender().clone();
-
-    let t = complete_tx.clone();
-    tx.spawn(lazy(move || {
-        t.send(()).unwrap();
-        Ok(())
-    })).unwrap();
-
-    // The future completes
-    complete_rx.recv().unwrap();
-
-    // The thread shuts down eventually
-    shutdown_rx.recv().unwrap();
-
-    // Futures can still be run
-    tx.spawn(lazy(move || {
-        complete_tx.send(()).unwrap();
-        Ok(())
-    })).unwrap();
-
-    complete_rx.recv().unwrap();
-
-    pool.shutdown().wait().unwrap();
-}
-
-#[test]
 fn many_oneshot_futures() {
     const NUM: usize = 10_000;
 

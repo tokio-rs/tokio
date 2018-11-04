@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.11")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.12")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 #![cfg_attr(feature = "async-await-preview", feature(
         async_await,
@@ -76,6 +76,7 @@ extern crate bytes;
 #[macro_use]
 extern crate futures;
 extern crate mio;
+extern crate num_cpus;
 extern crate tokio_current_thread;
 extern crate tokio_io;
 extern crate tokio_executor;
