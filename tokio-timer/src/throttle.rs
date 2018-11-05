@@ -12,8 +12,13 @@ use std::time::{Duration, Instant};
 pub struct Throttle<T> {
     delay: Option<Delay>,
     duration: Duration,
-    stream: Option<T>,
+    stream: T,
 }
+
+/// Either the error of the underlying stream, or an error within
+/// tokio's timing machinery.
+#[derive(Debug)]
+pub struct ThrottleError<T>(Either<T, Error>);
 
 impl<T> Throttle<T> {
     /// Slow down a stream by enforcing a delay between items.
@@ -21,48 +26,33 @@ impl<T> Throttle<T> {
         Self {
             delay: None,
             duration: duration,
-            stream: Some(stream),
+            stream: stream,
         }
     }
 }
 
 impl<T: Stream> Stream for Throttle<T> {
     type Item = T::Item;
-    type Error = Either<T::Error, Error>;
+    type Error = ThrottleError<T::Error>;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        // 1. Is there a better way than nested match statements?
-        // 2. What about having a delay and the underlying stream error'd?
-
-        match self.delay.take() {
-            Some(mut d) => match d.poll() {
-                Ok(Async::Ready(_)) => self.poll(),
-                Ok(Async::NotReady) => {
-                    self.delay = Some(d);
-
-                    Ok(Async::NotReady)
-                },
-                Err(e) => Err(Either::B(e)),
-            },
-
-            None => match self.stream.take() {
-                Some(mut s) => match s.poll() {
-                    Ok(Async::Ready(Some(it))) => {
-                        self.delay = Some(Delay::new(Instant::now() + self.duration));
-                        self.stream = Some(s);
-
-                        Ok(Async::Ready(Some(it)))
-                    },
-                    Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
-                    Ok(Async::NotReady) => {
-                        self.stream = Some(s);
-
-                        Ok(Async::NotReady)
-                    },
-                    Err(e) => Err(Either::A(e)),
-                },
-                None => Ok(Async::Ready(None)),
-            },
+        if let Some(ref mut delay) = self.delay {
+            try_ready!(delay.poll().map_err(Either::B));
         }
+
+        self.delay = None;
+        let value = try_ready!(self.stream.poll().map_err(Either::A));
+
+        if value.is_some() {
+            self.delay = Some(Delay::new(Instant::now() + self.duration));
+        }
+
+        Ok(Async::Ready(value))
+    }
+}
+
+impl<T> From<Either<T, Error>> for ThrottleError<T> {
+    fn from(a_or_b: Either<T, Error>) -> Self {
+        ThrottleError(a_or_b)
     }
 }
