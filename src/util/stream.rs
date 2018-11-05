@@ -28,21 +28,6 @@ pub trait StreamExt: Stream {
         Throttle::new(self, duration)
     }
 
-    /// Throttle down the stream by enforcing that a maximum of `rate_per_sec`
-    /// items will be passed through per second.
-    ///
-    /// Errors are also delayed.
-    fn rate_limit(self, max_per_sec: f64) -> Throttle<Self>
-    where Self: Sized
-    {
-        const NANOS_PER_SEC: f64 = 1000_000_000f64;
-
-        self.throttle(Duration::new(
-            (1f64 / max_per_sec) as u64,
-            (NANOS_PER_SEC / max_per_sec % NANOS_PER_SEC) as u32,
-        ))
-    }
-
     /// Creates a new stream which allows `self` until `timeout`.
     ///
     /// This combinator creates a new stream which wraps the receiving stream
