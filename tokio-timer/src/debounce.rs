@@ -7,12 +7,12 @@
 //! [`DebounceLeading`]: struct.DebounceLeading.html
 //! [`DebounceTrailing`]: struct.DebounceTrailing.html
 
-use {Delay, Error};
+use {clock, Delay, Error};
 
 use futures::{Async, Future, Poll, Stream};
 use futures::future::Either;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Debounce a stream discarding items that passed through within a certain
 /// timeframe.
@@ -83,7 +83,7 @@ impl<T: Stream> Stream for DebounceLeading<T> {
                         // We have gotten an item, but we're currently blocked on
                         // the delay. Discard it and reset the timer.
                         Ok(Async::Ready(Some(_))) => {
-                            self.delay = Some(Delay::new(Instant::now() + self.duration));
+                            self.delay = Some(Delay::new(clock::now() + self.duration));
                             self.stream = Some(s);
 
                             Ok(Async::NotReady)
@@ -112,7 +112,7 @@ impl<T: Stream> Stream for DebounceLeading<T> {
                     // We have gotten an item. Set up the delay for future items to bep
                     // debounced and return it.
                     Ok(Async::Ready(Some(item))) => {
-                        self.delay = Some(Delay::new(Instant::now() + self.duration));
+                        self.delay = Some(Delay::new(clock::now() + self.duration));
                         self.stream = Some(s);
 
                         Ok(Async::Ready(Some(item)))
@@ -152,7 +152,7 @@ impl<T: Stream> Stream for DebounceTrailing<T> {
                         // We have gotten an item, but we're currently blocked on
                         // the delay. Save it in the struct for returning it later.
                         Ok(Async::Ready(Some(item))) => {
-                            self.delay = Some(Delay::new(Instant::now() + self.duration));
+                            self.delay = Some(Delay::new(clock::now() + self.duration));
                             self.last_item = Some(item);
                             self.stream = Some(s);
 
@@ -182,7 +182,7 @@ impl<T: Stream> Stream for DebounceTrailing<T> {
                     // We have gotten an item. Set up the delay to return it after and
                     // save it in the struct for possibly returning it later.
                     Ok(Async::Ready(Some(item))) => {
-                        self.delay = Some(Delay::new(Instant::now() + self.duration));
+                        self.delay = Some(Delay::new(clock::now() + self.duration));
                         self.last_item = Some(item);
                         self.stream = Some(s);
 
