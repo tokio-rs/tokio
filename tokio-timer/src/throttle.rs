@@ -1,11 +1,11 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use {Delay, Error};
+use {clock, Delay, Error};
 
 use futures::{Async, Future, Poll, Stream};
 use futures::future::Either;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Slow down a stream by enforcing a delay between items.
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl<T: Stream> Stream for Throttle<T> {
         let value = try_ready!(self.stream.poll().map_err(Either::A));
 
         if value.is_some() {
-            self.delay = Some(Delay::new(Instant::now() + self.duration));
+            self.delay = Some(Delay::new(clock::now() + self.duration));
         }
 
         Ok(Async::Ready(value))
