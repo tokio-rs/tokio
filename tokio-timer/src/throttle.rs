@@ -37,11 +37,17 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         if let Some(ref mut delay) = self.delay {
-            try_ready!(delay.poll().map_err(Either::B));
+            try_ready!({
+                delay.poll()
+                    .map_err(ThrottleError::from_timer_err)
+            });
         }
 
         self.delay = None;
-        let value = try_ready!(self.stream.poll().map_err(Either::A));
+        let value = try_ready!({
+            self.stream.poll()
+                .map_err(ThrottleError::from_stream_err)
+        });
 
         if value.is_some() {
             self.delay = Some(Delay::new(clock::now() + self.duration));
@@ -51,8 +57,61 @@ impl<T: Stream> Stream for Throttle<T> {
     }
 }
 
-impl<T> From<Either<T, Error>> for ThrottleError<T> {
-    fn from(a_or_b: Either<T, Error>) -> Self {
-        ThrottleError(a_or_b)
+impl<T> ThrottleError<T> {
+    /// Creates a new `ThrottleError` from the given stream error.
+    pub fn from_stream_err(err: T) -> Self {
+        ThrottleError(Either::A(err))
+    }
+
+    /// Creates a new `ThrottleError` from the given tokio timer error.
+    pub fn from_timer_err(err: Error) -> Self {
+        ThrottleError(Either::B(err))
+    }
+
+    /// Attempts to get the underlying stream error, if it is present.
+    pub fn get_stream_error(&self) -> Option<&T> {
+        match self.0 {
+            Either::A(ref x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// Attempts to get the underlying timer error, if it is present.
+    pub fn get_timer_error(&self) -> Option<&Error> {
+        match self.0 {
+            Either::B(ref x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// Attempts to extract the underlying stream error, if it is present.
+    pub fn into_stream_error(self) -> Option<T> {
+        match self.0 {
+            Either::A(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// Attempts to extract the underlying timer error, if it is present.
+    pub fn into_timer_error(self) -> Option<Error> {
+        match self.0 {
+            Either::B(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// Returns whether the throttle error has occured because of an error
+    /// in the underlying stream.
+    pub fn is_stream_error(&self) -> bool {
+        !self.is_timer_error()
+    }
+
+    /// Returns whether the throttle error has occured because of an error
+    /// in tokio's timer system.
+    pub fn is_timer_error(&self) -> bool {
+        match self.0 {
+            Either::A(_) => false,
+            Either::B(_) => true,
+        }
     }
 }
