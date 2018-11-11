@@ -5,7 +5,11 @@ use {clock, Delay, Error};
 use futures::{Async, Future, Poll, Stream};
 use futures::future::Either;
 
-use std::time::Duration;
+use std::{
+    error::Error as StdError,
+    fmt::{Display, Formatter, Result as FmtResult},
+    time::Duration,
+};
 
 /// Slow down a stream by enforcing a delay between items.
 #[derive(Debug)]
@@ -112,6 +116,31 @@ impl<T> ThrottleError<T> {
         match self.0 {
             Either::A(_) => false,
             Either::B(_) => true,
+        }
+    }
+}
+
+impl<T: StdError> Display for ThrottleError<T> {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        match self.0 {
+            Either::A(ref err) => write!(f, "stream error: {}", err),
+            Either::B(ref err) => write!(f, "timer error: {}", err),
+        }
+    }
+}
+
+impl<T: StdError + 'static> StdError for ThrottleError<T> {
+    fn description(&self) -> &str {
+        match self.0 {
+            Either::A(_) => "stream error",
+            Either::B(_) => "timer error",
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
+        match self.0 {
+            Either::A(ref err) => Some(err),
+            Either::B(ref err) => Some(err),
         }
     }
 }
