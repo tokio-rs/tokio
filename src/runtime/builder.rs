@@ -31,6 +31,8 @@ use tokio_timer::timer::{self, Timer};
 /// extern crate tokio;
 /// extern crate tokio_timer;
 ///
+/// use std::time::Duration;
+///
 /// use tokio::runtime::Builder;
 /// use tokio_timer::clock::Clock;
 ///
@@ -40,6 +42,7 @@ use tokio_timer::timer::{self, Timer};
 ///         .blocking_threads(4)
 ///         .clock(Clock::system())
 ///         .core_threads(4)
+///         .keep_alive(Some(Duration::from_secs(60)))
 ///         .name_prefix("my-custom-name-")
 ///         .stack_size(3 * 1024 * 1024)
 ///         .build()
