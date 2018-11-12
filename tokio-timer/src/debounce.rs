@@ -317,7 +317,14 @@ impl<T: StdError> Display for DebounceError<T> {
 }
 
 impl<T: StdError + 'static> StdError for DebounceError<T> {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+    fn description(&self) -> &str {
+        match self.0 {
+            Either::A(_) => "stream error",
+            Either::B(_) => "timer error",
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
         match self.0 {
             Either::A(ref err) => Some(err),
             Either::B(ref err) => Some(err),
