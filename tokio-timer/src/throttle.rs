@@ -13,6 +13,7 @@ use std::{
 
 /// Slow down a stream by enforcing a delay between items.
 #[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
 pub struct Throttle<T> {
     delay: Option<Delay>,
     duration: Duration,
