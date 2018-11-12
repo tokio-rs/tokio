@@ -20,6 +20,7 @@ use std::{
 
 /// Debounce streams on the leading or trailing edge or both.
 #[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
 pub struct Debounce<T: Stream> {
     delay: Option<Delay>,
     duration: Duration,
