@@ -53,6 +53,21 @@ pub trait StreamExt: Stream {
         DebounceBuilder::from_stream(self)
     }
 
+    /// Sample the stream at the given `interval`.
+    ///
+    /// Sampling works similar to debouncing in that frequent values will be
+    /// ignored. Sampling, however ensures that an item is passed through at
+    /// least after every `interval`. Debounce, on the other hand, would not
+    /// pass items through until there has been enough "silence".
+    fn sample(self, interval: Duration) -> Debounce<Self>
+    where Self:Sized
+    {
+        self.debounce_builder()
+            .max_wait(interval)
+            .edge(Edge::Both)
+            .build()
+    }
+
     /// Throttle down the stream by enforcing a fixed delay between items.
     ///
     /// Errors are also delayed.
