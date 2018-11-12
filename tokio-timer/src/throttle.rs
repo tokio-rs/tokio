@@ -34,6 +34,29 @@ impl<T> Throttle<T> {
             stream: stream,
         }
     }
+
+    /// Acquires a reference to the underlying stream that this combinator is
+    /// pulling from.
+    pub fn get_ref(&self) -> &T {
+        &self.stream
+    }
+
+    /// Acquires a mutable reference to the underlying stream that this combinator
+    /// is pulling from.
+    ///
+    /// Note that care must be taken to avoid tampering with the state of the stream
+    /// which may otherwise confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.stream
+    }
+
+    /// Consumes this combinator, returning the underlying stream.
+    ///
+    /// Note that this may discard intermediate state of this combinator, so care
+    /// should be taken to avoid losing resources when this is called.
+    pub fn into_inner(self) -> T {
+        self.stream
+    }
 }
 
 impl<T: Stream> Stream for Throttle<T> {
