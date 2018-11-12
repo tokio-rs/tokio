@@ -19,6 +19,9 @@ use std::{
 };
 
 /// Debounce streams on the leading or trailing edge or both.
+///
+/// Useful for slowing processing of e. g. user input or network events
+/// to a bearable rate.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Debounce<T: Stream> {
