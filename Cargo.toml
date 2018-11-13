@@ -25,6 +25,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 members = [
   "./",
   "tokio-async-await",
+  "tokio-buf",
   "tokio-channel",
   "tokio-codec",
   "tokio-current-thread",

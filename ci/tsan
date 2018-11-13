@@ -31,3 +31,7 @@ race:crossbeam_deque*steal
 race:Backup::next_sleeper
 race:Backup::set_next_sleeper
 race:WorkerEntry::set_next_sleeper
+
+# This ignores a false positive caused by `thread::park()`/`thread::unpark()`.
+# See: https://github.com/rust-lang/rust/pull/54806#issuecomment-436193353
+race:pthread_cond_destroy
