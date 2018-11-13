@@ -27,6 +27,7 @@ tokio-io = { version = "0.1.6", path = "../tokio-io" }
 [dev-dependencies]
 rand = "0.5"
 tempfile = "3"
+tempdir = "0.3"
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
 tokio = { version = "0.1.7", path = ".." }
