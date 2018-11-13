@@ -12,7 +12,7 @@ use tokio_threadpool::*;
 use futures::Future;
 use futures::future::poll_fn;
 use futures::sync::oneshot;
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, distributions};
 use tempfile::Builder as TmpBuilder;
 
 use std::fs::File as StdFile;
@@ -25,7 +25,8 @@ fn read_write() {
     let dir = TmpBuilder::new().prefix("tokio-fs-tests").tempdir().unwrap();
     let file_path = dir.path().join("read_write.txt");
 
-    let contents: Vec<u8> = thread_rng().gen_ascii_chars()
+    let contents: Vec<u8> = thread_rng()
+        .sample_iter(&distributions::Alphanumeric)
         .take(NUM_CHARS)
         .collect::<String>()
         .into();
