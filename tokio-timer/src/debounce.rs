@@ -74,7 +74,12 @@ pub enum Edge {
 
 impl<T: Stream> Debounce<T> {
     /// Constructs a new stream that debounces on the trailing edge.
-    pub fn new(stream: T, duration: Duration, edge: Edge, max_wait: Option<Duration>) -> Self {
+    pub fn new(
+        stream: T,
+        duration: Duration,
+        edge: Edge,
+        max_wait: Option<Duration>,
+    ) -> Self {
         Self {
             delay: None,
             duration: duration,
@@ -128,7 +133,9 @@ impl<T: Stream> Debounce<T> {
     }
 
     /// Polls the underlying stream.
-    fn poll_stream(&mut self) -> Poll<Option<<Self as Stream>::Item>, <Self as Stream>::Error> {
+    fn poll_stream(
+        &mut self,
+    ) -> Poll<Option<<Self as Stream>::Item>, <Self as Stream>::Error> {
         self.stream.poll().map_err(DebounceError::from_stream_error)
     }
 
@@ -220,8 +227,8 @@ impl<T> DebounceBuilder<T> {
     /// Sets the duration to debounce to.
     ///
     /// If no duration is set here but [`max_wait`] is given instead, the resulting
-    /// stream will sample the underlying stream at the interval given by [`max_wait`]
-    /// instead of debouncing it.
+    /// stream will sample the underlying stream at the interval given by
+    /// [`max_wait`] instead of debouncing it.
     ///
     /// [`max_wait`]: #method.max_wait
     pub fn duration(mut self, dur: Duration) -> Self {
@@ -242,8 +249,8 @@ impl<T> DebounceBuilder<T> {
     /// Sets the maximum waiting time.
     ///
     /// If only a `max_wait` is given (and no [`duration`]), the resulting stream
-    /// will sample the underlying stream at the interval given by `max_wait` instead
-    /// of debouncing it.
+    /// will sample the underlying stream at the interval given by `max_wait`
+    /// instead of debouncing it.
     ///
     /// [`duration`]: #method.duration
     pub fn max_wait(mut self, max_wait: Duration) -> Self {
@@ -256,14 +263,15 @@ impl<T: Stream> DebounceBuilder<T> {
     /// Builds the debouncing stream.
     pub fn build(self) -> Debounce<T> {
         // If we've only been given a maximum waiting time, this means we need to
-        // sample the stream at the interval given by max_wait instead of debouncing it.
+        // sample the stream at the interval given by max_wait instead of
+        // debouncing it.
         let duration = match self.max_wait {
             Some(max_wait) => match self.duration {
                 Some(dur) => dur,
 
-                // The actual duration added here doesn't matter, as long as its means the
-                // result is longer than `max_wait` and we have more than a millisecond
-                // (tokio timer precision).
+                // The actual duration added here doesn't matter, as long as its
+                // means the result is longer than `max_wait` and we have more than
+                // a millisecond (tokio timer precision).
                 None => max_wait + Duration::from_secs(1),
             },
 
