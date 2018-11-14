@@ -66,6 +66,9 @@ pub enum Edge {
     /// The debounce triggers on both the leading and the trailing edge.
     ///
     /// The first and the last items will be returned.
+    ///
+    /// Note that trailing edge behavior will only be visible if the underlying
+    /// stream fires at least twice during the debouncing period.
     Both,
 }
 
