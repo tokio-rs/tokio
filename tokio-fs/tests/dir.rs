@@ -1,32 +1,21 @@
 extern crate futures;
 extern crate tempdir;
 extern crate tokio_fs;
-extern crate tokio_threadpool;
 
-use futures::sync::oneshot;
 use futures::{Future, Stream};
 use std::fs;
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
 use tokio_fs::*;
-use tokio_threadpool::Builder;
 
-fn run_in_pool<F>(f: F)
-where
-    F: Future<Item = (), Error = std::io::Error> + Send + 'static,
-{
-    let pool = Builder::new().pool_size(1).build();
-    let (tx, rx) = oneshot::channel::<()>();
-    pool.spawn(f.then(|_| tx.send(())));
-    rx.wait().unwrap()
-}
+mod pool;
 
 #[test]
 fn create() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
 
-    run_in_pool({ create_dir(new_dir.clone()) });
+    pool::run({ create_dir(new_dir.clone()) });
 
     assert!(new_dir.is_dir());
 }
@@ -36,7 +25,7 @@ fn create_all() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo").join("bar");
 
-    run_in_pool({ create_dir_all(new_dir.clone()) });
+    pool::run({ create_dir_all(new_dir.clone()) });
 
     assert!(new_dir.is_dir());
 }
@@ -48,7 +37,7 @@ fn remove() {
 
     fs::create_dir(new_dir.clone()).unwrap();
 
-    run_in_pool({ remove_dir(new_dir.clone()) });
+    pool::run({ remove_dir(new_dir.clone()) });
 
     assert!(!new_dir.exists());
 }
@@ -66,7 +55,7 @@ fn read() {
 
     let f = files.clone();
     let p = p.to_path_buf();
-    run_in_pool({
+    pool::run({
         read_dir(p).flatten_stream().for_each(move |e| {
             let s = e.file_name().to_str().unwrap().to_string();
             f.lock().unwrap().push(s);
