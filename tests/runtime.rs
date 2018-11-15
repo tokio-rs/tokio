@@ -3,7 +3,7 @@ extern crate env_logger;
 extern crate futures;
 
 use futures::sync::oneshot;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, atomic};
 use std::thread;
 use tokio::io;
 use tokio::net::{TcpStream, TcpListener};
@@ -492,4 +492,25 @@ fn runtime_reactor_handle() {
     let _ = StdStream::connect(&addr).unwrap();
 
     th.join().unwrap();
+}
+
+#[test]
+fn after_start_and_before_stop_is_called() {
+    let _ = env_logger::try_init();
+
+    let after_start = Arc::new(atomic::AtomicUsize::new(0));
+    let before_stop = Arc::new(atomic::AtomicUsize::new(0));
+
+    let after_inner = after_start.clone();
+    let before_inner = before_stop.clone();
+    let runtime = tokio::runtime::Builder::new()
+            .after_start(move || { after_inner.clone().fetch_add(1, atomic::Ordering::Relaxed); })
+            .before_stop(move || { before_inner.clone().fetch_add(1, atomic::Ordering::Relaxed); })
+            .build()
+            .unwrap();
+
+    runtime.block_on_all(create_client_server_future()).unwrap();
+
+    assert!(after_start.load(atomic::Ordering::Relaxed) > 0);
+    assert!(before_stop.load(atomic::Ordering::Relaxed) > 0);
 }
