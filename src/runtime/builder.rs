@@ -28,24 +28,28 @@ use tokio_timer::timer::{self, Timer};
 /// # Examples
 ///
 /// ```
-/// # extern crate tokio;
-/// # extern crate tokio_threadpool;
-/// # use tokio::runtime::Builder;
+/// extern crate tokio;
+/// extern crate tokio_timer;
 ///
-/// # pub fn main() {
-/// // create and configure ThreadPool
-/// let mut threadpool_builder = tokio_threadpool::Builder::new();
-/// threadpool_builder
-///     .name_prefix("my-runtime-worker-")
-///     .pool_size(4);
+/// use std::time::Duration;
 ///
-/// // build Runtime
-/// let runtime = Builder::new()
-///     .threadpool_builder(threadpool_builder)
-///     .build();
-/// // ... call runtime.run(...)
-/// # let _ = runtime;
-/// # }
+/// use tokio::runtime::Builder;
+/// use tokio_timer::clock::Clock;
+///
+/// fn main() {
+///     // build Runtime
+///     let mut runtime = Builder::new()
+///         .blocking_threads(4)
+///         .clock(Clock::system())
+///         .core_threads(4)
+///         .keep_alive(Some(Duration::from_secs(60)))
+///         .name_prefix("my-custom-name-")
+///         .stack_size(3 * 1024 * 1024)
+///         .build()
+///         .unwrap();
+///
+///     // use runtime ...
+/// }
 /// ```
 #[derive(Debug)]
 pub struct Builder {
