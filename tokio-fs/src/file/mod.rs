@@ -82,7 +82,7 @@ impl File {
     /// Convert a [`std::fs::File`][std] to a `tokio_fs::File`.
     ///
     /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
-    pub(crate) fn from_std(std: StdFile) -> File {
+    pub fn from_std(std: StdFile) -> File {
         File { std: Some(std) }
     }
 
