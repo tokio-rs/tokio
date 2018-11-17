@@ -20,7 +20,7 @@ cargo-features = ["edition"]
 edition = "2018"
 
 # In the `[dependencies]` section
-tokio-async-await = "0.1.0"
+tokio = {version = "0.1.0", features = ["async-await-preview"]}
 ```
 
 Then, get started. In your application, add:
