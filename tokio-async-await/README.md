@@ -13,9 +13,6 @@ To use this crate, you need to start with a Rust 2018 edition crate.
 Add this to your `Cargo.toml`:
 
 ```toml
-# At the very top of the file
-cargo-features = ["edition"]
-
 # In the `[packages]` section
 edition = "2018"
 
