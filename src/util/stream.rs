@@ -64,7 +64,7 @@ pub trait StreamExt: Stream {
     {
         self.debounce_builder()
             .max_wait(interval)
-            .edge(Edge::Both)
+            .edge(Edge::Leading)
             .build()
     }
 

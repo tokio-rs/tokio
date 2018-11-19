@@ -251,6 +251,8 @@ impl<T> DebounceBuilder<T> {
     /// If only a `max_wait` is given (and no [`duration`]), the resulting stream
     /// will sample the underlying stream at the interval given by `max_wait`
     /// instead of debouncing it.
+    /// Sampling cannot occur on both edges. Trying to build a sampling stream
+    /// on both edges will panic.
     ///
     /// [`duration`]: #method.duration
     pub fn max_wait(mut self, max_wait: Duration) -> Self {
@@ -262,6 +264,8 @@ impl<T> DebounceBuilder<T> {
 impl<T: Stream> DebounceBuilder<T> {
     /// Builds the debouncing stream.
     pub fn build(self) -> Debounce<T> {
+        let edge = self.edge.expect("missing debounce edge");
+
         // If we've only been given a maximum waiting time, this means we need to
         // sample the stream at the interval given by max_wait instead of
         // debouncing it.
@@ -269,10 +273,16 @@ impl<T: Stream> DebounceBuilder<T> {
             Some(max_wait) => match self.duration {
                 Some(dur) => dur,
 
-                // The actual duration added here doesn't matter, as long as its
-                // means the result is longer than `max_wait` and we have more than
-                // a millisecond (tokio timer precision).
-                None => max_wait + Duration::from_secs(1),
+                None => {
+                    // Sampling on both edges leads to unexpected behavior where, when a
+                    // sample interval elapses, two items will be returned.
+                    assert!(edge != Edge::Both, "cannot sample on both edges");
+
+                    // The actual duration added here doesn't matter, as long as its
+                    // means the result is longer than `max_wait` and we have more than
+                    // a millisecond (tokio timer precision).
+                    max_wait + Duration::from_secs(1)
+                },
             },
 
             None => self.duration.expect("missing debounce duration")
@@ -281,7 +291,7 @@ impl<T: Stream> DebounceBuilder<T> {
         Debounce::new(
             self.stream,
             duration,
-            self.edge.expect("missing debounce edge"),
+            edge,
             self.max_wait,
         )
     }
