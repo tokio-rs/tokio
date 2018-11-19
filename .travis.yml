@@ -34,7 +34,7 @@ matrix:
       cargo check --all
 
   # This runs TSAN against nightly and allows failures to propagate up.
-  - rust: nightly
+  - rust: 1.32.0-nightly
     env: TSAN=yes
 
   allow_failures:
