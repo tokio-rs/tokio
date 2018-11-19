@@ -56,7 +56,7 @@ pub trait StreamExt: Stream {
     /// Sample the stream at the given `interval`.
     ///
     /// Sampling works similar to debouncing in that frequent values will be
-    /// ignored. Sampling, however ensures that an item is passed through at
+    /// ignored. Sampling, however, ensures that an item is passed through at
     /// least after every `interval`. Debounce, on the other hand, would not
     /// pass items through until there has been enough "silence".
     fn sample(self, interval: Duration) -> Debounce<Self>
