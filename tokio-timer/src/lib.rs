@@ -9,6 +9,8 @@
 //!
 //! * [`Interval`] A stream that yields at fixed time intervals.
 //!
+//! * [`Throttle`]: Throttle down a stream by enforcing a fixed delay between items.
+//!
 //! * [`Timeout`]: Wraps a future or stream, setting an upper bound to the
 //!   amount of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
@@ -21,6 +23,7 @@
 //! [`Timer`] instance must be running on some thread.
 //!
 //! [`Delay`]: struct.Delay.html
+//! [`Throttle`]: throttle/struct.Throttle.html
 //! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
@@ -34,6 +37,7 @@ extern crate slab;
 
 pub mod clock;
 pub mod delay_queue;
+pub mod throttle;
 pub mod timeout;
 pub mod timer;
 
