@@ -58,7 +58,6 @@ pub use self::delay::Delay;
 pub use self::error::Error;
 pub use self::interval::Interval;
 #[doc(inline)]
-pub use self::throttle::Throttle;
 pub use self::timeout::Timeout;
 pub use self::timer::{with_default, Timer};
 

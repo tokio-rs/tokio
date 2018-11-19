@@ -1,4 +1,7 @@
-use tokio_timer::{Throttle, Timeout};
+use tokio_timer::{
+    throttle::Throttle,
+    Timeout,
+};
 
 use futures::Stream;
 
