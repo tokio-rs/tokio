@@ -116,15 +116,13 @@ impl<T: Stream> Debounce<T> {
 
     /// Computes the instant at which the next debounce delay elapses.
     fn delay_time(&mut self) -> Instant {
-        let now = clock::now();
+        let next = clock::now() + self.duration;
 
-        let duration = if let Some(to) = self.max_wait_to {
-            cmp::min(self.duration, to - now)
+        if let Some(to) = self.max_wait_to {
+            cmp::min(next, to)
         } else {
-            self.duration
-        };
-
-        now + duration
+            next
+        }
     }
 
     /// Polls the underlying delay future.
