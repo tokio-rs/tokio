@@ -27,16 +27,17 @@ mod platform {
          (i.e. this binary)"
         );
         let (item, _rest) = ::tokio::runtime::current_thread::block_on_all(stream.into_future())
-            .ok()?;
+            .map_err(|_| "failed to wait for signals")?;
 
         // Figure out which signal we received
-        let item = item?;
+        let item = item.ok_or("received no signal")?;
         if item == SIGINT {
             println!("received SIGINT");
         } else {
             assert_eq!(item, SIGTERM);
             println!("received SIGTERM");
         }
+        Ok(())
     }
 
 }
