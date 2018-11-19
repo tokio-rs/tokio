@@ -1,3 +1,13 @@
+# 0.1.10 (October 23, 2018)
+
+* Expose inner codec from `Framed` (#686).
+* Implement AsyncRead::prepare_uninitialized_buffer for Take and Chain (#678).
+
+# 0.1.9 (September 27, 2018)
+
+* Fix bug in `AsyncRead::split()` (#655).
+* Fix non-terminating loop in `length_delimited::FramedWrite` (#576).
+
 # 0.1.8 (August 23, 2018)
 
 * Documentation improvements

@@ -13,18 +13,18 @@ use split::{ReadHalf, WriteHalf};
 /// **non-blocking**. All non-blocking I/O objects must return an error when
 /// bytes are unavailable instead of blocking the current thread.
 ///
-/// Specifically, this means that the `read` function will return one of the
-/// following:
+/// Specifically, this means that the `poll_read` function will return one of
+/// the following:
 ///
 /// * `Ok(Async::Ready(n))` means that `n` bytes of data was immediately read
 ///   and placed into the output buffer, where `n` == 0 implies that EOF has
 ///   been reached.
 ///
-/// * `Ok(Async::NotReady)` means that no data was read into the buffer 
+/// * `Ok(Async::NotReady)` means that no data was read into the buffer
 ///   provided. The I/O object is not currently readable but may become readable
 ///   in the future. Most importantly, **the current future's task is scheduled
-///   to get unparked when the object is readable**. This means that like 
-///   `Future::poll` you'll receive a notification when the I/O object is 
+///   to get unparked when the object is readable**. This means that like
+///   `Future::poll` you'll receive a notification when the I/O object is
 ///   readable again.
 ///
 /// * `Err(e)` for other errors are standard I/O errors coming from the
@@ -43,13 +43,13 @@ pub trait AsyncRead: std_io::Read {
     /// zero out buffers can be expensive.
     ///
     /// This function does any necessary work to prepare an uninitialized buffer
-    /// to be safe to pass to `read`. If `read` guarantees to never attempt read
-    /// data out of the supplied buffer, then `prepare_uninitialized_buffer`
+    /// to be safe to pass to `read`. If `read` guarantees to never attempt to
+    /// read data out of the supplied buffer, then `prepare_uninitialized_buffer`
     /// doesn't need to do any work.
     ///
     /// If this function returns `true`, then the memory has been zeroed out.
     /// This allows implementations of `AsyncRead` which are composed of
-    /// multiple sub implementations to efficiently implement
+    /// multiple subimplementations to efficiently implement
     /// `prepare_uninitialized_buffer`.
     ///
     /// This function isn't actually `unsafe` to call but `unsafe` to implement.
@@ -74,7 +74,7 @@ pub trait AsyncRead: std_io::Read {
     /// On success, returns `Ok(Async::Ready(num_bytes_read))`.
     ///
     /// If no data is available for reading, the method returns
-    /// `Ok(Async::Pending)` and arranges for the current task (via
+    /// `Ok(Async::NotReady)` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
     /// readable or is closed.
     fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, std_io::Error> {
@@ -87,7 +87,7 @@ pub trait AsyncRead: std_io::Read {
         }
     }
 
-    /// Pull some bytes from this source into the specified `Buf`, returning
+    /// Pull some bytes from this source into the specified `BufMut`, returning
     /// how many bytes were read.
     ///
     /// The `buf` provided will have bytes read into it and the internal cursor
@@ -115,7 +115,7 @@ pub trait AsyncRead: std_io::Read {
     }
 
     /// Provides a `Stream` and `Sink` interface for reading and writing to this
-    /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
+    /// I/O object, using `Decode` and `Encode` to read and write the raw data.
     ///
     /// Raw I/O objects work with byte sequences, but higher-level code usually
     /// wants to batch these into meaningful chunks, called "frames". This

@@ -1,3 +1,11 @@
+# 0.2.3 (October 23, 2018)
+
+* Fix build on NetBSD (#715).
+
+# 0.2.2 (September 27, 2018)
+
+* Fix bug in `UdsStream::read_buf` (#672).
+
 # 0.2.1 (August 19, 2018)
 
 * Re-export `ConnectFuture` (#430).

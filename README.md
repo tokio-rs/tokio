@@ -129,6 +129,8 @@ have greater guarantees of stability.
 
 The crates included as part of Tokio are:
 
+* [`tokio-async-await`]: Experimental `async` / `await` support.
+
 * [`tokio-codec`]: Utilities for encoding and decoding protocol frames.
 
 * [`tokio-current-thread`]: Schedule the execution of futures on the current
@@ -155,6 +157,7 @@ The crates included as part of Tokio are:
 * [`tokio-uds`]: Unix Domain Socket bindings for use with `tokio-io` and
   `tokio-reactor`.
 
+[`tokio-async-await`]: tokio-async-await
 [`tokio-codec`]: tokio-codec
 [`tokio-current-thread`]: tokio-current-thread
 [`tokio-executor`]: tokio-executor

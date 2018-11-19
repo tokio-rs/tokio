@@ -3,10 +3,12 @@ use runtime::{Inner, Runtime};
 use reactor::Reactor;
 
 use std::io;
+use std::sync::Mutex;
+use std::time::Duration;
 
+use num_cpus;
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
-use tokio_threadpool::park::DefaultPark;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
@@ -26,29 +28,36 @@ use tokio_timer::timer::{self, Timer};
 /// # Examples
 ///
 /// ```
-/// # extern crate tokio;
-/// # extern crate tokio_threadpool;
-/// # use tokio::runtime::Builder;
+/// extern crate tokio;
+/// extern crate tokio_timer;
 ///
-/// # pub fn main() {
-/// // create and configure ThreadPool
-/// let mut threadpool_builder = tokio_threadpool::Builder::new();
-/// threadpool_builder
-///     .name_prefix("my-runtime-worker-")
-///     .pool_size(4);
+/// use std::time::Duration;
 ///
-/// // build Runtime
-/// let runtime = Builder::new()
-///     .threadpool_builder(threadpool_builder)
-///     .build();
-/// // ... call runtime.run(...)
-/// # let _ = runtime;
-/// # }
+/// use tokio::runtime::Builder;
+/// use tokio_timer::clock::Clock;
+///
+/// fn main() {
+///     // build Runtime
+///     let mut runtime = Builder::new()
+///         .blocking_threads(4)
+///         .clock(Clock::system())
+///         .core_threads(4)
+///         .keep_alive(Some(Duration::from_secs(60)))
+///         .name_prefix("my-custom-name-")
+///         .stack_size(3 * 1024 * 1024)
+///         .build()
+///         .unwrap();
+///
+///     // use runtime ...
+/// }
 /// ```
 #[derive(Debug)]
 pub struct Builder {
     /// Thread pool specific builder
     threadpool_builder: ThreadPoolBuilder,
+
+    /// The number of worker threads
+    core_threads: usize,
 
     /// The clock to use
     clock: Clock,
@@ -60,11 +69,15 @@ impl Builder {
     ///
     /// Configuration methods can be chained on the return value.
     pub fn new() -> Builder {
+        let core_threads = num_cpus::get().max(1);
+
         let mut threadpool_builder = ThreadPoolBuilder::new();
         threadpool_builder.name_prefix("tokio-runtime-worker-");
+        threadpool_builder.pool_size(core_threads);
 
         Builder {
             threadpool_builder,
+            core_threads,
             clock: Clock::new(),
         }
     }
@@ -79,7 +92,8 @@ impl Builder {
     #[deprecated(
         since="0.1.9",
         note="use the `core_threads`, `blocking_threads`, `name_prefix`, \
-              and `stack_size` functions on `runtime::Builder`, instead")]
+              `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
+              instead")]
     #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
@@ -108,6 +122,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn core_threads(&mut self, val: usize) -> &mut Self {
+        self.core_threads = val;
         self.threadpool_builder.pool_size(val);
         self
     }
@@ -139,6 +154,37 @@ impl Builder {
     /// ```
     pub fn blocking_threads(&mut self, val: usize) -> &mut Self {
         self.threadpool_builder.max_blocking(val);
+        self
+    }
+
+    /// Set the worker thread keep alive duration for threads in the `Runtime`'s
+    /// thread pool.
+    ///
+    /// If set, a worker thread will wait for up to the specified duration for
+    /// work, at which point the thread will shutdown. When work becomes
+    /// available, a new thread will eventually be spawned to replace the one
+    /// that shut down.
+    ///
+    /// When the value is `None`, the thread will wait for work forever.
+    ///
+    /// The default value is `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    /// use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .keep_alive(Some(Duration::from_secs(30)))
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn keep_alive(&mut self, val: Option<Duration>) -> &mut Self {
+        self.threadpool_builder.keep_alive(val);
         self
     }
 
@@ -210,50 +256,58 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        use std::collections::HashMap;
-        use std::sync::{Arc, Mutex};
+        // TODO(stjepang): Once we remove the `threadpool_builder` method, remove this line too.
+        self.threadpool_builder.pool_size(self.core_threads);
+
+        let mut reactor_handles = Vec::new();
+        let mut timer_handles = Vec::new();
+        let mut timers = Vec::new();
+
+        for _ in 0..self.core_threads {
+            // Create a new reactor.
+            let reactor = Reactor::new()?;
+            reactor_handles.push(reactor.handle());
+
+            // Create a new timer.
+            let timer = Timer::new_with_now(reactor, self.clock.clone());
+            timer_handles.push(timer.handle());
+            timers.push(Mutex::new(Some(timer)));
+        }
 
         // Get a handle to the clock for the runtime.
-        let clock1 = self.clock.clone();
-        let clock2 = clock1.clone();
-
-        let timers = Arc::new(Mutex::new(HashMap::<_, timer::Handle>::new()));
-        let t1 = timers.clone();
-
-        // Spawn a reactor on a background thread.
-        let reactor = Reactor::new()?.background()?;
-
-        // Get a handle to the reactor.
-        let reactor_handle = reactor.handle().clone();
+        let clock = self.clock.clone();
 
         let pool = self.threadpool_builder
             .around_worker(move |w, enter| {
-                let timer_handle = t1.lock().unwrap()
-                    .get(w.id()).unwrap()
-                    .clone();
+                let index = w.id().to_usize();
 
-                tokio_reactor::with_default(&reactor_handle, enter, |enter| {
-                    clock::with_default(&clock1, enter, |enter| {
-                        timer::with_default(&timer_handle, enter, |_| {
+                tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
+                    clock::with_default(&clock, enter, |enter| {
+                        timer::with_default(&timer_handles[index], enter, |_| {
                             w.run();
                         });
                     })
                 });
             })
             .custom_park(move |worker_id| {
-                // Create a new timer
-                let timer = Timer::new_with_now(DefaultPark::new(), clock2.clone());
+                let index = worker_id.to_usize();
 
-                timers.lock().unwrap()
-                    .insert(worker_id.clone(), timer.handle());
-
-                timer
+                timers[index]
+                    .lock()
+                    .unwrap()
+                    .take()
+                    .unwrap()
             })
             .build();
 
+        // To support deprecated `reactor()` function
+        let reactor = Reactor::new()?;
+        let reactor_handle = reactor.handle();
+
         Ok(Runtime {
             inner: Some(Inner {
-                reactor,
+                reactor_handle,
+                reactor: Mutex::new(Some(reactor)),
                 pool,
             }),
         })

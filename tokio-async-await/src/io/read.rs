@@ -1,11 +1,11 @@
 use tokio_io::AsyncRead;
 
-use futures_core::future::Future;
-use futures_core::task::{self, Poll};
+use std::future::Future;
+use std::task::{self, Poll};
 
 use std::io;
 use std::marker::Unpin;
-use std::pin::PinMut;
+use std::pin::Pin;
 
 /// A future which can be used to read bytes.
 #[derive(Debug)]
@@ -29,8 +29,8 @@ impl<'a, T: AsyncRead + ?Sized> Read<'a, T> {
 impl<'a, T: AsyncRead + ?Sized> Future for Read<'a, T> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: PinMut<Self>, _cx: &mut task::Context) -> Poll<Self::Output> {
-        use crate::async_await::compat::forward::convert_poll;
+    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
+        use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
         convert_poll(this.reader.poll_read(this.buf))

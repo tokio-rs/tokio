@@ -171,7 +171,7 @@ pub struct Expired<T> {
 /// documentation for more details.
 ///
 /// [`DelayQueue`]: struct.DelayQueue.html
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Key {
     index: usize,
 }

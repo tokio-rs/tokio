@@ -1,11 +1,11 @@
 use tokio_io::AsyncWrite;
 
-use futures_core::future::Future;
-use futures_core::task::{self, Poll};
+use std::future::Future;
+use std::task::{self, Poll};
 
 use std::io;
 use std::marker::Unpin;
-use std::pin::PinMut;
+use std::pin::Pin;
 
 /// A future used to write data.
 #[derive(Debug)]
@@ -29,8 +29,8 @@ impl<'a, T: AsyncWrite + ?Sized> Write<'a, T> {
 impl<'a, T: AsyncWrite + ?Sized> Future for Write<'a, T> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: PinMut<Self>, _cx: &mut task::Context) -> Poll<io::Result<usize>> {
-        use crate::async_await::compat::forward::convert_poll;
+    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<io::Result<usize>> {
+        use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
         convert_poll(this.writer.poll_write(this.buf))
