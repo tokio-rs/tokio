@@ -19,6 +19,7 @@ matrix:
   - rust: stable
   - rust: beta
   - rust: nightly
+    env: ALLOW_FAILURES=true
   - os: osx
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
@@ -31,15 +32,19 @@ matrix:
     script: |
       cd tokio-async-await
       cargo check --all
+
+  # This runs TSAN against nightly and allows failures to propagate up.
+  - rust: nightly-2018-11-18
+    env: TSAN=yes
+
   allow_failures:
     - rust: nightly
       env: ALLOW_FAILURES=true
 
-
 script:
   - |
     set -e
-    if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
+    if [[ "$TRAVIS_RUST_VERSION" == nightly && "$TSAN" == yes ]]
     then
         # Make sure the benchmarks compile
         cargo build --benches --all
