@@ -1,3 +1,6 @@
+// This file is testing deprecated code.
+#![allow(deprecated)]
+
 extern crate tokio_io;
 extern crate futures;
 
