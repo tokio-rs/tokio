@@ -9,6 +9,8 @@
 //!
 //! * [`Interval`] A stream that yields at fixed time intervals.
 //!
+//! * [`Throttle`]: Slow down a stream by enforcing a delay between items.
+//!
 //! * [`Timeout`]: Wraps a future or stream, setting an upper bound to the
 //!   amount of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
@@ -21,6 +23,7 @@
 //! [`Timer`] instance must be running on some thread.
 //!
 //! [`Delay`]: struct.Delay.html
+//! [`Throttle`]: struct.Throttle.html
 //! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
