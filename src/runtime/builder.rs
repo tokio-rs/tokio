@@ -240,6 +240,59 @@ impl Builder {
         self
     }
 
+    /// Execute function `f` after each thread is started but before it starts
+    /// doing work.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let thread_pool = runtime::Builder::new()
+    ///     .after_start(|| {
+    ///         println!("thread started");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn after_start<F>(&mut self, f: F) -> &mut Self
+        where F: Fn() + Send + Sync + 'static
+    {
+        self.threadpool_builder.after_start(f);
+        self
+    }
+
+    /// Execute function `f` before each thread stops.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let thread_pool = runtime::Builder::new()
+    ///     .before_stop(|| {
+    ///         println!("thread stopping");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn before_stop<F>(&mut self, f: F) -> &mut Self
+        where F: Fn() + Send + Sync + 'static
+    {
+        self.threadpool_builder.before_stop(f);
+        self
+    }
+
     /// Create the configured `Runtime`.
     ///
     /// The returned `ThreadPool` instance is ready to spawn tasks.
