@@ -1,10 +1,12 @@
 use builder::Builder;
 use pool::Pool;
 use sender::Sender;
-use shutdown::Shutdown;
+use shutdown::{Shutdown, ShutdownTrigger};
 
 use futures::{Future, Poll};
 use futures::sync::oneshot;
+
+use std::sync::Arc;
 
 /// Work-stealing based thread pool for executing futures.
 ///
@@ -15,7 +17,13 @@ use futures::sync::oneshot;
 /// Create `ThreadPool` instances using `Builder`.
 #[derive(Debug)]
 pub struct ThreadPool {
-    pub(crate) sender: Option<Sender>,
+    inner: Option<Inner>,
+}
+
+#[derive(Debug)]
+struct Inner {
+    sender: Sender,
+    trigger: Arc<ShutdownTrigger>,
 }
 
 impl ThreadPool {
@@ -26,6 +34,18 @@ impl ThreadPool {
     /// [`Builder`]: struct.Builder.html
     pub fn new() -> ThreadPool {
         Builder::new().build()
+    }
+
+    pub(crate) fn new2(
+        pool: Arc<Pool>,
+        trigger: Arc<ShutdownTrigger>,
+    ) -> ThreadPool {
+        ThreadPool {
+            inner: Some(Inner {
+                sender: Sender { pool },
+                trigger,
+            }),
+        }
     }
 
     /// Spawn a future onto the thread pool.
@@ -111,12 +131,12 @@ impl ThreadPool {
     /// The handle is used to spawn futures onto the thread pool. It also
     /// implements the `Executor` trait.
     pub fn sender(&self) -> &Sender {
-        self.sender.as_ref().unwrap()
+        &self.inner.as_ref().unwrap().sender
     }
 
     /// Return a mutable reference to the sender handle
     pub fn sender_mut(&mut self) -> &mut Sender {
-        self.sender.as_mut().unwrap()
+        &mut self.inner.as_mut().unwrap().sender
     }
 
     /// Shutdown the pool once it becomes idle.
@@ -130,8 +150,9 @@ impl ThreadPool {
     /// shutdown. The returned future completes once all worker threads have
     /// completed the shutdown process.
     pub fn shutdown_on_idle(mut self) -> Shutdown {
-        self.pool().shutdown(false, false);
-        Shutdown { sender: self.sender.take().unwrap() }
+        let inner = self.inner.take().unwrap();
+        inner.sender.pool.shutdown(false, false);
+        Shutdown::new(&inner.trigger)
     }
 
     /// Shutdown the pool
@@ -143,8 +164,9 @@ impl ThreadPool {
     /// worker threads are signaled and will shutdown. The returned future
     /// completes once all worker threads have completed the shutdown process.
     pub fn shutdown(mut self) -> Shutdown {
-        self.pool().shutdown(true, false);
-        Shutdown { sender: self.sender.take().unwrap() }
+        let inner = self.inner.take().unwrap();
+        inner.sender.pool.shutdown(true, false);
+        Shutdown::new(&inner.trigger)
     }
 
     /// Shutdown the pool immediately
@@ -156,20 +178,23 @@ impl ThreadPool {
     /// worker threads are signaled and will shutdown. The returned future
     /// completes once all worker threads have completed the shutdown process.
     pub fn shutdown_now(mut self) -> Shutdown {
-        self.pool().shutdown(true, true);
-        Shutdown { sender: self.sender.take().unwrap() }
-    }
-
-    fn pool(&self) -> &Pool {
-        &*self.sender.as_ref().unwrap().pool
+        let inner = self.inner.take().unwrap();
+        inner.sender.pool.shutdown(true, true);
+        Shutdown::new(&inner.trigger)
     }
 }
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        if let Some(sender) = self.sender.take() {
-            sender.pool.shutdown(true, true);
-            let shutdown = Shutdown { sender };
+        if let Some(inner) = self.inner.take() {
+            // Begin the shutdown process.
+            inner.sender.pool.shutdown(true, true);
+            let shutdown = Shutdown::new(&inner.trigger);
+
+            // Drop `inner` in order to drop its shutdown trigger.
+            drop(inner);
+
+            // Wait until all worker threads terminate and the threadpool's resources clean up.
             let _ = shutdown.wait();
         }
     }

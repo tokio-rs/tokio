@@ -149,7 +149,6 @@ mod notifier;
 mod pool;
 mod sender;
 mod shutdown;
-mod shutdown_task;
 mod task;
 mod thread_pool;
 mod worker;
