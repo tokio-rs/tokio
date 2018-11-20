@@ -27,10 +27,10 @@ mio = "0.6.14"
 num_cpus = "1.8.0"
 parking_lot = "0.6.3"
 slab = "0.4.0"
-tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
-tokio-io = { version = "0.1.6", path = "../tokio-io" }
+tokio-executor = "0.1.1"
+tokio-io = "0.1.6"
 
 [dev-dependencies]
 num_cpus = "1.8.0"
-tokio = { version = "0.1.7", path = ".." }
+tokio = { path = ".." }
 tokio-io-pool = "0.1.4"

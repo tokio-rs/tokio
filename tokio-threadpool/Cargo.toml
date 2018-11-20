@@ -18,7 +18,7 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
+tokio-executor = "0.1.2"
 futures = "0.1.19"
 crossbeam-deque = "0.6.1"
 crossbeam-utils = "0.6.0"
@@ -27,7 +27,7 @@ rand = "0.6"
 log = "0.4"
 
 [dev-dependencies]
-tokio-timer = "0.1"
+tokio-timer = "0.1.2"
 env_logger = "0.5"
 
 # For comparison benchmarks
