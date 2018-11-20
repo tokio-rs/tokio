@@ -8,16 +8,16 @@ use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // Bind the server's socket
-    let addr = "127.0.0.1:12345".parse().unwrap();
-    let tcp = TcpListener::bind(&addr).unwrap();
+    let addr = "127.0.0.1:12345".parse()?;
+    let tcp = TcpListener::bind(&addr)?;
 
     // Create the TLS acceptor.
     let der = include_bytes!("identity.p12");
-    let cert = Identity::from_pkcs12(der, "mypass").unwrap();
+    let cert = Identity::from_pkcs12(der, "mypass")?;
     let tls_acceptor = tokio_tls::TlsAcceptor::from(
-        native_tls::TlsAcceptor::builder(cert).build().unwrap());
+        native_tls::TlsAcceptor::builder(cert).build()?);
 
     // Iterate incoming connections
     let server = tcp.incoming().for_each(move |tcp| {
@@ -56,4 +56,5 @@ fn main() {
 
     // Start the runtime and spin up the server
     tokio::run(server);
+    Ok(())
 }

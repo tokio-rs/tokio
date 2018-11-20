@@ -34,12 +34,12 @@ use std::env;
 use std::io::{BufReader};
 use std::sync::{Arc, Mutex};
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // Create the TCP listener we'll accept connections on.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse().unwrap();
+    let addr = addr.parse()?;
 
-    let socket = TcpListener::bind(&addr).unwrap();
+    let socket = TcpListener::bind(&addr)?;
     println!("Listening on: {}", addr);
 
     // This is running on the Tokio runtime, so it will be multi-threaded. The
@@ -49,10 +49,10 @@ fn main() {
     // The server task asynchronously iterates over and processes each incoming
     // connection.
     let srv = socket.incoming()
-        .map_err(|e| println!("failed to accept socket; error = {:?}", e))
+        .map_err(|e| {println!("failed to accept socket; error = {:?}", e); e})
         .for_each(move |stream| {
             // The client's socket address
-            let addr = stream.peer_addr().unwrap();
+            let addr = stream.peer_addr()?;
 
             println!("New Connection: {}", addr);
 
@@ -143,8 +143,10 @@ fn main() {
             }));
 
             Ok(())
-        });
+        })
+        .map_err(|err| println!("error occurred: {:?}", err));
 
     // execute server
     tokio::run(srv);
+    Ok(())
 }

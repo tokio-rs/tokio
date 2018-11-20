@@ -34,13 +34,13 @@ use bytes::BytesMut;
 use http::header::HeaderValue;
 use http::{Request, Response, StatusCode};
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = addr.parse::<SocketAddr>()?;
 
-    let listener = TcpListener::bind(&addr).expect("failed to bind");
+    let listener = TcpListener::bind(&addr)?;
     println!("Listening on: {}", addr);
 
     tokio::run({
@@ -51,6 +51,7 @@ fn main() {
                 Ok(())
             })
     });
+    Ok(())
 }
 
 fn process(socket: TcpStream) {
@@ -84,28 +85,32 @@ fn process(socket: TcpStream) {
 fn respond(req: Request<()>)
     -> Box<Future<Item = Response<String>, Error = io::Error> + Send>
 {
-    let mut ret = Response::builder();
-    let body = match req.uri().path() {
-        "/plaintext" => {
-            ret.header("Content-Type", "text/plain");
-            "Hello, World!".to_string()
-        }
-        "/json" => {
-            ret.header("Content-Type", "application/json");
-
-            #[derive(Serialize)]
-            struct Message {
-                message: &'static str,
+    let f = future::lazy(move || {
+        let mut response = Response::builder();
+        let body = match req.uri().path() {
+            "/plaintext" => {
+                response.header("Content-Type", "text/plain");
+                "Hello, World!".to_string()
             }
-            serde_json::to_string(&Message { message: "Hello, World!" })
-                .unwrap()
-        }
-        _ => {
-            ret.status(StatusCode::NOT_FOUND);
-            String::new()
-        }
-    };
-    Box::new(future::ok(ret.body(body).unwrap()))
+            "/json" => {
+                response.header("Content-Type", "application/json");
+
+                #[derive(Serialize)]
+                struct Message {
+                    message: &'static str,
+                }
+                serde_json::to_string(&Message { message: "Hello, World!" })?
+            }
+            _ => {
+                response.status(StatusCode::NOT_FOUND);
+                String::new()
+            }
+        };
+        let response = response.body(body).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+        Ok(response)
+    });
+
+    Box::new(f)
 }
 
 struct Http;

@@ -74,12 +74,12 @@ enum Response {
     Error { msg: String },
 }
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
-    let listener = TcpListener::bind(&addr).expect("failed to bind");
+    let addr = addr.parse::<SocketAddr>()?;
+    let listener = TcpListener::bind(&addr).map_err(|_| "failed to bind")?;
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all
@@ -156,6 +156,7 @@ fn main() {
         });
 
     tokio::run(done);
+    Ok(())
 }
 
 impl Request {

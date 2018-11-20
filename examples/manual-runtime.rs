@@ -60,7 +60,7 @@ fn run<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
     Ok(())
 }
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     run(future::lazy(|| {
         // Here comes the application logic. It can spawn further tasks by tokio_current_thread::spawn().
         // It also can use the default reactor and create timeouts.
@@ -82,5 +82,6 @@ fn main() {
         // We can spawn on the default executor, which is also the local one.
         tokio::executor::spawn(deadline);
         Ok(())
-    })).unwrap();
+    }))?;
+    Ok(())
 }

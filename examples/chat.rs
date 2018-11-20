@@ -426,7 +426,7 @@ fn process(socket: TcpStream, state: Arc<Mutex<Shared>>) {
     tokio::spawn(connection);
 }
 
-pub fn main() {
+pub fn main() -> Result<(), Box<std::error::Error>> {
     // Create the shared state. This is how all the peers communicate.
     //
     // The server task will hold a handle to this. For every new client, the
@@ -434,12 +434,12 @@ pub fn main() {
     // client connection.
     let state = Arc::new(Mutex::new(Shared::new()));
 
-    let addr = "127.0.0.1:6142".parse().unwrap();
+    let addr = "127.0.0.1:6142".parse()?;
 
     // Bind a TCP listener to the socket address.
     //
     // Note that this is the Tokio TcpListener, which is fully async.
-    let listener = TcpListener::bind(&addr).unwrap();
+    let listener = TcpListener::bind(&addr)?;
 
     // The server task asynchronously iterates over and processes each
     // incoming connection.
@@ -471,4 +471,5 @@ pub fn main() {
     // In our example, we have not defined a shutdown strategy, so this will
     // block until `ctrl-c` is pressed at the terminal.
     tokio::run(server);
+    Ok(())
 }

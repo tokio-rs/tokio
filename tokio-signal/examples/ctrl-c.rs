@@ -7,7 +7,7 @@ use futures::{Future, Stream};
 /// how many signals to handle before exiting
 const STOP_AFTER: u64 = 10;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // tokio_signal provides a convenience builder for Ctrl+C
     // this even works cross-platform: linux and windows!
     //
@@ -53,7 +53,8 @@ fn main() {
     // Up until now, we haven't really DONE anything, just prepared
     // now it's time to actually schedule, and thus execute, the stream
     // on our event loop
-    tokio::runtime::current_thread::block_on_all(future).unwrap();
+    tokio::runtime::current_thread::block_on_all(future)?;
 
     println!("Stream ended, quiting the program.");
+    Ok(())
 }

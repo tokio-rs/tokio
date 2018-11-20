@@ -14,7 +14,7 @@ use futures::{Future, Stream, Sink};
 
 use std::io;
 
-pub fn main() {
+pub fn main() -> Result<(), Box<std::error::Error>> {
     let pool = Builder::new()
         .pool_size(1)
         .build();
@@ -44,5 +44,6 @@ pub fn main() {
             .map_err(|e| panic!("io error = {:?}", e))
     });
 
-    pool.shutdown_on_idle().wait().unwrap();
+    pool.shutdown_on_idle().wait().map_err(|_| "failed to shutdown the thread pool")?;
+    Ok(())
 }
