@@ -778,6 +778,25 @@ fn spawn_from_other_thread_unpark() {
     ).unwrap();
 }
 
+#[test]
+fn spawn_from_executor_with_handle() {
+    let mut current_thread = CurrentThread::new();
+    let handle = current_thread.handle();
+    let (tx, rx) = oneshot::channel();
+
+    current_thread.spawn(lazy(move || {
+        handle.spawn(lazy(move || {
+            tx.send(()).unwrap();
+            Ok(())
+        })).unwrap();
+        Ok::<_, ()>(())
+    }));
+
+    current_thread.run();
+
+    rx.wait().unwrap();
+}
+
 fn ok() -> future::FutureResult<(), ()> {
     future::ok(())
 }
