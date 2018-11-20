@@ -2,7 +2,7 @@
 
 extern crate bytes;
 extern crate futures;
-extern crate tempdir;
+extern crate tempfile;
 extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_uds;
@@ -19,8 +19,6 @@ use tokio::runtime::current_thread::Runtime;
 use tokio_codec::{Decoder, Encoder};
 
 use futures::{Future, Sink, Stream};
-
-use tempdir::TempDir;
 
 struct StringDatagramCodec;
 
@@ -51,7 +49,7 @@ impl Decoder for StringDatagramCodec {
 
 #[test]
 fn framed_echo() {
-    let dir = TempDir::new("tokio-uds-tests").unwrap();
+    let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
     let client_path = dir.path().join("client.sock");
 
