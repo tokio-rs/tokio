@@ -23,7 +23,7 @@ use futures::{future, Future};
 /// [`ThreadPool::sender`]: struct.ThreadPool.html#method.sender
 #[derive(Debug)]
 pub struct Sender {
-    pub(crate) inner: Arc<Pool>,
+    pub(crate) pool: Arc<Pool>,
 }
 
 impl Sender {
@@ -85,7 +85,7 @@ impl Sender {
 
     /// Logic to prepare for spawning
     fn prepare_for_spawn(&self) -> Result<(), SpawnError> {
-        let mut state: pool::State = self.inner.state.load(Acquire).into();
+        let mut state: pool::State = self.pool.state.load(Acquire).into();
 
         // Increment the number of futures spawned on the pool as well as
         // validate that the pool is still running/
@@ -104,7 +104,7 @@ impl Sender {
 
             next.inc_num_futures();
 
-            let actual = self.inner.state.compare_and_swap(
+            let actual = self.pool.state.compare_and_swap(
                 state.into(), next.into(), AcqRel).into();
 
             if actual == state {
@@ -135,7 +135,7 @@ impl tokio_executor::Executor for Sender {
 
 impl<'a> tokio_executor::Executor for &'a Sender {
     fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        let state: pool::State = self.inner.state.load(Acquire).into();
+        let state: pool::State = self.pool.state.load(Acquire).into();
 
         if state.num_futures() == MAX_FUTURES {
             // No capacity
@@ -161,7 +161,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         // Create a new task for the future
         let task = Arc::new(Task::new(future));
 
-        self.inner.submit_to_random(task, &self.inner);
+        self.pool.submit_to_random(task, &self.pool);
 
         Ok(())
     }
@@ -189,7 +189,7 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
 impl Clone for Sender {
     #[inline]
     fn clone(&self) -> Sender {
-        let inner = self.inner.clone();
-        Sender { inner }
+        let pool = self.pool.clone();
+        Sender { pool }
     }
 }

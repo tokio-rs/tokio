@@ -13,7 +13,7 @@ use futures::executor::Notify;
 /// to poll the future again.
 #[derive(Debug)]
 pub(crate) struct Notifier {
-    pub inner: Arc<Pool>,
+    pub pool: Arc<Pool>,
 }
 
 /// A guard that ensures that the inner value gets forgotten.
@@ -38,7 +38,7 @@ impl Notify for Notifier {
                 // Bump the ref count
                 let task = task.clone();
 
-                let _ = self.inner.submit(task, &self.inner);
+                let _ = self.pool.submit(task, &self.pool);
             }
         }
     }

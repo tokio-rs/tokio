@@ -16,12 +16,12 @@ use futures::{Future, Poll, Async};
 /// [`shutdown_now`]: struct.ThreadPool.html#method.shutdown_now
 #[derive(Debug)]
 pub struct Shutdown {
-    pub(crate) inner: Sender,
+    pub(crate) sender: Sender,
 }
 
 impl Shutdown {
-    fn inner(&self) -> &Pool {
-        &*self.inner.inner
+    fn pool(&self) -> &Pool {
+        &*self.sender.pool
     }
 }
 
@@ -32,9 +32,9 @@ impl Future for Shutdown {
     fn poll(&mut self) -> Poll<(), ()> {
         use futures::task;
 
-        self.inner().shutdown_task.task.register_task(task::current());
+        self.pool().shutdown_task.task.register_task(task::current());
 
-        if !self.inner().is_shutdown() {
+        if !self.pool().is_shutdown() {
             return Ok(Async::NotReady);
         }
 
