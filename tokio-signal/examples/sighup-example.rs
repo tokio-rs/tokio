@@ -9,7 +9,7 @@ mod platform {
     use futures::{Future, Stream};
     use tokio_signal::unix::{Signal, SIGHUP};
 
-    pub fn main() -> Result<(), Box<std::error::Error>> {
+    pub fn main() -> Result<(), Box<::std::error::Error>> {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
         let stream = Signal::new(SIGHUP).flatten_stream();
 
