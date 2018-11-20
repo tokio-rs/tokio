@@ -409,18 +409,18 @@ impl Builder {
         }
 
         // Create the pool
-        let inner = Arc::new(
+        let pool = Arc::new(
             Pool::new(
                 workers.into_boxed_slice(),
                 self.max_blocking,
                 self.config.clone()));
 
         // Wrap with `Sender`
-        let inner = Some(Sender {
-            inner
+        let sender = Some(Sender {
+            pool
         });
 
-        ThreadPool { inner }
+        ThreadPool { sender }
     }
 }
 

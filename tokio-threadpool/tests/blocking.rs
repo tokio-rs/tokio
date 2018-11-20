@@ -1,7 +1,6 @@
 extern crate tokio_threadpool;
 
 extern crate env_logger;
-#[macro_use]
 extern crate futures;
 extern crate rand;
 
