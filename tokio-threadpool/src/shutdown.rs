@@ -1,7 +1,9 @@
-use pool::Pool;
-use sender::Sender;
+use worker;
 
 use futures::{Future, Poll, Async};
+use futures::task::AtomicTask;
+
+use std::sync::{Arc, Mutex};
 
 /// Future that resolves when the thread pool is shutdown.
 ///
@@ -16,12 +18,25 @@ use futures::{Future, Poll, Async};
 /// [`shutdown_now`]: struct.ThreadPool.html#method.shutdown_now
 #[derive(Debug)]
 pub struct Shutdown {
-    pub(crate) sender: Sender,
+    inner: Arc<Mutex<Inner>>,
+}
+
+/// Shared state between `Shutdown` and `ShutdownTrigger`.
+///
+/// This is used for notifying the `Shutdown` future when `ShutdownTrigger` gets dropped.
+#[derive(Debug)]
+struct Inner {
+    /// The task to notify when the threadpool completes the shutdown process.
+    task: AtomicTask,
+    /// `true` if the threadpool has been shut down.
+    completed: bool,
 }
 
 impl Shutdown {
-    fn pool(&self) -> &Pool {
-        &*self.sender.pool
+    pub(crate) fn new(trigger: &ShutdownTrigger) -> Shutdown {
+        Shutdown {
+            inner: trigger.inner.clone(),
+        }
     }
 }
 
@@ -30,14 +45,44 @@ impl Future for Shutdown {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
-        use futures::task;
+        let inner = self.inner.lock().unwrap();
 
-        self.pool().shutdown_task.task.register_task(task::current());
-
-        if !self.pool().is_shutdown() {
-            return Ok(Async::NotReady);
+        if !inner.completed {
+            inner.task.register();
+            Ok(Async::NotReady)
+        } else {
+            Ok(().into())
         }
+    }
+}
 
-        Ok(().into())
+/// When dropped, cleans up threadpool's resources and completes the shutdown process.
+#[derive(Debug)]
+pub(crate) struct ShutdownTrigger {
+    inner: Arc<Mutex<Inner>>,
+    workers: Arc<[worker::Entry]>,
+}
+
+unsafe impl Send for ShutdownTrigger {}
+unsafe impl Sync for ShutdownTrigger {}
+
+impl ShutdownTrigger {
+    pub(crate) fn new(workers: Arc<[worker::Entry]>) -> ShutdownTrigger {
+        ShutdownTrigger {
+            inner: Arc::new(Mutex::new(Inner {
+                task: AtomicTask::new(),
+                completed: false,
+            })),
+            workers,
+        }
+    }
+}
+
+impl Drop for ShutdownTrigger {
+    fn drop(&mut self) {
+        // Notify the task interested in shutdown.
+        let mut inner = self.inner.lock().unwrap();
+        inner.completed = true;
+        inner.task.notify();
     }
 }

@@ -14,6 +14,7 @@ pub(crate) use self::state::{
 use pool::{self, Pool, BackupId};
 use notifier::Notifier;
 use sender::Sender;
+use shutdown::ShutdownTrigger;
 use task::{self, Task, CanBlock};
 
 use tokio_executor;
@@ -60,6 +61,9 @@ pub struct Worker {
     // Set when the worker should finalize on drop
     should_finalize: Cell<bool>,
 
+    // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
+    trigger: Arc<ShutdownTrigger>,
+
     // Keep the value on the current thread.
     _p: PhantomData<Rc<()>>,
 }
@@ -86,7 +90,12 @@ pub struct WorkerId(pub(crate) usize);
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
 
 impl Worker {
-    pub(crate) fn new(id: WorkerId, backup_id: BackupId, pool: Arc<Pool>) -> Worker {
+    pub(crate) fn new(
+        id: WorkerId,
+        backup_id: BackupId,
+        pool: Arc<Pool>,
+        trigger: Arc<ShutdownTrigger>,
+    ) -> Worker {
         Worker {
             pool,
             id,
@@ -94,6 +103,7 @@ impl Worker {
             current_task: CurrentTask::new(),
             is_blocking: Cell::new(false),
             should_finalize: Cell::new(false),
+            trigger,
             _p: PhantomData,
         }
     }
