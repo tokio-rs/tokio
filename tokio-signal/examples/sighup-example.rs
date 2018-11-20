@@ -9,7 +9,7 @@ mod platform {
     use futures::{Future, Stream};
     use tokio_signal::unix::{Signal, SIGHUP};
 
-    pub fn main() {
+    pub fn main() -> Result<(), Box<::std::error::Error>> {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
         let stream = Signal::new(SIGHUP).flatten_stream();
 
@@ -35,16 +35,17 @@ mod platform {
         // Up until now, we haven't really DONE anything, just prepared
         // now it's time to actually schedule, and thus execute, the stream
         // on our event loop, and loop forever
-        ::tokio::runtime::current_thread::block_on_all(future).unwrap();
+        ::tokio::runtime::current_thread::block_on_all(future)?;
+        Ok(())
     }
 
 }
 
 #[cfg(not(unix))]
 mod platform {
-    pub fn main() {}
+    pub fn main() -> Result<(), Box<::std::error::Error>> {Ok(())}
 }
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     platform::main()
 }

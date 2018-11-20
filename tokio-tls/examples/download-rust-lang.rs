@@ -12,12 +12,12 @@ use native_tls::TlsConnector;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 
-fn main() {
-    let mut runtime = Runtime::new().unwrap();
-    let addr = "www.rust-lang.org:443".to_socket_addrs().unwrap().next().unwrap();
+fn main() -> Result<(), Box<std::error::Error>> {
+    let mut runtime = Runtime::new()?;
+    let addr = "www.rust-lang.org:443".to_socket_addrs()?.next().ok_or("failed to resolve www.rust-lang.org")?;
 
     let socket = TcpStream::connect(&addr);
-    let cx = TlsConnector::builder().build().unwrap();
+    let cx = TlsConnector::builder().build()?;
     let cx = tokio_tls::TlsConnector::from(cx);
 
     let tls_handshake = socket.and_then(move |socket| {
@@ -36,6 +36,7 @@ fn main() {
         tokio_io::io::read_to_end(socket, Vec::new())
     });
 
-    let (_, data) = runtime.block_on(response).unwrap();
+    let (_, data) = runtime.block_on(response)?;
     println!("{}", String::from_utf8_lossy(&data));
+    Ok(())
 }

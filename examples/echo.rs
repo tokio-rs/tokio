@@ -30,19 +30,19 @@ use tokio::prelude::*;
 use std::env;
 use std::net::SocketAddr;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // Allow passing an address to listen on as the first argument of this
     // program, but otherwise we'll just set up our TCP listener on
     // 127.0.0.1:8080 for connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = addr.parse::<SocketAddr>()?;
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
     // above and must be associated with an event loop, so we pass in a handle
     // to our event loop. After the socket's created we inform that we're ready
     // to go and start accepting connections.
-    let socket = TcpListener::bind(&addr).unwrap();
+    let socket = TcpListener::bind(&addr)?;
     println!("Listening on: {}", addr);
 
     // Here we convert the `TcpListener` to a stream of incoming connections
@@ -111,4 +111,5 @@ fn main() {
     // never completes (it just keeps accepting sockets), `tokio::run` blocks
     // forever (until ctrl-c is pressed).
     tokio::run(done);
+    Ok(())
 }
