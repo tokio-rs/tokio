@@ -27,7 +27,6 @@ rand = "0.6"
 log = "0.4"
 
 [dev-dependencies]
-tokio-timer = "0.1"
 env_logger = "0.5"
 
 # For comparison benchmarks
