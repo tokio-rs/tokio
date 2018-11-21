@@ -1,3 +1,7 @@
+# 0.1.4 (November 21, 2018)
+
+* Fix shutdown on idle (#763).
+
 # 0.1.3 (September 27, 2018)
 
 * Fix minimal versions

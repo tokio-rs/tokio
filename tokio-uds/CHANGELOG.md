@@ -1,3 +1,10 @@
+# 0.2.4 (November 24, 2018)
+
+* Implement `UnixDatagramFramed`, providing a `Stream + Sink` layer for
+  unix domain sockets (#453).
+* Add solaris support for `ucred` (#733).
+* Documentation tweaks (#754).
+
 # 0.2.3 (October 23, 2018)
 
 * Fix build on NetBSD (#715).
