@@ -1,3 +1,8 @@
+# 0.1.9 (November 21, 2018)
+
+* Bump internal dependency versions (#746, #753).
+* Internal refactors (#768, #769).
+
 # 0.1.8 (October 23, 2018)
 
 * Assign spawned tasks to random worker (#660).
