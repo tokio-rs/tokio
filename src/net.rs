@@ -8,7 +8,10 @@
 //! * [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
 //! * [`UdpSocket`] and [`UdpFramed`] provide functionality for communication over UDP
 //! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
-//! Unix Domain Socket **(available on Unix only)**
+//! Unix Domain Stream Socket **(available on Unix only)**
+//! * [`UnixDatagram`] and [`UnixDatagramFramed`] provide functionality for communication
+//! over Unix Domain Datagram Socket **(available on Unix only)**
+
 //!
 //! [`TcpListener`]: struct.TcpListener.html
 //! [`TcpStream`]: struct.TcpStream.html
@@ -16,6 +19,8 @@
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`UnixListener`]: struct.UnixListener.html
 //! [`UnixStream`]: struct.UnixStream.html
+//! [`UnixDatagram`]: struct.UnixDatagram.html
+//! [`UnixDatagramFramed`]: struct.UnixDatagramFramed.html
 
 pub mod tcp {
     //! TCP bindings for `tokio`.
@@ -77,9 +82,9 @@ pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
 
     pub use tokio_uds::{
-        ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixListener,
-        UnixStream,
+        ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixDatagramFramed,
+        UnixListener, UnixStream,
     };
 }
 #[cfg(unix)]
-pub use self::unix::{UnixListener, UnixStream};
+pub use self::unix::{UnixDatagram, UnixDatagramFramed, UnixListener, UnixStream};
