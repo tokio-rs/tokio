@@ -23,18 +23,17 @@ use tokio_reactor::{Handle, PollEvented};
 /// # Examples
 ///
 /// ```
-/// # extern crate tokio_io;
-/// # extern crate tokio_tcp;
+/// # extern crate tokio;
 /// # extern crate futures;
-/// # use futures::Future;
-/// # use tokio_io::AsyncWrite;
-/// # use tokio_tcp::TcpStream;
+/// use futures::Future;
+/// use tokio::io::AsyncWrite;
+/// use tokio::net::TcpStream;
 /// use std::net::SocketAddr;
 ///
 /// # fn main() -> Result<(), Box<std::error::Error>> {
 /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
-/// let connect_future = TcpStream::connect(&addr);
-/// connect_future.map(|mut stream| {
+/// let stream = TcpStream::connect(&addr);
+/// stream.map(|mut stream| {
 ///     // Attempt to write bytes asynchronously to the stream
 ///     stream.poll_write(&[1]);
 /// });
@@ -72,17 +71,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_io;
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use futures::Future;
-    /// # use tokio_tcp::TcpStream;
-    /// # use std::net::SocketAddr;
+    /// use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
-    /// let connect_future = TcpStream::connect(&addr)
-    ///     .map(|_stream| println!("successfully connected"));
+    /// let stream = TcpStream::connect(&addr)
+    ///     .map(|stream| 
+    ///         println!("successfully connected to {}", stream.local_addr().unwrap()));
     /// # Ok(())
     /// # }
     /// ```
@@ -111,10 +110,9 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate tokio_reactor;
-    ///
-    /// # use tokio_tcp::TcpStream;
+    /// use tokio::net::TcpStream;
     /// use std::net::TcpStream as StdTcpStream;
     /// use tokio_reactor::Handle;
     ///
@@ -193,19 +191,19 @@ impl TcpStream {
     ///
     /// ```
     /// # extern crate mio;
-    /// # extern crate tokio_io;
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use futures::Async;
-    /// # use futures::Future;
-    /// # use tokio_tcp::TcpStream;
-    /// # use std::net::SocketAddr;
+    /// use mio::Ready;
+    /// use futures::Async;
+    /// use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
-    /// let fut = TcpStream::connect(&addr);
-    /// fut.map(|stream| {
-    ///     match stream.poll_read_ready(mio::Ready::readable()) {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     match stream.poll_read_ready(Ready::readable()) {
     ///         Ok(Async::Ready(_)) => println!("read ready"),
     ///         Ok(Async::NotReady) => println!("not read ready"),
     ///         Err(e) => eprintln!("got error: {}", e),
@@ -236,18 +234,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_io;
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use futures::Async;
-    /// # use futures::Future;
-    /// # use tokio_tcp::TcpStream;
-    /// # use std::net::SocketAddr;
+    /// use futures::Async;
+    /// use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
-    /// let fut = TcpStream::connect(&addr);
-    /// fut.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     match stream.poll_write_ready() {
     ///         Ok(Async::Ready(_)) => println!("write ready"),
     ///         Ok(Async::NotReady) => println!("not write ready"),
@@ -266,16 +263,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     assert_eq!(stream.local_addr().unwrap(),
     ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
     /// });
@@ -290,16 +287,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     assert_eq!(stream.peer_addr().unwrap(),
     ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
     /// });
@@ -341,17 +338,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Async;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Async;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|mut stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|mut stream| {
     ///     let mut buf = [0; 10];
     ///     match stream.poll_peek(&mut buf) {
     ///        Ok(Async::Ready(len)) => println!("read {} bytes", len),
@@ -384,16 +381,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::{Shutdown, SocketAddr};
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.shutdown(Shutdown::Both)
     /// });
     /// # Ok(())
@@ -412,16 +409,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_nodelay(true).expect("set_nodelay call failed");;
     ///     assert_eq!(stream.nodelay().unwrap_or(false), true);
     /// });
@@ -443,16 +440,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_nodelay(true).expect("set_nodelay call failed");
     /// });
     /// # Ok(())
@@ -471,16 +468,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_recv_buffer_size(100).expect("set_recv_buffer_size failed");
     ///     assert_eq!(stream.recv_buffer_size().unwrap_or(0), 100);
     /// });
@@ -499,16 +496,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_recv_buffer_size(100).expect("set_recv_buffer_size failed");
     /// });
     /// # Ok(())
@@ -527,16 +524,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_send_buffer_size(100).expect("set_send_buffer_size failed");
     ///     assert_eq!(stream.send_buffer_size().unwrap_or(0), 100);
     /// });
@@ -555,16 +552,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_send_buffer_size(100).expect("set_send_buffer_size failed");
     /// });
     /// # Ok(())
@@ -584,16 +581,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_keepalive(None).expect("set_keepalive failed");
     ///     assert_eq!(stream.keepalive().unwrap(), None);
     /// });
@@ -620,16 +617,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_keepalive(None).expect("set_keepalive failed");
     /// });
     /// # Ok(())
@@ -648,16 +645,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_ttl(100).expect("set_ttl failed");
     ///     assert_eq!(stream.ttl().unwrap_or(0), 100);
     /// });
@@ -676,16 +673,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_ttl(100).expect("set_ttl failed");
     /// });
     /// # Ok(())
@@ -705,16 +702,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_linger(None).expect("set_linger failed");
     ///     assert_eq!(stream.linger().unwrap(), None);
     /// });
@@ -740,16 +737,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     stream.set_linger(None).expect("set_linger failed");
     /// });
     /// # Ok(())
@@ -769,16 +766,16 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_tcp;
+    /// # extern crate tokio;
     /// # extern crate futures;
-    /// # use tokio_tcp::TcpStream;
-    /// # use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let future = TcpStream::connect(&addr);
-    /// future.map(|stream| {
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
     ///     let clone = stream.try_clone().unwrap();
     /// });
     /// # Ok(())
