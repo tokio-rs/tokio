@@ -192,6 +192,7 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
+    /// # extern crate mio;
     /// # extern crate tokio_io;
     /// # extern crate tokio_tcp;
     /// # extern crate futures;
