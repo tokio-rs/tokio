@@ -43,12 +43,14 @@ pub struct TlsStream<S> {
 
 /// A wrapper around a `native_tls::TlsConnector`, providing an async `connect`
 /// method.
+#[derive(Clone)]
 pub struct TlsConnector {
     inner: native_tls::TlsConnector,
 }
 
 /// A wrapper around a `native_tls::TlsAcceptor`, providing an async `accept`
 /// method.
+#[derive(Clone)]
 pub struct TlsAcceptor {
     inner: native_tls::TlsAcceptor,
 }
