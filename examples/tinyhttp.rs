@@ -1,9 +1,9 @@
-//! A "tiny" example of HTTP request/response handling using just tokio-core
+//! A "tiny" example of HTTP request/response handling using transports.
 //!
 //! This example is intended for *learning purposes* to see how various pieces
 //! hook up together and how HTTP can get up and running. Note that this example
 //! is written with the restriction that it *can't* use any "big" library other
-//! than tokio-core, if you'd like a "real world" HTTP library you likely want a
+//! than Tokio, if you'd like a "real world" HTTP library you likely want a
 //! crate like Hyper.
 //!
 //! Code here is based on the `echo-threads` example and implements two paths,
