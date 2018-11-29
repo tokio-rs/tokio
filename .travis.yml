@@ -41,7 +41,7 @@ matrix:
     - rust: nightly
       env: ALLOW_FAILURES=true
 
-before_script: |-1
+before_script: |-
 set -e
 cat <<-EOF >> Cargo.toml
 
