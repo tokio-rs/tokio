@@ -145,6 +145,7 @@ impl UnixDatagram {
         let r = self.io.get_ref().send_to(buf, path);
         if is_wouldblock(&r) {
             self.io.clear_write_ready()?;
+            return Ok(Async::NotReady);
         }
         r.map(Async::Ready)
     }
@@ -162,6 +163,7 @@ impl UnixDatagram {
         let r = self.io.get_ref().send(buf);
         if is_wouldblock(&r) {
             self.io.clear_write_ready()?;
+            return Ok(Async::NotReady);
         }
         r.map(Async::Ready)
     }
