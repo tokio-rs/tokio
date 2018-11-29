@@ -49,7 +49,7 @@ before_script: |-2
   tokio = { path = "." }
   tokio-async-await  = { path = "./tokio-async-await" }
   tokio-buf = { path = "./tokio-buf" }
-  tokio-channel = { path = ".tokio-channel" }
+  tokio-channel = { path = "./tokio-channel" }
   tokio-codec = { path = "./tokio-codec" }
   tokio-current-thread = { path = "./tokio-current-thread" }
   tokio-executor = { path = "./tokio-executor" }
