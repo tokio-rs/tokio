@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
 
+use crossbeam::queue::SegQueue;
 use crossbeam_utils::CachePadded;
 use deque;
 
@@ -38,7 +39,7 @@ pub(crate) struct WorkerEntry {
     pub unpark: BoxUnpark,
 
     // MPSC queue of jobs submitted to the worker from an external source.
-    pub inbound: Queue,
+    pub inbound: SegQueue<Arc<Task>>,
 }
 
 impl WorkerEntry {
@@ -50,7 +51,7 @@ impl WorkerEntry {
             next_sleeper: UnsafeCell::new(0),
             worker: w,
             stealer: s,
-            inbound: Queue::new(),
+            inbound: SegQueue::new(),
             park: UnsafeCell::new(park),
             unpark,
         }
@@ -201,7 +202,14 @@ impl WorkerEntry {
     /// them into `dest` in order to balance the work distribution among
     /// workers.
     pub fn steal_tasks(&self, dest: &Self) -> deque::Steal<Arc<Task>> {
-        self.stealer.steal_many(&dest.worker)
+        use deque::Steal::*;
+        match self.stealer.steal_many(&dest.worker) {
+            Data(task) => Data(task),
+            Empty | Retry => match self.inbound.try_pop() {
+                None => Empty,
+                Some(task) => Data(task),
+            }
+        }
     }
 
     /// Drain (and drop) all tasks that are queued for work.

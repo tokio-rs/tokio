@@ -567,15 +567,13 @@ impl Worker {
     /// state.
     #[inline]
     fn drain_inbound(&self) -> bool {
-        use task::Poll::*;
-
         let mut found_work = false;
 
         loop {
-            let task = unsafe { self.entry().inbound.poll() };
+            let task = self.entry().inbound.try_pop();
 
             match task {
-                Empty => {
+                None => {
                     if found_work {
                         // TODO: Why is this called on every iteration? Would it
                         // not be better to only signal when work was found
@@ -586,15 +584,7 @@ impl Worker {
 
                     return true;
                 }
-                Inconsistent => {
-                    if found_work {
-                        trace!("found work while draining; signal_work");
-                        self.pool.signal_work(&self.pool);
-                    }
-
-                    return false;
-                }
-                Data(task) => {
+                Some(task) => {
                     found_work = true;
                     self.entry().push_internal(task);
                 }
