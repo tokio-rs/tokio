@@ -131,11 +131,11 @@ fn seek() {
             .write(true)
             .open(file_path)
             .and_then(|file| io::write_all(file, "Hello, world!"))
-            .and_then(|(file, _)| file.seek(SeekFrom::End(-6)))
+            .and_then(|(file, _)| io::seek(file, SeekFrom::End(-6)))
             .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
             .and_then(|(file, buf)| {
                 assert_eq!(buf, b"world");
-                file.seek(SeekFrom::Start(0))
+                io::seek(file, SeekFrom::Start(0))
             })
             .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
             .and_then(|(_, buf)| {

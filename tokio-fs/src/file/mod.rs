@@ -20,7 +20,7 @@ use futures::Poll;
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::{AsyncRead, AsyncWrite, AsyncSeek};
 
 /// A reference to an open file on the filesystem.
 ///
@@ -502,6 +502,14 @@ impl AsyncWrite for File {
         })
     }
 }
+
+impl Seek for File {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        ::would_block(|| self.std().seek(pos))
+    }
+}
+
+impl AsyncSeek for File { }
 
 impl Drop for File {
     fn drop(&mut self) {
