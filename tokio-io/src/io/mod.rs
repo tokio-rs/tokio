@@ -17,6 +17,7 @@ mod read_to_end;
 mod read_until;
 mod shutdown;
 mod write_all;
+mod seek;
 
 pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
@@ -26,6 +27,7 @@ pub use self::read_to_end::{read_to_end, ReadToEnd};
 pub use self::read_until::{read_until, ReadUntil};
 pub use self::shutdown::{shutdown, Shutdown};
 pub use self::write_all::{write_all, WriteAll};
+pub use self::seek::{seek, Seek};
 pub use crate::allow_std::AllowStdIo;
 pub use crate::lines::{lines, Lines};
 pub use crate::split::{ReadHalf, WriteHalf};

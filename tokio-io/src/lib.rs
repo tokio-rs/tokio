@@ -46,6 +46,7 @@ pub mod _tokio_codec;
 mod allow_std;
 mod async_read;
 mod async_write;
+mod async_seek;
 mod framed;
 mod framed_read;
 mod framed_write;
@@ -56,6 +57,7 @@ mod window;
 
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
+pub use self::async_seek::AsyncSeek;
 
 fn _assert_objects() {
     fn _assert<T>() {}
