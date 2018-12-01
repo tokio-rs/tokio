@@ -35,6 +35,11 @@ fn debounce_trailing_many() {
 
         // Send in two items.
         tx.unbounded_send(1).unwrap();
+
+        // Process the first item. We shouldn't be ready yet, but there should be a delay now.
+        assert_not_ready!(debounced);
+
+        // Send in the second one.
         tx.unbounded_send(2).unwrap();
 
         // We shouldn't be ready yet, but we should have stored 2 as our last item.
