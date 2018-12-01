@@ -82,12 +82,12 @@ impl<T: Stream> Debounce<T> {
     ) -> Self {
         Self {
             delay: None,
-            duration: duration,
-            edge: edge,
+            duration,
+            edge,
             last_item: None,
-            max_wait: max_wait,
+            max_wait,
             max_wait_to: None,
-            stream: stream,
+            stream,
         }
     }
 
