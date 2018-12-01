@@ -29,6 +29,29 @@ fn debounce_leading() {
 }
 
 #[test]
+fn debounce_trailing_many() {
+    mocked(|timer, _| {
+        let (mut debounced, tx) = make_debounced(Edge::Trailing, None);
+
+        // Send in two items.
+        tx.unbounded_send(1).unwrap();
+        tx.unbounded_send(2).unwrap();
+
+        // We shouldn't be ready yet, but we should have stored 2 as our last item.
+        assert_not_ready!(debounced);
+
+        // Go past our delay instant.
+        advance(timer, ms(11));
+
+        // Poll again, we should get 2.
+        assert_ready_eq!(debounced, Some(2));
+
+        // No more items in the stream, delay finished: we should be NotReady.
+        assert_not_ready!(debounced);
+    });
+}
+
+#[test]
 fn debounce_trailing() {
     mocked(|timer, _| {
         let (debounced, tx) = make_debounced(Edge::Trailing, None);
