@@ -14,6 +14,7 @@ pub use self::create::CreateFuture;
 pub use self::metadata::MetadataFuture;
 pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
+#[allow(deprecated)]
 pub use self::seek::SeekFuture;
 
 use futures::Poll;
@@ -191,6 +192,9 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
+    #[deprecated(since = "0.2", note = "use tokio::io::AsyncSeek instead")]
+    #[doc(hidden)]
+    #[allow(deprecated)]
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
         crate::blocking_io(|| self.std().seek(pos))
     }
@@ -217,6 +221,9 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
+    #[deprecated(since = "0.2", note = "use tokio::io::seek instead")]
+    #[doc(hidden)]
+    #[allow(deprecated)]
     pub fn seek(self, pos: io::SeekFrom) -> SeekFuture {
         SeekFuture::new(self, pos)
     }

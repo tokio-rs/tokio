@@ -1,8 +1,11 @@
+#![allow(deprecated)]
 use super::File;
 use futures::{try_ready, Future, Poll};
 use std::io;
 
 /// Future returned by `File::seek`.
+#[deprecated(since = "0.2", note = "use tokio::io::Seek<File> instead")]
+#[doc(hidden)]
 #[derive(Debug)]
 pub struct SeekFuture {
     inner: Option<File>,
