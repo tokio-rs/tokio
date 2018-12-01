@@ -73,7 +73,7 @@ pub enum Edge {
 }
 
 impl<T: Stream> Debounce<T> {
-    /// Constructs a new stream that debounces on the trailing edge.
+    /// Constructs a new stream that debounces the items passed through.
     pub fn new(
         stream: T,
         duration: Duration,
