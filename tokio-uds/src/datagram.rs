@@ -1,4 +1,4 @@
-use {SendDgram, RecvDgram};
+use {RecvDgram, SendDgram};
 
 use tokio_reactor::{Handle, PollEvented};
 
@@ -98,30 +98,32 @@ impl UnixDatagram {
     /// On success, returns the number of bytes read and the address from
     /// whence the data came.
     pub fn poll_recv_from(&self, buf: &mut [u8]) -> Poll<(usize, SocketAddr), io::Error> {
-        if self.io.poll_read_ready(Ready::readable())?.is_not_ready() {
-            return Ok(Async::NotReady);
+        try_ready!(self.io.poll_read_ready(Ready::readable()));
+
+        match self.io.get_ref().recv_from(buf) {
+            Ok(ret) => Ok(ret.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_read_ready(Ready::readable())?;
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
         }
-        let r = self.io.get_ref().recv_from(buf);
-        if is_wouldblock(&r) {
-            self.io.clear_read_ready(Ready::readable())?;
-            return Ok(Async::NotReady);
-        }
-        r.map(Async::Ready)
     }
 
     /// Receives data from the socket.
     ///
     /// On success, returns the number of bytes read.
     pub fn poll_recv(&self, buf: &mut [u8]) -> Poll<usize, io::Error> {
-        if self.io.poll_read_ready(Ready::readable())?.is_not_ready() {
-            return Ok(Async::NotReady);
+        try_ready!(self.io.poll_read_ready(Ready::readable()));
+
+        match self.io.get_ref().recv(buf) {
+            Ok(ret) => Ok(ret.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_read_ready(Ready::readable())?;
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
         }
-        let r = self.io.get_ref().recv(buf);
-        if is_wouldblock(&r) {
-            self.io.clear_read_ready(Ready::readable())?;
-            return Ok(Async::NotReady);
-        }
-        r.map(Async::Ready)
     }
 
     /// Returns a future for receiving a datagram. See the documentation on RecvDgram for details.
@@ -139,14 +141,16 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        if self.io.poll_write_ready()?.is_not_ready() {
-            return Ok(Async::NotReady);
+        try_ready!(self.io.poll_write_ready());
+
+        match self.io.get_ref().send_to(buf, path) {
+            Ok(ret) => Ok(ret.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_write_ready()?;
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
         }
-        let r = self.io.get_ref().send_to(buf, path);
-        if is_wouldblock(&r) {
-            self.io.clear_write_ready()?;
-        }
-        r.map(Async::Ready)
     }
 
     /// Sends data on the socket to the socket's peer.
@@ -156,14 +160,16 @@ impl UnixDatagram {
     ///
     /// On success, returns the number of bytes written.
     pub fn poll_send(&self, buf: &[u8]) -> Poll<usize, io::Error> {
-        if self.io.poll_write_ready()?.is_not_ready() {
-            return Ok(Async::NotReady);
+        try_ready!(self.io.poll_write_ready());
+
+        match self.io.get_ref().send(buf) {
+            Ok(ret) => Ok(ret.into()),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_write_ready()?;
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
         }
-        let r = self.io.get_ref().send(buf);
-        if is_wouldblock(&r) {
-            self.io.clear_write_ready()?;
-        }
-        r.map(Async::Ready)
     }
 
     /// Returns a future sending the data in buf to the socket at path.
@@ -199,12 +205,5 @@ impl fmt::Debug for UnixDatagram {
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
         self.io.get_ref().as_raw_fd()
-    }
-}
-
-fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
-    match *r {
-        Ok(_) => false,
-        Err(ref e) => e.kind() == io::ErrorKind::WouldBlock,
     }
 }
