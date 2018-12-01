@@ -36,7 +36,7 @@ pub trait StreamExt: Stream {
     ///
     /// [`debounce_builder`]: #method.debounce_builder
     fn debounce(self, dur: Duration) -> Debounce<Self>
-    where Self:Sized
+    where Self: Sized
     {
         self.debounce_builder()
             .duration(dur)
@@ -48,7 +48,7 @@ pub trait StreamExt: Stream {
     ///
     /// The returned builder can be used to configure the debouncing process.
     fn debounce_builder(self) -> DebounceBuilder<Self>
-    where Self:Sized
+    where Self: Sized
     {
         DebounceBuilder::from_stream(self)
     }
@@ -60,7 +60,7 @@ pub trait StreamExt: Stream {
     /// least after every `interval`. Debounce, on the other hand, would not
     /// pass items through until there has been enough "silence".
     fn sample(self, interval: Duration) -> Debounce<Self>
-    where Self:Sized
+    where Self: Sized
     {
         self.debounce_builder()
             .max_wait(interval)
