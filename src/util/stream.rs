@@ -31,6 +31,10 @@ pub trait StreamExt: Stream {
     /// being passed through. The last item that was passed through will
     /// be returned.
     ///
+    /// Care must be taken that this stream returns `Async::NotReady` at some point,
+    /// otherwise the debouncing implementation will overflow the stack during
+    /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
+    ///
     /// See also [`debounce_builder`], which allows more configuration over how the
     /// debouncing is done.
     ///
@@ -47,6 +51,10 @@ pub trait StreamExt: Stream {
     /// Create a builder that builds a debounced version of this stream.
     ///
     /// The returned builder can be used to configure the debouncing process.
+    ///
+    /// Care must be taken that this stream returns `Async::NotReady` at some point,
+    /// otherwise the debouncing implementation will overflow the stack during
+    /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
     fn debounce_builder(self) -> DebounceBuilder<Self>
     where Self: Sized
     {
@@ -59,6 +67,10 @@ pub trait StreamExt: Stream {
     /// ignored. Sampling, however, ensures that an item is passed through at
     /// least after every `interval`. Debounce, on the other hand, would not
     /// pass items through until there has been enough "silence".
+    ///
+    /// Care must be taken that this stream returns `Async::NotReady` at some point,
+    /// otherwise the sampling implementation will overflow the stack during
+    /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
     fn sample(self, interval: Duration) -> Debounce<Self>
     where Self: Sized
     {

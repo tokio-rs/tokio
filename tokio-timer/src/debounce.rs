@@ -74,6 +74,10 @@ pub enum Edge {
 
 impl<T: Stream> Debounce<T> {
     /// Constructs a new stream that debounces the items passed through.
+    ///
+    /// Care must be taken that `stream` returns `Async::NotReady` at some point,
+    /// otherwise the debouncing implementation will overflow the stack during
+    /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
     pub fn new(
         stream: T,
         duration: Duration,
@@ -173,7 +177,7 @@ impl<T: Stream> Stream for Debounce<T> {
                         self.delay = Some(d);
                         self.last_item = Some(item);
 
-                        Ok(Async::NotReady)
+                        self.poll()
                     },
 
                     // The stream has ended. Communicate this immediately to the
@@ -194,13 +198,13 @@ impl<T: Stream> Stream for Debounce<T> {
                 Some(item) => {
                     self.start_delay();
 
-                    Ok(if self.edge.is_leading() {
-                        Async::Ready(Some(item))
+                    if self.edge.is_leading() {
+                        Ok(Async::Ready(Some(item)))
                     } else {
                         self.last_item = Some(item);
 
-                        Async::NotReady
-                    })
+                        self.poll()
+                    }
                 },
 
                 // The stream has ended. Communicate this immediately to the
@@ -213,6 +217,10 @@ impl<T: Stream> Stream for Debounce<T> {
 
 impl<T> DebounceBuilder<T> {
     /// Creates a new builder from the given debounce stream.
+    ///
+    /// Care must be taken that `stream` returns `Async::NotReady` at some point,
+    /// otherwise the debouncing implementation will overflow the stack during
+    /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
     pub fn from_stream(stream: T) -> Self {
         DebounceBuilder {
             duration: None,
