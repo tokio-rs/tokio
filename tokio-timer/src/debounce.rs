@@ -269,6 +269,9 @@ impl<T> DebounceBuilder<T> {
 
 impl<T: Stream> DebounceBuilder<T> {
     /// Builds the debouncing stream.
+    ///
+    /// Panics if the edge or the duration is unspecified, or if only `max_wait`
+    /// together with `Edge::Both` was specified.
     pub fn build(self) -> Debounce<T> {
         let edge = self.edge.expect("missing debounce edge");
 
