@@ -25,6 +25,13 @@ pub struct BlockingError {
 /// calls complete. The maximum value is specified when creating a thread pool
 /// using [`Builder::max_blocking`][build]
 ///
+/// NB: The entire task that called `blocking` is blocked whenever the supplied
+/// closure blocks, even if you have used future combinators such as `select` -
+/// the other futures in this task will not make progress until the closure
+/// returns.
+/// If this is not desired, ensure that `blocking` runs in its own task (e.g.
+/// using `futures::sync::oneshot::spawn`).
+///
 /// [build]: struct.Builder.html#method.max_blocking
 ///
 /// # Return
