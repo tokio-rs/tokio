@@ -205,7 +205,8 @@ impl WorkerEntry {
         use deque::Steal::*;
         match self.stealer.steal_many(&dest.worker) {
             Data(task) => Data(task),
-            Empty | Retry => match self.inbound.try_pop() {
+            Retry => Retry,
+            Empty => match self.inbound.try_pop() {
                 None => Empty,
                 Some(task) => Data(task),
             }
