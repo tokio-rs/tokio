@@ -45,7 +45,11 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
-pub use tokio_io::{AsyncRead, AsyncWrite};
+pub use tokio_io::{
+    AsyncRead,
+    AsyncWrite,
+    AsyncSeek,
+};
 
 // standard input, output, and error
 #[cfg(feature = "fs")]
@@ -53,8 +57,8 @@ pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
 
 // Utils
 pub use tokio_io::io::{
-    copy, flush, lines, read, read_exact, read_to_end, read_until, shutdown, write_all, Copy,
-    Flush, Lines, ReadExact, ReadHalf, ReadToEnd, ReadUntil, Shutdown, WriteAll, WriteHalf,
+    copy, flush, lines, read, read_exact, read_to_end, read_until, seek, shutdown, write_all, Copy,
+    Flush, Lines, ReadExact, ReadHalf, ReadToEnd, ReadUntil, Seek, Shutdown, WriteAll, WriteHalf,
 };
 
 // Re-export io::Error so that users don't have to deal
