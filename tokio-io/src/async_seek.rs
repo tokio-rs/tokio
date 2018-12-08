@@ -12,11 +12,9 @@ use AsyncWrite;
 /// Specifically, this means that the `poll_seek` function will return one of
 /// the following:
 ///
-
 /// * `Ok(Async::Ready(n))` means that the seek was successful, and `n` is the
 ///   new position in the file.
 ///
-
 /// * `Ok(Async::NotReady)` means that the I/O object is not currently seekable
 ///   but may become seekable in the future. Most importantly, **the current
 ///   future's task is scheduled to get unparked when the object is seekable**.
