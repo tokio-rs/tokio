@@ -35,6 +35,7 @@
 #![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.2")]
 
+extern crate crossbeam_utils;
 extern crate futures;
 
 #[cfg(feature = "unstable-futures")]

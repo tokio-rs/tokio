@@ -46,10 +46,9 @@
 
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, Condvar};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
+
+use crossbeam_utils::sync::{Parker, Unparker};
 
 /// Block the current thread.
 ///
@@ -162,26 +161,11 @@ pub struct ParkError {
 /// Unblocks a thread that was blocked by `ParkThread`.
 #[derive(Clone, Debug)]
 pub struct UnparkThread {
-    inner: Arc<Inner>,
+    inner: Unparker,
 }
-
-#[derive(Debug)]
-struct Inner {
-    state: AtomicUsize,
-    mutex: Mutex<()>,
-    condvar: Condvar,
-}
-
-const IDLE: usize = 0;
-const NOTIFY: usize = 1;
-const SLEEP: usize = 2;
 
 thread_local! {
-    static CURRENT_PARK_THREAD: Arc<Inner> = Arc::new(Inner {
-        state: AtomicUsize::new(IDLE),
-        mutex: Mutex::new(()),
-        condvar: Condvar::new(),
-    });
+    static CURRENT_PARKER: Parker = Parker::new();
 }
 
 // ===== impl ParkThread =====
@@ -199,9 +183,9 @@ impl ParkThread {
 
     /// Get a reference to the `ParkThread` handle for this thread.
     fn with_current<F, R>(&self, f: F) -> R
-        where F: FnOnce(&Arc<Inner>) -> R,
+        where F: FnOnce(&Parker) -> R,
     {
-        CURRENT_PARK_THREAD.with(|inner| f(inner))
+        CURRENT_PARKER.with(|inner| f(inner))
     }
 }
 
@@ -210,16 +194,18 @@ impl Park for ParkThread {
     type Error = ParkError;
 
     fn unpark(&self) -> Self::Unpark {
-        let inner = self.with_current(|inner| inner.clone());
+        let inner = self.with_current(|inner| inner.unparker().clone());
         UnparkThread { inner }
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.with_current(|inner| inner.park(None))
+        self.with_current(|inner| inner.park());
+        Ok(())
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.with_current(|inner| inner.park(Some(duration)))
+        self.with_current(|inner| inner.park_timeout(duration));
+        Ok(())
     }
 }
 
@@ -228,99 +214,5 @@ impl Park for ParkThread {
 impl Unpark for UnparkThread {
     fn unpark(&self) {
         self.inner.unpark();
-    }
-}
-
-// ===== impl Inner =====
-
-impl Inner {
-    /// Park the current thread for at most `dur`.
-    fn park(&self, timeout: Option<Duration>) -> Result<(), ParkError> {
-        // If currently notified, then we skip sleeping. This is checked outside
-        // of the lock to avoid acquiring a mutex if not necessary.
-        if self.state.compare_exchange(NOTIFY, IDLE, SeqCst, SeqCst).is_ok() {
-            return Ok(());
-        }
-
-        // If the duration is zero, then there is no need to actually block
-        if let Some(ref dur) = timeout {
-            if *dur == Duration::from_millis(0) {
-                return Ok(());
-            }
-        }
-
-        // The state is currently idle, so obtain the lock and then try to
-        // transition to a sleeping state.
-        let mut m = self.mutex.lock().unwrap();
-
-        // Transition to sleeping
-        match self.state.compare_exchange(IDLE, SLEEP, SeqCst, SeqCst) {
-            Ok(_) => {}
-            Err(NOTIFY) => {
-                // Notified before we could sleep, consume the notification and
-                // exit
-                self.state.swap(IDLE, SeqCst);
-                return Ok(());
-            }
-            _ => unreachable!(),
-        }
-
-        match timeout {
-            Some(timeout) => {
-                m = self.condvar.wait_timeout(m, timeout).unwrap().0;
-
-                // Transition back to idle. If the state has transitioned to `NOTIFY`,
-                // this will consume that notification.
-                match self.state.swap(IDLE, SeqCst) {
-                    NOTIFY => {}, // Got a notification
-                    SLEEP => {}, // No notification, timed out
-                    _ => unreachable!(),
-                }
-            }
-            None => {
-                loop {
-                    m = self.condvar.wait(m).unwrap();
-                    match self.state.compare_exchange(NOTIFY, IDLE, SeqCst, SeqCst) {
-                        Ok(_) => break, // Got a notification
-                        Err(_) => {} // Spurious wakeup, go back to sleep
-                    }
-                }
-            }
-        };
-
-        // Explicitly drop the mutex guard. There is no real point in doing it
-        // except that I find it helpful to make it explicit where we want the
-        // mutex to unlock.
-        drop(m);
-
-        Ok(())
-    }
-
-    fn unpark(&self) {
-        loop {
-            // First, try transitioning from IDLE -> NOTIFY, this does not require a
-            // lock.
-            match self.state.compare_exchange(IDLE, NOTIFY, SeqCst, SeqCst) {
-                Ok(_) => return, // No one was waiting
-                Err(NOTIFY) => return, // Already unparked
-                Err(SLEEP) => {} // Gotta wake up
-                _ => unreachable!(),
-            }
-
-            // The other half is sleeping, this requires a lock
-            let _m = self.mutex.lock().unwrap();
-
-            // Transition to NOTIFY
-            match self.state.compare_exchange(SLEEP, NOTIFY, SeqCst, SeqCst) {
-                Ok(_) => {
-                    // Wakeup the sleeper
-                    self.condvar.notify_one();
-                    return;
-                }
-                Err(NOTIFY) => return, // A different thread unparked
-                Err(IDLE) => {} // Parked thread went away, try again
-                _ => unreachable!(),
-            }
-        }
     }
 }
