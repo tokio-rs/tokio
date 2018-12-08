@@ -21,7 +21,7 @@ impl tokio_timer::clock::Now for MockNow {
 
 #[test]
 fn clock_and_timer_concurrent() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
@@ -48,7 +48,7 @@ fn clock_and_timer_concurrent() {
 
 #[test]
 fn clock_and_timer_single_threaded() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));

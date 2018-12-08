@@ -1,3 +1,6 @@
+#![deny(missing_docs, missing_debug_implementations, warnings)]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.5")]
+
 //! Task execution related traits and utilities.
 //!
 //! In the Tokio execution model, futures are lazy. When a future is created, no
@@ -17,7 +20,7 @@
 //! * The [`Executor`] trait describes the API for spawning a future onto an
 //!   executor.
 //!
-//! * [`enter`] marks that the the current thread is entering an execution
+//! * [`enter`] marks that the current thread is entering an execution
 //!   context. This prevents a second executor from accidentally starting from
 //!   within the context of one that is already running.
 //!
@@ -32,14 +35,8 @@
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
 
-#![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.2")]
-
 extern crate crossbeam_utils;
 extern crate futures;
-
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
 
 mod enter;
 mod global;
@@ -48,10 +45,10 @@ pub mod park;
 pub use enter::{enter, Enter, EnterError};
 pub use global::{spawn, with_default, DefaultExecutor};
 
-#[cfg(feature = "unstable-futures")]
-pub use global::spawn2;
-
 use futures::Future;
+
+use std::error::Error;
+use std::fmt;
 
 /// A value that executes futures.
 ///
@@ -118,7 +115,7 @@ pub trait Executor {
     ///
     /// # Panics
     ///
-    /// Implementors are encouraged to avoid panics. However, a panic is
+    /// Implementers are encouraged to avoid panics. However, a panic is
     /// permitted and the caller should check the implementation specific
     /// documentation for more details on possible panics.
     ///
@@ -140,11 +137,6 @@ pub trait Executor {
     fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
              -> Result<(), SpawnError>;
 
-    /// Like `spawn`, but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
-             -> Result<(), futures2::executor::SpawnError>;
-
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///
     /// This function may return both false positives **and** false negatives.
@@ -157,7 +149,7 @@ pub trait Executor {
     ///
     /// # Panics
     ///
-    /// This function must not panic. Implementors must ensure that panics do
+    /// This function must not panic. Implementers must ensure that panics do
     /// not happen.
     ///
     /// # Examples
@@ -190,13 +182,6 @@ impl<E: Executor + ?Sized> Executor for Box<E> {
         -> Result<(), SpawnError>
     {
         (**self).spawn(future)
-    }
-
-    #[cfg(feature = "unstable-futures")]
-    fn spawn2(&mut self, future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
-        -> Result<(), futures2::executor::SpawnError>
-    {
-        (**self).spawn2(future)
     }
 
     fn status(&self) -> Result<(), SpawnError> {
@@ -237,5 +222,17 @@ impl SpawnError {
     /// Returns `true` if the error reflects an executor at capacity failure.
     pub fn is_at_capacity(&self) -> bool {
         !self.is_shutdown
+    }
+}
+
+impl fmt::Display for SpawnError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for SpawnError {
+    fn description(&self) -> &str {
+        "attempted to spawn task while the executor is at capacity or shut down"
     }
 }

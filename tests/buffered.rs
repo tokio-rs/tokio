@@ -22,7 +22,7 @@ macro_rules! t {
 #[test]
 fn echo_server() {
     const N: usize = 1024;
-    drop(env_logger::init());
+    drop(env_logger::try_init());
 
     let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());

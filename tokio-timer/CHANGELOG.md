@@ -1,3 +1,25 @@
+# 0.2.8 (November 21, 2018)
+
+* Implement throttle combinator (#736).
+* Derive `Clone` for `delay_queue::Key` (#730).
+* Bump internal dependencies (#753).
+
+# 0.2.7 (September 27, 2018)
+
+* Fix `Timeout` on error bug (#648).
+* Miscellaneous documentation improvements.
+
+# 0.2.6 (August 23, 2018)
+
+* Implement `Default` for `timer::Handle` (#553)
+* Provide `DelayQueue` utility (#550)
+* Reduce size of `Delay` struct (#554)
+* Introduce `Timeout`, deprecate `Deadline` (#558)
+
+# 0.2.5 (August 6, 2018)
+
+* Add `Interval::interval` shortcut (#492).
+
 # 0.2.4 (June 6, 2018)
 
 * Add `sleep` function for easy interval delays (#347).

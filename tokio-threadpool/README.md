@@ -25,19 +25,21 @@ It's 10x slower.
 extern crate tokio_threadpool;
 extern crate futures;
 
-use tokio_threadpool::*;
-use futures::*;
+use tokio_threadpool::ThreadPool;
+use futures::{Future, lazy};
 use futures::sync::oneshot;
 
 pub fn main() {
-    let (tx, _pool) = ThreadPool::new();
+    let pool = ThreadPool::new();
+    let (tx, rx) = oneshot::channel();
 
-    let res = oneshot::spawn(future::lazy(|| {
+    pool.spawn(lazy(|| {
         println!("Running on the pool");
-        Ok::<_, ()>("complete")
-    }), &tx);
+        tx.send("complete").map_err(|e| println!("send error, {}", e))
+    }));
 
-    println!("Result: {:?}", res.wait());
+    println!("Result: {:?}", rx.wait());
+    pool.shutdown().wait().unwrap();
 }
 ```
 

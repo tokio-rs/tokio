@@ -17,7 +17,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 
-/// A structure representing a connected unix socket.
+/// A structure representing a connected Unix socket.
 ///
 /// This socket can be connected directly with `UnixStream::connect` or accepted
 /// from a listener with `UnixListener::incoming`. Additionally, a pair of
@@ -43,7 +43,7 @@ enum State {
 impl UnixStream {
     /// Connects to the socket named by `path`.
     ///
-    /// This function will create a new unix socket and connect to the path
+    /// This function will create a new Unix socket and connect to the path
     /// specified, associating the returned stream with the default event loop's
     /// handle.
     pub fn connect<P>(path: P) -> ConnectFuture
@@ -75,9 +75,9 @@ impl UnixStream {
 
     /// Creates an unnamed pair of connected sockets.
     ///
-    /// This function will create a pair of interconnected unix sockets for
-    /// communicating back and forth between one another. Each socket will be
-    /// associated with the event loop whose handle is also provided.
+    /// This function will create a pair of interconnected Unix sockets for
+    /// communicating back and forth between one another. Each socket will
+    /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
         let (a, b) = try!(mio_uds::UnixStream::pair());
         let a = UnixStream::new(a);
@@ -111,7 +111,7 @@ impl UnixStream {
         self.io.get_ref().peer_addr()
     }
 
-    /// Returns effective credentials of the process which called `connect` or `socketpair`.
+    /// Returns effective credentials of the process which called `connect` or `pair`.
     pub fn peer_cred(&self) -> io::Result<UCred> {
         ucred::get_peer_cred(self)
     }
@@ -196,7 +196,7 @@ impl<'a> AsyncRead for &'a UnixStream {
             if r == -1 {
                 let e = io::Error::last_os_error();
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.clear_write_ready()?;
+                    self.io.clear_read_ready(Ready::readable())?;
                     Ok(Async::NotReady)
                 } else {
                     Err(e)

@@ -1,3 +1,11 @@
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.13")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![cfg_attr(feature = "async-await-preview", feature(
+        async_await,
+        await_macro,
+        futures_api,
+        ))]
+
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
 //! Tokio is an event-driven, non-blocking I/O platform for writing asynchronous
@@ -64,15 +72,15 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.5")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
-
+extern crate bytes;
 #[macro_use]
 extern crate futures;
 extern crate mio;
+extern crate num_cpus;
 extern crate tokio_current_thread;
 extern crate tokio_io;
 extern crate tokio_executor;
+extern crate tokio_codec;
 extern crate tokio_fs;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
@@ -80,157 +88,34 @@ extern crate tokio_timer;
 extern crate tokio_tcp;
 extern crate tokio_udp;
 
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
+#[cfg(feature = "async-await-preview")]
+extern crate tokio_async_await;
+
+#[cfg(unix)]
+extern crate tokio_uds;
 
 pub mod clock;
+pub mod codec;
 pub mod executor;
 pub mod fs;
+pub mod io;
 pub mod net;
+pub mod prelude;
 pub mod reactor;
 pub mod runtime;
 pub mod timer;
 pub mod util;
 
 pub use executor::spawn;
-#[cfg(feature = "unstable-futures")]
-pub use executor::spawn2;
-
 pub use runtime::run;
 
-pub mod io {
-    //! Asynchronous I/O.
-    //!
-    //! This module is the asynchronous version of `std::io`. Primarily, it
-    //! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which extend the
-    //! `Read` and `Write` traits of the standard library.
-    //!
-    //! # AsyncRead and AsyncWrite
-    //!
-    //! [`AsyncRead`] and [`AsyncWrite`] must only be implemented for
-    //! non-blocking I/O types that integrate with the futures type system. In
-    //! other words, these types must never block the thread, and instead the
-    //! current task is notified when the I/O resource is ready.
-    //!
-    //! # Standard input and output
-    //!
-    //! Tokio provides asynchronous APIs to standard [input], [output], and [error].
-    //! These APIs are very similar to the ones provided by `std`, but they also
-    //! implement [`AsyncRead`] and [`AsyncWrite`].
-    //!
-    //! Unlike *most* other Tokio APIs, the standard input / output APIs
-    //! **must** be used from the context of the Tokio runtime as they require
-    //! Tokio specific features to function.
-    //!
-    //! [input]: fn.stdin.html
-    //! [output]: fn.stdout.html
-    //! [error]: fn.stderr.html
-    //!
-    //! # Utility functions
-    //!
-    //! Utilities functions are provided for working with [`AsyncRead`] /
-    //! [`AsyncWrite`] types. For example, [`copy`] asynchronously copies all
-    //! data from a source to a destination.
-    //!
-    //! # `std` re-exports
-    //!
-    //! Additionally, [`Read`], [`Write`], [`Error`], [`ErrorKind`], and
-    //! [`Result`] are re-exported from `std::io` for ease of use.
-    //!
-    //! [`AsyncRead`]: trait.AsyncRead.html
-    //! [`AsyncWrite`]: trait.AsyncWrite.html
-    //! [`copy`]: fn.copy.html
-    //! [`Read`]: trait.Read.html
-    //! [`Write`]: trait.Write.html
-    //! [`Error`]: struct.Error.html
-    //! [`ErrorKind`]: enum.ErrorKind.html
-    //! [`Result`]: type.Result.html
+// ===== Experimental async/await support =====
 
-    pub use tokio_io::{
-        AsyncRead,
-        AsyncWrite,
-    };
+#[cfg(feature = "async-await-preview")]
+mod async_await;
 
-    // standard input, output, and error
-    pub use tokio_fs::{
-        stdin,
-        Stdin,
-        stdout,
-        Stdout,
-        stderr,
-        Stderr,
-    };
+#[cfg(feature = "async-await-preview")]
+pub use async_await::{run_async, spawn_async};
 
-    // Utils
-    pub use tokio_io::io::{
-        copy,
-        Copy,
-        flush,
-        Flush,
-        lines,
-        Lines,
-        read_exact,
-        ReadExact,
-        read_to_end,
-        ReadToEnd,
-        read_until,
-        ReadUntil,
-        ReadHalf,
-        shutdown,
-        Shutdown,
-        write_all,
-        WriteAll,
-        WriteHalf,
-    };
-
-    // Re-export io::Error so that users don't have to deal
-    // with conflicts when `use`ing `futures::io` and `std::io`.
-    pub use ::std::io::{
-        Error,
-        ErrorKind,
-        Result,
-        Read,
-        Write,
-    };
-}
-
-pub mod prelude {
-    //! A "prelude" for users of the `tokio` crate.
-    //!
-    //! This prelude is similar to the standard library's prelude in that you'll
-    //! almost always want to import its entire contents, but unlike the standard
-    //! library's prelude you'll have to do so manually:
-    //!
-    //! ```
-    //! use tokio::prelude::*;
-    //! ```
-    //!
-    //! The prelude may grow over time as additional items see ubiquitous use.
-
-    pub use tokio_io::{
-        AsyncRead,
-        AsyncWrite,
-    };
-
-    pub use util::{
-        FutureExt,
-    };
-
-    pub use ::std::io::{
-        Read,
-        Write,
-    };
-
-    pub use futures::{
-        Future,
-        future,
-        Stream,
-        stream,
-        Sink,
-        IntoFuture,
-        Async,
-        AsyncSink,
-        Poll,
-        task,
-    };
-}
+#[cfg(feature = "async-await-preview")]
+pub use tokio_async_await::await;

@@ -10,17 +10,18 @@ use AsyncRead;
 /// **nonblocking**. All non-blocking I/O objects must return an error when
 /// bytes cannot be written instead of blocking the current thread.
 ///
-/// Specifically, this means that the `write` function will return one of the
-/// following:
+/// Specifically, this means that the `poll_write` function will return one of
+/// the following:
 ///
-/// * `Ok(n)` means that `n` bytes of data was immediately written .
+/// * `Ok(Async::Ready(n))` means that `n` bytes of data was immediately
+///   written.
 ///
-/// * `Err(e) if e.kind() == ErrorKind::WouldBlock` means that no data was
-///   written from the buffer provided. The I/O object is not currently
-///   writable but may become writable in the future. Most importantly, **the
-///   current future's task is scheduled to get unparked when the object is
-///   readable**. This means that like `Future::poll` you'll receive a
-///   notification when the I/O object is writable again.
+/// * `Ok(Async::NotReady)` means that no data was written from the buffer
+///   provided. The I/O object is not currently writable but may become writable
+///   in the future. Most importantly, **the current future's task is scheduled
+///   to get unparked when the object is writable**. This means that like
+///   `Future::poll` you'll receive a notification when the I/O object is
+///   writable again.
 ///
 /// * `Err(e)` for other errors are standard I/O errors coming from the
 ///   underlying object.
@@ -39,7 +40,7 @@ pub trait AsyncWrite: std_io::Write {
     /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
     ///
     /// If the object is not ready for writing, the method returns
-    /// `Ok(Async::Pending)` and arranges for the current task (via
+    /// `Ok(Async::NotReady)` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
     /// readable or is closed.
     fn poll_write(&mut self, buf: &[u8]) -> Poll<usize, std_io::Error> {
@@ -58,7 +59,7 @@ pub trait AsyncWrite: std_io::Write {
     /// On success, returns `Ok(Async::Ready(()))`.
     ///
     /// If flushing cannot immediately complete, this method returns
-    /// `Ok(Async::Pending)` and arranges for the current task (via
+    /// `Ok(Async::NotReady)` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object can make
     /// progress towards flushing.
     fn poll_flush(&mut self) -> Poll<(), std_io::Error> {
@@ -82,7 +83,7 @@ pub trait AsyncWrite: std_io::Write {
     /// appropriate. This method is the hook for such protocols to implement the
     /// graceful shutdown logic.
     ///
-    /// This `shutdown` method is required by implementors of the
+    /// This `shutdown` method is required by implementers of the
     /// `AsyncWrite` trait. Wrappers typically just want to proxy this call
     /// through to the wrapped type, and base types will typically implement
     /// shutdown logic here or just return `Ok(().into())`. Note that if you're
@@ -171,17 +172,22 @@ impl AsyncWrite for std_io::Sink {
     }
 }
 
-// TODO: Implement `prepare_uninitialized_buffer` for `io::Take`.
-// This is blocked on rust-lang/rust#27269
 impl<T: AsyncRead> AsyncRead for std_io::Take<T> {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        self.get_ref().prepare_uninitialized_buffer(buf)
+    }
 }
 
-// TODO: Implement `prepare_uninitialized_buffer` when upstream exposes inner
-// parts
 impl<T, U> AsyncRead for std_io::Chain<T, U>
     where T: AsyncRead,
           U: AsyncRead,
 {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        let (t, u) = self.get_ref();
+        // We don't need to execute the second initializer if the first one
+        // already zeroed the buffer out.
+        t.prepare_uninitialized_buffer(buf) || u.prepare_uninitialized_buffer(buf)
+    }
 }
 
 impl<T: AsyncWrite> AsyncWrite for std_io::BufWriter<T> {

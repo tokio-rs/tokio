@@ -19,15 +19,15 @@ use tokio::prelude::*;
 use tokio::net::{UdpSocket, UdpFramed};
 use tokio_codec::BytesCodec;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     let _ = env_logger::init();
 
-    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+    let addr: SocketAddr = "127.0.0.1:0".parse()?;
 
     // Bind both our sockets and then figure out what ports we got.
-    let a = UdpSocket::bind(&addr).unwrap();
-    let b = UdpSocket::bind(&addr).unwrap();
-    let b_addr = b.local_addr().unwrap();
+    let a = UdpSocket::bind(&addr)?;
+    let b = UdpSocket::bind(&addr)?;
+    let b_addr = b.local_addr()?;
 
     // We're parsing each socket with the `BytesCodec` included in `tokio_io`, and then we
     // `split` each codec into the sink/stream halves.
@@ -61,4 +61,5 @@ fn main() {
             .map(|_| ())
             .map_err(|e| println!("error = {:?}", e))
     });
+    Ok(())
 }

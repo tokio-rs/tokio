@@ -15,19 +15,36 @@ matrix:
   # This represents the minimum Rust version supported by Tokio. Updating this
   # should be done in a dedicated PR and cannot be greater than two 0.x
   # releases prior to the current stable.
-  - rust: 1.25.0
+  - rust: 1.26.0
   - rust: stable
   - rust: beta
   - rust: nightly
+    env: ALLOW_FAILURES=true
   - os: osx
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
 
+  # Test the async / await preview. We don't want to block PRs on this failing
+  # though.
+  - rust: nightly
+    env: ALLOW_FAILURES=true
+    script: |
+      cd tokio-async-await
+      cargo check --all
+
+  # This runs TSAN against nightly and allows failures to propagate up.
+  - rust: nightly-2018-11-18
+    env: TSAN=yes
+
+  allow_failures:
+    - rust: nightly
+      env: ALLOW_FAILURES=true
+
 script:
   - |
     set -e
-    if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
+    if [[ "$TRAVIS_RUST_VERSION" == nightly && "$TSAN" == yes ]]
     then
         # Make sure the benchmarks compile
         cargo build --benches --all
@@ -46,28 +63,25 @@ script:
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
 
-        # TODO: Uncomment the sanitizer tests once the fence in steal issue is
-        #       resolved: https://github.com/tokio-rs/tokio/issues/329
-        #
-        # # === tokio-threadpool ====
-        #
-        # # Run address sanitizer
-        # RUSTFLAGS="-Z sanitizer=address" \
-        # cargo test -p tokio-threadpool --tests
-        #
-        # # Run thread sanitizer
-        # RUSTFLAGS="-Z sanitizer=thread" \
-        # cargo test -p tokio-threadpool --tests
+        # === tokio-threadpool ====
+
+        # Run address sanitizer
+        RUSTFLAGS="-Z sanitizer=address" \
+        cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
+
+        # Run thread sanitizer
+        RUSTFLAGS="-Z sanitizer=thread" \
+        cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
     fi
   - |
     set -e
     if [[ "$TARGET" ]]
     then
         rustup target add $TARGET
-        cargo check --all --target $TARGET
-        cargo check --tests --all --target $TARGET
+        cargo check --all --exclude tokio-tls --target $TARGET
+        cargo check --tests --all --exclude tokio-tls --target $TARGET
     else
-        cargo test --all
+        cargo test --all --no-fail-fast
         # Disable these tests for now as they are buggy
         #
         # cargo test --features unstable-futures
@@ -88,7 +102,7 @@ deploy:
     branch: master
     repo: tokio-rs/tokio
     rust: stable
-    condition: $TRAVIS_OS_NAME = linux
+    condition: $TRAVIS_OS_NAME = "linux" && $TARGET = ""
 
 env:
   global:

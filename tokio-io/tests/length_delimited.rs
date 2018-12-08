@@ -1,3 +1,6 @@
+// This file is testing deprecated code.
+#![allow(deprecated)]
+
 extern crate tokio_io;
 extern crate futures;
 
@@ -430,6 +433,16 @@ fn write_max_frame_len() {
         .new_write(mock! { });
 
     assert_eq!(io.start_send("abcdef").unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    assert!(io.get_ref().calls.is_empty());
+}
+
+#[test]
+fn write_zero() {
+    let mut io = Builder::new()
+        .new_write(mock! { });
+
+    assert!(io.start_send("abcdef").unwrap().is_ready());
+    assert_eq!(io.poll_complete().unwrap_err().kind(), io::ErrorKind::WriteZero);
     assert!(io.get_ref().calls.is_empty());
 }
 

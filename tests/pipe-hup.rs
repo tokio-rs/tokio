@@ -63,7 +63,7 @@ impl Evented for MyFile {
 
 #[test]
 fn hup() {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
 
     let handle = Handle::default();
     unsafe {

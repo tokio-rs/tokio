@@ -32,6 +32,8 @@ pub use framed::{Framed, FramedParts};
 pub use framed_read::FramedRead;
 pub use framed_write::FramedWrite;
 
+#[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
+#[doc(hidden)]
 pub mod length_delimited {
     //! Frame a stream of bytes based on a length prefix
     //!

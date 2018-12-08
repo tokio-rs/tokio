@@ -1,7 +1,7 @@
 use callback::Callback;
 use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
-use sender::Sender;
+use shutdown::ShutdownTrigger;
 use pool::{Pool, MAX_BACKUP};
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
@@ -10,13 +10,11 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
+use std::cmp::max;
 
 use num_cpus;
 use tokio_executor::Enter;
 use tokio_executor::park::Park;
-
-#[cfg(feature = "unstable-futures")]
-use futures2;
 
 /// Builds a thread pool with custom configuration values.
 ///
@@ -92,7 +90,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn new() -> Builder {
-        let num_cpus = num_cpus::get();
+        let num_cpus = max(1, num_cpus::get());
 
         let new_park = Box::new(|_: &WorkerId| {
             Box::new(BoxedPark::new(DefaultPark::new()))
@@ -136,7 +134,7 @@ impl Builder {
     /// ```
     pub fn pool_size(&mut self, val: usize) -> &mut Self {
         assert!(val >= 1, "at least one thread required");
-        assert!(val <= MAX_WORKERS, "max value is {}", 32768);
+        assert!(val <= MAX_WORKERS, "max value is {}", MAX_WORKERS);
 
         self.pool_size = val;
         self
@@ -172,14 +170,14 @@ impl Builder {
         self
     }
 
-    /// Set the worker thread keep alive duration
+    /// Set the thread keep alive duration
     ///
-    /// If set, a worker thread will wait for up to the specified duration for
-    /// work, at which point the thread will shutdown. When work becomes
-    /// available, a new thread will eventually be spawned to replace the one
-    /// that shut down.
+    /// If set, a thread that has completed a `blocking` call will wait for up
+    /// to the specified duration to become a worker thread again. Once the
+    /// duration elapses, the thread will shutdown.
     ///
-    /// When the value is `None`, the thread will wait for work forever.
+    /// When the value is `None`, the thread will wait to become a worker
+    /// thread forever.
     ///
     /// The default value is `None`.
     ///
@@ -398,31 +396,38 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&self) -> ThreadPool {
-        let mut workers = vec![];
-
         trace!("build; num-workers={}", self.pool_size);
 
-        for i in 0..self.pool_size {
-            let id = WorkerId::new(i);
-            let park = (self.new_park)(&id);
-            let unpark = park.unpark();
+        // Create the worker entry list
+        let workers: Arc<[worker::Entry]> = {
+            let mut workers = vec![];
 
-            workers.push(worker::Entry::new(park, unpark));
-        }
+            for i in 0..self.pool_size {
+                let id = WorkerId::new(i);
+                let park = (self.new_park)(&id);
+                let unpark = park.unpark();
+
+                workers.push(worker::Entry::new(park, unpark));
+            }
+
+            workers.into()
+        };
+
+        // Create a trigger that will clean up resources on shutdown.
+        //
+        // The `Pool` contains a weak reference to it, while `Worker`s and the `ThreadPool` contain
+        // strong references.
+        let trigger = Arc::new(ShutdownTrigger::new(workers.clone()));
 
         // Create the pool
-        let inner = Arc::new(
-            Pool::new(
-                workers.into_boxed_slice(),
-                self.max_blocking,
-                self.config.clone()));
+        let pool = Arc::new(Pool::new(
+            workers,
+            Arc::downgrade(&trigger),
+            self.max_blocking,
+            self.config.clone(),
+        ));
 
-        // Wrap with `Sender`
-        let inner = Some(Sender {
-            inner
-        });
-
-        ThreadPool { inner }
+        ThreadPool::new2(pool, trigger)
     }
 }
 

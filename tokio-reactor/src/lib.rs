@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.7")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! Event loop that drives Tokio I/O resources.
 //!
 //! The reactor is the engine that drives asynchronous I/O resources (like TCP and
@@ -27,25 +30,25 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
 
-#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.2")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
-
+extern crate crossbeam_utils;
 #[macro_use]
 extern crate futures;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate mio;
+extern crate num_cpus;
+extern crate parking_lot;
 extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
-
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
 
 mod atomic_task;
 pub(crate) mod background;
 mod poll_evented;
 mod registration;
+mod sharded_rwlock;
 
 // ===== Public re-exports =====
 
@@ -56,17 +59,20 @@ pub use self::poll_evented::PollEvented;
 // ===== Private imports =====
 
 use atomic_task::AtomicTask;
+use sharded_rwlock::RwLock;
 
+use futures::task::Task;
 use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
 
 use std::{fmt, usize};
+use std::error::Error;
 use std::io;
 use std::mem;
 use std::cell::RefCell;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
-use std::sync::{Arc, Weak, RwLock};
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use log::Level;
@@ -174,14 +180,6 @@ fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
 
     _assert::<Handle>();
-}
-
-/// A wakeup handle for a task, which may be either a futures 0.1 or 0.2 task
-#[derive(Debug, Clone)]
-pub(crate) enum Task {
-    Futures1(futures::task::Task),
-    #[cfg(feature = "unstable-futures")]
-    Futures2(futures2::task::Waker),
 }
 
 // ===== impl Reactor =====
@@ -334,7 +332,7 @@ impl Reactor {
     /// either successfully or with an error.
     pub fn is_idle(&self) -> bool {
         self.inner.io_dispatch
-            .read().unwrap()
+            .read()
             .is_empty()
     }
 
@@ -378,7 +376,7 @@ impl Reactor {
 
         if let Some(start) = start {
             let dur = start.elapsed();
-            debug!("loop process - {} events, {}.{:03}s",
+            trace!("loop process - {} events, {}.{:03}s",
                    events,
                    dur.as_secs(),
                    dur.subsec_nanos() / 1_000_000);
@@ -397,7 +395,7 @@ impl Reactor {
         // Create a scope to ensure that notifying the tasks stays out of the
         // lock's critical section.
         {
-            let io_dispatch = self.inner.io_dispatch.read().unwrap();
+            let io_dispatch = self.inner.io_dispatch.read();
 
             let io = match io_dispatch.get(token) {
                 Some(io) => io,
@@ -641,7 +639,7 @@ impl Inner {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
-        let mut io_dispatch = self.io_dispatch.write().unwrap();
+        let mut io_dispatch = self.io_dispatch.write();
 
         if io_dispatch.len() == MAX_SOURCES {
             return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
@@ -671,13 +669,13 @@ impl Inner {
 
     fn drop_source(&self, token: usize) {
         debug!("dropping I/O source: {}", token);
-        self.io_dispatch.write().unwrap().remove(token);
+        self.io_dispatch.write().remove(token);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
     fn register(&self, token: usize, dir: Direction, t: Task) {
         debug!("scheduling direction for: {}", token);
-        let io_dispatch = self.io_dispatch.read().unwrap();
+        let io_dispatch = self.io_dispatch.read();
         let sched = io_dispatch.get(token).unwrap();
 
         let (task, ready) = match dir {
@@ -698,7 +696,7 @@ impl Drop for Inner {
         // When a reactor is dropped it needs to wake up all blocked tasks as
         // they'll never receive a notification, and all connected I/O objects
         // will start returning errors pretty quickly.
-        let io = self.io_dispatch.read().unwrap();
+        let io = self.io_dispatch.read();
         for (_, io) in io.iter() {
             io.writer.notify();
             io.reader.notify();
@@ -714,17 +712,6 @@ impl Direction {
                 mio::Ready::all() - mio::Ready::writable()
             }
             Direction::Write => mio::Ready::writable() | platform::hup(),
-        }
-    }
-}
-
-impl Task {
-    fn notify(&self) {
-        match *self {
-            Task::Futures1(ref task) => task.notify(),
-
-            #[cfg(feature = "unstable-futures")]
-            Task::Futures2(ref waker) => waker.wake(),
         }
     }
 }
@@ -756,18 +743,16 @@ mod platform {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-fn lift_async<T>(old: futures::Async<T>) -> futures2::Async<T> {
-    match old {
-        futures::Async::Ready(x) => futures2::Async::Ready(x),
-        futures::Async::NotReady => futures2::Async::Pending,
+// ===== impl SetFallbackError =====
+
+impl fmt::Display for SetFallbackError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-fn lower_async<T>(new: futures2::Async<T>) -> futures::Async<T> {
-    match new {
-        futures2::Async::Ready(x) => futures::Async::Ready(x),
-        futures2::Async::Pending => futures::Async::NotReady,
+impl Error for SetFallbackError {
+    fn description(&self) -> &str {
+        "attempted to set fallback reactor while already configured"
     }
 }

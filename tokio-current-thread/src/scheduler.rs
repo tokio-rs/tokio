@@ -73,7 +73,7 @@ struct Inner<U> {
     head_readiness: AtomicPtr<Node<U>>,
     tail_readiness: UnsafeCell<*const Node<U>>,
 
-    // Used as part of the MPSC queue algorithm
+    // Used as part of the mpsc queue algorithm
     stub: Arc<Node<U>>,
 }
 
@@ -210,7 +210,7 @@ where U: Unpark,
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick(&mut self, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
+    pub fn tick(&mut self, eid: u64, enter: &mut Enter, num_futures: &AtomicUsize) -> bool
     {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst)
@@ -242,7 +242,7 @@ where U: Unpark,
                     // being released, another thread notified it, which
                     // resulted in it getting pushed into the mpsc channel.
                     //
-                    // In this case, we just dec the ref count.
+                    // In this case, we just decrement the ref count.
                     let node = ptr2arc(node);
                     assert!((*node.next_all.get()).is_null());
                     assert!((*node.prev_all.get()).is_null());
@@ -279,6 +279,7 @@ where U: Unpark,
                 let node = self.nodes.remove(node);
 
                 let mut borrow = Borrow {
+                    id: eid,
                     scheduler: self,
                     num_futures,
                 };

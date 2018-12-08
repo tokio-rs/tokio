@@ -7,7 +7,7 @@ use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 use tokio_executor;
 
-use futures::Future;
+use futures::{future, Future};
 
 use std::fmt;
 use std::error::Error;
@@ -41,6 +41,38 @@ impl Handle {
     pub fn spawn<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
     where F: Future<Item = (), Error = ()> + Send + 'static {
         self.0.spawn(future)
+    }
+
+    /// Provides a best effort **hint** to whether or not `spawn` will succeed.
+    ///
+    /// This function may return both false positives **and** false negatives.
+    /// If `status` returns `Ok`, then a call to `spawn` will *probably*
+    /// succeed, but may fail. If `status` returns `Err`, a call to `spawn` will
+    /// *probably* fail, but may succeed.
+    ///
+    /// This allows a caller to avoid creating the task if the call to `spawn`
+    /// has a high likelihood of failing.
+    pub fn status(&self) -> Result<(), tokio_executor::SpawnError> {
+        self.0.status()
+    }
+}
+
+impl<T> future::Executor<T> for Handle
+where T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
+        if let Err(e) = self.status() {
+            let kind = if e.is_at_capacity() {
+                future::ExecuteErrorKind::NoCapacity
+            } else {
+                future::ExecuteErrorKind::Shutdown
+            };
+
+            return Err(future::ExecuteError::new(kind, future));
+        }
+
+        let _ = self.spawn(future);
+        Ok(())
     }
 }
 

@@ -51,7 +51,7 @@ impl Encoder for LineCodec {
 
 #[test]
 fn echo() {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
 
     let pool = Builder::new()
         .pool_size(1)

@@ -1,3 +1,26 @@
+# 0.1.7 (November 21, 2018)
+
+* Reduce log level to trace (#734).
+* Bump internal dependency versions (#746).
+
+# 0.1.6 (September 27, 2018)
+
+* Fix panic when reactor is stored in a thread-local (#628).
+
+# 0.1.5 (August 27, 2018)
+
+* Experimental async / await support.
+
+# 0.1.4 (August 23, 2018)
+
+* Use a scalable RW lock (#517)
+* Implement std::error::Error for error types (#511)
+* Documentation improvements
+
+# 0.1.3 (August 6, 2018)
+
+* Misc small fixes (#508)
+
 # 0.1.2 (June 13, 2018)
 
 * Fix deadlock that can happen when shutting down (#409)

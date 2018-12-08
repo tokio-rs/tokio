@@ -1,3 +1,51 @@
+This changelog only applies to the `tokio` crate proper. Each sub crate
+maintains its own changelog tracking changes made in each respective sub crate.
+
+# 0.1.13 (November 21, 2018)
+
+* Fix `Runtime::reactor()` when no tasks are spawned (#721).
+* `runtime::Builder` no longer uses deprecated methods (#749).
+* Provide `after_start` and `before_stop` configuration settings for
+  `Runtime` (#756).
+* Implement throttle stream combinator (#736).
+
+# 0.1.12 (October 23, 2018)
+
+* runtime: expose `keep_alive` on runtime builder (#676).
+* runtime: create a reactor per worker thread (#660).
+* codec: fix panic in `LengthDelimitedCodec` (#682).
+* io: re-export `tokio_io::io::read` function (#689).
+* runtime: check for executor re-entry in more places (#708).
+
+# 0.1.11 (September 28, 2018)
+
+* Fix `tokio-async-await` dependency (#675).
+
+# 0.1.10 (September 27, 2018)
+
+* Fix minimal versions
+
+# 0.1.9 (September 27, 2018)
+
+* Experimental async/await improvements (#661).
+* Re-export `TaskExecutor` from `tokio-current-thread` (#652).
+* Improve `Runtime` builder API (#645).
+* `tokio::run` panics when called from the context of an executor
+  (#646).
+* Introduce `StreamExt` with a `timeout` helper (#573).
+* Move `length_delimited` into `tokio` (#575).
+* Re-organize `tokio::net` module (#548).
+* Re-export `tokio-current-thread::spawn` in current_thread runtime
+  (#579).
+
+# 0.1.8 (August 23, 2018)
+
+* Extract tokio::executor::current_thread to a sub crate (#370)
+* Add `Runtime::block_on` (#398)
+* Add `runtime::current_thread::block_on_all` (#477)
+* Misc documentation improvements (#450)
+* Implement `std::error::Error` for error types (#501)
+
 # 0.1.7 (June 6, 2018)
 
 * Add `Runtime::block_on` for concurrent runtime (#391).

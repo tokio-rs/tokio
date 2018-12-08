@@ -22,7 +22,7 @@ executor, including:
 * The [`Executor`] trait describes the API for spawning a future onto an
   executor.
 
-* [`enter`] marks that the the current thread is entering an execution
+* [`enter`] marks that the current thread is entering an execution
   context. This prevents a second executor from accidentally starting from
   within the context of one that is already running.
 

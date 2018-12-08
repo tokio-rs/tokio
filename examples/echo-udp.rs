@@ -1,6 +1,6 @@
 //! An UDP echo server that just sends back everything that it receives.
 //!
-//! If you're on unix you can test this out by in one terminal executing:
+//! If you're on Unix you can test this out by in one terminal executing:
 //!
 //!     cargo run --example echo-udp
 //!
@@ -50,12 +50,12 @@ impl Future for Server {
     }
 }
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = addr.parse::<SocketAddr>()?;
 
-    let socket = UdpSocket::bind(&addr).unwrap();
-    println!("Listening on: {}", socket.local_addr().unwrap());
+    let socket = UdpSocket::bind(&addr)?;
+    println!("Listening on: {}", socket.local_addr()?);
 
     let server = Server {
         socket: socket,
@@ -70,4 +70,5 @@ fn main() {
     //
     // `tokio::run` spawns the task on the Tokio runtime and starts running.
     tokio::run(server.map_err(|e| println!("server error = {:?}", e)));
+    Ok(())
 }

@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.5")]
+#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.9")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 //! A work-stealing based thread pool for executing futures.
@@ -89,9 +89,6 @@ extern crate rand;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
-
 // ## Crate layout
 //
 // The primary type, `Pool`, holds the majority of a thread pool's state,
@@ -106,7 +103,7 @@ extern crate futures2;
 //
 // ## Sleeping workers
 //
-// Sleeping workers are tracked using a [treiber stack]. This results in the
+// Sleeping workers are tracked using a [Treiber stack]. This results in the
 // thread that most recently went to sleep getting woken up first. When the pool
 // is not under load, this helps threads shutdown faster.
 //
@@ -140,7 +137,7 @@ extern crate futures2;
 // Also, whenever a worker is woken up via a signal and it does find work, it,
 // in turn, will try to wake up a new worker.
 //
-// [treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
+// [Treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
 
 pub mod park;
 
@@ -148,13 +145,10 @@ mod blocking;
 mod builder;
 mod callback;
 mod config;
-#[cfg(feature = "unstable-futures")]
-mod futures2_wake;
 mod notifier;
 mod pool;
 mod sender;
 mod shutdown;
-mod shutdown_task;
 mod task;
 mod thread_pool;
 mod worker;
@@ -163,5 +157,5 @@ pub use blocking::{blocking, BlockingError};
 pub use builder::Builder;
 pub use sender::Sender;
 pub use shutdown::Shutdown;
-pub use thread_pool::ThreadPool;
+pub use thread_pool::{ThreadPool, SpawnHandle};
 pub use worker::{Worker, WorkerId};

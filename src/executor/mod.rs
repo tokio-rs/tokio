@@ -13,7 +13,7 @@
 //!
 //! The specific strategy used to manage the tasks is left up to the
 //! executor. There are two main flavors of executors: single-threaded and
-//! multithreaded. Tokio provides implementation for both of these in the
+//! multi-threaded. Tokio provides implementation for both of these in the
 //! [`runtime`] module.
 //!
 //! # `Executor` trait.
@@ -39,11 +39,15 @@
 //! [`Executor`]: trait.Executor.html
 //! [`spawn`]: fn.spawn.html
 
-#[deprecated(since = "0.1.8", note = "use tokio-current-thread crate instead")]
+#[deprecated(
+    since = "0.1.8",
+    note = "use tokio-current-thread crate or functions in tokio::runtime::current_thread instead",
+)]
 #[doc(hidden)]
 pub mod current_thread;
 
 #[deprecated(since = "0.1.8", note = "use tokio-threadpool crate instead")]
+#[doc(hidden)]
 /// Re-exports of [`tokio-threadpool`], deprecated in favor of the crate.
 ///
 /// [`tokio-threadpool`]: https://docs.rs/tokio-threadpool/0.1
@@ -60,9 +64,6 @@ pub use tokio_executor::{Executor, DefaultExecutor, SpawnError};
 
 use futures::{Future, IntoFuture};
 use futures::future::{self, FutureResult};
-
-#[cfg(feature = "unstable-futures")]
-use futures2;
 
 /// Return value from the `spawn` function.
 ///
@@ -133,15 +134,6 @@ where F: Future<Item = (), Error = ()> + 'static + Send
     Spawn(())
 }
 
-/// Like `spawn`, but compatible with futures 0.2
-#[cfg(feature = "unstable-futures")]
-pub fn spawn2<F>(f: F) -> Spawn
-    where F: futures2::Future<Item = (), Error = futures2::Never> + 'static + Send
-{
-    ::tokio_executor::spawn2(f);
-    Spawn(())
-}
-
 impl IntoFuture for Spawn {
     type Future = FutureResult<(), ()>;
     type Item = ();
@@ -149,16 +141,5 @@ impl IntoFuture for Spawn {
 
     fn into_future(self) -> Self::Future {
         future::ok(())
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::IntoFuture for Spawn {
-    type Future = futures2::future::FutureResult<(), ()>;
-    type Item = ();
-    type Error = ();
-
-    fn into_future(self) -> Self::Future {
-        futures2::future::ok(())
     }
 }

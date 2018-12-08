@@ -20,7 +20,7 @@ macro_rules! t {
 
 #[test]
 fn connect() {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
     let srv = t!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = t!(srv.local_addr());
     let t = thread::spawn(move || {
@@ -37,7 +37,7 @@ fn connect() {
 
 #[test]
 fn accept() {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
     let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
@@ -61,7 +61,7 @@ fn accept() {
 
 #[test]
 fn accept2() {
-    drop(env_logger::init());
+    drop(env_logger::try_init());
     let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
     let addr = t!(srv.local_addr());
 
@@ -96,7 +96,7 @@ mod unix {
 
     #[test]
     fn poll_hup() {
-        drop(env_logger::init());
+        drop(env_logger::try_init());
 
         let srv = t!(net::TcpListener::bind("127.0.0.1:0"));
         let addr = t!(srv.local_addr());

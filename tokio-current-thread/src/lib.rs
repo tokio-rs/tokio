@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.4")]
+#![deny(warnings, missing_docs, missing_debug_implementations)]
+
 //! A single-threaded executor which executes tasks on the same thread from which
 //! they are spawned.
 //!
@@ -22,9 +25,6 @@
 //! [`block_on_all`]: fn.block_on_all.html
 //! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
 
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.0")]
-#![deny(warnings, missing_docs, missing_debug_implementations)]
-
 extern crate futures;
 extern crate tokio_executor;
 
@@ -44,9 +44,7 @@ use std::error::Error;
 use std::rc::Rc;
 use std::sync::{atomic, mpsc, Arc};
 use std::time::{Duration, Instant};
-
-#[cfg(feature = "unstable-futures")]
-use futures2;
+use std::thread;
 
 /// Executes tasks on the current thread
 pub struct CurrentThread<P: Park = ParkThread> {
@@ -67,6 +65,9 @@ pub struct CurrentThread<P: Park = ParkThread> {
 
     /// Receiver for futures spawned from other threads
     spawn_receiver: mpsc::Receiver<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+
+    /// The thread-local ID assigned to this executor.
+    id: u64,
 }
 
 /// Executes futures on the current thread.
@@ -179,6 +180,7 @@ impl<T: fmt::Debug> Error for BlockError<T> {
 
 /// This is mostly split out to make the borrow checker happy.
 struct Borrow<'a, U: 'a> {
+    id: u64,
     scheduler: &'a mut Scheduler<U>,
     num_futures: &'a atomic::AtomicUsize,
 }
@@ -189,12 +191,20 @@ trait SpawnLocal {
 
 struct CurrentRunner {
     spawn: Cell<Option<*mut SpawnLocal>>,
+    id: Cell<Option<u64>>,
 }
 
 /// Current thread's task runner. This is set in `TaskRunner::with`
 thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
     spawn: Cell::new(None),
+    id: Cell::new(None),
 });
+
+/// Unique ID to assign to each new executor launched on this thread.
+///
+/// The unique ID is used to determine if the currently running executor matches the one referred
+/// to by a `Handle` so that direct task dispatch can be used.
+thread_local!(static EXECUTOR_ID: Cell<u64> = Cell::new(0));
 
 /// Run the executor bootstrapping the execution with the provided future.
 ///
@@ -259,6 +269,12 @@ impl<P: Park> CurrentThread<P> {
         let unpark = park.unpark();
 
         let (spawn_sender, spawn_receiver) = mpsc::channel();
+        let thread = thread::current().id();
+        let id = EXECUTOR_ID.with(|idc| {
+            let id = idc.get();
+            idc.set(id + 1);
+            id
+        });
 
         let scheduler = Scheduler::new(unpark);
         let notify = scheduler.notify();
@@ -269,11 +285,14 @@ impl<P: Park> CurrentThread<P> {
             scheduler: scheduler,
             num_futures: num_futures.clone(),
             park,
+            id,
             spawn_handle: Handle {
                 sender: spawn_sender,
                 num_futures: num_futures,
                 notify: notify,
                 shut_down: Cell::new(false),
+                thread: thread,
+                id,
             },
             spawn_receiver: spawn_receiver,
         }
@@ -370,6 +389,7 @@ impl<P: Park> CurrentThread<P> {
 
     fn borrow(&mut self) -> Borrow<P::Unpark> {
         Borrow {
+            id: self.id,
             scheduler: &mut self.scheduler,
             num_futures: &*self.num_futures,
         }
@@ -409,13 +429,6 @@ impl tokio_executor::Executor for CurrentThread {
     ) -> Result<(), SpawnError> {
         self.borrow().spawn_local(future, false);
         Ok(())
-    }
-
-    #[cfg(feature = "unstable-futures")]
-    fn spawn2(&mut self, _future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
-        -> Result<(), futures2::executor::SpawnError>
-    {
-        panic!("Futures 0.2 integration is not available for current_thread");
     }
 }
 
@@ -577,6 +590,7 @@ impl<'a, P: Park> Entered<'a, P> {
         // FIXME: Slightly ugly but needed to make the borrow checker happy
         let (mut borrow, spawn_receiver) = (
             Borrow {
+                id: self.executor.id,
                 scheduler: &mut self.executor.scheduler,
                 num_futures: &*self.executor.num_futures,
             },
@@ -589,6 +603,7 @@ impl<'a, P: Park> Entered<'a, P> {
 
         // After any pending futures were scheduled, do the actual tick
         borrow.scheduler.tick(
+            borrow.id,
             &mut *self.enter,
             borrow.num_futures)
     }
@@ -612,6 +627,10 @@ pub struct Handle {
     num_futures: Arc<atomic::AtomicUsize>,
     shut_down: Cell<bool>,
     notify: executor::NotifyHandle,
+    thread: thread::ThreadId,
+
+    /// The thread-local ID assigned to this Handle's executor.
+    id: u64,
 }
 
 // Manual implementation because the Sender does not implement Debug
@@ -634,6 +653,13 @@ impl Handle {
     where
         F: Future<Item = (), Error = ()> + Send + 'static,
     {
+        if thread::current().id() == self.thread {
+            let mut e = TaskExecutor::current();
+            if e.id() == Some(self.id) {
+                return e.spawn_local(Box::new(future));
+            }
+        }
+
         if self.shut_down.get() {
             return Err(SpawnError::shutdown());
         }
@@ -650,11 +676,26 @@ impl Handle {
             return Err(SpawnError::shutdown());
         }
 
-        self.sender
-            .send(Box::new(future))
+        self.sender.send(Box::new(future))
             .expect("CurrentThread does not exist anymore");
         // use 0 for the id, CurrentThread does not make use of it
         self.notify.notify(0);
+        Ok(())
+    }
+
+    /// Provides a best effort **hint** to whether or not `spawn` will succeed.
+    ///
+    /// This function may return both false positives **and** false negatives.
+    /// If `status` returns `Ok`, then a call to `spawn` will *probably*
+    /// succeed, but may fail. If `status` returns `Err`, a call to `spawn` will
+    /// *probably* fail, but may succeed.
+    ///
+    /// This allows a caller to avoid creating the task if the call to `spawn`
+    /// has a high likelihood of failing.
+    pub fn status(&self) -> Result<(), SpawnError> {
+        if self.shut_down.get() {
+            return Err(SpawnError::shutdown());
+        }
 
         Ok(())
     }
@@ -673,6 +714,13 @@ impl TaskExecutor {
         TaskExecutor {
             _p: ::std::marker::PhantomData,
         }
+    }
+
+    /// Get the current executor's thread-local ID.
+    fn id(&self) -> Option<u64> {
+        CURRENT.with(|current| {
+            current.id.get()
+        })
     }
 
     /// Spawn a future onto the current `CurrentThread` instance.
@@ -698,23 +746,6 @@ impl tokio_executor::Executor for TaskExecutor {
         -> Result<(), SpawnError>
     {
         self.spawn_local(future)
-    }
-
-    #[cfg(feature = "unstable-futures")]
-    fn spawn2(&mut self, _future: Box<futures2::Future<Item = (), Error = futures2::Never> + Send>)
-        -> Result<(), futures2::executor::SpawnError>
-    {
-        panic!("Futures 0.2 integration is not available for current_thread");
-    }
-
-    fn status(&self) -> Result<(), SpawnError> {
-        CURRENT.with(|current| {
-            if current.spawn.get().is_some() {
-                Ok(())
-            } else {
-                Err(SpawnError::shutdown())
-            }
-        })
     }
 }
 
@@ -743,6 +774,7 @@ impl<'a, U: Unpark> Borrow<'a, U> {
     where F: FnOnce() -> R,
     {
         CURRENT.with(|current| {
+            current.id.set(Some(self.id));
             current.set_spawn(self, || {
                 f()
             })
@@ -772,6 +804,7 @@ impl CurrentRunner {
         impl<'a> Drop for Reset<'a> {
             fn drop(&mut self) {
                 self.0.spawn.set(None);
+                self.0.id.set(None);
             }
         }
 

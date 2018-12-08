@@ -14,7 +14,7 @@ use std::thread;
 /// Manages the state around entering a blocking section and tasks that are
 /// queued pending the ability to block.
 ///
-/// This is a hybrid counter and instrusive mpsc channel (like `Queue`).
+/// This is a hybrid counter and intrusive mpsc channel (like `Queue`).
 #[derive(Debug)]
 pub(crate) struct Blocking {
     /// Queue head.

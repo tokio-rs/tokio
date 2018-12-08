@@ -1,3 +1,11 @@
+# 0.1.4 (October 23, 2018)
+
+* Provide `File::from_std` (#696).
+
+# 0.1.3 (August 6, 2018)
+
+* Add async equivalents to most of `std::fs` (#494).
+
 # 0.1.2 (July 11, 2018)
 
 * Add `metadata` and `File::metadata` ([#433](https://github.com/tokio-rs/tokio/pull/433), [#385](https://github.com/tokio-rs/tokio/pull/385))

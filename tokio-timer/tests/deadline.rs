@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 extern crate futures;
 extern crate tokio_executor;
 extern crate tokio_timer;

@@ -1,3 +1,3 @@
-// For now, we need to keep the implmentation of Encoder in tokio_io.
+// For now, we need to keep the implementation of Encoder in tokio_io.
 
 pub use codec::Decoder;

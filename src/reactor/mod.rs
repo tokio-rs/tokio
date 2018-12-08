@@ -132,8 +132,8 @@
 //! [`Poll::poll`]: https://docs.rs/mio/0.6/mio/struct.Poll.html#method.poll
 //! [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
 //! [`PollEvented`]: struct.PollEvented.html
-//! [`std::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-//! [`std::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+//! [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+//! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 
 pub use tokio_reactor::{
     Reactor,

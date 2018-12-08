@@ -1,3 +1,6 @@
+#![deny(missing_docs, missing_debug_implementations, warnings)]
+#![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.4")]
+
 //! Asynchronous file and standard stream adaptation.
 //!
 //! This module contains utility methods and adapter types for input/output to
@@ -25,26 +28,44 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
-#![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.2")]
-
 #[macro_use]
 extern crate futures;
 extern crate tokio_io;
 extern crate tokio_threadpool;
 
+mod create_dir;
+mod create_dir_all;
 pub mod file;
+mod hard_link;
 mod metadata;
+pub mod os;
+mod read_dir;
+mod read_link;
+mod remove_dir;
+mod remove_file;
+mod rename;
+mod set_permissions;
 mod stdin;
 mod stdout;
 mod stderr;
+mod symlink_metadata;
 
+pub use create_dir::{create_dir, CreateDirFuture};
+pub use create_dir_all::{create_dir_all, CreateDirAllFuture};
 pub use file::File;
 pub use file::OpenOptions;
+pub use hard_link::{hard_link, HardLinkFuture};
 pub use metadata::{metadata, MetadataFuture};
+pub use read_dir::{read_dir, ReadDirFuture, ReadDir, DirEntry};
+pub use read_link::{read_link, ReadLinkFuture};
+pub use remove_dir::{remove_dir, RemoveDirFuture};
+pub use remove_file::{remove_file, RemoveFileFuture};
+pub use rename::{rename, RenameFuture};
+pub use set_permissions::{set_permissions, SetPermissionsFuture};
 pub use stdin::{stdin, Stdin};
 pub use stdout::{stdout, Stdout};
 pub use stderr::{stderr, Stderr};
+pub use symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
 
 use futures::Poll;
 use futures::Async::*;

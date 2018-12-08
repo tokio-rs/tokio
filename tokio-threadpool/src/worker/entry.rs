@@ -188,23 +188,34 @@ impl WorkerEntry {
     ///
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
-    pub fn pop_task(&self) -> Option<Arc<Task>> {
+    pub fn pop_task(&self) -> deque::Pop<Arc<Task>> {
         self.worker.pop()
     }
 
-    /// Steal a task
+    /// Steal tasks
     ///
     /// This is called by *other* workers to steal a task for processing. This
     /// function is `Sync`.
-    pub fn steal_task(&self) -> Option<Arc<Task>> {
-        self.stealer.steal()
+    ///
+    /// At the same time, this method steals some additional tasks and moves
+    /// them into `dest` in order to balance the work distribution among
+    /// workers.
+    pub fn steal_tasks(&self, dest: &Self) -> deque::Steal<Arc<Task>> {
+        self.stealer.steal_many(&dest.worker)
     }
 
     /// Drain (and drop) all tasks that are queued for work.
     ///
     /// This is called when the pool is shutting down.
     pub fn drain_tasks(&self) {
-        while let Some(_) = self.worker.pop() {
+        use deque::Pop;
+
+        loop {
+            match self.worker.pop() {
+                Pop::Data(_) => {}
+                Pop::Empty => break,
+                Pop::Retry => {}
+            }
         }
     }
 

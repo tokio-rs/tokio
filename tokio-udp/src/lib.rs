@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.3")]
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! UDP bindings for `tokio`.
 //!
 //! This module contains the UDP networking types, similar to the standard
@@ -16,9 +19,6 @@
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`framed`]: struct.UdpSocket.html#method.framed
 
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.1")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
-
 extern crate bytes;
 #[macro_use]
 extern crate futures;
@@ -28,9 +28,6 @@ extern crate log;
 extern crate tokio_codec;
 extern crate tokio_io;
 extern crate tokio_reactor;
-
-#[cfg(feature = "unstable-futures")]
-extern crate futures2;
 
 mod frame;
 mod socket;

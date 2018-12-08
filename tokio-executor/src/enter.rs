@@ -1,9 +1,9 @@
 use std::prelude::v1::*;
 use std::cell::Cell;
+use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
+use futures::{self, Future};
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
@@ -13,9 +13,6 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 pub struct Enter {
     on_exit: Vec<Box<Callback>>,
     permanent: bool,
-
-    #[cfg(feature = "unstable-futures")]
-    _enter2: futures2::executor::Enter,
 }
 
 /// An error returned by `enter` if an execution scope has already been
@@ -27,8 +24,20 @@ pub struct EnterError {
 impl fmt::Debug for EnterError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EnterError")
-            .field("reason", &"attempted to run an executor while another executor is already running")
+            .field("reason", &self.description())
             .finish()
+    }
+}
+
+impl fmt::Display for EnterError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl Error for EnterError {
+    fn description(&self) -> &str {
+        "attempted to run an executor while another executor is already running"
     }
 }
 
@@ -53,9 +62,6 @@ pub fn enter() -> Result<Enter, EnterError> {
             Ok(Enter {
                 on_exit: Vec::new(),
                 permanent: false,
-
-                #[cfg(feature = "unstable-futures")]
-                _enter2: futures2::executor::enter().unwrap(),
             })
         }
     })
@@ -76,6 +82,13 @@ impl Enter {
     pub fn make_permanent(mut self) {
         self.permanent = true;
     }
+
+    /// Blocks the thread on the specified future, returning the value with
+    /// which that future completes.
+    pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
+        futures::executor::spawn(f).wait_future()
+    }
+
 }
 
 impl fmt::Debug for Enter {

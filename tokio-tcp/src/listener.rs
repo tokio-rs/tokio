@@ -9,13 +9,40 @@ use futures::{Poll, Async};
 use mio;
 use tokio_reactor::{Handle, PollEvented};
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
 /// This object can be converted into a stream of incoming connections for
 /// various forms of processing.
+///
+/// # Examples
+///
+/// ```no_run
+/// extern crate tokio;
+/// extern crate futures;
+///
+/// use futures::stream::Stream;
+/// use std::net::SocketAddr;
+/// use tokio::net::{TcpListener, TcpStream};
+///
+/// fn process_socket(socket: TcpStream) {
+///     // ...
+/// }
+///
+/// fn main() -> Result<(), Box<std::error::Error>> {
+///     let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+///     let listener = TcpListener::bind(&addr)?;
+///
+///     // accept connections and process them
+///     tokio::run(listener.incoming()
+///         .map_err(|e| eprintln!("failed to accept socket; error = {:?}", e))
+///         .for_each(|socket| {
+///             process_socket(socket);
+///             Ok(())
+///         })
+///     );
+///     Ok(())
+/// }
+/// ```
 pub struct TcpListener {
     io: PollEvented<mio::net::TcpListener>,
 }
@@ -25,6 +52,20 @@ impl TcpListener {
     ///
     /// The TCP listener will bind to the provided `addr` address, if available.
     /// If the result is `Ok`, the socket has successfully bound.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// use std::net::SocketAddr;
+    /// use tokio::net::TcpListener;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let listener = TcpListener::bind(&addr)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         let l = mio::net::TcpListener::bind(addr)?;
         Ok(TcpListener::new(l))
@@ -57,24 +98,29 @@ impl TcpListener {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use std::net::SocketAddr;
+    /// use tokio::net::TcpListener;
+    /// use futures::Async;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let mut listener = TcpListener::bind(&addr)?;
+    /// match listener.poll_accept() {
+    ///     Ok(Async::Ready((_socket, addr))) => println!("listener ready to accept: {:?}", addr),
+    ///     Ok(Async::NotReady) => println!("listener not ready to accept!"),
+    ///     Err(e) => eprintln!("got an error: {}", e),
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn poll_accept(&mut self) -> Poll<(TcpStream, SocketAddr), io::Error> {
         let (io, addr) = try_ready!(self.poll_accept_std());
-
-        let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io);
-
-        Ok((io, addr).into())
-    }
-
-    /// Like `poll_accept`, but for futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_accept2(&mut self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<(TcpStream, SocketAddr), io::Error>
-    {
-        let (io, addr) = match self.poll_accept_std2(cx)? {
-            futures2::Async::Ready(x) => x,
-            futures2::Async::Pending => return Ok(futures2::Async::Pending),
-        };
 
         let io = mio::net::TcpStream::from_stream(io)?;
         let io = TcpStream::new(io);
@@ -110,6 +156,27 @@ impl TcpListener {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use std::net::SocketAddr;
+    /// use tokio::net::TcpListener;
+    /// use futures::Async;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let mut listener = TcpListener::bind(&addr)?;
+    /// match listener.poll_accept_std() {
+    ///     Ok(Async::Ready((_socket, addr))) => println!("listener ready to accept: {:?}", addr),
+    ///     Ok(Async::NotReady) => println!("listener not ready to accept!"),
+    ///     Err(e) => eprintln!("got an error: {}", e),
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn poll_accept_std(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
         try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
@@ -118,25 +185,6 @@ impl TcpListener {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_read_ready(mio::Ready::readable())?;
                 Ok(Async::NotReady)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Like `poll_accept_std`, but for futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_accept_std2(&mut self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<(net::TcpStream, SocketAddr), io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.io.get_ref().accept_std() {
-            Ok(pair) => Ok(pair.into()),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
             }
             Err(e) => Err(e),
         }
@@ -159,7 +207,7 @@ impl TcpListener {
     ///
     /// Finally, the `handle` argument is the event loop that this listener will
     /// be bound to.
-    /// Use `Handle::default()` to lazily bind to an event loop, just like `bind` does.
+    /// Use [`Handle::default()`] to lazily bind to an event loop, just like `bind` does.
     ///
     /// The platform specific behavior of this function looks like:
     ///
@@ -170,6 +218,23 @@ impl TcpListener {
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
+    ///
+    /// [`Handle::default()`]: ../reactor/struct.Handle.html
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # extern crate tokio;
+    /// # extern crate tokio_reactor;
+    /// use tokio::net::TcpListener;
+    /// use std::net::TcpListener as StdTcpListener;
+    /// use tokio::reactor::Handle;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let std_listener = StdTcpListener::bind("127.0.0.1:8080")?;
+    /// let listener = TcpListener::from_std(std_listener, &Handle::default())?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn from_std(listener: net::TcpListener, handle: &Handle)
         -> io::Result<TcpListener>
     {
@@ -187,6 +252,22 @@ impl TcpListener {
     ///
     /// This can be useful, for example, when binding to port 0 to figure out
     /// which port was actually bound.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// use tokio::net::TcpListener;
+    /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let listener = TcpListener::bind(&addr)?;
+    /// assert_eq!(listener.local_addr()?,
+    ///            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
     }
@@ -206,6 +287,29 @@ impl TcpListener {
     ///
     /// If aiming for production, decision what to do about them must be made. The
     /// [`tk-listen`](https://crates.io/crates/tk-listen) crate might be of some help.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpListener;
+    /// use futures::stream::Stream;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let listener = TcpListener::bind(&addr)?;
+    ///
+    /// listener.incoming()
+    ///     .map_err(|e| eprintln!("failed to accept stream; error = {:?}", e))
+    ///     .for_each(|_socket| {
+    ///         println!("new socket!");
+    ///         Ok(())
+    ///     });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
     }
@@ -215,6 +319,22 @@ impl TcpListener {
     /// For more information about this option, see [`set_ttl`].
     ///
     /// [`set_ttl`]: #method.set_ttl
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// use tokio::net::TcpListener;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let listener = TcpListener::bind(&addr)?;
+    /// listener.set_ttl(100).expect("could not set TTL");
+    /// assert_eq!(listener.ttl()?, 100);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
     }
@@ -223,6 +343,21 @@ impl TcpListener {
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// use tokio::net::TcpListener;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let listener = TcpListener::bind(&addr)?;
+    /// listener.set_ttl(100).expect("could not set TTL");
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
     }

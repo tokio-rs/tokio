@@ -115,3 +115,13 @@ impl Queue {
         Poll::Inconsistent
     }
 }
+
+impl Drop for Queue {
+    fn drop(&mut self) {
+        loop {
+            if let Poll::Empty = unsafe { self.poll() } {
+                break
+            }
+        }
+    }
+}

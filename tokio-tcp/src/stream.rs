@@ -11,9 +11,6 @@ use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_reactor::{Handle, PollEvented};
 
-#[cfg(feature = "unstable-futures")]
-use futures2;
-
 /// An I/O object representing a TCP stream connected to a remote endpoint.
 ///
 /// A TCP stream can either be created by connecting to an endpoint, via the
@@ -22,6 +19,27 @@ use futures2;
 /// [`connect`]: struct.TcpStream.html#method.connect
 /// [accepting]: struct.TcpListener.html#method.accept
 /// [listener]: struct.TcpListener.html
+///
+/// # Examples
+///
+/// ```
+/// # extern crate tokio;
+/// # extern crate futures;
+/// use futures::Future;
+/// use tokio::io::AsyncWrite;
+/// use tokio::net::TcpStream;
+/// use std::net::SocketAddr;
+///
+/// # fn main() -> Result<(), Box<std::error::Error>> {
+/// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
+/// let stream = TcpStream::connect(&addr);
+/// stream.map(|mut stream| {
+///     // Attempt to write bytes asynchronously to the stream
+///     stream.poll_write(&[1]);
+/// });
+/// # Ok(())
+/// # }
+/// ```
 pub struct TcpStream {
     io: PollEvented<mio::net::TcpStream>,
 }
@@ -47,8 +65,26 @@ impl TcpStream {
     ///
     /// This function will create a new TCP socket and attempt to connect it to
     /// the `addr` provided. The returned future will be resolved once the
-    /// stream has successfully connected, or it wil return an error if one
+    /// stream has successfully connected, or it will return an error if one
     /// occurs.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr)
+    ///     .map(|stream| 
+    ///         println!("successfully connected to {}", stream.local_addr().unwrap()));
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn connect(addr: &SocketAddr) -> ConnectFuture {
         use self::ConnectFutureState::*;
 
@@ -70,6 +106,22 @@ impl TcpStream {
     /// This function will convert a TCP stream created by the standard library
     /// to a TCP stream ready to be used with the provided event loop handle.
     /// Use `Handle::default()` to lazily bind to an event loop, just like `connect` does.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # extern crate tokio;
+    /// # extern crate tokio_reactor;
+    /// use tokio::net::TcpStream;
+    /// use std::net::TcpStream as StdTcpStream;
+    /// use tokio_reactor::Handle;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let std_stream = StdTcpStream::connect("127.0.0.1:34254")?;
+    /// let stream = TcpStream::from_std(std_stream, &Handle::default())?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn from_std(stream: net::TcpStream, handle: &Handle)
         -> io::Result<TcpStream>
     {
@@ -134,16 +186,34 @@ impl TcpStream {
     ///
     /// * `ready` includes writable.
     /// * called from outside of a task context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate mio;
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use mio::Ready;
+    /// use futures::Async;
+    /// use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     match stream.poll_read_ready(Ready::readable()) {
+    ///         Ok(Async::Ready(_)) => println!("read ready"),
+    ///         Ok(Async::NotReady) => println!("not read ready"),
+    ///         Err(e) => eprintln!("got error: {}", e),
+    /// }
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
         self.io.poll_read_ready(mask)
-    }
-
-    /// Like `poll_read_ready`, but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_read_ready2(&self, cx: &mut futures2::task::Context, mask: mio::Ready)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        self.io.poll_read_ready2(cx, mask)
     }
 
     /// Check the TCP stream's write readiness state.
@@ -159,28 +229,80 @@ impl TcpStream {
     ///
     /// # Panics
     ///
-    /// This function panics if:
+    /// This function panics if called from outside of a task context.
     ///
-    /// * `ready` contains bits besides `writable` and `hup`.
-    /// * called from outside of a task context.
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use futures::Async;
+    /// use futures::Future;
+    /// use tokio::net::TcpStream;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     match stream.poll_write_ready() {
+    ///         Ok(Async::Ready(_)) => println!("write ready"),
+    ///         Ok(Async::NotReady) => println!("not write ready"),
+    ///         Err(e) => eprintln!("got error: {}", e),
+    /// }
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.io.poll_write_ready()
     }
 
-    /// Like `poll_write_ready`, but compatible with futures 0.2.
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_write_ready2(&self, cx: &mut futures2::task::Context)
-        -> futures2::Poll<mio::Ready, io::Error>
-    {
-        self.io.poll_write_ready2(cx)
-    }
-
     /// Returns the local address that this stream is bound to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     assert_eq!(stream.local_addr().unwrap(),
+    ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
     }
 
     /// Returns the remote address that this stream is connected to.
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     assert_eq!(stream.peer_addr().unwrap(),
+    ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().peer_addr()
     }
@@ -212,6 +334,31 @@ impl TcpStream {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Async;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|mut stream| {
+    ///     let mut buf = [0; 10];
+    ///     match stream.poll_peek(&mut buf) {
+    ///        Ok(Async::Ready(len)) => println!("read {} bytes", len),
+    ///        Ok(Async::NotReady) => println!("no data available"),
+    ///        Err(e) => eprintln!("got error: {}", e),
+    ///     }
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn poll_peek(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
         try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
@@ -225,30 +372,30 @@ impl TcpStream {
         }
     }
 
-    /// Like `poll_peek` but compatible with futures 0.2
-    #[cfg(feature = "unstable-futures")]
-    pub fn poll_peek2(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending);
-        }
-
-        match self.io.get_ref().peek(buf) {
-            Ok(ret) => Ok(ret.into()),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
     /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::{Shutdown, SocketAddr};
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.shutdown(Shutdown::Both)
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
     }
@@ -258,6 +405,26 @@ impl TcpStream {
     /// For more information about this option, see [`set_nodelay`].
     ///
     /// [`set_nodelay`]: #method.set_nodelay
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_nodelay(true).expect("set_nodelay call failed");;
+    ///     assert_eq!(stream.nodelay().unwrap_or(false), true);
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
         self.io.get_ref().nodelay()
     }
@@ -269,6 +436,25 @@ impl TcpStream {
     /// small amount of data. When not set, data is buffered until there is a
     /// sufficient amount to send out, thereby avoiding the frequent sending of
     /// small packets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_nodelay(true).expect("set_nodelay call failed");
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
         self.io.get_ref().set_nodelay(nodelay)
     }
@@ -278,6 +464,26 @@ impl TcpStream {
     /// For more information about this option, see [`set_recv_buffer_size`].
     ///
     /// [`set_recv_buffer_size`]: #tymethod.set_recv_buffer_size
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_recv_buffer_size(100).expect("set_recv_buffer_size failed");
+    ///     assert_eq!(stream.recv_buffer_size().unwrap_or(0), 100);
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn recv_buffer_size(&self) -> io::Result<usize> {
         self.io.get_ref().recv_buffer_size()
     }
@@ -286,6 +492,25 @@ impl TcpStream {
     ///
     /// Changes the size of the operating system's receive buffer associated
     /// with the socket.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_recv_buffer_size(100).expect("set_recv_buffer_size failed");
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
         self.io.get_ref().set_recv_buffer_size(size)
     }
@@ -295,6 +520,26 @@ impl TcpStream {
     /// For more information about this option, see [`set_send_buffer`].
     ///
     /// [`set_send_buffer`]: #tymethod.set_send_buffer
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_send_buffer_size(100).expect("set_send_buffer_size failed");
+    ///     assert_eq!(stream.send_buffer_size().unwrap_or(0), 100);
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn send_buffer_size(&self) -> io::Result<usize> {
         self.io.get_ref().send_buffer_size()
     }
@@ -303,6 +548,25 @@ impl TcpStream {
     ///
     /// Changes the size of the operating system's send buffer associated with
     /// the socket.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_send_buffer_size(100).expect("set_send_buffer_size failed");
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
         self.io.get_ref().set_send_buffer_size(size)
     }
@@ -313,6 +577,26 @@ impl TcpStream {
     /// For more information about this option, see [`set_keepalive`].
     ///
     /// [`set_keepalive`]: #tymethod.set_keepalive
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_keepalive(None).expect("set_keepalive failed");
+    ///     assert_eq!(stream.keepalive().unwrap(), None);
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn keepalive(&self) -> io::Result<Option<Duration>> {
         self.io.get_ref().keepalive()
     }
@@ -329,6 +613,25 @@ impl TcpStream {
     ///
     /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_keepalive(None).expect("set_keepalive failed");
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
         self.io.get_ref().set_keepalive(keepalive)
     }
@@ -338,6 +641,26 @@ impl TcpStream {
     /// For more information about this option, see [`set_ttl`].
     ///
     /// [`set_ttl`]: #tymethod.set_ttl
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_ttl(100).expect("set_ttl failed");
+    ///     assert_eq!(stream.ttl().unwrap_or(0), 100);
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
     }
@@ -346,6 +669,25 @@ impl TcpStream {
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_ttl(100).expect("set_ttl failed");
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
     }
@@ -356,6 +698,26 @@ impl TcpStream {
     /// For more information about this option, see [`set_linger`].
     ///
     /// [`set_linger`]: #tymethod.set_linger
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_linger(None).expect("set_linger failed");
+    ///     assert_eq!(stream.linger().unwrap(), None);
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.io.get_ref().linger()
     }
@@ -371,6 +733,25 @@ impl TcpStream {
     /// If `SO_LINGER` is not specified, and the stream is closed, the system
     /// handles the call in a way that allows the process to continue as quickly
     /// as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     stream.set_linger(None).expect("set_linger failed");
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.io.get_ref().set_linger(dur)
     }
@@ -381,6 +762,25 @@ impl TcpStream {
     /// object references. Both handles will read and write the same stream of
     /// data, and options set on one stream will be propagated to the other
     /// stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// use tokio::net::TcpStream;
+    /// use futures::Future;
+    /// use std::net::SocketAddr;
+    ///
+    /// # fn main() -> Result<(), Box<std::error::Error>> {
+    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let stream = TcpStream::connect(&addr);
+    /// stream.map(|stream| {
+    ///     let clone = stream.try_clone().unwrap();
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         let io = self.io.get_ref().try_clone()?;
         Ok(TcpStream::new(io))
@@ -414,25 +814,6 @@ impl AsyncRead for TcpStream {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl futures2::io::AsyncRead for TcpStream {
-    fn poll_read(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncRead::poll_read(&mut self.io, cx, buf)
-    }
-
-    fn poll_vectored_read(&mut self, cx: &mut futures2::task::Context, vec: &mut [&mut IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncRead::poll_vectored_read(&mut &*self, cx, vec)
-    }
-
-    unsafe fn initializer(&self) -> futures2::io::Initializer {
-        futures2::io::Initializer::nop()
-    }
-}
-
 impl AsyncWrite for TcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         <&TcpStream>::shutdown(&mut &*self)
@@ -440,29 +821,6 @@ impl AsyncWrite for TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         <&TcpStream>::write_buf(&mut &*self, buf)
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::io::AsyncWrite for TcpStream {
-    fn poll_write(&mut self, cx: &mut futures2::task::Context, buf: &[u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncWrite::poll_write(&mut self.io, cx, buf)
-    }
-
-    fn poll_vectored_write(&mut self, cx: &mut futures2::task::Context, vec: &[&IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncWrite::poll_vectored_write(&mut &*self, cx, vec)
-    }
-
-    fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_flush(&mut self.io, cx)
-    }
-
-    fn poll_close(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_close(&mut self.io, cx)
     }
 }
 
@@ -538,40 +896,6 @@ impl<'a> AsyncRead for &'a TcpStream {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl<'a> futures2::io::AsyncRead for &'a TcpStream {
-    fn poll_read(&mut self, cx: &mut futures2::task::Context, buf: &mut [u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncRead::poll_read(&mut &self.io, cx, buf)
-    }
-
-    fn poll_vectored_read(&mut self, cx: &mut futures2::task::Context, vec: &mut [&mut IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_read_ready2(cx, mio::Ready::readable())? {
-            return Ok(futures2::Async::Pending)
-        }
-
-        let r = self.io.get_ref().read_bufs(vec);
-
-        match r {
-            Ok(n) => {
-                Ok(futures2::Async::Ready(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready2(cx, mio::Ready::readable())?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    unsafe fn initializer(&self) -> futures2::io::Initializer {
-        futures2::io::Initializer::nop()
-    }
-}
-
 impl<'a> AsyncWrite for &'a TcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
@@ -606,44 +930,6 @@ impl<'a> AsyncWrite for &'a TcpStream {
     }
 }
 
-#[cfg(feature = "unstable-futures")]
-impl<'a> futures2::io::AsyncWrite for &'a TcpStream {
-    fn poll_write(&mut self, cx: &mut futures2::task::Context, buf: &[u8])
-        -> futures2::Poll<usize, io::Error>
-    {
-        futures2::io::AsyncWrite::poll_write(&mut &self.io, cx, buf)
-    }
-
-    fn poll_vectored_write(&mut self, cx: &mut futures2::task::Context, vec: &[&IoVec])
-        -> futures2::Poll<usize, io::Error>
-    {
-        if let futures2::Async::Pending = self.io.poll_write_ready2(cx)? {
-            return Ok(futures2::Async::Pending)
-        }
-
-        let r = self.io.get_ref().write_bufs(vec);
-
-        match r {
-            Ok(n) => {
-                Ok(futures2::Async::Ready(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready2(cx)?;
-                Ok(futures2::Async::Pending)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn poll_flush(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_flush(&mut &self.io, cx)
-    }
-
-    fn poll_close(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<(), io::Error> {
-        futures2::io::AsyncWrite::poll_close(&mut &self.io, cx)
-    }
-}
-
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.io.get_ref().fmt(f)
@@ -656,16 +942,6 @@ impl Future for ConnectFuture {
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
         self.inner.poll()
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::Future for ConnectFuture {
-    type Item = TcpStream;
-    type Error = io::Error;
-
-    fn poll(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<TcpStream, io::Error> {
-        futures2::Future::poll(&mut self.inner, cx)
     }
 }
 
@@ -714,17 +990,6 @@ impl Future for ConnectFutureState {
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
         self.poll_inner(|io| io.poll_write_ready())
-    }
-}
-
-#[cfg(feature = "unstable-futures")]
-impl futures2::Future for ConnectFutureState {
-    type Item = TcpStream;
-    type Error = io::Error;
-
-    fn poll(&mut self, cx: &mut futures2::task::Context) -> futures2::Poll<TcpStream, io::Error> {
-        self.poll_inner(|io| io.poll_write_ready2(cx).map(::lower_async))
-            .map(::lift_async)
     }
 }
 

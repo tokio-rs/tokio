@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 #[test]
 fn timer_with_runtime() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let when = Instant::now() + Duration::from_millis(100);
     let (tx, rx) = mpsc::channel();
@@ -33,7 +33,7 @@ fn timer_with_runtime() {
 fn starving() {
     use futures::{task, Poll, Async};
 
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     struct Starve(Delay, u64);
 
@@ -75,14 +75,36 @@ fn starving() {
 fn deadline() {
     use futures::future;
 
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
 
     let when = Instant::now() + Duration::from_millis(20);
     let (tx, rx) = mpsc::channel();
 
+    #[allow(deprecated)]
     tokio::run({
         future::empty::<(), ()>()
             .deadline(when)
+            .then(move |res| {
+                assert!(res.is_err());
+                tx.send(()).unwrap();
+                Ok(())
+            })
+    });
+
+    rx.recv().unwrap();
+}
+
+#[test]
+fn timeout() {
+    use futures::future;
+
+    let _ = env_logger::try_init();
+
+    let (tx, rx) = mpsc::channel();
+
+    tokio::run({
+        future::empty::<(), ()>()
+            .timeout(Duration::from_millis(20))
             .then(move |res| {
                 assert!(res.is_err());
                 tx.send(()).unwrap();
