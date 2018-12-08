@@ -192,7 +192,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    #[deprecated(since = "0.2", note = "use tokio::io::AsyncSeek instead")]
+    #[deprecated(since = "0.1.7", note = "use tokio::io::AsyncSeek instead")]
     #[doc(hidden)]
     #[allow(deprecated)]
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
@@ -221,7 +221,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    #[deprecated(since = "0.2", note = "use tokio::io::seek instead")]
+    #[deprecated(since = "0.1.7", note = "use tokio::io::seek instead")]
     #[doc(hidden)]
     #[allow(deprecated)]
     pub fn seek(self, pos: io::SeekFrom) -> SeekFuture {
