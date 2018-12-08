@@ -510,13 +510,11 @@ impl AsyncWrite for File {
     }
 }
 
-impl Seek for File {
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        ::would_block(|| self.std().seek(pos))
+impl AsyncSeek for File {
+    fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
+        crate::blocking_io(|| self.std().seek(pos))
     }
 }
-
-impl AsyncSeek for File { }
 
 impl Drop for File {
     fn drop(&mut self) {

@@ -1,13 +1,7 @@
-use std::io as std_io;
+use std::io::{self as std_io, Seek};
 use futures::{Async, Poll};
 
-use AsyncWrite;
-
 /// Seek files asynchronously.
-///
-/// This trait inherits from `std::io::Seek` and indicates that an I/O object is
-/// **non-blocking**. All non-blocking I/O objects must return an error when
-/// seeking is unavailable instead of blocking the current thread.
 ///
 /// Specifically, this means that the `poll_seek` function will return one of
 /// the following:
@@ -23,10 +17,7 @@ use AsyncWrite;
 ///
 /// * `Err(e)` for other errors are standard I/O errors coming from the
 ///   underlying object.
-///
-/// This trait importantly means that the `seek` method only works in the
-/// context of a future's task. The object may panic if used outside of a task.
-pub trait AsyncSeek: std_io::Seek {
+pub trait AsyncSeek {
     /// Seek to an offset, in bytes, in a stream.
     ///
     /// A seek beyond the end of a stream is allowed, but implementation
@@ -39,23 +30,23 @@ pub trait AsyncSeek: std_io::Seek {
     /// # Errors
     ///
     /// Seeking to a negative offset is considered an error.
+    fn poll_seek(&mut self, pos: std_io::SeekFrom) -> Poll<u64, std_io::Error>;
+}
+
+impl<T: ?Sized + AsyncSeek> AsyncSeek for Box<T> {
     fn poll_seek(&mut self, pos: std_io::SeekFrom) -> Poll<u64, std_io::Error> {
-        match self.seek(pos) {
-            Ok(t) => Ok(Async::Ready(t)),
-            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => {
-                return Ok(Async::NotReady)
-            }
-            Err(e) => return Err(e.into())
-        }
+        (**self).poll_seek(pos)
     }
 }
 
-impl<T: ?Sized + AsyncSeek> AsyncSeek for Box<T> { }
+impl<'a, T: ?Sized + AsyncSeek> AsyncSeek for &'a mut T {
+    fn poll_seek(&mut self, pos: std_io::SeekFrom) -> Poll<u64, std_io::Error> {
+        (**self).poll_seek(pos)
+    }
+}
 
-impl<'a, T: ?Sized + AsyncSeek> AsyncSeek for &'a mut T { }
-
-impl<T: AsRef<[u8]>> AsyncSeek for std_io::Cursor<T> { }
-
-impl<T: AsyncSeek> AsyncSeek for std_io::BufReader<T> { }
-
-impl<T: AsyncSeek + AsyncWrite> AsyncSeek for std_io::BufWriter<T> { }
+impl<T: AsRef<[u8]>> AsyncSeek for std_io::Cursor<T> {
+    fn poll_seek(&mut self, pos: std_io::SeekFrom) -> Poll<u64, std_io::Error> {
+        self.seek(pos).map(|n| Async::Ready(n))
+    }
+}
