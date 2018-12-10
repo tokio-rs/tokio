@@ -9,10 +9,10 @@
 //! # Getting started
 //!
 //! If implementing a protocol from scratch, using length delimited framing
-//! is an easy way to get started. [`Codec::new()`] will return a length
-//! delimited codec using default configuration values. This can then be
-//! used to construct a framer to adapt a full-duplex byte stream into a
-//! stream of frames.
+//! is an easy way to get started. [`LengthDelimitedCodec::new()`] will
+//! return a length delimited codec using default configuration values.
+//! This can then be used to construct a framer to adapt a full-duplex
+//! byte stream into a stream of frames.
 //!
 //! ```
 //! # extern crate tokio;
@@ -345,6 +345,7 @@
 //! +------------+--------------+
 //! ```
 //!
+//! [`LengthDelimitedCodec::new()`]: struct.LengthDelimitedCodec.html#method.new
 //! [`FramedRead`]: struct.FramedRead.html
 //! [`FramedWrite`]: struct.FramedWrite.html
 //! [`AsyncRead`]: ../../trait.AsyncRead.html
