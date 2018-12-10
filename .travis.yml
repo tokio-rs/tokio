@@ -1,9 +1,6 @@
 ---
 language: rust
 sudo: false
-cache:
-  - apt
-  - cargo
 addons:
   apt:
     packages:
