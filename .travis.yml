@@ -34,6 +34,11 @@ matrix:
   - rust: nightly-2018-11-18
     env: TSAN=yes
 
+  # This runs cargo +nightly doc
+  - rust: nightly
+    env: ALLOW_FAILURES=true # FIXME remove this live after #437 is resolved
+    script: cargo doc
+
   allow_failures:
     - rust: nightly
       env: ALLOW_FAILURES=true
