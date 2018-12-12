@@ -526,7 +526,6 @@ impl Worker {
     {
         struct Guard<'a> {
             worker: &'a Worker,
-            allocated_at_run: bool
         }
 
         impl<'a> Drop for Guard<'a> {
@@ -537,24 +536,27 @@ impl Worker {
                 // This capacity is "use it or lose it", so if the thread is not
                 // transitioned to blocking in this call, then another task has
                 // to be notified.
-                if self.allocated_at_run && !self.worker.is_blocking.get() {
-                    self.worker.pool.notify_blocking_task(&self.worker.pool);
+                //
+                // If the task has consumed its blocking allocation but hasn't
+                // used it, it must be given to some other task instead.
+                if !self.worker.is_blocking.get() {
+                    let can_block = self.worker.current_task.can_block();
+                    if can_block == CanBlock::Allocated {
+                        self.worker.pool.notify_blocking_task(&self.worker.pool);
+                    }
                 }
 
                 self.worker.current_task.clear();
             }
         }
 
-        let can_block = task.consume_blocking_allocation();
-
         // Set `current_task`
-        self.current_task.set(task, can_block);
+        self.current_task.set(task, CanBlock::CanRequest);
 
         // Create the guard, this ensures that `current_task` is unset when the
         // function returns, even if the return is caused by a panic.
         let _g = Guard {
             worker: self,
-            allocated_at_run: can_block == CanBlock::Allocated
         };
 
         task.run(notify)
@@ -774,7 +776,16 @@ impl CurrentTask {
     }
 
     fn can_block(&self) -> CanBlock {
-        self.can_block.get()
+        use self::CanBlock::*;
+
+        match self.can_block.get() {
+            Allocated => Allocated,
+            CanRequest | NoCapacity => {
+                let can_block = self.get_ref().consume_blocking_allocation();
+                self.can_block.set(can_block);
+                can_block
+            }
+        }
     }
 
     fn set_can_block(&self, can_block: CanBlock) {
