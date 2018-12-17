@@ -1,9 +1,6 @@
 ---
 language: rust
 sudo: false
-cache:
-  - apt
-  - cargo
 addons:
   apt:
     packages:
@@ -36,16 +33,8 @@ matrix:
   # This runs TSAN against nightly and allows failures to propagate up.
   - rust: nightly-2018-11-18
     env: TSAN=yes
-
-  allow_failures:
-    - rust: nightly
-      env: ALLOW_FAILURES=true
-
-script:
-  - |
-    set -e
-    if [[ "$TRAVIS_RUST_VERSION" == nightly && "$TSAN" == yes ]]
-    then
+    script: |
+        set -e
         # Make sure the benchmarks compile
         cargo build --benches --all
 
@@ -72,22 +61,31 @@ script:
         # Run thread sanitizer
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
-    fi
-  - |
-    set -e
-    if [[ "$TARGET" ]]
-    then
-        rustup target add $TARGET
-        cargo check --all --exclude tokio-tls --target $TARGET
-        cargo check --tests --all --exclude tokio-tls --target $TARGET
-    else
-        cargo test --all --no-fail-fast
-        # Disable these tests for now as they are buggy
-        #
-        # cargo test --features unstable-futures
-        # cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
-        # cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
-    fi
+
+  # This runs cargo +nightly doc
+  - rust: nightly
+    env: ALLOW_FAILURES=true # FIXME remove this live after #437 is resolved
+    script: cargo doc
+
+  allow_failures:
+    - rust: nightly
+      env: ALLOW_FAILURES=true
+
+script: |
+  set -e
+  if [[ "$TARGET" ]]
+  then
+      rustup target add $TARGET
+      cargo check --all --exclude tokio-tls --target $TARGET
+      cargo check --tests --all --exclude tokio-tls --target $TARGET
+  else
+      cargo test --all --no-fail-fast
+      # Disable these tests for now as they are buggy
+      #
+      # cargo test --features unstable-futures
+      # cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
+      # cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
+  fi
 
 before_deploy:
   - cargo doc --all --no-deps
