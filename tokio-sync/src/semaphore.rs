@@ -117,15 +117,13 @@ impl Semaphore {
     ///
     /// Panics if `permits` is zero.
     pub fn new(permits: usize) -> Semaphore {
-        assert!(permits > 0, "permits must be greater than zero");
-
         let stub = Box::new(WaiterNode::new());
         let ptr = NonNull::new(&*stub as *const _ as *mut _).unwrap();
 
         // Allocations are aligned
         debug_assert!(ptr.as_ptr() as usize & NUM_FLAG == 0);
 
-        let state = SemState::new(permits);
+        let state = SemState::new(permits, &stub);
 
         Semaphore {
             state: AtomicUsize::new(state.to_usize()),
@@ -235,37 +233,47 @@ impl Semaphore {
         }
     }
 
-    /// Release one permit back to the sempahore.
-    ///
-    /// This either increments the number of available permits or notifies a
-    /// pending waiter.
-    fn release_one(&self) {
-        debug!(" + release_one");
+    /// Add `n` new permits to the semaphore.
+    pub fn add_permits(&self, n: usize) {
+        debug!(" + add_permits; n = {}", n);
 
-        let prev = self.rx_lock.fetch_add(1, AcqRel);
+        if n == 0 {
+            return;
+        }
+
+        // TODO: Handle overflow. A panic is not sufficient, the process must
+        // abort.
+        let prev = self.rx_lock.fetch_add(n, AcqRel);
 
         if prev != 0 {
-            debug!("+ release_one; locked");
+            debug!("+ add_permits; locked");
             // Another thread has the lock and will be responsible for notifying
             // pending waiters.
             return;
         }
 
         // The remaining amount of permits to release back to the semaphore.
-        let mut rem = 1;
+        let mut rem = n;
 
         while rem > 0 {
             // Release the permits
-            self.release_n(rem);
+            self.add_permits_locked(rem);
 
             let actual = self.rx_lock.fetch_sub(rem, AcqRel);
 
+            debug!(" + add_permits; lock_sub; n = {}; prev = {}", rem, actual);
+
             rem = actual - rem;
         }
+
+        debug!(" + add_permits; done");
     }
 
     /// Release a specific amount of permits to the semaphore
-    fn release_n(&self, mut n: usize) {
+    ///
+    /// This function is called by `add_permits` after the add lock has been
+    /// acquired.
+    fn add_permits_locked(&self, mut n: usize) {
         while n > 0 {
             let waiter = match self.pop(n) {
                 Some(waiter) => waiter,
@@ -444,7 +452,8 @@ impl Permit {
         self.state == PermitState::Acquired
     }
 
-    /// Try to acquire the permit.
+    /// Try to acquire the permit. If no permits are available, the current task
+    /// will be notified once a new permit becomes available.
     pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), ()> {
         use futures::Async::*;
 
@@ -454,6 +463,7 @@ impl Permit {
                 let waiter = self.waiter.as_ref().unwrap();
 
                 if waiter.acquire() {
+                    self.state = PermitState::Acquired;
                     return Ok(Ready(()));
                 } else {
                     return Ok(NotReady);
@@ -483,10 +493,25 @@ impl Permit {
     /// This function panics if called when the permit has not yet been
     /// acquired.
     pub fn release(&mut self, semaphore: &Semaphore) {
-        assert!(self.is_acquired(), "permit not acquired");
-        self.state = PermitState::Idle;
+        self.forget();
+        semaphore.add_permits(1);
+    }
 
-        semaphore.release_one();
+    /// Forget the permit **without** releasing it back to the semaphore.
+    ///
+    /// After calling `forget`, `poll_acquire` is able to acquire new permit
+    /// from the sempahore.
+    ///
+    /// Repeatedly calling `forget` without associated calls to `add_permit`
+    /// will result in the semaphore losing all permits.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called when the permit has not yet been
+    /// acquired.
+    pub fn forget(&mut self) {
+        assert!(self.is_acquired(), "permit not acquired; state = {:?}", self.state);
+        self.state = PermitState::Idle;
     }
 }
 
@@ -616,8 +641,12 @@ const NUM_SHIFT: usize = 1;
 
 impl SemState {
     /// Returns a new default `State` value.
-    fn new(permits: usize) -> SemState {
-        SemState((permits << NUM_SHIFT) | NUM_FLAG)
+    fn new(permits: usize, stub: &WaiterNode) -> SemState {
+        if permits > 0 {
+            SemState((permits << NUM_SHIFT) | NUM_FLAG)
+        } else {
+            SemState(stub as *const _ as usize)
+        }
     }
 
     /// Returns a `State` tracking `ptr` as the tail of the queue.

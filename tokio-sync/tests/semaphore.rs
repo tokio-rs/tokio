@@ -67,11 +67,26 @@ fn unavailable_permits() {
     assert_eq!(s.available_permits(), 0);
     assert!(task.is_notified());
     assert_ready!(permit_2.poll_acquire(&s));
+
+    permit_2.release(&s);
+    assert_eq!(s.available_permits(), 1);
 }
 
 #[test]
-#[ignore]
 fn zero_permits() {
     let s = Semaphore::new(0);
     assert_eq!(s.available_permits(), 0);
+
+    let mut permit = Permit::new();
+    let mut task = MockTask::new();
+
+    // Try to acquire the permit
+    task.enter(|| {
+        assert_not_ready!(permit.poll_acquire(&s));
+    });
+
+    s.add_permits(1);
+
+    assert!(task.is_notified());
+    assert_ready!(permit.poll_acquire(&s));
 }

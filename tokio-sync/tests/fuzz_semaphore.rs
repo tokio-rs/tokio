@@ -4,6 +4,7 @@ extern crate futures;
 extern crate loom;
 
 #[path = "../src/semaphore.rs"]
+#[allow(warnings)]
 mod semaphore;
 
 use semaphore::*;
@@ -18,7 +19,7 @@ use std::sync::atomic::Ordering::SeqCst;
 const NUM: usize = 2;
 
 struct Actor {
-    waiter: Waiter,
+    waiter: Permit,
     shared: Arc<Shared>,
 }
 
@@ -32,7 +33,7 @@ impl Future for Actor {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
-        try_ready!(self.shared.semaphore.poll_permit(Some(&mut self.waiter)));
+        try_ready!(self.waiter.poll_acquire(&self.shared.semaphore));
 
         let actual = self.shared.active.fetch_add(1, SeqCst);
         assert!(actual <= NUM-1);
@@ -40,7 +41,7 @@ impl Future for Actor {
         let actual = self.shared.active.fetch_sub(1, SeqCst);
         assert!(actual <= NUM);
 
-        self.shared.semaphore.release_one();
+        self.waiter.release(&self.shared.semaphore);
 
         Ok(Async::Ready(()))
     }
@@ -56,13 +57,13 @@ fn smoke() {
 
         for _ in 0..NUM {
             spawn(Actor {
-                waiter: Waiter::new(),
+                waiter: Permit::new(),
                 shared: shared.clone(),
             });
         }
 
         Actor {
-            waiter: Waiter::new(),
+            waiter: Permit::new(),
             shared
         }
     });
