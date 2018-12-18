@@ -14,6 +14,6 @@ mod semaphore;
 
 pub use atomic_task::AtomicTask;
 pub use semaphore::{
+    Permit,
     Semaphore,
-    Waiter as SemaphoreWaiter,
 };

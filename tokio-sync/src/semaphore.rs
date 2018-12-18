@@ -30,9 +30,12 @@ pub struct Semaphore {
     stub: Box<WaiterNode>,
 }
 
-/// Wait on a semaphore.
+/// Semaphore permit
 #[derive(Debug)]
-pub struct Waiter(Option<Arc<WaiterNode>>);
+pub struct Permit {
+    waiter: Option<Arc<WaiterNode>>,
+    state: PermitState,
+}
 
 /// Node used to notify the semaphore waiter when permit is available.
 #[derive(Debug)]
@@ -61,6 +64,14 @@ struct WaiterNode {
 /// of the "waiting senders" queue.
 #[derive(Copy, Clone)]
 struct SemState(usize);
+
+/// Permit state
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum PermitState {
+    Idle,
+    Waiting,
+    Acquired,
+}
 
 /// Waiter node state
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -120,12 +131,8 @@ impl Semaphore {
         curr.available_permits()
     }
 
-    pub fn poll_permit(&self, waiter: &mut Waiter) -> Poll<(), ()> {
-        self.poll_permit2(Some(waiter))
-    }
-
     /// Poll for a permit
-    fn poll_permit2(&self, mut waiter: Option<&mut Waiter>) -> Poll<(), ()> {
+    fn poll_permit(&self, mut permit: Option<&mut Permit>) -> Poll<(), ()> {
         use futures::Async::*;
 
         // Load the current state
@@ -147,9 +154,9 @@ impl Semaphore {
                 debug_assert!(curr.waiter().is_some());
 
                 if maybe_strong.is_none() {
-                    if let Some(ref mut waiter) = waiter {
+                    if let Some(ref mut permit) = permit {
                         // Get the Sender's waiter node, or initialize one
-                        let waiter = waiter.0
+                        let waiter = permit.waiter
                             .get_or_insert_with(|| Arc::new(WaiterNode::new()));
 
                         waiter.register();
@@ -402,15 +409,43 @@ impl Semaphore {
     }
 }
 
-// ===== impl Waiter =====
+// ===== impl Permit =====
 
-impl Waiter {
-    pub fn new() -> Waiter {
-        Waiter(None)
+impl Permit {
+    pub fn new() -> Permit {
+        Permit {
+            waiter: None,
+            state: PermitState::Idle,
+        }
     }
 
-    pub fn acquire(&self) -> bool {
-        self.0.as_ref()
+    pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), ()> {
+        use futures::Async::*;
+
+        match self.state {
+            PermitState::Idle => {}
+            PermitState::Waiting => {
+                unimplemented!();
+            }
+            PermitState::Acquired => {
+                return Ok(Ready(()));
+            }
+        }
+
+        match semaphore.poll_permit(Some(self))? {
+            Ready(v) => {
+                self.state = PermitState::Acquired;
+                Ok(Ready(v))
+            }
+            NotReady => {
+                self.state = PermitState::Waiting;
+                Ok(NotReady)
+            }
+        }
+    }
+
+    fn acquire(&self) -> bool {
+        self.waiter.as_ref()
             .map(|node| node.acquire())
             .unwrap_or(false)
     }
