@@ -34,6 +34,7 @@ members = [
   "tokio-io",
   "tokio-reactor",
   "tokio-signal",
+  "tokio-sync",
   "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
