@@ -133,6 +133,12 @@ impl Unpark for Box<Unpark> {
     }
 }
 
+impl Unpark for Arc<Unpark> {
+    fn unpark(&self) {
+        (**self).unpark()
+    }
+}
+
 /// Blocks the current thread using a condition variable.
 ///
 /// Implements the [`Park`] functionality by using a condition variable. An
