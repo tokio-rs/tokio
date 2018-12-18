@@ -30,7 +30,17 @@ pub struct Semaphore {
     stub: Box<WaiterNode>,
 }
 
-/// Semaphore permit
+/// A semaphore permit
+///
+/// Tracks the lifecycle of a semaphore permit.
+///
+/// An instance of `Permit` is intended to be used with a **single** instance of
+/// `Semaphore`. Using a single instance of `Permit` with multiple semaphore
+/// intsances will result in unexpected behavior.
+///
+/// `Permit` does **not** release the permit back to the semaphore on drop. It
+/// is the user's responsibility to ensure that `Permit::release` is called
+/// before dropping the permit.
 #[derive(Debug)]
 pub struct Permit {
     waiter: Option<Arc<WaiterNode>>,
@@ -229,7 +239,7 @@ impl Semaphore {
     ///
     /// This either increments the number of available permits or notifies a
     /// pending waiter.
-    pub fn release_one(&self) {
+    fn release_one(&self) {
         debug!(" + release_one");
 
         let prev = self.rx_lock.fetch_add(1, AcqRel);
@@ -412,6 +422,16 @@ impl Semaphore {
 // ===== impl Permit =====
 
 impl Permit {
+    /// Create a new `Permit`.
+    ///
+    /// The permit begins in the "unacquired" state.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let permit = Permit::new();
+    /// assert!(!permit.is_acquired());
+    /// ```
     pub fn new() -> Permit {
         Permit {
             waiter: None,
@@ -419,13 +439,25 @@ impl Permit {
         }
     }
 
+    /// Returns true if the permit has been acquired
+    pub fn is_acquired(&self) -> bool {
+        self.state == PermitState::Acquired
+    }
+
+    /// Try to acquire the permit.
     pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), ()> {
         use futures::Async::*;
 
         match self.state {
             PermitState::Idle => {}
             PermitState::Waiting => {
-                unimplemented!();
+                let waiter = self.waiter.as_ref().unwrap();
+
+                if waiter.acquire() {
+                    return Ok(Ready(()));
+                } else {
+                    return Ok(NotReady);
+                }
             }
             PermitState::Acquired => {
                 return Ok(Ready(()));
@@ -444,10 +476,17 @@ impl Permit {
         }
     }
 
-    fn acquire(&self) -> bool {
-        self.waiter.as_ref()
-            .map(|node| node.acquire())
-            .unwrap_or(false)
+    /// Release a permit back to the semaphore
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called when the permit has not yet been
+    /// acquired.
+    pub fn release(&mut self, semaphore: &Semaphore) {
+        assert!(self.is_acquired(), "permit not acquired");
+        self.state = PermitState::Idle;
+
+        semaphore.release_one();
     }
 }
 
@@ -463,6 +502,16 @@ impl WaiterNode {
     }
 
     fn acquire(&self) -> bool {
+        if self.acquire2() {
+            return true;
+        }
+
+        self.task.register();
+
+        self.acquire2()
+    }
+
+    fn acquire2(&self) -> bool {
         use self::NodeState::*;
         Idle.compare_exchange(&self.state, Assigned, AcqRel, Acquire).is_ok()
     }
