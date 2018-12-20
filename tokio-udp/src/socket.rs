@@ -449,14 +449,12 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
-    // TODO: let's land these upstream with mio and then we can add them here.
-    //
-    // use std::os::windows::prelude::*;
-    // use super::UdpSocket;
-    //
-    // impl AsRawHandle for UdpSocket {
-    //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.io.get_ref().as_raw_handle()
-    //     }
-    // }
+    use std::os::windows::prelude::*;
+    use super::UdpSocket;
+
+    impl AsRawSocket for UdpSocket {
+        fn as_raw_socket(&self) -> RawSocket {
+            self.io.get_ref().as_raw_socket()
+        }
+    }
 }

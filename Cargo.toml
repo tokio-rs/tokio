@@ -107,3 +107,4 @@ tokio-timer = { path = "./tokio-timer" }
 tokio-tls = { path = "./tokio-tls" }
 tokio-udp = { path = "./tokio-udp" }
 tokio-uds = { path = "./tokio-uds" }
+mio = { git = "https://github.com/sdroege/mio", branch = "windows-as-raw-socket" }
