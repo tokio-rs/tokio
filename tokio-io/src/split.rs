@@ -23,6 +23,17 @@ pub fn split<T: AsyncRead + AsyncWrite>(t: T) -> (ReadHalf<T>, WriteHalf<T>) {
     (ReadHalf { handle: a }, WriteHalf { handle: b })
 }
 
+/// Reunite a previously split resource.
+///
+/// If the given `ReadHalf` and `WriteHalf` do not originate from the
+/// same `AsyncRead::split` operation they will be returned as is in
+/// `Result::Err`.
+pub fn unsplit<T>(r: ReadHalf<T>, w: WriteHalf<T>) -> Result<T, (ReadHalf<T>, WriteHalf<T>)> {
+    r.handle.reunite(w.handle).map_err(|e| {
+        (ReadHalf { handle: e.0 }, WriteHalf { handle: e.1 })
+    })
+}
+
 fn would_block() -> io::Error {
     io::Error::new(io::ErrorKind::WouldBlock, "would block")
 }
