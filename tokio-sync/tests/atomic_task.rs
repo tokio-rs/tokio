@@ -1,4 +1,5 @@
 extern crate futures;
+#[macro_use]
 extern crate loom;
 
 #[path = "../src/atomic_task.rs"]
@@ -42,6 +43,7 @@ fn basic_notification() {
         poll_fn(move || {
             chan.task.register();
 
+            println!(" + chan.num.load()");
             if NUM_NOTIFY == chan.num.load(Relaxed) {
                 return Ok(Async::Ready(()));
             }

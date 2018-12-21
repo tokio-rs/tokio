@@ -437,6 +437,8 @@ impl Permit {
     /// # Examples
     ///
     /// ```
+    /// use tokio_sync::Permit;
+    ///
     /// let permit = Permit::new();
     /// assert!(!permit.is_acquired());
     /// ```

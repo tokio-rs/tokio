@@ -174,6 +174,7 @@ impl AtomicTask {
     /// tasks to be notified. One of the callers will win and have its task set,
     /// but there is no guarantee as to which caller will succeed.
     pub fn register_task(&self, task: Task) {
+        debug!(" + register_task");
         match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
             WAITING => {
                 unsafe {
@@ -239,22 +240,26 @@ impl AtomicTask {
     ///
     /// If `register` has not been called yet, then this does nothing.
     pub fn notify(&self) {
+        debug!(" + notify");
         // AcqRel ordering is used in order to acquire the value of the `task`
         // cell as well as to establish a `release` ordering with whatever
         // memory the `AtomicTask` is associated with.
         match self.state.fetch_or(NOTIFYING, AcqRel) {
             WAITING => {
+                debug!(" + WAITING");
                 // The notifying lock has been acquired.
                 let task = unsafe { self.task.with_mut(|t| t.take()) };
 
                 // Release the lock
                 self.state.fetch_and(!NOTIFYING, Release);
+                debug!(" + Done notifying");
 
                 if let Some(task) = task {
                     task.notify();
                 }
             }
             state => {
+                debug!(" + state = {:?}", state);
                 // There is a concurrent thread currently updating the
                 // associated task.
                 //
