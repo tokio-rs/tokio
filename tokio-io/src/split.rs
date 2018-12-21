@@ -1,3 +1,4 @@
+use std::{error, fmt};
 use std::io::{self, Read, Write};
 
 use futures::{Async, Poll};
@@ -26,11 +27,14 @@ pub fn split<T: AsyncRead + AsyncWrite>(t: T) -> (ReadHalf<T>, WriteHalf<T>) {
 /// Reunite a previously split resource.
 ///
 /// If the given `ReadHalf` and `WriteHalf` do not originate from the
-/// same `AsyncRead::split` operation they will be returned as is in
-/// `Result::Err`.
-pub fn unsplit<T>(r: ReadHalf<T>, w: WriteHalf<T>) -> Result<T, (ReadHalf<T>, WriteHalf<T>)> {
+/// same `AsyncRead::split` operation they will be returned, wrapped
+/// in an `UnsplitError`.
+pub fn unsplit<T>(r: ReadHalf<T>, w: WriteHalf<T>) -> Result<T, UnsplitError<T>> {
     r.handle.reunite(w.handle).map_err(|e| {
-        (ReadHalf { handle: e.0 }, WriteHalf { handle: e.1 })
+        UnsplitError {
+            read_half: ReadHalf { handle: e.0 },
+            write_half: WriteHalf { handle: e.1 }
+        }
     })
 }
 
@@ -86,6 +90,33 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
 
 fn wrap_as_io<T>(t: Async<T>) -> Result<Async<T>, io::Error> {
     Ok(t)
+}
+
+/// Error returned from `unsplit` if reuniting a `ReadHalf` with
+/// another `WriteHalf` fails.
+pub struct UnsplitError<T> {
+    /// The `ReadHalf` passed to `unsplit`.
+    pub read_half: ReadHalf<T>,
+    /// The `WriteHalf` passed to `unsplit`.
+    pub write_half: WriteHalf<T>
+}
+
+impl<T> fmt::Debug for UnsplitError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("UnsplitError")
+    }
+}
+
+impl<T> fmt::Display for UnsplitError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("tried to reunite unrelated read and write halves")
+    }
+}
+
+impl<T> error::Error for UnsplitError<T> {
+    fn description(&self) -> &str {
+        "tried to reunite unrelated read and write halves"
+    }
 }
 
 #[cfg(test)]
