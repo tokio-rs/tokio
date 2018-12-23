@@ -488,6 +488,38 @@ impl Permit {
         }
     }
 
+    /// Try to acquire the permit.
+    pub fn try_acquire(&mut self, semaphore: &Semaphore) -> Result<(), ()> {
+        use futures::Async::*;
+
+        match self.state {
+            PermitState::Idle => {}
+            PermitState::Waiting => {
+                let waiter = self.waiter.as_ref().unwrap();
+
+                if waiter.acquire2() {
+                    self.state = PermitState::Acquired;
+                    return Ok(());
+                } else {
+                    return Err(());
+                }
+            }
+            PermitState::Acquired => {
+                return Ok(());
+            }
+        }
+
+        match semaphore.poll_permit(None)? {
+            Ready(()) => {
+                self.state = PermitState::Acquired;
+                Ok(())
+            }
+            NotReady => {
+                Err(())
+            }
+        }
+    }
+
     /// Release a permit back to the semaphore
     ///
     /// # Panics

@@ -10,6 +10,7 @@ macro_rules! debug {
 
 mod atomic_task;
 mod loom;
+pub mod mpsc;
 mod semaphore;
 
 pub use atomic_task::AtomicTask;
