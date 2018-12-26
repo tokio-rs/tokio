@@ -2,16 +2,22 @@ use super::chan;
 
 use futures::{Poll, Stream};
 
-use std::sync::Arc;
-
 pub struct Receiver<T> {
     /// The channel receiver
-    chan: chan::Rx<T>,
+    chan: chan::Rx<T, Semaphore>,
 }
 
+/// Channel semaphore is a tuple of the semaphore implementation and a `usize`
+/// representing the channel bound.
+type Semaphore = (::Semaphore, usize);
+
 impl<T> Receiver<T> {
-    pub(crate) fn new(chan: chan::Rx<T>) -> Receiver<T> {
+    pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
         Receiver { chan }
+    }
+
+    pub fn close(&mut self) {
+        unimplemented!();
     }
 }
 
@@ -20,6 +26,6 @@ impl<T> Stream for Receiver<T> {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
-        unimplemented!();
+        self.chan.recv()
     }
 }

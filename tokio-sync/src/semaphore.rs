@@ -427,6 +427,9 @@ impl Semaphore {
     }
 }
 
+unsafe impl Send for Semaphore {}
+unsafe impl Sync for Semaphore {}
+
 // ===== impl Permit =====
 
 impl Permit {

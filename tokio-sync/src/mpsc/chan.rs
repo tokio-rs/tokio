@@ -1,6 +1,4 @@
 use super::list;
-use semaphore::{Semaphore, Permit};
-
 use futures::Poll;
 use futures::task::AtomicTask;
 
@@ -10,25 +8,40 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 /// Channel sender
-pub(crate) struct Tx<T> {
-    inner: Arc<Chan<T>>,
-    permit: Permit,
+pub(crate) struct Tx<T, S: Semaphore> {
+    inner: Arc<Chan<T, S>>,
+    permit: S::Permit,
 }
 
 /// Channel receiver
-pub(crate) struct Rx<T> {
-    inner: Arc<Chan<T>>,
+pub(crate) struct Rx<T, S> {
+    inner: Arc<Chan<T, S>>,
 }
 
-struct Chan<T> {
+pub trait Semaphore: Sync {
+    type Permit;
+
+    fn new_permit() -> Self::Permit;
+
+    fn drop_permit(&self, permit: &mut Self::Permit);
+
+    fn is_idle(&self) -> bool;
+
+    fn add_permits(&self, num: usize);
+
+    fn poll_acquire(&self, permit: &mut Self::Permit) -> Poll<(), ()>;
+
+    fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), ()>;
+
+    fn forget(&self, permit: &mut Self::Permit);
+}
+
+struct Chan<T, S> {
     /// Handle to the push half of the lock-free list.
     tx: list::Tx<T>,
 
-    /// Channel capacity
-    capacity: usize,
-
     /// Coordinates access to channel's capacity.
-    semaphore: Semaphore,
+    semaphore: S,
 
     /// Receiver task. Notified when a value is pushed into the channel.
     rx_task: AtomicTask,
@@ -42,13 +55,18 @@ struct Chan<T> {
     rx: UnsafeCell<list::Rx<T>>,
 }
 
-pub(crate) fn channel<T>(capacity: usize) -> (Tx<T>, Rx<T>) {
+unsafe impl<T: Send, S: Send> Send for Chan<T, S> {}
+unsafe impl<T: Send, S: Sync> Sync for Chan<T, S> {}
+
+pub(crate) fn channel<T, S>(semaphore: S) -> (Tx<T, S>, Rx<T, S>)
+where
+    S: Semaphore,
+{
     let (tx, rx) = list::channel();
 
     let chan = Arc::new(Chan {
         tx,
-        capacity,
-        semaphore: Semaphore::new(capacity),
+        semaphore,
         rx_task: AtomicTask::new(),
         tx_count: AtomicUsize::new(1),
         rx: UnsafeCell::new(rx),
@@ -59,22 +77,25 @@ pub(crate) fn channel<T>(capacity: usize) -> (Tx<T>, Rx<T>) {
 
 // ===== impl Tx =====
 
-impl<T> Tx<T> {
-    fn new(chan: Arc<Chan<T>>) -> Tx<T> {
+impl<T, S> Tx<T, S>
+where
+    S: Semaphore,
+{
+    fn new(chan: Arc<Chan<T, S>>) -> Tx<T, S> {
         Tx {
             inner: chan,
-            permit: Permit::new(),
+            permit: S::new_permit(),
         }
     }
 
     /// TODO: Docs
     pub fn poll_ready(&mut self) -> Poll<(), ()> {
-        self.permit.poll_acquire(&self.inner.semaphore)
+        self.inner.semaphore.poll_acquire(&mut self.permit)
     }
 
     /// Send a message and notify the receiver.
     pub fn try_send(&mut self, value: T) -> Result<(), ()> {
-        self.permit.try_acquire(&self.inner.semaphore)?;
+        self.inner.semaphore.try_acquire(&mut self.permit)?;
 
         // Push the value
         self.inner.tx.push(value);
@@ -83,27 +104,35 @@ impl<T> Tx<T> {
         self.inner.rx_task.notify();
 
         // Release the permit
-        self.permit.forget();
+        self.inner.semaphore.forget(&mut self.permit);
 
         Ok(())
     }
 }
 
-impl<T> Clone for Tx<T> {
-    fn clone(&self) -> Tx<T> {
+impl<T, S> Clone for Tx<T, S>
+where
+    S: Semaphore,
+{
+    fn clone(&self) -> Tx<T, S> {
         // Using a Relaxed ordering here is sufficient as the caller holds a
         // strong ref to `self`, preventing a concurrent decrement to zero.
         self.inner.tx_count.fetch_add(1, Relaxed);
 
         Tx {
             inner: self.inner.clone(),
-            permit: Permit::new(),
+            permit: S::new_permit(),
         }
     }
 }
 
-impl<T> Drop for Tx<T> {
+impl<T, S> Drop for Tx<T, S>
+where
+    S: Semaphore,
+{
     fn drop(&mut self) {
+        self.inner.semaphore.drop_permit(&mut self.permit);
+
         if self.inner.tx_count.fetch_sub(1, AcqRel) != 1 {
             return;
         }
@@ -118,13 +147,16 @@ impl<T> Drop for Tx<T> {
 
 // ===== impl Rx =====
 
-impl<T> Rx<T> {
-    fn new(chan: Arc<Chan<T>>) -> Rx<T> {
+impl<T, S> Rx<T, S>
+where
+    S: Semaphore,
+{
+    fn new(chan: Arc<Chan<T, S>>) -> Rx<T, S> {
         Rx { inner: chan }
     }
 
     /// Receive the next value
-    pub fn recv(&mut self, tx: &Tx<T>) -> Poll<Option<T>, ()> {
+    pub fn recv(&mut self) -> Poll<Option<T>, ()> {
         use super::block::Read::*;
         use futures::Async::*;
 
@@ -132,15 +164,13 @@ impl<T> Rx<T> {
 
         macro_rules! try_recv {
             () => {
-                match rx.pop(&tx.inner.tx) {
+                match rx.pop(&self.inner.tx) {
                     Some(Value(value)) => {
                         self.inner.semaphore.add_permits(1);
                         return Ok(Ready(Some(value)));
                     }
                     Some(Closed) => {
-                        let permits = self.inner.semaphore.available_permits();
-
-                        if self.inner.capacity == permits {
+                        if self.inner.semaphore.is_idle() {
                             return Ok(Ready(None));
                         }
                     }
@@ -161,3 +191,41 @@ impl<T> Rx<T> {
         Ok(NotReady)
     }
 }
+
+// ===== impl Semaphore for (::Semaphore, capacity) =====
+
+impl Semaphore for (::Semaphore, usize) {
+    type Permit = ::Permit;
+
+    fn new_permit() -> ::Permit {
+        ::Permit::new()
+    }
+
+    fn drop_permit(&self, permit: &mut ::Permit) {
+        if permit.is_acquired() {
+            permit.release(&self.0);
+        }
+    }
+
+    fn add_permits(&self, num: usize) {
+        self.0.add_permits(num)
+    }
+
+    fn is_idle(&self) -> bool {
+        self.0.available_permits() == self.1
+    }
+
+    fn poll_acquire(&self, permit: &mut ::Permit) -> Poll<(), ()> {
+        permit.poll_acquire(&self.0)
+    }
+
+    fn try_acquire(&self, permit: &mut ::Permit) -> Result<(), ()> {
+        permit.try_acquire(&self.0)
+    }
+
+    fn forget(&self, permit: &mut Self::Permit) {
+        permit.forget()
+    }
+}
+
+// ===== impl Semaphore for AtomicUsize =====
