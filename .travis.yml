@@ -22,6 +22,17 @@ matrix:
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
 
+  # Test some combinations of enabled features.
+  - rust: stable
+    script: |
+      cargo check --no-default-features --features threadpool
+  - rust: stable
+    script: |
+      cargo check --no-default-features --features threadpool,tcp
+  - rust: stable
+    script: |
+      cargo check --no-default-features --features threadpool,current-thread,udp,codec
+
   # Test the async / await preview. We don't want to block PRs on this failing
   # though.
   - rust: nightly
