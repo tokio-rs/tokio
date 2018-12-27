@@ -11,6 +11,8 @@ mod list;
 #[allow(warnings)]
 mod block;
 
+const BLOCK_CAP: usize = 2;
+
 use loom::thread;
 
 use std::sync::Arc;
