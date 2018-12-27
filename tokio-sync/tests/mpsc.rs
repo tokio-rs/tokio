@@ -6,7 +6,6 @@ use tokio_sync::mpsc;
 use tokio_mock_task::*;
 
 use futures::prelude::*;
-use futures::future::lazy;
 
 use std::thread;
 
@@ -35,7 +34,7 @@ macro_rules! assert_not_ready {
 }
 
 #[test]
-fn send_recv() {
+fn send_recv_with_buffer() {
     let (tx, rx) = mpsc::channel::<i32>(16);
     let mut rx = rx.wait();
 
@@ -45,11 +44,12 @@ fn send_recv() {
 }
 
 #[test]
-fn send_recv_no_buffer() {
-    let (mut tx, mut rx) = mpsc::channel::<i32>(0);
+fn send_recv_buffer_limited() {
+    let (mut tx, mut rx) = mpsc::channel::<i32>(1);
+    let mut task = MockTask::new();
 
     // Run on a task context
-    lazy(move || {
+    task.enter(|| {
         assert!(tx.poll_complete().unwrap().is_ready());
         assert!(tx.poll_ready().unwrap().is_ready());
 
@@ -73,9 +73,7 @@ fn send_recv_no_buffer() {
         // Take the value
         assert_eq!(rx.poll().unwrap(), Async::Ready(Some(2)));
         assert!(tx.poll_ready().unwrap().is_ready());
-
-        Ok::<(), ()>(())
-    }).wait().unwrap();
+    });
 }
 
 #[test]
@@ -104,41 +102,11 @@ fn send_recv_threads() {
 }
 
 #[test]
-#[ignore]
-fn send_recv_threads_no_capacity() {
-    let (tx, rx) = mpsc::channel::<i32>(0);
-    let mut rx = rx.wait();
-
-    let (readytx, readyrx) = mpsc::channel::<()>(2);
-    let mut readyrx = readyrx.wait();
-    let t = thread::spawn(move|| {
-        let readytx = readytx.sink_map_err(|_| panic!());
-        let (a, b) = tx.send(1).join(readytx.send(())).wait().unwrap();
-        a.send(2).join(b.send(())).wait().unwrap();
-    });
-
-    drop(readyrx.next().unwrap());
-    assert_eq!(rx.next().unwrap(), Ok(1));
-    drop(readyrx.next().unwrap());
-    assert_eq!(rx.next().unwrap(), Ok(2));
-
-    t.join().unwrap();
-}
-
-#[test]
 fn recv_close_gets_none_idle() {
     let (mut tx, mut rx) = mpsc::channel::<i32>(10);
     let mut task = MockTask::new();
 
-    /*
-    task.enter(|| {
-        assert_not_ready!(tx.poll_ready());
-    });
-    */
-
     rx.close();
-
-    // assert!(task.is_notified());
 
     task.enter(|| {
         assert_eq!(rx.poll(), Ok(Async::Ready(None)));
@@ -186,14 +154,13 @@ fn recv_close_gets_none_reserved() {
 #[test]
 fn tx_close_gets_none() {
     let (_, mut rx) = mpsc::channel::<i32>(10);
+    let mut task = MockTask::new();
 
     // Run on a task context
-    lazy(move || {
-        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
-        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
-
-        Ok::<(), ()>(())
-    }).wait().unwrap();
+    task.enter(|| {
+        let v = assert_ready!(rx.poll());
+        assert!(v.is_none());
+    });
 }
 
 fn is_ready<T>(res: &AsyncSink<T>) -> bool {
@@ -204,59 +171,8 @@ fn is_ready<T>(res: &AsyncSink<T>) -> bool {
 }
 
 #[test]
-#[ignore]
-fn try_send_1() {
-    const N: usize = 3000;
-    let (mut tx, rx) = mpsc::channel(0);
-
-    let t = thread::spawn(move || {
-        for i in 0..N {
-            loop {
-                if tx.try_send(i).is_ok() {
-                    break
-                }
-            }
-        }
-    });
-    for (i, j) in rx.wait().enumerate() {
-        assert_eq!(i, j.unwrap());
-    }
-    t.join().unwrap();
-}
-
-/*
-#[test]
-fn try_send_2() {
-    let (mut tx, rx) = mpsc::channel(0);
-
-    tx.try_send("hello").unwrap();
-
-    let (readytx, readyrx) = oneshot::channel::<()>();
-
-    let th = thread::spawn(|| {
-        lazy(|| {
-            assert!(tx.start_send("fail").unwrap().is_not_ready());
-            Ok::<_, ()>(())
-        }).wait().unwrap();
-
-        drop(readytx);
-        tx.send("goodbye").wait().unwrap();
-    });
-
-    let mut rx = rx.wait();
-
-    drop(readyrx.wait());
-    assert_eq!(rx.next(), Some(Ok("hello")));
-    assert_eq!(rx.next(), Some(Ok("goodbye")));
-    assert!(rx.next().is_none());
-
-    th.join().unwrap();
-}
-*/
-
-#[test]
 fn try_send_fail() {
-    let (mut tx, rx) = mpsc::channel(0);
+    let (mut tx, rx) = mpsc::channel(1);
     let mut rx = rx.wait();
 
     tx.try_send("hello").unwrap();
