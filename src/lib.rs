@@ -80,25 +80,32 @@ extern crate num_cpus;
 extern crate tokio_current_thread;
 extern crate tokio_io;
 extern crate tokio_executor;
+#[cfg(feature = "codec")]
 extern crate tokio_codec;
+#[cfg(feature = "fs")]
 extern crate tokio_fs;
 extern crate tokio_reactor;
 extern crate tokio_threadpool;
 extern crate tokio_timer;
+#[cfg(feature = "tcp")]
 extern crate tokio_tcp;
+#[cfg(feature = "udp")]
 extern crate tokio_udp;
 
 #[cfg(feature = "async-await-preview")]
 extern crate tokio_async_await;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 extern crate tokio_uds;
 
 pub mod clock;
+#[cfg(feature = "codec")]
 pub mod codec;
 pub mod executor;
+#[cfg(feature = "fs")]
 pub mod fs;
 pub mod io;
+#[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
 pub mod net;
 pub mod prelude;
 pub mod reactor;
