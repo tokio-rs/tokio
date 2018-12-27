@@ -194,4 +194,19 @@ fn try_send_fail() {
 fn drop_tx_with_permit_releases_permit() {
     // poll_ready reserves capacity, ensure that the capacity is released if tx
     // is dropped w/o sending a value.
+    let (mut tx1, rx) = mpsc::channel::<i32>(1);
+    let mut tx2 = tx1.clone();
+    let mut task = MockTask::new();
+
+    assert_ready!(tx1.poll_ready());
+
+    task.enter(|| {
+        assert_not_ready!(tx2.poll_ready());
+    });
+
+    drop(tx1);
+
+    assert!(task.is_notified());
+
+    assert_ready!(tx2.poll_ready());
 }
