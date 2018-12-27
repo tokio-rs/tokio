@@ -332,7 +332,7 @@ impl Semaphore {
     /// acquired.
     fn add_permits_locked2(&self, mut n: usize, closed: bool) {
         while n > 0 || closed {
-            let waiter = match self.pop(n) {
+            let waiter = match self.pop(n, closed) {
                 Some(waiter) => waiter,
                 None => {
                     return;
@@ -353,7 +353,7 @@ impl Semaphore {
     /// `rem` represents the remaining number of times the caller will pop. If
     /// there are no more waiters to pop, `rem` is used to set the available
     /// permits.
-    fn pop(&self, rem: usize) -> Option<Arc<WaiterNode>> {
+    fn pop(&self, rem: usize, closed: bool) -> Option<Arc<WaiterNode>> {
         debug!(" + pop; rem = {}", rem);
         'outer:
         loop {
@@ -443,7 +443,7 @@ impl Semaphore {
                     continue 'outer;
                 }
 
-                self.push_stub();
+                self.push_stub(closed);
 
                 next_ptr = head.as_ref().next.load(Acquire);
 
@@ -460,7 +460,7 @@ impl Semaphore {
         }
     }
 
-    unsafe fn push_stub(&self) {
+    unsafe fn push_stub(&self, closed: bool) {
         let stub = self.stub();
 
         // Set the next pointer. This does not require an atomic operation as
@@ -472,8 +472,10 @@ impl Semaphore {
         // Update the tail to point to the new node. We need to see the previous
         // node in order to update the next pointer as well as release `task`
         // to any other threads calling `push`.
-        let prev = SemState::new_ptr(stub)
+        let prev = SemState::new_ptr(stub, closed)
             .swap(&self.state, AcqRel);
+
+        debug_assert_eq!(closed, prev.is_closed());
 
         // The stub is only pushed when there are pending tasks. Because of
         // this, the state must *always* be in pointer mode.
@@ -770,8 +772,14 @@ impl SemState {
     }
 
     /// Returns a `State` tracking `ptr` as the tail of the queue.
-    fn new_ptr(tail: NonNull<WaiterNode>) -> SemState {
-        SemState(tail.as_ptr() as usize)
+    fn new_ptr(tail: NonNull<WaiterNode>, closed: bool) -> SemState {
+        let mut val = tail.as_ptr() as usize;
+
+        if closed {
+            val |= CLOSED_FLAG;
+        }
+
+        SemState(val)
     }
 
     /// Returns the amount of remaining capacity
@@ -823,7 +831,7 @@ impl SemState {
         debug_assert!(permits > 0);
 
         if self.is_stub(stub) {
-            self.0 = (permits << NUM_SHIFT) | NUM_FLAG;
+            self.0 = (permits << NUM_SHIFT) | NUM_FLAG | (self.0 & CLOSED_FLAG);
             return;
         }
 
@@ -878,7 +886,7 @@ impl SemState {
     /// Swap the values
     fn swap(&self, cell: &AtomicUsize, ordering: Ordering) -> SemState {
         let prev = SemState(cell.swap(self.to_usize(), ordering));
-        debug_assert!(!prev.is_closed() || self.is_closed());
+        debug_assert_eq!(prev.is_closed(), self.is_closed());
         prev
     }
 
@@ -890,7 +898,7 @@ impl SemState {
                         failure: Ordering)
         -> Result<SemState, SemState>
     {
-        debug_assert!(!prev.is_closed() || self.is_closed());
+        debug_assert_eq!(prev.is_closed(), self.is_closed());
 
         let res = cell.compare_exchange(prev.to_usize(), self.to_usize(), success, failure);
 
@@ -945,6 +953,7 @@ impl NodeState {
             1 => Queued,
             2 => QueuedWaiting,
             3 => Assigned,
+            4 => Closed,
             _ => panic!(),
         }
     }

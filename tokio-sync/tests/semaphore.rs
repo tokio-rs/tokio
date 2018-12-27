@@ -112,7 +112,7 @@ fn close_semaphore_prevents_acquire() {
 }
 
 #[test]
-fn close_semaphore_notifies_permit() {
+fn close_semaphore_notifies_permit1() {
     let s = Semaphore::new(0);
 
     let mut permit = Permit::new();
@@ -126,4 +126,49 @@ fn close_semaphore_notifies_permit() {
 
     assert!(task.is_notified());
     assert!(permit.poll_acquire(&s).is_err());
+}
+
+#[test]
+fn close_semaphore_notifies_permit2() {
+    let s = Semaphore::new(2);
+
+    let mut permit1 = Permit::new();
+    let mut permit2 = Permit::new();
+    let mut permit3 = Permit::new();
+    let mut permit4 = Permit::new();
+
+    // Acquire a couple of permits
+    assert_ready!(permit1.poll_acquire(&s));
+    assert_ready!(permit2.poll_acquire(&s));
+
+    let mut task1 = MockTask::new();
+    let mut task2 = MockTask::new();
+
+    task1.enter(|| {
+        assert_not_ready!(permit3.poll_acquire(&s));
+    });
+
+    task2.enter(|| {
+        assert_not_ready!(permit4.poll_acquire(&s));
+    });
+
+    s.close();
+
+    assert!(task1.is_notified());
+    assert!(task2.is_notified());
+
+    assert!(permit3.poll_acquire(&s).is_err());
+    assert!(permit4.poll_acquire(&s).is_err());
+
+    assert_eq!(0, s.available_permits());
+
+    permit1.release(&s);
+
+    assert_eq!(1, s.available_permits());
+
+    assert!(permit1.poll_acquire(&s).is_err());
+
+    permit2.release(&s);
+
+    assert_eq!(2, s.available_permits());
 }
