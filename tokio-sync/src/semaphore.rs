@@ -258,8 +258,7 @@ impl Semaphore {
     /// Close the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub fn close(&self) {
-        debug!(" + close");
-
+        debug!("+ Semaphore::close");
         let prev = SemState::fetch_set_closed(&self.state, AcqRel);
 
         if prev.is_closed() {
