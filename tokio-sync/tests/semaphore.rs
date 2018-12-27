@@ -90,3 +90,40 @@ fn zero_permits() {
     assert!(task.is_notified());
     assert_ready!(permit.poll_acquire(&s));
 }
+
+#[test]
+#[should_panic]
+fn validates_max_permits() {
+    use std::usize;
+    Semaphore::new((usize::MAX >> 2) + 1);
+}
+
+#[test]
+fn close_semaphore_prevents_acquire() {
+    let s = Semaphore::new(1);
+    s.close();
+
+    assert_eq!(1, s.available_permits());
+
+    let mut permit = Permit::new();
+
+    assert!(permit.poll_acquire(&s).is_err());
+    assert_eq!(1, s.available_permits());
+}
+
+#[test]
+fn close_semaphore_notifies_permit() {
+    let s = Semaphore::new(0);
+
+    let mut permit = Permit::new();
+    let mut task = MockTask::new();
+
+    task.enter(|| {
+        assert_not_ready!(permit.poll_acquire(&s));
+    });
+
+    s.close();
+
+    assert!(task.is_notified());
+    assert!(permit.poll_acquire(&s).is_err());
+}

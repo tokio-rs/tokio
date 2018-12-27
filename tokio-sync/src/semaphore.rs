@@ -13,6 +13,7 @@ use std::fmt;
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed};
+use std::usize;
 
 /// Futures-aware semaphore.
 pub struct Semaphore {
@@ -78,8 +79,14 @@ struct SemState(usize);
 /// Permit state
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum PermitState {
+    /// The permit has not been requested.
     Idle,
+
+    /// Currently waiting for a permit to be made available and assigned to the
+    /// waiter.
     Waiting,
+
+    /// The permit has been acquired.
     Acquired,
 }
 
@@ -106,6 +113,9 @@ enum NodeState {
     /// The waiter has been assigned a permit and the node has been removed from
     /// the queue.
     Assigned = 3,
+
+    /// The semaphore has been closed. No more permits will be issued.
+    Closed = 4,
 }
 
 // ===== impl Semaphore =====
@@ -151,10 +161,28 @@ impl Semaphore {
         // Tracks a *mut WaiterNode representing an Arc clone.
         //
         // This avoids having to bump the ref count unless required.
-        let mut maybe_strong = None;
+        let mut maybe_strong: Option<NonNull<WaiterNode>> = None;
+
+        macro_rules! undo_strong {
+            () => {
+                if let Some(waiter) = maybe_strong {
+                    // The waiter was cloned, but never got queued.
+                    // Before enterig `poll_permit`, the waiter was
+                    // in the `Idle` state. We must transition the node
+                    // back to the idle state.
+                    let waiter = unsafe { Arc::from_raw(waiter.as_ptr()) };
+                    waiter.revert_to_idle();
+                }
+            }
+        }
 
         loop {
             let mut next = curr;
+
+            if curr.is_closed() {
+                undo_strong!();
+                return Err(());
+            }
 
             if !next.acquire_permit(&self.stub) {
                 debug!(" + poll_permit -- no permits");
@@ -213,14 +241,8 @@ impl Semaphore {
                         }
                         None => {
                             debug!(" + poll_permit -- permit acquired");
-                            if let Some(waiter) = maybe_strong {
-                                // The waiter was cloned, but never got queued.
-                                // Before enterig `inc_num_messages`, the waiter was
-                                // in the `Idle` state. We must transition the node
-                                // back to the idle state.
-                                let waiter = unsafe { Arc::from_raw(waiter.as_ptr()) };
-                                waiter.revert_to_idle();
-                            }
+
+                            undo_strong!();
 
                             return Ok(Ready(()));
                         }
@@ -233,6 +255,30 @@ impl Semaphore {
         }
     }
 
+    /// Close the semaphore. This prevents the semaphore from issuing new
+    /// permits and notifies all pending waiters.
+    pub fn close(&self) {
+        debug!(" + close");
+
+        let prev = SemState::fetch_set_closed(&self.state, AcqRel);
+
+        if prev.is_closed() {
+            return;
+        }
+
+        // Acquire the `rx_lock`, setting the "closed" flag on the lock.
+        let prev = self.rx_lock.fetch_add(1, AcqRel);
+
+        if prev != 0 {
+            debug!("+ close; locked");
+            // Another thread has the lock and will be responsible for notifying
+            // pending waiters.
+            return;
+        }
+
+        self.add_permits_locked(0, true);
+    }
+
     /// Add `n` new permits to the semaphore.
     pub fn add_permits(&self, n: usize) {
         debug!(" + add_permits; n = {}", n);
@@ -243,27 +289,38 @@ impl Semaphore {
 
         // TODO: Handle overflow. A panic is not sufficient, the process must
         // abort.
-        let prev = self.rx_lock.fetch_add(n, AcqRel);
+        let prev = self.rx_lock.fetch_add(n << 1, AcqRel);
 
         if prev != 0 {
-            debug!("+ add_permits; locked");
+            debug!(" + add_permits -- locked; prev = {}", prev);
             // Another thread has the lock and will be responsible for notifying
             // pending waiters.
             return;
         }
 
-        // The remaining amount of permits to release back to the semaphore.
-        let mut rem = n;
+        self.add_permits_locked(n, false);
+    }
 
-        while rem > 0 {
-            // Release the permits
-            self.add_permits_locked(rem);
+    fn add_permits_locked(&self, mut rem: usize, mut closed: bool) {
+        while rem > 0 || closed {
+            // Release the permits and notify
+            self.add_permits_locked2(rem, closed);
 
-            let actual = self.rx_lock.fetch_sub(rem, AcqRel);
+            let n = rem << 1;
 
-            debug!(" + add_permits; lock_sub; n = {}; prev = {}", rem, actual);
+            let actual = if closed {
+                let actual = self.rx_lock.fetch_sub(n | 1, AcqRel);
 
-            rem = actual - rem;
+                closed = false;
+                actual
+            } else {
+                let actual = self.rx_lock.fetch_sub(n, AcqRel);
+
+                closed = actual & 1 == 1;
+                actual
+            };
+
+            rem = (actual >> 1) - rem;
         }
 
         debug!(" + add_permits; done");
@@ -273,8 +330,8 @@ impl Semaphore {
     ///
     /// This function is called by `add_permits` after the add lock has been
     /// acquired.
-    fn add_permits_locked(&self, mut n: usize) {
-        while n > 0 {
+    fn add_permits_locked2(&self, mut n: usize, closed: bool) {
+        while n > 0 || closed {
             let waiter = match self.pop(n) {
                 Some(waiter) => waiter,
                 None => {
@@ -284,8 +341,8 @@ impl Semaphore {
 
             debug!(" + release_n -- notify");
 
-            if waiter.notify() {
-                n -= 1;
+            if waiter.notify(closed) {
+                n = n.saturating_sub(1);
                 debug!(" + release_n -- dec");
             }
         }
@@ -337,6 +394,15 @@ impl Semaphore {
                                     debug!(" + pop; inconsistent 1");
                                     yield_now();
                                     continue 'outer;
+                                }
+
+                                // When closing the semaphore, nodes are popped
+                                // with `rem == 0`. In this case, we are not
+                                // adding permits, but notifying waiters of the
+                                // semaphore's closed state.
+                                if rem == 0 {
+                                    debug_assert!(curr.is_closed(), "state = {:?}", curr);
+                                    return None;
                                 }
 
                                 let mut next = curr;
@@ -467,7 +533,7 @@ impl Permit {
             PermitState::Waiting => {
                 let waiter = self.waiter.as_ref().unwrap();
 
-                if waiter.acquire() {
+                if waiter.acquire()? {
                     self.state = PermitState::Acquired;
                     return Ok(Ready(()));
                 } else {
@@ -500,7 +566,7 @@ impl Permit {
             PermitState::Waiting => {
                 let waiter = self.waiter.as_ref().unwrap();
 
-                if waiter.acquire2() {
+                if waiter.acquire2()? {
                     self.state = PermitState::Acquired;
                     return Ok(());
                 } else {
@@ -563,9 +629,9 @@ impl WaiterNode {
         }
     }
 
-    fn acquire(&self) -> bool {
-        if self.acquire2() {
-            return true;
+    fn acquire(&self) -> Result<bool, ()> {
+        if self.acquire2()? {
+            return Ok(true);
         }
 
         self.task.register();
@@ -573,9 +639,14 @@ impl WaiterNode {
         self.acquire2()
     }
 
-    fn acquire2(&self) -> bool {
+    fn acquire2(&self) -> Result<bool, ()> {
         use self::NodeState::*;
-        Idle.compare_exchange(&self.state, Assigned, AcqRel, Acquire).is_ok()
+
+        match Idle.compare_exchange(&self.state, Assigned, AcqRel, Acquire) {
+            Ok(_) => Ok(true),
+            Err(Closed) => Err(()),
+            Err(_) => Ok(false),
+        }
     }
 
     fn register(&self) {
@@ -616,7 +687,7 @@ impl WaiterNode {
     /// Notify the waiter
     ///
     /// Returns `true` if the waiter accepts the notification
-    fn notify(&self) -> bool {
+    fn notify(&self, closed: bool) -> bool {
         use self::NodeState::*;
 
         // Assume QueuedWaiting state
@@ -625,7 +696,13 @@ impl WaiterNode {
         loop {
             let next = match curr {
                 Queued => Idle,
-                QueuedWaiting => Assigned,
+                QueuedWaiting => {
+                    if closed {
+                        Closed
+                    } else {
+                        Assigned
+                    }
+                }
                 actual => panic!("actual = {:?}", actual),
             };
 
@@ -670,15 +747,21 @@ impl WaiterNode {
 /// If we assume pointers are properly aligned, then the least significant bit
 /// will always be zero. So, we use that bit to track if the value represents a
 /// number.
-const NUM_FLAG: usize = 0b1;
+const NUM_FLAG: usize = 0b01;
+
+const CLOSED_FLAG: usize = 0b10;
+
+const MAX_PERMITS: usize = usize::MAX >> NUM_SHIFT;
 
 /// When representing "numbers", the state has to be shifted this much (to get
 /// rid of the flag bit).
-const NUM_SHIFT: usize = 1;
+const NUM_SHIFT: usize = 2;
 
 impl SemState {
     /// Returns a new default `State` value.
     fn new(permits: usize, stub: &WaiterNode) -> SemState {
+        assert!(permits <= MAX_PERMITS);
+
         if permits > 0 {
             SemState((permits << NUM_SHIFT) | NUM_FLAG)
         } else {
@@ -721,7 +804,6 @@ impl SemState {
             return false;
         }
 
-        debug_assert!(self.0 != 1);
         debug_assert!(self.waiter().is_none());
 
         self.0 -= 1 << NUM_SHIFT;
@@ -757,7 +839,7 @@ impl SemState {
     /// Returns the waiter, if one is set.
     fn waiter(&self) -> Option<NonNull<WaiterNode>> {
         if self.is_waiter() {
-            let waiter = NonNull::new(self.0 as *mut WaiterNode)
+            let waiter = NonNull::new(self.as_ptr())
                 .expect("null pointer stored");
 
             Some(waiter)
@@ -766,18 +848,24 @@ impl SemState {
         }
     }
 
+    /// Assumes `self` represents a pointer
+    fn as_ptr(&self) -> *mut WaiterNode {
+        (self.0 & !CLOSED_FLAG) as *mut WaiterNode
+    }
+
     /// Set to a pointer to a waiter.
     ///
     /// This can only be done from the full state.
     fn set_waiter(&mut self, waiter: NonNull<WaiterNode>) {
         let waiter = waiter.as_ptr() as usize;
         debug_assert!(waiter & NUM_FLAG == 0);
+        debug_assert!(!self.is_closed());
 
         self.0 = waiter;
     }
 
     fn is_stub(&self, stub: &WaiterNode) -> bool {
-        self.0 == stub as *const _ as usize
+        self.as_ptr() as usize == stub as *const _ as usize
     }
 
     /// Load the state from an AtomicUsize.
@@ -789,7 +877,9 @@ impl SemState {
 
     /// Swap the values
     fn swap(&self, cell: &AtomicUsize, ordering: Ordering) -> SemState {
-        SemState(cell.swap(self.to_usize(), ordering))
+        let prev = SemState(cell.swap(self.to_usize(), ordering));
+        debug_assert!(!prev.is_closed() || self.is_closed());
+        prev
     }
 
     /// Compare and exchange the current value into the provided cell
@@ -800,6 +890,8 @@ impl SemState {
                         failure: Ordering)
         -> Result<SemState, SemState>
     {
+        debug_assert!(!prev.is_closed() || self.is_closed());
+
         let res = cell.compare_exchange(prev.to_usize(), self.to_usize(), success, failure);
 
         debug!(" + SemState::compare_exchange; prev = {}; next = {}; result = {:?}",
@@ -807,6 +899,15 @@ impl SemState {
 
         res.map(SemState)
             .map_err(SemState)
+    }
+
+    fn fetch_set_closed(cell: &AtomicUsize, ordering: Ordering) -> SemState {
+        let value = cell.fetch_or(CLOSED_FLAG, ordering);
+        SemState(value)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.0 & CLOSED_FLAG == CLOSED_FLAG
     }
 
     /// Converts the state into a `usize` representation.
