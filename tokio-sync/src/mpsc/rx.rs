@@ -17,7 +17,7 @@ impl<T> Receiver<T> {
     }
 
     pub fn close(&mut self) {
-        unimplemented!();
+        self.chan.close();
     }
 }
 

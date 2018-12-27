@@ -354,6 +354,7 @@ impl Semaphore {
     /// permits.
     fn pop(&self, rem: usize, closed: bool) -> Option<Arc<WaiterNode>> {
         debug!(" + pop; rem = {}", rem);
+
         'outer:
         loop {
             unsafe {

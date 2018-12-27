@@ -34,6 +34,8 @@ pub trait Semaphore: Sync {
     fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), ()>;
 
     fn forget(&self, permit: &mut Self::Permit);
+
+    fn close(&self);
 }
 
 struct Chan<T, S> {
@@ -51,8 +53,17 @@ struct Chan<T, S> {
     /// When this drops to zero, the send half of the channel is closed.
     tx_count: AtomicUsize,
 
+    /// Only accessed by `Rx` handle.
+    rx_fields: UnsafeCell<RxFields<T>>,
+}
+
+/// Fields only accessed by `Rx` handle.
+struct RxFields<T> {
     /// Channel receiver. This field is only accessed by the `Receiver` type.
-    rx: UnsafeCell<list::Rx<T>>,
+    list: list::Rx<T>,
+
+    /// `true` if `Rx::close` is called.
+    rx_closed: bool,
 }
 
 unsafe impl<T: Send, S: Send> Send for Chan<T, S> {}
@@ -69,7 +80,10 @@ where
         semaphore,
         rx_task: AtomicTask::new(),
         tx_count: AtomicUsize::new(1),
-        rx: UnsafeCell::new(rx),
+        rx_fields: UnsafeCell::new(RxFields {
+            list: rx,
+            rx_closed: false,
+        }),
     });
 
     (Tx::new(chan.clone()), Rx::new(chan))
@@ -155,24 +169,36 @@ where
         Rx { inner: chan }
     }
 
+    pub fn close(&mut self) {
+        let rx_fields = unsafe { &mut *self.inner.rx_fields.get() };
+
+        rx_fields.rx_closed = true;
+        self.inner.semaphore.close();
+    }
+
     /// Receive the next value
     pub fn recv(&mut self) -> Poll<Option<T>, ()> {
         use super::block::Read::*;
         use futures::Async::*;
 
-        let rx = unsafe { &mut *self.inner.rx.get() };
+        let rx_fields = unsafe { &mut *self.inner.rx_fields.get() };
 
         macro_rules! try_recv {
             () => {
-                match rx.pop(&self.inner.tx) {
+                match rx_fields.list.pop(&self.inner.tx) {
                     Some(Value(value)) => {
                         self.inner.semaphore.add_permits(1);
                         return Ok(Ready(Some(value)));
                     }
                     Some(Closed) => {
-                        if self.inner.semaphore.is_idle() {
-                            return Ok(Ready(None));
-                        }
+                        // TODO: This check may not be required as it most
+                        // likely can only return `true` at this point. A
+                        // channel is closed when all tx handles are dropped.
+                        // Dropping a tx handle releases memory, which ensures
+                        // that if dropping the tx handle is visible, then all
+                        // messages sent are also visible.
+                        assert!(self.inner.semaphore.is_idle());
+                        return Ok(Ready(None));
                     }
                     None => {} // fall through
                 }
@@ -188,7 +214,14 @@ where
         // here.
         try_recv!();
 
-        Ok(NotReady)
+        debug!("recv; rx_closed = {:?}; is_idle = {:?}",
+               rx_fields.rx_closed, self.inner.semaphore.is_idle());
+
+        if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
+            Ok(Ready(None))
+        } else {
+            Ok(NotReady)
+        }
     }
 }
 
@@ -225,6 +258,10 @@ impl Semaphore for (::Semaphore, usize) {
 
     fn forget(&self, permit: &mut Self::Permit) {
         permit.forget()
+    }
+
+    fn close(&self) {
+        self.0.close();
     }
 }
 

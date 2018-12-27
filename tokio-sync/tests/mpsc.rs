@@ -1,8 +1,10 @@
-extern crate tokio_sync;
 #[macro_use]
 extern crate futures;
+extern crate tokio_mock_task;
+extern crate tokio_sync;
 
 use tokio_sync::mpsc;
+use tokio_mock_task::*;
 
 use futures::prelude::*;
 use futures::future::lazy;
@@ -14,6 +16,26 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
 impl AssertSend for mpsc::Receiver<i32> {}
+
+macro_rules! assert_ready {
+    ($e:expr) => {{
+        match $e {
+            Ok(futures::Async::Ready(v)) => v,
+            Ok(_) => panic!("not ready"),
+            Err(e) => panic!("error = {:?}", e),
+        }
+    }}
+}
+
+macro_rules! assert_not_ready {
+    ($e:expr) => {{
+        match $e {
+            Ok(futures::Async::NotReady) => {},
+            Ok(futures::Async::Ready(v)) => panic!("ready; value = {:?}", v),
+            Err(e) => panic!("error = {:?}", e),
+        }
+    }}
+}
 
 #[test]
 fn send_recv() {
@@ -107,22 +129,48 @@ fn send_recv_threads_no_capacity() {
 }
 
 #[test]
-fn recv_close_gets_none() {
+fn recv_close_gets_none_idle() {
     let (mut tx, mut rx) = mpsc::channel::<i32>(10);
+    let mut task = MockTask::new();
 
-    // Run on a task context
-    lazy(move || {
-        rx.close();
+    /*
+    task.enter(|| {
+        assert_not_ready!(tx.poll_ready());
+    });
+    */
 
+    rx.close();
+
+    // assert!(task.is_notified());
+
+    task.enter(|| {
         assert_eq!(rx.poll(), Ok(Async::Ready(None)));
         assert!(tx.poll_ready().is_err());
-
-        drop(tx);
-
-        Ok::<(), ()>(())
-    }).wait().unwrap();
+    });
 }
 
+#[test]
+fn recv_close_gets_none_reserved() {
+    let (mut tx1, mut rx) = mpsc::channel::<i32>(1);
+    let mut tx2 = tx1.clone();
+
+    assert_ready!(tx1.poll_ready());
+
+    let mut task = MockTask::new();
+
+    task.enter(|| {
+        assert_not_ready!(tx2.poll_ready());
+    });
+
+    rx.close();
+
+    assert!(task.is_notified());
+
+    task.enter(|| {
+        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
+        assert!(tx2.poll_ready().is_err());
+    });
+}
 
 #[test]
 fn tx_close_gets_none() {
