@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate futures;
 extern crate tokio_mock_task;
 extern crate tokio_sync;
@@ -10,8 +9,6 @@ use futures::prelude::*;
 use futures::future::lazy;
 
 use std::thread;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
@@ -167,8 +164,22 @@ fn recv_close_gets_none_reserved() {
     assert!(task.is_notified());
 
     task.enter(|| {
-        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
         assert!(tx2.poll_ready().is_err());
+        assert_not_ready!(rx.poll());
+    });
+
+    assert!(!task.is_notified());
+
+    assert!(tx1.try_send(123).is_ok());
+
+    assert!(task.is_notified());
+
+    task.enter(|| {
+        let v = assert_ready!(rx.poll());
+        assert_eq!(v, Some(123));
+
+        let v = assert_ready!(rx.poll());
+        assert!(v.is_none());
     });
 }
 
