@@ -113,9 +113,13 @@
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 
 mod builder;
+#[cfg(feature = "current-thread")]
 pub mod current_thread;
 mod shutdown;
 mod task_executor;
+
+#[cfg(not(feature = "threadpool"))]
+compile_error!("`threadpool` feature cannot be disabled yet");
 
 pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;

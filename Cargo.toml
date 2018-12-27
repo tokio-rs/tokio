@@ -45,15 +45,19 @@ members = [
 [features]
 default = [
   "codec",
-  "fs"
+  "current-thread",
+  "fs",
   "tcp",
+  "threadpool",
   "udp",
   "uds",
 ]
 
 codec = ["tokio-codec"]
+current-thread = ["tokio-current-thread"]
 fs = ["tokio-fs"]
 tcp = ["tokio-tcp"]
+threadpool = []
 udp = ["tokio-udp"]
 uds = ["tokio-uds"]
 
@@ -71,7 +75,7 @@ appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 bytes = "0.4"
 num_cpus = "1.8.0"
 tokio-codec = { version = "0.1.0", path = "tokio-codec", optional = true }
-tokio-current-thread = { version = "0.1.3", path = "tokio-current-thread" }
+tokio-current-thread = { version = "0.1.3", path = "tokio-current-thread", optional = true }
 tokio-io = { version = "0.1.6", path = "tokio-io" }
 tokio-executor = { version = "0.1.5", path = "tokio-executor" }
 tokio-reactor = { version = "0.1.1", path = "tokio-reactor" }
