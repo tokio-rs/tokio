@@ -36,7 +36,9 @@ fn basic_usage() {
         type Error = ();
 
         fn poll(&mut self) -> Poll<(), ()> {
-            try_ready!(self.waiter.poll_acquire(&self.shared.semaphore));
+            try_ready!(
+                self.waiter.poll_acquire(&self.shared.semaphore)
+                .map_err(|_| ()));
 
             let actual = self.shared.active.fetch_add(1, SeqCst);
             assert!(actual <= NUM-1);
@@ -77,20 +79,23 @@ fn basic_closing() {
     loom::fuzz(|| {
         let semaphore = Arc::new(Semaphore::new(1));
 
-        let handles: Vec<_> = (0..NUM).map(|_| {
+        for _ in 0..NUM {
             let semaphore = semaphore.clone();
 
             thread::spawn(move || {
                 let mut permit = Permit::new();
 
                 for _ in 0..2 {
-                    wait(future::poll_fn(|| permit.poll_acquire(&semaphore)))?;
+                    wait(future::poll_fn(|| {
+                        permit.poll_acquire(&semaphore)
+                            .map_err(|_| ())
+                    }))?;
                     permit.release(&semaphore);
                 }
 
                 Ok::<(), ()>(())
-            })
-        }).collect();
+            });
+        }
 
         semaphore.close();
     });

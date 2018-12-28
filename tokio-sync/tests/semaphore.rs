@@ -2,7 +2,7 @@ extern crate futures;
 extern crate tokio_mock_task;
 extern crate tokio_sync;
 
-use tokio_sync::{Semaphore, Permit};
+use tokio_sync::semaphore::{Semaphore, Permit};
 use tokio_mock_task::*;
 
 macro_rules! assert_ready {

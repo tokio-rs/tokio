@@ -20,7 +20,7 @@ pub struct SendError<T>(T);
 
 /// TODO: Dox
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
-    let semaphore = (::Semaphore::new(buffer), buffer);
+    let semaphore = (::semaphore::Semaphore::new(buffer), buffer);
     let (tx, rx) = chan::channel(semaphore);
 
     let tx = Sender::new(tx);
@@ -31,7 +31,7 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Channel semaphore is a tuple of the semaphore implementation and a `usize`
 /// representing the channel bound.
-type Semaphore = (::Semaphore, usize);
+type Semaphore = (::semaphore::Semaphore, usize);
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {

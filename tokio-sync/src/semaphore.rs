@@ -48,6 +48,18 @@ pub struct Permit {
     state: PermitState,
 }
 
+/// TODO: Dox
+#[derive(Debug)]
+pub struct Error {
+    kind: ErrorKind,
+}
+
+#[derive(Debug)]
+enum ErrorKind {
+    Closed,
+    NoPermits,
+}
+
 /// Node used to notify the semaphore waiter when permit is available.
 #[derive(Debug)]
 struct WaiterNode {
@@ -150,7 +162,7 @@ impl Semaphore {
     }
 
     /// Poll for a permit
-    fn poll_permit(&self, mut permit: Option<&mut Permit>) -> Poll<(), ()> {
+    fn poll_permit(&self, mut permit: Option<&mut Permit>) -> Poll<(), Error> {
         use futures::Async::*;
 
         // Load the current state
@@ -181,7 +193,7 @@ impl Semaphore {
 
             if curr.is_closed() {
                 undo_strong!();
-                return Err(());
+                return Err(Error::closed());
             }
 
             if !next.acquire_permit(&self.stub) {
@@ -210,7 +222,7 @@ impl Semaphore {
                     } else {
                         // If no `waiter`, then the task is not registered and there
                         // is no further work to do.
-                        return Err(());
+                        return Ok(NotReady);
                     }
                 }
 
@@ -495,6 +507,19 @@ impl Semaphore {
     }
 }
 
+impl fmt::Debug for Semaphore {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        fmt.debug_struct("Semaphore")
+            .field("state", &SemState::load(&self.state, Relaxed))
+            .field("head", &self.head.with(|ptr| ptr))
+            .field("rx_lock", &self.rx_lock.load(Relaxed))
+            .field("stub", &self.stub)
+            .finish()
+    }
+}
+
 unsafe impl Send for Semaphore {}
 unsafe impl Sync for Semaphore {}
 
@@ -527,7 +552,7 @@ impl Permit {
 
     /// Try to acquire the permit. If no permits are available, the current task
     /// will be notified once a new permit becomes available.
-    pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), ()> {
+    pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), Error> {
         use futures::Async::*;
 
         match self.state {
@@ -560,7 +585,7 @@ impl Permit {
     }
 
     /// Try to acquire the permit.
-    pub fn try_acquire(&mut self, semaphore: &Semaphore) -> Result<(), ()> {
+    pub fn try_acquire(&mut self, semaphore: &Semaphore) -> Result<(), Error> {
         use futures::Async::*;
 
         match self.state {
@@ -572,7 +597,7 @@ impl Permit {
                     self.state = PermitState::Acquired;
                     return Ok(());
                 } else {
-                    return Err(());
+                    return Err(Error::no_permits());
                 }
             }
             PermitState::Acquired => {
@@ -586,7 +611,7 @@ impl Permit {
                 Ok(())
             }
             NotReady => {
-                Err(())
+                Err(Error::no_permits())
             }
         }
     }
@@ -620,6 +645,51 @@ impl Permit {
     }
 }
 
+// ===== impl Error =====
+
+impl Error {
+    fn closed() -> Error {
+        Error { kind: ErrorKind::Closed }
+    }
+
+    fn no_permits() -> Error {
+        Error { kind: ErrorKind::NoPermits }
+    }
+
+    /// Returns true if the error was caused by a closed semaphore.
+    pub fn is_closed(&self) -> bool {
+        match self.kind {
+            ErrorKind::Closed => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if the error was caused by calling `try_acquire` on a
+    /// semaphore with no available permits.
+    pub fn is_no_permits(&self) -> bool {
+        match self.kind {
+            ErrorKind::NoPermits => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::error::Error;
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl ::std::error::Error for Error {
+    fn description(&self) -> &str {
+        match self.kind {
+            ErrorKind::Closed => "semaphore closed",
+            ErrorKind::NoPermits => "no permits available",
+        }
+    }
+}
+
 // ===== impl WaiterNode =====
 
 impl WaiterNode {
@@ -631,7 +701,7 @@ impl WaiterNode {
         }
     }
 
-    fn acquire(&self) -> Result<bool, ()> {
+    fn acquire(&self) -> Result<bool, Error> {
         if self.acquire2()? {
             return Ok(true);
         }
@@ -641,12 +711,12 @@ impl WaiterNode {
         self.acquire2()
     }
 
-    fn acquire2(&self) -> Result<bool, ()> {
+    fn acquire2(&self) -> Result<bool, Error> {
         use self::NodeState::*;
 
         match Idle.compare_exchange(&self.state, Assigned, AcqRel, Acquire) {
             Ok(_) => Ok(true),
-            Err(Closed) => Err(()),
+            Err(Closed) => Err(Error::closed()),
             Err(_) => Ok(false),
         }
     }

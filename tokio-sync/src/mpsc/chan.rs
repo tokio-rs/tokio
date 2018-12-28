@@ -227,14 +227,16 @@ where
 
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
-impl Semaphore for (::Semaphore, usize) {
-    type Permit = ::Permit;
+use semaphore::Permit;
 
-    fn new_permit() -> ::Permit {
-        ::Permit::new()
+impl Semaphore for (::semaphore::Semaphore, usize) {
+    type Permit = Permit;
+
+    fn new_permit() -> Permit {
+        Permit::new()
     }
 
-    fn drop_permit(&self, permit: &mut ::Permit) {
+    fn drop_permit(&self, permit: &mut Permit) {
         if permit.is_acquired() {
             permit.release(&self.0);
         }
@@ -248,12 +250,14 @@ impl Semaphore for (::Semaphore, usize) {
         self.0.available_permits() == self.1
     }
 
-    fn poll_acquire(&self, permit: &mut ::Permit) -> Poll<(), ()> {
+    fn poll_acquire(&self, permit: &mut Permit) -> Poll<(), ()> {
         permit.poll_acquire(&self.0)
+            .map_err(|_| ())
     }
 
-    fn try_acquire(&self, permit: &mut ::Permit) -> Result<(), ()> {
+    fn try_acquire(&self, permit: &mut Permit) -> Result<(), ()> {
         permit.try_acquire(&self.0)
+            .map_err(|_| ())
     }
 
     fn forget(&self, permit: &mut Self::Permit) {
