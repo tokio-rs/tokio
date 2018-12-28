@@ -5,7 +5,6 @@
     async_await,
     await_macro,
     futures_api,
-    pin,
     )]
 
 #![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.4")]
