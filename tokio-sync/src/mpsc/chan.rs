@@ -27,7 +27,7 @@ pub trait Semaphore: Sync {
 
     fn is_idle(&self) -> bool;
 
-    fn add_permits(&self, num: usize);
+    fn add_permit(&self);
 
     fn poll_acquire(&self, permit: &mut Self::Permit) -> Poll<(), ()>;
 
@@ -187,7 +187,7 @@ where
             () => {
                 match rx_fields.list.pop(&self.inner.tx) {
                     Some(Value(value)) => {
-                        self.inner.semaphore.add_permits(1);
+                        self.inner.semaphore.add_permit();
                         return Ok(Ready(Some(value)));
                     }
                     Some(Closed) => {
@@ -242,8 +242,8 @@ impl Semaphore for (::semaphore::Semaphore, usize) {
         }
     }
 
-    fn add_permits(&self, num: usize) {
-        self.0.add_permits(num)
+    fn add_permit(&self) {
+        self.0.add_permits(1)
     }
 
     fn is_idle(&self) -> bool {
@@ -270,3 +270,63 @@ impl Semaphore for (::semaphore::Semaphore, usize) {
 }
 
 // ===== impl Semaphore for AtomicUsize =====
+
+use std::sync::atomic::Ordering::{Acquire, Release};
+use std::usize;
+
+impl Semaphore for AtomicUsize {
+    type Permit = ();
+
+    fn new_permit() {
+    }
+
+    fn drop_permit(&self, _permit: &mut ()) {
+    }
+
+    fn add_permit(&self) {
+        let prev = self.fetch_sub(2, Release);
+
+        if prev >> 1 == 0 {
+            // Something went wrong
+            std::process::abort();
+        }
+    }
+
+    fn is_idle(&self) -> bool {
+        self.load(Acquire) >> 1 == 0
+    }
+
+    fn poll_acquire(&self, permit: &mut ()) -> Poll<(), ()> {
+        use futures::Async::Ready;
+        self.try_acquire(permit)
+            .map(Ready)
+    }
+
+    fn try_acquire(&self, _permit: &mut ()) -> Result<(), ()> {
+        let mut curr = self.load(Acquire);
+
+        loop {
+            if curr & 1 == 1 {
+                return Err(());
+            }
+
+            if curr == usize::MAX ^ 1 {
+                ::std::process::abort()
+            }
+
+            match self.compare_exchange(curr, curr + 2, AcqRel, Acquire) {
+                Ok(_) => return Ok(()),
+                Err(actual) => {
+                    curr = actual;
+                }
+            }
+        }
+    }
+
+    fn forget(&self, _permit: &mut ()) {
+    }
+
+    fn close(&self) {
+        self.fetch_or(1, Release);
+    }
+}

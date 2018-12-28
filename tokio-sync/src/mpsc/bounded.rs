@@ -89,7 +89,8 @@ impl<T> Sink for Sender<T> {
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.poll_ready()
+        use futures::Async::Ready;
+        Ok(Ready(()))
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {

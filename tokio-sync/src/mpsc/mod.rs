@@ -2,9 +2,14 @@ mod block;
 mod bounded;
 mod chan;
 mod list;
-// mod unbounded;
+mod unbounded;
 
 pub use self::bounded::{channel, Receiver, Sender, SendError};
+pub use self::unbounded::{
+    unbounded_channel,
+    UnboundedReceiver,
+    UnboundedSender,
+};
 
 /// The number of values a block can contain.
 ///
