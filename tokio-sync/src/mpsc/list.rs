@@ -5,7 +5,6 @@ use super::block::{self, Block};
 use loom::{
     self,
     sync::{
-        // CausalCell,
         atomic::{AtomicUsize, AtomicPtr},
     },
 };

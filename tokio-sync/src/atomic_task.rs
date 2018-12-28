@@ -202,7 +202,7 @@ impl AtomicTask {
 
                             // Take the task to notify once the atomic operation has
                             // completed.
-                            let notify = self.task.with_mut(|t| t.take()).unwrap();
+                            let notify = self.task.with_mut(|t| (*t).take()).unwrap();
 
                             // Just swap, because no one could change state
                             // while state == `Registering | `Waking`
@@ -248,7 +248,7 @@ impl AtomicTask {
             WAITING => {
                 debug!(" + WAITING");
                 // The notifying lock has been acquired.
-                let task = unsafe { self.task.with_mut(|t| t.take()) };
+                let task = unsafe { self.task.with_mut(|t| (*t).take()) };
 
                 // Release the lock
                 self.state.fetch_and(!NOTIFYING, Release);

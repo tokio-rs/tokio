@@ -8,8 +8,15 @@ macro_rules! debug {
     }
 }
 
+macro_rules! if_fuzz {
+    ($($t:tt)*) => {{
+        if false { $($t)* }
+    }}
+}
+
 mod atomic_task;
 mod loom;
+// pub mod oneshot;
 pub mod mpsc;
 mod semaphore;
 

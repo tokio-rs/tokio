@@ -3,6 +3,12 @@ extern crate futures;
 #[macro_use]
 extern crate loom;
 
+macro_rules! if_fuzz {
+    ($($t:tt)*) => {
+        $($t)*
+    }
+}
+
 #[path = "../src/mpsc/list.rs"]
 #[allow(warnings)]
 mod list;

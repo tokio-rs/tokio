@@ -1,13 +1,14 @@
 use loom::{
     self,
+    sync::CausalCell,
     sync::atomic::{
         AtomicPtr,
         AtomicUsize,
     },
 };
 
-use std::cell::UnsafeCell;
 use std::mem::{self, ManuallyDrop};
+use std::ops;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel};
 
@@ -28,16 +29,18 @@ pub(crate) struct Block<T> {
 
     /// The observed `tail_position` value *after* the block has been passed by
     /// `block_tail`.
-    observed_tail_position: UnsafeCell<usize>,
+    observed_tail_position: CausalCell<usize>,
 
     /// Values
-    values: [UnsafeCell<ManuallyDrop<T>>; BLOCK_CAP],
+    values: Values<T>,
 }
 
 pub(crate) enum Read<T> {
     Value(T),
     Closed,
 }
+
+struct Values<T>([CausalCell<ManuallyDrop<T>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
 
@@ -83,10 +86,10 @@ impl<T> Block<T> {
 
             ready_slots: AtomicUsize::new(0),
 
-            observed_tail_position: UnsafeCell::new(0),
+            observed_tail_position: CausalCell::new(0),
 
             // Value storage
-            values: unsafe { mem::uninitialized() },
+            values: unsafe { Values::uninitialized() },
         }
     }
 
@@ -128,8 +131,9 @@ impl<T> Block<T> {
         }
 
         // Get the value
-        let value = ptr::read(
-            self.values[offset].get());
+        let value = self.values[offset].with(|ptr| {
+            ptr::read(ptr)
+        });
 
         Some(Read::Value(ManuallyDrop::into_inner(value)))
     }
@@ -146,9 +150,9 @@ impl<T> Block<T> {
         // Get the offset into the block
         let slot_offset = offset(slot_index);
 
-        ptr::write(
-            self.values[slot_offset].get(),
-            ManuallyDrop::new(value));
+        self.values[slot_offset].with_mut(|ptr| {
+            ptr::write(ptr, ManuallyDrop::new(value));
+        });
 
         // Release the value. After this point, the slot ref may no longer
         // be used. It is possible for the receiver to free the memory at
@@ -189,7 +193,7 @@ impl<T> Block<T> {
     pub unsafe fn tx_release(&self, tail_position: usize) {
         // Track the observed tail_position. Any sender targetting a greater
         // tail_position is guaranteed to not access this block.
-        *self.observed_tail_position.get() = tail_position;
+        self.observed_tail_position.with_mut(|ptr| *ptr = tail_position);
 
         // Set the released bit, signalling to the receiver that it is safe to
         // free the block's memory as soon as all slots **prior** to
@@ -223,7 +227,7 @@ impl<T> Block<T> {
         if 0 == RELEASED & self.ready_slots.load(Acquire) {
             None
         } else {
-            Some(unsafe { *self.observed_tail_position.get() })
+            Some(self.observed_tail_position.with(|ptr| unsafe { *ptr }))
         }
     }
 
@@ -358,4 +362,31 @@ fn is_ready(bits: usize, slot: usize) -> bool {
 /// Returns `true` if the closed flag has been set.
 fn is_tx_closed(bits: usize) -> bool {
     TX_CLOSED == bits & TX_CLOSED
+}
+
+impl<T> Values<T> {
+    unsafe fn uninitialized() -> Values<T> {
+        let mut vals = mem::uninitialized();
+
+        // When fuzzing, `CausalCell` needs to be initialized.
+        if_fuzz! {
+            use std::ptr;
+
+            for v in &mut vals {
+                ptr::write(
+                    v as *mut _,
+                    CausalCell::new(mem::zeroed()));
+            }
+        }
+
+        Values(vals)
+    }
+}
+
+impl<T> ops::Index<usize> for Values<T> {
+    type Output = CausalCell<ManuallyDrop<T>>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.0.index(index)
+    }
 }
