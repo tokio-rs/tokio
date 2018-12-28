@@ -63,8 +63,8 @@ matrix:
         cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
 
   # This runs cargo +nightly doc
-  - rust: nightly
-    env: ALLOW_FAILURES=true # FIXME remove this live after #437 is resolved
+  - name: nightly_docs
+    rust: nightly
     script: cargo doc
 
   allow_failures:
