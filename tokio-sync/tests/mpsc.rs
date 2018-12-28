@@ -8,6 +8,7 @@ use tokio_mock_task::*;
 use futures::prelude::*;
 
 use std::thread;
+use std::sync::Arc;
 
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
@@ -35,12 +36,59 @@ macro_rules! assert_not_ready {
 
 #[test]
 fn send_recv_with_buffer() {
-    let (tx, rx) = mpsc::channel::<i32>(16);
-    let mut rx = rx.wait();
+    let (mut tx, mut rx) = mpsc::channel::<i32>(16);
 
-    tx.send(1).wait().unwrap();
+    // Using poll_ready / try_send
+    assert_ready!(tx.poll_ready());
+    tx.try_send(1).unwrap();
 
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    // Without poll_ready
+    tx.try_send(2).unwrap();
+
+    // Sink API
+    assert!(tx.start_send(3).unwrap().is_ready());
+    assert_ready!(tx.poll_complete());
+    assert_ready!(tx.close());
+
+    drop(tx);
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(1));
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(2));
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(3));
+
+    let val = assert_ready!(rx.poll());
+    assert!(val.is_none());
+}
+
+#[test]
+fn send_recv_unbounded() {
+    let (mut tx, mut rx) = mpsc::unbounded_channel::<i32>();
+
+    // Using `try_send`
+    tx.try_send(1).unwrap();
+
+    // Using `Sink` API
+    assert!(tx.start_send(2).unwrap().is_ready());
+    assert_ready!(tx.poll_complete());
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(1));
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(2));
+
+    assert_ready!(tx.poll_complete());
+    assert_ready!(tx.close());
+
+    drop(tx);
+
+    let val = assert_ready!(rx.poll());
+    assert!(val.is_none());
 }
 
 #[test]
@@ -190,11 +238,10 @@ fn try_send_fail() {
 }
 
 #[test]
-#[ignore]
 fn drop_tx_with_permit_releases_permit() {
     // poll_ready reserves capacity, ensure that the capacity is released if tx
     // is dropped w/o sending a value.
-    let (mut tx1, rx) = mpsc::channel::<i32>(1);
+    let (mut tx1, _rx) = mpsc::channel::<i32>(1);
     let mut tx2 = tx1.clone();
     let mut task = MockTask::new();
 
@@ -209,4 +256,32 @@ fn drop_tx_with_permit_releases_permit() {
     assert!(task.is_notified());
 
     assert_ready!(tx2.poll_ready());
+}
+
+#[test]
+fn dropping_rx_closes_channel() {
+    let (mut tx, rx) = mpsc::channel(100);
+
+    let msg = Arc::new(());
+    tx.try_send(msg.clone()).unwrap();
+
+    drop(rx);
+    assert!(tx.poll_ready().is_err());
+
+    assert_eq!(1, Arc::strong_count(&msg));
+}
+
+#[test]
+fn unconsumed_messagers_are_dropped() {
+    let msg = Arc::new(());
+
+    let (mut tx, rx) = mpsc::channel(100);
+
+    tx.try_send(msg.clone()).unwrap();
+
+    assert_eq!(2, Arc::strong_count(&msg));
+
+    drop((tx, rx));
+
+    assert_eq!(1, Arc::strong_count(&msg));
 }

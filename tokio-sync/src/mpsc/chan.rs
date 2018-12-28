@@ -14,7 +14,7 @@ pub(crate) struct Tx<T, S: Semaphore> {
 }
 
 /// Channel receiver
-pub(crate) struct Rx<T, S> {
+pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
 }
 
@@ -172,6 +172,10 @@ where
     pub fn close(&mut self) {
         let rx_fields = unsafe { &mut *self.inner.rx_fields.get() };
 
+        if rx_fields.rx_closed {
+            return;
+        }
+
         rx_fields.rx_closed = true;
         self.inner.semaphore.close();
     }
@@ -221,6 +225,36 @@ where
             Ok(Ready(None))
         } else {
             Ok(NotReady)
+        }
+    }
+}
+
+impl<T, S> Drop for Rx<T, S>
+where
+    S: Semaphore,
+{
+    fn drop(&mut self) {
+        use super::block::Read::Value;
+
+        self.close();
+
+        let rx_fields = unsafe { &mut *self.inner.rx_fields.get() };
+
+        while let Some(Value(_)) = rx_fields.list.pop(&self.inner.tx) {
+            self.inner.semaphore.add_permit();
+        }
+    }
+}
+
+// ===== impl Chan =====
+
+impl<T, S> Drop for Chan<T, S> {
+    fn drop(&mut self) {
+        use super::block::Read::Value;
+
+        let rx_fields = unsafe { &mut *self.rx_fields.get() };
+
+        while let Some(Value(_)) = rx_fields.list.pop(&self.tx) {
         }
     }
 }
