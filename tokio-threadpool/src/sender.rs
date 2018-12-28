@@ -161,7 +161,10 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         // Create a new task for the future
         let task = Arc::new(Task::new(future));
 
-        self.pool.submit_to_random(task, &self.pool);
+        // Call `submit_external()` in order to place the task into the global
+        // queue. This way all workers have equal chance of running this task,
+        // which means IO handles will be assigned to reactors more evenly.
+        self.pool.submit_external(task, &self.pool);
 
         Ok(())
     }

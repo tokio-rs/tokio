@@ -4,7 +4,7 @@ mod queue;
 mod state;
 
 pub(crate) use self::blocking::{Blocking, CanBlock};
-pub(crate) use self::queue::{Queue, Poll};
+pub(crate) use self::queue::Queue;
 use self::blocking_state::BlockingState;
 use self::state::State;
 
@@ -30,9 +30,6 @@ pub(crate) struct Task {
 
     /// Task blocking related state
     blocking: AtomicUsize,
-
-    /// Next pointer in the queue that submits tasks to a worker.
-    next: AtomicPtr<Task>,
 
     /// Next pointer in the queue of tasks pending blocking capacity.
     next_blocking: AtomicPtr<Task>,
@@ -63,7 +60,6 @@ impl Task {
         Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
-            next: AtomicPtr::new(ptr::null_mut()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             future: UnsafeCell::new(Some(task_fut)),
         }
@@ -78,7 +74,6 @@ impl Task {
         Task {
             state: AtomicUsize::new(State::stub().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
-            next: AtomicPtr::new(ptr::null_mut()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             future: UnsafeCell::new(Some(task_fut)),
         }
@@ -237,7 +232,6 @@ impl Task {
 impl fmt::Debug for Task {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Task")
-            .field("next", &self.next)
             .field("state", &self.state)
             .field("future", &"Spawn<BoxFuture>")
             .finish()
