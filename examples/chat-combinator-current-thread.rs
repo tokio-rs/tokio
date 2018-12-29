@@ -6,6 +6,11 @@
 //! This example is similar to chat.rs, but uses combinators and a much more
 //! functional style.
 //!
+//! Because we are here running the reactor/executor on the same thread instead
+//! of a threadpool, we can avoid full synchronization with Arc + Mutex and use
+//! Rc + RefCell instead. The max performance is however limited to a CPU HW
+//! thread.
+//!
 //! You can test this out by running:
 //!
 //!     cargo run --example chat-combinator-current-thread
@@ -27,8 +32,7 @@ extern crate futures;
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
-use tokio::runtime::current_thread::Runtime;
-use tokio::runtime::current_thread::TaskExecutor;
+use tokio::runtime::current_thread::{Runtime, TaskExecutor};
 
 use std::collections::HashMap;
 use std::iter;
