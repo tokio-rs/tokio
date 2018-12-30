@@ -31,20 +31,13 @@ struct Inner<T> {
 
     /// The value. This is set by `Sender` and read by `Receiver`. The state of
     /// the cell is tracked by `state`.
-    value: CausalCell<ManuallyDrop<T>>,
+    value: CausalCell<Option<T>>,
 
     /// The task to notify when the receiver drops without consuming the value.
     tx_task: CausalCell<ManuallyDrop<Task>>,
 
     /// The task to notify when the value is sent.
     rx_task: CausalCell<ManuallyDrop<Task>>,
-
-    /// Fields only accessed by receiver
-    rx_fields: UnsafeCell<RxFields>,
-}
-
-struct RxFields {
-    consumed: bool,
 }
 
 /// States:
@@ -57,12 +50,9 @@ struct State(usize);
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
-        value: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
+        value: CausalCell::new(None),
         tx_task: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
         rx_task: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
-        rx_fields: UnsafeCell::new(RxFields {
-            consumed: false,
-        }),
     });
 
     let tx = Sender { inner: inner.clone() };
@@ -74,15 +64,8 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 impl<T> Sender<T> {
     pub fn send(self, t: T) -> Result<(), T> {
         self.inner.value.with_mut(|ptr| {
-            unsafe { ptr::write(ptr, ManuallyDrop::new(t)); }
+            unsafe { *ptr = Some(t); }
         });
-
-        let prev = State::set_complete(&self.inner.state);
-
-        if prev.is_rx_task_set() {
-            let rx_task = unsafe { self.inner.rx_task() };
-            rx_task.notify();
-        }
 
         Ok(())
     }
@@ -96,6 +79,17 @@ impl<T> Sender<T> {
     }
 }
 
+impl<T> Drop for Sender<T> {
+    fn drop(&mut self) {
+        let prev = State::set_complete(&self.inner.state);
+
+        if prev.is_rx_task_set() {
+            let rx_task = unsafe { self.inner.rx_task() };
+            rx_task.notify();
+        }
+    }
+}
+
 impl<T> Receiver<T> {
     pub fn close(&mut self) {
         unimplemented!();
@@ -106,14 +100,9 @@ impl<T> Receiver<T> {
     }
 
     /// Consume the value. This function does not check `state`.
-    unsafe fn consume_value(&mut self) -> T {
-        let rx_fields = &mut *self.inner.rx_fields.get();
-
-        assert!(!rx_fields.consumed);
-        rx_fields.consumed = true;
-
-        self.inner.value.with(|ptr| {
-            ManuallyDrop::into_inner(ptr::read(ptr))
+    unsafe fn consume_value(&mut self) -> Option<T> {
+        self.inner.value.with_mut(|ptr| {
+            (*ptr).take()
         })
     }
 
@@ -132,8 +121,10 @@ impl<T> Future for Receiver<T> {
         let mut state = State::load(&self.inner.state, Acquire);
 
         if state.is_complete() {
-            let value = unsafe { self.consume_value() };
-            return Ok(Async::Ready(value));
+            match unsafe { self.consume_value() } {
+                Some(value) => return Ok(Async::Ready(value)),
+                None => return Err(Error {}),
+            }
         }
 
         if state.is_rx_task_set() {
@@ -153,8 +144,10 @@ impl<T> Future for Receiver<T> {
             state = State::set_rx_task(&self.inner.state);
 
             if state.is_complete() {
-                let value = unsafe { self.consume_value() };
-                return Ok(Async::Ready(value));
+                match unsafe { self.consume_value() } {
+                    Some(value) => return Ok(Async::Ready(value)),
+                    None => return Err(Error {}),
+                }
             }
         }
 
