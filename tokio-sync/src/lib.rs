@@ -16,7 +16,7 @@ macro_rules! if_fuzz {
 
 mod atomic_task;
 mod loom;
-// pub mod oneshot;
+pub mod oneshot;
 pub mod mpsc;
 pub mod semaphore;
 

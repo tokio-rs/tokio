@@ -4,9 +4,7 @@ use super::block::{self, Block};
 
 use loom::{
     self,
-    sync::{
-        atomic::{AtomicUsize, AtomicPtr},
-    },
+    sync::atomic::{AtomicUsize, AtomicPtr},
 };
 
 use std::ptr::NonNull;
