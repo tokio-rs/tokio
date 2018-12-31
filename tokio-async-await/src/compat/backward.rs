@@ -84,6 +84,6 @@ unsafe impl UnsafeWake for NoopWaker {
     }
 
     unsafe fn wake(&self) {
-        panic!("NoopWake cannot wake");
+        unimplemented!("async-await-preview currently only supports futures 0.1. Use the compatibility layer of futures 0.3 instead, if you want to use futures 0.3.");
     }
 }
