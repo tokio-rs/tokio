@@ -7,23 +7,23 @@ use loom::{
 
 use futures::{Async, Future, Poll};
 
-use std::cell::UnsafeCell;
 use std::mem::{self, ManuallyDrop};
-use std::ptr;
 use std::sync::Arc;
-use std::sync::atomic;
-use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel};
+use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
 
 pub struct Sender<T> {
-    inner: Arc<Inner<T>>,
+    inner: Option<Arc<Inner<T>>>,
 }
 
 pub struct Receiver<T> {
-    inner: Arc<Inner<T>>,
+    inner: Option<Arc<Inner<T>>>,
 }
 
 #[derive(Debug)]
 pub struct Error {}
+
+#[derive(Debug)]
+pub struct TryRecvError {}
 
 struct Inner<T> {
     /// Manages the state of the inner cell
@@ -55,61 +55,110 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
         rx_task: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
     });
 
-    let tx = Sender { inner: inner.clone() };
-    let rx = Receiver { inner };
+    let tx = Sender { inner: Some(inner.clone()) };
+    let rx = Receiver { inner: Some(inner) };
 
     (tx, rx)
 }
 
 impl<T> Sender<T> {
-    pub fn send(self, t: T) -> Result<(), T> {
-        self.inner.value.with_mut(|ptr| {
+    pub fn send(mut self, t: T) -> Result<(), T> {
+        let inner = self.inner.take().unwrap();
+
+        inner.value.with_mut(|ptr| {
             unsafe { *ptr = Some(t); }
         });
+
+        if !inner.complete() {
+            return Err(inner.value.with_mut(|ptr| {
+                unsafe { (*ptr).take() }.unwrap()
+            }));
+        }
 
         Ok(())
     }
 
     pub fn poll_cancel(&mut self) -> Poll<(), ()> {
-        unimplemented!();
+        let inner = self.inner.as_ref().unwrap();
+
+        let mut state = State::load(&inner.state, Acquire);
+
+        if state.is_closed() {
+            return Ok(Async::Ready(()));
+        }
+
+        if state.is_tx_task_set() {
+            let tx_task = unsafe { inner.tx_task() };
+
+            if !tx_task.will_notify_current() {
+                unimplemented!();
+            }
+        }
+
+        if !state.is_tx_task_set() {
+            // Attempt to set the task
+            unsafe { inner.set_tx_task(); }
+
+            // Update the state
+            state = State::set_tx_task(&inner.state);
+
+            if state.is_closed() {
+                return Ok(Async::Ready(()));
+            }
+        }
+
+        Ok(Async::NotReady)
     }
 
     pub fn is_canceled(&self) -> bool {
-        unimplemented!();
+        let inner = self.inner.as_ref().unwrap();
+
+        let state = State::load(&inner.state, Acquire);
+        state.is_closed()
     }
 }
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        let prev = State::set_complete(&self.inner.state);
-
-        if prev.is_rx_task_set() {
-            let rx_task = unsafe { self.inner.rx_task() };
-            rx_task.notify();
+        if let Some(inner) = self.inner.as_ref() {
+            inner.complete();
         }
     }
 }
 
 impl<T> Receiver<T> {
     pub fn close(&mut self) {
-        unimplemented!();
+        let inner = self.inner.as_ref().unwrap();
+        inner.close();
     }
 
-    pub fn try_recv(&mut self) -> Result<Option<T>, Error> {
-        unimplemented!();
-    }
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        let result = if let Some(inner) = self.inner.as_ref() {
+            let state = State::load(&inner.state, Acquire);
 
-    /// Consume the value. This function does not check `state`.
-    unsafe fn consume_value(&mut self) -> Option<T> {
-        self.inner.value.with_mut(|ptr| {
-            (*ptr).take()
-        })
-    }
+            if state.is_complete() {
+                match unsafe { inner.consume_value() } {
+                    Some(value) => Ok(value),
+                    None => Err(TryRecvError {}),
+                }
+            } else {
+                // Not ready, this does not clear `inner`
+                return Err(TryRecvError {});
+            }
+        } else {
+            panic!("called after complete");
+        };
 
-    unsafe fn set_rx_task(&self) {
-        self.inner.rx_task.with_mut(|ptr| {
-            *ptr = ManuallyDrop::new(task::current())
-        });
+        self.inner = None;
+        result
+    }
+}
+
+impl<T> Drop for Receiver<T> {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.as_ref() {
+            inner.close();
+        }
     }
 }
 
@@ -118,51 +167,127 @@ impl<T> Future for Receiver<T> {
     type Error = Error;
 
     fn poll(&mut self) -> Poll<T, Error> {
-        let mut state = State::load(&self.inner.state, Acquire);
+        use futures::Async::{Ready, NotReady};
 
-        if state.is_complete() {
-            match unsafe { self.consume_value() } {
-                Some(value) => return Ok(Async::Ready(value)),
-                None => return Err(Error {}),
-            }
-        }
-
-        if state.is_rx_task_set() {
-            let rx_task = unsafe { self.inner.rx_task() };
-            // Check if the task is still the same
-            if !rx_task.will_notify_current() {
-                // Unset the task
-                unimplemented!();
-            }
-        }
-
-        if !state.is_rx_task_set() {
-            // Attempt to set the task
-            unsafe { self.set_rx_task(); }
-
-            // Update the state
-            state = State::set_rx_task(&self.inner.state);
+        let ret = if let Some(inner) = self.inner.as_ref() {
+            let mut state = State::load(&inner.state, Acquire);
 
             if state.is_complete() {
-                match unsafe { self.consume_value() } {
-                    Some(value) => return Ok(Async::Ready(value)),
-                    None => return Err(Error {}),
+                match unsafe { inner.consume_value() } {
+                    Some(value) => Ok(Ready(value)),
+                    None => Err(Error {}),
+                }
+            } else {
+                if state.is_rx_task_set() {
+                    let rx_task = unsafe { inner.rx_task() };
+                    // Check if the task is still the same
+                    if !rx_task.will_notify_current() {
+                        // Unset the task
+                        unimplemented!();
+                    }
+                }
+
+                if !state.is_rx_task_set() {
+                    // Attempt to set the task
+                    unsafe { inner.set_rx_task(); }
+
+                    // Update the state
+                    state = State::set_rx_task(&inner.state);
+
+                    if state.is_complete() {
+                        match unsafe { inner.consume_value() } {
+                            Some(value) => Ok(Ready(value)),
+                            None => Err(Error {}),
+                        }
+                    } else {
+                        return Ok(NotReady);
+                    }
+                } else {
+                    return Ok(NotReady);
                 }
             }
-        }
+        } else {
+            panic!("called after complete");
+        };
 
-        Ok(Async::NotReady)
+        self.inner = None;
+        ret
     }
 }
 
 impl<T> Inner<T> {
+    fn complete(&self) -> bool {
+        let prev = State::set_complete(&self.state);
+
+        if prev.is_closed() {
+            return false;
+        }
+
+        if prev.is_rx_task_set() {
+            let rx_task = unsafe { self.rx_task() };
+            rx_task.notify();
+        }
+
+        true
+    }
+
+    /// Called by `Receiver` to indicate that the value will never be received.
+    fn close(&self) {
+        let prev = State::set_closed(&self.state);
+        debug_assert!(!prev.is_complete());
+
+        if prev.is_tx_task_set() {
+            let tx_task = unsafe { self.tx_task() };
+            tx_task.notify();
+        }
+    }
+
+    /// Consume the value. This function does not check `state`.
+    unsafe fn consume_value(&self) -> Option<T> {
+        self.value.with_mut(|ptr| {
+            (*ptr).take()
+        })
+    }
+
     unsafe fn rx_task(&self) -> &Task {
         &*self.rx_task.with(|ptr| ptr)
     }
+
+    unsafe fn set_rx_task(&self) {
+        self.rx_task.with_mut(|ptr| {
+            *ptr = ManuallyDrop::new(task::current())
+        });
+    }
+
+    unsafe fn tx_task(&self) -> &Task {
+        &*self.tx_task.with(|ptr| ptr)
+    }
+
+    unsafe fn set_tx_task(&self) {
+        self.tx_task.with_mut(|ptr| {
+            *ptr = ManuallyDrop::new(task::current())
+        });
+    }
 }
 
-const RX_TASK_SET: usize = 0b0001;
-const VALUE_SENT: usize  = 0b0010;
+impl<T> Drop for Inner<T> {
+    fn drop(&mut self) {
+        let state = State(*self.state.get_mut());
+
+        if state.is_rx_task_set() {
+            self.rx_task.with_mut(|ptr| {
+                unsafe {
+                    ManuallyDrop::drop(&mut *ptr);
+                }
+            });
+        }
+    }
+}
+
+const RX_TASK_SET: usize = 0b00001;
+const VALUE_SENT: usize  = 0b00010;
+const CLOSED: usize      = 0b00100;
+const TX_TASK_SET: usize = 0b10000;
 
 impl State {
     fn new() -> State {
@@ -188,6 +313,26 @@ impl State {
     fn set_rx_task(cell: &AtomicUsize) -> State {
         let val = cell.fetch_or(RX_TASK_SET, AcqRel);
         State(val)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.0 & CLOSED == CLOSED
+    }
+
+    fn set_closed(cell: &AtomicUsize) -> State {
+        // Acquire because we want all later writes (attempting to poll) to be
+        // ordered after this.
+        let val = cell.fetch_or(CLOSED, Acquire);
+        State(val)
+    }
+
+    fn set_tx_task(cell: &AtomicUsize) -> State {
+        let val = cell.fetch_or(TX_TASK_SET, AcqRel);
+        State(val)
+    }
+
+    fn is_tx_task_set(&self) -> bool {
+        self.0 & TX_TASK_SET == TX_TASK_SET
     }
 
     fn as_usize(self) -> usize {
