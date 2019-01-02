@@ -1,4 +1,4 @@
-use runtime::{Inner, Runtime};
+use super::{Inner, Runtime};
 
 use reactor::Reactor;
 
