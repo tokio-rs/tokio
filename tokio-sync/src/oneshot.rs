@@ -141,6 +141,8 @@ impl<T> Receiver<T> {
                     Some(value) => Ok(value),
                     None => Err(TryRecvError {}),
                 }
+            } else if state.is_closed() {
+                Err(TryRecvError {})
             } else {
                 // Not ready, this does not clear `inner`
                 return Err(TryRecvError {});
@@ -169,7 +171,9 @@ impl<T> Future for Receiver<T> {
     fn poll(&mut self) -> Poll<T, Error> {
         use futures::Async::{Ready, NotReady};
 
+        // If `inner` is `None`, then `poll()` has already completed.
         let ret = if let Some(inner) = self.inner.as_ref() {
+            // Load the state
             let mut state = State::load(&inner.state, Acquire);
 
             if state.is_complete() {
@@ -177,6 +181,8 @@ impl<T> Future for Receiver<T> {
                     Some(value) => Ok(Ready(value)),
                     None => Err(Error {}),
                 }
+            } else if state.is_closed() {
+                Err(Error {})
             } else {
                 if state.is_rx_task_set() {
                     let rx_task = unsafe { inner.rx_task() };
@@ -234,9 +240,8 @@ impl<T> Inner<T> {
     /// Called by `Receiver` to indicate that the value will never be received.
     fn close(&self) {
         let prev = State::set_closed(&self.state);
-        debug_assert!(!prev.is_complete());
 
-        if prev.is_tx_task_set() {
+        if prev.is_tx_task_set() && !prev.is_complete() {
             let tx_task = unsafe { self.tx_task() };
             tx_task.notify();
         }
@@ -270,12 +275,23 @@ impl<T> Inner<T> {
     }
 }
 
+unsafe impl<T: Send> Send for Inner<T> {}
+unsafe impl<T: Send> Sync for Inner<T> {}
+
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
         let state = State(*self.state.get_mut());
 
         if state.is_rx_task_set() {
             self.rx_task.with_mut(|ptr| {
+                unsafe {
+                    ManuallyDrop::drop(&mut *ptr);
+                }
+            });
+        }
+
+        if state.is_tx_task_set() {
+            self.tx_task.with_mut(|ptr| {
                 unsafe {
                     ManuallyDrop::drop(&mut *ptr);
                 }

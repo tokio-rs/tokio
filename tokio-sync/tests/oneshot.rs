@@ -27,6 +27,11 @@ macro_rules! assert_not_ready {
     }}
 }
 
+
+trait AssertSend: Send {}
+impl AssertSend for oneshot::Sender<i32> {}
+impl AssertSend for oneshot::Receiver<i32> {}
+
 #[test]
 fn send_recv() {
     let (tx, mut rx) = oneshot::channel();
@@ -36,7 +41,7 @@ fn send_recv() {
         assert_not_ready!(rx.poll());
     });
 
-    tx.send(1).unwrap();
+    assert!(tx.send(1).is_ok());
 
     assert!(task.is_notified());
 
@@ -56,8 +61,7 @@ fn cancel_tx() {
     drop(tx);
 
     assert!(task.is_notified());
-
-    rx.poll().unwrap_err();
+    assert!(rx.poll().is_err());
 }
 
 #[test]
@@ -70,7 +74,7 @@ fn cancel_rx() {
 
     // Second, via poll_cancel();
 
-    let (mut tx, rx) = oneshot::channel::<i32>();
+    let (mut tx, rx) = oneshot::channel();
     let mut task = MockTask::new();
 
     task.enter(|| assert_not_ready!(tx.poll_cancel()));
@@ -80,4 +84,115 @@ fn cancel_rx() {
     assert!(task.is_notified());
     assert!(tx.is_canceled());
     assert_ready!(tx.poll_cancel());
+
+    assert!(tx.send(1).is_err());
+}
+
+#[test]
+fn explicit_close_poll() {
+    // First, with message sent
+    let (tx, mut rx) = oneshot::channel();
+
+    assert!(tx.send(1).is_ok());
+
+    rx.close();
+
+    let value = assert_ready!(rx.poll());
+    assert_eq!(value, 1);
+
+    println!("~~~~~~~~~ TWO ~~~~~~~~~~");
+
+    // Second, without the message sent
+    let (mut tx, mut rx) = oneshot::channel::<i32>();
+    let mut task = MockTask::new();
+
+    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+
+    rx.close();
+
+    assert!(task.is_notified());
+    assert!(tx.is_canceled());
+    assert_ready!(tx.poll_cancel());
+
+    assert!(tx.send(1).is_err());
+
+    assert!(rx.poll().is_err());
+
+    // Again, but without sending the value this time
+    let (mut tx, mut rx) = oneshot::channel::<i32>();
+    let mut task = MockTask::new();
+
+    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+
+    rx.close();
+
+    assert!(task.is_notified());
+    assert!(tx.is_canceled());
+    assert_ready!(tx.poll_cancel());
+
+    assert!(rx.poll().is_err());
+}
+
+#[test]
+fn explicit_close_try_recv() {
+    // First, with message sent
+    let (tx, mut rx) = oneshot::channel();
+
+    assert!(tx.send(1).is_ok());
+
+    rx.close();
+
+    assert_eq!(rx.try_recv().unwrap(), 1);
+
+    println!("~~~~~~~~~ TWO ~~~~~~~~~~");
+
+    // Second, without the message sent
+    let (mut tx, mut rx) = oneshot::channel::<i32>();
+    let mut task = MockTask::new();
+
+    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+
+    rx.close();
+
+    assert!(task.is_notified());
+    assert!(tx.is_canceled());
+    assert_ready!(tx.poll_cancel());
+
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+#[should_panic]
+fn close_try_recv_poll() {
+    let (_tx, mut rx) = oneshot::channel::<i32>();
+    let mut task = MockTask::new();
+
+    rx.close();
+
+    assert!(rx.try_recv().is_err());
+
+    task.enter(|| {
+        let _ = rx.poll();
+    });
+}
+
+#[test]
+fn drops_tasks() {
+    let (mut tx, mut rx) = oneshot::channel::<i32>();
+    let mut tx_task = MockTask::new();
+    let mut rx_task = MockTask::new();
+
+    tx_task.enter(|| {
+        assert_not_ready!(tx.poll_cancel());
+    });
+
+    rx_task.enter(|| {
+        assert_not_ready!(rx.poll());
+    });
+
+    drop(tx);
+    drop(rx);
+
+    assert_eq!(1, tx_task.notifier_ref_count());
+    assert_eq!(1, rx_task.notifier_ref_count());
 }
