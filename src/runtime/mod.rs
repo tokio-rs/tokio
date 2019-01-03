@@ -126,3 +126,19 @@ pub use self::threadpool::{
     run,
 };
 
+#[cfg(all(
+    feature = "current-thread",
+    not(feature = "threadpool")
+))]
+/// Start the Tokio runtime using the supplied future to bootstrap execution.
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+pub fn run<F>(future: F)
+where
+    // NOTE: The `Send` bounds must be here to match `threadpool::run`.
+    F: Future<Item = (), Error = ()> + Send + 'static,
+{
+    self::current_thread::run(future);
+}
