@@ -46,6 +46,7 @@
 
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crossbeam_utils::sync::{Parker, Unparker};
