@@ -74,27 +74,13 @@
 
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
-        #[cfg(all(
-            feature = "reactor",
-            feature = "timer",
-            any(
-                feature = "current_thread",
-                feature = "threadpool",
-            ),
-        ))]
+        #[cfg(any(feature = "current_thread", feature = "threadpool"))]
         $i
     )*)
 }
 
 #[cfg_attr(
-    all(
-        feature = "reactor",
-        feature = "timer",
-        any(
-            feature = "current_thread",
-            feature = "threadpool",
-        ),
-    ),
+    any(feature = "current_thread", feature = "threadpool"),
     macro_use
 )]
 extern crate futures;
