@@ -781,6 +781,8 @@ impl TcpStream {
     /// # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.1.14", note = "use `split()` instead")]
+    #[doc(hidden)]
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         let io = self.io.get_ref().try_clone()?;
         Ok(TcpStream::new(io))
