@@ -72,6 +72,7 @@ pub struct FieldSet {
 }
 
 /// An iterator over a set of fields.
+#[derive(Debug)]
 pub struct Iter {
     idxs: Range<usize>,
     fields: FieldSet,

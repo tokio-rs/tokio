@@ -1,3 +1,5 @@
+#![deny(missing_docs, warnings, missing_debug_implementations)]
+
 //! Core primitives for `tokio-trace`.
 //!
 //! `tokio-trace` is a framework for instrumenting Rust programs to collect
@@ -18,7 +20,7 @@
 //! * [`Dispatch`] allows span events to be dispatched to `Subscriber`s.
 //!
 //! Application authors will typically not use this crate directly. Instead,
-//! they will use the [`tokio-trace`] crate, which provides a much more
+//! they will use the `tokio-trace` crate, which provides a much more
 //! fully-featured API. However, this crate's API will change very infrequently,
 //! so it may be used when dependencies must be very stable.
 //!
@@ -29,9 +31,7 @@
 //! [`Field`]: ::field::Field
 //! [`FieldSet`]: ::field::FieldSet
 //! [`Dispatch`]: ::dispatcher::Dispatch
-//! [`tokio-trace`]: ../
 //!
-#![warn(missing_docs)]
 
 #[macro_use]
 extern crate lazy_static;

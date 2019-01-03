@@ -1,3 +1,4 @@
+//! Dispatches trace events to `Subscriber`s.
 use {
     callsite, field,
     subscriber::{self, Subscriber},
