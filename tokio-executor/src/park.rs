@@ -46,9 +46,9 @@
 
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, Condvar};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
+
+use crossbeam_utils::sync::{Parker, Unparker};
 
 /// Block the current thread.
 ///
@@ -167,26 +167,11 @@ pub struct ParkError {
 /// Unblocks a thread that was blocked by `ParkThread`.
 #[derive(Clone, Debug)]
 pub struct UnparkThread {
-    inner: Arc<Inner>,
+    inner: Unparker,
 }
-
-#[derive(Debug)]
-struct Inner {
-    state: AtomicUsize,
-    mutex: Mutex<()>,
-    condvar: Condvar,
-}
-
-const IDLE: usize = 0;
-const NOTIFY: usize = 1;
-const SLEEP: usize = 2;
 
 thread_local! {
-    static CURRENT_PARK_THREAD: Arc<Inner> = Arc::new(Inner {
-        state: AtomicUsize::new(IDLE),
-        mutex: Mutex::new(()),
-        condvar: Condvar::new(),
-    });
+    static CURRENT_PARKER: Parker = Parker::new();
 }
 
 // ===== impl ParkThread =====
@@ -204,9 +189,9 @@ impl ParkThread {
 
     /// Get a reference to the `ParkThread` handle for this thread.
     fn with_current<F, R>(&self, f: F) -> R
-        where F: FnOnce(&Arc<Inner>) -> R,
+        where F: FnOnce(&Parker) -> R,
     {
-        CURRENT_PARK_THREAD.with(|inner| f(inner))
+        CURRENT_PARKER.with(|inner| f(inner))
     }
 }
 
@@ -215,16 +200,18 @@ impl Park for ParkThread {
     type Error = ParkError;
 
     fn unpark(&self) -> Self::Unpark {
-        let inner = self.with_current(|inner| inner.clone());
+        let inner = self.with_current(|inner| inner.unparker().clone());
         UnparkThread { inner }
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.with_current(|inner| inner.park(None))
+        self.with_current(|inner| inner.park());
+        Ok(())
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.with_current(|inner| inner.park(Some(duration)))
+        self.with_current(|inner| inner.park_timeout(duration));
+        Ok(())
     }
 }
 
@@ -233,76 +220,5 @@ impl Park for ParkThread {
 impl Unpark for UnparkThread {
     fn unpark(&self) {
         self.inner.unpark();
-    }
-}
-
-// ===== impl Inner =====
-
-impl Inner {
-    /// Park the current thread for at most `dur`.
-    fn park(&self, timeout: Option<Duration>) -> Result<(), ParkError> {
-        // If currently notified, then we skip sleeping. This is checked outside
-        // of the lock to avoid acquiring a mutex if not necessary.
-        match self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
-            NOTIFY => return Ok(()),
-            IDLE => {},
-            _ => unreachable!(),
-        }
-
-        // The state is currently idle, so obtain the lock and then try to
-        // transition to a sleeping state.
-        let mut m = self.mutex.lock().unwrap();
-
-        // Transition to sleeping
-        match self.state.compare_and_swap(IDLE, SLEEP, Ordering::SeqCst) {
-            NOTIFY => {
-                // Notified before we could sleep, consume the notification and
-                // exit
-                self.state.store(IDLE, Ordering::SeqCst);
-                return Ok(());
-            }
-            IDLE => {},
-            _ => unreachable!(),
-        }
-
-        m = match timeout {
-            Some(timeout) => self.condvar.wait_timeout(m, timeout).unwrap().0,
-            None => self.condvar.wait(m).unwrap(),
-        };
-
-        // Transition back to idle. If the state has transitioned to `NOTIFY`,
-        // this will consume that notification
-        self.state.store(IDLE, Ordering::SeqCst);
-
-        // Explicitly drop the mutex guard. There is no real point in doing it
-        // except that I find it helpful to make it explicit where we want the
-        // mutex to unlock.
-        drop(m);
-
-        Ok(())
-    }
-
-    fn unpark(&self) {
-        // First, try transitioning from IDLE -> NOTIFY, this does not require a
-        // lock.
-        match self.state.compare_and_swap(IDLE, NOTIFY, Ordering::SeqCst) {
-            IDLE | NOTIFY => return,
-            SLEEP => {}
-            _ => unreachable!(),
-        }
-
-        // The other half is sleeping, this requires a lock
-        let _m = self.mutex.lock().unwrap();
-
-        // Transition to NOTIFY
-        match self.state.swap(NOTIFY, Ordering::SeqCst) {
-            SLEEP => {}
-            NOTIFY => return,
-            IDLE => return,
-            _ => unreachable!(),
-        }
-
-        // Wakeup the sleeper
-        self.condvar.notify_one();
     }
 }
