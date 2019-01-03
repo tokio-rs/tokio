@@ -455,7 +455,8 @@ impl fmt::Debug for Reactor {
 // ===== impl Handle =====
 
 impl Handle {
-    /// Returns a handle to the current reactor.
+    #[doc(hidden)]
+    #[deprecated(note = "semantics were sometimes surprising, use Handle::default()")]
     pub fn current() -> Handle {
         // TODO: Should this panic on error?
         HandlePriv::try_current()

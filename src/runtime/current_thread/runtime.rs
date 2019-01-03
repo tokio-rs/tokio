@@ -92,6 +92,10 @@ impl Error for RunError {
     fn description(&self) -> &str {
         self.inner.description()
     }
+
+    // FIXME(taiki-e): When the minimum support version of tokio reaches Rust 1.30,
+    // replace this with Error::source.
+    #[allow(deprecated)]
     fn cause(&self) -> Option<&Error> {
         self.inner.cause()
     }

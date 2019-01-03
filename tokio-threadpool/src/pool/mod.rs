@@ -15,7 +15,7 @@ use self::backup_stack::BackupStack;
 
 use config::Config;
 use shutdown::ShutdownTrigger;
-use task::{Task, Blocking};
+use task::{Blocking, Queue, Task};
 use worker::{self, Worker, WorkerId};
 
 use futures::Poll;
@@ -59,6 +59,12 @@ pub(crate) struct Pool {
     // The number of workers will *usually* be small.
     pub workers: Arc<[worker::Entry]>,
 
+    // The global MPMC queue of tasks.
+    //
+    // Spawned tasks are pushed into this queue. Although worker threads have their own dedicated
+    // task queues, they periodically steal tasks from this global queue, too.
+    pub queue: Arc<Queue>,
+
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     //
     // When spawning a new `Worker`, this weak reference is upgraded and handed out to the new
@@ -90,6 +96,7 @@ impl Pool {
         trigger: Weak<ShutdownTrigger>,
         max_blocking: usize,
         config: Config,
+        queue: Arc<Queue>,
     ) -> Pool {
         let pool_size = workers.len();
         let total_size = max_blocking + pool_size;
@@ -117,6 +124,7 @@ impl Pool {
             sleep_stack: CachePadded::new(worker::Stack::new()),
             num_workers: AtomicUsize::new(0),
             workers,
+            queue,
             trigger,
             backup,
             backup_stack,
@@ -264,50 +272,10 @@ impl Pool {
     pub fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
-        use worker::Lifecycle::Notified;
+        trace!("    -> submit external");
 
-        // First try to get a handle to a sleeping worker. This ensures that
-        // sleeping tasks get woken up
-        if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Notified, false) {
-            trace!("submit to existing worker; idx={}; state={:?}", idx, worker_state);
-            self.submit_to_external(idx, task, worker_state, pool);
-            return;
-        }
-
-        // All workers are active, so pick a random worker and submit the
-        // task to it.
-        self.submit_to_random(task, pool);
-    }
-
-    /// Submit a task to a random worker
-    ///
-    /// Called from outside of the scheduler, this function is how new tasks
-    /// enter the system.
-    pub fn submit_to_random(&self, task: Arc<Task>, pool: &Arc<Pool>) {
-        debug_assert_eq!(*self, **pool);
-
-        let len = self.workers.len();
-        let idx = self.rand_usize() % len;
-
-        trace!("  -> submitting to random; idx={}", idx);
-
-        let state = self.workers[idx].load_state();
-        self.submit_to_external(idx, task, state, pool);
-    }
-
-    fn submit_to_external(&self,
-                          idx: usize,
-                          task: Arc<Task>,
-                          state: worker::State,
-                          pool: &Arc<Pool>)
-    {
-        debug_assert_eq!(*self, **pool);
-
-        let entry = &self.workers[idx];
-
-        if !entry.submit_external(task, state) {
-            self.spawn_thread(WorkerId::new(idx), pool);
-        }
+        self.queue.push(task);
+        self.signal_work(pool);
     }
 
     pub fn release_backup(&self, backup_id: BackupId) -> Result<(), ()> {
@@ -438,43 +406,21 @@ impl Pool {
     pub fn signal_work(&self, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
-        use worker::Lifecycle::*;
+        use worker::Lifecycle::Signaled;
 
-        if let Some((idx, mut worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
+        if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
             let entry = &self.workers[idx];
 
-            debug_assert!(worker_state.lifecycle() != Signaled, "actual={:?}", worker_state.lifecycle());
+            debug_assert!(
+                worker_state.lifecycle() != Signaled,
+                "actual={:?}", worker_state.lifecycle(),
+            );
 
-            // Transition the worker state to signaled
-            loop {
-                let mut next = worker_state;
+            trace!("signal_work -- notify; idx={}", idx);
 
-                next.set_lifecycle(Signaled);
-
-                let actual = entry.state.compare_and_swap(
-                    worker_state.into(), next.into(), AcqRel).into();
-
-                if actual == worker_state {
-                    break;
-                }
-
-                worker_state = actual;
-            }
-
-            // The state has been transitioned to signal, now we need to wake up
-            // the worker if necessary.
-            match worker_state.lifecycle() {
-                Sleeping => {
-                    trace!("signal_work -- wakeup; idx={}", idx);
-                    self.workers[idx].wakeup();
-                }
-                Shutdown => {
-                    trace!("signal_work -- spawn; idx={}", idx);
-                    self.spawn_thread(WorkerId(idx), pool);
-                }
-                Running | Notified | Signaled => {
-                    // The workers are already active. No need to wake them up.
-                }
+            if !entry.notify(worker_state) {
+                trace!("signal_work -- spawn; idx={}", idx);
+                self.spawn_thread(WorkerId(idx), pool);
             }
         }
     }

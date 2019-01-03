@@ -63,10 +63,11 @@ use std::time::{Instant, Duration};
 /// Cancelling a `Timeout` is done by dropping the value. No additional cleanup
 /// or other work is required.
 ///
-/// The original future or stream may be obtained by calling [`into_inner`]. This
+/// The original future or stream may be obtained by calling [`Timeout::into_inner`]. This
 /// consumes the `Timeout`.
 ///
 /// [`Error`]: struct.Error.html
+/// [`Timeout::into_inner`]: struct.Timeout.html#method.into_iter
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Timeout<T> {

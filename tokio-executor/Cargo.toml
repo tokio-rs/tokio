@@ -19,4 +19,5 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
+crossbeam-utils = "0.6.2"
 futures = "0.1.19"
