@@ -397,7 +397,8 @@ impl Pool {
         });
 
         if let Err(e) = res {
-            warn!("failed to spawn worker thread; err={:?}", e);
+            error!("failed to spawn worker thread; err={:?}", e);
+            panic!("failed to spawn worker thread: {:?}", e);
         }
     }
 
