@@ -143,11 +143,14 @@
 //! #[macro_use]
 //! extern crate tokio_trace;
 //! use tokio_trace::field;
+//! # #[derive(Debug)] pub struct Yak(String);
+//! # impl Yak { fn shave(&mut self, _: u32) {} }
+//! # fn find_a_razor() -> Result<u32, u32> { Ok(1) }
 //! # fn main() {
 //! pub fn shave_the_yak(yak: &mut Yak) {
 //!     // Create a new span for this invocation of `shave_the_yak`, annotated
 //!     // with  the yak being shaved as a *field* on the span.
-//!     span!("shave_the_yak", yak = field::debug(yak)).enter(|| {
+//!     span!("shave_the_yak", yak = field::debug(&yak)).enter(|| {
 //!         // Since the span is annotated with the yak, it is part of the context
 //!         // for everything happening inside the span. Therefore, we don't need
 //!         // to add it to the message for this event, as the `log` crate does.
