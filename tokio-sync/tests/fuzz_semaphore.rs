@@ -11,7 +11,7 @@ use semaphore::*;
 
 use futures::{future, Future, Async, Poll};
 use loom::thread;
-use loom::futures::{spawn, wait};
+use loom::futures::block_on;
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
@@ -52,23 +52,27 @@ fn basic_usage() {
         }
     }
 
-    loom::fuzz_future(|| {
+    loom::fuzz(|| {
         let shared = Arc::new(Shared {
             semaphore: Semaphore::new(NUM),
             active: AtomicUsize::new(0),
         });
 
         for _ in 0..NUM {
-            spawn(Actor {
-                waiter: Permit::new(),
-                shared: shared.clone(),
+            let shared = shared.clone();
+
+            thread::spawn(move || {
+                block_on(Actor {
+                    waiter: Permit::new(),
+                    shared,
+                }).unwrap();
             });
         }
 
-        Actor {
+        block_on(Actor {
             waiter: Permit::new(),
             shared
-        }
+        }).unwrap();
     });
 }
 
@@ -86,7 +90,7 @@ fn basic_closing() {
                 let mut permit = Permit::new();
 
                 for _ in 0..2 {
-                    wait(future::poll_fn(|| {
+                    block_on(future::poll_fn(|| {
                         permit.poll_acquire(&semaphore)
                             .map_err(|_| ())
                     }))?;

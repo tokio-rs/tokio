@@ -1,6 +1,4 @@
-#[macro_use]
 extern crate futures;
-#[macro_use]
 extern crate loom;
 
 #[path = "../src/oneshot.rs"]
@@ -8,7 +6,7 @@ extern crate loom;
 mod oneshot;
 
 use loom::thread;
-use loom::futures::wait;
+use loom::futures::block_on;
 
 #[test]
 fn smoke() {
@@ -16,10 +14,10 @@ fn smoke() {
         let (tx, rx) = oneshot::channel();
 
         thread::spawn(move || {
-            tx.send(1);
+            tx.send(1).unwrap();
         });
 
-        let value = wait(rx).unwrap();
+        let value = block_on(rx).unwrap();
         assert_eq!(1, value);
     });
 }

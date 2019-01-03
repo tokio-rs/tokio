@@ -2,11 +2,12 @@ extern crate futures;
 #[macro_use]
 extern crate loom;
 
-#[path = "../src/atomic_task.rs"]
+#[path = "../src/task/atomic_task.rs"]
 mod atomic_task;
 
 use atomic_task::AtomicTask;
 
+use loom::futures::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;
 
@@ -25,7 +26,7 @@ struct Chan {
 fn basic_notification() {
     const NUM_NOTIFY: usize = 2;
 
-    loom::fuzz_future(|| {
+    loom::fuzz(|| {
         let chan = Arc::new(Chan {
             num: AtomicUsize::new(0),
             task: AtomicTask::new(),
@@ -40,15 +41,14 @@ fn basic_notification() {
             });
         }
 
-        poll_fn(move || {
+        block_on(poll_fn(move || {
             chan.task.register();
 
-            println!(" + chan.num.load()");
             if NUM_NOTIFY == chan.num.load(Relaxed) {
                 return Ok(Async::Ready(()));
             }
 
-            Ok(Async::NotReady)
-        })
+            Ok::<_, ()>(Async::NotReady)
+        })).unwrap();
     });
 }
