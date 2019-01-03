@@ -432,6 +432,34 @@ macro_rules! event {
             event
         }
     });
+    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* } ) => ({
+        {
+            #[allow(unused_imports)]
+            use $crate::{callsite, Id, Subscriber, Event, field::{Value, AsField}};
+            use $crate::callsite::Callsite;
+            let callsite = callsite! { event:
+                $lvl,
+                target:
+                $target, $( $k ),*
+            };
+            let mut event = Event::new(callsite.interest(), callsite.metadata());
+            // Depending on how many fields are generated, this may or may
+            // not actually be used, but it doesn't make sense to repeat it.
+            #[allow(unused_variables, unused_mut)] {
+                if !event.is_disabled() {
+                    let mut keys = callsite.metadata().fields().into_iter();
+                    let msg_key = keys.next()
+                        .expect("event metadata should define a key for the message");
+                    $(
+                        let key = keys.next()
+                            .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
+                        event!(@ record: event, $k, &key, $($val)*);
+                    )*
+                }
+            }
+            event
+        }
+    });
     ( $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* }, $($arg)+)
     );
@@ -451,6 +479,9 @@ macro_rules! trace {
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* }, $($arg)+)
     );
+    ($( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* })
+    );
     ( $($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::TRACE, {}, $($arg)+));
     );
@@ -460,6 +491,9 @@ macro_rules! trace {
 macro_rules! debug {
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::DEBUG, { $($k $( = $val)* ),* }, $($arg)+)
+    );
+    ($( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::DEBUG, { $($k $( = $val)* ),* })
     );
     ( $($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::DEBUG, {}, $($arg)+));
@@ -471,6 +505,9 @@ macro_rules! info {
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::INFO, { $($k $( = $val)* ),* }, $($arg)+)
     );
+    ($( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::INFO, { $($k $( = $val)* ),* })
+    );
     ( $($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::INFO, {}, $($arg)+));
     );
@@ -481,6 +518,9 @@ macro_rules! warn {
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::WARN, { $($k $( = $val)* ),* }, $($arg)+)
     );
+    ($( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::WARN, { $($k $( = $val)* ),* })
+    );
     ( $($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::WARN, {}, $($arg)+));
     );
@@ -490,6 +530,9 @@ macro_rules! warn {
 macro_rules! error {
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::ERROR, { $($k $( = $val)* ),* }, $($arg)+)
+    );
+    ($( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::ERROR, { $($k $( = $val)* ),* })
     );
     ( $($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::ERROR, {}, $($arg)+));
