@@ -74,24 +74,21 @@
 
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
-        #[cfg(any(feature = "current_thread", feature = "threadpool"))]
+        #[cfg(any(feature = "rt-full"))]
         $i
     )*)
 }
 
-#[cfg_attr(
-    any(feature = "current_thread", feature = "threadpool"),
-    macro_use
-)]
+#[cfg_attr(feature = "rt-full", macro_use)]
 extern crate futures;
 
 #[cfg(feature = "io")]
 extern crate bytes;
 #[cfg(feature = "reactor")]
 extern crate mio;
-#[cfg(feature = "threadpool")]
+#[cfg(feature = "rt-full")]
 extern crate num_cpus;
-#[cfg(feature = "current-thread")]
+#[cfg(feature = "rt-full")]
 extern crate tokio_current_thread;
 #[cfg(feature = "io")]
 extern crate tokio_io;
@@ -101,7 +98,7 @@ extern crate tokio_codec;
 extern crate tokio_fs;
 #[cfg(feature = "reactor")]
 extern crate tokio_reactor;
-#[cfg(feature = "threadpool")]
+#[cfg(feature = "rt-full")]
 extern crate tokio_threadpool;
 #[cfg(feature = "timer")]
 extern crate tokio_timer;

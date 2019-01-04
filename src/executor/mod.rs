@@ -39,7 +39,6 @@
 //! [`Executor`]: trait.Executor.html
 //! [`spawn`]: fn.spawn.html
 
-#[cfg(feature = "current-thread")]
 #[deprecated(
     since = "0.1.8",
     note = "use tokio-current-thread crate or functions in tokio::runtime::current_thread instead",
@@ -47,7 +46,6 @@
 #[doc(hidden)]
 pub mod current_thread;
 
-#[cfg(feature = "threadpool")]
 #[deprecated(since = "0.1.8", note = "use tokio-threadpool crate instead")]
 #[doc(hidden)]
 /// Re-exports of [`tokio-threadpool`], deprecated in favor of the crate.

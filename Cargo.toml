@@ -45,24 +45,29 @@ members = [
 [features]
 default = [
   "codec",
-  "current-thread",
   "fs",
   "io",
   "reactor",
+  "rt-full",
   "tcp",
-  "threadpool",
   "timer",
   "udp",
   "uds",
 ]
 
 codec = ["tokio-codec"]
-current-thread = ["tokio-current-thread", "tokio-executor", "reactor", "timer"]
 fs = ["tokio-fs"]
 io = ["bytes", "tokio-io"]
 reactor = ["io", "mio", "tokio-reactor"]
+rt-full = [
+  "num_cpus",
+  "reactor",
+  "timer",
+  "tokio-current-thread",
+  "tokio-executor",
+  "tokio-threadpool",
+]
 tcp = ["tokio-tcp"]
-threadpool = ["num_cpus", "tokio-executor", "tokio-threadpool", "reactor", "timer"]
 timer = ["tokio-timer"]
 udp = ["tokio-udp"]
 uds = ["tokio-uds"]

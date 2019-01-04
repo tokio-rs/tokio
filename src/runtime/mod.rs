@@ -112,12 +112,9 @@
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 
-#[cfg(feature = "current-thread")]
 pub mod current_thread;
-#[cfg(feature = "threadpool")]
 mod threadpool;
 
-#[cfg(feature = "threadpool")]
 pub use self::threadpool::{
     Builder,
     Runtime,
@@ -126,19 +123,3 @@ pub use self::threadpool::{
     run,
 };
 
-#[cfg(all(
-    feature = "current-thread",
-    not(feature = "threadpool")
-))]
-/// Start the Tokio runtime using the supplied future to bootstrap execution.
-///
-/// # Panics
-///
-/// This function panics if called from the context of an executor.
-pub fn run<F>(future: F)
-where
-    // NOTE: The `Send` bounds must be here to match `threadpool::run`.
-    F: Future<Item = (), Error = ()> + Send + 'static,
-{
-    self::current_thread::run(future);
-}
