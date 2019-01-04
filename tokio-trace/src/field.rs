@@ -10,7 +10,7 @@ use Metadata;
 /// Indexing a field with a string results in an iterative search that performs
 /// string comparisons. Thus, if possible, once the key for a field is known, it
 /// should be used whenever possible.
-pub trait AsField {
+pub trait AsField: ::sealed::Sealed {
     /// Attempts to convert `&self` into a `Field` with the specified `metadata`.
     ///
     /// If `metadata` defines this field, then the field is returned. Otherwise,
@@ -18,7 +18,9 @@ pub trait AsField {
     fn as_field(&self, metadata: &Metadata) -> Option<Field>;
 }
 
-pub trait Record {
+// If, in the future, there's a valid use-case for user-defined `Record`
+// implementations, consider unsealing this trait.
+pub trait Record: ::sealed::Sealed {
     /// Record a signed 64-bit integer value.
     fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
     where
@@ -160,6 +162,10 @@ impl AsField for str {
         metadata.fields().field_named(&self)
     }
 }
+
+impl ::sealed::Sealed for Field {}
+impl<'a> ::sealed::Sealed for &'a Field {}
+impl ::sealed::Sealed for str {}
 
 // ===== impl Value =====
 

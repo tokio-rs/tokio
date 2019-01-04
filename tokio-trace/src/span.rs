@@ -619,6 +619,8 @@ impl<'a> Clone for Enter<'a> {
     }
 }
 
+impl<'a> ::sealed::Sealed for Enter<'a> {}
+
 impl<'a> field::Record for Enter<'a> {
     #[inline]
     fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
