@@ -12,12 +12,12 @@ use tokio_trace::{field, span, Id, Metadata};
 struct EnabledSubscriber;
 
 impl tokio_trace::Subscriber for EnabledSubscriber {
-    fn new_id(&self, span: span::Attributes) -> Id {
+    fn new_span(&self, span: &Metadata) -> Id {
         let _ = span;
         Id::from_u64(0)
     }
 
-    fn record_fmt(&self, span: &Id, field: &field::Field, value: ::std::fmt::Arguments) {
+    fn record_debug(&self, span: &Id, field: &field::Field, value: &::std::fmt::Debug) {
         let _ = (span, field, value);
     }
 
@@ -30,34 +30,26 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         true
     }
 
-    fn enter(&self, span: Id) {
+    fn enter(&self, span: &Id) {
         let _ = span;
     }
 
-    fn exit(&self, span: Id) {
-        let _ = span;
-    }
-
-    fn close(&self, span: Id) {
+    fn exit(&self, span: &Id) {
         let _ = span;
     }
 }
 
 /// Simulates a subscriber that records span data.
-struct Record(Mutex<Option<span::SpanAttributes>>);
+struct Record(Mutex<Option<String>>);
 
 impl tokio_trace::Subscriber for Record {
-    fn new_span(&self, span: span::SpanAttributes) -> Id {
-        *self.0.lock().unwrap() = Some(span.into());
+    fn new_span(&self, span: &Metadata) -> Id {
+        *self.0.lock().unwrap() = Some(span.name().to_string());
         Id::from_u64(0)
     }
 
-    fn new_id(&self, _span: span::Attributes) -> Id {
-        Id::from_u64(0)
-    }
-
-    fn record_fmt(&self, _span: &Id, _field: &field::Field, value: ::std::fmt::Arguments) {
-        let _ = ::std::fmt::format(value);
+    fn record_debug(&self, _span: &Id, _field: &field::Field, value: &::std::fmt::Debug) {
+       *self.0.lock().unwrap() = Some(format!("{:?}", value));
     }
 
     fn add_follows_from(&self, span: &Id, follows: Id) {
@@ -69,15 +61,11 @@ impl tokio_trace::Subscriber for Record {
         true
     }
 
-    fn enter(&self, span: Id) {
+    fn enter(&self, span: &Id) {
         let _ = span;
     }
 
-    fn exit(&self, span: Id) {
-        let _ = span;
-    }
-
-    fn close(&self, span: Id) {
+    fn exit(&self, span: &Id) {
         let _ = span;
     }
 }
@@ -86,24 +74,27 @@ const N_SPANS: usize = 100;
 
 #[bench]
 fn span_no_fields(b: &mut Bencher) {
-    tokio_trace::Dispatch::new(EnabledSubscriber).as_default(|| b.iter(|| span!("span")));
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+        b.iter(|| span!("span"))
+    });
 }
 
 #[bench]
 fn span_repeatedly(b: &mut Bencher) {
     #[inline]
-    fn mk_span(i: u64) -> tokio_trace::Span {
+    fn mk_span(i: u64) -> tokio_trace::Span<'static> {
         span!("span", i = i)
     }
 
     let n = test::black_box(N_SPANS);
-    tokio_trace::Dispatch::new(EnabledSubscriber)
-        .as_default(|| b.iter(|| (0..n).fold(mk_span(0), |_, i| mk_span(i as u64))));
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+        b.iter(|| (0..n).fold(mk_span(0), |_, i| mk_span(i as u64)))
+    });
 }
 
 #[bench]
 fn span_with_fields(b: &mut Bencher) {
-    tokio_trace::Dispatch::new(EnabledSubscriber).as_default(|| {
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
         b.iter(|| {
             span!(
                 "span",
@@ -118,7 +109,7 @@ fn span_with_fields(b: &mut Bencher) {
 
 #[bench]
 fn span_with_fields_record(b: &mut Bencher) {
-    tokio_trace::Dispatch::new(Record(Mutex::new(None))).as_default(|| {
+    tokio_trace::subscriber::with_default(Record(Mutex::new(None)), || {
         b.iter(|| {
             span!(
                 "span",
