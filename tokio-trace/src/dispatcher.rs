@@ -17,14 +17,23 @@ thread_local! {
 /// [`Subscriber`]: ::Subscriber
 /// [`Event`]: ::Event
 pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
-    let prior = CURRENT_DISPATCH.try_with(|current| current.replace(dispatcher));
-    let result = f();
-    if let Ok(prior) = prior {
-        let _ = CURRENT_DISPATCH.try_with(|current| {
-            *current.borrow_mut() = prior;
-        });
+    // A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
+    // Using this (rather than simply resetting after calling `f`) ensures
+    // that we always reset to the prior dispatcher even if `f` panics.
+    struct ResetGuard(Option<Dispatch>);
+    impl Drop for ResetGuard {
+        fn drop(&mut self) {
+            if let Some(dispatch) = self.0.take() {
+                let _ = CURRENT_DISPATCH.try_with(|current| {
+                    *current.borrow_mut() = dispatch;
+                });
+            }
+        }
     }
-    result
+
+    let prior = CURRENT_DISPATCH.try_with(|current| current.replace(dispatcher));
+    let _guard = ResetGuard(prior.ok());
+    f()
 }
 
 pub(crate) fn with_current<T, F>(mut f: F) -> T
