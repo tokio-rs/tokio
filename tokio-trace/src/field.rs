@@ -68,7 +68,7 @@ pub struct DebugValue<T: fmt::Debug>(T);
 
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
 /// recorded using its `Display` implementation.
-pub fn display<'a, T>(t: T) -> DisplayValue<T>
+pub fn display<T>(t: T) -> DisplayValue<T>
 where
     T: fmt::Display,
 {
