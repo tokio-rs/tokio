@@ -363,9 +363,19 @@ macro_rules! callsite {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// span!("my span", foo = 2u64, bar = "a string").enter(|| {
+/// span!("my span", foo = 2, bar = "a string").enter(|| {
 ///     // do work inside the span...
 /// });
+/// # }
+/// ```
+///
+/// Field values may be recorded after the span is created:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// let mut my_span = span!("my span", foo = 2, bar);
+/// my_span.record("bar", &7);
 /// # }
 /// ```
 #[macro_export]
@@ -401,6 +411,30 @@ macro_rules! span {
     );
 }
 
+/// Constructs a new `Event`.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// use tokio_trace::{Level, field};
+///
+/// # fn main() {
+/// let data = (42, "fourty-two");
+/// let private_data = "private";
+/// let error = "a bad error";
+///
+/// event!(Level::ERROR, { error = field::display(error) }, "Received error");
+/// event!(target: "app_events", Level::WARN, {
+///         private_data = private_data,
+///         data = field::debug(data)
+///     },
+///     "App warning: {}", error
+/// );
+/// event!(Level::INFO, the_answer = data.0);
+/// # }
+/// ```
 #[macro_export]
 macro_rules! event {
     // (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $fmt:expr ) => (
@@ -472,6 +506,7 @@ macro_rules! event {
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
     );
+
     (@ record: $ev:expr, $k:expr, $i:expr, $val:expr) => (
         $ev.record($i, &$val);
     );
@@ -480,6 +515,39 @@ macro_rules! event {
     );
 }
 
+/// Constructs an event at the trace level.
+///
+/// When both a message and fields are included, curly braces (`{` and `}`) are
+/// used to delimit the list of fields from the format string for the message.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use std::time::SystemTime;
+/// # #[derive(Debug, Copy, Clone)] struct Position { x: f32, y: f32 }
+/// # impl Position {
+/// # const ORIGIN: Self = Self { x: 0.0, y: 0.0 };
+/// # fn dist(&self, other: Position) -> f32 {
+/// #    let x = (other.x - self.x).exp2(); let y = (self.y - other.y).exp2();
+/// #    (x + y).sqrt()
+/// # }
+/// # }
+/// # fn main() {
+/// use tokio_trace::field;
+///
+/// let pos = Position { x: 3.234, y: -1.223 };
+/// let origin_dist = pos.dist(Position::ORIGIN);
+///
+/// trace!(position = field::debug(pos), origin_dist = field::debug(origin_dist));
+/// trace!(target: "app_events",
+///         { pos = field::debug(pos) },
+///         "x is {} and y is {}",
+///        if pos.x >= 0.0 { "positive" } else { "negative" },
+///        if pos.y >= 0.0 { "positive" } else { "negative" });
+/// # }
+/// ```
 #[macro_export]
 macro_rules! trace {
     (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
@@ -502,6 +570,26 @@ macro_rules! trace {
     );
 }
 
+/// Constructs an event at the debug level.
+///
+/// When both a message and fields are included, curly braces (`{` and `}`) are
+/// used to delimit the list of fields from the format string for the message.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// # #[derive(Debug)] struct Position { x: f32, y: f32 }
+/// use tokio_trace::field;
+///
+/// let pos = Position { x: 3.234, y: -1.223 };
+///
+/// debug!(x = field::debug(pos.x), y = field::debug(pos.y));
+/// debug!(target: "app_events", { position = field::debug(pos) }, "New position");
+/// # }
+/// ```
 #[macro_export]
 macro_rules! debug {
     (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
@@ -524,6 +612,33 @@ macro_rules! debug {
     );
 }
 
+/// Constructs an event at the info level.
+//
+/// When both a message and fields are included, curly braces (`{` and `}`) are
+/// used to delimit the list of fields from the format string for the message.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use std::net::Ipv4Addr;
+/// # fn main() {
+/// # struct Connection { port: u32,  speed: f32 }
+/// use tokio_trace::field;
+///
+/// let addr = Ipv4Addr::new(127, 0, 0, 1);
+/// let conn_info = Connection { port: 40, speed: 3.20 };
+///
+/// info!({ port = conn_info.port }, "connected to {}", addr);
+/// info!(
+///     target: "connection_events",
+///     ip = field::display(addr),
+///     port = conn_info.port,
+///     speed = field::debug(conn_info.speed)
+/// );
+/// # }
+/// ```
 #[macro_export]
 macro_rules! info {
     (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
@@ -546,6 +661,30 @@ macro_rules! info {
     );
 }
 
+/// Constructs an event at the warn level.
+///
+/// When both a message and fields are included, curly braces (`{` and `}`) are
+/// used to delimit the list of fields from the format string for the message.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// use tokio_trace::field;
+///
+/// let warn_description = "Invalid Input";
+/// let input = &[0x27, 0x45];
+///
+/// warn!(input = field::debug(input), warning = warn_description);
+/// warn!(
+///     target: "input_events",
+///     { warning = warn_description },
+///     "Received warning for input: {:?}", input,
+/// );
+/// # }
+/// ```
 #[macro_export]
 macro_rules! warn {
     (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
@@ -568,6 +707,25 @@ macro_rules! warn {
     );
 }
 
+/// Constructs an event at the error level.
+///
+/// When both a message and fields are included, curly braces (`{` and `}`) are
+/// used to delimit the list of fields from the format string for the message.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// use tokio_trace::field;
+/// let (err_info, port) = ("No connection", 22);
+///
+/// error!(port = port, error = field::display(err_info));
+/// error!(target: "app_events", "App Error: {}", err_info);
+/// error!({ info = err_info }, "error on port: {}", port);
+/// # }
+/// ```
 #[macro_export]
 macro_rules! error {
     (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
