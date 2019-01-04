@@ -3,6 +3,7 @@ use futures::Poll;
 use futures::task::AtomicTask;
 
 use std::cell::UnsafeCell;
+use std::process;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
@@ -322,7 +323,7 @@ impl Semaphore for AtomicUsize {
 
         if prev >> 1 == 0 {
             // Something went wrong
-            std::process::abort();
+            process::abort();
         }
     }
 
@@ -345,7 +346,7 @@ impl Semaphore for AtomicUsize {
             }
 
             if curr == usize::MAX ^ 1 {
-                ::std::process::abort()
+                process::abort()
             }
 
             match self.compare_exchange(curr, curr + 2, AcqRel, Acquire) {
