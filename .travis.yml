@@ -82,11 +82,6 @@ script: |
       # Limit the execution time of loom tests.
       export LOOM_MAX_DURATION=10
       cargo test --all --no-fail-fast
-      # Disable these tests for now as they are buggy
-      #
-      # cargo test --features unstable-futures
-      # cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
-      # cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
   fi
 
 before_deploy:
