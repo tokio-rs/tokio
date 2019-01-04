@@ -437,9 +437,9 @@ macro_rules! span {
 /// ```
 #[macro_export]
 macro_rules! event {
-    // (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $fmt:expr ) => (
-    //     event!(target: $target, $lvl, { $($k $( = $val)* ),* }, $fmt, )
-    // );
+    (target: $target:expr, $lvl:expr, $( $k:ident $( = $val:expr )* ),+ ) => (
+        event!(target: $target, $lvl, { $( $k $( = $val)* ),+ })
+    );
     (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
         {
             #[allow(unused_imports)]
@@ -497,6 +497,9 @@ macro_rules! event {
             event
         }
     });
+    (target: $target:expr, $lvl:expr, $($arg:tt)+ ) => (
+        event!(target: $target, $lvl, { }, $($arg)+)
+    );
     ( $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* }, $($arg)+)
     );
@@ -506,7 +509,6 @@ macro_rules! event {
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
     );
-
     (@ record: $ev:expr, $k:expr, $i:expr, $val:expr) => (
         $ev.record($i, &$val);
     );
