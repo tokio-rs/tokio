@@ -119,6 +119,11 @@ impl Subscriber for Dispatch {
 
 struct NoSubscriber;
 impl Subscriber for NoSubscriber {
+    #[inline]
+    fn register_callsite(&self, _: &Metadata) -> subscriber::Interest {
+        subscriber::Interest::NEVER
+    }
+
     fn new_span(&self, _meta: &Metadata) -> Span {
         Span::from_u64(0)
     }
@@ -127,6 +132,7 @@ impl Subscriber for NoSubscriber {
 
     fn add_follows_from(&self, _span: &Span, _follows: Span) {}
 
+    #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {
         false
     }
