@@ -44,6 +44,11 @@
 //! span; an optional name, and metadata describing the source code location
 //! where the span was originally entered.
 //!
+//! As a rule of thumb, spans should be used to represent discrete units of work
+//! (e.g., a given request's lifetime in a server) or periods of time spent in a
+//! given context (e.g., time spent interacting with an instance of an external
+//! system, such as a database).
+//!
 //! ## Events
 //!
 //! An [`Event`] represents a _point_ in time. It signifies something that
@@ -66,6 +71,10 @@
 //! Events are represented as a special case of spans --- they are created, they
 //! may have fields added, and then they close immediately, without being
 //! entered.
+//!
+//! In general, events should be used to represent points in time _within_ a
+//! span — a request returned with a given status code, _n_ new items were taken
+//! from a queue, and so on.
 //!
 //! ## `Subscriber`s
 //!

@@ -41,6 +41,13 @@ This crate provides macros for creating `Span`s and `Event`s, which represent
 periods of time and momentary events within the execution of a program,
 respectively.
 
+As a rule of thumb, _spans_ should be used to represent discrete units of work
+(e.g., a given request's lifetime in a server) or periods of time spent in a
+given context (e.g., time spent interacting with an instance of an external
+system, such as a database). In contrast, _events_ should be used to represent
+points in time within a span — a request returned with a given status code,
+_n_ new items were taken from a queue, and so on.
+
 `Span`s are constructed using the `span!` macro, and then _entered_
 to indicate that some code takes place within the context of that `Span`:
 
