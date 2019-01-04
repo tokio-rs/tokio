@@ -568,6 +568,11 @@ macro_rules! trace {
         event!(target: $target, $crate::Level::TRACE, { $($k $( = $val)* ),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
+        // When invoking this macro with `log`-style syntax (no fields), we
+        // drop the event immediately --- the `log` crate's macros don't
+        // expand to an item, and if this did, it would break drop-in
+        // compatibility with `log`'s macros. Since it defines no fields,
+        // the handle won't be used later to add values to them.
         drop(event!(target: $target, $crate::Level::TRACE, {}, $($arg)+));
     );
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
