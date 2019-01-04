@@ -9,10 +9,6 @@ addons:
 
 matrix:
   include:
-  # This represents the minimum Rust version supported by Tokio. Updating this
-  # should be done in a dedicated PR and cannot be greater than two 0.x
-  # releases prior to the current stable.
-  - rust: 1.26.0
   - rust: stable
   - rust: beta
   - rust: nightly
@@ -21,6 +17,15 @@ matrix:
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
+
+  # This represents the minimum Rust version supported by Tokio. Updating this
+  # should be done in a dedicated PR and cannot be greater than two 0.x
+  # releases prior to the current stable.
+  #
+  # Tests are not run as tests may require newer versions of rust.
+  - rust: 1.26.0
+    script: |
+      cargo check --all
 
   # Test combinations of enabled features.
   - rust: stable
