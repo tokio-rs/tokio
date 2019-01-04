@@ -26,7 +26,6 @@ members = [
   "./",
   "tokio-async-await",
   "tokio-buf",
-  "tokio-channel",
   "tokio-codec",
   "tokio-current-thread",
   "tokio-executor",
