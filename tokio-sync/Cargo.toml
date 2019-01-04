@@ -25,7 +25,3 @@ env_logger = { version = "0.5", default-features = false }
 tokio = { path = ".." }
 tokio-mock-task = "0.1.1"
 loom = { git = "http://github.com/carllerche/loom", features = ["futures", "generator"] }
-
-[dev-dependencies.loom]
-path = "/Users/carllerche/Code/Rust/loom"
-features = ["futures", "generator"]
