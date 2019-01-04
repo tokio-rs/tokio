@@ -43,6 +43,35 @@ members = [
 ]
 
 [features]
+default = [
+  "codec",
+  "fs",
+  "io",
+  "reactor",
+  "rt-full",
+  "tcp",
+  "timer",
+  "udp",
+  "uds",
+]
+
+codec = ["tokio-codec"]
+fs = ["tokio-fs"]
+io = ["bytes", "tokio-io"]
+reactor = ["io", "mio", "tokio-reactor"]
+rt-full = [
+  "num_cpus",
+  "reactor",
+  "timer",
+  "tokio-current-thread",
+  "tokio-executor",
+  "tokio-threadpool",
+]
+tcp = ["tokio-tcp"]
+timer = ["tokio-timer"]
+udp = ["tokio-udp"]
+uds = ["tokio-uds"]
+
 # This feature comes with no promise of stability. Things will
 # break with each patch release. Use at your own risk.
 async-await-preview = [
@@ -54,29 +83,31 @@ travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
-bytes = "0.4"
-num_cpus = "1.8.0"
-tokio-codec = { version = "0.1.0", path = "tokio-codec" }
-tokio-current-thread = { version = "0.1.3", path = "tokio-current-thread" }
-tokio-io = { version = "0.1.6", path = "tokio-io" }
-tokio-executor = { version = "0.1.5", path = "tokio-executor" }
-tokio-reactor = { version = "0.1.1", path = "tokio-reactor" }
-tokio-threadpool = { version = "0.1.4", path = "tokio-threadpool" }
-tokio-tcp = { version = "0.1.0", path = "tokio-tcp" }
-tokio-udp = { version = "0.1.0", path = "tokio-udp" }
-tokio-timer = { version = "0.2.8", path = "tokio-timer" }
-tokio-fs = { version = "0.1.3", path = "tokio-fs" }
-
+# Only non-optional dependency...
 futures = "0.1.20"
 
+# Everything else is optional...
+bytes = { version = "0.4", optional = true }
+num_cpus = { version = "1.8.0", optional = true }
+tokio-codec = { version = "0.1.0", path = "tokio-codec", optional = true }
+tokio-current-thread = { version = "0.1.3", path = "tokio-current-thread", optional = true }
+tokio-fs = { version = "0.1.3", path = "tokio-fs", optional = true }
+tokio-io = { version = "0.1.6", path = "tokio-io", optional = true }
+tokio-executor = { version = "0.1.5", path = "tokio-executor", optional = true }
+tokio-reactor = { version = "0.1.1", path = "tokio-reactor", optional = true }
+tokio-threadpool = { version = "0.1.4", path = "tokio-threadpool", optional = true }
+tokio-tcp = { version = "0.1.0", path = "tokio-tcp", optional = true }
+tokio-udp = { version = "0.1.0", path = "tokio-udp", optional = true }
+tokio-timer = { version = "0.2.8", path = "tokio-timer", optional = true }
+
 # Needed until `reactor` is removed from `tokio`.
-mio = "0.6.14"
+mio = { version = "0.6.14", optional = true }
 
 # Needed for async/await preview support
 tokio-async-await = { version = "0.1.0", path = "tokio-async-await", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.2.1", path = "tokio-uds" }
+tokio-uds = { version = "0.2.1", path = "tokio-uds", optional = true }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
@@ -92,18 +123,18 @@ serde_json = "1.0"
 time = "0.1"
 
 [patch.crates-io]
-tokio = { path = "." }
-tokio-async-await  = { path = "./tokio-async-await" }
-tokio-codec = { path = "./tokio-codec" }
-tokio-current-thread = { path = "./tokio-current-thread" }
-tokio-executor = { path = "./tokio-executor" }
-tokio-fs = { path = "./tokio-fs" }
-tokio-io = { path = "./tokio-io" }
-tokio-reactor = { path = "./tokio-reactor" }
-tokio-signal = { path = "./tokio-signal" }
-tokio-tcp = { path = "./tokio-tcp" }
-tokio-threadpool = { path = "./tokio-threadpool" }
-tokio-timer = { path = "./tokio-timer" }
-tokio-tls = { path = "./tokio-tls" }
-tokio-udp = { path = "./tokio-udp" }
-tokio-uds = { path = "./tokio-uds" }
+#tokio = { path = "." }
+#tokio-async-await  = { path = "./tokio-async-await" }
+#tokio-codec = { path = "./tokio-codec" }
+#tokio-current-thread = { path = "./tokio-current-thread" }
+#tokio-executor = { path = "./tokio-executor" }
+#tokio-fs = { path = "./tokio-fs" }
+#tokio-io = { path = "./tokio-io" }
+#tokio-reactor = { path = "./tokio-reactor" }
+#tokio-signal = { path = "./tokio-signal" }
+#tokio-tcp = { path = "./tokio-tcp" }
+#tokio-threadpool = { path = "./tokio-threadpool" }
+#tokio-timer = { path = "./tokio-timer" }
+#tokio-tls = { path = "./tokio-tls" }
+#tokio-udp = { path = "./tokio-udp" }
+#tokio-uds = { path = "./tokio-uds" }

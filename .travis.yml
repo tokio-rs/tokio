@@ -22,6 +22,22 @@ matrix:
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
 
+  # Test combinations of enabled features.
+  - rust: stable
+    script: |
+      shopt -s expand_aliases
+      alias check="cargo check --no-default-features"
+      check
+      check --features codec
+      check --features fs
+      check --features io
+      check --features reactor
+      check --features rt-full
+      check --features tcp
+      check --features timer
+      check --features udp
+      check --features uds
+
   # Test the async / await preview. We don't want to block PRs on this failing
   # though.
   - rust: nightly

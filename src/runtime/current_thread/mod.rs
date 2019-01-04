@@ -90,3 +90,18 @@ where
     r.run().expect("failed to resolve remaining futures");
     Ok(v)
 }
+
+/// Start a current-thread runtime using the supplied future to bootstrap execution.
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+pub fn run<F>(future: F)
+where
+    F: Future<Item = (), Error = ()> + 'static,
+{
+
+    let mut r = Runtime::new().expect("failed to start runtime on current thread");
+    r.spawn(future);
+    r.run().expect("failed to resolve remaining futures");
+}

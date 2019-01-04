@@ -72,42 +72,72 @@
 //! }
 //! ```
 
-extern crate bytes;
-#[macro_use]
+macro_rules! if_runtime {
+    ($($i:item)*) => ($(
+        #[cfg(any(feature = "rt-full"))]
+        $i
+    )*)
+}
+
+#[cfg_attr(feature = "rt-full", macro_use)]
 extern crate futures;
+
+#[cfg(feature = "io")]
+extern crate bytes;
+#[cfg(feature = "reactor")]
 extern crate mio;
+#[cfg(feature = "rt-full")]
 extern crate num_cpus;
+#[cfg(feature = "rt-full")]
 extern crate tokio_current_thread;
+#[cfg(feature = "io")]
 extern crate tokio_io;
-extern crate tokio_executor;
+#[cfg(feature = "codec")]
 extern crate tokio_codec;
+#[cfg(feature = "fs")]
 extern crate tokio_fs;
+#[cfg(feature = "reactor")]
 extern crate tokio_reactor;
+#[cfg(feature = "rt-full")]
 extern crate tokio_threadpool;
+#[cfg(feature = "timer")]
 extern crate tokio_timer;
+#[cfg(feature = "tcp")]
 extern crate tokio_tcp;
+#[cfg(feature = "udp")]
 extern crate tokio_udp;
 
 #[cfg(feature = "async-await-preview")]
 extern crate tokio_async_await;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 extern crate tokio_uds;
 
+#[cfg(feature = "timer")]
 pub mod clock;
+#[cfg(feature = "codec")]
 pub mod codec;
-pub mod executor;
+#[cfg(feature = "fs")]
 pub mod fs;
+#[cfg(feature = "io")]
 pub mod io;
+#[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
 pub mod net;
 pub mod prelude;
+#[cfg(feature = "reactor")]
 pub mod reactor;
-pub mod runtime;
+#[cfg(feature = "timer")]
 pub mod timer;
 pub mod util;
 
-pub use executor::spawn;
-pub use runtime::run;
+if_runtime! {
+    extern crate tokio_executor;
+    pub mod executor;
+    pub mod runtime;
+
+    pub use executor::spawn;
+    pub use runtime::run;
+}
 
 // ===== Experimental async/await support =====
 
