@@ -466,6 +466,9 @@ macro_rules! event {
     ( $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* }, $($arg)+)
     );
+    ( $lvl:expr, $( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* })
+    );
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
     );
