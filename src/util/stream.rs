@@ -1,6 +1,5 @@
 #[cfg(feature = "timer")]
 use tokio_timer::{
-    debounce::{Debounce, DebounceBuilder, Edge},
     throttle::Throttle,
     timeout::Timeout,
 };
@@ -10,6 +9,8 @@ use futures::Stream;
 #[cfg(feature = "timer")]
 use std::time::Duration;
 
+#[cfg(feature = "timer")]
+use debounce::{Debounce, DebounceBuilder, Edge};
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
@@ -41,6 +42,7 @@ pub trait StreamExt: Stream {
     /// debouncing is done.
     ///
     /// [`debounce_builder`]: #method.debounce_builder
+    #[cfg(feature = "timer")]
     fn debounce(self, dur: Duration) -> Debounce<Self>
     where Self: Sized
     {
@@ -57,6 +59,7 @@ pub trait StreamExt: Stream {
     /// Care must be taken that this stream returns `Async::NotReady` at some point,
     /// otherwise the debouncing implementation will overflow the stack during
     /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
+    #[cfg(feature = "timer")]
     fn debounce_builder(self) -> DebounceBuilder<Self>
     where Self: Sized
     {

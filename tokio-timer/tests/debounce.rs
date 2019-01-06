@@ -11,11 +11,11 @@ use futures::{
     prelude::*,
     sync::mpsc,
 };
-use tokio::util::StreamExt;
-use tokio_timer::{
+use tokio::{
     debounce::{Debounce, Edge},
-    Timer,
+    util::StreamExt,
 };
+use tokio_timer::Timer;
 
 #[test]
 fn debounce_leading() {

@@ -117,6 +117,8 @@ extern crate tokio_uds;
 pub mod clock;
 #[cfg(feature = "codec")]
 pub mod codec;
+#[cfg(feature = "timer")]
+pub mod debounce;
 #[cfg(feature = "fs")]
 pub mod fs;
 #[cfg(feature = "io")]

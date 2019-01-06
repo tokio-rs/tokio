@@ -5,8 +5,6 @@
 //!
 //! [`Debounce`]: struct.Debounce.html
 
-use {clock, Delay, Error};
-
 use futures::{
     future::Either,
     prelude::*,
@@ -17,6 +15,7 @@ use std::{
     fmt::{Display, Formatter, Result as FmtResult},
     time::{Duration, Instant},
 };
+use tokio_timer::{clock, Delay, Error};
 
 /// Debounce streams on the leading or trailing edge or both.
 ///
