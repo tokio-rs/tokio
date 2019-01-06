@@ -35,7 +35,7 @@ pub struct Debounce<T: Stream> {
 
 /// Builds a debouncing stream.
 #[derive(Debug)]
-pub struct DebounceBuilder<T> {
+pub struct Builder<T> {
     duration: Option<Duration>,
     edge: Option<Edge>,
     max_wait: Option<Duration>,
@@ -214,14 +214,14 @@ impl<T: Stream> Stream for Debounce<T> {
     }
 }
 
-impl<T> DebounceBuilder<T> {
+impl<T> Builder<T> {
     /// Creates a new builder from the given debounce stream.
     ///
     /// Care must be taken that `stream` returns `Async::NotReady` at some point,
     /// otherwise the debouncing implementation will overflow the stack during
     /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
     pub fn from_stream(stream: T) -> Self {
-        DebounceBuilder {
+        Builder {
             duration: None,
             edge: None,
             max_wait: None,
@@ -266,7 +266,7 @@ impl<T> DebounceBuilder<T> {
     }
 }
 
-impl<T: Stream> DebounceBuilder<T> {
+impl<T: Stream> Builder<T> {
     /// Builds the debouncing stream.
     ///
     /// Panics if the edge or the duration is unspecified, or if only `max_wait`

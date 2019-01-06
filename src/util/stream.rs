@@ -10,7 +10,7 @@ use futures::Stream;
 use std::time::Duration;
 
 #[cfg(feature = "timer")]
-use debounce::{Debounce, DebounceBuilder, Edge};
+use debounce::{self, Debounce, Edge};
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
@@ -60,10 +60,10 @@ pub trait StreamExt: Stream {
     /// otherwise the debouncing implementation will overflow the stack during
     /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
     #[cfg(feature = "timer")]
-    fn debounce_builder(self) -> DebounceBuilder<Self>
+    fn debounce_builder(self) -> debounce::Builder<Self>
     where Self: Sized
     {
-        DebounceBuilder::from_stream(self)
+        debounce::Builder::from_stream(self)
     }
 
     /// Sample the stream at the given `interval`.
