@@ -5,9 +5,6 @@
 //!
 //! This crate provides a number of utilities for working with periods of time:
 //!
-//! * [`Debounce`]: Wraps a stream, throwing items away until there has been at
-//!   least some amount of time without items having passed through.
-//!
 //! * [`Delay`]: A future that completes at a specified instant in time.
 //!
 //! * [`Interval`] A stream that yields at fixed time intervals.
@@ -27,7 +24,6 @@
 //!
 //! [`Delay`]: struct.Delay.html
 //! [`Throttle`]: throttle/struct.Throttle.html
-//! [`Debounce`]: debounce/struct.Debounce.html
 //! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
@@ -40,7 +36,6 @@ extern crate futures;
 extern crate slab;
 
 pub mod clock;
-pub mod debounce;
 pub mod delay_queue;
 pub mod throttle;
 pub mod timeout;
