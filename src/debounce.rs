@@ -220,7 +220,7 @@ impl<T> Builder<T> {
     /// Care must be taken that `stream` returns `Async::NotReady` at some point,
     /// otherwise the debouncing implementation will overflow the stack during
     /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
-    pub fn from_stream(stream: T) -> Self {
+    pub fn new(stream: T) -> Self {
         Builder {
             duration: None,
             edge: None,

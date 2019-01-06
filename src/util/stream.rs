@@ -46,24 +46,10 @@ pub trait StreamExt: Stream {
     fn debounce(self, dur: Duration) -> Debounce<Self>
     where Self: Sized
     {
-        self.debounce_builder()
+        debounce::Builder::new(self)
             .duration(dur)
             .edge(Edge::Trailing)
             .build()
-    }
-
-    /// Create a builder that builds a debounced version of this stream.
-    ///
-    /// The returned builder can be used to configure the debouncing process.
-    ///
-    /// Care must be taken that this stream returns `Async::NotReady` at some point,
-    /// otherwise the debouncing implementation will overflow the stack during
-    /// `.poll()` (i. e. don't use this directly on `stream::repeat`).
-    #[cfg(feature = "timer")]
-    fn debounce_builder(self) -> debounce::Builder<Self>
-    where Self: Sized
-    {
-        debounce::Builder::from_stream(self)
     }
 
     /// Sample the stream at the given `interval`.
@@ -79,7 +65,7 @@ pub trait StreamExt: Stream {
     fn sample(self, interval: Duration) -> Debounce<Self>
     where Self: Sized
     {
-        self.debounce_builder()
+        debounce::Builder::new(self)
             .max_wait(interval)
             .edge(Edge::Leading)
             .build()
