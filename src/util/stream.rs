@@ -9,7 +9,7 @@ use futures::Stream;
 
 #[cfg(feature = "timer")]
 use std::time::Duration;
-
+use util::enumerate::Enumerate;
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
@@ -90,6 +90,18 @@ pub trait StreamExt: Stream {
     where Self: Sized
     {
         Throttle::new(self, duration)
+    }
+
+    /// Creates a new stream which gives the current iteration count as well
+    /// as the next value.
+    ///
+    /// The stream returned yields pairs `(i, val)`, where `i` is the
+    /// current index of iteration and `val` is the value returned by the
+    /// iterator.
+    fn enumerate(self) -> Enumerate<Self>
+    where Self: Sized,
+    {
+        Enumerate::new(self)
     }
 
     /// Creates a new stream which allows `self` until `timeout`.

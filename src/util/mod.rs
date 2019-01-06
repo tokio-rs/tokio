@@ -9,6 +9,7 @@
 
 mod future;
 mod stream;
+mod enumerate;
 
 pub use self::future::FutureExt;
 pub use self::stream::StreamExt;
