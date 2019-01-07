@@ -271,17 +271,13 @@ impl Semaphore {
     /// permits and notifies all pending waiters.
     pub fn close(&self) {
         debug!("+ Semaphore::close");
-        let prev = SemState::fetch_set_closed(&self.state, AcqRel);
-
-        if prev.is_closed() {
-            return;
-        }
 
         // Acquire the `rx_lock`, setting the "closed" flag on the lock.
-        let prev = self.rx_lock.fetch_add(1, AcqRel);
+        let prev = self.rx_lock.fetch_or(1, AcqRel);
+        debug!(" + close -- rx_lock.fetch_add(1)");
 
         if prev != 0 {
-            debug!("+ close; locked");
+            debug!("+ close -- locked; prev = {}", prev);
             // Another thread has the lock and will be responsible for notifying
             // pending waiters.
             return;
@@ -301,6 +297,7 @@ impl Semaphore {
         // TODO: Handle overflow. A panic is not sufficient, the process must
         // abort.
         let prev = self.rx_lock.fetch_add(n << 1, AcqRel);
+        debug!(" + add_permits; rx_lock.fetch_add(n << 1); n = {}", n);
 
         if prev != 0 {
             debug!(" + add_permits -- locked; prev = {}", prev);
@@ -314,6 +311,13 @@ impl Semaphore {
 
     fn add_permits_locked(&self, mut rem: usize, mut closed: bool) {
         while rem > 0 || closed {
+            debug!(" + add_permits_locked -- iter; rem = {}; closed = {:?}",
+                   rem, closed);
+
+            if closed {
+                SemState::fetch_set_closed(&self.state, AcqRel);
+            }
+
             // Release the permits and notify
             self.add_permits_locked2(rem, closed);
 
@@ -321,11 +325,13 @@ impl Semaphore {
 
             let actual = if closed {
                 let actual = self.rx_lock.fetch_sub(n | 1, AcqRel);
+                debug!(" + add_permits_locked; rx_lock.fetch_sub(n | 1); n = {}; actual={}", n, actual);
 
                 closed = false;
                 actual
             } else {
                 let actual = self.rx_lock.fetch_sub(n, AcqRel);
+                debug!(" + add_permits_locked; rx_lock.fetch_sub(n); n = {}; actual={}", n, actual);
 
                 closed = actual & 1 == 1;
                 actual
@@ -533,7 +539,7 @@ impl Permit {
     /// # Examples
     ///
     /// ```
-    /// use tokio_sync::Permit;
+    /// use tokio_sync::semaphore::Permit;
     ///
     /// let permit = Permit::new();
     /// assert!(!permit.is_acquired());

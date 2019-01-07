@@ -104,3 +104,31 @@ fn basic_closing() {
         semaphore.close();
     });
 }
+
+#[test]
+fn concurrent_close() {
+    const NUM: usize = 3;
+
+    loom::fuzz(|| {
+        let semaphore = Arc::new(Semaphore::new(1));
+
+        for _ in 0..NUM {
+            let semaphore = semaphore.clone();
+
+            thread::spawn(move || {
+                let mut permit = Permit::new();
+
+                block_on(future::poll_fn(|| {
+                    permit.poll_acquire(&semaphore)
+                        .map_err(|_| ())
+                }))?;
+
+                permit.release(&semaphore);
+
+                semaphore.close();
+
+                Ok::<(), ()>(())
+            });
+        }
+    });
+}
