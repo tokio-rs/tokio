@@ -13,29 +13,47 @@ pub struct ReadHalf<T> {
     handle: BiLock<T>,
 }
 
+impl<T: AsyncRead + AsyncWrite> ReadHalf<T> {
+    /// Reunite with a previously split `WriteHalf`.
+    ///
+    /// If this `ReadHalf` and the given `WriteHalf` do not originate from
+    /// the same `AsyncRead::split` operation they will be returned, wrapped
+    /// in an `UnsplitError`.
+    pub fn unsplit(self, w: WriteHalf<T>) -> Result<T, UnsplitError<T>> {
+        self.handle.reunite(w.handle).map_err(|e| {
+            UnsplitError {
+                read_half: ReadHalf { handle: e.0 },
+                write_half: WriteHalf { handle: e.1 }
+            }
+        })
+    }
+}
+
 /// The writable half of an object returned from `AsyncRead::split`.
 #[derive(Debug)]
 pub struct WriteHalf<T> {
     handle: BiLock<T>,
 }
 
+impl<T: AsyncRead + AsyncWrite> WriteHalf<T> {
+    /// Reunite with a previously split `ReadHalf`.
+    ///
+    /// If this `WriteHalf` and the given `ReadHalf` do not originate from
+    /// the same `AsyncRead::split` operation they will be returned, wrapped
+    /// in an `UnsplitError`.
+    pub fn unsplit(self, r: ReadHalf<T>) -> Result<T, UnsplitError<T>> {
+        self.handle.reunite(r.handle).map_err(|e| {
+            UnsplitError {
+                read_half: ReadHalf { handle: e.0 },
+                write_half: WriteHalf { handle: e.1 }
+            }
+        })
+    }
+}
+
 pub fn split<T: AsyncRead + AsyncWrite>(t: T) -> (ReadHalf<T>, WriteHalf<T>) {
     let (a, b) = BiLock::new(t);
     (ReadHalf { handle: a }, WriteHalf { handle: b })
-}
-
-/// Reunite a previously split resource.
-///
-/// If the given `ReadHalf` and `WriteHalf` do not originate from the
-/// same `AsyncRead::split` operation they will be returned, wrapped
-/// in an `UnsplitError`.
-pub fn unsplit<T>(r: ReadHalf<T>, w: WriteHalf<T>) -> Result<T, UnsplitError<T>> {
-    r.handle.reunite(w.handle).map_err(|e| {
-        UnsplitError {
-            read_half: ReadHalf { handle: e.0 },
-            write_half: WriteHalf { handle: e.1 }
-        }
-    })
 }
 
 fn would_block() -> io::Error {
@@ -214,14 +232,22 @@ mod tests {
     #[test]
     fn unsplit_ok() {
         let (r, w) = RW.split();
-        assert!(super::unsplit(r, w).is_ok())
+        assert!(r.unsplit(w).is_ok());
+
+        let (r, w) = RW.split();
+        assert!(w.unsplit(r).is_ok())
     }
 
     #[test]
     fn unsplit_err() {
         let (r1, w1) = RW.split();
         let (r2, w2) = RW.split();
-        assert!(super::unsplit(r1, w2).is_err());
-        assert!(super::unsplit(r2, w1).is_err())
+        assert!(r1.unsplit(w2).is_err());
+        assert!(r2.unsplit(w1).is_err());
+
+        let (r1, w1) = RW.split();
+        let (r2, w2) = RW.split();
+        assert!(w1.unsplit(r2).is_err());
+        assert!(w2.unsplit(r1).is_err())
     }
 }

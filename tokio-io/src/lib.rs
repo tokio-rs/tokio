@@ -60,7 +60,6 @@ pub mod _tokio_codec;
 
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
-pub use self::split::{unsplit, UnsplitError};
 
 fn _assert_objects() {
     fn _assert<T>() {}
