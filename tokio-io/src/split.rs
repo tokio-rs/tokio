@@ -210,4 +210,18 @@ mod tests {
             ok::<(), ()>(())
         })).unwrap();
     }
+
+    #[test]
+    fn unsplit_ok() {
+        let (r, w) = RW.split();
+        assert!(super::unsplit(r, w).is_ok())
+    }
+
+    #[test]
+    fn unsplit_err() {
+        let (r1, w1) = RW.split();
+        let (r2, w2) = RW.split();
+        assert!(super::unsplit(r1, w2).is_err());
+        assert!(super::unsplit(r2, w1).is_err())
+    }
 }
