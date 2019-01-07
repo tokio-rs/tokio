@@ -2,7 +2,7 @@
 
 TCP bindings for `tokio`.
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio_tcp/)
+[Documentation](https://docs.rs/tokio-tcp/0.1.3/tokio_tcp)
 
 ## License
 

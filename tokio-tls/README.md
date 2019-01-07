@@ -3,7 +3,7 @@
 An implementation of TLS/SSL streams for Tokio built on top of the [`native-tls`
 crate]
 
-[Documentation](https://docs.rs/tokio-tls)
+[Documentation](https://docs.rs/tokio-tls/0.2.1/tokio_tls/)
 
 [`native-tls` crate]: https://github.com/sfackler/rust-native-tls
 

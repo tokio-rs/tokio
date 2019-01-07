@@ -4,7 +4,7 @@ Core I/O abstractions for the Tokio stack.
 
 [![Build Status](https://travis-ci.org/tokio-rs/tokio-io.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-io)
 
-[Documentation](https://docs.rs/tokio-io)
+[Documentation](https://docs.rs/tokio-io/0.1.11/tokio_io)
 
 ## Usage
 

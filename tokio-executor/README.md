@@ -2,7 +2,7 @@
 
 Task execution related traits and utilities.
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio_executor/)
+[Documentation](https://docs.rs/tokio-executor/0.1.6/tokio_executor)
 
 ## Overview
 
