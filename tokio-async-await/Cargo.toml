@@ -20,10 +20,10 @@ categories = ["asynchronous"]
 async-await-preview = ["futures/nightly"]
 
 [dependencies]
-futures = "^0.1"
-tokio-io = { version = "^0.1", path = "../tokio-io" }
+futures = "0.1.23"
+tokio-io = { version = "0.1.7", path = "../tokio-io" }
 
 [dev-dependencies]
-bytes = "^0.4"
-tokio = { version = "^0.1", path = ".." }
-hyper = "^0.12"
+bytes = "0.4.9"
+tokio = { version = "0.1.8", path = ".." }
+hyper = "0.12.8"
