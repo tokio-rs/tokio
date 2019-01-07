@@ -79,7 +79,7 @@ macro_rules! if_runtime {
     )*)
 }
 
-#[cfg_attr(feature = "rt-full", macro_use)]
+#[macro_use]
 extern crate futures;
 
 #[cfg(feature = "io")]

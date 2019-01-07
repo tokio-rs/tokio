@@ -1,4 +1,4 @@
-use futures::{Async, Poll, Stream};
+use futures::{Async, Poll, Stream, Sink, StartSend};
 
 /// A stream combinator which combines the yields the current item
 /// plus its count starting from 0.
@@ -56,5 +56,25 @@ where
             }
             None => return Ok(Async::Ready(None)),
         }
+    }
+}
+
+// Forwarding impl of Sink from the underlying stream
+impl<T> Sink for Enumerate<T>
+    where T: Sink + Stream
+{
+    type SinkItem = T::SinkItem;
+    type SinkError = T::SinkError;
+
+    fn start_send(&mut self, item: T::SinkItem) -> StartSend<T::SinkItem, T::SinkError> {
+        self.stream.start_send(item)
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), T::SinkError> {
+        self.stream.poll_complete()
+    }
+
+    fn close(&mut self) -> Poll<(), T::SinkError> {
+        self.stream.close()
     }
 }
