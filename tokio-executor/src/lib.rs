@@ -1,5 +1,5 @@
 #![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.5")]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.6")]
 
 //! Task execution related traits and utilities.
 //!
@@ -35,6 +35,7 @@
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
 
+extern crate crossbeam_utils;
 extern crate futures;
 
 mod enter;

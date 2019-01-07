@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.7")]
+#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.8")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 //! Event loop that drives Tokio I/O resources.
@@ -455,7 +455,8 @@ impl fmt::Debug for Reactor {
 // ===== impl Handle =====
 
 impl Handle {
-    /// Returns a handle to the current reactor.
+    #[doc(hidden)]
+    #[deprecated(note = "semantics were sometimes surprising, use Handle::default()")]
     pub fn current() -> Handle {
         // TODO: Should this panic on error?
         HandlePriv::try_current()

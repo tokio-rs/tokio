@@ -1,3 +1,4 @@
+use task::Queue;
 use worker;
 
 use futures::{Future, Poll, Async};
@@ -61,25 +62,30 @@ impl Future for Shutdown {
 pub(crate) struct ShutdownTrigger {
     inner: Arc<Mutex<Inner>>,
     workers: Arc<[worker::Entry]>,
+    queue: Arc<Queue>,
 }
 
 unsafe impl Send for ShutdownTrigger {}
 unsafe impl Sync for ShutdownTrigger {}
 
 impl ShutdownTrigger {
-    pub(crate) fn new(workers: Arc<[worker::Entry]>) -> ShutdownTrigger {
+    pub(crate) fn new(workers: Arc<[worker::Entry]>, queue: Arc<Queue>) -> ShutdownTrigger {
         ShutdownTrigger {
             inner: Arc::new(Mutex::new(Inner {
                 task: AtomicTask::new(),
                 completed: false,
             })),
             workers,
+            queue,
         }
     }
 }
 
 impl Drop for ShutdownTrigger {
     fn drop(&mut self) {
+        // Drain the global task queue.
+        while self.queue.pop().is_some() {}
+
         // Notify the task interested in shutdown.
         let mut inner = self.inner.lock().unwrap();
         inner.completed = true;

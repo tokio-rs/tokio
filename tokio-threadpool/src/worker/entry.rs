@@ -1,12 +1,12 @@
 use park::{BoxPark, BoxUnpark};
-use task::{Task, Queue};
+use task::Task;
 use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 use crossbeam_utils::CachePadded;
 use deque;
@@ -36,9 +36,6 @@ pub(crate) struct WorkerEntry {
 
     // Thread unparker
     pub unpark: BoxUnpark,
-
-    // MPSC queue of jobs submitted to the worker from an external source.
-    pub inbound: Queue,
 }
 
 impl WorkerEntry {
@@ -50,19 +47,9 @@ impl WorkerEntry {
             next_sleeper: UnsafeCell::new(0),
             worker: w,
             stealer: s,
-            inbound: Queue::new(),
             park: UnsafeCell::new(park),
             unpark,
         }
-    }
-
-    /// Atomically load the worker's state
-    ///
-    /// # Ordering
-    ///
-    /// An `Acquire` ordering is established on the entry's state variable.
-    pub fn load_state(&self) -> State {
-        self.state.load(Acquire).into()
     }
 
     /// Atomically unset the pushed flag.
@@ -85,19 +72,14 @@ impl WorkerEntry {
         self.push_internal(task);
     }
 
-    /// Submits a task to the worker. This assumes that the caller is external
-    /// to the worker. Internal submissions go through another path.
-    ///
-    /// Returns `false` if the worker needs to be spawned.
+    /// Notifies the worker and returns `false` if it needs to be spawned.
     ///
     /// # Ordering
     ///
     /// The `state` must have been obtained with an `Acquire` ordering.
-    pub fn submit_external(&self, task: Arc<Task>, mut state: State) -> bool {
+    #[inline]
+    pub fn notify(&self, mut state: State) -> bool {
         use worker::Lifecycle::*;
-
-        // Push the task onto the external queue
-        self.push_external(task);
 
         loop {
             let mut next = state;
@@ -188,6 +170,7 @@ impl WorkerEntry {
     ///
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
+    #[inline]
     pub fn pop_task(&self) -> deque::Pop<Arc<Task>> {
         self.worker.pop()
     }
@@ -208,20 +191,15 @@ impl WorkerEntry {
     ///
     /// This is called when the pool is shutting down.
     pub fn drain_tasks(&self) {
-        use deque::Pop;
+        use deque::Pop::*;
 
         loop {
             match self.worker.pop() {
-                Pop::Data(_) => {}
-                Pop::Empty => break,
-                Pop::Retry => {}
+                Data(_) => {}
+                Empty => break,
+                Retry => {}
             }
         }
-    }
-
-    #[inline]
-    fn push_external(&self, task: Arc<Task>) {
-        self.inbound.push(task);
     }
 
     #[inline]
@@ -254,7 +232,6 @@ impl fmt::Debug for WorkerEntry {
             .field("stealer", &self.stealer)
             .field("park", &"UnsafeCell<BoxPark>")
             .field("unpark", &"BoxUnpark")
-            .field("inbound", &self.inbound)
             .finish()
     }
 }

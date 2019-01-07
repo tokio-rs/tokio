@@ -2,7 +2,7 @@
 
 Event loop that drives Tokio I/O resources.
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio_reactor/)
+[Documentation](https://docs.rs/tokio-reactor/0.1.8/tokio_reactor)
 
 ## Overview
 

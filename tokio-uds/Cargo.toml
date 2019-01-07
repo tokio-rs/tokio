@@ -3,14 +3,16 @@ name = "tokio-uds"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update doc url
+#   - Cargo.toml
+#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-uds/0.2.4/tokio_uds/"
+documentation = "https://docs.rs/tokio-uds/0.2.5/tokio_uds/"
 description = """
 Unix Domain sockets for Tokio
 """

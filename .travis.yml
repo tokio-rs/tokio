@@ -9,10 +9,6 @@ addons:
 
 matrix:
   include:
-  # This represents the minimum Rust version supported by Tokio. Updating this
-  # should be done in a dedicated PR and cannot be greater than two 0.x
-  # releases prior to the current stable.
-  - rust: 1.26.0
   - rust: stable
   - rust: beta
   - rust: nightly
@@ -21,6 +17,31 @@ matrix:
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
+
+  # This represents the minimum Rust version supported by Tokio. Updating this
+  # should be done in a dedicated PR and cannot be greater than two 0.x
+  # releases prior to the current stable.
+  #
+  # Tests are not run as tests may require newer versions of rust.
+  - rust: 1.26.0
+    script: |
+      cargo check --all
+
+  # Test combinations of enabled features.
+  - rust: stable
+    script: |
+      shopt -s expand_aliases
+      alias check="cargo check --no-default-features"
+      check
+      check --features codec
+      check --features fs
+      check --features io
+      check --features reactor
+      check --features rt-full
+      check --features tcp
+      check --features timer
+      check --features udp
+      check --features uds
 
   # Test the async / await preview. We don't want to block PRs on this failing
   # though.
@@ -63,8 +84,8 @@ matrix:
         cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
 
   # This runs cargo +nightly doc
-  - rust: nightly
-    env: ALLOW_FAILURES=true # FIXME remove this live after #437 is resolved
+  - name: nightly_docs
+    rust: nightly
     script: cargo doc
 
   allow_failures:
@@ -80,11 +101,6 @@ script: |
       cargo check --tests --all --exclude tokio-tls --target $TARGET
   else
       cargo test --all --no-fail-fast
-      # Disable these tests for now as they are buggy
-      #
-      # cargo test --features unstable-futures
-      # cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
-      # cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
   fi
 
 before_deploy:
