@@ -5,14 +5,16 @@ name = "tokio-reactor"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Update doc URL.
+#   - Cargo.toml
+#   - README.md
 # - Create "v0.1.x" git tag.
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-reactor/0.1.7/tokio_reactor"
+documentation = "https://docs.rs/tokio-reactor/0.1.8/tokio_reactor"
 description = """
 Event loop that drives Tokio I/O resources.
 """

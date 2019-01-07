@@ -1,3 +1,7 @@
+# 0.1.11 (January 6, 2019)
+
+* Fix minor error in Decoder::decode API documentation (#797).
+
 # 0.1.10 (October 23, 2018)
 
 * Expose inner codec from `Framed` (#686).

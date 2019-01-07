@@ -4,12 +4,12 @@ name = "tokio-tls"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Create "tokio-tls-0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-tls"
+documentation = "https://docs.rs/tokio-tls/0.2.1/tokio_tls/"
 description = """
 An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
 for nonblocking I/O streams.

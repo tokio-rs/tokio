@@ -6,11 +6,11 @@ name = "tokio"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.13"
+version = "0.1.14"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.1.13/tokio/"
+documentation = "https://docs.rs/tokio/0.1.14/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
