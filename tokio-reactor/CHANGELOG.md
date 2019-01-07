@@ -1,3 +1,8 @@
+# 0.1.8 (January 6, 2019)
+
+* Update to `parking_lot` 0.7 (#778).
+* Deprecate `Handle::current()` (#805).
+
 # 0.1.7 (November 21, 2018)
 
 * Reduce log level to trace (#734).

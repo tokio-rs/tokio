@@ -1,3 +1,7 @@
+# 0.1.5 (January 6, 2019)
+
+* Add examples to `File` API docs (#786).
+
 # 0.1.4 (October 23, 2018)
 
 * Provide `File::from_std` (#696).

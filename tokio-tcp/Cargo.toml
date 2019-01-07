@@ -4,14 +4,16 @@ name = "tokio-tcp"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update doc url
+#   - Cargo.toml
+#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-tcp/0.1.2/tokio_tcp"
+documentation = "https://docs.rs/tokio-tcp/0.1.3/tokio_tcp"
 description = """
 TCP bindings for tokio.
 """
