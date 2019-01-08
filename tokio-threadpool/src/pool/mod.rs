@@ -45,12 +45,6 @@ pub(crate) struct Pool {
     // Stack tracking sleeping workers.
     sleep_stack: CachePadded<worker::Stack>,
 
-    // Number of workers that haven't reached the final state of shutdown
-    //
-    // This is only used to know when to single `shutdown_task` once the
-    // shutdown process has completed.
-    pub num_workers: AtomicUsize,
-
     // Worker state
     //
     // A worker is a thread that is processing the work queue and polling
@@ -122,7 +116,6 @@ impl Pool {
         let ret = Pool {
             state: CachePadded::new(AtomicUsize::new(State::new().into())),
             sleep_stack: CachePadded::new(worker::Stack::new()),
-            num_workers: AtomicUsize::new(0),
             workers,
             queue,
             trigger,
@@ -313,7 +306,6 @@ impl Pool {
         }
 
         let trigger = match self.trigger.upgrade() {
-            // The pool is shutting down.
             None => {
                 // The pool is shutting down.
                 return;
