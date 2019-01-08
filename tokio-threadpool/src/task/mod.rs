@@ -1,10 +1,8 @@
 mod blocking;
 mod blocking_state;
-mod queue;
 mod state;
 
 pub(crate) use self::blocking::{Blocking, CanBlock};
-pub(crate) use self::queue::Queue;
 use self::blocking_state::BlockingState;
 use self::state::State;
 

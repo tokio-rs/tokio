@@ -15,7 +15,7 @@ use self::backup_stack::BackupStack;
 
 use config::Config;
 use shutdown::ShutdownTrigger;
-use task::{Blocking, Queue, Task};
+use task::{Blocking, Task};
 use worker::{self, Worker, WorkerId};
 
 use futures::Poll;
@@ -27,6 +27,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Weak};
 use std::thread;
 
+use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use rand;
 
@@ -57,7 +58,7 @@ pub(crate) struct Pool {
     //
     // Spawned tasks are pushed into this queue. Although worker threads have their own dedicated
     // task queues, they periodically steal tasks from this global queue, too.
-    pub queue: Arc<Queue>,
+    pub queue: Arc<Injector<Arc<Task>>>,
 
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     //
@@ -90,7 +91,7 @@ impl Pool {
         trigger: Weak<ShutdownTrigger>,
         max_blocking: usize,
         config: Config,
-        queue: Arc<Queue>,
+        queue: Arc<Injector<Arc<Task>>>,
     ) -> Pool {
         let pool_size = workers.len();
         let total_size = max_blocking + pool_size;

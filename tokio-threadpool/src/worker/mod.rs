@@ -386,16 +386,13 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     fn try_run_owned_task(&self, notify: &Arc<Notifier>) -> bool {
-        use deque::Pop;
-
         // Poll the internal queue for a task to run
         match self.entry().pop_task() {
-            Pop::Data(task) => {
+            Some(task) => {
                 self.run_task(task, notify);
                 true
             }
-            Pop::Empty => false,
-            Pop::Retry => true,
+            None => false,
         }
     }
 
@@ -403,7 +400,7 @@ impl Worker {
     ///
     /// Returns `true` if work was found
     fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
-        use deque::Steal;
+        use crossbeam_deque::Steal;
 
         debug_assert!(!self.is_blocking.get());
 
@@ -415,7 +412,7 @@ impl Worker {
         loop {
             if idx < len {
                 match self.pool.workers[idx].steal_tasks(self.entry()) {
-                    Steal::Data(task) => {
+                    Steal::Success(task) => {
                         trace!("stole task from another worker");
 
                         self.run_task(task, notify);
@@ -701,15 +698,17 @@ impl Worker {
     ///
     /// Returns `true` if this worker has tasks in its queue.
     fn sleep_light(&self) {
-        const STEAL_COUNT: usize = 32;
-
         self.entry().park_timeout(Duration::from_millis(0));
 
-        for _ in 0..STEAL_COUNT {
-            if let Some(task) = self.pool.queue.pop() {
-                self.pool.submit(task, &self.pool);
-            } else {
-                break;
+        use crossbeam_deque::Steal;
+        loop {
+            match self.pool.queue.steal_batch(&self.entry().worker) {
+                Steal::Success(()) => {
+                    self.pool.signal_work(&self.pool);
+                    break;
+                }
+                Steal::Empty => break,
+                Steal::Retry => {}
             }
         }
     }
