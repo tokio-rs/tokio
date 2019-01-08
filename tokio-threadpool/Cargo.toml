@@ -26,6 +26,7 @@ crossbeam-deque = "0.6.1"
 crossbeam-utils = "0.6.2"
 num_cpus = "1.2"
 rand = "0.6"
+slab = "0.4.1"
 log = "0.4"
 
 [dev-dependencies]

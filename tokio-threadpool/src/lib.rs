@@ -87,6 +87,7 @@ extern crate crossbeam_utils;
 extern crate futures;
 extern crate num_cpus;
 extern crate rand;
+extern crate slab;
 
 #[macro_use]
 extern crate log;

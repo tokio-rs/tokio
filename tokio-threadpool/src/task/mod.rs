@@ -1,12 +1,10 @@
 mod blocking;
 mod blocking_state;
 mod queue;
-mod registry;
 mod state;
 
 pub(crate) use self::blocking::{Blocking, CanBlock};
 pub(crate) use self::queue::Queue;
-pub(crate) use self::registry::Registry;
 use self::blocking_state::BlockingState;
 use self::state::State;
 
@@ -45,7 +43,7 @@ pub(crate) struct Task {
     /// on 64-bit platforms.
     pub reg_worker: Cell<Option<u32>>,
 
-    /// Position of this task in the `Vec` inside the `Registry` it was registered in.
+    /// The key associated with this task in the `Slab` it was registered in.
     ///
     /// This field can be a `Cell` because it's only accessed by the worker thread that has
     /// registered the task.

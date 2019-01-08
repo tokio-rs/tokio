@@ -1,5 +1,5 @@
 use park::{BoxPark, BoxUnpark};
-use task::{Registry, Task};
+use task::Task;
 use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
@@ -12,6 +12,7 @@ use std::time::Duration;
 use crossbeam::queue::SegQueue;
 use crossbeam_utils::CachePadded;
 use deque;
+use slab::Slab;
 
 // TODO: None of the fields should be public
 //
@@ -40,12 +41,12 @@ pub(crate) struct WorkerEntry {
     unpark: UnsafeCell<Option<BoxUnpark>>,
 
     // Tasks that have been first polled by this worker, but not completed yet.
-    registry: UnsafeCell<Option<Registry>>,
+    running_tasks: UnsafeCell<Slab<Arc<Task>>>,
 
     // Tasks that have been first polled by this worker, but completed by another worker.
     completed_tasks: SegQueue<Arc<Task>>,
 
-    // Set to `true` when `completed_tasks` has tasks that need to be removed from `registry`.
+    // Set to `true` when `completed_tasks` has tasks that need to be removed from `running_tasks`.
     needs_drain: AtomicBool,
 }
 
@@ -60,7 +61,7 @@ impl WorkerEntry {
             stealer: s,
             park: UnsafeCell::new(Some(park)),
             unpark: UnsafeCell::new(Some(unpark)),
-            registry: UnsafeCell::new(Some(Registry::new())),
+            running_tasks: UnsafeCell::new(Slab::new()),
             completed_tasks: SegQueue::new(),
             needs_drain: AtomicBool::new(false),
         }
@@ -242,9 +243,11 @@ impl WorkerEntry {
     ///
     /// Called when the task is being polled for the first time.
     #[inline]
-    pub fn register_task(&self, task: Arc<Task>) {
-        let registry = unsafe { (*self.registry.get()).as_mut().unwrap() };
-        registry.add(task);
+    pub fn register_task(&self, task: &Arc<Task>) {
+        let running_tasks = unsafe { &mut *self.running_tasks.get() };
+
+        let key = running_tasks.insert(task.clone());
+        task.reg_index.set(key);
     }
 
     /// Unregisters a task from this worker.
@@ -252,8 +255,8 @@ impl WorkerEntry {
     /// Called when the task is completed and was previously registered in this worker.
     #[inline]
     pub fn unregister_task(&self, task: Arc<Task>) {
-        let registry = unsafe { (*self.registry.get()).as_mut().unwrap() };
-        registry.remove(&task);
+        let running_tasks = unsafe { &mut *self.running_tasks.get() };
+        running_tasks.remove(task.reg_index.get());
         self.drain_completed_tasks();
     }
 
@@ -273,21 +276,28 @@ impl WorkerEntry {
     pub fn shutdown(&self) {
         self.drain_completed_tasks();
 
+        // Abort all incomplete tasks.
+        let running_tasks = unsafe { &mut *self.running_tasks.get() };
+        for (_, task) in running_tasks.iter() {
+            task.abort();
+        }
+        running_tasks.clear();
+
+        // Drop the parker.
         unsafe {
             *self.park.get() = None;
             *self.unpark.get() = None;
-            *self.registry.get() = None;
         }
     }
 
-    /// Drains the `completed_tasks` queue and removes tasks from `registry`.
+    /// Drains the `completed_tasks` queue and removes tasks from `running_tasks`.
     #[inline]
     fn drain_completed_tasks(&self) {
         if self.needs_drain.compare_and_swap(true, false, Acquire) {
-            let registry = unsafe { (*self.registry.get()).as_mut().unwrap() };
+            let running_tasks = unsafe { &mut *self.running_tasks.get() };
 
             while let Some(task) = self.completed_tasks.try_pop() {
-                registry.remove(&task);
+                running_tasks.remove(task.reg_index.get());
             }
         }
     }

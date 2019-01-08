@@ -455,7 +455,7 @@ impl Worker {
         // track of tasks that are in progress.
         if task.reg_worker.get().is_none() {
             task.reg_worker.set(Some(self.id.0 as u32));
-            self.entry().register_task(task.clone());
+            self.entry().register_task(&task);
         }
 
         let run = self.run_task2(&task, notify);
@@ -507,7 +507,7 @@ impl Worker {
                         // Find which worker polled this task first.
                         let worker = task.reg_worker.get().unwrap() as usize;
 
-                        // Unregister the task from the registry in which it was registered.
+                        // Unregister the task from the worker it was registered in.
                         if !self.is_blocking.get() && worker == self.id.0 {
                             self.entry().unregister_task(task);
                         } else {
