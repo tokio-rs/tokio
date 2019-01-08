@@ -17,7 +17,7 @@ use futures::{self, Future, Async};
 use futures::executor::{self, Spawn};
 
 use std::{fmt, panic, ptr};
-use std::cell::{UnsafeCell};
+use std::cell::{Cell, UnsafeCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
@@ -37,10 +37,19 @@ pub(crate) struct Task {
     next_blocking: AtomicPtr<Task>,
 
     /// ID of the worker that polled this task first.
-    pub reg_worker: AtomicUsize,
+    ///
+    /// This field can be a `Cell` because it's only accessed by the worker thread that is
+    /// executing the task.
+    ///
+    /// The worker ID is represented by a `u32` rather than `usize` in order to save some space
+    /// on 64-bit platforms.
+    pub reg_worker: Cell<Option<u32>>,
 
-    /// Position of this task in the `Vec` inside the `Registry` it was registerd in.
-    pub reg_index: AtomicUsize,
+    /// Position of this task in the `Vec` inside the `Registry` it was registered in.
+    ///
+    /// This field can be a `Cell` because it's only accessed by the worker thread that has
+    /// registered the task.
+    pub reg_index: Cell<usize>,
 
     /// Store the future at the head of the struct
     ///
@@ -69,8 +78,8 @@ impl Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
-            reg_worker: AtomicUsize::new(!0),
-            reg_index: AtomicUsize::new(!0),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -85,8 +94,8 @@ impl Task {
             state: AtomicUsize::new(State::stub().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
-            reg_worker: AtomicUsize::new(!0),
-            reg_index: AtomicUsize::new(!0),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }

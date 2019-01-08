@@ -24,7 +24,7 @@ use futures::{Poll, Async};
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -453,8 +453,8 @@ impl Worker {
 
         // If this is the first time this task is being polled, register it so that we can keep
         // track of tasks that are in progress.
-        if task.reg_worker.load(Acquire) == !0 {
-            task.reg_worker.store(self.id.0, Release);
+        if task.reg_worker.get().is_none() {
+            task.reg_worker.set(Some(self.id.0 as u32));
             self.entry().register_task(task.clone());
         }
 
@@ -505,7 +505,7 @@ impl Worker {
                         }
 
                         // Find which worker polled this task first.
-                        let worker = task.reg_worker.load(Acquire);
+                        let worker = task.reg_worker.get().unwrap() as usize;
 
                         // Unregister the task from the registry in which it was registered.
                         if !self.is_blocking.get() && worker == self.id.0 {

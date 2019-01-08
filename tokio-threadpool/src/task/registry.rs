@@ -2,7 +2,6 @@ use task::Task;
 
 use std::fmt;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 /// A list of tasks that have been polled but not completed.
 ///
@@ -29,14 +28,14 @@ impl Registry {
     #[inline]
     pub fn add(&mut self, task: Arc<Task>) {
         // Remember the index in the `Vec` so that we can later remove the task in O(1) time.
-        task.reg_index.store(self.tasks.len(), Ordering::Release);
+        task.reg_index.set(self.tasks.len());
         self.tasks.push(task);
     }
 
     /// Removes a task from the registry.
     #[inline]
     pub fn remove(&mut self, task: &Arc<Task>) {
-        let index = task.reg_index.load(Ordering::Acquire);
+        let index = task.reg_index.get();
         assert!(Arc::ptr_eq(&self.tasks[index], task));
 
         self.tasks.swap_remove(index);
@@ -44,7 +43,7 @@ impl Registry {
         // With `swap_remove()` we might've changed the position of another task in the `Vec`, so
         // we need to update its index.
         if index < self.tasks.len() {
-            (*self.tasks[index]).reg_index.store(index, Ordering::Release);
+            (*self.tasks[index]).reg_index.set(index);
         }
     }
 }
