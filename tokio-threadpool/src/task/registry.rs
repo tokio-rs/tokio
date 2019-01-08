@@ -1,7 +1,6 @@
 use task::Task;
 
 use std::fmt;
-use std::ptr;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -15,7 +14,7 @@ use std::sync::atomic::Ordering;
 /// can just drop each worker's registry in order to abort all incomplete tasks.
 pub(crate) struct Registry {
     /// The list of registered tasks.
-    tasks: Vec<*const Task>,
+    tasks: Vec<Arc<Task>>,
 }
 
 impl Registry {
@@ -28,26 +27,24 @@ impl Registry {
 
     /// Adds a task to the registry.
     #[inline]
-    pub fn add(&mut self, task: &Arc<Task>) {
+    pub fn add(&mut self, task: Arc<Task>) {
         // Remember the index in the `Vec` so that we can later remove the task in O(1) time.
         task.reg_index.store(self.tasks.len(), Ordering::Release);
-        self.tasks.push(Arc::into_raw(task.clone()));
+        self.tasks.push(task);
     }
 
     /// Removes a task from the registry.
     #[inline]
     pub fn remove(&mut self, task: &Arc<Task>) {
         let index = task.reg_index.load(Ordering::Acquire);
-        assert!(ptr::eq(self.tasks[index], &**task));
+        assert!(Arc::ptr_eq(&self.tasks[index], task));
 
-        unsafe {
-            drop(Arc::from_raw(self.tasks.swap_remove(index)));
+        self.tasks.swap_remove(index);
 
-            // By doing `swap_remove()` we might've changed the position of another task in the
-            // `Vec`, so we need to update its index.
-            if index < self.tasks.len() {
-                (*self.tasks[index]).reg_index.store(index, Ordering::Release);
-            }
+        // With `swap_remove()` we might've changed the position of another task in the `Vec`, so
+        // we need to update its index.
+        if index < self.tasks.len() {
+            (*self.tasks[index]).reg_index.store(index, Ordering::Release);
         }
     }
 }
@@ -55,11 +52,8 @@ impl Registry {
 impl Drop for Registry {
     fn drop(&mut self) {
         // Abort all tasks in the registry.
-        for raw in self.tasks.drain(..) {
-            unsafe {
-                let task = Arc::from_raw(raw);
-                task.abort();
-            }
+        for task in self.tasks.drain(..) {
+            task.abort();
         }
     }
 }

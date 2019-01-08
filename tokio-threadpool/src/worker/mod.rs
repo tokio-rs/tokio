@@ -455,7 +455,7 @@ impl Worker {
         // track of tasks that are in progress.
         if task.reg_worker.load(Acquire) == !0 {
             task.reg_worker.store(self.id.0, Release);
-            self.entry().register_task(&task);
+            self.entry().register_task(task.clone());
         }
 
         let run = self.run_task2(&task, notify);

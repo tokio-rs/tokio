@@ -242,7 +242,7 @@ impl WorkerEntry {
     ///
     /// Called when the task is being polled for the first time.
     #[inline]
-    pub fn register_task(&self, task: &Arc<Task>) {
+    pub fn register_task(&self, task: Arc<Task>) {
         let registry = unsafe { (*self.registry.get()).as_mut().unwrap() };
         registry.add(task);
     }
