@@ -2,13 +2,12 @@
 //! asynchronous tasks.
 //!
 //! Similar to `std`, channel creation provides [`Receiver`] and [`Sender`]
-//! handles. [`Receiver`] implements [`Stream`] and allows a task to
-//! read values out of the channel. If there is no message to read, the current
-//! task will be notified when a new value is sent.  [`Sender`] implements the
-//! `Sink` trait and allows sending messages into the channel. If the channel is
-//! at capacity, the send is rejected and the task will be notified when
-//! additional capacity is available. In other words, the channel provides
-//! backpressure.
+//! handles. [`Receiver`] implements `Stream` and allows a task to read values
+//! out of the channel. If there is no message to read, the current task will be
+//! notified when a new value is sent.  [`Sender`] implements the `Sink` trait
+//! and allows sending messages into the channel. If the channel is at capacity,
+//! the send is rejected and the task will be notified when additional capacity
+//! is available. In other words, the channel provides backpressure.
 //!
 //! Unbounded channels are also available using the `unbounded_channel`
 //! constructor.
@@ -17,7 +16,7 @@
 //!
 //! When all [`Sender`] handles have been dropped, it is no longer
 //! possible to send values into the channel. This is considered the termination
-//! event of the stream. As such, [`Receiver::poll`] returns `Ok(Ready(None))`.
+//! event of the stream. As such, `Receiver::poll` returns `Ok(Ready(None))`.
 //!
 //! If the [`Receiver`] handle is dropped, then messages can no longer
 //! be read out of the channel. In this case, all further attempts to send will
@@ -34,8 +33,6 @@
 //!
 //! [`Sender`]: struct.Sender.html
 //! [`Receiver`]: struct.Receiver.html
-//! [`Stream`]: ../../futures_core/stream/trait.Stream.html
-//! [`Receiver::poll_next`]: ../../futures_core/stream/trait.Stream.html#tymethod.poll_next
 
 mod block;
 mod bounded;

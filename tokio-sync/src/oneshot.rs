@@ -15,7 +15,7 @@ use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
 
 /// Sends a value to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
@@ -23,7 +23,7 @@ pub struct Sender<T> {
 
 /// Receive a value from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
@@ -134,7 +134,7 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    /// Check if the associated [`Receiver`](Receiver) handle has been dropped.
+    /// Check if the associated [`Receiver`] handle has been dropped.
     ///
     /// # Return values
     ///
@@ -144,6 +144,8 @@ impl<T> Sender<T> {
     /// If `Ok(NotReady)` is returned then the associated `Receiver` is still
     /// alive and may be able to receive a message if sent. The current task is
     /// registered to receive a notification if the `Receiver` handle goes away.
+    ///
+    /// [`Receiver`]: struct.Receiver.html
     pub fn poll_cancel(&mut self) -> Poll<(), ()> {
         let inner = self.inner.as_ref().unwrap();
 
@@ -181,10 +183,13 @@ impl<T> Sender<T> {
     }
 
 
-    /// Check if the associated [`Receiver`](Receiver) handle has been dropped.
+    /// Check if the associated [`Receiver`] handle has been dropped.
     ///
-    /// Unlike [`poll_cancel`](Sender::poll_cancel), this function does not
-    /// register a task for wakeup upon cancellation.
+    /// Unlike [`poll_cancel`], this function does not register a task for
+    /// wakeup upon cancellation.
+    ///
+    /// [`Receiver`]: struct.Receiver.html
+    /// [`poll_cancel`]: struct.Sender.html#method.poll_cancel
     pub fn is_canceled(&self) -> bool {
         let inner = self.inner.as_ref().unwrap();
 
@@ -202,12 +207,14 @@ impl<T> Drop for Sender<T> {
 }
 
 impl<T> Receiver<T> {
-    /// Prevent the associated [`Sender`](Sender) handle from sending a value.
+    /// Prevent the associated [`Sender`] handle from sending a value.
     ///
     /// Any `send` operation which happens after calling `close` is guaranteed
-    /// to fail. After calling `close`, [`Receiver::poll`](Future::poll) should
-    /// be called to receive a value if one was sent **before** the call to
-    /// `close` completed.
+    /// to fail. After calling `close`, `Receiver::poll`] should be called to
+    /// receive a value if one was sent **before** the call to `close`
+    /// completed.
+    ///
+    /// [`Sender`]: struct.Sender.html
     pub fn close(&mut self) {
         let inner = self.inner.as_ref().unwrap();
         inner.close();
@@ -218,9 +225,11 @@ impl<T> Receiver<T> {
     /// Does not register a task if no value has been sent.
     ///
     /// A return value of `None` must be considered immediately stale (out of
-    /// date) unless [`close`](Receiver::close) has been called first.
+    /// date) unless [`close`] has been called first.
     ///
     /// Returns an error if the sender was dropped.
+    ///
+    /// [`close`]: #method.close
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         let result = if let Some(inner) = self.inner.as_ref() {
             let state = State::load(&inner.state, Acquire);

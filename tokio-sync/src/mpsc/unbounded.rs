@@ -7,8 +7,8 @@ use std::fmt;
 
 /// Send values to the associated `UnboundedReceiver`.
 ///
-/// Instances are created by the [`unbounded_channel`](unbounded_channel)
-/// function.
+/// Instances are created by the
+/// [`unbounded_channel`](fn.unbounded_channel.html) function.
 #[derive(Debug, Clone)]
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
@@ -16,8 +16,8 @@ pub struct UnboundedSender<T> {
 
 /// Receive values from the associated `UnboundedSender`.
 ///
-/// Instances are created by the [`unbounded_channel`](unbounded_channel)
-/// function.
+/// Instances are created by the
+/// [`unbounded_channel`](fn.unbounded_channel.html) function.
 #[derive(Debug)]
 pub struct UnboundedReceiver<T> {
     /// The channel receiver

@@ -6,7 +6,7 @@ use std::fmt;
 
 /// Send values to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug, Clone)]
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
@@ -14,7 +14,7 @@ pub struct Sender<T> {
 
 /// Receive values from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// The channel receiver
