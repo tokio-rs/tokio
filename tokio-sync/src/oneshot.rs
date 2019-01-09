@@ -1,3 +1,4 @@
+//! A channel for sending a single message between asynchronous tasks.
 
 use loom::{
     futures::task::{self, Task},
@@ -11,17 +12,25 @@ use std::mem::{self, ManuallyDrop};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
 
+/// Sends a value to the associated `Receiver`.
+///
+/// This is created by the [`channel`](channel) function.
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
 }
 
+/// Receive a value from the associated `Sender`.
+///
+/// This is created by the [`channel`](channel) function.
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
 }
 
+/// Error returned by the `Future` implementation for `Receiver`.
 #[derive(Debug)]
-pub struct Error {}
+pub struct RecvError {}
 
+/// Error returned by the `try_recv` function on `Receiver`.
 #[derive(Debug)]
 pub struct TryRecvError {}
 
@@ -40,13 +49,42 @@ struct Inner<T> {
     rx_task: CausalCell<ManuallyDrop<Task>>,
 }
 
-/// States:
-///
-/// * rx_task_set
-/// * value complete: once set, rx_task can no longer be modified.
 #[derive(Clone, Copy)]
 struct State(usize);
 
+/// Create a new one-shot channel for sending single values across asynchronous
+/// tasks.
+///
+/// The function returns separate "send" and "receive" handles. The `Sender`
+/// handle is used by the producer to send the value. The `Receiver` handle is
+/// used by the consumer to receive the value.
+///
+/// Each handle can be used on separate tasks.
+///
+/// # Examples
+///
+/// ```
+/// extern crate futures;
+/// extern crate tokio_sync;
+///
+/// use tokio_sync::oneshot;
+/// use futures::Future;
+/// use std::thread;
+///
+/// let (sender, receiver) = oneshot::channel::<i32>();
+///
+/// # let t =
+/// thread::spawn(|| {
+///     let future = receiver.map(|i| {
+///         println!("got: {:?}", i);
+///     });
+///     // ...
+/// # return future;
+/// });
+///
+/// sender.send(3).unwrap();
+/// # t.join().unwrap().wait().unwrap();
+/// ```
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
@@ -62,6 +100,15 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Sender<T> {
+    /// Completes this oneshot with a successful result.
+    ///
+    /// The function consumes `self` and notifies the `Receiver` handle that a
+    /// value is ready to be received.
+    ///
+    /// If the value is successfully enqueued for the remote end to receive,
+    /// then `Ok(())` is returned. If the receiving end was dropped before this
+    /// function was called, however, then `Err` is returned with the value
+    /// provided.
     pub fn send(mut self, t: T) -> Result<(), T> {
         let inner = self.inner.take().unwrap();
 
@@ -78,6 +125,16 @@ impl<T> Sender<T> {
         Ok(())
     }
 
+    /// Check if the associated [`Receiver`](Receiver) handle has been dropped.
+    ///
+    /// # Return values
+    ///
+    /// If `Ok(Ready)` is returned then the associated `Receiver` has been
+    /// dropped, which means any work required for sending should be canceled.
+    ///
+    /// If `Ok(NotReady)` is returned then the associated `Receiver` is still
+    /// alive and may be able to receive a message if sent. The current task is
+    /// registered to receive a notification if the `Receiver` handle goes away.
     pub fn poll_cancel(&mut self) -> Poll<(), ()> {
         let inner = self.inner.as_ref().unwrap();
 
@@ -110,6 +167,11 @@ impl<T> Sender<T> {
         Ok(Async::NotReady)
     }
 
+
+    /// Check if the associated [`Receiver`](Receiver) handle has been dropped.
+    ///
+    /// Unlike [`poll_cancel`](Sender::poll_cancel), this function does not
+    /// register a task for wakeup upon cancellation.
     pub fn is_canceled(&self) -> bool {
         let inner = self.inner.as_ref().unwrap();
 
@@ -127,11 +189,25 @@ impl<T> Drop for Sender<T> {
 }
 
 impl<T> Receiver<T> {
+    /// Prevent the associated [`Sender`](Sender) handle from sending a value.
+    ///
+    /// Any `send` operation which happens after calling `close` is guaranteed
+    /// to fail. After calling `close`, [`Receiver::poll`](Future::poll) should
+    /// be called to receive a value if one was sent **before** the call to
+    /// `close` completed.
     pub fn close(&mut self) {
         let inner = self.inner.as_ref().unwrap();
         inner.close();
     }
 
+    /// Attempts to receive a value outside of the context of a task.
+    ///
+    /// Does not register a task if no value has been sent.
+    ///
+    /// A return value of `None` must be considered immediately stale (out of
+    /// date) unless [`close`](Receiver::close) has been called first.
+    ///
+    /// Returns an error if the sender was dropped.
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         let result = if let Some(inner) = self.inner.as_ref() {
             let state = State::load(&inner.state, Acquire);
@@ -166,9 +242,9 @@ impl<T> Drop for Receiver<T> {
 
 impl<T> Future for Receiver<T> {
     type Item = T;
-    type Error = Error;
+    type Error = RecvError;
 
-    fn poll(&mut self) -> Poll<T, Error> {
+    fn poll(&mut self) -> Poll<T, RecvError> {
         use futures::Async::{Ready, NotReady};
 
         // If `inner` is `None`, then `poll()` has already completed.
@@ -179,10 +255,10 @@ impl<T> Future for Receiver<T> {
             if state.is_complete() {
                 match unsafe { inner.consume_value() } {
                     Some(value) => Ok(Ready(value)),
-                    None => Err(Error {}),
+                    None => Err(RecvError {}),
                 }
             } else if state.is_closed() {
-                Err(Error {})
+                Err(RecvError {})
             } else {
                 if state.is_rx_task_set() {
                     let rx_task = unsafe { inner.rx_task() };
@@ -203,7 +279,7 @@ impl<T> Future for Receiver<T> {
                     if state.is_complete() {
                         match unsafe { inner.consume_value() } {
                             Some(value) => Ok(Ready(value)),
-                            None => Err(Error {}),
+                            None => Err(RecvError {}),
                         }
                     } else {
                         return Ok(NotReady);
