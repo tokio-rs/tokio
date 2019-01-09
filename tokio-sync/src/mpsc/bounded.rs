@@ -42,7 +42,54 @@ enum ErrorKind {
 #[derive(Debug)]
 pub struct RecvError {}
 
-/// Create a bounded mpsc channel for communicating between asynchronous tasks.
+/// Create a bounded mpsc channel for communicating between asynchronous tasks,
+/// returning the sender/receiver halves.
+///
+/// All data sent on `Sender` will become available on `Receiver` in the same
+/// order as it was sent.
+///
+/// The `Sender` can be cloned to `send` to the same channel from multiple code
+/// locations. Only one `Receiver` is supported.
+///
+/// If the `Receiver` is disconnected while trying to `send`, the `send` method
+/// will return a `SendError`. Similarly, if `Sender` is disconnected while
+/// trying to `recv`, the `recv` method will return a `RecvError`.
+///
+/// # Examples
+///
+/// ```rust
+/// extern crate futures;
+/// extern crate tokio;
+///
+/// use tokio::sync::mpsc::channel;
+/// use tokio::prelude::*;
+/// use futures::future::lazy;
+///
+/// # fn some_computation() -> impl Future<Item = (), Error = ()> + Send {
+/// # futures::future::ok::<(), ()>(())
+/// # }
+///
+/// tokio::run(lazy(|| {
+///     let (tx, rx) = channel(100);
+///
+///     tokio::spawn({
+///         some_computation()
+///             .and_then(|value| {
+///                 tx.send(value)
+///                     .map_err(|_| ())
+///             })
+///             .map(|_| ())
+///             .map_err(|_| ())
+///     });
+///
+///     rx.for_each(|value| {
+///         println!("got value = {:?}", value);
+///         Ok(())
+///     })
+///     .map(|_| ())
+///     .map_err(|_| ())
+/// }));
+/// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     let semaphore = (::semaphore::Semaphore::new(buffer), buffer);
     let (tx, rx) = chan::channel(semaphore);
