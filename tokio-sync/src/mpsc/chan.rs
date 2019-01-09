@@ -9,12 +9,14 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 /// Channel sender
+#[derive(Debug)]
 pub(crate) struct Tx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
     permit: S::Permit,
 }
 
 /// Channel receiver
+#[derive(Debug)]
 pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
 }
@@ -45,6 +47,7 @@ pub(crate) trait Semaphore: Sync {
     fn close(&self);
 }
 
+#[derive(Debug)]
 struct Chan<T, S> {
     /// Handle to the push half of the lock-free list.
     tx: list::Tx<T>,
@@ -65,6 +68,7 @@ struct Chan<T, S> {
 }
 
 /// Fields only accessed by `Rx` handle.
+#[derive(Debug)]
 struct RxFields<T> {
     /// Channel receiver. This field is only accessed by the `Receiver` type.
     list: list::Rx<T>,

@@ -50,9 +50,7 @@ pub struct Permit {
 
 /// Error returned by `Permit::poll_acquire`.
 #[derive(Debug)]
-pub struct AcquireError {
-    // This error can only be raised by the semaphore closing.
-}
+pub struct AcquireError(());
 
 /// Error returned by `Permit::try_acquire`.
 #[derive(Debug)]
@@ -667,7 +665,7 @@ impl Permit {
 
 impl AcquireError {
     fn closed() -> AcquireError {
-        AcquireError {}
+        AcquireError(())
     }
 }
 

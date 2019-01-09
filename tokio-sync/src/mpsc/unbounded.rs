@@ -10,22 +10,20 @@ pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
-/// TODO: Dox
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
 }
 
 #[derive(Debug)]
-pub struct UnboundedSendError {}
+pub struct UnboundedSendError(());
 
 #[derive(Debug)]
 pub struct UnboundedTrySendError<T>(T);
 
 #[derive(Debug)]
-pub struct UnboundedRecvError {}
+pub struct UnboundedRecvError(());
 
-/// TODO: Dox
 pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
     let (tx, rx) = chan::channel(AtomicUsize::new(0));
 
@@ -54,7 +52,7 @@ impl<T> Stream for UnboundedReceiver<T> {
 
     fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
         self.chan.recv()
-            .map_err(|_| UnboundedRecvError {})
+            .map_err(|_| UnboundedRecvError(()))
     }
 }
 
@@ -80,7 +78,7 @@ impl<T> Sink for UnboundedSender<T> {
     fn start_send(&mut self, msg: T) -> StartSend<T, Self::SinkError> {
         use futures::AsyncSink;
 
-        self.try_send(msg).map_err(|_| UnboundedSendError {})?;
+        self.try_send(msg).map_err(|_| UnboundedSendError(()))?;
         Ok(AsyncSink::Ready)
     }
 

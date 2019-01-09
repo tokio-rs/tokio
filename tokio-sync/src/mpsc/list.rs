@@ -7,6 +7,7 @@ use loom::{
     sync::atomic::{AtomicUsize, AtomicPtr},
 };
 
+use std::fmt;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Release, AcqRel, Relaxed};
 
@@ -211,6 +212,17 @@ impl<T> Tx<T> {
     }
 }
 
+impl<T: fmt::Debug> fmt::Debug for Tx<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        fmt.debug_struct("Tx")
+            .field("block_tail", &self.block_tail.load(Relaxed))
+            .field("tail_position", &self.tail_position.load(Relaxed))
+            .finish()
+    }
+}
+
 impl<T> Rx<T> {
     /// Pop the next value off the queue
     pub fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
@@ -306,5 +318,15 @@ impl<T> Rx<T> {
 
             loom::yield_now();
         }
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Rx<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Rx")
+            .field("head", &self.head)
+            .field("index", &self.index)
+            .field("free_head", &self.free_head)
+            .finish()
     }
 }

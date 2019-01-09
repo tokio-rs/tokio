@@ -7,7 +7,7 @@ use std::fmt;
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -15,6 +15,7 @@ pub struct Sender<T> {
 /// Receive values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+#[derive(Debug)]
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -22,7 +23,7 @@ pub struct Receiver<T> {
 
 /// Error returned by the `Sender`.
 #[derive(Debug)]
-pub struct SendError {}
+pub struct SendError(());
 
 /// Error returned by `Sender::try_send`.
 #[derive(Debug)]
@@ -87,7 +88,7 @@ impl<T> Sender<T> {
 
     pub fn poll_ready(&mut self) -> Poll<(), SendError> {
         self.chan.poll_ready()
-            .map_err(|_| SendError {})
+            .map_err(|_| SendError(()))
     }
 
     /// Attempts to send a message on this `Sender`, returning the message
@@ -108,7 +109,7 @@ impl<T> Sink for Sender<T> {
 
         match self.poll_ready() {
             Ok(Ready(_)) => {
-                self.try_send(msg).map_err(|_| SendError {})?;
+                self.try_send(msg).map_err(|_| SendError(()))?;
                 Ok(AsyncSink::Ready)
             }
             Ok(NotReady) => {

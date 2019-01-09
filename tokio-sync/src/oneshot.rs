@@ -8,6 +8,7 @@ use loom::{
 
 use futures::{Async, Future, Poll};
 
+use std::fmt;
 use std::mem::{self, ManuallyDrop};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
@@ -15,6 +16,7 @@ use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
 /// Sends a value to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+#[derive(Debug)]
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
 }
@@ -22,6 +24,7 @@ pub struct Sender<T> {
 /// Receive a value from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+#[derive(Debug)]
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
 }
@@ -398,6 +401,16 @@ impl<T> Drop for Inner<T> {
     }
 }
 
+impl<T: fmt::Debug> fmt::Debug for Inner<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        fmt.debug_struct("Inner")
+            .field("state", &State::load(&self.state, Relaxed))
+            .finish()
+    }
+}
+
 const RX_TASK_SET: usize = 0b00001;
 const VALUE_SENT: usize  = 0b00010;
 const CLOSED: usize      = 0b00100;
@@ -466,5 +479,16 @@ impl State {
     fn load(cell: &AtomicUsize, order: Ordering) -> State {
         let val = cell.load(order);
         State(val)
+    }
+}
+
+impl fmt::Debug for State {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("State")
+            .field("is_complete", &self.is_complete())
+            .field("is_closed", &self.is_closed())
+            .field("is_rx_task_set", &self.is_rx_task_set())
+            .field("is_tx_task_set", &self.is_tx_task_set())
+            .finish()
     }
 }
