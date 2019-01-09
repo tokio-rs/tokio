@@ -14,14 +14,14 @@ use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
 
 /// Sends a value to the associated `Receiver`.
 ///
-/// This is created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`](channel) function.
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
 }
 
 /// Receive a value from the associated `Sender`.
 ///
-/// This is created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`](channel) function.
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
 }

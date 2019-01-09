@@ -19,7 +19,13 @@ pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
 }
 
-pub trait Semaphore: Sync {
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum TrySendError {
+    Closed,
+    NoPermits,
+}
+
+pub(crate) trait Semaphore: Sync {
     type Permit;
 
     fn new_permit() -> Self::Permit;
@@ -32,7 +38,7 @@ pub trait Semaphore: Sync {
 
     fn poll_acquire(&self, permit: &mut Self::Permit) -> Poll<(), ()>;
 
-    fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), ()>;
+    fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), TrySendError>;
 
     fn forget(&self, permit: &mut Self::Permit);
 
@@ -109,8 +115,10 @@ where
     }
 
     /// Send a message and notify the receiver.
-    pub fn try_send(&mut self, value: T) -> Result<(), ()> {
-        self.inner.semaphore.try_acquire(&mut self.permit)?;
+    pub fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
+        if let Err(e) = self.inner.semaphore.try_acquire(&mut self.permit) {
+            return Err((value, e));
+        }
 
         // Push the value
         self.inner.tx.push(value);
@@ -260,6 +268,20 @@ impl<T, S> Drop for Chan<T, S> {
     }
 }
 
+use semaphore::TryAcquireError;
+
+impl From<TryAcquireError> for TrySendError {
+    fn from(src: TryAcquireError) -> TrySendError {
+        if src.is_closed() {
+            TrySendError::Closed
+        } else if src.is_no_permits() {
+            TrySendError::NoPermits
+        } else {
+            unreachable!();
+        }
+    }
+}
+
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
 use semaphore::Permit;
@@ -290,9 +312,9 @@ impl Semaphore for (::semaphore::Semaphore, usize) {
             .map_err(|_| ())
     }
 
-    fn try_acquire(&self, permit: &mut Permit) -> Result<(), ()> {
-        permit.try_acquire(&self.0)
-            .map_err(|_| ())
+    fn try_acquire(&self, permit: &mut Permit) -> Result<(), TrySendError> {
+        permit.try_acquire(&self.0)?;
+        Ok(())
     }
 
     fn forget(&self, permit: &mut Self::Permit) {
@@ -335,14 +357,15 @@ impl Semaphore for AtomicUsize {
         use futures::Async::Ready;
         self.try_acquire(permit)
             .map(Ready)
+            .map_err(|_| ())
     }
 
-    fn try_acquire(&self, _permit: &mut ()) -> Result<(), ()> {
+    fn try_acquire(&self, _permit: &mut ()) -> Result<(), TrySendError> {
         let mut curr = self.load(Acquire);
 
         loop {
             if curr & 1 == 1 {
-                return Err(());
+                return Err(TrySendError::Closed);
             }
 
             if curr == usize::MAX ^ 1 {

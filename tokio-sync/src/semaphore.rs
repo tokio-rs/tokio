@@ -48,9 +48,15 @@ pub struct Permit {
     state: PermitState,
 }
 
-/// TODO: Dox
+/// Error returned by `Permit::poll_acquire`.
 #[derive(Debug)]
-pub struct Error {
+pub struct AcquireError {
+    // This error can only be raised by the semaphore closing.
+}
+
+/// Error returned by `Permit::try_acquire`.
+#[derive(Debug)]
+pub struct TryAcquireError {
     kind: ErrorKind,
 }
 
@@ -162,7 +168,9 @@ impl Semaphore {
     }
 
     /// Poll for a permit
-    fn poll_permit(&self, mut permit: Option<&mut Permit>) -> Poll<(), Error> {
+    fn poll_permit(&self, mut permit: Option<&mut Permit>)
+        -> Poll<(), AcquireError>
+    {
         use futures::Async::*;
 
         // Load the current state
@@ -193,7 +201,7 @@ impl Semaphore {
 
             if curr.is_closed() {
                 undo_strong!();
-                return Err(Error::closed());
+                return Err(AcquireError::closed());
             }
 
             if !next.acquire_permit(&self.stub) {
@@ -557,8 +565,10 @@ impl Permit {
     }
 
     /// Try to acquire the permit. If no permits are available, the current task
-    /// will be notified once a new permit becomes available.
-    pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), Error> {
+    /// is notified once a new permit becomes available.
+    pub fn poll_acquire(&mut self, semaphore: &Semaphore)
+        -> Poll<(), AcquireError>
+    {
         use futures::Async::*;
 
         match self.state {
@@ -591,7 +601,9 @@ impl Permit {
     }
 
     /// Try to acquire the permit.
-    pub fn try_acquire(&mut self, semaphore: &Semaphore) -> Result<(), Error> {
+    pub fn try_acquire(&mut self, semaphore: &Semaphore)
+        -> Result<(), TryAcquireError>
+    {
         use futures::Async::*;
 
         match self.state {
@@ -599,11 +611,11 @@ impl Permit {
             PermitState::Waiting => {
                 let waiter = self.waiter.as_ref().unwrap();
 
-                if waiter.acquire2()? {
+                if waiter.acquire2().map_err(to_try_acquire)? {
                     self.state = PermitState::Acquired;
                     return Ok(());
                 } else {
-                    return Err(Error::no_permits());
+                    return Err(TryAcquireError::no_permits());
                 }
             }
             PermitState::Acquired => {
@@ -611,13 +623,13 @@ impl Permit {
             }
         }
 
-        match semaphore.poll_permit(None)? {
+        match semaphore.poll_permit(None).map_err(to_try_acquire)? {
             Ready(()) => {
                 self.state = PermitState::Acquired;
                 Ok(())
             }
             NotReady => {
-                Err(Error::no_permits())
+                Err(TryAcquireError::no_permits())
             }
         }
     }
@@ -651,15 +663,40 @@ impl Permit {
     }
 }
 
-// ===== impl Error =====
+// ===== impl AcquireError ====
 
-impl Error {
-    fn closed() -> Error {
-        Error { kind: ErrorKind::Closed }
+impl AcquireError {
+    fn closed() -> AcquireError {
+        AcquireError {}
+    }
+}
+
+fn to_try_acquire(_: AcquireError) -> TryAcquireError {
+    TryAcquireError::closed()
+}
+
+impl fmt::Display for AcquireError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::error::Error;
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl ::std::error::Error for AcquireError {
+    fn description(&self) -> &str {
+        "semaphore closed"
+    }
+}
+
+// ===== impl TryAcquireError =====
+
+impl TryAcquireError {
+    fn closed() -> TryAcquireError {
+        TryAcquireError { kind: ErrorKind::Closed }
     }
 
-    fn no_permits() -> Error {
-        Error { kind: ErrorKind::NoPermits }
+    fn no_permits() -> TryAcquireError {
+        TryAcquireError { kind: ErrorKind::NoPermits }
     }
 
     /// Returns true if the error was caused by a closed semaphore.
@@ -680,14 +717,14 @@ impl Error {
     }
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for TryAcquireError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
 }
 
-impl ::std::error::Error for Error {
+impl ::std::error::Error for TryAcquireError {
     fn description(&self) -> &str {
         match self.kind {
             ErrorKind::Closed => "semaphore closed",
@@ -707,7 +744,7 @@ impl WaiterNode {
         }
     }
 
-    fn acquire(&self) -> Result<bool, Error> {
+    fn acquire(&self) -> Result<bool, AcquireError> {
         if self.acquire2()? {
             return Ok(true);
         }
@@ -717,12 +754,12 @@ impl WaiterNode {
         self.acquire2()
     }
 
-    fn acquire2(&self) -> Result<bool, Error> {
+    fn acquire2(&self) -> Result<bool, AcquireError> {
         use self::NodeState::*;
 
         match Idle.compare_exchange(&self.state, Assigned, AcqRel, Acquire) {
             Ok(_) => Ok(true),
-            Err(Closed) => Err(Error::closed()),
+            Err(Closed) => Err(AcquireError::closed()),
             Err(_) => Ok(false),
         }
     }
