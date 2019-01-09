@@ -9,7 +9,7 @@ use futures::Stream;
 
 #[cfg(feature = "timer")]
 use std::time::Duration;
-use util::enumerate::Enumerate;
+pub use util::enumerate::Enumerate;
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
@@ -98,6 +98,12 @@ pub trait StreamExt: Stream {
     /// The stream returned yields pairs `(i, val)`, where `i` is the
     /// current index of iteration and `val` is the value returned by the
     /// iterator.
+    ///
+    /// # Overflow Behavior
+    ///
+    /// The method does no guarding against overflows, so counting elements of
+    /// an iterator with more than [`std::usize::MAX`] elements either produces the
+    /// wrong result or panics.
     fn enumerate(self) -> Enumerate<Self>
     where Self: Sized,
     {
