@@ -148,7 +148,11 @@ impl<T> Sender<T> {
             let tx_task = unsafe { inner.tx_task() };
 
             if !tx_task.will_notify_current() {
-                unimplemented!();
+                state = State::unset_tx_task(&inner.state);
+
+                if state.is_closed() {
+                    return Ok(Async::Ready(()));
+                }
             }
         }
 
@@ -249,44 +253,10 @@ impl<T> Future for Receiver<T> {
 
         // If `inner` is `None`, then `poll()` has already completed.
         let ret = if let Some(inner) = self.inner.as_ref() {
-            // Load the state
-            let mut state = State::load(&inner.state, Acquire);
-
-            if state.is_complete() {
-                match unsafe { inner.consume_value() } {
-                    Some(value) => Ok(Ready(value)),
-                    None => Err(RecvError {}),
-                }
-            } else if state.is_closed() {
-                Err(RecvError {})
-            } else {
-                if state.is_rx_task_set() {
-                    let rx_task = unsafe { inner.rx_task() };
-                    // Check if the task is still the same
-                    if !rx_task.will_notify_current() {
-                        // Unset the task
-                        unimplemented!();
-                    }
-                }
-
-                if !state.is_rx_task_set() {
-                    // Attempt to set the task
-                    unsafe { inner.set_rx_task(); }
-
-                    // Update the state
-                    state = State::set_rx_task(&inner.state);
-
-                    if state.is_complete() {
-                        match unsafe { inner.consume_value() } {
-                            Some(value) => Ok(Ready(value)),
-                            None => Err(RecvError {}),
-                        }
-                    } else {
-                        return Ok(NotReady);
-                    }
-                } else {
-                    return Ok(NotReady);
-                }
+            match inner.poll_recv() {
+                Ok(Ready(v)) => Ok(Ready(v)),
+                Ok(NotReady) => return Ok(NotReady),
+                Err(e) => Err(e),
             }
         } else {
             panic!("called after complete");
@@ -311,6 +281,58 @@ impl<T> Inner<T> {
         }
 
         true
+    }
+
+    fn poll_recv(&self) -> Poll<T, RecvError> {
+        use futures::Async::{Ready, NotReady};
+
+        // Load the state
+        let mut state = State::load(&self.state, Acquire);
+
+        if state.is_complete() {
+            match unsafe { self.consume_value() } {
+                Some(value) => Ok(Ready(value)),
+                None => Err(RecvError {}),
+            }
+        } else if state.is_closed() {
+            Err(RecvError {})
+        } else {
+            if state.is_rx_task_set() {
+                let rx_task = unsafe { self.rx_task() };
+
+                // Check if the task is still the same
+                if !rx_task.will_notify_current() {
+                    // Unset the task
+                    state = State::unset_rx_task(&self.state);
+
+                    if state.is_complete() {
+                        return match unsafe { self.consume_value() } {
+                            Some(value) => Ok(Ready(value)),
+                            None => Err(RecvError {}),
+                        };
+                    }
+                }
+            }
+
+            if !state.is_rx_task_set() {
+                // Attempt to set the task
+                unsafe { self.set_rx_task(); }
+
+                // Update the state
+                state = State::set_rx_task(&self.state);
+
+                if state.is_complete() {
+                    match unsafe { self.consume_value() } {
+                        Some(value) => Ok(Ready(value)),
+                        None => Err(RecvError {}),
+                    }
+                } else {
+                    return Ok(NotReady);
+                }
+            } else {
+                return Ok(NotReady);
+            }
+        }
     }
 
     /// Called by `Receiver` to indicate that the value will never be received.
@@ -404,7 +426,12 @@ impl State {
 
     fn set_rx_task(cell: &AtomicUsize) -> State {
         let val = cell.fetch_or(RX_TASK_SET, AcqRel);
-        State(val)
+        State(val | RX_TASK_SET)
+    }
+
+    fn unset_rx_task(cell: &AtomicUsize) -> State {
+        let val = cell.fetch_and(!RX_TASK_SET, AcqRel);
+        State(val & !RX_TASK_SET)
     }
 
     fn is_closed(&self) -> bool {
@@ -420,7 +447,12 @@ impl State {
 
     fn set_tx_task(cell: &AtomicUsize) -> State {
         let val = cell.fetch_or(TX_TASK_SET, AcqRel);
-        State(val)
+        State(val | TX_TASK_SET)
+    }
+
+    fn unset_tx_task(cell: &AtomicUsize) -> State {
+        let val = cell.fetch_and(!TX_TASK_SET, AcqRel);
+        State(val & !TX_TASK_SET)
     }
 
     fn is_tx_task_set(&self) -> bool {

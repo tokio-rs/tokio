@@ -196,3 +196,49 @@ fn drops_tasks() {
     assert_eq!(1, tx_task.notifier_ref_count());
     assert_eq!(1, rx_task.notifier_ref_count());
 }
+
+#[test]
+fn receiver_changes_task() {
+    let (tx, mut rx) = oneshot::channel();
+
+    let mut task1 = MockTask::new();
+    let mut task2 = MockTask::new();
+
+    task1.enter(|| {
+        assert_not_ready!(rx.poll());
+    });
+
+    task2.enter(|| {
+        assert_not_ready!(rx.poll());
+    });
+
+    tx.send(1).unwrap();
+
+    assert!(!task1.is_notified());
+    assert!(task2.is_notified());
+
+    assert_ready!(rx.poll());
+}
+
+#[test]
+fn sender_changes_task() {
+    let (mut tx, rx) = oneshot::channel::<i32>();
+
+    let mut task1 = MockTask::new();
+    let mut task2 = MockTask::new();
+
+    task1.enter(|| {
+        assert_not_ready!(tx.poll_cancel());
+    });
+
+    task2.enter(|| {
+        assert_not_ready!(tx.poll_cancel());
+    });
+
+    drop(rx);
+
+    assert!(!task1.is_notified());
+    assert!(task2.is_notified());
+
+    assert_ready!(tx.poll_cancel());
+}
