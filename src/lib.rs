@@ -100,6 +100,8 @@ extern crate tokio_fs;
 extern crate tokio_reactor;
 #[cfg(feature = "rt-full")]
 extern crate tokio_threadpool;
+#[cfg(feature = "sync")]
+extern crate tokio_sync;
 #[cfg(feature = "timer")]
 extern crate tokio_timer;
 #[cfg(feature = "tcp")]
@@ -126,6 +128,8 @@ pub mod net;
 pub mod prelude;
 #[cfg(feature = "reactor")]
 pub mod reactor;
+#[cfg(feature = "sync")]
+pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
 pub mod util;

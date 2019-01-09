@@ -29,13 +29,19 @@ pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
 }
 
-/// Error returned by the `Future` implementation for `Receiver`.
-#[derive(Debug)]
-pub struct RecvError {}
+pub mod error {
+    //! Oneshot error types
 
-/// Error returned by the `try_recv` function on `Receiver`.
-#[derive(Debug)]
-pub struct TryRecvError {}
+    /// Error returned by the `Future` implementation for `Receiver`.
+    #[derive(Debug)]
+    pub struct RecvError {}
+
+    /// Error returned by the `try_recv` function on `Receiver`.
+    #[derive(Debug)]
+    pub struct TryRecvError {}
+}
+
+use self::error::*;
 
 struct Inner<T> {
     /// Manages the state of the inner cell
@@ -68,9 +74,9 @@ struct State(usize);
 ///
 /// ```
 /// extern crate futures;
-/// extern crate tokio_sync;
+/// extern crate tokio;
 ///
-/// use tokio_sync::oneshot;
+/// use tokio::sync::oneshot;
 /// use futures::Future;
 /// use std::thread;
 ///
