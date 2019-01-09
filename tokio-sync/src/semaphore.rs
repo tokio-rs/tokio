@@ -1,3 +1,13 @@
+//! Thread-safe, asynchronous counting semaphore.
+//!
+//! A `Semaphore` instance holds a set of permits. Permits are used to
+//! synchronize access ot a shared resource.
+//!
+//! Before accessing the shared resource, callers acquire a permit from the
+//! semaphore. Once the permit is acquired, the caller then enters the critical
+//! section. If no permits are available, then acquiring the semaphore returns
+//! `NotReady`. The task is notified once a permit becomes available.
+
 use loom::{
     futures::AtomicTask,
     sync::{

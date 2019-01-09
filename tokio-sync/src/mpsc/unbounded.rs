@@ -5,25 +5,47 @@ use futures::{Poll, Sink, StartSend, Stream};
 
 use std::fmt;
 
-#[derive(Clone)]
+/// Send values to the associated `UnboundedReceiver`.
+///
+/// Instances are created by the [`unbounded_channel`](unbounded_channel)
+/// function.
+#[derive(Debug, Clone)]
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
+/// Receive values from the associated `UnboundedSender`.
+///
+/// Instances are created by the [`unbounded_channel`](unbounded_channel)
+/// function.
+#[derive(Debug)]
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
 }
 
+/// Error returned by the `UnboundedSender`.
 #[derive(Debug)]
 pub struct UnboundedSendError(());
 
+/// Error returned by `UnboundedSender::try_send`.
 #[derive(Debug)]
 pub struct UnboundedTrySendError<T>(T);
 
+/// Error returned by `UnboundedReceiver`.
 #[derive(Debug)]
 pub struct UnboundedRecvError(());
 
+/// Create an unbounded mpsc channel for communicating between asynchronous
+/// tasks.
+///
+/// A `send` on this channel will always succeed as long as the receive half has
+/// not been closed. If the receiver falls behind, messages will be arbitrarily
+/// buffered.
+///
+/// **Note** that the amount of available system memory is an implicit bound to
+/// the channel. Using an `unbounded` channel has the ability of causing the
+/// process to run out of memory. In this case, the process will be aborted.
 pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
     let (tx, rx) = chan::channel(AtomicUsize::new(0));
 
@@ -41,6 +63,10 @@ impl<T> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
     }
 
+    /// Closes the receiving half of a channel, without dropping it.
+    ///
+    /// This prevents any further messages from being sent on the channel while
+    /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
         self.chan.close();
     }

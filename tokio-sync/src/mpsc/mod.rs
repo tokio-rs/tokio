@@ -56,6 +56,8 @@ pub use self::unbounded::{
 };
 
 pub mod error {
+    //! Channel error types
+
     pub use super::bounded::{
         SendError,
         TrySendError,

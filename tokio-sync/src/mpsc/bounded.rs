@@ -38,7 +38,7 @@ enum ErrorKind {
     NoCapacity,
 }
 
-/// Error returned by the `Receiver`.
+/// Error returned by `Receiver`.
 #[derive(Debug)]
 pub struct RecvError {}
 
@@ -86,6 +86,26 @@ impl<T> Sender<T> {
         Sender { chan }
     }
 
+    /// Check if the `Sender` is ready to handle a value.
+    ///
+    /// Polls the channel to determine if there is guaranteed capacity to send
+    /// at least one item without waiting.
+    ///
+    /// When `poll_ready` returns `Ready`, the channel reserves capacity for one
+    /// message for this `Sender` instance. The capacity is held until a message
+    /// is send or the `Sender` instance is dropped. Callers should ensure a
+    /// message is sent in a timely fashion in order to not starve other
+    /// `Sender` instances.
+    ///
+    /// # Return value
+    ///
+    /// This method returns:
+    ///
+    /// - `Ok(Async::Ready(_))` if capacity is reserved for a single message.
+    /// - `Ok(Async::NotReady)` if the channel may not have capacity, in which
+    ///   case the current task is queued to be notified once
+    ///   capacity is available;
+    /// - `Err(SendError)` if the receiver has been dropped.
     pub fn poll_ready(&mut self) -> Poll<(), SendError> {
         self.chan.poll_ready()
             .map_err(|_| SendError(()))
