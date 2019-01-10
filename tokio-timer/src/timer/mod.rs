@@ -18,14 +18,14 @@
 //! customized. This ability is especially useful in tests and any environment
 //! where determinism is necessary.
 //!
-//! Note, when using the Tokio runtime, the `Timer` does not need to be manually
-//! setup as the runtime comes pre-configured with a `Timer` instance.
+//! Note, when using the Tokio runtime, the [`Timer`] does not need to be manually
+//! setup as the runtime comes pre-configured with a [`Timer`] instance.
 //!
 //! [`Timer`]: struct.Timer.html
 //! [`Handle`]: struct.Handle.html
 //! [`Delay`]: ../struct.Delay.html
-//! [`Now`]: trait.Now.html
-//! [`Now::now`]: trait.Now.html#method.now
+//! [`Now`]: ../clock/trait.Now.html
+//! [`Now::now`]: ../clock/trait.Now.html#method.now
 //! [`SystemNow`]: struct.SystemNow.html
 
 // This allows the usage of the old `Now` trait.
