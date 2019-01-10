@@ -10,8 +10,11 @@ use std::time::Instant;
 
 /// A handle to a source of time.
 ///
-/// `Clock` instances return `Instant` values corresponding to "now". The source
-/// of these values is configurable. The default source is `Instant::now()`.
+/// `Clock` instances return [`Instant`] values corresponding to "now". The source
+/// of these values is configurable. The default source is [`Instant::now`].
+/// 
+/// [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
+/// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 #[derive(Default, Clone)]
 pub struct Clock {
     now: Option<Arc<Now>>,
@@ -69,8 +72,10 @@ impl Clock {
         }
     }
 
-    /// Return a new `Clock` instance that uses `Instant::now()` as the source
+    /// Return a new `Clock` instance that uses [`Instant::now`] as the source
     /// of time.
+    /// 
+    /// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
     pub fn system() -> Clock {
         Clock {
             now: None,

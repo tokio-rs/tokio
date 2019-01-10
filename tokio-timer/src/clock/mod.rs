@@ -4,15 +4,16 @@
 //! the source of time may be configured. This allows mocking out the source of
 //! time in tests.
 //!
-//! The [`now`][n] function returns the current `Instant`. By default, it delegates
-//! to [`Instant::now`][std].
+//! The [`now`][n] function returns the current [`Instant`]. By default, it delegates
+//! to [`Instant::now`].
 //!
 //! The source of time used by [`now`][n] can be configured by implementing the
 //! [`Now`] trait and passing an instance to [`with_default`].
 //!
 //! [n]: fn.now.html
 //! [`Now`]: trait.Now.html
-//! [std]: https://doc.rust-lang.org/std/time/struct.Instant.html
+//! [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
+//! [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 //! [`with_default`]: fn.with_default.html
 
 mod clock;
