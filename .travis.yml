@@ -86,6 +86,7 @@ matrix:
   # This runs cargo +nightly doc
   - name: nightly_docs
     rust: nightly
+    env: ALLOW_FAILURES=true
     script: cargo doc
 
   allow_failures:
@@ -101,6 +102,7 @@ script: |
       cargo check --tests --all --exclude tokio-tls --target $TARGET
   else
       cargo test --all --no-fail-fast
+      cargo doc --all
   fi
 
 before_deploy:
