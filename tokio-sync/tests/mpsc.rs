@@ -131,10 +131,10 @@ fn send_shared_recv() {
     let mut rx = rx.wait();
 
     tx1.send(1).wait().unwrap();
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    assert_eq!(rx.next().unwrap().unwrap(), 1);
 
     tx2.send(2).wait().unwrap();
-    assert_eq!(rx.next().unwrap(), Ok(2));
+    assert_eq!(rx.next().unwrap().unwrap(), 2);
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn send_recv_threads() {
         tx.send(1).wait().unwrap();
     });
 
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    assert_eq!(rx.next().unwrap().unwrap(), 1);
 }
 
 #[test]
@@ -157,7 +157,8 @@ fn recv_close_gets_none_idle() {
     rx.close();
 
     task.enter(|| {
-        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
+        let val = assert_ready!(rx.poll());
+        assert!(val.is_none());
         assert!(tx.poll_ready().is_err());
     });
 }
@@ -228,12 +229,12 @@ fn try_send_fail() {
     // This should fail
     assert!(tx.try_send("fail").is_err());
 
-    assert_eq!(rx.next(), Some(Ok("hello")));
+    assert_eq!(rx.next().unwrap().unwrap(), "hello");
 
     tx.try_send("goodbye").unwrap();
     drop(tx);
 
-    assert_eq!(rx.next(), Some(Ok("goodbye")));
+    assert_eq!(rx.next().unwrap().unwrap(), "goodbye");
     assert!(rx.next().is_none());
 }
 
