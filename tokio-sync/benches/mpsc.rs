@@ -19,7 +19,7 @@ mod tokio {
             tx.try_send(1).unwrap();
 
             // Receive
-            assert_eq!(Ok(Async::Ready(Some(1))), rx.poll());
+            assert_eq!(Async::Ready(Some(1)), rx.poll().unwrap());
         })
     }
 
@@ -31,7 +31,7 @@ mod tokio {
             for i in 0..1000 {
                 tx.try_send(i).unwrap();
                 // No need to create a task, because poll is not going to park.
-                assert_eq!(Ok(Async::Ready(Some(i))), rx.poll());
+                assert_eq!(Async::Ready(Some(i)), rx.poll().unwrap());
             }
         })
     }
@@ -47,7 +47,7 @@ mod tokio {
 
             for i in 0..1000 {
                 // No need to create a task, because poll is not going to park.
-                assert_eq!(Ok(Async::Ready(Some(i))), rx.poll());
+                assert_eq!(Async::Ready(Some(i)), rx.poll().unwrap());
             }
         })
     }
