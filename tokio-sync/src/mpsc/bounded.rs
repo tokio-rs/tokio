@@ -40,7 +40,7 @@ enum ErrorKind {
 
 /// Error returned by `Receiver`.
 #[derive(Debug)]
-pub struct RecvError {}
+pub struct RecvError(());
 
 /// Create a bounded mpsc channel for communicating between asynchronous tasks,
 /// returning the sender/receiver halves.
@@ -120,10 +120,11 @@ impl<T> Receiver<T> {
 
 impl<T> Stream for Receiver<T> {
     type Item = T;
-    type Error = ();
+    type Error = RecvError;
 
     fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
         self.chan.recv()
+            .map_err(|_| RecvError(()))
     }
 }
 
