@@ -10,9 +10,9 @@
 //! `Clone`, `Send`, and `Sync`. This type is used to create instances of
 //! [`Delay`].
 //!
-//! The [`Now`] trait describes how to get an `Instance` representing the
+//! The [`Now`] trait describes how to get an [`Instant`] representing the
 //! current moment in time. [`SystemNow`] is the default implementation, where
-//! [`Now::now`] is implemented by calling `Instant::now`.
+//! [`Now::now`] is implemented by calling [`Instant::now`].
 //!
 //! [`Timer`] is generic over [`Now`]. This allows the source of time to be
 //! customized. This ability is especially useful in tests and any environment
@@ -27,6 +27,8 @@
 //! [`Now`]: ../clock/trait.Now.html
 //! [`Now::now`]: ../clock/trait.Now.html#method.now
 //! [`SystemNow`]: struct.SystemNow.html
+//! [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
+//! [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 
 // This allows the usage of the old `Now` trait.
 #![allow(deprecated)]
