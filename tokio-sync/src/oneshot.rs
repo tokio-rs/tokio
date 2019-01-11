@@ -34,11 +34,11 @@ pub mod error {
 
     /// Error returned by the `Future` implementation for `Receiver`.
     #[derive(Debug)]
-    pub struct RecvError {}
+    pub struct RecvError(pub(super) ());
 
     /// Error returned by the `try_recv` function on `Receiver`.
     #[derive(Debug)]
-    pub struct TryRecvError {}
+    pub struct TryRecvError(pub(super) ());
 }
 
 use self::error::*;
@@ -237,13 +237,13 @@ impl<T> Receiver<T> {
             if state.is_complete() {
                 match unsafe { inner.consume_value() } {
                     Some(value) => Ok(value),
-                    None => Err(TryRecvError {}),
+                    None => Err(TryRecvError(())),
                 }
             } else if state.is_closed() {
-                Err(TryRecvError {})
+                Err(TryRecvError(()))
             } else {
                 // Not ready, this does not clear `inner`
-                return Err(TryRecvError {});
+                return Err(TryRecvError(()));
             }
         } else {
             panic!("called after complete");
@@ -310,10 +310,10 @@ impl<T> Inner<T> {
         if state.is_complete() {
             match unsafe { self.consume_value() } {
                 Some(value) => Ok(Ready(value)),
-                None => Err(RecvError {}),
+                None => Err(RecvError(())),
             }
         } else if state.is_closed() {
-            Err(RecvError {})
+            Err(RecvError(()))
         } else {
             if state.is_rx_task_set() {
                 let rx_task = unsafe { self.rx_task() };
@@ -326,7 +326,7 @@ impl<T> Inner<T> {
                     if state.is_complete() {
                         return match unsafe { self.consume_value() } {
                             Some(value) => Ok(Ready(value)),
-                            None => Err(RecvError {}),
+                            None => Err(RecvError(())),
                         };
                     }
                 }
@@ -342,7 +342,7 @@ impl<T> Inner<T> {
                 if state.is_complete() {
                     match unsafe { self.consume_value() } {
                         Some(value) => Ok(Ready(value)),
-                        None => Err(RecvError {}),
+                        None => Err(RecvError(())),
                     }
                 } else {
                     return Ok(NotReady);
