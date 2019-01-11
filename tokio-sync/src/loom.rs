@@ -1,6 +1,6 @@
 pub(crate) mod futures {
-    pub use futures::task;
-    pub use ::task::AtomicTask;
+    pub(crate) use futures::task;
+    pub(crate) use ::task::AtomicTask;
 }
 
 pub(crate) mod sync {
@@ -8,21 +8,21 @@ pub(crate) mod sync {
 
     use std::cell::UnsafeCell;
 
-    pub struct CausalCell<T>(UnsafeCell<T>);
+    pub(crate) struct CausalCell<T>(UnsafeCell<T>);
 
     impl<T> CausalCell<T> {
-        pub fn new(data: T) -> CausalCell<T> {
+        pub(crate) fn new(data: T) -> CausalCell<T> {
             CausalCell(UnsafeCell::new(data))
         }
 
-        pub fn with<F, R>(&self, f: F) -> R
+        pub(crate) fn with<F, R>(&self, f: F) -> R
         where
             F: FnOnce(*const T) -> R,
         {
             f(self.0.get())
         }
 
-        pub fn with_mut<F, R>(&self, f: F) -> R
+        pub(crate) fn with_mut<F, R>(&self, f: F) -> R
         where
             F: FnOnce(*mut T) -> R,
         {
@@ -31,4 +31,4 @@ pub(crate) mod sync {
     }
 }
 
-pub fn yield_now() {}
+pub(crate) fn yield_now() {}

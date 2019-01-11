@@ -76,7 +76,7 @@ pub(crate) fn offset(slot_index: usize) -> usize {
 }
 
 impl<T> Block<T> {
-    pub fn new(start_index: usize) -> Block<T> {
+    pub(crate) fn new(start_index: usize) -> Block<T> {
         Block {
             // The absolute index in the channel of the first slot in the block.
             start_index,
@@ -94,7 +94,7 @@ impl<T> Block<T> {
     }
 
     /// Returns `true` if the block matches the given index
-    pub fn at_index(&self, index: usize) -> bool {
+    pub(crate) fn at_index(&self, index: usize) -> bool {
         debug_assert!(offset(index) == 0);
         self.start_index == index
     }
@@ -103,7 +103,7 @@ impl<T> Block<T> {
     /// specified index.
     ///
     /// `start_index` must represent a block *after* `self`.
-    pub fn distance(&self, other_index: usize) -> usize {
+    pub(crate) fn distance(&self, other_index: usize) -> usize {
         debug_assert!(offset(other_index) == 0);
         other_index.wrapping_sub(self.start_index) / BLOCK_CAP
     }
@@ -117,7 +117,7 @@ impl<T> Block<T> {
     /// To maintain safety, the caller must ensure:
     ///
     /// * No concurrent access to the slot.
-    pub unsafe fn read(&self, slot_index: usize) -> Option<Read<T>> {
+    pub(crate) unsafe fn read(&self, slot_index: usize) -> Option<Read<T>> {
         let offset = offset(slot_index);
 
         let ready_bits = self.ready_slots.load(Acquire);
@@ -146,7 +146,7 @@ impl<T> Block<T> {
     ///
     /// * The slot is empty.
     /// * No concurrent access to the slot.
-    pub unsafe fn write(&self, slot_index: usize, value: T) {
+    pub(crate) unsafe fn write(&self, slot_index: usize, value: T) {
         // Get the offset into the block
         let slot_offset = offset(slot_index);
 
@@ -161,7 +161,7 @@ impl<T> Block<T> {
     }
 
     /// Signal to the receiver that the sender half of the list is closed.
-    pub unsafe fn tx_close(&self) {
+    pub(crate) unsafe fn tx_close(&self) {
         self.ready_slots.fetch_or(TX_CLOSED, Release);
     }
 
@@ -174,7 +174,7 @@ impl<T> Block<T> {
     ///
     /// * All slots are empty.
     /// * The caller holds a unique pointer to the block.
-    pub unsafe fn reclaim(&mut self) {
+    pub(crate) unsafe fn reclaim(&mut self) {
         self.start_index = 0;
         self.next = AtomicPtr::new(ptr::null_mut());
         self.ready_slots = AtomicUsize::new(0);
@@ -190,7 +190,7 @@ impl<T> Block<T> {
     /// To maintain safety, the caller must ensure:
     ///
     /// * The block will no longer be accessed by any sender.
-    pub unsafe fn tx_release(&self, tail_position: usize) {
+    pub(crate) unsafe fn tx_release(&self, tail_position: usize) {
         // Track the observed tail_position. Any sender targetting a greater
         // tail_position is guaranteed to not access this block.
         self.observed_tail_position.with_mut(|ptr| *ptr = tail_position);
@@ -218,12 +218,12 @@ impl<T> Block<T> {
     /// be that it would make more sense to coalesce ready flags as bits in a
     /// single atomic cell. However, this could have negative impact on cache
     /// behavior as there would be many more mutations to a single slot.
-    pub fn is_final(&self) -> bool {
+    pub(crate) fn is_final(&self) -> bool {
         self.ready_slots.load(Acquire) & READY_MASK == READY_MASK
     }
 
     /// Returns the `observed_tail_position` value, if set
-    pub fn observed_tail_position(&self) -> Option<usize> {
+    pub(crate) fn observed_tail_position(&self) -> Option<usize> {
         if 0 == RELEASED & self.ready_slots.load(Acquire) {
             None
         } else {
@@ -232,7 +232,7 @@ impl<T> Block<T> {
     }
 
     /// Load the next block
-    pub fn load_next(&self, ordering: Ordering) -> Option<NonNull<Block<T>>> {
+    pub(crate) fn load_next(&self, ordering: Ordering) -> Option<NonNull<Block<T>>> {
         let ret = NonNull::new(self.next.load(ordering));
 
         debug_assert!(unsafe {
@@ -260,7 +260,7 @@ impl<T> Block<T> {
     /// To maintain safety, the caller must ensure:
     ///
     /// * `block` is not freed until it has been removed from the list.
-    pub unsafe fn try_push(&self, block: &mut NonNull<Block<T>>, ordering: Ordering)
+    pub(crate) unsafe fn try_push(&self, block: &mut NonNull<Block<T>>, ordering: Ordering)
         -> Result<(), NonNull<Block<T>>>
     {
         block.as_mut().start_index =
@@ -289,7 +289,7 @@ impl<T> Block<T> {
     /// linked list. If the compare-and-swap fails, the current thread acquires
     /// the next block in the linked list, allowing the current thread to access
     /// the slots.
-    pub fn grow(&self) -> NonNull<Block<T>> {
+    pub(crate) fn grow(&self) -> NonNull<Block<T>> {
         // Create the new block. It is assumed that the block will become the
         // next one after `&self`. If this turns out to not be the case,
         // `start_index` is updated accordingly.

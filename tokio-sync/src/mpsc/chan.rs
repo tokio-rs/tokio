@@ -114,12 +114,12 @@ where
     }
 
     /// TODO: Docs
-    pub fn poll_ready(&mut self) -> Poll<(), ()> {
+    pub(crate) fn poll_ready(&mut self) -> Poll<(), ()> {
         self.inner.semaphore.poll_acquire(&mut self.permit)
     }
 
     /// Send a message and notify the receiver.
-    pub fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
+    pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
         if let Err(e) = self.inner.semaphore.try_acquire(&mut self.permit) {
             return Err((value, e));
         }
@@ -182,7 +182,7 @@ where
         Rx { inner: chan }
     }
 
-    pub fn close(&mut self) {
+    pub(crate) fn close(&mut self) {
         let rx_fields = unsafe { &mut *self.inner.rx_fields.get() };
 
         if rx_fields.rx_closed {
@@ -194,7 +194,7 @@ where
     }
 
     /// Receive the next value
-    pub fn recv(&mut self) -> Poll<Option<T>, ()> {
+    pub(crate) fn recv(&mut self) -> Poll<Option<T>, ()> {
         use super::block::Read::*;
         use futures::Async::*;
 

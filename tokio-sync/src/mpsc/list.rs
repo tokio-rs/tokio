@@ -56,7 +56,7 @@ pub(crate) fn channel<T>() -> (Tx<T>, Rx<T>) {
 
 impl<T> Tx<T> {
     /// Push a value into the list.
-    pub fn push(&self, value: T) {
+    pub(crate) fn push(&self, value: T) {
         // First, claim a slot for the value. `Acquire` is used here to
         // synchronize with the `fetch_add` in `free_blocks`.
         let slot_index = self.tail_position
@@ -75,7 +75,7 @@ impl<T> Tx<T> {
     ///
     /// Similar process as pushing a value, but instead of writing the value &
     /// setting the ready flag, the TX_CLOSED flag is set on the block.
-    pub fn close(&self) {
+    pub(crate) fn close(&self) {
         // First, claim a slot for the value. This is the last slot that will be
         // claimed.
         let slot_index = self.tail_position
@@ -170,7 +170,7 @@ impl<T> Tx<T> {
         }
     }
 
-    pub unsafe fn reclaim_block(&self, mut block: NonNull<Block<T>>) {
+    pub(crate) unsafe fn reclaim_block(&self, mut block: NonNull<Block<T>>) {
         // The block has been removed from the linked list and ownership
         // is reclaimed.
         //
@@ -225,7 +225,7 @@ impl<T: fmt::Debug> fmt::Debug for Tx<T> {
 
 impl<T> Rx<T> {
     /// Pop the next value off the queue
-    pub fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
+    pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed
         if !self.try_advancing_head() {
             debug!("+ !self.try_advancing_head() -> false");

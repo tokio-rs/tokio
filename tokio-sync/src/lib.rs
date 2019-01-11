@@ -1,5 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-sync/0.1.0")]
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unreachable_pub)]
 #![cfg_attr(test, deny(warnings))]
 
 //! Asynchronous synchronization primitives.

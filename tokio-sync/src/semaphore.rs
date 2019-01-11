@@ -1101,7 +1101,7 @@ impl NodeState {
     }
 
     /// Returns `true` if `self` represents a queued state.
-    pub fn is_queued(&self) -> bool {
+    fn is_queued(&self) -> bool {
         use self::NodeState::*;
 
         match *self {
