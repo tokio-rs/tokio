@@ -1,3 +1,8 @@
+# 0.1.6 (January 6, 2019)
+
+* Implement `Unpark` for `Arc<Unpark>` (#802).
+* Switch to crossbeam's Parker / Unparker (#528).
+
 # 0.1.5 (September 26, 2018)
 
 * Implement `futures::Executor` for `DefaultExecutor` (#563).

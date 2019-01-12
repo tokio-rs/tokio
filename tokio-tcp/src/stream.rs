@@ -781,9 +781,14 @@ impl TcpStream {
     /// # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.1.14", note = "use `split()` instead")]
+    #[doc(hidden)]
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        let io = self.io.get_ref().try_clone()?;
-        Ok(TcpStream::new(io))
+        // Rationale for deprecation:
+        // - https://github.com/tokio-rs/tokio/pull/824
+        // - https://github.com/tokio-rs/tokio/issues/774#issuecomment-451059317
+        let msg = "`TcpStream::split()` is deprecated because it doesn't work as intended";
+        Err(io::Error::new(io::ErrorKind::Other, msg))
     }
 }
 

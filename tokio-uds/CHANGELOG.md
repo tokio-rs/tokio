@@ -1,3 +1,7 @@
+# 0.2.5 (January 6, 2019)
+
+* Fix bug in `UnixDatagram::send` (#782).
+
 # 0.2.4 (November 24, 2018)
 
 * Implement `UnixDatagramFramed`, providing a `Stream + Sink` layer for

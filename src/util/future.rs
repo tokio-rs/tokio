@@ -1,9 +1,12 @@
+#[cfg(feature = "timer")]
 #[allow(deprecated)]
 use tokio_timer::Deadline;
+#[cfg(feature = "timer")]
 use tokio_timer::Timeout;
 
 use futures::Future;
 
+#[cfg(feature = "timer")]
 use std::time::{Instant, Duration};
 
 
@@ -55,12 +58,14 @@ pub trait FutureExt: Future {
     /// tokio::run(future);
     /// # }
     /// ```
+    #[cfg(feature = "timer")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
     where Self: Sized,
     {
         Timeout::new(self, timeout)
     }
 
+    #[cfg(feature = "timer")]
     #[deprecated(since = "0.1.8", note = "use `timeout` instead")]
     #[allow(deprecated)]
     #[doc(hidden)]
@@ -78,6 +83,7 @@ mod test {
     use super::*;
     use prelude::future;
 
+    #[cfg(feature = "timer")]
     #[test]
     fn timeout_polls_at_least_once() {
         let base_future = future::result::<(), ()>(Ok(()));

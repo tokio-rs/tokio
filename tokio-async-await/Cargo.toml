@@ -3,7 +3,7 @@ name = "tokio-async-await"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -26,5 +26,4 @@ tokio-io = { version = "0.1.7", path = "../tokio-io" }
 [dev-dependencies]
 bytes = "0.4.9"
 tokio = { version = "0.1.8", path = ".." }
-# tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
 hyper = "0.12.8"

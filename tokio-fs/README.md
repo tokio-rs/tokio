@@ -2,7 +2,7 @@
 
 Asynchronous filesystem manipulation operations (and stdin, stdout, stderr).
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio_fs/)
+[Documentation](https://docs.rs/tokio-fs/0.1.5/tokio_fs)
 
 ## Overview
 

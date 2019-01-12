@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.2")]
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.3")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 //! TCP bindings for `tokio`.
