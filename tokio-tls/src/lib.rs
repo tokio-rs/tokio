@@ -1,3 +1,6 @@
+#![deny(missing_docs)]
+#![doc(html_root_url = "https://docs.rs/tokio-tls/0.2.1")]
+
 //! Async TLS streams
 //!
 //! This library is an implementation of TLS streams using the most appropriate
@@ -14,9 +17,6 @@
 //! functionality provided by the `native-tls` crate, on which this crate is
 //! built. Configuration of TLS parameters is still primarily done through the
 //! `native-tls` crate.
-
-#![deny(missing_docs)]
-#![doc(html_root_url = "https://docs.rs/tokio-tls/0.2.0")]
 
 extern crate futures;
 extern crate native_tls;
@@ -43,12 +43,14 @@ pub struct TlsStream<S> {
 
 /// A wrapper around a `native_tls::TlsConnector`, providing an async `connect`
 /// method.
+#[derive(Clone)]
 pub struct TlsConnector {
     inner: native_tls::TlsConnector,
 }
 
 /// A wrapper around a `native_tls::TlsAcceptor`, providing an async `accept`
 /// method.
+#[derive(Clone)]
 pub struct TlsAcceptor {
     inner: native_tls::TlsAcceptor,
 }

@@ -29,7 +29,7 @@ use std::thread;
 use tokio::prelude::*;
 use futures::sync::mpsc;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     // Determine if we're going to run in TCP or UDP mode
     let mut args = env::args().skip(1).collect::<Vec<_>>();
     let tcp = match args.iter().position(|a| a == "--udp") {
@@ -41,10 +41,11 @@ fn main() {
     };
 
     // Parse what address we're going to connect to
-    let addr = args.first().unwrap_or_else(|| {
-        panic!("this program requires at least one argument")
-    });
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = match args.first() {
+        Some(addr) => addr,
+        None => Err("this program requires at least one argument")?,
+    };
+    let addr = addr.parse::<SocketAddr>()?;
 
     // Right now Tokio doesn't support a handle to stdin running on the event
     // loop, so we farm out that work to a separate thread. This thread will
@@ -52,15 +53,15 @@ fn main() {
     // loop over a standard futures channel.
     let (stdin_tx, stdin_rx) = mpsc::channel(0);
     thread::spawn(|| read_stdin(stdin_tx));
-    let stdin_rx = stdin_rx.map_err(|_| panic!()); // errors not possible on rx
+    let stdin_rx = stdin_rx.map_err(|_| panic!("errors not possible on rx"));
 
     // Now that we've got our stdin read we either set up our TCP connection or
     // our UDP connection to get a stream of bytes we're going to emit to
     // stdout.
     let stdout = if tcp {
-        tcp::connect(&addr, Box::new(stdin_rx))
+        tcp::connect(&addr, Box::new(stdin_rx))?
     } else {
-        udp::connect(&addr, Box::new(stdin_rx))
+        udp::connect(&addr, Box::new(stdin_rx))?
     };
 
     // And now with our stream of bytes to write to stdout, we execute that in
@@ -77,6 +78,7 @@ fn main() {
             })
             .map_err(|e| println!("error reading stdout; error = {:?}", e))
     });
+    Ok(())
 }
 
 mod codec {
@@ -127,12 +129,13 @@ mod tcp {
     use bytes::BytesMut;
     use codec::Bytes;
 
+    use std::error::Error;
     use std::io;
     use std::net::SocketAddr;
 
     pub fn connect(addr: &SocketAddr,
                    stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>)
-        -> Box<Stream<Item = BytesMut, Error = io::Error> + Send>
+        -> Result<Box<Stream<Item = BytesMut, Error = io::Error> + Send>, Box<Error>>
     {
         let tcp = TcpStream::connect(addr);
 
@@ -151,22 +154,24 @@ mod tcp {
         // You'll also note that we *spawn* the work to read stdin and write it
         // to the TCP stream. This is done to ensure that happens concurrently
         // with us reading data from the stream.
-        Box::new(tcp.map(move |stream| {
+        let stream = Box::new(tcp.map(move |stream| {
             let (sink, stream) = Bytes.framed(stream).split();
 
             tokio::spawn(stdin.forward(sink).then(|result| {
                 if let Err(e) = result {
-                    panic!("failed to write to socket: {}", e)
+                    println!("failed to write to socket: {}", e)
                 }
                 Ok(())
             }));
 
             stream
-        }).flatten_stream())
+        }).flatten_stream());
+        Ok(stream)
     }
 }
 
 mod udp {
+    use std::error::Error;
     use std::io;
     use std::net::SocketAddr;
 
@@ -179,17 +184,19 @@ mod udp {
 
     pub fn connect(&addr: &SocketAddr,
                    stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>)
-        -> Box<Stream<Item = BytesMut, Error = io::Error> + Send>
+        -> Result<Box<Stream<Item = BytesMut, Error = io::Error> + Send>, Box<Error>>
     {
         // We'll bind our UDP socket to a local IP/port, but for now we
         // basically let the OS pick both of those.
         let addr_to_bind = if addr.ip().is_ipv4() {
-            "0.0.0.0:0".parse().unwrap()
+            "0.0.0.0:0".parse()?
         } else {
-            "[::]:0".parse().unwrap()
+            "[::]:0".parse()?
         };
-        let udp = UdpSocket::bind(&addr_to_bind)
-            .expect("failed to bind socket");
+        let udp = match UdpSocket::bind(&addr_to_bind) {
+            Ok(udp) => udp,
+            Err(_) => Err("failed to bind socket")?,
+        };
 
         // Like above with TCP we use an instance of `Bytes` codec to transform
         // this UDP socket into a framed sink/stream which operates over
@@ -203,7 +210,7 @@ mod udp {
             (chunk, addr)
         }).forward(sink).then(|result| {
             if let Err(e) = result {
-                panic!("failed to write to socket: {}", e)
+                println!("failed to write to socket: {}", e)
             }
             Ok(())
         });
@@ -218,10 +225,11 @@ mod udp {
             }
         });
 
-        Box::new(future::lazy(|| {
+        let stream = Box::new(future::lazy(|| {
             tokio::spawn(forward_stdin);
             future::ok(receive)
-        }).flatten_stream())
+        }).flatten_stream());
+        Ok(stream)
     }
 }
 

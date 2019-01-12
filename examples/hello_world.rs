@@ -19,8 +19,8 @@ use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 
-pub fn main() {
-    let addr = "127.0.0.1:6142".parse().unwrap();
+pub fn main() -> Result<(), Box<std::error::Error>> {
+    let addr = "127.0.0.1:6142".parse()?;
 
     // Open a TCP stream to the socket address.
     //
@@ -52,4 +52,6 @@ pub fn main() {
     println!("About to create the stream and write to it...");
     tokio::run(client);
     println!("Stream has been created and written to.");
+
+    Ok(())
 }

@@ -57,7 +57,7 @@ pub trait Decoder {
     ///
     /// Note that the bytes provided may be empty. If a previous call to
     /// `decode` consumed all the bytes in the buffer then `decode` will be
-    /// called again until it returns `None`, indicating that more bytes need to
+    /// called again until it returns `Ok(None)`, indicating that more bytes need to
     /// be read.
     ///
     /// Finally, if the bytes in the buffer are malformed then an error is

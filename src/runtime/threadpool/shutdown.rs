@@ -1,4 +1,4 @@
-use runtime::Inner;
+use super::Inner;
 use tokio_threadpool as threadpool;
 
 use std::fmt;

@@ -1,9 +1,6 @@
 ---
 language: rust
 sudo: false
-cache:
-  - apt
-  - cargo
 addons:
   apt:
     packages:
@@ -12,17 +9,39 @@ addons:
 
 matrix:
   include:
-  # This represents the minimum Rust version supported by Tokio. Updating this
-  # should be done in a dedicated PR and cannot be greater than two 0.x
-  # releases prior to the current stable.
-  - rust: 1.26.0
   - rust: stable
   - rust: beta
   - rust: nightly
+    env: ALLOW_FAILURES=true
   - os: osx
   - env: TARGET=x86_64-unknown-freebsd
   - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
+
+  # This represents the minimum Rust version supported by Tokio. Updating this
+  # should be done in a dedicated PR and cannot be greater than two 0.x
+  # releases prior to the current stable.
+  #
+  # Tests are not run as tests may require newer versions of rust.
+  - rust: 1.26.0
+    script: |
+      cargo check --all
+
+  # Test combinations of enabled features.
+  - rust: stable
+    script: |
+      shopt -s expand_aliases
+      alias check="cargo check --no-default-features"
+      check
+      check --features codec
+      check --features fs
+      check --features io
+      check --features reactor
+      check --features rt-full
+      check --features tcp
+      check --features timer
+      check --features udp
+      check --features uds
 
   # Test the async / await preview. We don't want to block PRs on this failing
   # though.
@@ -31,16 +50,12 @@ matrix:
     script: |
       cd tokio-async-await
       cargo check --all
-  allow_failures:
-    - rust: nightly
-      env: ALLOW_FAILURES=true
 
-
-script:
-  - |
-    set -e
-    if [[ "$TRAVIS_RUST_VERSION" == nightly ]]
-    then
+  # This runs TSAN against nightly and allows failures to propagate up.
+  - rust: nightly-2018-11-18
+    env: TSAN=yes
+    script: |
+        set -e
         # Make sure the benchmarks compile
         cargo build --benches --all
 
@@ -67,22 +82,28 @@ script:
         # Run thread sanitizer
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
-    fi
-  - |
-    set -e
-    if [[ "$TARGET" ]]
-    then
-        rustup target add $TARGET
-        cargo check --all --exclude tokio-tls --target $TARGET
-        cargo check --tests --all --exclude tokio-tls --target $TARGET
-    else
-        cargo test --all --no-fail-fast
-        # Disable these tests for now as they are buggy
-        #
-        # cargo test --features unstable-futures
-        # cargo test --manifest-path tokio-threadpool/Cargo.toml --features unstable-futures
-        # cargo test --manifest-path tokio-reactor/Cargo.toml --features unstable-futures
-    fi
+
+  # This runs cargo +nightly doc
+  - name: nightly_docs
+    rust: nightly
+    env: ALLOW_FAILURES=true
+    script: cargo doc
+
+  allow_failures:
+    - rust: nightly
+      env: ALLOW_FAILURES=true
+
+script: |
+  set -e
+  if [[ "$TARGET" ]]
+  then
+      rustup target add $TARGET
+      cargo check --all --exclude tokio-tls --target $TARGET
+      cargo check --tests --all --exclude tokio-tls --target $TARGET
+  else
+      cargo test --all --no-fail-fast
+      cargo doc --all
+  fi
 
 before_deploy:
   - cargo doc --all --no-deps
@@ -97,7 +118,7 @@ deploy:
     branch: master
     repo: tokio-rs/tokio
     rust: stable
-    condition: $TRAVIS_OS_NAME = linux
+    condition: $TRAVIS_OS_NAME = "linux" && $TARGET = ""
 
 env:
   global:

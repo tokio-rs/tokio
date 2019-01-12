@@ -1,6 +1,20 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.14 (January 6, 2019)
+
+* Use feature flags to break up the crate, allowing users to pick & choose
+  components (#808).
+* Export `UnixDatagram` and `UnixDatagramFramed` (#772).
+
+# 0.1.13 (November 21, 2018)
+
+* Fix `Runtime::reactor()` when no tasks are spawned (#721).
+* `runtime::Builder` no longer uses deprecated methods (#749).
+* Provide `after_start` and `before_stop` configuration settings for
+  `Runtime` (#756).
+* Implement throttle stream combinator (#736).
+
 # 0.1.12 (October 23, 2018)
 
 * runtime: expose `keep_alive` on runtime builder (#676).

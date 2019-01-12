@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.3")]
+#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.4")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 //! A single-threaded executor which executes tasks on the same thread from which
@@ -653,6 +653,13 @@ impl Handle {
     where
         F: Future<Item = (), Error = ()> + Send + 'static,
     {
+        if thread::current().id() == self.thread {
+            let mut e = TaskExecutor::current();
+            if e.id() == Some(self.id) {
+                return e.spawn_local(Box::new(future));
+            }
+        }
+
         if self.shut_down.get() {
             return Err(SpawnError::shutdown());
         }
@@ -667,13 +674,6 @@ impl Handle {
             self.shut_down.set(true);
 
             return Err(SpawnError::shutdown());
-        }
-
-        if thread::current().id() == self.thread {
-            let mut e = TaskExecutor::current();
-            if e.id() == Some(self.id) {
-                return e.spawn_local(Box::new(future));
-            }
         }
 
         self.sender.send(Box::new(future))

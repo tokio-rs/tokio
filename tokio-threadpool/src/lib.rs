@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.8")]
+#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.10")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 //! A work-stealing based thread pool for executing futures.
@@ -79,6 +79,7 @@
 
 extern crate tokio_executor;
 
+extern crate crossbeam_channel;
 extern crate crossbeam_deque as deque;
 extern crate crossbeam_utils;
 #[macro_use]
@@ -149,7 +150,6 @@ mod notifier;
 mod pool;
 mod sender;
 mod shutdown;
-mod shutdown_task;
 mod task;
 mod thread_pool;
 mod worker;

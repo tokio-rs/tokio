@@ -1,7 +1,12 @@
-use tokio_timer::Timeout;
+#[cfg(feature = "timer")]
+use tokio_timer::{
+    throttle::Throttle,
+    Timeout,
+};
 
 use futures::Stream;
 
+#[cfg(feature = "timer")]
 use std::time::Duration;
 
 
@@ -19,6 +24,15 @@ use std::time::Duration;
 ///
 /// [`timeout`]: #method.timeout
 pub trait StreamExt: Stream {
+    /// Throttle down the stream by enforcing a fixed delay between items.
+    ///
+    /// Errors are also delayed.
+    #[cfg(feature = "timer")]
+    fn throttle(self, duration: Duration) -> Throttle<Self>
+    where Self: Sized
+    {
+        Throttle::new(self, duration)
+    }
 
     /// Creates a new stream which allows `self` until `timeout`.
     ///
@@ -52,6 +66,7 @@ pub trait StreamExt: Stream {
     /// tokio::run(stream);
     /// # }
     /// ```
+    #[cfg(feature = "timer")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
     where Self: Sized,
     {

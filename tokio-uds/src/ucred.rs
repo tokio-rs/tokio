@@ -15,6 +15,9 @@ pub use self::impl_linux::get_peer_cred;
 #[cfg(any(target_os = "dragonfly", target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
 pub use self::impl_macos::get_peer_cred;
 
+#[cfg(any(target_os = "solaris"))]
+pub use self::impl_solaris::get_peer_cred;
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod impl_linux {
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
@@ -84,6 +87,51 @@ pub mod impl_macos {
         }
     }
 }
+
+
+#[cfg(any(target_os = "solaris"))]
+pub mod impl_solaris {
+    use std::io;
+    use std::os::unix::io::AsRawFd;
+    use UnixStream;
+    use std::ptr;
+
+    #[allow(non_camel_case_types)]
+    enum ucred_t {}
+
+    extern "C" {
+        fn ucred_free(cred: *mut ucred_t);
+        fn ucred_geteuid(cred: *const ucred_t) -> super::uid_t;
+        fn ucred_getegid(cred: *const ucred_t) -> super::gid_t;
+
+        fn getpeerucred(fd: ::std::os::raw::c_int, cred: *mut *mut ucred_t) -> ::std::os::raw::c_int;
+    }
+
+    pub fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        unsafe {
+            let raw_fd = sock.as_raw_fd();
+
+            let mut cred = ptr::null_mut::<*mut ucred_t>() as *mut ucred_t;
+
+            let ret = getpeerucred(raw_fd, &mut cred);
+
+            if ret == 0 {
+                let uid = ucred_geteuid(cred);
+                let gid = ucred_getegid(cred);
+
+                ucred_free(cred);
+
+                Ok(super::UCred {
+                    uid,
+                    gid,
+                })
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+    }
+}
+
 
 // Note that LOCAL_PEERCRED is not supported on DragonFly (yet). So do not run tests.
 #[cfg(not(target_os = "dragonfly"))]

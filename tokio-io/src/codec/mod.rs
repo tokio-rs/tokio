@@ -46,7 +46,7 @@ pub mod length_delimited {
     //! # Getting started
     //!
     //! If implementing a protocol from scratch, using length delimited framing
-    //! is an easy way to get started. [`Framed::new()`] will adapt a
+    //! is an easy way to get started. [`Framed::new()`](length_delimited::Framed::new) will adapt a
     //! full-duplex byte stream with a length delimited framer using default
     //! configuration values.
     //!

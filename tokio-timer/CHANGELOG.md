@@ -1,3 +1,9 @@
+# 0.2.8 (November 21, 2018)
+
+* Implement throttle combinator (#736).
+* Derive `Clone` for `delay_queue::Key` (#730).
+* Bump internal dependencies (#753).
+
 # 0.2.7 (September 27, 2018)
 
 * Fix `Timeout` on error bug (#648).

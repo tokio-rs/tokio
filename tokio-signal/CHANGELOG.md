@@ -1,4 +1,11 @@
-## Unreleased
+## 0.2.7 - (November 21, 2018)
+### Changed
+* `unix::Signal` now implements `Sync`
+* minimize allocations
+
+### Fixes
+* `unix::Signal` now avoids extraneous wakeups generated as a result of
+dropping other instances
 
 ## 0.2.6 - (October 26, 2018)
 ### Changed

@@ -1,4 +1,4 @@
-use runtime::{Inner, Runtime};
+use super::{Inner, Runtime};
 
 use reactor::Reactor;
 
@@ -28,24 +28,28 @@ use tokio_timer::timer::{self, Timer};
 /// # Examples
 ///
 /// ```
-/// # extern crate tokio;
-/// # extern crate tokio_threadpool;
-/// # use tokio::runtime::Builder;
+/// extern crate tokio;
+/// extern crate tokio_timer;
 ///
-/// # pub fn main() {
-/// // create and configure ThreadPool
-/// let mut threadpool_builder = tokio_threadpool::Builder::new();
-/// threadpool_builder
-///     .name_prefix("my-runtime-worker-")
-///     .pool_size(4);
+/// use std::time::Duration;
 ///
-/// // build Runtime
-/// let runtime = Builder::new()
-///     .threadpool_builder(threadpool_builder)
-///     .build();
-/// // ... call runtime.run(...)
-/// # let _ = runtime;
-/// # }
+/// use tokio::runtime::Builder;
+/// use tokio_timer::clock::Clock;
+///
+/// fn main() {
+///     // build Runtime
+///     let mut runtime = Builder::new()
+///         .blocking_threads(4)
+///         .clock(Clock::system())
+///         .core_threads(4)
+///         .keep_alive(Some(Duration::from_secs(60)))
+///         .name_prefix("my-custom-name-")
+///         .stack_size(3 * 1024 * 1024)
+///         .build()
+///         .unwrap();
+///
+///     // use runtime ...
+/// }
 /// ```
 #[derive(Debug)]
 pub struct Builder {
@@ -233,6 +237,59 @@ impl Builder {
     /// ```
     pub fn stack_size(&mut self, val: usize) -> &mut Self {
         self.threadpool_builder.stack_size(val);
+        self
+    }
+
+    /// Execute function `f` after each thread is started but before it starts
+    /// doing work.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let thread_pool = runtime::Builder::new()
+    ///     .after_start(|| {
+    ///         println!("thread started");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn after_start<F>(&mut self, f: F) -> &mut Self
+        where F: Fn() + Send + Sync + 'static
+    {
+        self.threadpool_builder.after_start(f);
+        self
+    }
+
+    /// Execute function `f` before each thread stops.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let thread_pool = runtime::Builder::new()
+    ///     .before_stop(|| {
+    ///         println!("thread stopping");
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn before_stop<F>(&mut self, f: F) -> &mut Self
+        where F: Fn() + Send + Sync + 'static
+    {
+        self.threadpool_builder.before_stop(f);
         self
     }
 

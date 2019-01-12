@@ -3,6 +3,8 @@
 A library for scheduling execution of futures concurrently across a pool of
 threads.
 
+[Documentation](https://docs.rs/tokio-threadpool/0.1.10/tokio_threadpool)
+
 ### Why not Rayon?
 
 Rayon is designed to handle parallelizing single computations by breaking them

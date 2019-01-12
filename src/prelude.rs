@@ -10,6 +10,7 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
+#[cfg(feature = "io")]
 pub use tokio_io::{
     AsyncRead,
     AsyncWrite,

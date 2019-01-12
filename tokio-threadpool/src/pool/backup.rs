@@ -243,10 +243,6 @@ impl State {
         self.0 & PUSHED == PUSHED
     }
 
-    pub fn set_pushed(&mut self) {
-        self.0 |= PUSHED;
-    }
-
     fn unset_pushed(&mut self) {
         self.0 &= !PUSHED;
     }

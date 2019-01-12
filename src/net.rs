@@ -8,7 +8,10 @@
 //! * [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
 //! * [`UdpSocket`] and [`UdpFramed`] provide functionality for communication over UDP
 //! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
-//! Unix Domain Socket **(available on Unix only)**
+//! Unix Domain Stream Socket **(available on Unix only)**
+//! * [`UnixDatagram`] and [`UnixDatagramFramed`] provide functionality for communication
+//! over Unix Domain Datagram Socket **(available on Unix only)**
+
 //!
 //! [`TcpListener`]: struct.TcpListener.html
 //! [`TcpStream`]: struct.TcpStream.html
@@ -16,7 +19,10 @@
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`UnixListener`]: struct.UnixListener.html
 //! [`UnixStream`]: struct.UnixStream.html
+//! [`UnixDatagram`]: struct.UnixDatagram.html
+//! [`UnixDatagramFramed`]: struct.UnixDatagramFramed.html
 
+#[cfg(feature = "tcp")]
 pub mod tcp {
     //! TCP bindings for `tokio`.
     //!
@@ -37,15 +43,19 @@ pub mod tcp {
     //! [`Incoming`]: struct.Incoming.html
     pub use tokio_tcp::{ConnectFuture, Incoming, TcpListener, TcpStream};
 }
+#[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
 
+#[cfg(feature = "tcp")]
 #[deprecated(note = "use `tokio::net::tcp::ConnectFuture` instead")]
 #[doc(hidden)]
 pub type ConnectFuture = self::tcp::ConnectFuture;
+#[cfg(feature = "tcp")]
 #[deprecated(note = "use `tokio::net::tcp::Incoming` instead")]
 #[doc(hidden)]
 pub type Incoming = self::tcp::Incoming;
 
+#[cfg(feature = "udp")]
 pub mod udp {
     //! UDP bindings for `tokio`.
     //!
@@ -63,23 +73,26 @@ pub mod udp {
     //! [`framed`]: struct.UdpSocket.html#method.framed
     pub use tokio_udp::{RecvDgram, SendDgram, UdpFramed, UdpSocket};
 }
+#[cfg(feature = "udp")]
 pub use self::udp::{UdpFramed, UdpSocket};
 
+#[cfg(feature = "udp")]
 #[deprecated(note = "use `tokio::net::udp::RecvDgram` instead")]
 #[doc(hidden)]
 pub type RecvDgram<T> = self::udp::RecvDgram<T>;
+#[cfg(feature = "udp")]
 #[deprecated(note = "use `tokio::net::udp::SendDgram` instead")]
 #[doc(hidden)]
 pub type SendDgram<T> = self::udp::SendDgram<T>;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
 
     pub use tokio_uds::{
-        ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixListener,
-        UnixStream,
+        ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixDatagramFramed,
+        UnixListener, UnixStream,
     };
 }
-#[cfg(unix)]
-pub use self::unix::{UnixListener, UnixStream};
+#[cfg(all(unix, feature = "uds"))]
+pub use self::unix::{UnixDatagram, UnixDatagramFramed, UnixListener, UnixStream};

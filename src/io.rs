@@ -51,6 +51,7 @@ pub use tokio_io::{
 };
 
 // standard input, output, and error
+#[cfg(feature = "fs")]
 pub use tokio_fs::{
     stdin,
     Stdin,

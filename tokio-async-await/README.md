@@ -8,19 +8,17 @@ guarantees. You are living on the edge here.**
 
 ## Usage
 
-To use this crate, you need to start with a Rust 2018 edition crate.
+To use this crate, you need to start with a Rust 2018 edition crate, with rustc
+1.33.0-nightly or later.
 
 Add this to your `Cargo.toml`:
 
 ```toml
-# At the very top of the file
-cargo-features = ["edition"]
-
 # In the `[packages]` section
 edition = "2018"
 
 # In the `[dependencies]` section
-tokio-async-await = "0.1.0"
+tokio = {version = "0.1.0", features = ["async-await-preview"]}
 ```
 
 Then, get started. In your application, add:

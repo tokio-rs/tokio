@@ -1,3 +1,16 @@
+# 0.1.10 (January 6, 2019)
+
+* Fix deadlock bug in `blocking` (#795).
+* Introduce global task queue (#798).
+* Use crossbeam's Parker / Unparker (#529).
+* Panic if worker thread cannot be spawned (#826).
+* Improve `blocking` API documentation (#789).
+
+# 0.1.9 (November 21, 2018)
+
+* Bump internal dependency versions (#746, #753).
+* Internal refactors (#768, #769).
+
 # 0.1.8 (October 23, 2018)
 
 * Assign spawned tasks to random worker (#660).

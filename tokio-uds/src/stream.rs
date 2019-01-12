@@ -76,8 +76,8 @@ impl UnixStream {
     /// Creates an unnamed pair of connected sockets.
     ///
     /// This function will create a pair of interconnected Unix sockets for
-    /// communicating back and forth between one another. Each socket will be
-    /// associated with the event loop whose handle is also provided.
+    /// communicating back and forth between one another. Each socket will
+    /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
         let (a, b) = try!(mio_uds::UnixStream::pair());
         let a = UnixStream::new(a);
@@ -111,7 +111,7 @@ impl UnixStream {
         self.io.get_ref().peer_addr()
     }
 
-    /// Returns effective credentials of the process which called `connect` or `socketpair`.
+    /// Returns effective credentials of the process which called `connect` or `pair`.
     pub fn peer_cred(&self) -> io::Result<UCred> {
         ucred::get_peer_cred(self)
     }

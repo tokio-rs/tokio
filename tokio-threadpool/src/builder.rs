@@ -1,8 +1,9 @@
 use callback::Callback;
 use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
-use sender::Sender;
+use shutdown::ShutdownTrigger;
 use pool::{Pool, MAX_BACKUP};
+use task::Queue;
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
 
@@ -396,31 +397,41 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&self) -> ThreadPool {
-        let mut workers = vec![];
-
         trace!("build; num-workers={}", self.pool_size);
 
-        for i in 0..self.pool_size {
-            let id = WorkerId::new(i);
-            let park = (self.new_park)(&id);
-            let unpark = park.unpark();
+        // Create the worker entry list
+        let workers: Arc<[worker::Entry]> = {
+            let mut workers = vec![];
 
-            workers.push(worker::Entry::new(park, unpark));
-        }
+            for i in 0..self.pool_size {
+                let id = WorkerId::new(i);
+                let park = (self.new_park)(&id);
+                let unpark = park.unpark();
+
+                workers.push(worker::Entry::new(park, unpark));
+            }
+
+            workers.into()
+        };
+
+        let queue = Arc::new(Queue::new());
+
+        // Create a trigger that will clean up resources on shutdown.
+        //
+        // The `Pool` contains a weak reference to it, while `Worker`s and the `ThreadPool` contain
+        // strong references.
+        let trigger = Arc::new(ShutdownTrigger::new(workers.clone(), queue.clone()));
 
         // Create the pool
-        let inner = Arc::new(
-            Pool::new(
-                workers.into_boxed_slice(),
-                self.max_blocking,
-                self.config.clone()));
+        let pool = Arc::new(Pool::new(
+            workers,
+            Arc::downgrade(&trigger),
+            self.max_blocking,
+            self.config.clone(),
+            queue,
+        ));
 
-        // Wrap with `Sender`
-        let inner = Some(Sender {
-            inner
-        });
-
-        ThreadPool { inner }
+        ThreadPool::new2(pool, trigger)
     }
 }
 

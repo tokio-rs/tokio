@@ -33,15 +33,15 @@ use tokio::io::{copy, shutdown};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     let listen_addr = env::args().nth(1).unwrap_or("127.0.0.1:8081".to_string());
-    let listen_addr = listen_addr.parse::<SocketAddr>().unwrap();
+    let listen_addr = listen_addr.parse::<SocketAddr>()?;
 
     let server_addr = env::args().nth(2).unwrap_or("127.0.0.1:8080".to_string());
-    let server_addr = server_addr.parse::<SocketAddr>().unwrap();
+    let server_addr = server_addr.parse::<SocketAddr>()?;
 
     // Create a TCP listener which will listen for incoming connections.
-    let socket = TcpListener::bind(&listen_addr).unwrap();
+    let socket = TcpListener::bind(&listen_addr)?;
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
@@ -94,6 +94,7 @@ fn main() {
         });
 
     tokio::run(done);
+    Ok(())
 }
 
 // This is a custom type used to have a custom implementation of the
