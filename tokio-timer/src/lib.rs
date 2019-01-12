@@ -23,6 +23,7 @@
 //! [`Timer`] instance must be running on some thread.
 //!
 //! [`Delay`]: struct.Delay.html
+//! [`DelayQueue`]: struct.DelayQueue.html
 //! [`Throttle`]: throttle/struct.Throttle.html
 //! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
