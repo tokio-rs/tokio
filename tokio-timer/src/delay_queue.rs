@@ -152,7 +152,9 @@ pub struct DelayQueue<T> {
 
 /// An entry in `DelayQueue` that has expired and removed.
 ///
-/// Values are returned by `DelayQueue::poll`.
+/// Values are returned by [`DelayQueue::poll`].
+/// 
+/// [`DelayQueue::poll`]: struct.DelayQueue.html#method.poll
 #[derive(Debug)]
 pub struct Expired<T> {
     /// The data stored in the queue
@@ -167,10 +169,11 @@ pub struct Expired<T> {
 
 /// Token to a value stored in a `DelayQueue`.
 ///
-/// Instances of `Key` are returned by `DelayQueue::insert`. See [`DelayQueue`]
+/// Instances of `Key` are returned by [`DelayQueue::insert`]. See [`DelayQueue`]
 /// documentation for more details.
 ///
 /// [`DelayQueue`]: struct.DelayQueue.html
+/// [`DelayQueue::insert`]: struct.DelayQueue.html#method.insert
 #[derive(Debug, Clone)]
 pub struct Key {
     index: usize,
