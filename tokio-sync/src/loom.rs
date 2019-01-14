@@ -31,4 +31,6 @@ pub(crate) mod sync {
     }
 }
 
-pub(crate) fn yield_now() {}
+pub(crate) fn yield_now() {
+    ::std::sync::atomic::spin_loop_hint();
+}

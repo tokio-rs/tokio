@@ -31,7 +31,9 @@ pub(crate) struct Block<T> {
     /// `block_tail`.
     observed_tail_position: CausalCell<usize>,
 
-    /// Values
+    /// Array containing values pushed into the block. Values are stored in a
+    /// continuous array in order to improve cache line behavior when reading.
+    /// The values must be manually dropped.
     values: Values<T>,
 }
 
@@ -94,7 +96,7 @@ impl<T> Block<T> {
     }
 
     /// Returns `true` if the block matches the given index
-    pub(crate) fn at_index(&self, index: usize) -> bool {
+    pub(crate) fn is_at_index(&self, index: usize) -> bool {
         debug_assert!(offset(index) == 0);
         self.start_index == index
     }
@@ -348,6 +350,7 @@ impl<T> Block<T> {
                 Err(curr) => curr,
             };
 
+            // When running outside of loom, this calls `spin_loop_hint`.
             loom::yield_now();
         }
     }

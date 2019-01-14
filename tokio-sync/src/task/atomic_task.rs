@@ -139,12 +139,6 @@ const NOTIFYING: usize = 0b10;
 impl AtomicTask {
     /// Create an `AtomicTask` initialized with the given `Task`
     pub fn new() -> AtomicTask {
-        /*
-        // Make sure that task is Sync
-        trait AssertSync: Sync {}
-        impl AssertSync for Task {}
-        */
-
         AtomicTask {
             state: AtomicUsize::new(WAITING),
             task: CausalCell::new(None),

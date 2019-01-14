@@ -32,6 +32,8 @@ pub(crate) trait Semaphore: Sync {
 
     fn new_permit() -> Self::Permit;
 
+    /// The permit is dropped without a value being sent. In this case, the
+    /// permit must be returned to the semaphore.
     fn drop_permit(&self, permit: &mut Self::Permit);
 
     fn is_idle(&self) -> bool;
@@ -42,6 +44,10 @@ pub(crate) trait Semaphore: Sync {
 
     fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), TrySendError>;
 
+    /// A value was sent into the channel and the permit held by `tx` is
+    /// dropped. In this case, the permit should not immeditely be returned to
+    /// the semaphore. Instead, the permit is returnred to the semaphore once
+    /// the sent value is read by the rx handle.
     fn forget(&self, permit: &mut Self::Permit);
 
     fn close(&self);
@@ -373,6 +379,8 @@ impl Semaphore for AtomicUsize {
             }
 
             if curr == usize::MAX ^ 1 {
+                // Overflowed the ref count. There is no safe way to recover, so
+                // abort the process. In practice, this should never happen.
                 process::abort()
             }
 

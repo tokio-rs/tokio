@@ -119,7 +119,7 @@ impl<T> Tx<T> {
         loop {
             let block = unsafe { &(*block_ptr) };
 
-            if block.at_index(start_index) {
+            if block.is_at_index(start_index) {
                 return unsafe { NonNull::new_unchecked(block_ptr) };
             }
 
@@ -239,11 +239,8 @@ impl<T> Rx<T> {
 
             let ret = block.read(self.index);
 
-            match ret {
-                Some(block::Read::Value(..)) => {
-                    self.index = self.index.wrapping_add(1);
-                }
-                _ => {}
+            if let Some(block::Read::Value(..)) = ret {
+                self.index = self.index.wrapping_add(1);
             }
 
             ret
@@ -260,7 +257,7 @@ impl<T> Rx<T> {
             let next_block = {
                 let block = unsafe { self.head.as_ref() };
 
-                if block.at_index(block_index) {
+                if block.is_at_index(block_index) {
                     return true;
                 }
 
