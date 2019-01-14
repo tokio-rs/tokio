@@ -153,7 +153,7 @@ pub struct DelayQueue<T> {
 /// An entry in `DelayQueue` that has expired and removed.
 ///
 /// Values are returned by [`DelayQueue::poll`].
-/// 
+///
 /// [`DelayQueue::poll`]: struct.DelayQueue.html#method.poll
 #[derive(Debug)]
 pub struct Expired<T> {
@@ -501,10 +501,13 @@ impl<T> DelayQueue<T> {
 
         self.slab[key.index].when = when;
 
+        let next_poll = self.wheel.poll_at()
+            .map(|t| self.start + Duration::from_millis(t));
+
         if let Some(ref mut delay) = self.delay {
             debug_assert!(old >= delay.deadline());
 
-            if old == delay.deadline() {
+            if next_poll != Some(delay.deadline()) {
                 delay.reset(self.start + Duration::from_millis(when));
             }
         }
