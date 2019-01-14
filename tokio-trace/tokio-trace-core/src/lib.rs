@@ -1,4 +1,5 @@
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_debug_implementations, missing_docs, unreachable_pub)]
+#![cfg_attr(test, deny(warnings))]
 
 //! Core primitives for `tokio-trace`.
 //!
