@@ -251,7 +251,7 @@ impl<'a> Span<'a> {
         if interest.is_never() {
             return Span::new_disabled();
         }
-        dispatcher::with_current(|dispatch| {
+        dispatcher::with(|dispatch| {
             if interest.is_sometimes() && !dispatch.enabled(meta) {
                 return Span {
                     inner: None,
@@ -414,7 +414,7 @@ impl<'a> Event<'a> {
         if interest.is_never() {
             return Self { inner: None };
         }
-        dispatcher::with_current(|dispatch| {
+        dispatcher::with(|dispatch| {
             if interest.is_sometimes() && !dispatch.enabled(meta) {
                 return Self { inner: None };
             }

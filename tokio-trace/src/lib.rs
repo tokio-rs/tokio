@@ -261,7 +261,7 @@ pub use self::{
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite::{self, Callsite},
-        metadata, Level, Metadata,
+        dispatcher, metadata, Level, Metadata,
     },
 };
 
@@ -763,7 +763,6 @@ macro_rules! error {
     );
 }
 
-pub mod dispatcher;
 pub mod field;
 pub mod span;
 pub mod subscriber;
