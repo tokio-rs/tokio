@@ -497,13 +497,15 @@ impl<T> DelayQueue<T> {
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
 
+        // This is needed only for the debug assertion inside the if-let, but
+        // calculating it there causes the assertion to fail for some reason.
+        #[cfg(debug_assertions)]
+        let old = self.start + Duration::from_millis(self.slab[key.index].when);
+
         self.slab[key.index].when = when;
 
         if let Some(ref mut delay) = self.delay {
-            debug_assert!({
-                let old = self.start + Duration::from_millis(self.slab[key.index].when);
-                old >= delay.deadline()
-            });
+            debug_assert!(old >= delay.deadline());
 
             let start = self.start;
             let next_poll = self.wheel.poll_at()
