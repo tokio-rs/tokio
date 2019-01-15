@@ -146,7 +146,7 @@ impl FieldSet {
 
     /// Returns the [`Field`](::field::Field) named `name`, or `None` if no such
     /// field exists.
-    pub fn field_named<Q>(&self, name: &Q) -> Option<Field>
+    pub fn field<Q>(&self, name: &Q) -> Option<Field>
     where
         Q: Borrow<str>,
     {

@@ -297,13 +297,13 @@ impl<'a> Span<'a> {
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn field_named<Q>(&self, name: &Q) -> Option<field::Field>
+    pub fn field<Q>(&self, name: &Q) -> Option<field::Field>
     where
         Q: Borrow<str>,
     {
         self.inner
             .as_ref()
-            .and_then(|inner| inner.meta.fields().field_named(name))
+            .and_then(|inner| inner.meta.fields().field(name))
     }
 
     /// Returns true if this `Span` has a field for the given
@@ -434,13 +434,13 @@ impl<'a> Event<'a> {
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn field_named<Q>(&self, name: &Q) -> Option<field::Field>
+    pub fn field<Q>(&self, name: &Q) -> Option<field::Field>
     where
         Q: Borrow<str>,
     {
         self.inner
             .as_ref()
-            .and_then(|inner| inner.meta.fields().field_named(name))
+            .and_then(|inner| inner.meta.fields().field(name))
     }
 
     /// Returns true if this `Event` has a field for the given

@@ -159,7 +159,7 @@ impl<'a> AsField for &'a Field {
 impl AsField for str {
     #[inline]
     fn as_field(&self, metadata: &Metadata) -> Option<Field> {
-        metadata.fields().field_named(&self)
+        metadata.fields().field(&self)
     }
 }
 
