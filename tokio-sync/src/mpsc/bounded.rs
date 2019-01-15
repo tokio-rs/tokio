@@ -175,15 +175,14 @@ impl<T> Sink for Sender<T> {
         use futures::AsyncSink;
         use futures::Async::*;
 
-        match self.poll_ready() {
-            Ok(Ready(_)) => {
+        match self.poll_ready()? {
+            Ready(_) => {
                 self.try_send(msg).map_err(|_| SendError(()))?;
                 Ok(AsyncSink::Ready)
             }
-            Ok(NotReady) => {
+            NotReady => {
                 Ok(AsyncSink::NotReady(msg))
             }
-            Err(e) => Err(e),
         }
     }
 
