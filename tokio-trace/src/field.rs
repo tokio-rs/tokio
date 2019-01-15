@@ -1,3 +1,4 @@
+//! Structured data associated with `Span`s and `Event`s.
 pub use tokio_trace_core::field::*;
 
 use std::fmt;

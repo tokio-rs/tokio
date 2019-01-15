@@ -1,3 +1,4 @@
+//! Collects and records trace data.
 pub use tokio_trace_core::subscriber::*;
 
 use std::{cell::RefCell, default::Default, thread};

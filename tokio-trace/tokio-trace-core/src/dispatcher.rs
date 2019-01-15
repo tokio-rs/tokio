@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-/// `Dispatch` trace data to a [`Subscriber`].
+/// `Dispatch` trace data to a [`Subscriber`](::Subscriber).
 #[derive(Clone)]
 pub struct Dispatch {
     subscriber: Arc<Subscriber + Send + Sync>,

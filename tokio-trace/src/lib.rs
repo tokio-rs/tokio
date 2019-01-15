@@ -252,6 +252,7 @@ extern crate tokio_trace_core;
 // Somehow this `use` statement is necessary for us to re-export the `core`
 // macros on Rust 1.26.0. I'm not sure how this makes it work, but it does.
 #[allow(unused_imports)]
+#[doc(hidden)]
 use tokio_trace_core::*;
 
 pub use self::{
@@ -628,7 +629,7 @@ macro_rules! debug {
 }
 
 /// Constructs an event at the info level.
-//
+///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
 ///
