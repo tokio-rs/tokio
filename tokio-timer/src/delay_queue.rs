@@ -496,13 +496,14 @@ impl<T> DelayQueue<T> {
 
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
-        let old = self.start + Duration::from_millis(self.slab[key.index].when);
-
 
         self.slab[key.index].when = when;
 
         if let Some(ref mut delay) = self.delay {
-            debug_assert!(old >= delay.deadline());
+            debug_assert!({
+                let old = self.start + Duration::from_millis(self.slab[key.index].when);
+                old >= delay.deadline()
+            });
 
             let start = self.start;
             let next_poll = self.wheel.poll_at()
