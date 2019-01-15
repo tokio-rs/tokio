@@ -12,7 +12,7 @@ often be quite challenging. Since individual tasks are multiplexed on the same
 thread, associated events and log lines are intermixed making it difficult to
 trace the logic flow. `tokio-trace` expands upon logging-style diagnostics by
 allowing libraries and applications to record structured events with additional
-information about *temporality* and *causality* --- unlike a log message, a span
+information about *temporality* and *causality* — unlike a log message, a span
 in `tokio-trace` has a beginning and end time, may be entered and exited by the
 flow of execution, and may exist within a nested tree of similar spans. In
 addition, `tokio-trace` spans are *structured*, with the ability to record typed

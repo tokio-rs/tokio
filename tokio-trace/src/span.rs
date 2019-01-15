@@ -121,14 +121,14 @@
 //! been dropped, `Subscriber`s have a [`clone_span`](::Subscriber::clone_span)
 //! method, which is called every time a span handle is cloned. Combined with
 //! `drop_span`, this may be used to track the number of handles to a given span
-//! --- if `drop_span` has been called one more time than the number of calls to
+//! — if `drop_span` has been called one more time than the number of calls to
 //! `clone_span` for a given ID, then no more handles to the span with that ID
 //! exist. The subscriber may then treat it as closed.
 //!
 //! # Accessing a Span's Attributes
 //!
 //! The [`Attributes`] type represents a *non-entering* reference to a `Span`'s data
-//! --- a set of key-value pairs (known as _fields_), a creation timestamp,
+//! — a set of key-value pairs (known as _fields_), a creation timestamp,
 //! a reference to the span's parent in the trace tree, and metadata describing
 //! the source code location where the span was created. This data is provided
 //! to the [`Subscriber`] when the span is created; it may then choose to cache

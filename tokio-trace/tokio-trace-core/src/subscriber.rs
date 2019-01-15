@@ -8,7 +8,7 @@ use std::fmt;
 /// Crates that provide implementations of methods for collecting or recording
 /// trace data should implement the `Subscriber` interface. This trait is
 /// intended to represent fundamental primitives for collecting trace events and
-/// spans --- other libraries may offer utility functions and types to make
+/// spans — other libraries may offer utility functions and types to make
 /// subscriber implementations more modular or improve the ergonomics of writing
 /// subscribers.
 ///
@@ -25,8 +25,8 @@ use std::fmt;
 ///
 /// When a span is entered or exited, the subscriber is provided only with the
 /// [ID] with which it tagged that span when it was created. This means
-/// that it is up to the subscriber to determine whether or not span _data_ ---
-/// the fields and metadata describing the span --- should be stored. The
+/// that it is up to the subscriber to determine whether or not span _data_ —
+/// the fields and metadata describing the span — should be stored. The
 /// [`new_span`] function is called when a new span is created, and at that
 /// point, the subscriber _may_ choose to store the associated data if it will
 /// be referenced again. However, if the data has already been recorded and will

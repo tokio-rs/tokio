@@ -10,7 +10,7 @@
 //! thread, associated events and log lines are intermixed making it difficult to
 //! trace the logic flow. `tokio-trace` expands upon logging-style diagnostics by
 //! allowing libraries and applications to record structured events with additional
-//! information about *temporality* and *causality* --- unlike a log message, a span
+//! information about *temporality* and *causality* — unlike a log message, a span
 //! in `tokio-trace` has a beginning and end time, may be entered and exited by the
 //! flow of execution, and may exist within a nested tree of similar spans. In
 //! addition, `tokio-trace` spans are *structured*, with the ability to record typed
@@ -32,14 +32,14 @@
 //! another context. The span in which a thread is currently executing is
 //! referred to as the _current_ span.
 //!
-//! Spans form a tree structure --- unless it is a root span, all spans have a
+//! Spans form a tree structure — unless it is a root span, all spans have a
 //! _parent_, and may have one or more _children_. When a new span is created,
 //! the current span becomes the new span's parent. The total execution time of
 //! a span consists of the time spent in that span and in the entire subtree
 //! represented by its children. Thus, a parent span always lasts for at least
 //! as long as the longest-executing span in its subtree.
 //!
-//! In addition, data may be associated with spans. A span may have _fields_ ---
+//! In addition, data may be associated with spans. A span may have _fields_ —
 //! a set of key-value pairs describing the state of the program during that
 //! span; an optional name, and metadata describing the source code location
 //! where the span was originally entered.
@@ -68,7 +68,7 @@
 //! individual log record-like events can be pinpointed not only in time, but
 //! in the logical execution flow of the system.
 //!
-//! Events are represented as a special case of spans --- they are created, they
+//! Events are represented as a special case of spans — they are created, they
 //! may have fields added, and then they close immediately, without being
 //! entered.
 //!
@@ -329,7 +329,7 @@ macro_rules! callsite {
                 let current_interest = self.interest();
                 let interest = match () {
                     // If the added interest is `never()`, don't change anything
-                    // --- either a different subscriber added a higher
+                    // — either a different subscriber added a higher
                     // interest, which we want to preserve, or the interest is 0
                     // anyway (as it's initialized to 0).
                     _ if interest.is_never() => return,
@@ -576,7 +576,7 @@ macro_rules! trace {
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         // When invoking this macro with `log`-style syntax (no fields), we
-        // drop the event immediately --- the `log` crate's macros don't
+        // drop the event immediately — the `log` crate's macros don't
         // expand to an item, and if this did, it would break drop-in
         // compatibility with `log`'s macros. Since it defines no fields,
         // the handle won't be used later to add values to them.
