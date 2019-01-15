@@ -497,9 +497,7 @@ impl<T> DelayQueue<T> {
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
 
-        // This is needed only for the debug assertion inside the if-let, but
-        // calculating it there causes the assertion to fail for some reason.
-        #[cfg(debug_assertions)]
+        // This is needed only for the debug assertion inside the if-let.
         let old = self.start + Duration::from_millis(self.slab[key.index].when);
 
         self.slab[key.index].when = when;
