@@ -10,23 +10,25 @@
 //! `Clone`, `Send`, and `Sync`. This type is used to create instances of
 //! [`Delay`].
 //!
-//! The [`Now`] trait describes how to get an `Instance` representing the
+//! The [`Now`] trait describes how to get an [`Instant`] representing the
 //! current moment in time. [`SystemNow`] is the default implementation, where
-//! [`Now::now`] is implemented by calling `Instant::now`.
+//! [`Now::now`] is implemented by calling [`Instant::now`].
 //!
 //! [`Timer`] is generic over [`Now`]. This allows the source of time to be
 //! customized. This ability is especially useful in tests and any environment
 //! where determinism is necessary.
 //!
-//! Note, when using the Tokio runtime, the `Timer` does not need to be manually
-//! setup as the runtime comes pre-configured with a `Timer` instance.
+//! Note, when using the Tokio runtime, the [`Timer`] does not need to be manually
+//! setup as the runtime comes pre-configured with a [`Timer`] instance.
 //!
 //! [`Timer`]: struct.Timer.html
 //! [`Handle`]: struct.Handle.html
 //! [`Delay`]: ../struct.Delay.html
-//! [`Now`]: trait.Now.html
-//! [`Now::now`]: trait.Now.html#method.now
+//! [`Now`]: ../clock/trait.Now.html
+//! [`Now::now`]: ../clock/trait.Now.html#method.now
 //! [`SystemNow`]: struct.SystemNow.html
+//! [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
+//! [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 
 // This allows the usage of the old `Now` trait.
 #![allow(deprecated)]
@@ -60,18 +62,18 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::usize;
 
-/// Timer implementation that drives [`Delay`], [`Interval`], and [`Deadline`].
+/// Timer implementation that drives [`Delay`], [`Interval`], and [`Timeout`].
 ///
 /// A `Timer` instance tracks the state necessary for managing time and
 /// notifying the [`Delay`] instances once their deadlines are reached.
 ///
 /// It is expected that a single `Timer` instance manages many individual
-/// `Delay` instances. The `Timer` implementation is thread-safe and, as such,
+/// [`Delay`] instances. The `Timer` implementation is thread-safe and, as such,
 /// is able to handle callers from across threads.
 ///
-/// Callers do not use `Timer` directly to create `Delay` instances.  Instead,
-/// [`Handle`] is used. A handle for the timer instance is obtained by calling
-/// [`handle`]. [`Handle`] is the type that implements `Clone` and is `Send +
+/// Callers do not use `Timer` directly to create [`Delay`] instances.  Instead,
+/// [`Handle`][Handle.struct] is used. A handle for the timer instance is obtained by calling
+/// [`handle`]. [`Handle`][Handle.struct] is the type that implements `Clone` and is `Send +
 /// Sync`.
 ///
 /// After creating the `Timer` instance, the caller must repeatedly call
@@ -81,9 +83,9 @@ use std::usize;
 /// The `Timer` has a resolution of one millisecond. Any unit of time that falls
 /// between milliseconds are rounded up to the next millisecond.
 ///
-/// When the `Timer` instance is dropped, any outstanding `Delay` instance that
+/// When the `Timer` instance is dropped, any outstanding [`Delay`] instance that
 /// has not elapsed will be notified with an error. At this point, calling
-/// `poll` on the `Delay` instance will result in `Err` being returned.
+/// `poll` on the [`Delay`] instance will result in `Err` being returned.
 ///
 /// # Implementation
 ///
@@ -112,17 +114,17 @@ use std::usize;
 /// When the timer processes entries at level zero, it will notify all the
 /// [`Delay`] instances as their deadlines have been reached. For all higher
 /// levels, all entries will be redistributed across the wheel at the next level
-/// down. Eventually, as time progresses, entries will `Delay` instances will
+/// down. Eventually, as time progresses, entries will [`Delay`] instances will
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
 ///
 /// [`Delay`]: ../struct.Delay.html
 /// [`Interval`]: ../struct.Interval.html
-/// [`Deadline`]: ../struct.Deadline.html
+/// [`Timeout`]: ../struct.Timeout.html
 /// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
 /// [`handle`]: #method.handle
 /// [`turn`]: #method.turn
-/// [`Handle`]: struct.Handle.html
+/// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
 pub struct Timer<T, N = SystemNow> {
     /// Shared state
