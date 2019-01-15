@@ -95,26 +95,6 @@ pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     }
 }
 
-// TODO: do we want to provide this functionality?
-// pub fn reset_registry() {
-//     let mut registry = REGISTRY.lock().unwrap();
-//     registry.callsites.clear();
-//     registry.dispatchers.clear();
-// }
-
-// ===== impl Callsite =====
-
-// TODO: when `const fn` is stable, we should add this and deprecate the
-// `identify_callsite!` macro.
-/*
-impl Callsite + 'static {
-    /// Returns an `Identifier` unique to this `Callsite`.
-    pub const fn id(&'static self) -> Identifier {
-        Identifier(self)
-    }
-}
-*/
-
 // ===== impl Identifier =====
 
 impl PartialEq for Identifier {

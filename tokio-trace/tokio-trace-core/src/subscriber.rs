@@ -77,8 +77,6 @@ pub trait Subscriber {
     /// Similarly, if a `Subscriber` has a filtering strategy that can be
     /// changed dynamically at runtime, it would need to re-evaluate that filter
     /// if the cached results have changed.
-    // TODO: there should be a function to request all callsites be
-    // re-registered?
     ///
     /// A subscriber which manages fanout to multiple other subscribers
     /// should proxy this decision to all of its child subscribers,
