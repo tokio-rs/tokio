@@ -42,6 +42,31 @@ extern crate lazy_static;
 /// This may be used in contexts, such as static initializers, where the
 /// [`Callsite::id`] function is not currently usable.
 ///
+/// For example:
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace_core;
+/// use tokio_trace_core::callsite;
+/// # use tokio_trace_core::{Metadata, subscriber::Interest};
+/// # fn main() {
+/// pub struct MyCallsite {
+///    // ...
+/// }
+/// impl callsite::Callsite for MyCallsite {
+/// # fn add_interest(&self, _: Interest) { unimplemented!() }
+/// # fn clear_interest(&self) {}
+/// # fn metadata(&self) -> &Metadata { unimplemented!() }
+///     // ...
+/// }
+///
+/// static CALLSITE: MyCallsite = MyCallsite {
+///     // ...
+/// };
+///
+/// static CALLSITE_ID: callsite::Identifier = identify_callsite!(&CALLSITE);
+/// # }
+/// ```
+///
 /// [`Identifier`]: ::callsite::Identifier
 /// [`Callsite`]: ::callsite::Callsite
 /// [`Callsite::id`]: ::callsite::Callsite::id
@@ -57,6 +82,34 @@ macro_rules! identify_callsite {
 /// This may be used in contexts, such as static initializers, where the
 /// [`Metadata::new`] function is not currently usable.
 ///
+/// /// For example:
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace_core;
+/// # use tokio_trace_core::{callsite::Callsite, subscriber::Interest};
+/// use tokio_trace_core::{Metadata, Level};
+/// # fn main() {
+/// # pub struct MyCallsite { }
+/// # impl Callsite for MyCallsite {
+/// # fn add_interest(&self, _: Interest) { unimplemented!() }
+/// # fn clear_interest(&self) {}
+/// # fn metadata(&self) -> &Metadata { unimplemented!() }
+/// # }
+/// #
+/// static FOO_CALLSITE: MyCallsite = MyCallsite {
+///     // ...
+/// };
+///
+/// static FOO_METADATA: Metadata = metadata!{
+///     name: "foo",
+///     target: module_path!(),
+///     level: Level::DEBUG,
+///     fields: &["bar", "baz"],
+///     callsite: &FOO_CALLSITE,
+/// };
+/// # }
+/// ```
+///
 /// [metadata]: ::metadata::Metadata
 /// [`Metadata::new`]: ::metadata::Metadata::new
 #[macro_export]
@@ -65,7 +118,7 @@ macro_rules! metadata {
         name: $name:expr,
         target: $target:expr,
         level: $level:expr,
-        fields: $field:expr,
+        fields: $fields:expr,
         callsite: $callsite:expr
     ) => {
         metadata! {
