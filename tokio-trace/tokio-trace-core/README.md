@@ -21,6 +21,9 @@ The crate provides:
 
 * `Dispatch` allows span events to be dispatched to `Subscriber`s.
 
+In addition, it defines the global callsite registry and per-thread current
+dispatcher which other components of the tracing system rely on.
+
 Application authors will typically not use this crate directly. Instead, they
 will use the [`tokio-trace`] crate, which provides a much more fully-featured
 API. However, this crate's API will change very infrequently, so it may be used

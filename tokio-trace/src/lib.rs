@@ -258,15 +258,24 @@ use tokio_trace_core::*;
 pub use self::{
     dispatcher::Dispatch,
     field::Value,
-    span::{Event, Id, Span},
+    span::{Event, Span},
     subscriber::Subscriber,
     tokio_trace_core::{
-        callsite::{self, Callsite},
-        dispatcher, metadata, Level, Metadata,
+        dispatcher, Level, Metadata,
     },
 };
 
+#[doc(hidden)]
+pub use self::{
+    tokio_trace_core::{
+        callsite::{self, Callsite},
+        metadata,
+    },
+    span::Id,
+};
+
 /// Constructs a new static callsite for a span or event.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! callsite {
     (span: $name:expr, $( $field_name:ident ),*) => ({
