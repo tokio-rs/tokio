@@ -501,11 +501,12 @@ impl<T> DelayQueue<T> {
 
         self.slab[key.index].when = when;
 
-        let next_poll = self.wheel.poll_at()
-            .map(|t| self.start + Duration::from_millis(t));
-
         if let Some(ref mut delay) = self.delay {
             debug_assert!(old >= delay.deadline());
+
+            let start = self.start;
+            let next_poll = self.wheel.poll_at()
+                .map(move |t| start + Duration::from_millis(t));
 
             if next_poll != Some(delay.deadline()) {
                 delay.reset(self.start + Duration::from_millis(when));
