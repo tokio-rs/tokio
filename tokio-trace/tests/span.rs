@@ -4,7 +4,7 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{dispatcher, Dispatch, Span};
+use tokio_trace::{dispatcher, Dispatch, Span, Level};
 
 #[test]
 fn closed_handle_dropped_when_used() {

@@ -83,14 +83,14 @@ macro_rules! metadata {
         fields: $fields:expr,
         callsite: $callsite:expr,
     ) => {
-        metadata::Metadata {
+        $crate::metadata::Metadata {
             name: $name,
             target: $target,
             level: $level,
             file: Some(file!()),
             line: Some(line!()),
             module_path: Some(module_path!()),
-            fields: field::FieldSet {
+            fields: $crate::field::FieldSet {
                 names: $fields,
                 callsite: identify_callsite!($callsite),
             },

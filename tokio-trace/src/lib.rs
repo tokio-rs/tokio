@@ -296,7 +296,6 @@ macro_rules! callsite {
         use $crate::{callsite, Metadata, subscriber::Interest};
         struct MyCallsite;
         static META: Metadata<'static> = {
-            use $crate::*;
             metadata! {
                 name: $name,
                 target: $target,
