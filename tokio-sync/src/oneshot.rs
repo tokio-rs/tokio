@@ -146,7 +146,7 @@ impl<T> Sender<T> {
     /// registered to receive a notification if the `Receiver` handle goes away.
     ///
     /// [`Receiver`]: struct.Receiver.html
-    pub fn poll_cancel(&mut self) -> Poll<(), ()> {
+    pub fn poll_close(&mut self) -> Poll<(), ()> {
         let inner = self.inner.as_ref().unwrap();
 
         let mut state = State::load(&inner.state, Acquire);
@@ -185,12 +185,12 @@ impl<T> Sender<T> {
 
     /// Check if the associated [`Receiver`] handle has been dropped.
     ///
-    /// Unlike [`poll_cancel`], this function does not register a task for
-    /// wakeup upon cancellation.
+    /// Unlike [`poll_close`], this function does not register a task for
+    /// wakeup upon close.
     ///
     /// [`Receiver`]: struct.Receiver.html
-    /// [`poll_cancel`]: struct.Sender.html#method.poll_cancel
-    pub fn is_canceled(&self) -> bool {
+    /// [`poll_close`]: struct.Sender.html#method.poll_close
+    pub fn is_closed(&self) -> bool {
         let inner = self.inner.as_ref().unwrap();
 
         let state = State::load(&inner.state, Acquire);
@@ -429,7 +429,7 @@ impl<T: fmt::Debug> fmt::Debug for Inner<T> {
 const RX_TASK_SET: usize = 0b00001;
 const VALUE_SENT: usize  = 0b00010;
 const CLOSED: usize      = 0b00100;
-const TX_TASK_SET: usize = 0b10000;
+const TX_TASK_SET: usize = 0b01000;
 
 impl State {
     fn new() -> State {

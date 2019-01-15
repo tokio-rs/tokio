@@ -1,7 +1,7 @@
 //! Thread-safe, asynchronous counting semaphore.
 //!
 //! A `Semaphore` instance holds a set of permits. Permits are used to
-//! synchronize access ot a shared resource.
+//! synchronize access to a shared resource.
 //!
 //! Before accessing the shared resource, callers acquire a permit from the
 //! semaphore. Once the permit is acquired, the caller then enters the critical
@@ -47,7 +47,7 @@ pub struct Semaphore {
 ///
 /// An instance of `Permit` is intended to be used with a **single** instance of
 /// `Semaphore`. Using a single instance of `Permit` with multiple semaphore
-/// intsances will result in unexpected behavior.
+/// instances will result in unexpected behavior.
 ///
 /// `Permit` does **not** release the permit back to the semaphore on drop. It
 /// is the user's responsibility to ensure that `Permit::release` is called
@@ -195,9 +195,9 @@ impl Semaphore {
             () => {
                 if let Some(waiter) = maybe_strong {
                     // The waiter was cloned, but never got queued.
-                    // Before enterig `poll_permit`, the waiter was
-                    // in the `Idle` state. We must transition the node
-                    // back to the idle state.
+                    // Before entering `poll_permit`, the waiter was in the
+                    // `Idle` state. We must transition the node back to the
+                    // idle state.
                     let waiter = unsafe { Arc::from_raw(waiter.as_ptr()) };
                     waiter.revert_to_idle();
                 }

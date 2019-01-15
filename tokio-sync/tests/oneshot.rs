@@ -50,7 +50,7 @@ fn send_recv() {
 }
 
 #[test]
-fn cancel_tx() {
+fn close_tx() {
     let (tx, mut rx) = oneshot::channel::<i32>();
     let mut task = MockTask::new();
 
@@ -65,25 +65,25 @@ fn cancel_tx() {
 }
 
 #[test]
-fn cancel_rx() {
-    // First, without checking poll_cancel()
+fn close_rx() {
+    // First, without checking poll_close()
     //
     let (tx, _) = oneshot::channel();
 
     assert!(tx.send(1).is_err());
 
-    // Second, via poll_cancel();
+    // Second, via poll_close();
 
     let (mut tx, rx) = oneshot::channel();
     let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+    task.enter(|| assert_not_ready!(tx.poll_close()));
 
     drop(rx);
 
     assert!(task.is_notified());
-    assert!(tx.is_canceled());
-    assert_ready!(tx.poll_cancel());
+    assert!(tx.is_closed());
+    assert_ready!(tx.poll_close());
 
     assert!(tx.send(1).is_err());
 }
@@ -106,13 +106,13 @@ fn explicit_close_poll() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+    task.enter(|| assert_not_ready!(tx.poll_close()));
 
     rx.close();
 
     assert!(task.is_notified());
-    assert!(tx.is_canceled());
-    assert_ready!(tx.poll_cancel());
+    assert!(tx.is_closed());
+    assert_ready!(tx.poll_close());
 
     assert!(tx.send(1).is_err());
 
@@ -122,13 +122,13 @@ fn explicit_close_poll() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+    task.enter(|| assert_not_ready!(tx.poll_close()));
 
     rx.close();
 
     assert!(task.is_notified());
-    assert!(tx.is_canceled());
-    assert_ready!(tx.poll_cancel());
+    assert!(tx.is_closed());
+    assert_ready!(tx.poll_close());
 
     assert!(rx.poll().is_err());
 }
@@ -150,13 +150,13 @@ fn explicit_close_try_recv() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_cancel()));
+    task.enter(|| assert_not_ready!(tx.poll_close()));
 
     rx.close();
 
     assert!(task.is_notified());
-    assert!(tx.is_canceled());
-    assert_ready!(tx.poll_cancel());
+    assert!(tx.is_closed());
+    assert_ready!(tx.poll_close());
 
     assert!(rx.try_recv().is_err());
 }
@@ -183,7 +183,7 @@ fn drops_tasks() {
     let mut rx_task = MockTask::new();
 
     tx_task.enter(|| {
-        assert_not_ready!(tx.poll_cancel());
+        assert_not_ready!(tx.poll_close());
     });
 
     rx_task.enter(|| {
@@ -228,11 +228,11 @@ fn sender_changes_task() {
     let mut task2 = MockTask::new();
 
     task1.enter(|| {
-        assert_not_ready!(tx.poll_cancel());
+        assert_not_ready!(tx.poll_close());
     });
 
     task2.enter(|| {
-        assert_not_ready!(tx.poll_cancel());
+        assert_not_ready!(tx.poll_close());
     });
 
     drop(rx);
@@ -240,5 +240,5 @@ fn sender_changes_task() {
     assert!(!task1.is_notified());
     assert!(task2.is_notified());
 
-    assert_ready!(tx.poll_cancel());
+    assert_ready!(tx.poll_close());
 }
