@@ -24,7 +24,7 @@ use std::fmt;
 ///   they occur.
 ///
 /// When a span is entered or exited, the subscriber is provided only with the
-/// [`Id`] with which it tagged that span when it was created. This means
+/// [ID] with which it tagged that span when it was created. This means
 /// that it is up to the subscriber to determine whether or not span _data_ ---
 /// the fields and metadata describing the span --- should be stored. The
 /// [`new_span`] function is called when a new span is created, and at that
@@ -33,7 +33,7 @@ use std::fmt;
 /// not be needed by the implementations of `enter` and `exit`, the subscriber
 /// may freely discard that data without allocating space to store it.
 ///
-/// [`Id`]: ::Id
+/// [ID]: ::span::Span
 /// [`new_span`]: ::Span::new_span
 pub trait Subscriber {
     // === Span registry methods ==============================================
@@ -89,7 +89,9 @@ pub trait Subscriber {
     /// **Note**: If a subscriber returns `Interest::Never` for a particular
     /// callsite, it _may_ still see spans and events originating from that
     /// callsite, if another subscriber expressed interest in it.
-    /// [metadata]: ::Metadata [`enabled`]: ::Subscriber::enabled
+    ///
+    /// [metadata]: ::Metadata
+    /// [`enabled`]: ::Subscriber::enabled
     fn register_callsite(&self, metadata: &Metadata) -> Interest {
         match self.enabled(metadata) {
             true => Interest::always(),
@@ -118,7 +120,7 @@ pub trait Subscriber {
 
     /// Record a signed 64-bit integer value.
     ///
-    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// This defaults to calling `self.record_debug()`; implementations wishing to
     /// provide behaviour specific to signed integers may override the default
     /// implementation.
     ///
@@ -129,9 +131,9 @@ pub trait Subscriber {
         self.record_debug(span, field, &value)
     }
 
-    /// Record an umsigned 64-bit integer value.
+    /// Record an unsigned 64-bit integer value.
     ///
-    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// This defaults to calling `self.record_debug()`; implementations wishing to
     /// provide behaviour specific to unsigned integers may override the default
     /// implementation.
     ///
@@ -144,7 +146,7 @@ pub trait Subscriber {
 
     /// Record a boolean value.
     ///
-    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// This defaults to calling `self.record_debug()`; implementations wishing to
     /// provide behaviour specific to booleans may override the default
     /// implementation.
     ///
@@ -157,7 +159,7 @@ pub trait Subscriber {
 
     /// Record a string value.
     ///
-    /// This defaults to calling `self.record_str()`; implementations wishing to
+    /// This defaults to calling `self.record_debug()`; implementations wishing to
     /// provide behaviour specific to strings may override the default
     /// implementation.
     ///
@@ -197,7 +199,7 @@ pub trait Subscriber {
 
     // === Filtering methods ==================================================
 
-    /// Determines if a span with the specified [metadata] would be
+    /// Returns true if a span with the specified [metadata] would be
     /// recorded.
     ///
     /// This is used by the dispatcher to avoid allocating for span construction
@@ -211,30 +213,26 @@ pub trait Subscriber {
     /// Records that a [`Span`] has been entered.
     ///
     /// When entering a span, this method is called to notify the subscriber
-    /// that the span has been entered. The subscriber is provided with a handle
-    /// to the entered span, and should return its handle to the span that was
-    /// currently executing prior to entering the new span.
+    /// that the span has been entered. The subscriber is provided with the ID
+    /// of the entered span, and should update any internal state tracking the
+    /// current span accordingly.
     ///
     /// [`Span`]: ::span::Span
-    /// [`Id`]: ::Id
-    /// [`State`]: ::span::State
     fn enter(&self, span: &Span);
 
     /// Records that a [`Span`] has been exited.
     ///
-    /// When exiting a span, this method is called to notify the subscriber
-    /// that the span has been exited. The subscriber is provided with the
-    /// [`Id`] that identifies the exited span, and a handle to the
-    /// previously executing span, which should become the new current span. The
-    /// subscriber should return its handle to the exited span.
+    /// When entering a span, this method is called to notify the subscriber
+    /// that the span has been exited. The subscriber is provided with the ID
+    /// of the exited span, and should update any internal state tracking the
+    /// current span accordingly.
     ///
     /// Exiting a span does not imply that the span will not be re-entered.
+    ///
     /// [`Span`]: ::span::Span
-    /// [`Id`]: ::Id
     fn exit(&self, span: &Span);
 
-    /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
-    /// been cloned.
+    /// Notifies the subscriber that a [`Span`] has been cloned.
     ///
     /// This function is guaranteed to only be called with span IDs that were
     /// returned by this subscriber's `new_span` function.
@@ -252,14 +250,13 @@ pub trait Subscriber {
     /// kind this can be used as a hook to "clone" the pointer, depending on
     /// what that means for the specified pointer.
     ///
-    /// [`Id`]: ::span::Id,
+    /// [`Span`]: ::span::Span,
     /// [`drop_span`]: ::subscriber::Subscriber::drop_span
     fn clone_span(&self, id: &Span) -> Span {
         id.clone()
     }
 
-    /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
-    /// been dropped.
+    /// Notifies the subscriber that a [`Span`] has been dropped.
     ///
     /// This function is guaranteed to only be called with span IDs that were
     /// returned by this subscriber's `new_span` function.
@@ -279,7 +276,7 @@ pub trait Subscriber {
     /// inside of a `drop_span` function may cause a double panic, if the span
     /// was dropped due to a thread unwinding.
     ///
-    /// [`Id`]: ::span::Id,
+    /// [`Span`]: ::span::Span,
     /// [`drop_span`]: ::subscriber::Subscriber::drop_span
     fn drop_span(&self, id: Span) {
         let _ = id;

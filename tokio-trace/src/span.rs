@@ -329,8 +329,12 @@ impl<'a> Span<'a> {
         self
     }
 
-    /// Signals that this span should close the next time it is exited, or when
-    /// it is dropped.
+    /// Closes this span handle, dropping its internal state.
+    ///
+    /// Once this function has been called, subsequent calls to `enter` on this
+    /// handle will no longer enter the span. If this is the final handle with
+    /// the potential to enter that span, the subscriber may consider the span to
+    /// have ended.
     pub fn close(&mut self) {
         if let Some(ref mut inner) = self.inner {
             inner.close();
