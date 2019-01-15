@@ -8,7 +8,7 @@ use std::{
 };
 use {
     dispatcher::{self, Dispatch},
-    subscriber::{Interest, Subscriber},
+    subscriber::Interest,
     Metadata,
 };
 

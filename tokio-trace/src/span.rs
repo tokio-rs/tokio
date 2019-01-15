@@ -146,7 +146,7 @@ use std::{
 use {
     dispatcher::{self, Dispatch},
     field,
-    subscriber::{Interest, Subscriber},
+    subscriber::Interest,
     Metadata,
 };
 
