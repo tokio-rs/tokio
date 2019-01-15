@@ -15,11 +15,12 @@ extern crate humantime;
 use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self,
-    subscriber::{self, Subscriber},
+    Subscriber,
     Id, Level,
 };
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
     fmt,
     io::{self, Write},
@@ -27,13 +28,48 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Mutex,
     },
+    thread,
     time::SystemTime,
 };
+
+/// Tracks the currently executing span on a per-thread basis.
+#[derive(Clone)]
+pub struct CurrentSpanPerThread {
+    current: &'static thread::LocalKey<RefCell<Vec<Id>>>,
+}
+
+impl CurrentSpanPerThread {
+    pub fn new() -> Self {
+        thread_local! {
+            static CURRENT: RefCell<Vec<Id>> = RefCell::new(vec![]);
+        };
+        Self { current: &CURRENT }
+    }
+
+    /// Returns the [`Id`](::Id) of the span in which the current thread is
+    /// executing, or `None` if it is not inside of a span.
+    pub fn id(&self) -> Option<Id> {
+        self.current
+            .with(|current| current.borrow().last().cloned())
+    }
+
+    pub fn enter(&self, span: Id) {
+        self.current.with(|current| {
+            current.borrow_mut().push(span);
+        })
+    }
+
+    pub fn exit(&self) {
+        self.current.with(|current| {
+            let _ = current.borrow_mut().pop();
+        })
+    }
+}
 
 pub struct SloggishSubscriber {
     // TODO: this can probably be unified with the "stack" that's used for
     // printing?
-    current: subscriber::CurrentSpanPerThread,
+    current: CurrentSpanPerThread,
     indent_amount: usize,
     stderr: io::Stderr,
     stack: Mutex<Vec<Id>>,
@@ -111,7 +147,7 @@ impl Event {
 impl SloggishSubscriber {
     pub fn new(indent_amount: usize) -> Self {
         Self {
-            current: subscriber::CurrentSpanPerThread::new(),
+            current: CurrentSpanPerThread::new(),
             indent_amount,
             stderr: io::stderr(),
             stack: Mutex::new(vec![]),
