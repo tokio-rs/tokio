@@ -88,22 +88,21 @@ impl Field {
         self.fields.callsite()
     }
 
-    /// Returns a string representing the name of the field, or `None` if the
-    /// field does not exist.
-    pub fn name(&self) -> Option<&'static str> {
-        self.fields.names.get(self.i).map(|&n| n)
+    /// Returns a string representing the name of the field.
+    pub fn name(&self) -> &'static str {
+        self.fields.names[self.i]
     }
 }
 
 impl fmt::Display for Field {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad(self.name().unwrap_or("???"))
+        f.pad(self.name())
     }
 }
 
 impl AsRef<str> for Field {
     fn as_ref(&self) -> &str {
-        self.name().unwrap_or("???")
+        self.name()
     }
 }
 

@@ -79,7 +79,7 @@ impl Span {
 
     fn record(&mut self, key: &tokio_trace::field::Field, value: fmt::Arguments) {
         // TODO: shouldn't have to alloc the key...
-        let k = key.name().unwrap_or("???").to_owned();
+        let k = key.name().to_owned();
         let v = fmt::format(value);
         self.kvs.push((k, v));
     }
@@ -96,13 +96,13 @@ impl Event {
     }
 
     fn record(&mut self, key: &tokio_trace::field::Field, value: fmt::Arguments) {
-        if key.name() == Some("message") {
+        if key.name() == "message" {
             self.message = fmt::format(value);
             return;
         }
 
         // TODO: shouldn't have to alloc the key...
-        let k = key.name().unwrap_or("???").to_owned();
+        let k = key.name().to_owned();
         let v = fmt::format(value);
         self.kvs.push((k, v));
     }

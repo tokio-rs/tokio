@@ -27,16 +27,15 @@ impl Subscriber for CounterSubscriber {
     fn register_callsite(&self, meta: &tokio_trace::Metadata) -> subscriber::Interest {
         let mut interest = subscriber::Interest::never();
         for key in meta.fields() {
-            if let Some(name) = key.name() {
-                if name.contains("count") {
-                    self.counters
-                        .0
-                        .write()
-                        .unwrap()
-                        .entry(name.to_owned())
-                        .or_insert_with(|| AtomicUsize::new(0));
-                    interest = subscriber::Interest::always();
-                }
+            let name = key.name();
+            if name.contains("count") {
+                self.counters
+                    .0
+                    .write()
+                    .unwrap()
+                    .entry(name.to_owned())
+                    .or_insert_with(|| AtomicUsize::new(0));
+                interest = subscriber::Interest::always();
             }
         }
         interest
@@ -53,7 +52,7 @@ impl Subscriber for CounterSubscriber {
 
     fn record_i64(&self, _id: &Id, field: &field::Field, value: i64) {
         let registry = self.counters.0.read().unwrap();
-        if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
+        if let Some(counter) = registry.get(field.name()) {
             if value > 0 {
                 counter.fetch_add(value as usize, Ordering::Release);
             } else {
@@ -64,7 +63,7 @@ impl Subscriber for CounterSubscriber {
 
     fn record_u64(&self, _id: &Id, field: &field::Field, value: u64) {
         let registry = self.counters.0.read().unwrap();
-        if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
+        if let Some(counter) = registry.get(field.name()) {
             counter.fetch_add(value as usize, Ordering::Release);
         };
     }
@@ -75,7 +74,7 @@ impl Subscriber for CounterSubscriber {
         metadata
             .fields()
             .iter()
-            .any(|f| f.name().map(|name| name.contains("count")).unwrap_or(false))
+            .any(|f| f.name().contains("count"))
     }
 
     fn enter(&self, _span: &Id) {}
