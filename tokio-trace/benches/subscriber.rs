@@ -49,7 +49,7 @@ impl tokio_trace::Subscriber for Record {
     }
 
     fn record_debug(&self, _span: &Id, _field: &field::Field, value: &::std::fmt::Debug) {
-       *self.0.lock().unwrap() = Some(format!("{:?}", value));
+        *self.0.lock().unwrap() = Some(format!("{:?}", value));
     }
 
     fn add_follows_from(&self, span: &Id, follows: Id) {
@@ -74,9 +74,7 @@ const N_SPANS: usize = 100;
 
 #[bench]
 fn span_no_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        b.iter(|| span!("span"))
-    });
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || b.iter(|| span!("span")));
 }
 
 #[bench]

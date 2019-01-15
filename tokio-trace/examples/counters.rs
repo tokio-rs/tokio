@@ -71,10 +71,7 @@ impl Subscriber for CounterSubscriber {
     fn record_debug(&self, _id: &Id, _field: &field::Field, _value: &::std::fmt::Debug) {}
 
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata
-            .fields()
-            .iter()
-            .any(|f| f.name().contains("count"))
+        metadata.fields().iter().any(|f| f.name().contains("count"))
     }
 
     fn enter(&self, _span: &Id) {}

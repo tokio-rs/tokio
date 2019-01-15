@@ -13,11 +13,7 @@
 extern crate ansi_term;
 extern crate humantime;
 use self::ansi_term::{Color, Style};
-use super::tokio_trace::{
-    self,
-    Subscriber,
-    Id, Level,
-};
+use super::tokio_trace::{self, Id, Level, Subscriber};
 
 use std::{
     cell::RefCell,

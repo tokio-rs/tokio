@@ -86,7 +86,6 @@ fn warn() {
     warn!(target: "foo_events", { foo = 3, bar = 80 }, "baz");
     warn!(target: "foo_events", { foo = 2, bar = 79 }, "baz {:?}", true);
     warn!(target: "foo_events", { foo = 2, bar = 79 }, "baz {:?}, {quux}", true, quux = false);
-
 }
 
 #[test]

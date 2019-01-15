@@ -32,7 +32,7 @@ fn bench_costly_field_no_subscriber(b: &mut Bencher) {
 
 #[bench]
 fn bench_no_span_no_subscriber(b: &mut Bencher) {
-    b.iter(|| { });
+    b.iter(|| {});
 }
 
 #[bench]

@@ -260,18 +260,16 @@ pub use self::{
     field::Value,
     span::{Event, Span},
     subscriber::Subscriber,
-    tokio_trace_core::{
-        dispatcher, Level, Metadata,
-    },
+    tokio_trace_core::{dispatcher, Level, Metadata},
 };
 
 #[doc(hidden)]
 pub use self::{
+    span::Id,
     tokio_trace_core::{
         callsite::{self, Callsite},
         metadata,
     },
-    span::Id,
 };
 
 /// Constructs a new static callsite for a span or event.
