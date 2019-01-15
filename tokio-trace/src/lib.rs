@@ -336,7 +336,7 @@ macro_rules! callsite {
                 };
                 INTEREST.store(interest, Ordering::Relaxed);
             }
-            fn remove_interest(&self) {
+            fn clear_interest(&self) {
                 INTEREST.store(0, Ordering::Relaxed);
             }
             fn metadata(&self) -> &Metadata {

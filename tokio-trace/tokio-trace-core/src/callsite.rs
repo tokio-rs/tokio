@@ -40,7 +40,7 @@ pub trait Callsite: Sync {
     /// Remove _all_ [`Interest`] from the callsite, disabling it.
     ///
     /// [`Interest`]: ::subscriber::Interest
-    fn remove_interest(&self);
+    fn clear_interest(&self);
 
     /// Returns the [metadata] associated with the callsite.
     ///
