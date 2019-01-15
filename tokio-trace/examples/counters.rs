@@ -25,7 +25,7 @@ struct CounterSubscriber {
 
 impl Subscriber for CounterSubscriber {
     fn register_callsite(&self, meta: &tokio_trace::Metadata) -> subscriber::Interest {
-        let mut interest = subscriber::Interest::NEVER;
+        let mut interest = subscriber::Interest::never();
         for key in meta.fields() {
             if let Some(name) = key.name() {
                 if name.contains("count") {
@@ -35,7 +35,7 @@ impl Subscriber for CounterSubscriber {
                         .unwrap()
                         .entry(name.to_owned())
                         .or_insert_with(|| AtomicUsize::new(0));
-                    interest = subscriber::Interest::ALWAYS;
+                    interest = subscriber::Interest::always();
                 }
             }
         }

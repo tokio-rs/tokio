@@ -310,9 +310,9 @@ macro_rules! callsite {
             #[inline]
             fn interest(&self) -> Interest {
                 match INTEREST.load(Ordering::Relaxed) {
-                    0 => Interest::NEVER,
-                    2 => Interest::ALWAYS,
-                    _ => Interest::SOMETIMES,
+                    0 => Interest::never(),
+                    2 => Interest::always(),
+                    _ => Interest::sometimes(),
                 }
             }
         }
@@ -320,16 +320,16 @@ macro_rules! callsite {
             fn add_interest(&self, interest: Interest) {
                 let current_interest = self.interest();
                 let interest = match () {
-                    // If the added interest is `NEVER`, don't change anything
+                    // If the added interest is `never()`, don't change anything
                     // --- either a different subscriber added a higher
                     // interest, which we want to preserve, or the interest is 0
                     // anyway (as it's initialized to 0).
                     _ if interest.is_never() => return,
-                    // If the interest is `SOMETIMES`, that overwrites a `NEVER`
-                    // interest, but doesn't downgrade an `ALWAYS` interest.
+                    // If the interest is `sometimes()`, that overwrites a `never()`
+                    // interest, but doesn't downgrade an `always()` interest.
                     _ if interest.is_sometimes() && current_interest.is_never() => 1,
-                    // If the interest is `ALWAYS`, we overwrite the current
-                    // interest, as ALWAYS is the highest interest level and
+                    // If the interest is `always()`, we overwrite the current
+                    // interest, as always() is the highest interest level and
                     // should take precedent.
                     _ if interest.is_always() => 2,
                     _ => return,

@@ -92,8 +92,8 @@ pub trait Subscriber {
     /// [metadata]: ::Metadata [`enabled`]: ::Subscriber::enabled
     fn register_callsite(&self, metadata: &Metadata) -> Interest {
         match self.enabled(metadata) {
-            true => Interest::ALWAYS,
-            false => Interest::NEVER,
+            true => Interest::always(),
+            false => Interest::never(),
         }
     }
 
@@ -298,29 +298,37 @@ enum InterestKind {
 }
 
 impl Interest {
-    /// Indicates that the subscriber is never interested in being notified
-    /// about a callsite.
+    /// Returns an `Interest` indicating that the subscriber is never interested
+    /// in being notified about a callsite.
     ///
-    /// If all active subscribers are `NEVER` interested in a callsite, it will
+    /// If all active subscribers are `never()` interested in a callsite, it will
     /// be completely disabled unless a new subscriber becomes active.
-    pub const NEVER: Interest = Interest(InterestKind::Never);
+    #[inline]
+    pub fn never() -> Self {
+        Interest(InterestKind::Never)
+    }
 
-    /// Indicates that the subscriber is sometimes interested in being
-    /// notified about a callsite.
+    /// Returns an `Interest` indicating  the subscriber is sometimes interested
+    /// in being notified about a callsite.
     ///
     /// If all active subscribers are `sometimes` or `never` interested in a
     /// callsite, the currently active subscriber will be asked to filter that
-    /// callsite every time it creates a span. This will be the case
-    /// until a subscriber expresses that it is `always` interested in the
-    /// callsite.
-    pub const SOMETIMES: Interest = Interest(InterestKind::Sometimes);
+    /// callsite every time it creates a span. This will be the case until a
+    /// subscriber expresses that it is `always` interested in the callsite.
+    #[inline]
+    pub fn sometimes() -> Self {
+        Interest(InterestKind::Sometimes)
+    }
 
-    /// Indicates that the subscriber is always interested in being
-    /// notified about a callsite.
+    /// Returns an `Interest` indicating  the subscriber is always interested in
+    /// being notified about a callsite.
     ///
-    /// If any subscriber expresses that it is `ALWAYS` interested in a given
+    /// If any subscriber expresses that it is `always()` interested in a given
     /// callsite, then the callsite will always be enabled.
-    pub const ALWAYS: Interest = Interest(InterestKind::Always);
+    #[inline]
+    pub fn always() -> Self {
+        Interest(InterestKind::Always)
+    }
 
     /// Returns `true` if the subscriber is never interested in being notified
     /// about this callsite.

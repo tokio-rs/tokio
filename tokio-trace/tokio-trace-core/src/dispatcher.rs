@@ -121,7 +121,7 @@ struct NoSubscriber;
 impl Subscriber for NoSubscriber {
     #[inline]
     fn register_callsite(&self, _: &Metadata) -> subscriber::Interest {
-        subscriber::Interest::NEVER
+        subscriber::Interest::never()
     }
 
     fn new_span(&self, _meta: &Metadata) -> Span {
