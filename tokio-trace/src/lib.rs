@@ -44,10 +44,47 @@
 //! span; an optional name, and metadata describing the source code location
 //! where the span was originally entered.
 //!
+//! ### When to use spans
+//!
 //! As a rule of thumb, spans should be used to represent discrete units of work
 //! (e.g., a given request's lifetime in a server) or periods of time spent in a
 //! given context (e.g., time spent interacting with an instance of an external
 //! system, such as a database).
+//!
+//! Which scopes in a program correspond to new spans depend somewhat on user
+//! intent. For example, consider the case of a loop in a program. Should we
+//! construct one span and perform the entire loop inside of that span, like:
+//! ```rust
+//! # #[macro_use] extern crate tokio_trace;
+//! # fn main() {
+//! # let n = 1;
+//! span!("my loop").enter(|| {
+//!     for i in 0..n {
+//!         # let _ = i;
+//!         // ...
+//!     }
+//! })
+//! # }
+//! ```
+//! Or, should we create a new span for each iteration of the loop, as in:
+//! ```rust
+//! # #[macro_use] extern crate tokio_trace;
+//! # fn main() {
+//! # let n = 1u64;
+//! for i in 0..n {
+//!     # let _ = i;
+//!     span!("my loop", iteration = i).enter(|| {
+//!         // ...
+//!     })
+//! }
+//! # }
+//! ```
+//!
+//! Depending on the circumstances, we might want to do either, or both. For
+//! example, if we want to know how long was spent in the loop overall, we would
+//! create a single span around the entire loop; whereas if we wanted to know how
+//! much time was spent in each individual iteration, we would enter a new span
+//! on every iteration.
 //!
 //! ## Events
 //!
@@ -73,8 +110,8 @@
 //! entered.
 //!
 //! In general, events should be used to represent points in time _within_ a
-//! span — a request returned with a given status code, _n_ new items were taken
-//! from a queue, and so on.
+//! span — a request returned with a given status code, _n_ new items were
+//! taken from a queue, and so on.
 //!
 //! ## `Subscriber`s
 //!
@@ -140,11 +177,11 @@
 //! # }
 //! ```
 //!
-//! Users of the [`log`] crate should note that `tokio-trace` exposes a set of macros for
-//! creating `Event`s (`trace!`, `debug!`, `info!`, `warn!`, and `error!`) which may
-//! be invoked with the same syntax as the similarly-named macros from the `log`
-//! crate. Often, the process of converting a project to use `tokio-trace` can begin
-//! with a simple drop-in replacement.
+//! Users of the [`log`] crate should note that `tokio-trace` exposes a set of
+//! macros for creating `Event`s (`trace!`, `debug!`, `info!`, `warn!`, and
+//! `error!`) which may be invoked with the same syntax as the similarly-named
+//! macros from the `log` crate. Often, the process of converting a project to
+//! use `tokio-trace` can begin with a simple drop-in replacement.
 //!
 //! Let's consider the `log` crate's yak-shaving example:
 //!
@@ -187,22 +224,24 @@
 //! # }
 //! ```
 //!
-//! You can find examples showing how to use this crate in the examples directory.
+//! You can find examples showing how to use this crate in the examples
+//! directory.
 //!
 //! ### In libraries
 //!
 //! Libraries should link only to the `tokio-trace` crate, and use the provided
-//! macros to record whatever information will be useful to downstream consumers.
+//! macros to record whatever information will be useful to downstream
+//! consumers.
 //!
 //! ### In executables
 //!
 //! In order to record trace events, executables have to use a `Subscriber`
-//! implementation compatible with `tokio-trace`. A `Subscriber` implements a way of
-//! collecting trace data, such as by logging it to standard output.
+//! implementation compatible with `tokio-trace`. A `Subscriber` implements a
+//! way of collecting trace data, such as by logging it to standard output.
 //!
-//! Unlike the `log` crate, `tokio-trace` does *not* use a global `Subscriber` which
-//! is initialized once. Instead, it follows the `tokio` pattern of executing code
-//! in a context. For example:
+//! Unlike the `log` crate, `tokio-trace` does *not* use a global `Subscriber`
+//! which is initialized once. Instead, it follows the `tokio` pattern of
+//! executing code in a context. For example:
 //!
 //! ```rust
 //! #[macro_use]
@@ -230,13 +269,18 @@
 //! # }
 //! ```
 //!
-//! This approach allows trace data to be collected by multiple subscribers within
-//! different contexts in the program. Alternatively, a single subscriber may be
-//! constructed by the `main` function and all subsequent code executed with that
-//! subscriber as the default. Any trace events generated outside the context of a
-//! subscriber will not be collected.
+//! This approach allows trace data to be collected by multiple subscribers
+//! within different contexts in the program. Alternatively, a single subscriber
+//! may be constructed by the `main` function and all subsequent code executed
+//! with that subscriber as the default. Any trace events generated outside the
+//! context of a subscriber will not be collected.
 //!
-//! The executable itself may use the `tokio-trace` crate to instrument itself as well.
+//! The executable itself may use the `tokio-trace` crate to instrument itself
+//! as well.
+//!
+//! The [`tokio-trace-nursery`] repository contains less stable crates designed
+//! to be used with the `tokio-trace` ecosystem. It includes a collection of
+//! `Subscriber` implementations, as well as utility and adapter crates.
 //!
 //! [`log`]: https://docs.rs/log/0.4.6/log/
 //! [`Span`]: span/struct.Span
@@ -247,6 +291,7 @@
 //! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
 //! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
 //! [metadata]: struct.Metadata.html
+//! [`tokio-trace-nursury`]: https://github.com/tokio-rs/tokio-trace-nursery
 extern crate tokio_trace_core;
 
 // Somehow this `use` statement is necessary for us to re-export the `core`

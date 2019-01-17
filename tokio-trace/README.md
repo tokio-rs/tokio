@@ -148,7 +148,12 @@ constructed by the `main` function and all subsequent code executed with that
 subscriber as the default. Any trace events generated outside the context of a
 subscriber will not be collected.
 
-The executable itself may use the `tokio-trace` crate to instrument itself as well.
+The executable itself may use the `tokio-trace` crate to instrument itself as
+well.
+
+The [`tokio-trace-nursery`] repository contains less stable crates designed to
+be used with the `tokio-trace` ecosystem. It includes a collection of
+`Subscriber` implementations, as well as utility and adapter crates.
 
 [`log`]: https://docs.rs/log/0.4.6/log/
 
