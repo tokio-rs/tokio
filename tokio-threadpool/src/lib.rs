@@ -79,6 +79,7 @@
 
 extern crate tokio_executor;
 
+extern crate crossbeam;
 extern crate crossbeam_channel;
 extern crate crossbeam_deque as deque;
 extern crate crossbeam_utils;
@@ -86,6 +87,7 @@ extern crate crossbeam_utils;
 extern crate futures;
 extern crate num_cpus;
 extern crate rand;
+extern crate slab;
 
 #[macro_use]
 extern crate log;

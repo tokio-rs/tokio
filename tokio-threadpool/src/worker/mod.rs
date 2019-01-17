@@ -451,6 +451,13 @@ impl Worker {
     fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>) {
         use task::Run::*;
 
+        // If this is the first time this task is being polled, register it so that we can keep
+        // track of tasks that are in progress.
+        if task.reg_worker.get().is_none() {
+            task.reg_worker.set(Some(self.id.0 as u32));
+            self.entry().register_task(&task);
+        }
+
         let run = self.run_task2(&task, notify);
 
         // TODO: Try to claim back the worker state in case the backup thread
@@ -495,6 +502,16 @@ impl Worker {
                             if next.is_terminated() {
                                 self.pool.terminate_sleeping_workers();
                             }
+                        }
+
+                        // Find which worker polled this task first.
+                        let worker = task.reg_worker.get().unwrap() as usize;
+
+                        // Unregister the task from the worker it was registered in.
+                        if !self.is_blocking.get() && worker == self.id.0 {
+                            self.entry().unregister_task(task);
+                        } else {
+                            self.pool.workers[worker].remotely_complete_task(task);
                         }
 
                         // The worker's run loop will detect the shutdown state
@@ -672,11 +689,7 @@ impl Worker {
                 }
             }
 
-            unsafe {
-                (*self.entry().park.get())
-                    .park()
-                    .unwrap();
-            }
+            self.entry().park();
 
             trace!("    -> wakeup; idx={}", self.id.0);
         }
@@ -690,11 +703,7 @@ impl Worker {
     fn sleep_light(&self) {
         const STEAL_COUNT: usize = 32;
 
-        unsafe {
-            (*self.entry().park.get())
-                .park_timeout(Duration::from_millis(0))
-                .unwrap();
-        }
+        self.entry().park_timeout(Duration::from_millis(0));
 
         for _ in 0..STEAL_COUNT {
             if let Some(task) = self.pool.queue.pop() {

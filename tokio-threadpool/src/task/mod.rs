@@ -15,10 +15,10 @@ use futures::{self, Future, Async};
 use futures::executor::{self, Spawn};
 
 use std::{fmt, panic, ptr};
-use std::cell::{UnsafeCell};
+use std::cell::{Cell, UnsafeCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, AtomicPtr};
-use std::sync::atomic::Ordering::{AcqRel, Release, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
 
 /// Harness around a future.
 ///
@@ -33,6 +33,21 @@ pub(crate) struct Task {
 
     /// Next pointer in the queue of tasks pending blocking capacity.
     next_blocking: AtomicPtr<Task>,
+
+    /// ID of the worker that polled this task first.
+    ///
+    /// This field can be a `Cell` because it's only accessed by the worker thread that is
+    /// executing the task.
+    ///
+    /// The worker ID is represented by a `u32` rather than `usize` in order to save some space
+    /// on 64-bit platforms.
+    pub reg_worker: Cell<Option<u32>>,
+
+    /// The key associated with this task in the `Slab` it was registered in.
+    ///
+    /// This field can be a `Cell` because it's only accessed by the worker thread that has
+    /// registered the task.
+    pub reg_index: Cell<usize>,
 
     /// Store the future at the head of the struct
     ///
@@ -61,6 +76,8 @@ impl Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -75,6 +92,8 @@ impl Task {
             state: AtomicUsize::new(State::stub().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -166,6 +185,41 @@ impl Task {
         }
     }
 
+    /// Aborts this task.
+    ///
+    /// This is called when the threadpool shuts down and the task has already beed polled but not
+    /// completed.
+    pub fn abort(&self) {
+        use self::State::*;
+
+        let mut state = self.state.load(Acquire).into();
+
+        loop {
+            match state {
+                Idle | Scheduled => {}
+                Running | Notified | Complete | Aborted => {
+                    // It is assumed that no worker threads are running so the task must be either
+                    // in the idle or scheduled state.
+                    panic!("unexpected state while aborting task: {:?}", state);
+                }
+            }
+
+            let actual = self.state.compare_and_swap(
+                state.into(),
+                Aborted.into(),
+                AcqRel).into();
+
+            if actual == state {
+                // The future has been aborted. Drop it immediately to free resources and run drop
+                // handlers.
+                self.drop_future();
+                break;
+            }
+
+            state = actual;
+        }
+    }
+
     /// Notify the task
     pub fn notify(me: Arc<Task>, pool: &Arc<Pool>) {
         if me.schedule() {
@@ -206,7 +260,7 @@ impl Task {
                         _ => return false,
                     }
                 }
-                Complete | Notified | Scheduled => return false,
+                Complete | Aborted | Notified | Scheduled => return false,
             }
         }
     }

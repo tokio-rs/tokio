@@ -20,11 +20,13 @@ categories = ["concurrency", "asynchronous"]
 [dependencies]
 tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
 futures = "0.1.19"
+crossbeam = "0.6.0"
 crossbeam-channel = "0.3.3"
 crossbeam-deque = "0.6.1"
 crossbeam-utils = "0.6.2"
 num_cpus = "1.2"
 rand = "0.6"
+slab = "0.4.1"
 log = "0.4"
 
 [dev-dependencies]

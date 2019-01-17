@@ -86,6 +86,11 @@ impl Drop for ShutdownTrigger {
         // Drain the global task queue.
         while self.queue.pop().is_some() {}
 
+        // Drop the remaining incomplete tasks and parkers assosicated with workers.
+        for worker in self.workers.iter() {
+            worker.shutdown();
+        }
+
         // Notify the task interested in shutdown.
         let mut inner = self.inner.lock().unwrap();
         inner.completed = true;
