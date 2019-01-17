@@ -44,9 +44,10 @@ pub(crate) struct WorkerEntry {
     running_tasks: UnsafeCell<Slab<Arc<Task>>>,
 
     // Tasks that have been first polled by this worker, but completed by another worker.
-    completed_tasks: SegQueue<Arc<Task>>,
+    remotely_completed_tasks: SegQueue<Arc<Task>>,
 
-    // Set to `true` when `completed_tasks` has tasks that need to be removed from `running_tasks`.
+    // Set to `true` when `remotely_completed_tasks` has tasks that need to be removed from
+    // `running_tasks`.
     needs_drain: AtomicBool,
 }
 
@@ -62,7 +63,7 @@ impl WorkerEntry {
             park: UnsafeCell::new(Some(park)),
             unpark: UnsafeCell::new(Some(unpark)),
             running_tasks: UnsafeCell::new(Slab::new()),
-            completed_tasks: SegQueue::new(),
+            remotely_completed_tasks: SegQueue::new(),
             needs_drain: AtomicBool::new(false),
         }
     }
@@ -257,7 +258,7 @@ impl WorkerEntry {
     pub fn unregister_task(&self, task: Arc<Task>) {
         let running_tasks = unsafe { &mut *self.running_tasks.get() };
         running_tasks.remove(task.reg_index.get());
-        self.drain_completed_tasks();
+        self.drain_remotely_completed_tasks();
     }
 
     /// Unregisters a task from this worker.
@@ -265,8 +266,8 @@ impl WorkerEntry {
     /// Called when the task is completed by another worker and was previously registered in this
     /// worker.
     #[inline]
-    pub fn completed_task(&self, task: Arc<Task>) {
-        self.completed_tasks.push(task);
+    pub fn remotely_complete_task(&self, task: Arc<Task>) {
+        self.remotely_completed_tasks.push(task);
         self.needs_drain.store(true, Release);
     }
 
@@ -274,7 +275,7 @@ impl WorkerEntry {
     ///
     /// This function is called by the shutdown trigger.
     pub fn shutdown(&self) {
-        self.drain_completed_tasks();
+        self.drain_remotely_completed_tasks();
 
         // Abort all incomplete tasks.
         let running_tasks = unsafe { &mut *self.running_tasks.get() };
@@ -290,13 +291,13 @@ impl WorkerEntry {
         }
     }
 
-    /// Drains the `completed_tasks` queue and removes tasks from `running_tasks`.
+    /// Drains the `remotely_completed_tasks` queue and removes tasks from `running_tasks`.
     #[inline]
-    fn drain_completed_tasks(&self) {
+    fn drain_remotely_completed_tasks(&self) {
         if self.needs_drain.compare_and_swap(true, false, Acquire) {
             let running_tasks = unsafe { &mut *self.running_tasks.get() };
 
-            while let Some(task) = self.completed_tasks.try_pop() {
+            while let Some(task) = self.remotely_completed_tasks.try_pop() {
                 running_tasks.remove(task.reg_index.get());
             }
         }

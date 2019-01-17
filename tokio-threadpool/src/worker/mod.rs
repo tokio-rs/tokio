@@ -511,7 +511,7 @@ impl Worker {
                         if !self.is_blocking.get() && worker == self.id.0 {
                             self.entry().unregister_task(task);
                         } else {
-                            self.pool.workers[worker].completed_task(task);
+                            self.pool.workers[worker].remotely_complete_task(task);
                         }
 
                         // The worker's run loop will detect the shutdown state
