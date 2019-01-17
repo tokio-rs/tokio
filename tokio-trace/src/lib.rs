@@ -64,7 +64,7 @@
 //! unstructured logging and span-based tracing. Similar to log records, they
 //! may be recorded at a number of levels, and can have unstructured,
 //! human-readable messages; however, they also carry key-value data and exist
-//! within the context of the tree of spans that comprise a trase. Thus,
+//! within the context of the tree of spans that comprise a trace. Thus,
 //! individual log record-like events can be pinpointed not only in time, but
 //! in the logical execution flow of the system.
 //!
