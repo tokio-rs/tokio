@@ -7,9 +7,7 @@ use std::thread;
 use tokio_trace::{dispatcher, Dispatch, Level, Span};
 
 #[test]
-fn closed_handle_dropped_when_used() {
-    // Test that exiting a span only marks it as "done" when no handles
-    // that can re-enter the span exist.
+fn closed_handle_cannot_be_entered() {
     let subscriber = subscriber::mock()
         .enter(span::mock().named("foo"))
         .drop_span(span::mock().named("bar"))
@@ -25,9 +23,10 @@ fn closed_handle_dropped_when_used() {
             let mut another_bar = bar.clone();
             drop(bar);
 
-            another_bar.close();
             another_bar.enter(|| {});
-            // After we exit `another_bar`, it should close and not be
+
+            another_bar.close();
+            // After we close `another_bar`, it should close and not be
             // re-entered.
             another_bar.enter(|| {});
         });
@@ -265,8 +264,6 @@ fn span_closes_when_exited() {
     let (subscriber, handle) = subscriber::mock()
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
-        .enter(span::mock().named("foo"))
-        .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
@@ -291,23 +288,15 @@ fn span_closes_when_exited() {
 #[test]
 fn entering_a_closed_span_again_is_a_no_op() {
     let (subscriber, handle) = subscriber::mock()
-        .enter(span::mock().named("foo"))
-        .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
     dispatcher::with_default(Dispatch::new(subscriber), || {
         let mut foo = span!("foo");
+
         foo.close();
-
         foo.enter(|| {
-            // When we exit `foo` this time, it will close, and entering it
-            // again will do nothing.
-        });
-
-        foo.enter(|| {
-            // The subscriber expects nothing else to happen after the first
-            // exit.
+            // This should do nothing.
         });
         assert!(foo.is_closed());
     });

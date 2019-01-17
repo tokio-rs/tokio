@@ -336,7 +336,7 @@ impl<'a> Span<'a> {
     /// the potential to enter that span, the subscriber may consider the span to
     /// have ended.
     pub fn close(&mut self) {
-        if let Some(ref mut inner) = self.inner {
+        if let Some(mut inner) = self.inner.take() {
             inner.close();
         }
         self.is_closed = true;
