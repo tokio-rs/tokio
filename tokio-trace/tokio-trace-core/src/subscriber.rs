@@ -329,6 +329,7 @@ impl Interest {
 
     /// Returns `true` if the subscriber is never interested in being notified
     /// about this callsite.
+    #[inline]
     pub fn is_never(&self) -> bool {
         match self.0 {
             InterestKind::Never => true,
@@ -338,6 +339,7 @@ impl Interest {
 
     /// Returns `true` if the subscriber is sometimes interested in being notified
     /// about this callsite.
+    #[inline]
     pub fn is_sometimes(&self) -> bool {
         match self.0 {
             InterestKind::Sometimes => true,
@@ -347,6 +349,7 @@ impl Interest {
 
     /// Returns `true` if the subscriber is always interested in being notified
     /// about this callsite.
+    #[inline]
     pub fn is_always(&self) -> bool {
         match self.0 {
             InterestKind::Always => true,
