@@ -415,16 +415,24 @@ impl<'a> Event<'a> {
     #[inline]
     pub fn new(interest: Interest, meta: &'a Metadata<'a>) -> Self {
         if interest.is_never() {
-            return Self { inner: None };
+            return Self::new_disabled();
         }
         dispatcher::with(|dispatch| {
             if interest.is_sometimes() && !dispatch.enabled(meta) {
-                return Self { inner: None };
+                return Self::new_disabled();
             }
             let id = dispatch.new_span(meta);
             let inner = Enter::new(id, dispatch, meta);
             Self { inner: Some(inner) }
         })
+    }
+
+    /// Returns a new disabled `Event`.
+    #[inline]
+    pub fn new_disabled() -> Self {
+        Self {
+            inner: None,
+        }
     }
 
     /// Adds a formattable message describing the event that occurred.
