@@ -322,7 +322,9 @@ impl<'a> Span<'a> {
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
-            value.record(field, inner);
+            if let Some(field) = field.as_field(inner.metadata()) {
+                value.record(&field, inner);
+            }
         }
         self
     }
@@ -472,7 +474,9 @@ impl<'a> Event<'a> {
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
-            value.record(field, inner);
+            if let Some(field) = field.as_field(inner.metadata()) {
+                value.record(&field, inner);
+            }
         }
         self
     }
@@ -630,57 +634,30 @@ impl<'a> Clone for Enter<'a> {
     }
 }
 
-impl<'a> ::sealed::Sealed for Enter<'a> {}
-
 impl<'a> field::Record for Enter<'a> {
     #[inline]
-    fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_i64(&key, value);
-        }
+    fn record_i64(&mut self, field: &field::Field, value: i64) {
+        self.record_value_i64(field, value);
     }
 
     #[inline]
-    fn record_u64<Q: ?Sized>(&mut self, field: &Q, value: u64)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_u64(&key, value);
-        }
+    fn record_u64(&mut self, field: &field::Field, value: u64) {
+        self.record_value_u64(field, value);
     }
 
     #[inline]
-    fn record_bool<Q: ?Sized>(&mut self, field: &Q, value: bool)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_bool(&key, value);
-        }
+    fn record_bool(&mut self, field: &field::Field, value: bool) {
+        self.record_value_bool(field, value);
     }
 
     #[inline]
-    fn record_str<Q: ?Sized>(&mut self, field: &Q, value: &str)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_str(&key, value);
-        }
+    fn record_str(&mut self, field: &field::Field, value: &str) {
+        self.record_value_str(field, value);
     }
 
     #[inline]
-    fn record_debug<Q: ?Sized>(&mut self, field: &Q, value: &fmt::Debug)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_debug(&key, value);
-        }
+    fn record_debug(&mut self, field: &field::Field, value: &fmt::Debug) {
+        self.record_value_debug(field, value);
     }
 }
 

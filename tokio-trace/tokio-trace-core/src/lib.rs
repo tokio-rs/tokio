@@ -169,3 +169,7 @@ pub use self::{
     span::Span,
     subscriber::{Interest, Subscriber},
 };
+
+mod sealed {
+    pub trait Sealed {}
+}

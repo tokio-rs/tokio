@@ -177,6 +177,43 @@ pub trait Subscriber {
     /// do nothing.
     fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug);
 
+    /// Record all the fields of a span.
+    fn record_batch(&self, span: &Span, batch: field::Batch)
+    where Self: Sized {
+        struct RecordSpan<'a> {
+            subscriber: &'a dyn Subscriber,
+            span: &'a Span,
+        }
+        impl<'a> field::Record for RecordSpan<'a> {
+            #[inline] fn record_i64(&mut self, field: &field::Field, value: i64) {
+                self.subscriber.record_i64(self.span, field, value)
+            }
+
+            #[inline] fn record_u64(&mut self, field: &field::Field, value: u64) {
+                self.subscriber.record_u64(self.span, field, value)
+            }
+
+            #[inline] fn record_bool(&mut self, field: &field::Field, value: bool) {
+                self.subscriber.record_bool(self.span, field, value)
+            }
+
+            #[inline] fn record_str(&mut self, field: &field::Field, value: &str) {
+                self.subscriber.record_str(self.span, field, value)
+            }
+
+            #[inline] fn record_debug(&mut self, field: &field::Field, value: &fmt::Debug) {
+                self.subscriber.record_debug(self.span, field, value)
+            }
+        }
+        let mut recorder = RecordSpan {
+            subscriber: self,
+            span,
+        };
+        for (field, value) in batch {
+            value.record(&field, &mut recorder);
+        }
+    }
+
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
     ///

@@ -71,11 +71,169 @@ pub struct FieldSet {
     pub callsite: callsite::Identifier,
 }
 
+/// A complete set of fields and values for a span.
+pub struct Batch<'a> {
+    fields: &'a FieldSet,
+    values: &'a [&'a dyn Value],
+    i: usize,
+}
+
 /// An iterator over a set of fields.
 #[derive(Debug)]
 pub struct Iter {
     idxs: Range<usize>,
     fields: FieldSet,
+}
+
+/// Records typed values.
+pub trait Record {
+    /// Record a signed 64-bit integer value.
+    fn record_i64(&mut self, field: &Field, value: i64);
+
+    /// Record an umsigned 64-bit integer value.
+    fn record_u64(&mut self, field: &Field, value: u64);
+
+    /// Record a boolean value.
+    fn record_bool(&mut self, field: &Field, value: bool);
+
+    /// Record a string value.
+    fn record_str(&mut self, field: &Field, value: &str);
+
+    /// Record a value implementing `fmt::Debug`.
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug);
+}
+
+/// A field value of an erased type.
+///
+/// Implementors of `Value` may call the appropriate typed recording methods on
+/// the `Subscriber` passed to `record` in order to indicate how their data
+/// should be recorded.
+pub trait Value: ::sealed::Sealed {
+    /// Records this value with the given `Recorder`.
+    fn record(&self, key: &Field, recorder: &mut Record);
+}
+
+/// A `Value` which serializes as a string using `fmt::Display`.
+#[derive(Debug, Clone)]
+pub struct DisplayValue<T: fmt::Display>(T);
+
+/// A `Value` which serializes as a string using `fmt::Debug`.
+#[derive(Debug, Clone)]
+pub struct DebugValue<T: fmt::Debug>(T);
+
+/// Wraps a type implementing `fmt::Display` as a `Value` that can be
+/// recorded using its `Display` implementation.
+pub fn display<T>(t: T) -> DisplayValue<T>
+where
+    T: fmt::Display,
+{
+    DisplayValue(t)
+}
+
+// ===== impl Value =====
+
+/// Wraps a type implementing `fmt::Debug` as a `Value` that can be
+/// recorded using its `Debug` implementation.
+pub fn debug<T>(t: T) -> DebugValue<T>
+where
+    T: fmt::Debug,
+{
+    DebugValue(t)
+}
+
+macro_rules! impl_values {
+    ( $( $record:ident( $( $whatever:tt)+ ) ),+ ) => {
+        $(
+            impl_value!{ $record( $( $whatever )+ ) }
+        )+
+    }
+}
+macro_rules! impl_value {
+    ( $record:ident( $( $value_ty:ty ),+ ) ) => {
+        $(
+            impl $crate::sealed::Sealed for $value_ty {}
+            impl $crate::field::Value for $value_ty {
+                fn record(
+                    &self,
+                    key: &$crate::field::Field,
+                    recorder: &mut $crate::field::Record,
+                ) {
+                    recorder.$record(key, *self)
+                }
+            }
+        )+
+    };
+    ( $record:ident( $( $value_ty:ty ),+ as $as_ty:ty) ) => {
+        $(
+            impl $crate::sealed::Sealed for $value_ty {}
+            impl Value for $value_ty {
+                fn record(
+                    &self,
+                    key: &$crate::field::Field,
+                    recorder: &mut $crate::field::Record,
+                ) {
+                    recorder.$record(key, *self as $as_ty)
+                }
+            }
+        )+
+    };
+}
+
+// ===== impl Value =====
+
+impl_values! {
+    record_u64(u64),
+    record_u64(usize, u32, u16 as u64),
+    record_i64(i64),
+    record_i64(isize, i32, i16, i8 as i64),
+    record_bool(bool)
+}
+
+impl ::sealed::Sealed for str {}
+
+impl Value for str {
+    fn record(&self, key: &Field, recorder: &mut Record) {
+        recorder.record_str(key, &self)
+    }
+}
+
+impl<'a, T: ?Sized> ::sealed::Sealed for &'a T
+where
+    T: Value + ::sealed::Sealed + 'a,
+{}
+
+impl<'a, T: ?Sized> Value for &'a T
+where
+    T: Value + 'a,
+{
+    fn record(&self, key: &Field, recorder: &mut Record) {
+        (*self).record(key, recorder)
+    }
+}
+
+// ===== impl DisplayValue =====
+
+impl<T: fmt::Display> ::sealed::Sealed for DisplayValue<T> {}
+
+impl<T> Value for DisplayValue<T>
+where
+    T: fmt::Display,
+{
+    fn record(&self, key: &Field, recorder: &mut Record) {
+        recorder.record_debug(key, &format_args!("{}", self.0))
+    }
+}
+
+// ===== impl DebugValue =====
+impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
+
+impl<T: fmt::Debug> Value for DebugValue<T>
+where
+    T: fmt::Debug,
+{
+    fn record(&self, key: &Field, recorder: &mut Record) {
+        recorder.record_debug(key, &self.0)
+    }
 }
 
 // ===== impl Field =====
@@ -181,6 +339,14 @@ impl FieldSet {
             },
         }
     }
+
+    // this is because i'm not ready to commit to a public clone impl for `FieldSet`
+    fn duplicate(&self) -> Self {
+        FieldSet {
+            names: self.names,
+            callsite: callsite::Identifier(self.callsite.0),
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a FieldSet {
@@ -214,5 +380,44 @@ impl Iterator for Iter {
                 callsite: self.fields.callsite(),
             },
         })
+    }
+}
+
+// ===== impl Batch =====
+
+impl<'a> Batch<'a> {
+    /// If `val`s defines a value for _each_ field in `fields`, returns a new `Batch`.
+    pub fn new(fields: &'a FieldSet, values: &'a [&'a dyn Value]) -> Option<Self> {
+        if fields.names.len() != values.len() {
+            // Invalid batch!
+            return None;
+        }
+
+        Some(Batch {
+            fields, values,
+            i: 0,
+        })
+    }
+}
+
+impl<'a> Iterator for Batch<'a> {
+    type Item = (Field, &'a Value);
+    fn next(&mut self) -> Option<Self::Item> {
+        let field = Field {
+            i: self.i,
+            fields: self.fields.duplicate(),
+        };
+        let val = self.values.get(self.i)?;
+        self.i += 1;
+        Some((field, val))
+    }
+}
+
+impl<'a> fmt::Debug for Batch<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Batch")
+            .field("fields", &self.fields)
+            .field("values", &"[...]")
+            .finish()
     }
 }
