@@ -249,14 +249,11 @@ impl<'a> Span<'a> {
     #[inline]
     pub fn new(interest: Interest, meta: &'a Metadata<'a>) -> Span<'a> {
         if interest.is_never() {
-            return Span::new_disabled();
+            return Self::new_disabled();
         }
         dispatcher::with(|dispatch| {
             if interest.is_sometimes() && !dispatch.enabled(meta) {
-                return Span {
-                    inner: None,
-                    is_closed: false,
-                };
+                return Span::new_disabled();
             }
             let id = dispatch.new_span(meta);
             let inner = Some(Enter::new(id, dispatch, meta));
@@ -268,6 +265,7 @@ impl<'a> Span<'a> {
     }
 
     /// Constructs a new disabled span.
+    #[inline]
     pub fn new_disabled() -> Span<'a> {
         Span {
             inner: None,
@@ -349,6 +347,7 @@ impl<'a> Span<'a> {
 
     /// Returns `true` if this span was disabled by the subscriber and does not
     /// exist.
+    #[inline]
     pub fn is_disabled(&self) -> bool {
         self.inner.is_none() && !self.is_closed
     }
