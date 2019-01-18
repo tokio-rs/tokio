@@ -516,23 +516,28 @@ macro_rules! event {
                 target:
                 $target, $( $k ),*
             };
-            let mut event = Event::new(callsite.interest(), callsite.metadata());
-            // Depending on how many fields are generated, this may or may
-            // not actually be used, but it doesn't make sense to repeat it.
-            #[allow(unused_variables, unused_mut)] {
-                if !event.is_disabled() {
-                    let mut keys = callsite.metadata().fields().into_iter();
-                    let msg_key = keys.next()
-                        .expect("event metadata should define a key for the message");
-                    event.message(&msg_key, format_args!( $($arg)+ ));
-                    $(
-                        let key = keys.next()
-                            .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                        event!(@ record: event, $k, &key, $($val)*);
-                    )*
+            let interest = callsite.interest();
+            if interest.is_never() {
+                Event::new_disabled()
+            } else {
+                let mut event = Event::new(callsite.interest(), callsite.metadata());
+                // Depending on how many fields are generated, this may or may
+                // not actually be used, but it doesn't make sense to repeat it.
+                #[allow(unused_variables, unused_mut)] {
+                    if !event.is_disabled() {
+                        let mut keys = callsite.metadata().fields().into_iter();
+                        let msg_key = keys.next()
+                            .expect("event metadata should define a key for the message");
+                        event.message(&msg_key, format_args!( $($arg)+ ));
+                        $(
+                            let key = keys.next()
+                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
+                            event!(@ record: event, $k, &key, $($val)*);
+                        )*
+                    }
                 }
+                event
             }
-            event
         }
     });
     (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* } ) => ({
