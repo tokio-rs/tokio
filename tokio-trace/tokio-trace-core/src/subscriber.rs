@@ -178,13 +178,15 @@ pub trait Subscriber {
     fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug);
 
     /// Record all the fields of a span.
-    fn record_batch(&self, span: &Span, batch: field::Batch)
-    where Self: Sized {
-        struct RecordSpan<'a> {
-            subscriber: &'a dyn Subscriber,
+    fn record_batch(&self, span: &Span, batch: field::Batch) {
+        struct RecordSpan<'a, T: ?Sized + 'a> {
             span: &'a Span,
+            subscriber: &'a T
         }
-        impl<'a> field::Record for RecordSpan<'a> {
+        impl<'a, T: ?Sized> field::Record for RecordSpan<'a, T>
+        where
+             T: Subscriber + 'a,
+        {
             #[inline] fn record_i64(&mut self, field: &field::Field, value: i64) {
                 self.subscriber.record_i64(self.span, field, value)
             }
@@ -198,7 +200,7 @@ pub trait Subscriber {
             }
 
             #[inline] fn record_str(&mut self, field: &field::Field, value: &str) {
-                self.subscriber.record_str(self.span, field, value)
+               self.subscriber.record_str(self.span, field, value)
             }
 
             #[inline] fn record_debug(&mut self, field: &field::Field, value: &fmt::Debug) {
@@ -206,8 +208,7 @@ pub trait Subscriber {
             }
         }
         let mut recorder = RecordSpan {
-            subscriber: self,
-            span,
+            subscriber: self, span,
         };
         for (field, value) in batch {
             value.record(&field, &mut recorder);

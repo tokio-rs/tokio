@@ -155,6 +155,12 @@ impl Dispatch {
         self.subscriber.record_debug(span, field, value)
     }
 
+    /// Record all the fields of a span.
+    #[inline]
+    pub fn record_batch(&self, span: &Span, batch: field::Batch) {
+        self.subscriber.record_batch(span, batch)
+    }
+
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
     ///

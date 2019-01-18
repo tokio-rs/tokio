@@ -457,18 +457,30 @@ macro_rules! span {
                 // not actually be used, but it doesn't make sense to repeat it.
                 #[allow(unused_variables, unused_mut)] {
                     if !span.is_disabled() {
-                        let mut keys = callsite.metadata().fields().into_iter();
-                        $(
-                            let key = keys.next()
-                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                            span!(@ record: span, $k, &key, $($val)*);
-                        )*
+                        span!(@ record_maybe_batch:
+                            span, callsite.metadata().fields(),
+                            $($k = $($val)*),*
+                        );
                     };
                 }
                 span
             }
         }
     };
+    (@ record_maybe_batch: $span:expr, $fields:expr, $($k:ident = $val:expr ) ,+) => (
+        let vals: &[ &$crate::field::Value ] = &[ $( &$val ),+];
+        let batch = $crate::field::Batch::new($fields, &vals[..])
+            .expect("batch must be valid");
+        $span.record_all(batch);
+    );
+    (@ record_maybe_batch: $span:expr, $fields:expr, $($k:ident =  $( $val:expr)* ),*) => (
+        let mut keys = $fields.into_iter();
+        $(
+            let key = keys.next()
+                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
+            span!(@ record: $span, $k, &key, $($val)*);
+        )*
+    );
     (@ record: $span:expr, $k:expr, $i:expr, $val:expr) => (
         $span.record($i, &$val)
     );

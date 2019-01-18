@@ -329,6 +329,14 @@ impl<'a> Span<'a> {
         self
     }
 
+    /// Record all the fields in the span
+    pub fn record_all(&mut self, batch: field::Batch,) -> &mut Self {
+        if let Some(ref mut inner) = self.inner {
+            inner.record_batch(batch);
+        }
+        self
+    }
+
     /// Closes this span handle, dropping its internal state.
     ///
     /// Once this function has been called, subsequent calls to `enter` on this
@@ -593,6 +601,12 @@ impl<'a> Enter<'a> {
     /// Record a value implementing `fmt::Debug`.
     fn record_value_debug(&self, field: &field::Field, value: &fmt::Debug) {
         self.subscriber.record_debug(&self.id, field, value)
+    }
+
+    fn record_batch(&mut self, batch: field::Batch) {
+        if batch.callsite() == self.meta.callsite() {
+            self.subscriber.record_batch(&self.id, batch)
+        }
     }
 
     fn new(id: Id, subscriber: &Dispatch, meta: &'a Metadata<'a>) -> Self {

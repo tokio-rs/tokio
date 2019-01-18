@@ -398,6 +398,13 @@ impl<'a> Batch<'a> {
             i: 0,
         })
     }
+
+    /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
+    /// identifies the callsite that defines the fields this batch refers to.
+    #[inline]
+    pub fn callsite(&self) -> callsite::Identifier {
+        self.fields.callsite()
+    }
 }
 
 impl<'a> Iterator for Batch<'a> {
