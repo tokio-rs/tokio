@@ -49,11 +49,12 @@
 //! use bytes::Bytes;
 //! use futures::{Sink, Future};
 //!
-//! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
+//! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) -> Result<(), Box<std::error::Error>> {
 //!     let mut transport = Framed::new(io, LengthDelimitedCodec::new());
 //!     let frame = Bytes::from("hello world");
 //!
-//!     transport.send(frame).wait().unwrap();
+//!     transport.send(frame).wait()?;
+//!     Ok(())
 //! }
 //! #
 //! # pub fn main() {}
