@@ -29,9 +29,9 @@ pub struct Copy<R, W> {
 /// EOF and all bytes have been written to and flushed from the `writer`
 /// provided.
 ///
-/// On success the number of bytes is returned and the `reader` and `writer` are
-/// consumed. On error the error is returned and the I/O objects are consumed as
-/// well.
+/// On success returns a tuple containing the amount of bytes copied, along with
+/// the `reader` and `writer`. On error returns error and consumes `reader` and
+/// `writer`.
 pub fn copy<R, W>(reader: R, writer: W) -> Copy<R, W>
     where R: AsyncRead,
           W: AsyncWrite,
