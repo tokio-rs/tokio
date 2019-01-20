@@ -207,6 +207,64 @@ fn reset_entry() {
 }
 
 #[test]
+fn reset_much_later() {
+    // Reproduces tokio-rs/tokio#849.
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        turn(timer, ms(1));
+
+        let key = queue.insert_at("foo", epoch + ms(200));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        turn(timer, ms(3));
+
+        queue.reset_at(&key, epoch + ms(5));
+
+        turn(timer, ms(20));
+
+        assert!(task.is_notified());
+    });
+}
+
+#[test]
+fn reset_twice() {
+    // Reproduces tokio-rs/tokio#849.
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        turn(timer, ms(1));
+
+        let key = queue.insert_at("foo", epoch + ms(200));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        turn(timer, ms(3));
+
+        queue.reset_at(&key, epoch + ms(50));
+
+        turn(timer, ms(20));
+
+        queue.reset_at(&key, epoch + ms(40));
+
+        turn(timer, ms(20));
+
+        assert!(task.is_notified());
+    });
+}
+
+#[test]
 fn remove_expired_item() {
     mocked(|timer, time| {
         let mut queue = DelayQueue::new();

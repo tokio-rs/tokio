@@ -153,7 +153,7 @@ pub struct DelayQueue<T> {
 /// An entry in `DelayQueue` that has expired and removed.
 ///
 /// Values are returned by [`DelayQueue::poll`].
-/// 
+///
 /// [`DelayQueue::poll`]: struct.DelayQueue.html#method.poll
 #[derive(Debug)]
 pub struct Expired<T> {
@@ -496,15 +496,20 @@ impl<T> DelayQueue<T> {
 
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
-        let old = self.start + Duration::from_millis(self.slab[key.index].when);
 
+        // This is needed only for the debug assertion inside the if-let.
+        let old = self.start + Duration::from_millis(self.slab[key.index].when);
 
         self.slab[key.index].when = when;
 
         if let Some(ref mut delay) = self.delay {
             debug_assert!(old >= delay.deadline());
 
-            if old == delay.deadline() {
+            let start = self.start;
+            let next_poll = self.wheel.poll_at()
+                .map(move |t| start + Duration::from_millis(t));
+
+            if next_poll != Some(delay.deadline()) {
                 delay.reset(self.start + Duration::from_millis(when));
             }
         }
