@@ -29,7 +29,7 @@ pub struct Copy<R, W> {
 /// EOF and all bytes have been written to and flushed from the `writer`
 /// provided.
 ///
-/// On success returns a tuple containing the amount of bytes copied, along with
+/// On success returns a tuple containing the number of bytes copied, along with
 /// the `reader` and `writer`. On error returns error and consumes `reader` and
 /// `writer`.
 pub fn copy<R, W>(reader: R, writer: W) -> Copy<R, W>
