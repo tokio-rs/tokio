@@ -136,6 +136,13 @@ impl ::std::error::Error for UnboundedSendError {
 
 // ===== impl TrySendError =====
 
+impl<T> UnboundedTrySendError<T> {
+    /// Get the inner value.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
 impl<T: fmt::Debug> fmt::Display for UnboundedTrySendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         use std::error::Error;

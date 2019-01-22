@@ -214,6 +214,13 @@ impl ::std::error::Error for SendError {
 
 // ===== impl TrySendError =====
 
+impl<T> TrySendError<T> {
+    /// Get the inner value.
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+}
+
 impl<T: fmt::Debug> fmt::Display for TrySendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         use std::error::Error;
