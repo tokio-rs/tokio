@@ -26,7 +26,6 @@ members = [
   "./",
   "tokio-async-await",
   "tokio-buf",
-  "tokio-channel",
   "tokio-codec",
   "tokio-current-thread",
   "tokio-executor",
@@ -34,6 +33,7 @@ members = [
   "tokio-io",
   "tokio-reactor",
   "tokio-signal",
+  "tokio-sync",
   "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
@@ -49,6 +49,7 @@ default = [
   "io",
   "reactor",
   "rt-full",
+  "sync",
   "tcp",
   "timer",
   "udp",
@@ -67,6 +68,7 @@ rt-full = [
   "tokio-executor",
   "tokio-threadpool",
 ]
+sync = ["tokio-sync"]
 tcp = ["tokio-tcp"]
 timer = ["tokio-timer"]
 udp = ["tokio-udp"]
@@ -95,6 +97,7 @@ tokio-fs = { version = "0.1.3", path = "tokio-fs", optional = true }
 tokio-io = { version = "0.1.6", path = "tokio-io", optional = true }
 tokio-executor = { version = "0.1.5", path = "tokio-executor", optional = true }
 tokio-reactor = { version = "0.1.1", path = "tokio-reactor", optional = true }
+tokio-sync = { version = "0.1.0", path = "tokio-sync", optional = true }
 tokio-threadpool = { version = "0.1.8", path = "tokio-threadpool", optional = true }
 tokio-tcp = { version = "0.1.0", path = "tokio-tcp", optional = true }
 tokio-udp = { version = "0.1.0", path = "tokio-udp", optional = true }

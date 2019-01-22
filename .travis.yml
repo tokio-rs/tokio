@@ -101,6 +101,8 @@ script: |
       cargo check --all --exclude tokio-tls --target $TARGET
       cargo check --tests --all --exclude tokio-tls --target $TARGET
   else
+      # Limit the execution time of loom tests.
+      export LOOM_MAX_DURATION=10
       cargo test --all --no-fail-fast
       cargo doc --all
   fi

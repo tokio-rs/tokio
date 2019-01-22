@@ -1,8 +1,9 @@
 [package]
-name = "tokio-channel"
+name = "tokio-sync"
 
 # When releasing to crates.io:
 # - Update html_root_url.
+# - Update doc url
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.0"
@@ -10,11 +11,17 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-channel/0.1.0"
+documentation = "https://docs.rs/tokio-sync/0.1.0/tokio_sync"
 description = """
-Channels for asynchronous communication using Tokio.
+Synchronization utilities.
 """
 categories = ["asynchronous"]
 
 [dependencies]
-futures = "0.1.23"
+futures = "0.1.19"
+
+[dev-dependencies]
+env_logger = { version = "0.5", default-features = false }
+tokio = { path = ".." }
+tokio-mock-task = "0.1.1"
+loom = { version = "0.1.0", features = ["futures"] }
