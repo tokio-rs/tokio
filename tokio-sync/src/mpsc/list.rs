@@ -212,7 +212,7 @@ impl<T> Tx<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Tx<T> {
+impl<T> fmt::Debug for Tx<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         use std::sync::atomic::Ordering::Relaxed;
 
@@ -318,7 +318,7 @@ impl<T> Rx<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Rx<T> {
+impl<T> fmt::Debug for Rx<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Rx")
             .field("head", &self.head)

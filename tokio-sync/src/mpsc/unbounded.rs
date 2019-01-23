@@ -9,7 +9,6 @@ use std::fmt;
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](fn.unbounded_channel.html) function.
-#[derive(Debug)]
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -20,14 +19,29 @@ impl<T> Clone for UnboundedSender<T> {
     }
 }
 
+impl<T> fmt::Debug for UnboundedSender<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("UnboundedSender")
+            .field("chan", &self.chan)
+            .finish()
+    }
+}
+
 /// Receive values from the associated `UnboundedSender`.
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](fn.unbounded_channel.html) function.
-#[derive(Debug)]
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
+}
+
+impl<T> fmt::Debug for UnboundedReceiver<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("UnboundedReceiver")
+            .field("chan", &self.chan)
+            .finish()
+    }
 }
 
 /// Error returned by the `UnboundedSender`.

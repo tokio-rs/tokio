@@ -4,21 +4,42 @@ use futures::task::AtomicTask;
 
 use std::cell::UnsafeCell;
 use std::process;
+use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 /// Channel sender
-#[derive(Debug)]
 pub(crate) struct Tx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
     permit: S::Permit,
 }
 
+impl<T, S: Semaphore> fmt::Debug for Tx<T, S>
+where S::Permit: fmt::Debug,
+      S: fmt::Debug
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Tx")
+            .field("inner", &self.inner)
+            .field("permit", &self.permit)
+            .finish()
+    }
+}
+
 /// Channel receiver
-#[derive(Debug)]
 pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
+}
+
+impl<T, S: Semaphore> fmt::Debug for Rx<T, S>
+where S: fmt::Debug
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Rx")
+            .field("inner", &self.inner)
+            .finish()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -53,7 +74,6 @@ pub(crate) trait Semaphore: Sync {
     fn close(&self);
 }
 
-#[derive(Debug)]
 struct Chan<T, S> {
     /// Handle to the push half of the lock-free list.
     tx: list::Tx<T>,
@@ -73,14 +93,36 @@ struct Chan<T, S> {
     rx_fields: UnsafeCell<RxFields<T>>,
 }
 
+impl<T, S> fmt::Debug for Chan<T, S> where S: fmt::Debug
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Chan")
+            .field("tx", &self.tx)
+            .field("semaphore", &self.semaphore)
+            .field("rx_task", &self.rx_task)
+            .field("tx_count", &self.tx_count)
+            .field("rx_fields", &self.rx_fields)
+            .finish()
+    }
+}
+
 /// Fields only accessed by `Rx` handle.
-#[derive(Debug)]
 struct RxFields<T> {
     /// Channel receiver. This field is only accessed by the `Receiver` type.
     list: list::Rx<T>,
 
     /// `true` if `Rx::close` is called.
     rx_closed: bool,
+}
+
+impl<T> fmt::Debug for RxFields<T>
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("RxFields")
+            .field("list", &self.list)
+            .field("rx_closed", &self.rx_closed)
+            .finish()
+    }
 }
 
 unsafe impl<T: Send, S: Send> Send for Chan<T, S> {}

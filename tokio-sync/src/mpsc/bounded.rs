@@ -7,7 +7,6 @@ use std::fmt;
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](fn.channel.html) function.
-#[derive(Debug)]
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -18,13 +17,28 @@ impl<T> Clone for Sender<T> {
     }
 }
 
+impl<T> fmt::Debug for Sender<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Sender")
+            .field("chan", &self.chan)
+            .finish()
+    }
+}
+
 /// Receive values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](fn.channel.html) function.
-#[derive(Debug)]
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
+}
+
+impl<T> fmt::Debug for Receiver<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Receiver")
+            .field("chan", &self.chan)
+            .finish()
+    }
 }
 
 /// Error returned by the `Sender`.
