@@ -92,33 +92,31 @@ fn send_recv_unbounded() {
 }
 
 #[test]
-fn clone_sender_no_t_clone_buffer() {
-    #[derive(Debug, PartialEq, Eq)]
-    struct NotClone;
-    let (mut tx, mut rx) = mpsc::channel(100);
-    tx.try_send(NotClone).unwrap();
-    tx.clone().try_send(NotClone).unwrap();
+fn no_t_bounds_buffer() {
+    struct NoImpls;
+    let (tx, mut rx) = mpsc::channel(100);
 
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(NotClone));
-
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(NotClone));
+    // sender should be Debug even though T isn't Debug
+    println!("{:?}", tx);
+    // same with Receiver
+    println!("{:?}", rx);
+    // and sender should be Clone even though T isn't Clone
+    assert!(tx.clone().try_send(NoImpls).is_ok());
+    assert!(assert_ready!(rx.poll()).is_some());
 }
 
 #[test]
-fn clone_sender_no_t_clone_unbounded() {
-    #[derive(Debug, PartialEq, Eq)]
-    struct NotClone;
-    let (mut tx, mut rx) = mpsc::unbounded_channel();
-    tx.try_send(NotClone).unwrap();
-    tx.clone().try_send(NotClone).unwrap();
+fn no_t_bounds_unbounded() {
+    struct NoImpls;
+    let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(NotClone));
-
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(NotClone));
+    // sender should be Debug even though T isn't Debug
+    println!("{:?}", tx);
+    // same with Receiver
+    println!("{:?}", rx);
+    // and sender should be Clone even though T isn't Clone
+    assert!(tx.clone().try_send(NoImpls).is_ok());
+    assert!(assert_ready!(rx.poll()).is_some());
 }
 
 #[test]
