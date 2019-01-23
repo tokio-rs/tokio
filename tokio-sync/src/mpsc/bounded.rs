@@ -7,9 +7,15 @@ use std::fmt;
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](fn.channel.html) function.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
+}
+
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        Sender { chan: self.chan.clone() }
+    }
 }
 
 /// Receive values from the associated `Sender`.
