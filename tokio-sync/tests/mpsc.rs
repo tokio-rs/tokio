@@ -227,7 +227,7 @@ fn try_send_fail() {
     tx.try_send("hello").unwrap();
 
     // This should fail
-    assert!(tx.try_send("fail").is_err());
+    assert!(tx.try_send("fail").unwrap_err().was_full());
 
     assert_eq!(rx.next().unwrap().unwrap(), "hello");
 
@@ -268,6 +268,19 @@ fn dropping_rx_closes_channel() {
 
     drop(rx);
     assert!(tx.poll_ready().is_err());
+
+    assert_eq!(1, Arc::strong_count(&msg));
+}
+
+#[test]
+fn dropping_rx_closes_channel_for_try() {
+    let (mut tx, rx) = mpsc::channel(100);
+
+    let msg = Arc::new(());
+    tx.try_send(msg.clone()).unwrap();
+
+    drop(rx);
+    assert!(tx.try_send(msg.clone()).unwrap_err().was_closed());
 
     assert_eq!(1, Arc::strong_count(&msg));
 }

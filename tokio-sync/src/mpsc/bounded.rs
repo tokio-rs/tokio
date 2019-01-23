@@ -219,6 +219,24 @@ impl<T> TrySendError<T> {
     pub fn into_inner(self) -> T {
         self.value
     }
+
+    /// Did the send fail because the channel has been closed?
+    pub fn was_closed(&self) -> bool {
+        if let ErrorKind::Closed = self.kind {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Did the send fail because the channel was at capacity?
+    pub fn was_full(&self) -> bool {
+        if let ErrorKind::NoCapacity = self.kind {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl<T: fmt::Debug> fmt::Display for TrySendError<T> {
