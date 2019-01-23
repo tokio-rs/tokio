@@ -92,6 +92,36 @@ fn send_recv_unbounded() {
 }
 
 #[test]
+fn clone_sender_no_t_clone_buffer() {
+    #[derive(Debug, PartialEq, Eq)]
+    struct NotClone;
+    let (mut tx, mut rx) = mpsc::channel(100);
+    tx.try_send(NotClone).unwrap();
+    tx.clone().try_send(NotClone).unwrap();
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(NotClone));
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(NotClone));
+}
+
+#[test]
+fn clone_sender_no_t_clone_unbounded() {
+    #[derive(Debug, PartialEq, Eq)]
+    struct NotClone;
+    let (mut tx, mut rx) = mpsc::unbounded_channel();
+    tx.try_send(NotClone).unwrap();
+    tx.clone().try_send(NotClone).unwrap();
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(NotClone));
+
+    let val = assert_ready!(rx.poll());
+    assert_eq!(val, Some(NotClone));
+}
+
+#[test]
 fn send_recv_buffer_limited() {
     let (mut tx, mut rx) = mpsc::channel::<i32>(1);
     let mut task = MockTask::new();

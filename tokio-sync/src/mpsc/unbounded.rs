@@ -9,9 +9,15 @@ use std::fmt;
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](fn.unbounded_channel.html) function.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
+}
+
+impl<T> Clone for UnboundedSender<T> {
+    fn clone(&self) -> Self {
+        UnboundedSender { chan: self.chan.clone() }
+    }
 }
 
 /// Receive values from the associated `UnboundedSender`.
