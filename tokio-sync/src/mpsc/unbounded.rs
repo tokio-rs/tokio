@@ -48,7 +48,7 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
 #[derive(Debug)]
 pub struct UnboundedSendError(());
 
-/// Error returned by `UnboundedSender::try_send`.
+/// Returned by `UnboundedSender::try_send` when the channel has been closed.
 #[derive(Debug)]
 pub struct UnboundedTrySendError<T>(T);
 
