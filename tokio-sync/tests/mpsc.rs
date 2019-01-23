@@ -227,7 +227,7 @@ fn try_send_fail() {
     tx.try_send("hello").unwrap();
 
     // This should fail
-    assert!(tx.try_send("fail").unwrap_err().was_full());
+    assert!(tx.try_send("fail").unwrap_err().is_full());
 
     assert_eq!(rx.next().unwrap().unwrap(), "hello");
 
@@ -280,7 +280,7 @@ fn dropping_rx_closes_channel_for_try() {
     tx.try_send(msg.clone()).unwrap();
 
     drop(rx);
-    assert!(tx.try_send(msg.clone()).unwrap_err().was_closed());
+    assert!(tx.try_send(msg.clone()).unwrap_err().is_closed());
 
     assert_eq!(1, Arc::strong_count(&msg));
 }

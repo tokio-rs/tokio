@@ -221,7 +221,7 @@ impl<T> TrySendError<T> {
     }
 
     /// Did the send fail because the channel has been closed?
-    pub fn was_closed(&self) -> bool {
+    pub fn is_closed(&self) -> bool {
         if let ErrorKind::Closed = self.kind {
             true
         } else {
@@ -230,7 +230,7 @@ impl<T> TrySendError<T> {
     }
 
     /// Did the send fail because the channel was at capacity?
-    pub fn was_full(&self) -> bool {
+    pub fn is_full(&self) -> bool {
         if let ErrorKind::NoCapacity = self.kind {
             true
         } else {
