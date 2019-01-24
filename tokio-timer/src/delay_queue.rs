@@ -338,6 +338,16 @@ impl<T> DelayQueue<T> {
 
         self.insert_idx(when, key);
 
+        // Set a new delay if the current's deadline is later than the one of the new item
+        let should_set_delay =  if let Some(ref delay) = self.delay {
+            let current_exp = self.normalize_deadline(delay.deadline());
+            current_exp > when
+        } else  { false };
+
+        if should_set_delay {
+            self.delay = Some(self.handle.delay(self.start + Duration::from_millis(when)));
+        }
+
         Key::new(key)
     }
 

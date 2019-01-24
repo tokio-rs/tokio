@@ -279,3 +279,35 @@ fn remove_expired_item() {
         assert_eq!(entry.into_inner(), "foo");
     })
 }
+
+#[test]
+fn expires_before_last_insert() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+
+        let epoch = time.now();
+
+        queue.insert_at("foo", epoch + ms(10_000));
+
+        // Delay should be set to 8.192s here.
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        // Delay should be set to the delay of the new item here
+        queue.insert_at("bar", epoch + ms(600));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        advance(timer, ms(600));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "bar");
+
+    })
+}
