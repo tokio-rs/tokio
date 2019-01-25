@@ -178,7 +178,7 @@ pub trait Subscriber {
     fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug);
 
     /// Record all the fields of a span.
-    fn record_batch(&self, span: &Span, batch: field::Batch) {
+    fn record_batch(&self, span: &Span, batch: field::ValueSet) {
         struct RecordSpan<'a, T: ?Sized + 'a> {
             span: &'a Span,
             subscriber: &'a T

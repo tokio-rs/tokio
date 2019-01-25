@@ -469,7 +469,7 @@ macro_rules! span {
     };
     (@ record_maybe_batch: $span:expr, $fields:expr, $($k:ident = $val:expr ) ,+) => (
         let vals: &[ &$crate::field::Value ] = &[ $( &$val ),+];
-        let batch = $crate::field::Batch::new($fields, &vals[..])
+        let batch = $crate::field::ValueSet::new($fields, &vals[..])
             .expect("batch must be valid");
         $span.record_all(batch);
     );

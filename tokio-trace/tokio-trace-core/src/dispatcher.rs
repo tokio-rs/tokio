@@ -157,7 +157,7 @@ impl Dispatch {
 
     /// Record all the fields of a span.
     #[inline]
-    pub fn record_batch(&self, span: &Span, batch: field::Batch) {
+    pub fn record_batch(&self, span: &Span, batch: field::ValueSet) {
         self.subscriber.record_batch(span, batch)
     }
 

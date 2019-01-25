@@ -330,7 +330,7 @@ impl<'a> Span<'a> {
     }
 
     /// Record all the fields in the span
-    pub fn record_all(&mut self, batch: field::Batch,) -> &mut Self {
+    pub fn record_all(&mut self, batch: field::ValueSet,) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
             inner.record_batch(batch);
         }
@@ -603,7 +603,7 @@ impl<'a> Enter<'a> {
         self.subscriber.record_debug(&self.id, field, value)
     }
 
-    fn record_batch(&mut self, batch: field::Batch) {
+    fn record_batch(&mut self, batch: field::ValueSet) {
         if batch.callsite() == self.meta.callsite() {
             self.subscriber.record_batch(&self.id, batch)
         }

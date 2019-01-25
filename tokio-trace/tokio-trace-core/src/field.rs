@@ -72,7 +72,7 @@ pub struct FieldSet {
 }
 
 /// A complete set of fields and values for a span.
-pub struct Batch<'a> {
+pub struct ValueSet<'a> {
     fields: &'a FieldSet,
     values: &'a [&'a dyn Value],
     i: usize,
@@ -383,17 +383,17 @@ impl Iterator for Iter {
     }
 }
 
-// ===== impl Batch =====
+// ===== impl ValueSet =====
 
-impl<'a> Batch<'a> {
-    /// If `val`s defines a value for _each_ field in `fields`, returns a new `Batch`.
+impl<'a> ValueSet<'a> {
+    /// If `val`s defines a value for _each_ field in `fields`, returns a new `ValueSet`.
     pub fn new(fields: &'a FieldSet, values: &'a [&'a dyn Value]) -> Option<Self> {
         if fields.names.len() != values.len() {
             // Invalid batch!
             return None;
         }
 
-        Some(Batch {
+        Some(ValueSet {
             fields, values,
             i: 0,
         })
@@ -407,7 +407,7 @@ impl<'a> Batch<'a> {
     }
 }
 
-impl<'a> Iterator for Batch<'a> {
+impl<'a> Iterator for ValueSet<'a> {
     type Item = (Field, &'a Value);
     fn next(&mut self) -> Option<Self::Item> {
         let field = Field {
@@ -420,9 +420,9 @@ impl<'a> Iterator for Batch<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Batch<'a> {
+impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Batch")
+        f.debug_struct("ValueSet")
             .field("fields", &self.fields)
             .field("values", &"[...]")
             .finish()
