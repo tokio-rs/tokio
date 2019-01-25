@@ -31,7 +31,7 @@ the Rust programming language. It is:
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/getting-started/hello-world/) |
-[API Docs](https://docs.rs/tokio/0.1.14/tokio) |
+[API Docs](https://docs.rs/tokio/0.1.15/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
 The API docs for the master branch are published [here][master-dox].

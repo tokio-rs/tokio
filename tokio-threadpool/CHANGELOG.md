@@ -1,3 +1,8 @@
+# 0.1.11 (January 24, 2019)
+
+### Fixed
+- Drop incomplete tasks when threadpool is dropped (#722).
+
 # 0.1.10 (January 6, 2019)
 
 * Fix deadlock bug in `blocking` (#795).
