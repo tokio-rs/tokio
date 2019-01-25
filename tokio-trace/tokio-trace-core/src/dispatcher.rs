@@ -110,55 +110,13 @@ impl Dispatch {
         self.subscriber.new_span(metadata)
     }
 
-    /// Record a signed 64-bit integer value.
+    /// Record a set of values on a span.
     ///
-    /// This calls the [`record_i64`](::Subscriber::record_i64)
+    /// This calls the [`record`](::Subscriber::record)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn record_i64(&self, span: &Span, field: &field::Field, value: i64) {
-        self.subscriber.record_i64(span, field, value)
-    }
-
-    /// Record an unsigned 64-bit integer value.
-    ///
-    /// This calls the [`record_u64`](::Subscriber::record_u64)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_u64(&self, span: &Span, field: &field::Field, value: u64) {
-        self.subscriber.record_u64(span, field, value)
-    }
-
-    /// Record a boolean value.
-    ///
-    /// This calls the [`record_bool`](::Subscriber::record_bool)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_bool(&self, span: &Span, field: &field::Field, value: bool) {
-        self.subscriber.record_bool(span, field, value)
-    }
-
-    /// Record a string value.
-    ///
-    /// This calls the [`record_str`](::Subscriber::record_str)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_str(&self, span: &Span, field: &field::Field, value: &str) {
-        self.subscriber.record_str(span, field, value)
-    }
-
-    /// Record a value implementing `fmt::Debug`.
-    ///
-    /// This calls the [`record_debug`](::Subscriber::record_debug)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug) {
-        self.subscriber.record_debug(span, field, value)
-    }
-
-    /// Record all the fields of a span.
-    #[inline]
-    pub fn record_batch(&self, span: &Span, batch: field::ValueSet) {
-        self.subscriber.record_batch(span, batch)
+    pub fn record(&self, span: &Span, values: field::ValueSet) {
+        self.subscriber.record(span, values)
     }
 
     /// Adds an indication that `span` follows from the span with the id

@@ -73,9 +73,8 @@ pub struct FieldSet {
 
 /// A complete set of fields and values for a span.
 pub struct ValueSet<'a> {
+    values: &'a [(&'a Field, &'a dyn Value)],
     fields: &'a FieldSet,
-    values: &'a [&'a dyn Value],
-    i: usize,
 }
 
 /// An iterator over a set of fields.
@@ -387,16 +386,14 @@ impl Iterator for Iter {
 
 impl<'a> ValueSet<'a> {
     /// If `val`s defines a value for _each_ field in `fields`, returns a new `ValueSet`.
-    pub fn new(fields: &'a FieldSet, values: &'a [&'a dyn Value]) -> Option<Self> {
-        if fields.names.len() != values.len() {
-            // Invalid batch!
-            return None;
+    pub fn new(
+        fields: &'a FieldSet,
+        values: &'a [(&'a Field, &'a dyn Value)],
+    ) -> Self {
+        ValueSet {
+            values,
+            fields,
         }
-
-        Some(ValueSet {
-            fields, values,
-            i: 0,
-        })
     }
 
     /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
@@ -405,20 +402,24 @@ impl<'a> ValueSet<'a> {
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
     }
-}
 
-impl<'a> Iterator for ValueSet<'a> {
-    type Item = (Field, &'a Value);
-    fn next(&mut self) -> Option<Self::Item> {
-        let field = Field {
-            i: self.i,
-            fields: self.fields.duplicate(),
-        };
-        let val = self.values.get(self.i)?;
-        self.i += 1;
-        Some((field, val))
+    /// Records all the fields in this `ValueSet` with the provided `recorder`.
+    pub fn record(&self, recorder: &mut Record) {
+        let callsite = self.callsite();
+        for (field, value) in self.values.iter() {
+            if field.callsite() == callsite {
+                value.record(field, recorder)
+            }
+        }
+    }
+
+    /// Returns true if this `ValueSet` contains _all_ the fields defined on the
+    /// span or event it corresponds to.
+    pub fn is_complete(&self) -> bool {
+        self.values.len() == self.fields.names.len()
     }
 }
+
 
 impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

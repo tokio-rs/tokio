@@ -118,102 +118,11 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, metadata: &Metadata) -> Span;
 
-    /// Record a signed 64-bit integer value.
+    /// Record a set of values on a span.
     ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to signed integers may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_i64(&self, span: &Span, field: &field::Field, value: i64) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record an unsigned 64-bit integer value.
-    ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to unsigned integers may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_u64(&self, span: &Span, field: &field::Field, value: u64) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record a boolean value.
-    ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to booleans may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_bool(&self, span: &Span, field: &field::Field, value: bool) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record a string value.
-    ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to strings may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_str(&self, span: &Span, field: &field::Field, value: &str) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record a value implementing `fmt::Debug`.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug);
-
-    /// Record all the fields of a span.
-    fn record_batch(&self, span: &Span, batch: field::ValueSet) {
-        struct RecordSpan<'a, T: ?Sized + 'a> {
-            span: &'a Span,
-            subscriber: &'a T
-        }
-        impl<'a, T: ?Sized> field::Record for RecordSpan<'a, T>
-        where
-             T: Subscriber + 'a,
-        {
-            #[inline] fn record_i64(&mut self, field: &field::Field, value: i64) {
-                self.subscriber.record_i64(self.span, field, value)
-            }
-
-            #[inline] fn record_u64(&mut self, field: &field::Field, value: u64) {
-                self.subscriber.record_u64(self.span, field, value)
-            }
-
-            #[inline] fn record_bool(&mut self, field: &field::Field, value: bool) {
-                self.subscriber.record_bool(self.span, field, value)
-            }
-
-            #[inline] fn record_str(&mut self, field: &field::Field, value: &str) {
-               self.subscriber.record_str(self.span, field, value)
-            }
-
-            #[inline] fn record_debug(&mut self, field: &field::Field, value: &fmt::Debug) {
-                self.subscriber.record_debug(self.span, field, value)
-            }
-        }
-        let mut recorder = RecordSpan {
-            subscriber: self, span,
-        };
-        for (field, value) in batch {
-            value.record(&field, &mut recorder);
-        }
-    }
+    /// The subscriber is expected to provide an implementation of `Record` to
+    /// the `ValueSet`'s `record` method.
+    fn record(&self, span: &Span, values: field::ValueSet);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
