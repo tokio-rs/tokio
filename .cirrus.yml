@@ -23,6 +23,6 @@ task:
     - cargo doc --all
   i686_test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --no-fail-fast --target i686-unknown-freebsd
+    - cargo test --all --exclude tokio-tls --no-fail-fast --target i686-unknown-freebsd
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index
