@@ -210,7 +210,7 @@ impl Subscriber for NoSubscriber {
         Span::from_u64(0)
     }
 
-    fn record_debug(&self, _span: &Span, _field: &field::Field, _value: &fmt::Debug) {}
+    fn record(&self, _span: &Span, _values: field::ValueSet) {}
 
     fn add_follows_from(&self, _span: &Span, _follows: Span) {}
 

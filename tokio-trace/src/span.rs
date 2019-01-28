@@ -316,23 +316,23 @@ impl<'a> Span<'a> {
     }
 
     /// Records that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
+    pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsField,
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
             if let Some(field) = field.as_field(inner.metadata()) {
-                value.record(&field, inner);
+                inner.record(field.with_value(value))
             }
         }
         self
     }
 
     /// Record all the fields in the span
-    pub fn record_all(&mut self, batch: field::ValueSet,) -> &mut Self {
+    pub fn record_all(&mut self, values: field::ValueSet) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
-            inner.record_batch(batch);
+            inner.record(values);
         }
         self
     }
@@ -446,11 +446,8 @@ impl<'a> Event<'a> {
     }
 
     /// Adds a formattable message describing the event that occurred.
-    pub fn message(&mut self, key: &field::Field, message: fmt::Arguments) -> &mut Self {
-        if let Some(ref mut inner) = self.inner {
-            inner.subscriber.record_debug(&inner.id, key, &message);
-        }
-        self
+    pub fn message(&mut self, _key: &field::Field, _message: fmt::Arguments) -> &mut Self {
+        unimplemented!("Event type is being reworked soon")
     }
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
@@ -476,17 +473,12 @@ impl<'a> Event<'a> {
     }
 
     /// Records that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
+    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, _field: &Q, _value: &V) -> &mut Self
     where
         Q: field::AsField,
         V: field::Value,
     {
-        if let Some(ref mut inner) = self.inner {
-            if let Some(field) = field.as_field(inner.metadata()) {
-                value.record(&field, inner);
-            }
-        }
-        self
+        unimplemented!("Event type is being reworked soon")
     }
 
     /// Returns `true` if this span was disabled by the subscriber and does not
@@ -578,34 +570,9 @@ impl<'a> Enter<'a> {
         self.meta
     }
 
-    /// Record a signed 64-bit integer value.
-    fn record_value_i64(&self, field: &field::Field, value: i64) {
-        self.subscriber.record_i64(&self.id, field, value)
-    }
-
-    /// Record an unsigned 64-bit integer value.
-    fn record_value_u64(&self, field: &field::Field, value: u64) {
-        self.subscriber.record_u64(&self.id, field, value)
-    }
-
-    /// Record a boolean value.
-    fn record_value_bool(&self, field: &field::Field, value: bool) {
-        self.subscriber.record_bool(&self.id, field, value)
-    }
-
-    /// Record a string value.
-    fn record_value_str(&self, field: &field::Field, value: &str) {
-        self.subscriber.record_str(&self.id, field, value)
-    }
-
-    /// Record a value implementing `fmt::Debug`.
-    fn record_value_debug(&self, field: &field::Field, value: &fmt::Debug) {
-        self.subscriber.record_debug(&self.id, field, value)
-    }
-
-    fn record_batch(&mut self, batch: field::ValueSet) {
-        if batch.callsite() == self.meta.callsite() {
-            self.subscriber.record_batch(&self.id, batch)
+    fn record(&mut self, values: field::ValueSet) {
+        if values.callsite() == self.meta.callsite() {
+            self.subscriber.record(&self.id, values)
         }
     }
 
@@ -645,33 +612,6 @@ impl<'a> Clone for Enter<'a> {
             closed: self.closed,
             meta: self.meta,
         }
-    }
-}
-
-impl<'a> field::Record for Enter<'a> {
-    #[inline]
-    fn record_i64(&mut self, field: &field::Field, value: i64) {
-        self.record_value_i64(field, value);
-    }
-
-    #[inline]
-    fn record_u64(&mut self, field: &field::Field, value: u64) {
-        self.record_value_u64(field, value);
-    }
-
-    #[inline]
-    fn record_bool(&mut self, field: &field::Field, value: bool) {
-        self.record_value_bool(field, value);
-    }
-
-    #[inline]
-    fn record_str(&mut self, field: &field::Field, value: &str) {
-        self.record_value_str(field, value);
-    }
-
-    #[inline]
-    fn record_debug(&mut self, field: &field::Field, value: &fmt::Debug) {
-        self.record_value_debug(field, value);
     }
 }
 

@@ -71,10 +71,11 @@ pub struct FieldSet {
     pub callsite: callsite::Identifier,
 }
 
-/// A complete set of fields and values for a span.
+/// A set of fields and values for a span.
 pub struct ValueSet<'a> {
-    values: &'a [(&'a Field, &'a dyn Value)],
+    values: [Option<&'a dyn Value>; 32],
     fields: &'a FieldSet,
+    is_complete: bool,
 }
 
 /// An iterator over a set of fields.
@@ -249,6 +250,13 @@ impl Field {
     pub fn name(&self) -> &'static str {
         self.fields.names[self.i]
     }
+
+    /// Constructs a new `ValueSet` containing this field and the given value.
+    pub fn with_value<'a>(&'a self, value: &'a Value) -> ValueSet<'a> {
+        let mut values = [None; 32];
+        values[self.i] = Some(value);
+        ValueSet::new(&self.fields, values)
+    }
 }
 
 impl fmt::Display for Field {
@@ -324,12 +332,12 @@ impl FieldSet {
     /// define a field named "foo", the `Field` corresponding to "foo" for each
     /// of those callsites are not equivalent.
     pub fn contains(&self, field: &Field) -> bool {
-        field.callsite() == self.callsite() && field.i <= self.names.len()
+        field.callsite() == self.callsite() && field.i <= self.len()
     }
 
     /// Returns an iterator over the `Field`s in this `FieldSet`.
     pub fn iter(&self) -> Iter {
-        let idxs = 0..self.names.len();
+        let idxs = 0..self.len();
         Iter {
             idxs,
             fields: FieldSet {
@@ -337,6 +345,12 @@ impl FieldSet {
                 callsite: self.callsite(),
             },
         }
+    }
+
+    /// Returns the number of fields in this `FieldSet`.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.names.len()
     }
 
     // this is because i'm not ready to commit to a public clone impl for `FieldSet`
@@ -385,14 +399,16 @@ impl Iterator for Iter {
 // ===== impl ValueSet =====
 
 impl<'a> ValueSet<'a> {
-    /// If `val`s defines a value for _each_ field in `fields`, returns a new `ValueSet`.
+    /// Returns a new `ValueSet`.
     pub fn new(
         fields: &'a FieldSet,
-        values: &'a [(&'a Field, &'a dyn Value)],
+        values: [Option<&'a dyn Value>; 32],
     ) -> Self {
+        let is_complete = values.iter().all(Option::is_some);
         ValueSet {
             values,
             fields,
+            is_complete,
         }
     }
 
@@ -405,18 +421,28 @@ impl<'a> ValueSet<'a> {
 
     /// Records all the fields in this `ValueSet` with the provided `recorder`.
     pub fn record(&self, recorder: &mut Record) {
-        let callsite = self.callsite();
-        for (field, value) in self.values.iter() {
-            if field.callsite() == callsite {
-                value.record(field, recorder)
-            }
+        if self.fields.callsite() != self.callsite() {
+            return;
         }
+        let fields = self.fields.iter()
+            .filter_map(|field| {
+                let value = self.values.get(field.i)?.as_ref()?;
+                Some((field, value))
+            });
+        for (ref field, value) in fields {
+            value.record(field, recorder);
+        }
+    }
+
+    /// Returns the value for the given key, if one exists.
+    pub fn get<K: ?Sized>(&self, key: &K) -> Option<&Value> {
+        unimplemented!()
     }
 
     /// Returns true if this `ValueSet` contains _all_ the fields defined on the
     /// span or event it corresponds to.
     pub fn is_complete(&self) -> bool {
-        self.values.len() == self.fields.names.len()
+        self.is_complete
     }
 }
 
