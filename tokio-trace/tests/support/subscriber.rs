@@ -117,7 +117,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         (self.filter)(meta)
     }
 
-    fn record_debug(&self, _span: &Id, _field: &field::Field, _value: &fmt::Debug) {
+    fn record(&self, _span: &Id, _values: field::ValueSet) {
         // TODO: it would be nice to be able to expect field values...
     }
 
