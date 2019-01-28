@@ -445,48 +445,38 @@ macro_rules! span {
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
             #[allow(unused_imports)]
-            use $crate::{callsite, field::{Value, AsField}, Span};
+            use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
             let callsite = callsite! { span: $name, $( $k ),* };
             let interest = callsite.interest();
             if interest.is_never() {
                 Span::new_disabled()
             } else {
-                let mut span = Span::new(interest, callsite.metadata());
+                let meta = callsite.metadata();
+                let mut span = Span::new(interest, meta);
                 // Depending on how many fields are generated, this may or may
                 // not actually be used, but it doesn't make sense to repeat it.
                 #[allow(unused_variables, unused_mut)] {
                     if !span.is_disabled() {
-                        span!(@ record_maybe_batch:
-                            span, callsite.metadata().fields(),
-                            $($k = $($val)*),*
-                        );
+                        let mut vals: [Option<&Value>; 32] = [None; 32];
+                        let mut i = 0;
+                        let mut is_empty = true;
+                        $(
+                            $(
+                                is_empty = false;
+                                vals[i] = Some(&$val);
+                            )*
+                            i += 1;
+                        )*
+                        if !is_empty {
+                            span.record_all(ValueSet::new(meta.fields(), vals));
+                        }
                     };
                 }
                 span
             }
         }
     };
-    (@ record_maybe_batch: $span:expr, $fields:expr, $($k:ident = $val:expr ) ,+) => (
-        let vals: &[ &$crate::field::Value ] = &[ $( &$val ),+];
-        let batch = $crate::field::ValueSet::new($fields, &vals[..])
-            .expect("batch must be valid");
-        $span.record_all(batch);
-    );
-    (@ record_maybe_batch: $span:expr, $fields:expr, $($k:ident =  $( $val:expr)* ),*) => (
-        let mut keys = $fields.into_iter();
-        $(
-            let key = keys.next()
-                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-            span!(@ record: $span, $k, &key, $($val)*);
-        )*
-    );
-    (@ record: $span:expr, $k:expr, $i:expr, $val:expr) => (
-        $span.record($i, &$val)
-    );
-    (@ record: $span:expr, $k:expr, $i:expr,) => (
-        // skip
-    );
 }
 
 /// Constructs a new `Event`.
