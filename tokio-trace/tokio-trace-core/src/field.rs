@@ -455,6 +455,7 @@ impl<'a> fmt::Debug for ValueSet<'a> {
         f.debug_struct("ValueSet")
             .field("fields", &self.fields)
             .field("values", &"[...]")
+            .field("is_complete", &self.is_complete)
             .finish()
     }
 }
