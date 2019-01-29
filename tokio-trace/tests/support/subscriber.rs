@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use super::{span::MockSpan, field as mock_field};
+use super::{span::MockSpan, field as mock_field, event::MockEvent};
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -11,14 +11,8 @@ use std::{
 use tokio_trace::{field, Event, Id, Metadata, Subscriber};
 
 #[derive(Debug, Eq, PartialEq)]
-struct ExpectEvent {
-    // TODO: implement
-}
-
-#[derive(Debug, Eq, PartialEq)]
 enum Expect {
-    #[allow(dead_code)] // TODO: implement!
-    Event(ExpectEvent),
+    Event(MockEvent),
     Enter(MockSpan),
     Exit(MockSpan),
     CloneSpan(MockSpan),
@@ -59,9 +53,8 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
         self
     }
 
-    pub fn event(mut self) -> Self {
-        // TODO: expect message/fields!
-        self.expected.push_back(Expect::Event(ExpectEvent {}));
+    pub fn event(mut self, event: MockEvent) -> Self {
+        self.expected.push_back(Expect::Event(event));
         self
     }
 
@@ -132,7 +125,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         let span = spans
             .get(id)
             .unwrap_or_else(|| panic!("no span for ID {:?}", id));
-        println!("record: span={:?}; values={:?};", span.name, values);
+        println!("record: {}; id={:?}; values={:?};", span.name, id, values);
         let was_expected = if let Some(Expect::Record(_, _)) = expected.front() {
             true
         } else {
@@ -145,7 +138,10 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                 if let Some(name) = expected_span.name {
                     assert_eq!(name, span.name);
                 }
-                expected_values.check(values, format_args!("Span({})::record: ", span.name));
+                let mut checker = expected_values
+                    .checker(format!("span {}: ", span.name));
+                values.record(&mut checker);
+                checker.finish();
             }
 
         }
@@ -154,8 +150,21 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
     fn event(&self, event: Event) {
         match self.expected.lock().unwrap().pop_front() {
             None => {}
-            Some(Expect::Event(_)) => {
-                // TODO: implement me
+            Some(Expect::Event(MockEvent { name: expected_name, fields })) => {
+                let name = event.metadata().name();
+                if let Some(expected_name) = expected_name {
+                    assert_eq!(
+                        name, expected_name,
+                        "expected an event named {:?}, but got one named {:?}",
+                        expected_name, name
+                    );
+                }
+                if let Some(mut expected_fields) = fields {
+                    let mut checker = expected_fields
+                        .checker(format!("event {}: ", name));
+                    event.record(&mut checker);
+                    checker.finish();
+                }
             }
             Some(ex) => ex.bad(format_args!("observed event {:?}", event)),
         }

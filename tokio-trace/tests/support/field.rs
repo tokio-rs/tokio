@@ -42,7 +42,7 @@ where
 
 impl MockField {
     /// Expect a field with the given name and value.
-    pub fn with_value<K>(self, value: &Value) -> Self {
+    pub fn with_value(self, value: &Value) -> Self {
         Self {
             value: MockValue::from(value),
             ..self
@@ -80,49 +80,28 @@ impl Expect {
         }
     }
 
-    fn compare_or_panic(&mut self, name: &str, value: &Value, ctx: &fmt::Arguments) {
+    fn compare_or_panic(&mut self, name: &str, value: &Value, ctx: &str) {
         let value =  value.into();
         match self.fields.remove(name) {
             Some(MockValue::Any) => {},
-            Some(expected) => assert_eq!(expected, value,
-                "{}expected {}{} but got {}{}", ctx, name, expected, name, value),
-            None if self.only => panic!("{}expected only {}, but got {}{}", ctx, self, name, value),
+            Some(expected) => assert!(
+                expected == value,
+                "\nexpected `{}` to contain:\n\t`{}{}`\nbut got:\n\t`{}{}`",
+                ctx, name, expected, name, value
+            ),
+            None if self.only => panic!(
+                "\nexpected `{}` to contain only:\n\t`{}`\nbut got:\n\t`{}{}`",
+                ctx, self, name, value
+            ),
             _ => {},
         }
     }
 
-    pub fn check(&mut self, values: field::ValueSet, ctx: fmt::Arguments) {
-        struct CheckRecorder<'a> {
-            expect: &'a mut Expect,
-            ctx: fmt::Arguments<'a>,
-        }
-        impl<'a> Record for CheckRecorder<'a> {
-            fn record_i64(&mut self, field: &Field, value: i64) {
-                self.expect.compare_or_panic(field.name(), &value, &self.ctx)
-            }
-
-            fn record_u64(&mut self, field: &Field, value: u64) {
-                self.expect.compare_or_panic(field.name(), &value, &self.ctx)
-            }
-
-            fn record_bool(&mut self, field: &Field, value: bool) {
-                self.expect.compare_or_panic(field.name(), &value, &self.ctx)
-            }
-
-            fn record_str(&mut self, field: &Field, value: &str) {
-                self.expect.compare_or_panic(field.name(), &value, &self.ctx)
-            }
-
-            fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
-                self.expect.compare_or_panic(field.name(), &field::debug(value), &self.ctx)
-            }
-        }
-        values.record(&mut CheckRecorder {
+    pub fn checker<'a>(&'a mut self, ctx: String) -> CheckRecorder<'a> {
+        CheckRecorder {
             expect: self,
             ctx,
-        });
-        assert!(self.fields.is_empty(), "{}missing {}", self, ctx);
-
+        }
     }
 }
 
@@ -136,6 +115,39 @@ impl fmt::Display for MockValue {
             MockValue::Debug(v) => write!(f, ": &fmt::Debug = {:?}", v),
             MockValue::Any => write!(f, ": _ = _"),
         }
+    }
+}
+
+pub struct CheckRecorder<'a> {
+    expect: &'a mut Expect,
+    ctx: String,
+}
+
+impl<'a> Record for CheckRecorder<'a> {
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+    }
+
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+        self.expect.compare_or_panic(field.name(), &field::debug(value), &self.ctx)
+    }
+}
+
+impl<'a> CheckRecorder<'a> {
+    pub fn finish(self) {
+        assert!(self.expect.fields.is_empty(), "{}missing {}", self.expect, self.ctx);
     }
 }
 
