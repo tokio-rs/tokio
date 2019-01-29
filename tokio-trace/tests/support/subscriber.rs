@@ -2,13 +2,12 @@
 use super::span::MockSpan;
 use std::{
     collections::{HashMap, VecDeque},
-    fmt,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
 };
-use tokio_trace::{field, Id, Metadata, Subscriber};
+use tokio_trace::{field, Event, Id, Metadata, Subscriber};
 
 #[derive(Debug, Eq, PartialEq)]
 struct ExpectEvent {
@@ -119,6 +118,35 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
 
     fn record(&self, _span: &Id, _values: field::ValueSet) {
         // TODO: it would be nice to be able to expect field values...
+    }
+
+    fn event(&self, event: Event) {
+        match self.expected.lock().unwrap().pop_front() {
+            None => {}
+            Some(Expect::Event(_)) => {
+                // TODO: implement me
+            }
+            Some(Expect::Enter(ref expected_span)) => panic!(
+                "expected to enter {}, but observed event {:?} instead",
+                expected_span, event
+            ),
+            Some(Expect::Exit(ref expected_span)) => panic!(
+                "expected to exit {}, but observed event {:?} instead",
+                expected_span, event
+            ),
+            Some(Expect::CloneSpan(ref expected_span)) => panic!(
+                "expected to clone {}, but entered span {:?} instead",
+                expected_span, event
+            ),
+            Some(Expect::DropSpan(ref expected_span)) => panic!(
+                "expected to drop {}, but observed event {:?} instead",
+                expected_span, event
+            ),
+            Some(Expect::Nothing) => panic!(
+                "expected nothing else to happen, but observed event {:?} instead",
+                event
+            ),
+        }
     }
 
     fn add_follows_from(&self, _span: &Id, _follows: Id) {

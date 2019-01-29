@@ -2,7 +2,7 @@
 use {
     callsite, field,
     subscriber::{self, Subscriber},
-    Metadata, Span,
+    Event, Metadata, Span,
 };
 
 use std::{
@@ -141,6 +141,17 @@ impl Dispatch {
         self.subscriber.enabled(metadata)
     }
 
+    /// Records that an [`Event`] has occurred.
+    ///
+    /// This calls the [`event`](::Subscriber::event) function on
+    /// the `Subscriber` that this `Dispatch` forwards to.
+    ///
+    /// [`Event`]: ::event::Event
+    #[inline]
+    pub fn event(&self, event: Event) {
+        self.subscriber.event(event)
+    }
+
     /// Records that a [`Span`] has been entered.
     ///
     /// This calls the [`enter`](::Subscriber::enter) function on the
@@ -209,6 +220,8 @@ impl Subscriber for NoSubscriber {
     fn new_span(&self, _meta: &Metadata) -> Span {
         Span::from_u64(0)
     }
+
+    fn event(&self, _event: Event) {}
 
     fn record(&self, _span: &Span, _values: field::ValueSet) {}
 

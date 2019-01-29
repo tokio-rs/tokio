@@ -302,10 +302,11 @@ use tokio_trace_core::*;
 
 pub use self::{
     dispatcher::Dispatch,
+    event::Event,
     field::Value,
-    span::{Event, Span},
+    span::Span,
     subscriber::Subscriber,
-    tokio_trace_core::{dispatcher, Level, Metadata},
+    tokio_trace_core::{dispatcher, event, Level, Metadata},
 };
 
 #[doc(hidden)]
@@ -321,29 +322,28 @@ pub use self::{
 #[doc(hidden)]
 #[macro_export]
 macro_rules! callsite {
-    (span: $name:expr, $( $field_name:ident ),*) => ({
-        callsite!(@
+    (name: $name:expr, fields: $( $field_name:ident ),* $(,)*) => ({
+        callsite! {
             name: $name,
             target: module_path!(),
             level: $crate::Level::TRACE,
-            fields: &[ $(stringify!($field_name)),* ]
-        )
+            fields: $( $field_name ),*
+        }
     });
-    (event: $lvl:expr, $( $field_name:ident ),*) =>
-        (callsite!(event: $lvl, target: module_path!(), $( $field_name ),* ));
-    (event: $lvl:expr, target: $target:expr, $( $field_name:ident ),*) => ({
-        callsite!(@
-            name: concat!("event at ", file!(), ":", line!()),
-            target: $target,
+    (name: $name:expr, level: $lvl:expr, fields: $( $field_name:ident ),* $(,)*) => ({
+        callsite! {
+            name: $name,
+            target: module_path!(),
             level: $lvl,
-            fields: &[ "message", $(stringify!($field_name)),* ]
-        )
+            fields: $( $field_name ),*
+        }
     });
-    (@
+    (
         name: $name:expr,
         target: $target:expr,
         level: $lvl:expr,
-        fields: $field_names:expr
+        fields: $( $field_name:ident ),*
+        $(,)*
     ) => ({
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
         use $crate::{callsite, Metadata, subscriber::Interest};
@@ -353,7 +353,7 @@ macro_rules! callsite {
                 name: $name,
                 target: $target,
                 level: $lvl,
-                fields: $field_names,
+                fields: &[ $( stringify!($field_name) ),* ],
                 callsite: &MyCallsite,
             }
         };
@@ -447,7 +447,7 @@ macro_rules! span {
             #[allow(unused_imports)]
             use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
-            let callsite = callsite! { span: $name, $( $k ),* };
+            let callsite = callsite! { name: $name, fields: $( $k ),* };
             let interest = callsite.interest();
             if interest.is_never() {
                 Span::new_disabled()
@@ -505,76 +505,78 @@ macro_rules! span {
 /// ```
 #[macro_export]
 macro_rules! event {
-    (target: $target:expr, $lvl:expr, $( $k:ident $( = $val:expr )* ),+ ) => (
-        event!(target: $target, $lvl, { $( $k $( = $val)* ),+ })
-    );
+    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* } )=> ({
+        {
+            #[allow(unused_imports)]
+            use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
+            use $crate::callsite::Callsite;
+            let callsite = callsite! {
+                name: concat!("event at ", file!(), ":", stringify!(line!())),
+                target: $target,
+                level: $lvl,
+                fields: $( $k ),*
+            };
+            let interest = callsite.interest();
+            let meta = callsite.metadata();
+            if !interest.is_never() {
+                dispatcher::with(|current| {
+                    if interest.is_always()
+                        || (interest.is_sometimes() && current.enabled(meta)) {
+                            let mut vals: [Option<&Value>; 32] = [None; 32];
+                            let mut i = 0;
+                            $(
+                                $(
+                                    vals[i] = Some(&$val);
+                                )*
+                                i += 1;
+                            )*
+                        let values = ValueSet::new(meta.fields(), vals);
+                        current.event(Event::builder(meta, values).finish());
+                    }
+                })
+            }
+        }
+    });
     (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
         {
             #[allow(unused_imports)]
-            use $crate::{callsite, Id, Subscriber, Event, field::{Value, AsField}};
+            use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
             use $crate::callsite::Callsite;
-            let callsite = callsite! { event:
-                $lvl,
-                target:
-                $target, $( $k ),*
+            let callsite = callsite! {
+                name: concat!("event at ", file!(), ":", stringify!(line!())),
+                target: $target,
+                level: $lvl,
+                fields: message, $( $k ),*
             };
             let interest = callsite.interest();
-            if interest.is_never() {
-                Event::new_disabled()
-            } else {
-                let mut event = Event::new(callsite.interest(), callsite.metadata());
-                // Depending on how many fields are generated, this may or may
-                // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)] {
-                    if !event.is_disabled() {
-                        let mut keys = callsite.metadata().fields().into_iter();
-                        let msg_key = keys.next()
-                            .expect("event metadata should define a key for the message");
-                        event.message(&msg_key, format_args!( $($arg)+ ));
-                        $(
-                            let key = keys.next()
-                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                            event!(@ record: event, $k, &key, $($val)*);
-                        )*
+            let meta = callsite.metadata();
+            if !interest.is_never() {
+                dispatcher::with(|current| {
+                    if interest.is_always()
+                        || (interest.is_sometimes() && current.enabled(meta)) {
+                            let mut vals: [Option<&Value>; 32] = [None; 32];
+                            let mut i = 0;
+                            $(
+                                $(
+                                    vals[i] = Some(&$val);
+                                )*
+                                i += 1;
+                            )*
+                        let values = ValueSet::new(meta.fields(), vals);
+                        let message = meta.fields().iter().next()
+                            .expect("missing field for message; this is a bug");
+                        current.event(Event::builder(meta, values)
+                            .with_message(message, format_args!( $($arg)+ ))
+                            .finish()
+                        );
                     }
-                }
-                event
+                })
             }
         }
     });
-    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* } ) => ({
-        {
-            #[allow(unused_imports)]
-            use $crate::{callsite, Id, Subscriber, Event, field::{Value, AsField}};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! { event:
-                $lvl,
-                target:
-                $target, $( $k ),*
-            };
-            let interest = callsite.interest();
-            if interest.is_never() {
-                Event::new_disabled()
-            } else {
-                let mut event = Event::new(callsite.interest(), callsite.metadata());
-                // Depending on how many fields are generated, this may or may
-                // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)] {
-                    if !event.is_disabled() {
-                        let mut keys = callsite.metadata().fields().into_iter();
-                        let msg_key = keys.next()
-                            .expect("event metadata should define a key for the message");
-                        $(
-                            let key = keys.next()
-                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                            event!(@ record: event, $k, &key, $($val)*);
-                        )*
-                    }
-                }
-                event
-            }
-        }
-    });
+    (target: $target:expr, $lvl:expr, $( $k:ident $( = $val:expr )* ),+ ) => (
+        event!(target: $target, $lvl, { $( $k $( = $val)* ),+ })
+    );
     (target: $target:expr, $lvl:expr, $($arg:tt)+ ) => (
         event!(target: $target, $lvl, { }, $($arg)+)
     );
@@ -586,12 +588,6 @@ macro_rules! event {
     );
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
-    );
-    (@ record: $ev:expr, $k:expr, $i:expr, $val:expr) => (
-        $ev.record($i, &$val);
-    );
-    (@ record: $ev:expr, $k:expr, $i:expr,) => (
-        // skip
     );
 }
 

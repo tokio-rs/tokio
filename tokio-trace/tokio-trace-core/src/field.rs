@@ -447,6 +447,10 @@ impl<'a> ValueSet<'a> {
     pub fn is_complete(&self) -> bool {
         self.is_complete
     }
+
+    pub(crate) fn field_set(&self) -> &FieldSet {
+        self.fields
+    }
 }
 
 

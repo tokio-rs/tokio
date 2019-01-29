@@ -1,7 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, Metadata, Span};
-
-use std::fmt;
+use {field, Event, Metadata, Span};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -156,6 +154,11 @@ pub trait Subscriber {
     fn enabled(&self, metadata: &Metadata) -> bool;
 
     // === Notification methods ===============================================
+
+    /// Records that an [`Event`] has occurred.
+    ///
+    /// [`Event`]: ::event::Event
+    fn event(&self, event: Event);
 
     /// Records that a [`Span`] has been entered.
     ///
