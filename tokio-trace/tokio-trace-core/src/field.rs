@@ -458,7 +458,7 @@ impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ValueSet")
             .field("fields", &self.fields)
-            .field("values", &"[...]")
+            .field("values", &format_args!("{}", "[...]"))
             .field("is_complete", &self.is_complete)
             .finish()
     }
