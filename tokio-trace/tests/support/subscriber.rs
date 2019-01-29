@@ -148,10 +148,11 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
     }
 
     fn event(&self, event: Event) {
+        let name = event.metadata().name();
+        println!("event: {};", name);
         match self.expected.lock().unwrap().pop_front() {
             None => {}
             Some(Expect::Event(MockEvent { name: expected_name, fields })) => {
-                let name = event.metadata().name();
                 if let Some(expected_name) = expected_name {
                     assert_eq!(
                         name, expected_name,
@@ -308,7 +309,7 @@ impl Expect {
     fn bad<'a>(&self, what: fmt::Arguments<'a>) {
         match self {
             Expect::Event(e) => panic!(
-                "expected event, but {} instead", what,
+                "expected event {}, but {} instead", e, what,
             ),
             Expect::Enter(e) => panic!(
                 "expected to enter {} but {} instead", e, what,
