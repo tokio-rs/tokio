@@ -511,7 +511,7 @@ macro_rules! event {
             use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
             use $crate::callsite::Callsite;
             let callsite = callsite! {
-                name: concat!("event at ", file!(), ":", stringify!(line!())),
+                name: concat!("event ", file!(), ":", line!()),
                 target: $target,
                 level: $lvl,
                 fields: $( $k ),*
@@ -543,7 +543,7 @@ macro_rules! event {
             use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
             use $crate::callsite::Callsite;
             let callsite = callsite! {
-                name: concat!("event at ", file!(), ":", stringify!(line!())),
+                name: concat!("event ", file!(), ":", line!()),
                 target: $target,
                 level: $lvl,
                 fields: message, $( $k ),*
