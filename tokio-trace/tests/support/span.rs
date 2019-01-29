@@ -8,7 +8,6 @@ use std::fmt;
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct MockSpan {
     pub name: Option<&'static str>,
-    // TODO: more
 }
 
 pub fn mock() -> MockSpan {
@@ -22,15 +21,15 @@ impl MockSpan {
         self.name = Some(name);
         self
     }
-
-    // TODO: fields, etc
 }
+
 
 impl fmt::Display for MockSpan {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.name {
             Some(name) => write!(f, "a span named {:?}", name),
             None => write!(f, "any span"),
-        }
+        }?;
+        Ok(())
     }
 }
