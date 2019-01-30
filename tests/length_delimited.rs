@@ -11,12 +11,13 @@ use futures::Async::*;
 
 use std::io;
 use std::collections::VecDeque;
+use std::cmp;
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
         let mut v = VecDeque::new();
         v.extend(vec![$($x),*]);
-        Mock { calls: v }
+        Mock { calls: v, overflow: None }
     }};
 }
 
@@ -109,6 +110,33 @@ fn read_multi_frame_multi_packet() {
     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(None));
+}
+
+#[test]
+fn read_two_frames_single_packet_two_framed_read() {
+    let mut io = FramedRead::new(mock! {
+        Ok(b"\x00\x00\x00\x09abcdefghi\x00\x00\x00\x03123"[..].into()),
+    }, LengthDelimitedCodec::new());
+
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+
+    let mut io = FramedRead::new(io.into_inner(), LengthDelimitedCodec::new());
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(None));
+}
+
+#[test]
+fn read_two_frames_multi_packet_two_framed_read() {
+    let mut io = FramedRead::new(mock! {
+        Ok(b"\x00\x00\x00\x09abcdefghi\x00"[..].into()),
+        Ok(b"\x00\x00\x03123"[..].into()),
+    }, LengthDelimitedCodec::new());
+
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+
+    let mut io = FramedRead::new(io.into_inner(), LengthDelimitedCodec::new());
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(None));
 }
 
@@ -281,6 +309,36 @@ fn read_single_multi_frame_one_packet_skip_none_adjusted() {
 }
 
 #[test]
+fn read_single_multi_frame_one_packet_skip_none_adjusted_two_framed_read() {
+    let mut data: Vec<u8> = vec![];
+    data.extend_from_slice(b"xx\x00\x09abcdefghi");
+    data.extend_from_slice(b"yy\x00\x03123");
+    data.extend_from_slice(b"zz\x00\x0bhello world");
+
+    let mut io = length_delimited::Builder::new()
+        .length_field_length(2)
+        .length_field_offset(2)
+        .num_skip(0)
+        .length_adjustment(4)
+        .new_read(mock! {
+            Ok(data.into()),
+        });
+
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"xx\x00\x09abcdefghi"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"yy\x00\x03123"[..].into())));
+
+    let mut io = length_delimited::Builder::new()
+        .length_field_length(2)
+        .length_field_offset(2)
+        .num_skip(0)
+        .length_adjustment(4)
+        .new_read(io.into_inner());
+
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"zz\x00\x0bhello world"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(None));
+}
+
+#[test]
 fn read_single_multi_frame_one_packet_length_includes_head() {
     let mut data: Vec<u8> = vec![];
     data.extend_from_slice(b"\x00\x0babcdefghi");
@@ -296,6 +354,32 @@ fn read_single_multi_frame_one_packet_length_includes_head() {
 
     assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(None));
+}
+
+#[test]
+fn read_single_multi_frame_one_packet_length_includes_head_two_framed_read() {
+    let mut data: Vec<u8> = vec![];
+    data.extend_from_slice(b"\x00\x0babcdefghi");
+    data.extend_from_slice(b"\x00\x05123");
+    data.extend_from_slice(b"\x00\x0dhello world");
+
+    let mut io = length_delimited::Builder::new()
+        .length_field_length(2)
+        .length_adjustment(-2)
+        .new_read(mock! {
+            Ok(data.into()),
+        });
+
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
+
+    let mut io = length_delimited::Builder::new()
+        .length_field_length(2)
+        .length_adjustment(-2)
+        .new_read(io.into_inner());
+
     assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
     assert_eq!(io.poll().unwrap(), Ready(None));
 }
@@ -507,6 +591,7 @@ fn would_block() -> io::Error {
 
 struct Mock {
     calls: VecDeque<io::Result<Op>>,
+    overflow: Option<Vec<u8>>,
 }
 
 enum Op {
@@ -518,11 +603,31 @@ use self::Op::*;
 
 impl io::Read for Mock {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
+        fn copy_data(dst: &mut[u8], mut data: Vec<u8>) -> (usize, Option<Vec<u8>>) {
+            let len = cmp::min(dst.len(), data.len());
+            dst[..len].copy_from_slice(&data[..len]);
+
+            if len < data.len() {
+                data.drain(..len);
+                (len, Some(data))
+            } else {
+                (len, None)
+            }
+        }
+
+        if let Some(data) = self.overflow.take() {
+            let (len, overflow) = copy_data(dst, data);
+
+            self.overflow = overflow;
+            return Ok(len)
+        }
+
         match self.calls.pop_front() {
             Some(Ok(Op::Data(data))) => {
-                debug_assert!(dst.len() >= data.len());
-                dst[..data.len()].copy_from_slice(&data[..]);
-                Ok(data.len())
+                let (len, overflow) = copy_data(dst, data);
+
+                self.overflow = overflow;
+                Ok(len)
             }
             Some(Ok(_)) => panic!(),
             Some(Err(e)) => Err(e),

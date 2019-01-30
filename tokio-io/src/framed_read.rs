@@ -7,7 +7,7 @@ use codec::Decoder;
 use framed::Fuse;
 
 use futures::{Async, Poll, Stream, Sink, StartSend};
-use bytes::BytesMut;
+use bytes::{BytesMut, BufMut};
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 #[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
@@ -204,12 +204,38 @@ impl<T> Stream for FramedRead2<T>
 
             assert!(!self.eof);
 
-            // Otherwise, try to read more data and try again. Make sure we've
-            // got room for at least one byte to read to ensure that we don't
-            // get a spurious 0 that looks like EOF
-            self.buffer.reserve(1);
-            if 0 == try_ready!(self.inner.read_buf(&mut self.buffer)) {
-                self.eof = true;
+            if let Some(read) = self.inner.required_bytes_to_continue(&self.buffer) {
+                // We need to read at least one byte, otherwise it could look like a spurious EOF.
+                assert!(read > 0);
+
+                let remaining = self.buffer.remaining_mut();
+                if read > remaining {
+                    self.buffer.reserve(read - remaining);
+                }
+
+                let n = unsafe {
+                    let buf = &mut self.buffer.bytes_mut()[..read];
+
+                    self.inner.prepare_uninitialized_buffer(buf);
+
+                    try_ready!(self.inner.poll_read(buf))
+                };
+
+                if n == 0 {
+                    self.eof = true;
+                }
+
+                unsafe {
+                    self.buffer.advance_mut(n);
+                }
+            } else {
+                // Otherwise, try to read more data and try again. Make sure we've
+                // got room for at least one byte to read to ensure that we don't
+                // get a spurious 0 that looks like EOF
+                self.buffer.reserve(1);
+                if 0 == try_ready!(self.inner.read_buf(&mut self.buffer)) {
+                    self.eof = true;
+                }
             }
 
             self.is_readable = true;

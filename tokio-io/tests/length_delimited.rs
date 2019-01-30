@@ -12,12 +12,13 @@ use futures::Async::*;
 
 use std::io;
 use std::collections::VecDeque;
+use std::cmp;
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
         let mut v = VecDeque::new();
         v.extend(vec![$($x),*]);
-        Mock { calls: v }
+        Mock { calls: v, overflow: None }
     }};
 }
 
@@ -489,6 +490,7 @@ fn would_block() -> io::Error {
 
 struct Mock {
     calls: VecDeque<io::Result<Op>>,
+    overflow: Option<Vec<u8>>,
 }
 
 enum Op {
@@ -500,11 +502,31 @@ use self::Op::*;
 
 impl io::Read for Mock {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
+        fn copy_data(dst: &mut[u8], mut data: Vec<u8>) -> (usize, Option<Vec<u8>>) {
+            let len = cmp::min(dst.len(), data.len());
+            dst[..len].copy_from_slice(&data[..len]);
+
+            if len < data.len() {
+                data.drain(..len);
+                (len, Some(data))
+            } else {
+                (len, None)
+            }
+        }
+
+        if let Some(data) = self.overflow.take() {
+            let (len, overflow) = copy_data(dst, data);
+
+            self.overflow = overflow;
+            return Ok(len)
+        }
+
         match self.calls.pop_front() {
             Some(Ok(Op::Data(data))) => {
-                debug_assert!(dst.len() >= data.len());
-                dst[..data.len()].copy_from_slice(&data[..]);
-                Ok(data.len())
+                let (len, overflow) = copy_data(dst, data);
+
+                self.overflow = overflow;
+                Ok(len)
             }
             Some(Ok(_)) => panic!(),
             Some(Err(e)) => Err(e),

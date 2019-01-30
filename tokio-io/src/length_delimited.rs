@@ -386,6 +386,15 @@ impl codec::Decoder for Decoder {
             None => Ok(None),
         }
     }
+
+    fn required_bytes_to_continue(&self, buf: &BytesMut) -> Option<usize> {
+        let head_bytes = self.builder.num_head_bytes();
+        match self.state {
+            DecodeState::Head if buf.len() < head_bytes => Some(head_bytes - buf.len()),
+            DecodeState::Data(len) if buf.len() < len => Some(len - buf.len()),
+            _ => None,
+        }
+    }
 }
 
 // ===== impl FramedWrite =====

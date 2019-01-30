@@ -222,6 +222,10 @@ impl<T: Decoder> Decoder for FramedWrite2<T> {
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<T::Item>, T::Error> {
         self.inner.decode_eof(src)
     }
+
+    fn required_bytes_to_continue(&self, buf: &BytesMut) -> Option<usize> {
+        self.inner.required_bytes_to_continue(buf)
+    }
 }
 
 impl<T: Read> Read for FramedWrite2<T> {

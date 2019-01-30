@@ -233,6 +233,10 @@ impl<T, U: Decoder> Decoder for Fuse<T, U> {
     fn decode_eof(&mut self, buffer: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.1.decode_eof(buffer)
     }
+
+    fn required_bytes_to_continue(&self, buf: &BytesMut) -> Option<usize> {
+        self.1.required_bytes_to_continue(buf)
+    }
 }
 
 impl<T, U: Encoder> Encoder for Fuse<T, U> {

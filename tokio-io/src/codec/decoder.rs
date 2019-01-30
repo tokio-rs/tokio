@@ -114,4 +114,13 @@ pub trait Decoder {
     {
         Framed::new(io, self)
     }
+
+    /// Returns the number of bytes the decoder requires to continue decoding.
+    ///
+    /// The default and if the decoder does not need any fixed number of bytes is to return `None`.
+    ///
+    /// The given `buf` argument is the current buffer that holds all bytes read.
+    fn required_bytes_to_continue(&self, _buf: &BytesMut) -> Option<usize> {
+        None
+    }
 }
