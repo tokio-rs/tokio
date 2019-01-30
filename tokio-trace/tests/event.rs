@@ -6,7 +6,7 @@ use self::support::*;
 
 use tokio_trace::{
     subscriber::with_default,
-    field::display,
+    field::{display, debug},
     Level,
 };
 
@@ -121,5 +121,37 @@ fn borrowed_field() {
         message.push_str(", which happened!");
     });
 
+    handle.assert_finished();
+}
+
+#[test]
+fn move_field_out_of_struct() {
+    #[derive(Debug)]
+    struct Position { x: f32, y: f32 }
+
+    let pos = Position { x: 3.234, y: -1.223 };
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("x")
+                    .with_value(&debug(3.234))
+                    .and(field::mock("y").with_value(&debug(-1.223)))
+                    .only()
+            )
+        )
+        .event(
+            event::mock().with_fields(
+                field::mock("position")
+                    .with_value(&debug(&pos))
+            )
+        )
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let pos = Position { x: 3.234, y: -1.223 };
+        debug!(x = debug(pos.x), y = debug(pos.y));
+        debug!(target: "app_events", { position = debug(pos) }, "New position");
+    });
     handle.assert_finished();
 }

@@ -4,7 +4,7 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{dispatcher, Dispatch, Level, Span, field::display};
+use tokio_trace::{dispatcher, Dispatch, Level, Span, field::{debug, display}};
 
 #[test]
 fn closed_handle_cannot_be_entered() {
@@ -353,6 +353,39 @@ fn borrowed_field() {
         span.enter(|| {
             message.insert_str(10, " inside");
         });
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn move_field_out_of_struct() {
+    #[derive(Debug)]
+    struct Position { x: f32, y: f32 }
+
+    let pos = Position { x: 3.234, y: -1.223 };
+    let (subscriber, handle) = subscriber::mock()
+        .record(
+            span::mock().named("foo"),
+            field::mock("x")
+                .with_value(&debug(3.234))
+                .and(field::mock("y").with_value(&debug(-1.223)))
+                .only()
+        )
+        .record(
+            span::mock().named("bar"),
+            field::mock("position")
+                .with_value(&debug(&pos))
+                .only()
+        )
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let pos = Position { x: 3.234, y: -1.223 };
+        let mut foo = span!("foo", x = debug(pos.x), y = debug(pos.y));
+        let mut bar = span!("bar", position = debug(pos));
+        foo.enter(|| {});
+        bar.enter(|| {});
     });
 
     handle.assert_finished();
