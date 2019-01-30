@@ -522,15 +522,7 @@ macro_rules! event {
                 dispatcher::with(|current| {
                     if interest.is_always()
                         || (interest.is_sometimes() && current.enabled(meta)) {
-                            let mut vals: [Option<&Value>; 32] = [None; 32];
-                            let mut i = 0;
-                            $(
-                                $(
-                                    vals[i] = Some(&$val);
-                                )*
-                                i += 1;
-                            )*
-                        let values = ValueSet::new(meta.fields(), vals);
+                        let values = event!(@ meta, offset: 0, values: $($k $(= $val)*),*);
                         current.event(Event::builder(meta, values).finish());
                     }
                 })
@@ -554,15 +546,7 @@ macro_rules! event {
                 dispatcher::with(|current| {
                     if interest.is_always()
                         || (interest.is_sometimes() && current.enabled(meta)) {
-                            let mut vals: [Option<&Value>; 32] = [None; 32];
-                            let mut i = 0;
-                            $(
-                                $(
-                                    vals[i] = Some(&$val);
-                                )*
-                                i += 1;
-                            )*
-                        let values = ValueSet::new(meta.fields(), vals);
+                        let values = event!(@ meta, offset: 1, values: $($k $(= $val)*),*);
                         let message = meta.fields().iter().next()
                             .expect("missing field for message; this is a bug");
                         current.event(Event::builder(meta, values)
@@ -589,6 +573,17 @@ macro_rules! event {
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
     );
+    (@ $meta:expr, offset: $offset:expr, values: $( $k:ident $( = $val:expr )* ),* ) => ({
+        let mut vals: [Option<&Value>; 32] = [None; 32];
+        let mut i = $offset;
+        $(
+            $(
+                vals[i] = Some(&$val);
+            )*
+            i += 1;
+        )*
+        ValueSet::new($meta.fields(), vals)
+    });
 }
 
 /// Constructs an event at the trace level.
