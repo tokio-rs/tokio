@@ -426,14 +426,6 @@ impl<'a> ValueSet<'a> {
         }
     }
 
-    /// Returns the value for the given key, if one exists.
-    pub fn get(&self, key: &Field) -> Option<&Value> {
-        if self.callsite() != key.callsite() {
-            return None;
-        }
-        self.values.get(key.i)?.as_ref().map(|&v| v)
-    }
-
     /// Returns true if this `ValueSet` contains _all_ the fields defined on the
     /// span or event it corresponds to.
     pub fn is_complete(&self) -> bool {
