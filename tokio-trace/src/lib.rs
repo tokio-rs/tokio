@@ -458,13 +458,15 @@ macro_rules! span {
                 // not actually be used, but it doesn't make sense to repeat it.
                 #[allow(unused_variables, unused_mut)] {
                     if !span.is_disabled() {
+                        $( $( let $k = $val; )* )*
                         let mut vals: [Option<&Value>; 32] = [None; 32];
                         let mut i = 0;
                         let mut is_empty = true;
                         $(
                             $(
+                                span!(@ ignore $val);
                                 is_empty = false;
-                                vals[i] = Some(&$val);
+                                vals[i] = Some(&$k);
                             )*
                             i += 1;
                         )*
@@ -477,6 +479,7 @@ macro_rules! span {
             }
         }
     };
+    (@ ignore $v:tt) => {}
 }
 
 /// Constructs a new `Event`.
@@ -522,7 +525,15 @@ macro_rules! event {
                 dispatcher::with(|current| {
                     if interest.is_always()
                         || (interest.is_sometimes() && current.enabled(meta)) {
-                        let values = event!(@ meta, offset: 0, values: $($k $(= $val)*),*);
+                        $( $( let $k = $val; )* )*
+                        let mut vals: [Option<&Value>; 32] = [None; 32];
+                        let mut i = 0;
+                        $(
+                            event!(@ ignore $val);
+                            vals[i] = Some(&$k);
+                            i += 1;
+                        )*
+                        let values = ValueSet::new(meta.fields(), vals);
                         current.event(Event::builder(meta, values).finish());
                     }
                 })
@@ -546,7 +557,15 @@ macro_rules! event {
                 dispatcher::with(|current| {
                     if interest.is_always()
                         || (interest.is_sometimes() && current.enabled(meta)) {
-                        let values = event!(@ meta, offset: 1, values: $($k $(= $val)*),*);
+                        $( $( let $k = $val; ) )*
+                        let mut vals: [Option<&Value>; 32] = [None; 32];
+                        let mut i = 1;
+                        $(
+                            event!(@ ignore $val);
+                            vals[i] = Some(&$k);
+                            i += 1;
+                        )*
+                        let values = ValueSet::new(meta.fields(), vals);
                         let message = meta.fields().iter().next()
                             .expect("missing field for message; this is a bug");
                         current.event(Event::builder(meta, values)
@@ -573,17 +592,7 @@ macro_rules! event {
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
     );
-    (@ $meta:expr, offset: $offset:expr, values: $( $k:ident $( = $val:expr )* ),* ) => ({
-        let mut vals: [Option<&Value>; 32] = [None; 32];
-        let mut i = $offset;
-        $(
-            $(
-                vals[i] = Some(&$val);
-            )*
-            i += 1;
-        )*
-        ValueSet::new($meta.fields(), vals)
-    });
+    (@ ignore $v:tt) => {}
 }
 
 /// Constructs an event at the trace level.
@@ -639,7 +648,8 @@ macro_rules! trace {
         event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* }, $($arg)+)
     );
     ($( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* })
+    ($( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::TRACE, {}, $($arg)+));
