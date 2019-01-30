@@ -247,10 +247,11 @@
 //! #[macro_use]
 //! extern crate tokio_trace;
 //! # pub struct FooSubscriber;
-//! # use tokio_trace::{span::Id, field::Field, Metadata};
+//! # use tokio_trace::{span::Id, Metadata};
 //! # impl tokio_trace::Subscriber for FooSubscriber {
 //! #   fn new_span(&self, _: &Metadata) -> Id { Id::from_u64(0) }
-//! #   fn record_debug(&self, _: &Id, _: &Field, _: &::std::fmt::Debug) {}
+//! #   fn record(&self, _: &Id, _: tokio_trace::field::ValueSet) {}
+//! #   fn event(&self, _: tokio_trace::Event) {}
 //! #   fn add_follows_from(&self, _: &Id, _: Id) {}
 //! #   fn enabled(&self, _: &Metadata) -> bool { false }
 //! #   fn enter(&self, _: &Id) {}
@@ -634,7 +635,7 @@ macro_rules! event {
 ///
 /// trace!(position = field::debug(pos), origin_dist = field::debug(origin_dist));
 /// trace!(target: "app_events",
-///         { pos = field::debug(pos) },
+///         { position = field::debug(pos) },
 ///         "x is {} and y is {}",
 ///        if pos.x >= 0.0 { "positive" } else { "negative" },
 ///        if pos.y >= 0.0 { "positive" } else { "negative" });
