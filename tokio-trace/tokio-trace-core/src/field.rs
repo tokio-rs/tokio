@@ -73,7 +73,7 @@ pub struct FieldSet {
 
 /// A set of fields and values for a span.
 pub struct ValueSet<'a> {
-    values: [Option<&'a dyn Value>; 32],
+    values: [Option<&'a Value>; 32],
     fields: &'a FieldSet,
     is_complete: bool,
 }
@@ -394,7 +394,7 @@ impl<'a> ValueSet<'a> {
     /// Returns a new `ValueSet`.
     pub fn new(
         fields: &'a FieldSet,
-        values: [Option<&'a dyn Value>; 32],
+        values: [Option<&'a Value>; 32],
     ) -> Self {
         let is_complete = values.iter().all(Option::is_some);
         ValueSet {
