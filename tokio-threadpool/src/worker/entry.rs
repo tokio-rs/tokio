@@ -9,9 +9,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed, Release};
 use std::time::Duration;
 
-use crossbeam::queue::SegQueue;
+use crossbeam_deque::{Steal, Stealer, Worker};
+use crossbeam_queue::SegQueue;
 use crossbeam_utils::CachePadded;
-use deque;
 use slab::Slab;
 
 // TODO: None of the fields should be public
@@ -29,10 +29,10 @@ pub(crate) struct WorkerEntry {
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    worker: deque::Worker<Arc<Task>>,
+    pub worker: Worker<Arc<Task>>,
 
     // Stealer half of deque
-    stealer: deque::Stealer<Arc<Task>>,
+    stealer: Stealer<Arc<Task>>,
 
     // Thread parker
     park: UnsafeCell<Option<BoxPark>>,
@@ -53,7 +53,8 @@ pub(crate) struct WorkerEntry {
 
 impl WorkerEntry {
     pub fn new(park: BoxPark, unpark: BoxUnpark) -> Self {
-        let (w, s) = deque::fifo();
+        let w = Worker::new_fifo();
+        let s = w.stealer();
 
         WorkerEntry {
             state: CachePadded::new(AtomicUsize::new(State::default().into())),
@@ -187,7 +188,7 @@ impl WorkerEntry {
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
     #[inline]
-    pub fn pop_task(&self) -> deque::Pop<Arc<Task>> {
+    pub fn pop_task(&self) -> Option<Arc<Task>> {
         self.worker.pop()
     }
 
@@ -199,23 +200,15 @@ impl WorkerEntry {
     /// At the same time, this method steals some additional tasks and moves
     /// them into `dest` in order to balance the work distribution among
     /// workers.
-    pub fn steal_tasks(&self, dest: &Self) -> deque::Steal<Arc<Task>> {
-        self.stealer.steal_many(&dest.worker)
+    pub fn steal_tasks(&self, dest: &Self) -> Steal<Arc<Task>> {
+        self.stealer.steal_batch_and_pop(&dest.worker)
     }
 
     /// Drain (and drop) all tasks that are queued for work.
     ///
     /// This is called when the pool is shutting down.
     pub fn drain_tasks(&self) {
-        use deque::Pop::*;
-
-        loop {
-            match self.worker.pop() {
-                Data(_) => {}
-                Empty => break,
-                Retry => {}
-            }
-        }
+        while self.worker.pop().is_some() {}
     }
 
     /// Parks the worker thread.
@@ -284,7 +277,6 @@ impl WorkerEntry {
         }
         running_tasks.clear();
 
-        // Drop the parker.
         unsafe {
             *self.park.get() = None;
             *self.unpark.get() = None;
@@ -297,7 +289,7 @@ impl WorkerEntry {
         if self.needs_drain.compare_and_swap(true, false, Acquire) {
             let running_tasks = unsafe { &mut *self.running_tasks.get() };
 
-            while let Some(task) = self.remotely_completed_tasks.try_pop() {
+            while let Ok(task) = self.remotely_completed_tasks.pop() {
                 running_tasks.remove(task.reg_index.get());
             }
         }

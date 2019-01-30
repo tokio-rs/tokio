@@ -3,7 +3,6 @@ use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
 use shutdown::ShutdownTrigger;
 use pool::{Pool, MAX_BACKUP};
-use task::Queue;
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
 
@@ -13,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::cmp::max;
 
+use crossbeam_deque::Injector;
 use num_cpus;
 use tokio_executor::Enter;
 use tokio_executor::park::Park;
@@ -414,7 +414,7 @@ impl Builder {
             workers.into()
         };
 
-        let queue = Arc::new(Queue::new());
+        let queue = Arc::new(Injector::new());
 
         // Create a trigger that will clean up resources on shutdown.
         //
