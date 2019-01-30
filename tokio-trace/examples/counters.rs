@@ -2,16 +2,17 @@
 extern crate tokio_trace;
 
 use tokio_trace::{
-    field, span,
+    field::{self, Field, Record}, span,
     subscriber::{self, Subscriber},
-    Id, Metadata,
+    Event, Id, Metadata,
 };
 
 use std::{
+    fmt,
     collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, RwLock,
+        Arc, RwLock, RwLockReadGuard
     },
 };
 
@@ -23,8 +24,42 @@ struct CounterSubscriber {
     counters: Counters,
 }
 
+struct Count<'a> {
+    counters: RwLockReadGuard<'a, HashMap<String, AtomicUsize>>,
+}
+
+impl<'a> Record for Count<'a> {
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        if let Some(counter) = self.counters.get(field.name()) {
+            if value > 0 {
+                counter.fetch_add(value as usize, Ordering::Release);
+            } else {
+                counter.fetch_sub((value * -1) as usize, Ordering::Release);
+            }
+        };
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        if let Some(counter) = self.counters.get(field.name()) {
+            counter.fetch_add(value as usize, Ordering::Release);
+        };
+    }
+
+    fn record_bool(&mut self, _: &Field, _: bool) {}
+    fn record_str(&mut self, _: &Field, _: &str) {}
+    fn record_debug(&mut self, _: &Field, _: &fmt::Debug) {}
+}
+
+impl CounterSubscriber {
+    fn recorder(&self) -> Count {
+        Count {
+            counters: self.counters.0.read().unwrap()
+        }
+    }
+}
+
 impl Subscriber for CounterSubscriber {
-    fn register_callsite(&self, meta: &tokio_trace::Metadata) -> subscriber::Interest {
+    fn register_callsite(&self, meta: &Metadata) -> subscriber::Interest {
         let mut interest = subscriber::Interest::never();
         for key in meta.fields() {
             let name = key.name();
@@ -50,25 +85,13 @@ impl Subscriber for CounterSubscriber {
         // unimplemented
     }
 
-    fn record_i64(&self, _id: &Id, field: &field::Field, value: i64) {
-        let registry = self.counters.0.read().unwrap();
-        if let Some(counter) = registry.get(field.name()) {
-            if value > 0 {
-                counter.fetch_add(value as usize, Ordering::Release);
-            } else {
-                counter.fetch_sub(value as usize, Ordering::Release);
-            }
-        };
+    fn record(&self, _: &Id, values: field::ValueSet) {
+        values.record(&mut self.recorder())
     }
 
-    fn record_u64(&self, _id: &Id, field: &field::Field, value: u64) {
-        let registry = self.counters.0.read().unwrap();
-        if let Some(counter) = registry.get(field.name()) {
-            counter.fetch_add(value as usize, Ordering::Release);
-        };
+    fn event(&self, event: Event) {
+        event.record(&mut self.recorder())
     }
-
-    fn record_debug(&self, _id: &Id, _field: &field::Field, _value: &::std::fmt::Debug) {}
 
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.fields().iter().any(|f| f.name().contains("count"))
