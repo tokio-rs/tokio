@@ -352,14 +352,6 @@ impl FieldSet {
     pub fn len(&self) -> usize {
         self.names.len()
     }
-
-    // this is because i'm not ready to commit to a public clone impl for `FieldSet`
-    fn duplicate(&self) -> Self {
-        FieldSet {
-            names: self.names,
-            callsite: callsite::Identifier(self.callsite.0),
-        }
-    }
 }
 
 impl<'a> IntoIterator for &'a FieldSet {
