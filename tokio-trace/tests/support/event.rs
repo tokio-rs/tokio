@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
-use super::field;
+use super::{field, metadata};
 
-use std::{borrow::Borrow, fmt};
+use std::fmt;
 
 /// A mock event.
 ///
@@ -9,8 +9,8 @@ use std::{borrow::Borrow, fmt};
 /// `subscriber` module.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct MockEvent {
-    pub name: Option<String>,
     pub fields: Option<field::Expect>,
+    metadata: metadata::Expected,
 }
 
 pub fn mock() -> MockEvent {
@@ -22,11 +22,13 @@ pub fn mock() -> MockEvent {
 impl MockEvent {
     pub fn named<I>(self, name: I) -> Self
     where
-        I: ToOwned<Owned = String>,
-        String: Borrow<I>,
+        I: Into<String>,
     {
         Self {
-            name: Some(name.to_owned()),
+            metadata: metadata::Expected {
+                name: Some(name.into()),
+                ..self.metadata
+            },
             ..self
         }
     }
@@ -40,13 +42,48 @@ impl MockEvent {
             ..self
         }
     }
+
+    pub fn at_level(self, level: tokio_trace::Level) -> Self {
+        Self {
+            metadata: metadata::Expected {
+                level: Some(level),
+                ..self.metadata
+            },
+            ..self
+        }
+    }
+
+    pub fn with_target<I>(self, target: I) -> Self
+    where
+        I: Into<String>,
+    {
+        Self {
+            metadata: metadata::Expected {
+                target: Some(target.into()),
+                ..self.metadata
+            },
+            ..self
+        }
+    }
+
+    pub(in support) fn check(self, event: tokio_trace::Event) {
+        let meta = event.metadata();
+        let name = meta.name();
+        self.metadata.check(meta, format_args!("event {}", name));
+        if let Some(mut expected_fields) = self.fields {
+            let mut checker = expected_fields
+                .checker(format!("{}", name));
+            event.record(&mut checker);
+            checker.finish();
+        }
+    }
 }
 
 
 impl fmt::Display for MockEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "an event")?;
-        if let Some(ref name) = self.name {
+        if let Some(ref name) = self.metadata.name {
             write!(f, " named {:?}", name)?;
         }
         if let Some(ref fields) = self.fields {

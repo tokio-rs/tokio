@@ -135,7 +135,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             if let Expect::Record(expected_span, mut expected_values) =
                 expected.pop_front().unwrap()
             {
-                if let Some(name) = expected_span.name {
+                if let Some(name) = expected_span.name() {
                     assert_eq!(name, span.name);
                 }
                 let mut checker = expected_values
@@ -152,21 +152,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         println!("event: {};", name);
         match self.expected.lock().unwrap().pop_front() {
             None => {}
-            Some(Expect::Event(MockEvent { name: expected_name, fields })) => {
-                if let Some(expected_name) = expected_name {
-                    assert_eq!(
-                        name, expected_name,
-                        "expected an event named {:?}, but got one named {:?}",
-                        expected_name, name
-                    );
-                }
-                if let Some(mut expected_fields) = fields {
-                    let mut checker = expected_fields
-                        .checker(format!("event {}: ", name));
-                    event.record(&mut checker);
-                    checker.finish();
-                }
-            }
+            Some(Expect::Event(expected)) => expected.check(event),
             Some(ex) => ex.bad(format_args!("observed event {:?}", event)),
         }
     }
@@ -201,7 +187,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Enter(ref expected_span)) => {
-                    if let Some(name) = expected_span.name {
+                    if let Some(name) = expected_span.name() {
                         assert_eq!(name, span.name);
                     }
                 }
@@ -219,7 +205,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         match self.expected.lock().unwrap().pop_front() {
             None => {}
             Some(Expect::Exit(ref expected_span)) => {
-                if let Some(name) = expected_span.name {
+                if let Some(name) = expected_span.name() {
                     assert_eq!(name, span.name);
                 }
             }
@@ -239,7 +225,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         }
         let mut expected = self.expected.lock().unwrap();
         let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
-            assert_eq!(name, span.name);
+            assert_eq!(name, span.name());
             true
         } else {
             false
@@ -274,7 +260,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                     // Don't assert if this function was called while panicking,
                     // as failing the assertion can cause a double panic.
                     if !::std::thread::panicking() {
-                        assert_eq!(name, span.name);
+                        assert_eq!(name, span.name());
                     }
                     true
                 }
