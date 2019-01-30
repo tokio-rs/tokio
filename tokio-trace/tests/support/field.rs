@@ -55,6 +55,13 @@ impl MockField {
             only: false,
         }.and(self).and(other)
     }
+
+    pub fn only(self) -> Expect {
+        Expect {
+            fields: HashMap::new(),
+            only: true,
+        }.and(self)
+    }
 }
 
 impl Into<Expect> for MockField {

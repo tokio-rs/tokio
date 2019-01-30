@@ -4,7 +4,7 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{dispatcher, Dispatch, Level, Span};
+use tokio_trace::{dispatcher, Dispatch, Level, Span, field::display};
 
 #[test]
 fn closed_handle_cannot_be_entered() {
@@ -299,6 +299,60 @@ fn entering_a_closed_span_again_is_a_no_op() {
             // This should do nothing.
         });
         assert!(foo.is_closed());
+    });
+
+    handle.assert_finished();
+}
+
+
+#[test]
+fn moved_field() {
+    let (subscriber, handle) = subscriber::mock()
+        .record(
+            span::mock().named("foo"),
+            field::mock("bar")
+                .with_value(&display("hello from my span"))
+                .only()
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let from = "my span";
+        let mut span = span!(
+            "foo",
+            bar = display(format!("hello from {}", from))
+        );
+        span.enter(|| {});
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn borrowed_field() {
+    let (subscriber, handle) = subscriber::mock()
+        .record(
+            span::mock().named("foo"),
+            field::mock("bar")
+                .with_value(&display("hello from my span"))
+                .only()
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let from = "my span";
+        let mut message = format!("hello from {}", from);
+        let mut span = span!("foo", bar = display(&message));
+        span.enter(|| {
+            message.insert_str(10, " inside");
+        });
     });
 
     handle.assert_finished();
