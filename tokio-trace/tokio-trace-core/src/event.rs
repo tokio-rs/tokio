@@ -1,5 +1,5 @@
 //! Events represent single points in time during the execution of a program.
-use ::{field::{self, Value}, Metadata};
+use ::{dispatcher, field::{self, Value}, Metadata};
 use std::fmt;
 
 /// `Event`s represent single points in time where something occurred during the
@@ -81,8 +81,11 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Consumes the builder and returns the constructed `Event`.
-    pub fn finish(self) -> Event<'a> {
-        self.event
+    /// Consumes the builder and records the constructed `Event`.
+    pub fn record(self) {
+        let mut event = Some(self.event);
+        dispatcher::with(|current| {
+            current.event(event.take().unwrap());
+        });
     }
 }

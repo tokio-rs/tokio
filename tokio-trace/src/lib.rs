@@ -537,21 +537,20 @@ macro_rules! event {
             let interest = callsite.interest();
             let meta = callsite.metadata();
             if !interest.is_never() {
-                dispatcher::with(|current| {
-                    if interest.is_always()
-                        || (interest.is_sometimes() && current.enabled(meta)) {
-                        $( let $k = $val; )*
-                        let mut vals: [Option<&Value>; 32] = [None; 32];
-                        let mut i = 0;
-                        $(
-                            event!(@ ignore $val);
-                            vals[i] = Some(&$k);
-                            i += 1;
-                        )*
-                        let values = ValueSet::new(meta.fields(), vals);
-                        current.event(Event::builder(meta, values).finish());
-                    }
-                })
+                if interest.is_always() || dispatcher::with(|current| {
+                    interest.is_sometimes() && current.enabled(meta)
+                }) {
+                    $( let $k = $val; )*
+                    let mut vals: [Option<&Value>; 32] = [None; 32];
+                    let mut i = 0;
+                    $(
+                        event!(@ ignore $val);
+                        vals[i] = Some(&$k);
+                        i += 1;
+                    )*
+                    let values = ValueSet::new(meta.fields(), vals);
+                    Event::builder(meta, values).record();
+                }
             }
         }
     });
@@ -569,26 +568,24 @@ macro_rules! event {
             let interest = callsite.interest();
             let meta = callsite.metadata();
             if !interest.is_never() {
-                dispatcher::with(|current| {
-                    if interest.is_always()
-                        || (interest.is_sometimes() && current.enabled(meta)) {
-                        $( let $k = $val; )*
-                        let mut vals: [Option<&Value>; 32] = [None; 32];
-                        let mut i = 1;
-                        $(
-                            event!(@ ignore $val);
-                            vals[i] = Some(&$k);
-                            i += 1;
-                        )*
-                        let values = ValueSet::new(meta.fields(), vals);
-                        let message = meta.fields().iter().next()
-                            .expect("missing field for message; this is a bug");
-                        current.event(Event::builder(meta, values)
-                            .with_message(message, format_args!( $($arg)+ ))
-                            .finish()
-                        );
-                    }
-                })
+                if interest.is_always() || dispatcher::with(|current| {
+                    interest.is_sometimes() && current.enabled(meta)
+                }) {
+                    $( let $k = $val; )*
+                    let mut vals: [Option<&Value>; 32] = [None; 32];
+                    let mut i = 1;
+                    $(
+                        event!(@ ignore $val);
+                        vals[i] = Some(&$k);
+                        i += 1;
+                    )*
+                    let values = ValueSet::new(meta.fields(), vals);
+                    let message = meta.fields().iter().next()
+                        .expect("missing field for message; this is a bug");
+                    Event::builder(meta, values)
+                        .with_message(message, format_args!( $($arg)+ ))
+                        .record();
+                }
             }
         }
     });
