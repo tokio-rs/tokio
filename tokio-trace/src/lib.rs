@@ -826,16 +826,14 @@ macro_rules! error {
 // TODO: determine if this ought to be public API?
 #[doc(hidden)]
 macro_rules! is_enabled {
-    ($callsite:expr) => {
-        {
-            let interest = $callsite.interest();
-            !interest.is_never() && (
-                interest.is_always() || $crate::dispatcher::with(|current| {
+    ($callsite:expr) => {{
+        let interest = $callsite.interest();
+        !interest.is_never()
+            && (interest.is_always()
+                || $crate::dispatcher::with(|current| {
                     interest.is_sometimes() && current.enabled($callsite.metadata())
-                })
-            )
-        }
-    };
+                }))
+    }};
 }
 pub mod field;
 pub mod span;

@@ -71,14 +71,12 @@ impl MockEvent {
         let name = meta.name();
         self.metadata.check(meta, format_args!("event {}", name));
         if let Some(mut expected_fields) = self.fields {
-            let mut checker = expected_fields
-                .checker(format!("{}", name));
+            let mut checker = expected_fields.checker(format!("{}", name));
             event.record(&mut checker);
             checker.finish();
         }
     }
 }
-
 
 impl fmt::Display for MockEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

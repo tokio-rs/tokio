@@ -15,7 +15,9 @@ impl Expect {
             assert!(
                 expected_name == name,
                 "expected {} to be named `{}`, but got one named `{}`",
-                ctx, expected_name, name
+                ctx,
+                expected_name,
+                name
             )
         }
 
@@ -24,7 +26,9 @@ impl Expect {
             assert!(
                 expected_level == level,
                 "expected {} to be at level `{:?}`, but it was at level `{:?}` instead",
-                ctx, expected_level, level,
+                ctx,
+                expected_level,
+                level,
             )
         }
 
@@ -33,7 +37,9 @@ impl Expect {
             assert!(
                 expected_target == &target,
                 "expected {} to have target `{}`, but it had target `{}` instead",
-                ctx, expected_target, target,
+                ctx,
+                expected_target,
+                target,
             )
         }
     }

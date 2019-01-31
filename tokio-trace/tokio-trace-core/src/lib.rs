@@ -156,10 +156,10 @@ macro_rules! metadata {
 
 pub mod callsite;
 pub mod dispatcher;
+pub mod event;
 pub mod field;
 pub mod metadata;
 pub mod span;
-pub mod event;
 pub mod subscriber;
 
 pub use self::{

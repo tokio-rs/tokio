@@ -1,12 +1,9 @@
 use tokio_trace::{
     callsite::Callsite,
-    field::{self, Value, Field, Record},
+    field::{self, Field, Record, Value},
 };
 
-use std::{
-    collections::HashMap,
-    fmt,
-};
+use std::{collections::HashMap, fmt};
 
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct Expect {
@@ -53,14 +50,17 @@ impl MockField {
         Expect {
             fields: HashMap::new(),
             only: false,
-        }.and(self).and(other)
+        }
+        .and(self)
+        .and(other)
     }
 
     pub fn only(self) -> Expect {
         Expect {
             fields: HashMap::new(),
             only: true,
-        }.and(self)
+        }
+        .and(self)
     }
 }
 
@@ -69,7 +69,8 @@ impl Into<Expect> for MockField {
         Expect {
             fields: HashMap::new(),
             only: false,
-        }.and(self)
+        }
+        .and(self)
     }
 }
 
@@ -81,34 +82,32 @@ impl Expect {
 
     /// Indicates that no fields other than those specified should be expected.
     pub fn only(self) -> Self {
-        Self {
-            only: true,
-            ..self
-        }
+        Self { only: true, ..self }
     }
 
     fn compare_or_panic(&mut self, name: &str, value: &Value, ctx: &str) {
-        let value =  value.into();
+        let value = value.into();
         match self.fields.remove(name) {
-            Some(MockValue::Any) => {},
+            Some(MockValue::Any) => {}
             Some(expected) => assert!(
                 expected == value,
                 "\nexpected `{}` to contain:\n\t`{}{}`\nbut got:\n\t`{}{}`",
-                ctx, name, expected, name, value
+                ctx,
+                name,
+                expected,
+                name,
+                value
             ),
             None if self.only => panic!(
                 "\nexpected `{}` to contain only:\n\t`{}`\nbut got:\n\t`{}{}`",
                 ctx, self, name, value
             ),
-            _ => {},
+            _ => {}
         }
     }
 
     pub fn checker<'a>(&'a mut self, ctx: String) -> CheckRecorder<'a> {
-        CheckRecorder {
-            expect: self,
-            ctx,
-        }
+        CheckRecorder { expect: self, ctx }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -136,29 +135,39 @@ pub struct CheckRecorder<'a> {
 
 impl<'a> Record for CheckRecorder<'a> {
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+        self.expect
+            .compare_or_panic(field.name(), &value, &self.ctx[..])
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+        self.expect
+            .compare_or_panic(field.name(), &value, &self.ctx[..])
     }
 
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+        self.expect
+            .compare_or_panic(field.name(), &value, &self.ctx[..])
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.expect.compare_or_panic(field.name(), &value, &self.ctx[..])
+        self.expect
+            .compare_or_panic(field.name(), &value, &self.ctx[..])
     }
 
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
-        self.expect.compare_or_panic(field.name(), &field::debug(value), &self.ctx)
+        self.expect
+            .compare_or_panic(field.name(), &field::debug(value), &self.ctx)
     }
 }
 
 impl<'a> CheckRecorder<'a> {
     pub fn finish(self) {
-        assert!(self.expect.fields.is_empty(), "{}missing {}", self.expect, self.ctx);
+        assert!(
+            self.expect.fields.is_empty(),
+            "{}missing {}",
+            self.expect,
+            self.ctx
+        );
     }
 }
 
@@ -190,26 +199,26 @@ impl<'a> From<&'a Value> for MockValue {
             }
         }
 
-        let fake_field = callsite!(name: "fake", fields: fake_field).metadata()
-            .fields().field("fake_field")
+        let fake_field = callsite!(name: "fake", fields: fake_field)
+            .metadata()
+            .fields()
+            .field("fake_field")
             .unwrap();
-        let mut builder = MockValueBuilder {
-            value: None,
-        };
+        let mut builder = MockValueBuilder { value: None };
         value.record(&fake_field, &mut builder);
-        builder.value.expect("finish called before a value was recorded")
+        builder
+            .value
+            .expect("finish called before a value was recorded")
     }
 }
 
 impl fmt::Display for Expect {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "fields ")?;
-        let entries = self.fields.iter().map(|(k, v)| {
-            (field::display(k), field::display(v))
-        });
-        f.debug_map()
-            .entries(entries)
-            .finish()
+        let entries = self
+            .fields
+            .iter()
+            .map(|(k, v)| (field::display(k), field::display(v)));
+        f.debug_map().entries(entries).finish()
     }
-
 }

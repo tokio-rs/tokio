@@ -197,10 +197,7 @@ impl Value for str {
     }
 }
 
-impl<'a, T: ?Sized> ::sealed::Sealed for &'a T
-where
-    T: Value + ::sealed::Sealed + 'a,
-{}
+impl<'a, T: ?Sized> ::sealed::Sealed for &'a T where T: Value + ::sealed::Sealed + 'a {}
 
 impl<'a, T: ?Sized> Value for &'a T
 where
@@ -392,10 +389,7 @@ impl Iterator for Iter {
 
 impl<'a> ValueSet<'a> {
     /// Returns a new `ValueSet`.
-    pub fn new(
-        fields: &'a FieldSet,
-        values: [Option<&'a Value>; 32],
-    ) -> Self {
+    pub fn new(fields: &'a FieldSet, values: [Option<&'a Value>; 32]) -> Self {
         let is_complete = values.iter().all(Option::is_some);
         ValueSet {
             values,
@@ -416,11 +410,10 @@ impl<'a> ValueSet<'a> {
         if self.fields.callsite() != self.callsite() {
             return;
         }
-        let fields = self.fields.iter()
-            .filter_map(|field| {
-                let value = self.values.get(field.i)?.as_ref()?;
-                Some((field, value))
-            });
+        let fields = self.fields.iter().filter_map(|field| {
+            let value = self.values.get(field.i)?.as_ref()?;
+            Some((field, value))
+        });
         for (ref field, value) in fields {
             value.record(field, recorder);
         }
@@ -436,7 +429,6 @@ impl<'a> ValueSet<'a> {
         self.fields
     }
 }
-
 
 impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

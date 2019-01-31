@@ -13,7 +13,11 @@
 extern crate ansi_term;
 extern crate humantime;
 use self::ansi_term::{Color, Style};
-use super::tokio_trace::{self, Id, Level, Subscriber, field::{Record, Field}};
+use super::tokio_trace::{
+    self,
+    field::{Field, Record},
+    Id, Level, Subscriber,
+};
 
 use std::{
     cell::RefCell,
@@ -153,21 +157,30 @@ impl<'a> Record for Event<'a> {
     }
 
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
-        write!(&mut self.stderr, "{comma} ",
+        write!(
+            &mut self.stderr,
+            "{comma} ",
             comma = if self.comma { "," } else { "" },
-        ).unwrap();
+        )
+        .unwrap();
         let name = field.name();
         if name == "message" {
-            write!(&mut self.stderr, "{}",
+            write!(
+                &mut self.stderr,
+                "{}",
                 // Have to alloc here due to `ansi_term`'s API...
                 Style::new().bold().paint(format!("{:?}", value))
-            ).unwrap();
+            )
+            .unwrap();
             self.comma = true;
         } else {
-            write!(&mut self.stderr, "{}: {:?}",
+            write!(
+                &mut self.stderr,
+                "{}: {:?}",
                 Style::new().bold().paint(name),
                 value
-            ).unwrap();
+            )
+            .unwrap();
             self.comma = true;
         }
     }
@@ -233,10 +246,7 @@ impl Subscriber for SloggishSubscriber {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
         let span = Span::new(self.current.id(), span, values);
-        self.spans
-            .lock()
-            .unwrap()
-            .insert(id.clone(), span);
+        self.spans.lock().unwrap().insert(id.clone(), span);
         id
     }
 
@@ -298,7 +308,7 @@ impl Subscriber for SloggishSubscriber {
         let mut recorder = Event {
             stderr,
             comma: false,
-            };
+        };
         event.record(&mut recorder);
         write!(&mut recorder.stderr, "\n").unwrap();
     }

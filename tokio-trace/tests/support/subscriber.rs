@@ -1,5 +1,9 @@
 #![allow(missing_docs)]
-use super::{span::{MockSpan, NewSpan}, field as mock_field, event::MockEvent};
+use super::{
+    event::MockEvent,
+    field as mock_field,
+    span::{MockSpan, NewSpan},
+};
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -147,12 +151,10 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                 if let Some(name) = expected_span.name() {
                     assert_eq!(name, span.name);
                 }
-                let mut checker = expected_values
-                    .checker(format!("span {}: ", span.name));
+                let mut checker = expected_values.checker(format!("span {}: ", span.name));
                 values.record(&mut checker);
                 checker.finish();
             }
-
         }
     }
 
@@ -185,14 +187,13 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             _ => false,
         };
         if was_expected {
-            if let Expect::NewSpan(mut expected) =
-                expected.pop_front().unwrap()
-            {
+            if let Expect::NewSpan(mut expected) = expected.pop_front().unwrap() {
                 let name = meta.name();
-                expected.span.metadata
+                expected
+                    .span
+                    .metadata
                     .check(meta, format_args!("span `{}`", name));
-                let mut checker = expected.fields
-                    .checker(format!("{}", name));
+                let mut checker = expected.fields.checker(format!("{}", name));
                 values.record(&mut checker);
                 checker.finish();
             }
@@ -321,30 +322,16 @@ impl MockHandle {
 impl Expect {
     fn bad<'a>(&self, what: fmt::Arguments<'a>) {
         match self {
-            Expect::Event(e) => panic!(
-                "expected event {}, but {} instead", e, what,
-            ),
-            Expect::Enter(e) => panic!(
-                "expected to enter {} but {} instead", e, what,
-            ),
-            Expect::Exit(e) => panic!(
-                "expected to exit {} but {} instead", e, what,
-            ),
-            Expect::CloneSpan(e) => panic!(
-                "expected to clone {} but {} instead", e, what,
-            ),
-            Expect::DropSpan(e) => panic!(
-                "expected to drop {} but {} instead", e, what,
-            ),
-            Expect::Record(e, fields) => panic!(
-                "expected {} to record {} but {} instead", e, fields, what,
-            ),
-            Expect::NewSpan(e) => panic!(
-                "expected {} but {} instead", e, what
-            ),
-            Expect::Nothing => panic!(
-                "expected nothing else to happen, but {} instead", what,
-            ),
+            Expect::Event(e) => panic!("expected event {}, but {} instead", e, what,),
+            Expect::Enter(e) => panic!("expected to enter {} but {} instead", e, what,),
+            Expect::Exit(e) => panic!("expected to exit {} but {} instead", e, what,),
+            Expect::CloneSpan(e) => panic!("expected to clone {} but {} instead", e, what,),
+            Expect::DropSpan(e) => panic!("expected to drop {} but {} instead", e, what,),
+            Expect::Record(e, fields) => {
+                panic!("expected {} to record {} but {} instead", e, fields, what,)
+            }
+            Expect::NewSpan(e) => panic!("expected {} but {} instead", e, what),
+            Expect::Nothing => panic!("expected nothing else to happen, but {} instead", what,),
         }
     }
 }

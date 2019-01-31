@@ -145,8 +145,7 @@ use std::{
 };
 use {
     dispatcher::{self, Dispatch},
-    field,
-    Metadata,
+    field, Metadata,
 };
 
 /// A handle representing a span, with the capability to enter the span if it

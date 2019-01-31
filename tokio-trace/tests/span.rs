@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{dispatcher, Dispatch, Level, Span, field::{debug, display}};
+use tokio_trace::{
+    dispatcher,
+    field::{debug, display},
+    Dispatch, Level, Span,
+};
 
 #[test]
 fn closed_handle_cannot_be_entered() {
@@ -304,7 +308,6 @@ fn entering_a_closed_span_again_is_a_no_op() {
     handle.assert_finished();
 }
 
-
 #[test]
 fn moved_field() {
     let (subscriber, handle) = subscriber::mock()
@@ -312,8 +315,8 @@ fn moved_field() {
             span::mock().named("foo").with_field(
                 field::mock("bar")
                     .with_value(&display("hello from my span"))
-                    .only()
-            )
+                    .only(),
+            ),
         )
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
@@ -322,10 +325,7 @@ fn moved_field() {
         .run_with_handle();
     dispatcher::with_default(Dispatch::new(subscriber), || {
         let from = "my span";
-        let mut span = span!(
-            "foo",
-            bar = display(format!("hello from {}", from))
-        );
+        let mut span = span!("foo", bar = display(format!("hello from {}", from)));
         span.enter(|| {});
     });
 
@@ -339,8 +339,8 @@ fn borrowed_field() {
             span::mock().named("foo").with_field(
                 field::mock("bar")
                     .with_value(&display("hello from my span"))
-                    .only()
-            )
+                    .only(),
+            ),
         )
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
@@ -363,29 +363,36 @@ fn borrowed_field() {
 #[test]
 fn move_field_out_of_struct() {
     #[derive(Debug)]
-    struct Position { x: f32, y: f32 }
+    struct Position {
+        x: f32,
+        y: f32,
+    }
 
-    let pos = Position { x: 3.234, y: -1.223 };
+    let pos = Position {
+        x: 3.234,
+        y: -1.223,
+    };
     let (subscriber, handle) = subscriber::mock()
         .new_span(
             span::mock().named("foo").with_field(
                 field::mock("x")
                     .with_value(&debug(3.234))
                     .and(field::mock("y").with_value(&debug(-1.223)))
-                    .only()
-            )
+                    .only(),
+            ),
         )
         .new_span(
-            span::mock().named("bar").with_field(
-                field::mock("position")
-                    .with_value(&debug(&pos))
-                    .only()
-            )
+            span::mock()
+                .named("bar")
+                .with_field(field::mock("position").with_value(&debug(&pos)).only()),
         )
         .run_with_handle();
 
     dispatcher::with_default(Dispatch::new(subscriber), || {
-        let pos = Position { x: 3.234, y: -1.223 };
+        let pos = Position {
+            x: 3.234,
+            y: -1.223,
+        };
         let mut foo = span!("foo", x = debug(pos.x), y = debug(pos.y));
         let mut bar = span!("bar", position = debug(pos));
         foo.enter(|| {});
@@ -399,8 +406,9 @@ fn move_field_out_of_struct() {
 fn add_field_after_new_span() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(
-            span::mock().named("foo")
-                .with_field(field::mock("bar").with_value(&5).only())
+            span::mock()
+                .named("foo")
+                .with_field(field::mock("bar").with_value(&5).only()),
         )
         .record(
             span::mock().named("foo"),
@@ -420,7 +428,6 @@ fn add_field_after_new_span() {
 
     handle.assert_finished();
 }
-
 
 #[test]
 fn add_fields_only_after_new_span() {

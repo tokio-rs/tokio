@@ -1,6 +1,10 @@
 //! Events represent single points in time during the execution of a program.
-use ::{dispatcher, field::{self, Value}, Metadata};
 use std::fmt;
+use {
+    dispatcher,
+    field::{self, Value},
+    Metadata,
+};
 
 /// `Event`s represent single points in time where something occurred during the
 /// execution of a program.
@@ -68,7 +72,7 @@ impl<'a> Builder<'a> {
                 fields,
                 metadata,
                 message: None,
-            }
+            },
         }
     }
 

@@ -2,17 +2,18 @@
 extern crate tokio_trace;
 
 use tokio_trace::{
-    field::{self, Field, Record}, span,
+    field::{self, Field, Record},
+    span,
     subscriber::{self, Subscriber},
     Event, Id, Metadata,
 };
 
 use std::{
-    fmt,
     collections::HashMap,
+    fmt,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, RwLock, RwLockReadGuard
+        Arc, RwLock, RwLockReadGuard,
     },
 };
 
@@ -53,7 +54,7 @@ impl<'a> Record for Count<'a> {
 impl CounterSubscriber {
     fn recorder(&self) -> Count {
         Count {
-            counters: self.counters.0.read().unwrap()
+            counters: self.counters.0.read().unwrap(),
         }
     }
 }

@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
+use super::{field, metadata};
 use std::fmt;
-use super::{metadata, field};
 
 /// A mock span.
 ///
@@ -66,7 +66,7 @@ impl MockSpan {
 
     pub fn with_field<I>(self, fields: I) -> NewSpan
     where
-        I: Into<field::Expect>
+        I: Into<field::Expect>,
     {
         NewSpan {
             span: self,
@@ -78,7 +78,6 @@ impl MockSpan {
         self.metadata.check(actual, format_args!("span {}", self))
     }
 }
-
 
 impl fmt::Display for MockSpan {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -9,7 +9,7 @@ use std::{
     fmt,
     sync::{Mutex, MutexGuard},
 };
-use tokio_trace::{field, span, Id, Metadata, Event};
+use tokio_trace::{field, span, Event, Id, Metadata};
 
 /// A subscriber that is enabled but otherwise does nothing.
 struct EnabledSubscriber;
