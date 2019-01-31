@@ -1,16 +1,19 @@
-//! `Span` key-value data.
+//! `Span` and `Event` key-value data.
 //!
-//! Spans may be annotated with key-value data, referred to as known as
-//! _fields_. These fields consist of a mapping from a key (corresponding to a
-//! `&str` but represented internally as an array index) to a `Value`.
+//! Spans and events  may be annotated with key-value data, referred to as known
+//! as _fields_. These fields consist of a mapping from a key (corresponding to
+//! a `&str` but represented internally as an array index) to a `Value`.
 //!
 //! # `Value`s and `Subscriber`s
 //!
-//! `Subscriber`s consume `Value`s as fields attached to `Span`s. The set of
-//! field keys on a given `Span` or is defined on its `Metadata`. Once the span
-//! has been created (i.e., the `new_id` or `new_span` methods on the
-//! `Subscriber` have been called), field values may be added by calls to the
-//! subscriber's `record_` methods.
+//! `Subscriber`s consume `Value`s as fields attached to `Span`s or `Event`s.
+//! The set of field keys on a given `Span` or is defined on its `Metadata`.
+//! When a `Span` is created, it provides a `ValueSet` to the `Subscriber`'s
+//! [`new_span`] method, containing any fields whose values were provided when
+//! the span was created; and may call the `Subscriber`'s [`record`] method
+//! with additional `ValueSet`s if values are added for more of its fields.
+//! Similarly, the [`Event`] type passed to the subscriber's [`event`] method
+//! will contain any fields attached to each event.
 //!
 //! `tokio_trace` represents values as either one of a set of Rust primitives
 //! (`i64`, `u64`, `bool`, and `&str`) or using a `fmt::Display` or `fmt::Debug`
@@ -18,14 +21,16 @@
 //! allow `Subscriber` implementations to provide type-specific behaviour for
 //! consuming values of each type.
 //!
-//! The `Subscriber` trait provides default implementations of `record_u64`,
-//! `record_i64`, `record_bool`, and `record_str` which call the `record_fmt`
-//! function, so that only the `record_fmt` function must be implemented.
-//! However, implementors of `Subscriber` that wish to consume these primitives
-//! as their types may override the `record` methods for any types they care
-//! about. For example, we might record integers by incrementing counters for
-//! their field names, rather than printing them.
+//! Instances of the `Record` trait are provided by `Subscriber`s to record the
+//! values attached to `Span`s and `Event`. This trait represents the behavior
+//! used to record values of various types. For example, we might record
+//! integers by incrementing counters for their field names, rather than printing
+//! them.
 //!
+//! [`new_span`]: ::subscriber::Subscriber::new_span
+//! [`record`]: ::subscriber::Subscriber::record
+//! [`Event`]: ::event::Event
+//! [`event`]: ::subscriber::Subscriber::event
 use callsite;
 use std::{
     borrow::Borrow,
@@ -86,6 +91,111 @@ pub struct Iter {
 }
 
 /// Records typed values.
+///
+/// An instance of `Record` ("a recorder") represents the logic necessary to
+/// record field values of various types. When an implementor of [`Value`] is
+/// [recorded], it calls the appropriate method on the provided recorder to
+/// indicate the type that value should be recorded as.
+///
+/// When a [`Subscriber`] implementation [records an `Event`] or a
+/// [set of `Value`s added to a `Span`], it can pass an `&mut Record` to the
+/// `record` method on the provided [`ValueSet`] or [`Event`]. This recorder
+/// will then be used to record all the field-value pairs present on that
+/// `Event` or `ValueSet`.
+///
+/// # Examples
+///
+/// A simple recorder that writes to a string might be implemented like so:
+/// ```
+/// # extern crate tokio_trace_core as tokio_trace;
+/// use std::fmt::{self, Write};
+/// use tokio_trace::field::{Value, Record, Field};
+/// # fn main() {
+/// pub struct StringRecorder<'a> {
+///     string: &'a mut String,
+/// }
+///
+/// impl<'a> Record for StringRecorder<'a> {
+///     fn record_i64(&mut self, field: &Field, value: i64) {
+///         self.record_debug(field, &value)
+///     }
+///
+///     fn record_u64(&mut self, field: &Field, value: u64) {
+///         self.record_debug(field, &value)
+///     }
+///
+///     fn record_bool(&mut self, field: &Field, value: bool) {
+///         self.record_debug(field, &value)
+///     }
+///
+///    fn record_str(&mut self, field: &Field, value: &str) {
+///         self.record_debug(field, &value)
+///     }
+///
+///     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+///         write!(self.string, "{} = {:?}; ", field.name(), value).unwrap();
+///     }
+/// }
+/// # }
+/// ```
+/// This recorder will format each recorded value using `fmt::Debug`, and
+/// append the field name and formatted value to the provided string,
+/// regardless of the type of the recorded value. When all the values have
+/// been recorded, the `StringRecorder` may be dropped, allowing the string
+/// to be printed or stored in some other data structure.
+///
+/// While the `StringRecorder` implements the `record_i64`, `record_u64`,
+/// `record_bool`, and `record_str` functions by forwarding to `record_debug`,
+/// other recorders may implement type-specific behavior in those functions.
+/// Additionally, when a recorder recieves a value of a type it does not care
+/// about, it is free to ignore those values completely – for example, a
+/// recorder which only records numeric data might look like this:
+///
+/// ```
+/// # extern crate tokio_trace_core as tokio_trace;
+/// # use std::fmt::{self, Write};
+/// # use tokio_trace::field::{Value, Record, Field};
+/// # fn main() {
+/// pub struct SumRecorder {
+///     sum: i64,
+/// }
+///
+/// impl Record for SumRecorder {
+///     fn record_i64(&mut self, _field: &Field, value: i64) {
+///        self.sum += value;
+///     }
+///
+///     fn record_u64(&mut self, _field: &Field, value: u64) {
+///         self.sum += value as i64;
+///     }
+///
+///     fn record_bool(&mut self, _field: &Field, _value: bool) {
+///         // Do nothing
+///     }
+///
+///    fn record_str(&mut self, _field: &Field, _value: &str) {
+///         // Do nothing
+///     }
+///
+///     fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {
+///         // Do nothing
+///     }
+/// }
+/// # }
+/// ```
+/// This recorder (which is probably not particularly useful) keeps a running
+/// sum of all the numeric values it records, and ignores all other values. A
+/// more practical example of recording typed values is presented in
+/// `examples/counters.rs`, which demonstrates a very simple metrics system
+/// implemented using `tokio-trace`.
+///
+/// [`Value`]: ::field::Value
+/// [recorded]: ::field::Value::record
+/// [`Subscriber`]: ::subscriber::Subscriber
+/// [records an `Event`]: ::subscriber::Subscriber::event
+/// [set of `Value`s added to a `Span`]: ::subscriber::Subscriber::record
+/// [`Event`]: ::event::Event
+/// [`ValueSet`]: ::field::ValueSet
 pub trait Record {
     /// Record a signed 64-bit integer value.
     fn record_i64(&mut self, field: &Field, value: i64);
@@ -106,8 +216,10 @@ pub trait Record {
 /// A field value of an erased type.
 ///
 /// Implementors of `Value` may call the appropriate typed recording methods on
-/// the `Subscriber` passed to `record` in order to indicate how their data
-/// should be recorded.
+/// the [recorder] passed to their `record` method in order to indicate how
+/// their data should be recorded.
+///
+/// [recorder]: ::field::Record
 pub trait Value: ::sealed::Sealed {
     /// Records this value with the given `Recorder`.
     fn record(&self, key: &Field, recorder: &mut Record);
