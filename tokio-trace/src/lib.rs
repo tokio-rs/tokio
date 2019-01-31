@@ -535,23 +535,18 @@ macro_rules! event {
                 level: $lvl,
                 fields: $( $k ),*
             };
-            let interest = callsite.interest();
-            let meta = callsite.metadata();
-            if !interest.is_never() {
-                if interest.is_always() || dispatcher::with(|current| {
-                    interest.is_sometimes() && current.enabled(meta)
-                }) {
-                    $( let $k = $val; )*
-                    let mut vals: [Option<&Value>; 32] = [None; 32];
-                    let mut i = 0;
-                    $(
-                        event!(@ ignore $val);
-                        vals[i] = Some(&$k);
-                        i += 1;
-                    )*
-                    let values = ValueSet::new(meta.fields(), vals);
-                    Event::builder(meta, values).record();
-                }
+            if is_enabled!(callsite) {
+                let meta = callsite.metadata();
+                $( let $k = $val; )*
+                let mut vals: [Option<&Value>; 32] = [None; 32];
+                let mut i = 0;
+                $(
+                    event!(@ ignore $val);
+                    vals[i] = Some(&$k);
+                    i += 1;
+                )*
+                let values = ValueSet::new(meta.fields(), vals);
+                Event::builder(meta, values).record();
             }
         }
     });
@@ -566,27 +561,22 @@ macro_rules! event {
                 level: $lvl,
                 fields: message, $( $k ),*
             };
-            let interest = callsite.interest();
-            let meta = callsite.metadata();
-            if !interest.is_never() {
-                if interest.is_always() || dispatcher::with(|current| {
-                    interest.is_sometimes() && current.enabled(meta)
-                }) {
-                    $( let $k = $val; )*
-                    let mut vals: [Option<&Value>; 32] = [None; 32];
-                    let mut i = 1;
-                    $(
-                        event!(@ ignore $val);
-                        vals[i] = Some(&$k);
-                        i += 1;
-                    )*
-                    let values = ValueSet::new(meta.fields(), vals);
-                    let message = meta.fields().iter().next()
-                        .expect("missing field for message; this is a bug");
-                    Event::builder(meta, values)
-                        .with_message(message, format_args!( $($arg)+ ))
-                        .record();
-                }
+            if is_enabled!(callsite) {
+                let meta = callsite.metadata();
+                $( let $k = $val; )*
+                let mut vals: [Option<&Value>; 32] = [None; 32];
+                let mut i = 1;
+                $(
+                    event!(@ ignore $val);
+                    vals[i] = Some(&$k);
+                    i += 1;
+                )*
+                let values = ValueSet::new(meta.fields(), vals);
+                let message = meta.fields().iter().next()
+                    .expect("missing field for message; this is a bug");
+                Event::builder(meta, values)
+                    .with_message(message, format_args!( $($arg)+ ))
+                    .record();
             }
         }
     });
@@ -846,6 +836,21 @@ macro_rules! error {
     );
 }
 
+#[macro_export]
+// TODO: determine if this ought to be public API?
+#[doc(hidden)]
+macro_rules! is_enabled {
+    ($callsite:expr) => {
+        {
+            let interest = $callsite.interest();
+            !interest.is_never() && (
+                interest.is_always() || dispatcher::with(|current| {
+                    interest.is_sometimes() && current.enabled($callsite.metadata())
+                })
+            )
+        }
+    };
+}
 pub mod field;
 pub mod span;
 pub mod subscriber;
