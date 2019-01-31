@@ -211,35 +211,28 @@ struct Entered<'a> {
 // ===== impl Span =====
 
 impl<'a> Span<'a> {
-    /// Constructs a new `Span` originating from the given [`Callsite`].
+    /// Constructs a new `Span` with the given [metadata] and set of [field values].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
-    /// with the [current span] as its parent (if one exists).
+    /// with the current span as its parent (if one exists).
     ///
     /// After the span is constructed, [field values] and/or [`follows_from`]
     /// annotations may be added to it.
     ///
-    /// [`Callsite`]: ::callsite::Callsite
+    /// [metadata]: ::metadata::Metadata
     /// [`Subscriber`]: ::subscriber::Subscriber
-    /// [current span]: ::span::Span::current
-    /// [field values]: ::span::Span::record
+    /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new(interest: Interest, meta: &'a Metadata<'a>) -> Span<'a> {
-        if interest.is_never() {
-            return Self::new_disabled();
+    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+        let inner = dispatcher::with(move |dispatch| {
+            let id = dispatch.new_span(meta, values);
+            Some(Enter::new(id, dispatch, meta))
+        });
+        Self {
+            inner,
+            is_closed: false,
         }
-        dispatcher::with(|dispatch| {
-            if interest.is_sometimes() && !dispatch.enabled(meta) {
-                return Span::new_disabled();
-            }
-            let id = dispatch.new_span(meta);
-            let inner = Some(Enter::new(id, dispatch, meta));
-            Self {
-                inner,
-                is_closed: false,
-            }
-        })
     }
 
     /// Constructs a new disabled span.
@@ -301,16 +294,16 @@ impl<'a> Span<'a> {
     {
         if let Some(ref mut inner) = self.inner {
             if let Some(field) = field.as_field(inner.metadata()) {
-                inner.record(field.with_value(value))
+                inner.record(&field.with_value(value))
             }
         }
         self
     }
 
     /// Record all the fields in the span
-    pub fn record_all(&mut self, values: field::ValueSet) -> &mut Self {
+    pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
-            inner.record(values);
+            inner.record(&values);
         }
         self
     }
@@ -435,9 +428,9 @@ impl<'a> Enter<'a> {
         self.meta
     }
 
-    fn record(&mut self, values: field::ValueSet) {
+    fn record(&mut self, values: &field::ValueSet) {
         if values.callsite() == self.meta.callsite() {
-            self.subscriber.record(&self.id, values)
+            self.subscriber.record(&self.id, &values)
         }
     }
 

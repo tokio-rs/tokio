@@ -445,38 +445,24 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
-            #[allow(unused_imports)]
             use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
             let callsite = callsite! { name: $name, fields: $( $k ),* };
-            let interest = callsite.interest();
-            if interest.is_never() {
-                Span::new_disabled()
-            } else {
+            if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                let mut span = Span::new(interest, meta);
-                // Depending on how many fields are generated, this may or may
-                // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)] {
-                    if !span.is_disabled() {
-                        $( $( let $k = $val; )* )*
-                        let mut vals: [Option<&Value>; 32] = [None; 32];
-                        let mut i = 0;
-                        let mut is_empty = true;
-                        $(
-                            $(
-                                span!(@ ignore $val);
-                                is_empty = false;
-                                vals[i] = Some(&$k);
-                            )*
-                            i += 1;
-                        )*
-                        if !is_empty {
-                            span.record_all(ValueSet::new(meta.fields(), vals));
-                        }
-                    };
-                }
-                span
+                $( $( let $k = $val; )* )*
+                let mut vals: [Option<&Value>; 32] = [None; 32];
+                let mut i = 0;
+                $(
+                    $(
+                        span!(@ ignore $val);
+                        vals[i] = Some(&$k);
+                    )*
+                    i += 1;
+                )*
+                Span::new(meta, &ValueSet::new(meta.fields(), vals))
+            } else {
+                Span::new_disabled()
             }
         }
     };

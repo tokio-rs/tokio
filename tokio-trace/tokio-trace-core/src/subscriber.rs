@@ -114,13 +114,13 @@ pub trait Subscriber {
     /// from all calls to this function, if they so choose.
     ///
     /// [`Span`]: ::span::Span
-    fn new_span(&self, metadata: &Metadata) -> Span;
+    fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span;
 
     /// Record a set of values on a span.
     ///
     /// The subscriber is expected to provide an implementation of `Record` to
     /// the `ValueSet`'s `record` method.
-    fn record(&self, span: &Span, values: field::ValueSet);
+    fn record(&self, span: &Span, values: &field::ValueSet);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.

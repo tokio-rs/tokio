@@ -106,8 +106,8 @@ impl Dispatch {
     ///
     /// [`Span`]: ::span::Span
     #[inline]
-    pub fn new_span(&self, metadata: &Metadata) -> Span {
-        self.subscriber.new_span(metadata)
+    pub fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span {
+        self.subscriber.new_span(metadata, values)
     }
 
     /// Record a set of values on a span.
@@ -115,8 +115,8 @@ impl Dispatch {
     /// This calls the [`record`](::Subscriber::record)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn record(&self, span: &Span, values: field::ValueSet) {
-        self.subscriber.record(span, values)
+    pub fn record(&self, span: &Span, values: &field::ValueSet) {
+        self.subscriber.record(span, &values)
     }
 
     /// Adds an indication that `span` follows from the span with the id
@@ -217,13 +217,13 @@ impl Subscriber for NoSubscriber {
         subscriber::Interest::never()
     }
 
-    fn new_span(&self, _meta: &Metadata) -> Span {
+    fn new_span(&self, _meta: &Metadata, _vals: &field::ValueSet) -> Span {
         Span::from_u64(0)
     }
 
     fn event(&self, _event: Event) {}
 
-    fn record(&self, _span: &Span, _values: field::ValueSet) {}
+    fn record(&self, _span: &Span, _values: &field::ValueSet) {}
 
     fn add_follows_from(&self, _span: &Span, _follows: Span) {}
 
