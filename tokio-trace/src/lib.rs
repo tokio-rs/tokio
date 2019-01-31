@@ -830,7 +830,7 @@ macro_rules! is_enabled {
         {
             let interest = $callsite.interest();
             !interest.is_never() && (
-                interest.is_always() || dispatcher::with(|current| {
+                interest.is_always() || $crate::dispatcher::with(|current| {
                     interest.is_sometimes() && current.enabled($callsite.metadata())
                 })
             )
