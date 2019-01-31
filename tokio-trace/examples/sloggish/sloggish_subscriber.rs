@@ -99,11 +99,17 @@ impl<'a> fmt::Display for ColorLevel<'a> {
 }
 
 impl Span {
-    fn new(parent: Option<Id>, _meta: &tokio_trace::Metadata) -> Self {
-        Self {
+    fn new(
+        parent: Option<Id>,
+        _meta: &tokio_trace::Metadata,
+        values: &tokio_trace::field::ValueSet,
+    ) -> Self {
+        let mut span = Self {
             parent,
             kvs: Vec::new(),
-        }
+        };
+        values.record(&mut span);
+        span
     }
 }
 
@@ -219,17 +225,22 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_span(&self, span: &tokio_trace::Metadata) -> tokio_trace::Id {
+    fn new_span(
+        &self,
+        span: &tokio_trace::Metadata,
+        values: &tokio_trace::field::ValueSet,
+    ) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
+        let span = Span::new(self.current.id(), span, values);
         self.spans
             .lock()
             .unwrap()
-            .insert(id.clone(), Span::new(self.current.id(), span));
+            .insert(id.clone(), span);
         id
     }
 
-    fn record(&self, span: &tokio_trace::Id, values: tokio_trace::field::ValueSet) {
+    fn record(&self, span: &tokio_trace::Id, values: &tokio_trace::field::ValueSet) {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         if let Some(span) = spans.get_mut(span) {
             values.record(span);
