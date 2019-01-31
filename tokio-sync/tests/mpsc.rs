@@ -66,6 +66,12 @@ fn send_recv_with_buffer() {
 }
 
 #[test]
+#[should_panic]
+fn buffer_gteq_one() {
+    mpsc::channel::<i32>(0);
+}
+
+#[test]
 fn send_recv_unbounded() {
     let (mut tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
