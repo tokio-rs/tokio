@@ -394,3 +394,58 @@ fn move_field_out_of_struct() {
 
     handle.assert_finished();
 }
+
+#[test]
+fn add_field_after_new_span() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo")
+                .with_field(field::mock("bar").with_value(&5).only())
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let mut span = span!("foo", bar = 5, baz);
+        span.record("baz", &true);
+        span.enter(|| {})
+    });
+
+    handle.assert_finished();
+}
+
+
+#[test]
+fn add_fields_only_after_new_span() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .record(
+            span::mock().named("foo"),
+            field::mock("bar").with_value(&5).only(),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let mut span = span!("foo", bar, baz);
+        span.record("bar", &5);
+        span.record("baz", &true);
+        span.enter(|| {})
+    });
+
+    handle.assert_finished();
+}
