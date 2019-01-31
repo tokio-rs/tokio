@@ -234,7 +234,7 @@ impl<'a> Span<'a> {
     }
 
     /// Constructs a new disabled span.
-    #[inline]
+    #[inline(always)]
     pub fn new_disabled() -> Span<'a> {
         Span {
             inner: None,

@@ -828,11 +828,14 @@ macro_rules! error {
 macro_rules! is_enabled {
     ($callsite:expr) => {{
         let interest = $callsite.interest();
-        !interest.is_never()
-            && (interest.is_always()
-                || $crate::dispatcher::with(|current| {
-                    interest.is_sometimes() && current.enabled($callsite.metadata())
-                }))
+        if interest.is_never() {
+            false
+        } else if interest.is_always() {
+            true
+        } else {
+            let meta = $callsite.metadata();
+            $crate::dispatcher::with(|current| current.enabled(meta))
+        }
     }};
 }
 pub mod field;
