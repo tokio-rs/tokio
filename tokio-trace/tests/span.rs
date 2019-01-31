@@ -308,11 +308,12 @@ fn entering_a_closed_span_again_is_a_no_op() {
 #[test]
 fn moved_field() {
     let (subscriber, handle) = subscriber::mock()
-        .record(
-            span::mock().named("foo"),
-            field::mock("bar")
-                .with_value(&display("hello from my span"))
-                .only()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&display("hello from my span"))
+                    .only()
+            )
         )
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
@@ -334,11 +335,12 @@ fn moved_field() {
 #[test]
 fn borrowed_field() {
     let (subscriber, handle) = subscriber::mock()
-        .record(
-            span::mock().named("foo"),
-            field::mock("bar")
-                .with_value(&display("hello from my span"))
-                .only()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&display("hello from my span"))
+                    .only()
+            )
         )
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
@@ -365,18 +367,20 @@ fn move_field_out_of_struct() {
 
     let pos = Position { x: 3.234, y: -1.223 };
     let (subscriber, handle) = subscriber::mock()
-        .record(
-            span::mock().named("foo"),
-            field::mock("x")
-                .with_value(&debug(3.234))
-                .and(field::mock("y").with_value(&debug(-1.223)))
-                .only()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("x")
+                    .with_value(&debug(3.234))
+                    .and(field::mock("y").with_value(&debug(-1.223)))
+                    .only()
+            )
         )
-        .record(
-            span::mock().named("bar"),
-            field::mock("position")
-                .with_value(&debug(&pos))
-                .only()
+        .new_span(
+            span::mock().named("bar").with_field(
+                field::mock("position")
+                    .with_value(&debug(&pos))
+                    .only()
+            )
         )
         .run_with_handle();
 

@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use super::{span::MockSpan, field as mock_field, event::MockEvent};
+use super::{span::{MockSpan, NewSpan}, field as mock_field, event::MockEvent};
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -18,6 +18,7 @@ enum Expect {
     CloneSpan(MockSpan),
     DropSpan(MockSpan),
     Record(MockSpan, mock_field::Expect),
+    NewSpan(NewSpan),
     Nothing,
 }
 
@@ -83,6 +84,14 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
         I: Into<mock_field::Expect>,
     {
         self.expected.push_back(Expect::Record(span, fields.into()));
+        self
+    }
+
+    pub fn new_span<I>(mut self, new_span: I) -> Self
+    where
+        I: Into<NewSpan>,
+    {
+        self.expected.push_back(Expect::NewSpan(new_span.into()));
         self
     }
 
@@ -170,6 +179,24 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             meta.target(),
             id
         );
+        let mut expected = self.expected.lock().unwrap();
+        let was_expected = match expected.front() {
+            Some(Expect::NewSpan(_)) => true,
+            _ => false,
+        };
+        if was_expected {
+            if let Expect::NewSpan(mut expected) =
+                expected.pop_front().unwrap()
+            {
+                let name = meta.name();
+                expected.span.metadata
+                    .check(meta, format_args!("span `{}`", name));
+                let mut checker = expected.fields
+                    .checker(format!("{}", name));
+                values.record(&mut checker);
+                checker.finish();
+            }
+        }
         self.spans.lock().unwrap().insert(
             id.clone(),
             SpanState {
@@ -311,6 +338,9 @@ impl Expect {
             ),
             Expect::Record(e, fields) => panic!(
                 "expected {} to record {} but {} instead", e, fields, what,
+            ),
+            Expect::NewSpan(e) => panic!(
+                "expected {} but {} instead", e, what
             ),
             Expect::Nothing => panic!(
                 "expected nothing else to happen, but {} instead", what,

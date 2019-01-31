@@ -8,7 +8,7 @@ use std::{
     fmt,
 };
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Default, Debug, Eq, PartialEq)]
 pub struct Expect {
     fields: HashMap<String, MockValue>,
     only: bool,
@@ -109,6 +109,10 @@ impl Expect {
             expect: self,
             ctx,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
     }
 }
 

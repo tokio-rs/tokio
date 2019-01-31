@@ -10,7 +10,7 @@ use std::fmt;
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct MockEvent {
     pub fields: Option<field::Expect>,
-    metadata: metadata::Expected,
+    metadata: metadata::Expect,
 }
 
 pub fn mock() -> MockEvent {
@@ -25,7 +25,7 @@ impl MockEvent {
         I: Into<String>,
     {
         Self {
-            metadata: metadata::Expected {
+            metadata: metadata::Expect {
                 name: Some(name.into()),
                 ..self.metadata
             },
@@ -45,7 +45,7 @@ impl MockEvent {
 
     pub fn at_level(self, level: tokio_trace::Level) -> Self {
         Self {
-            metadata: metadata::Expected {
+            metadata: metadata::Expect {
                 level: Some(level),
                 ..self.metadata
             },
@@ -58,7 +58,7 @@ impl MockEvent {
         I: Into<String>,
     {
         Self {
-            metadata: metadata::Expected {
+            metadata: metadata::Expect {
                 target: Some(target.into()),
                 ..self.metadata
             },

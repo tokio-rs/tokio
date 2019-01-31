@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use std::fmt;
-use super::metadata;
+use super::{metadata, field};
 
 /// A mock span.
 ///
@@ -8,7 +8,13 @@ use super::metadata;
 /// `subscriber` module.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct MockSpan {
-    pub(in support) metadata: metadata::Expected,
+    pub(in support) metadata: metadata::Expect,
+}
+
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct NewSpan {
+    pub(in support) span: MockSpan,
+    pub(in support) fields: field::Expect,
 }
 
 pub fn mock() -> MockSpan {
@@ -23,7 +29,7 @@ impl MockSpan {
         I: Into<String>,
     {
         Self {
-            metadata: metadata::Expected {
+            metadata: metadata::Expect {
                 name: Some(name.into()),
                 ..self.metadata
             },
@@ -33,7 +39,7 @@ impl MockSpan {
 
     pub fn at_level(self, level: tokio_trace::Level) -> Self {
         Self {
-            metadata: metadata::Expected {
+            metadata: metadata::Expect {
                 level: Some(level),
                 ..self.metadata
             },
@@ -43,11 +49,10 @@ impl MockSpan {
 
     pub fn with_target<I>(self, target: I) -> Self
     where
-
         I: Into<String>,
     {
         Self {
-            metadata: metadata::Expected {
+            metadata: metadata::Expect {
                 target: Some(target.into()),
                 ..self.metadata
             },
@@ -59,6 +64,16 @@ impl MockSpan {
         self.metadata.name.as_ref().map(String::as_ref)
     }
 
+    pub fn with_field<I>(self, fields: I) -> NewSpan
+    where
+        I: Into<field::Expect>
+    {
+        NewSpan {
+            span: self,
+            fields: fields.into(),
+        }
+    }
+
     pub(in support) fn check_metadata(&self, actual: &tokio_trace::Metadata) {
         self.metadata.check(actual, format_args!("span {}", self))
     }
@@ -67,10 +82,29 @@ impl MockSpan {
 
 impl fmt::Display for MockSpan {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.metadata.name {
-            Some(ref name) => write!(f, "a span named {:?}", name),
-            None => write!(f, "any span"),
-        }?;
+        if self.metadata.name.is_some() {
+            write!(f, "a span{}", self.metadata)
+        } else {
+            write!(f, "any span{}", self.metadata)
+        }
+    }
+}
+
+impl Into<NewSpan> for MockSpan {
+    fn into(self) -> NewSpan {
+        NewSpan {
+            span: self,
+            ..Default::default()
+        }
+    }
+}
+
+impl fmt::Display for NewSpan {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a new span{}", self.span.metadata)?;
+        if !self.fields.is_empty() {
+            write!(f, " with {}", self.fields)?;
+        }
         Ok(())
     }
 }
