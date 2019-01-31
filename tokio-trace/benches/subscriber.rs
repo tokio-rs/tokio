@@ -15,8 +15,8 @@ use tokio_trace::{field, span, Event, Id, Metadata};
 struct EnabledSubscriber;
 
 impl tokio_trace::Subscriber for EnabledSubscriber {
-    fn new_span(&self, span: &Metadata) -> Id {
-        let _ = span;
+    fn new_span(&self, span: &Metadata, values: &field::ValueSet) -> Id {
+        let _ = (span, values);
         Id::from_u64(0)
     }
 
@@ -24,7 +24,7 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         let _ = event;
     }
 
-    fn record(&self, span: &Id, values: field::ValueSet) {
+    fn record(&self, span: &Id, values: &field::ValueSet) {
         let _ = (span, values);
     }
 
@@ -75,11 +75,13 @@ impl<'a> field::Record for Recorder<'a> {
 }
 
 impl tokio_trace::Subscriber for RecordingSubscriber {
-    fn new_span(&self, _span: &Metadata) -> Id {
+    fn new_span(&self, _span: &Metadata, values: &field::ValueSet) -> Id {
+        let mut recorder = Recorder(self.0.lock().unwrap());
+        values.record(&mut recorder);
         Id::from_u64(0)
     }
 
-    fn record(&self, _span: &Id, values: field::ValueSet) {
+    fn record(&self, _span: &Id, values: &field::ValueSet) {
         let mut recorder = Recorder(self.0.lock().unwrap());
         values.record(&mut recorder);
     }
