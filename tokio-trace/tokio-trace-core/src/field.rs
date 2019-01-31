@@ -511,19 +511,21 @@ impl<'a> ValueSet<'a> {
     }
 
     /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
-    /// identifies the callsite that defines the fields this batch refers to.
+    /// identifies the callsite that defines the fields this `ValueSet` refers to.
     #[inline]
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
     }
 
-    /// Records all the fields in this `ValueSet` with the provided `recorder`.
+    /// Records all the fields in this `ValueSet` with the provided [recorder].
+    ///
+    /// [recorder]: ::field::Record
     pub fn record(&self, recorder: &mut Record) {
         if self.fields.callsite() != self.callsite() {
             return;
         }
         let fields = self.fields.iter().filter_map(|field| {
-            let value = self.values.get(field.i)?.as_ref()?;
+            let value = self.values[field.i]?;
             Some((field, value))
         });
         for (ref field, value) in fields {
@@ -531,10 +533,40 @@ impl<'a> ValueSet<'a> {
         }
     }
 
+    /// Returns `true` if this `ValueSet` contains a value for the given `Field`.
+    pub fn contains(&self, field: &Field) -> bool {
+        field.callsite() == self.callsite() && self.contains_inner(field)
+    }
+
+    fn contains_inner(&self, field: &Field) -> bool {
+        self.values[field.i].is_some()
+    }
+
     /// Returns true if this `ValueSet` contains _all_ the fields defined on the
     /// span or event it corresponds to.
     pub fn is_complete(&self) -> bool {
-        self.is_complete
+        if self.fields.callsite() != self.callsite() {
+            return false;
+        }
+        for ref field in self.fields.iter() {
+            if !self.contains_inner(field) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns true if this `ValueSet` contains _no_ values.
+    pub fn is_empty(&self) -> bool {
+        if self.fields.callsite() != self.callsite() {
+            return true;
+        }
+        for ref field in self.fields.iter() {
+            if self.contains_inner(field) {
+                return false;
+            }
+        }
+        true
     }
 
     pub(crate) fn field_set(&self) -> &FieldSet {
@@ -547,7 +579,6 @@ impl<'a> fmt::Debug for ValueSet<'a> {
         f.debug_struct("ValueSet")
             .field("fields", &self.fields)
             .field("values", &format_args!("{}", "[...]"))
-            .field("is_complete", &self.is_complete)
             .finish()
     }
 }
