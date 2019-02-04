@@ -25,6 +25,7 @@ pub struct ReadFile<P: AsRef<Path> + Send + 'static> {
 #[derive(Debug)]
 enum State<P: AsRef<Path> + Send + 'static> {
     Open(file::OpenFuture<P>),
+    Metadata(file::MetadataFuture),
     Read(tokio_io::io::ReadToEnd<File>),
 }
 
@@ -36,7 +37,11 @@ impl<P: AsRef<Path> + Send + 'static> Future for ReadFile<P> {
         let new_state = match &mut self.state {
             State::Open(ref mut open_file) => {
                 let file = try_ready!(open_file.poll());
-                let buf = Vec::new();
+                State::Metadata(file.metadata())
+            }
+            State::Metadata(read_metadata) => {
+                let (file, metadata) = try_ready!(read_metadata.poll());
+                let buf = Vec::with_capacity(metadata.len() as usize + 1);
                 let read = tokio_io::io::read_to_end(file, buf);
                 State::Read(read)
             }
@@ -47,7 +52,7 @@ impl<P: AsRef<Path> + Send + 'static> Future for ReadFile<P> {
         };
 
         mem::replace(&mut self.state, new_state);
-        // We just entered the Read state, need to poll it before returning.
+        // Getting here means we transitionsed state. Must poll the new state.
         self.poll()
     }
 }

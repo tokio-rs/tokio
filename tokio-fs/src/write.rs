@@ -36,13 +36,11 @@ impl<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + fmt::Debug> Future for Wr
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let new_state = match &mut self.state {
             State::Create(ref mut create_file, contents) => {
-                eprintln!("WriteFile::Create poll");
                 let file = try_ready!(create_file.poll());
                 let write = tokio_io::io::write_all(file, contents.take().unwrap());
                 State::Write(write)
             }
             State::Write(ref mut write) => {
-                eprintln!("WriteFile::Write poll");
                 let (_, contents) = try_ready!(write.poll());
                 return Ok(Async::Ready(contents));
             }
