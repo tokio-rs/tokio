@@ -311,3 +311,99 @@ fn expires_before_last_insert() {
 
     })
 }
+
+#[test]
+fn multi_reset() {
+    mocked(|_, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        let foo = queue.insert_at("foo", epoch + ms(200));
+        let bar = queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&foo, epoch + ms(300));
+        queue.reset_at(&bar, epoch + ms(350));
+        queue.reset_at(&foo, epoch + ms(400));
+    })
+}
+
+#[test]
+fn expire_first_key_when_reset_to_expire_earlier() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        let foo = queue.insert_at("foo", epoch + ms(200));
+        queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&foo, epoch + ms(100));
+
+        advance(timer, ms(100));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "foo");
+    })
+}
+
+#[test]
+fn expire_second_key_when_reset_to_expire_earlier() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        queue.insert_at("foo", epoch + ms(200));
+        let bar = queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&bar, epoch + ms(100));
+
+        advance(timer, ms(100));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "bar");
+    })
+}
+
+
+#[test]
+fn reset_first_expiring_item_to_expire_later() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        let foo = queue.insert_at("foo", epoch + ms(200));
+        let bar = queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&foo, epoch + ms(300));
+        advance(timer, ms(250));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "bar");
+    })
+}
