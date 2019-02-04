@@ -91,7 +91,7 @@ impl Subscriber for CounterSubscriber {
         values.record(&mut self.recorder())
     }
 
-    fn event(&self, event: Event) {
+    fn event(&self, event: &Event) {
         event.record(&mut self.recorder())
     }
 

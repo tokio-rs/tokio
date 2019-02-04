@@ -168,7 +168,7 @@ pub trait Subscriber {
     /// [`Event`]: ::event::Event
     /// [recorder]: ::field::Record
     /// [`record` method]: ::event::Event::record
-    fn event(&self, event: Event);
+    fn event(&self, event: &Event);
 
     /// Records that a [`Span`] has been entered.
     ///

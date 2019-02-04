@@ -20,7 +20,7 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         Id::from_u64(0)
     }
 
-    fn event(&self, event: Event) {
+    fn event(&self, event: &Event) {
         let _ = event;
     }
 
@@ -70,7 +70,7 @@ impl tokio_trace::Subscriber for RecordingSubscriber {
         values.record(&mut recorder);
     }
 
-    fn event(&self, event: Event) {
+    fn event(&self, event: &Event) {
         let mut recorder = Recorder(self.0.lock().unwrap());
         event.record(&mut recorder);
     }

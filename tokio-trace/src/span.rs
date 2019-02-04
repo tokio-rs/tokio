@@ -291,8 +291,9 @@ impl<'a> Span<'a> {
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
-            if let Some(field) = field.as_field(inner.metadata()) {
-                inner.record(&field.with_value(value))
+            let meta = inner.metadata();
+            if let Some(field) = field.as_field(meta) {
+                inner.record(&field::ValueSet::new(meta.fields(), &[(&field, Some(value))]))
             }
         }
         self

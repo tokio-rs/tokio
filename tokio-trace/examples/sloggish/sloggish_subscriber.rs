@@ -261,7 +261,7 @@ impl Subscriber for SloggishSubscriber {
         }
     }
 
-    fn event(&self, event: tokio_trace::Event) {
+    fn event(&self, event: &tokio_trace::Event) {
         let mut stderr = self.stderr.lock();
         let indent = self.stack.lock().unwrap().len();
         self.print_indent(&mut stderr, indent).unwrap();

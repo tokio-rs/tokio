@@ -78,7 +78,7 @@ pub struct FieldSet {
 
 /// A set of fields and values for a span.
 pub struct ValueSet<'a> {
-    values: [Option<&'a Value>; 32],
+    values: &'a [(&'a Field, Option<&'a (Value + 'a)>)],
     fields: &'a FieldSet,
 }
 
@@ -303,6 +303,14 @@ where
     }
 }
 
+impl<'a> ::sealed::Sealed for fmt::Arguments<'a> {}
+
+impl<'a> Value for fmt::Arguments<'a> {
+    fn record(&self, key: &Field, recorder: &mut Record) {
+        recorder.record_debug(key, self)
+    }
+}
+
 // ===== impl DisplayValue =====
 
 impl<T: fmt::Display> ::sealed::Sealed for DisplayValue<T> {}
@@ -317,6 +325,7 @@ where
 }
 
 // ===== impl DebugValue =====
+
 impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
 
 impl<T: fmt::Debug> Value for DebugValue<T>
@@ -341,13 +350,6 @@ impl Field {
     /// Returns a string representing the name of the field.
     pub fn name(&self) -> &'static str {
         self.fields.names[self.i]
-    }
-
-    /// Constructs a new `ValueSet` containing this field and the given value.
-    pub fn with_value<'a>(&'a self, value: &'a Value) -> ValueSet<'a> {
-        let mut values = [None; 32];
-        values[self.i] = Some(value);
-        ValueSet::new(&self.fields, values)
     }
 }
 
@@ -484,7 +486,7 @@ impl Iterator for Iter {
 
 impl<'a> ValueSet<'a> {
     /// Returns a new `ValueSet`.
-    pub fn new(fields: &'a FieldSet, values: [Option<&'a Value>; 32]) -> Self {
+    pub fn new(fields: &'a FieldSet, values: &'a [(&'a Field, Option<&'a (Value + 'a)>)]) -> Self {
         ValueSet {
             values,
             fields,
@@ -502,15 +504,15 @@ impl<'a> ValueSet<'a> {
     ///
     /// [recorder]: ::field::Record
     pub fn record(&self, recorder: &mut Record) {
-        if self.fields.callsite() != self.callsite() {
-            return;
-        }
-        let fields = self.fields.iter().filter_map(|field| {
-            let value = self.values[field.i]?;
-            Some((field, value))
-        });
-        for (ref field, value) in fields {
-            value.record(field, recorder);
+        let my_callsite = self.callsite();
+        for (field, value) in self.values {
+            // Ensure that the field actually belongs to this span.
+            if field.callsite() != my_callsite {
+                continue;
+            }
+            if let Some(value) = value {
+                value.record(field, recorder);
+            }
         }
     }
 
@@ -520,13 +522,13 @@ impl<'a> ValueSet<'a> {
     }
 
     fn contains_inner(&self, field: &Field) -> bool {
-        self.values[field.i].is_some()
+        self.values.iter().any(|(key, val)| *key == field && val.is_some())
     }
 
     /// Returns true if this `ValueSet` contains _all_ the fields defined on the
     /// span or event it corresponds to.
     pub fn is_complete(&self) -> bool {
-        if self.fields.callsite() != self.callsite() {
+        if self.values.len() < self.fields.names.len() {
             return false;
         }
         for ref field in self.fields.iter() {
@@ -539,15 +541,10 @@ impl<'a> ValueSet<'a> {
 
     /// Returns true if this `ValueSet` contains _no_ values.
     pub fn is_empty(&self) -> bool {
-        if self.fields.callsite() != self.callsite() {
-            return true;
-        }
-        for ref field in self.fields.iter() {
-            if self.contains_inner(field) {
-                return false;
-            }
-        }
-        true
+        let my_callsite = self.callsite();
+        !self.values.iter().any(|(key, val)| {
+            key.callsite() == my_callsite && val.is_some()
+        })
     }
 
     pub(crate) fn field_set(&self) -> &FieldSet {

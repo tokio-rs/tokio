@@ -158,7 +158,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         }
     }
 
-    fn event(&self, event: Event) {
+    fn event(&self, event: &Event) {
         let name = event.metadata().name();
         println!("event: {};", name);
         match self.expected.lock().unwrap().pop_front() {

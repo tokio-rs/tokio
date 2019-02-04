@@ -23,31 +23,27 @@ use {
 /// [`Span`]: ::span::Span
 #[derive(Debug)]
 pub struct Event<'a> {
-    fields: field::ValueSet<'a>,
+    fields: &'a field::ValueSet<'a>,
     metadata: &'a Metadata<'a>,
-    message: Option<(field::Field, fmt::Arguments<'a>)>,
 }
 
 /// Constructs an `Event`.
 #[derive(Debug)]
 pub struct Builder<'a> {
-    event: Event<'a>,
+    metadata: &'a Metadata<'a>,
 }
 
 impl<'a> Event<'a> {
     /// Returns a new `Builder` for constructing an `Event` with the specified
-    /// `metadata` and `fields`.
-    pub fn builder(metadata: &'a Metadata<'a>, fields: field::ValueSet<'a>) -> Builder<'a> {
-        Builder::new(metadata, fields)
+    /// `metadata`.
+    pub fn builder(metadata: &'a Metadata<'a>) -> Builder<'a> {
+        Builder::new(metadata)
     }
 
     /// Returns all the fields on this `Event` with the specified [recorder].
     ///
     /// [recorder]: ::field::Record
     pub fn record(&self, recorder: &mut field::Record) {
-        if let Some((ref key, ref args)) = self.message {
-            field::debug(args).record(key, recorder);
-        }
         self.fields.record(recorder);
     }
 
@@ -66,30 +62,20 @@ impl<'a> Event<'a> {
 
 impl<'a> Builder<'a> {
     /// Returns a new event `Builder`.
-    pub fn new(metadata: &'a Metadata<'a>, fields: field::ValueSet<'a>) -> Self {
+    pub fn new(metadata: &'a Metadata<'a>) -> Self {
         Self {
-            event: Event {
-                fields,
-                metadata,
-                message: None,
-            },
+            metadata,
         }
     }
 
-    /// Adds a message to the event.
-    pub fn with_message(mut self, key: field::Field, message: fmt::Arguments<'a>) -> Self {
-        if key.callsite() != self.event.metadata.callsite() {
-            return self;
-        }
-        self.event.message = Some((key, message));
-        self
-    }
-
-    /// Consumes the builder and records the constructed `Event`.
-    pub fn record(self) {
-        let mut event = Some(self.event);
+    /// Records the constructed `Event` with a set of values.
+    pub fn record(&self, fields: &'a field::ValueSet<'a>) {
+        let event = Event {
+            metadata: self.metadata,
+            fields,
+        };
         dispatcher::with(|current| {
-            current.event(event.take().unwrap());
+            current.event(&event);
         });
     }
 }

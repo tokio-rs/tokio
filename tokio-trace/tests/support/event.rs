@@ -66,7 +66,7 @@ impl MockEvent {
         }
     }
 
-    pub(in support) fn check(self, event: tokio_trace::Event) {
+    pub(in support) fn check(self, event: &tokio_trace::Event) {
         let meta = event.metadata();
         let name = meta.name();
         self.metadata.check(meta, format_args!("event {}", name));

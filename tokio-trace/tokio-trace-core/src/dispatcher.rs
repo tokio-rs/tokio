@@ -148,7 +148,7 @@ impl Dispatch {
     ///
     /// [`Event`]: ::event::Event
     #[inline]
-    pub fn event(&self, event: Event) {
+    pub fn event(&self, event: &Event) {
         self.subscriber.event(event)
     }
 
@@ -221,7 +221,7 @@ impl Subscriber for NoSubscriber {
         Span::from_u64(0)
     }
 
-    fn event(&self, _event: Event) {}
+    fn event(&self, _event: &Event) {}
 
     fn record(&self, _span: &Span, _values: &field::ValueSet) {}
 

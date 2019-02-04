@@ -251,7 +251,7 @@
 //! # impl tokio_trace::Subscriber for FooSubscriber {
 //! #   fn new_span(&self, _: &Metadata, _: &ValueSet) -> Id { Id::from_u64(0) }
 //! #   fn record(&self, _: &Id, _: &ValueSet) {}
-//! #   fn event(&self, _: tokio_trace::Event) {}
+//! #   fn event(&self, _: &tokio_trace::Event) {}
 //! #   fn add_follows_from(&self, _: &Id, _: Id) {}
 //! #   fn enabled(&self, _: &Metadata) -> bool { false }
 //! #   fn enter(&self, _: &Id) {}
@@ -346,7 +346,7 @@ macro_rules! callsite {
         fields: $( $field_name:ident ),*
         $(,)*
     ) => ({
-        use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
+        use std::sync::{Once, atomic::{self, AtomicUsize, Ordering}};
         use $crate::{callsite, Metadata, subscriber::Interest};
         struct MyCallsite;
         static META: Metadata<'static> = {
@@ -358,7 +358,11 @@ macro_rules! callsite {
                 callsite: &MyCallsite,
             }
         };
-        static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
+        // ATOMIC_USIZE_INIT is now deprecated as `::new()` is a const fn;
+        // however, this isn't the case on older Rust versions, so we have
+        // to continue using the deprecated API.
+        #[allow(deprecated)]
+        static INTEREST: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();
         impl MyCallsite {
             #[inline]
@@ -450,23 +454,36 @@ macro_rules! span {
             let callsite = callsite! { name: $name, fields: $( $k ),* };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                $( $( let $k = $val; )* )*
-                let mut vals: [Option<&Value>; 32] = [None; 32];
-                let mut i = 0;
-                $(
-                    $(
-                        span!(@ ignore $val);
-                        vals[i] = Some(&$k);
-                    )*
-                    i += 1;
-                )*
-                Span::new(meta, &ValueSet::new(meta.fields(), vals))
+                Span::new(meta, &valueset!(meta.fields(), $($k $( = $val)*),*))
             } else {
                 Span::new_disabled()
             }
         }
     };
     (@ ignore $v:tt) => {}
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! valueset {
+    ($fields:expr, $($k:ident $( = $val:expr )* ) ,*) => {
+        {
+            let mut iter = $fields.iter();
+            $crate::field::ValueSet::new(
+                $fields,
+                &[
+                    $((
+                        &iter.next()
+                            .expect("FieldSet corrupted (this is a bug)"),
+                        valueset!(@val $k $(= $val)*)
+                    )),*
+                ])
+        }
+    };
+    (@val $k:ident = $val:expr) => {
+        Some(&$val as &$crate::field::Value)
+    };
+    (@val $k:ident) => { None };
 }
 
 /// Constructs a new `Event`.
@@ -510,7 +527,7 @@ macro_rules! span {
 /// ```
 #[macro_export]
 macro_rules! event {
-    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* } )=> ({
+    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* $(,)*} )=> ({
         {
             #[allow(unused_imports)]
             use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
@@ -523,48 +540,13 @@ macro_rules! event {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                $( let $k = $val; )*
-                let mut vals: [Option<&Value>; 32] = [None; 32];
-                let mut i = 0;
-                $(
-                    event!(@ ignore $val);
-                    vals[i] = Some(&$k);
-                    i += 1;
-                )*
-                let values = ValueSet::new(meta.fields(), vals);
-                Event::builder(meta, values).record();
+                Event::builder(meta)
+                    .record(&valueset!(meta.fields(), $( $k = $val),* ));
             }
         }
     });
     (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => ({
-        {
-            #[allow(unused_imports)]
-            use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! {
-                name: concat!("event ", file!(), ":", line!()),
-                target: $target,
-                level: $lvl,
-                fields: message, $( $k ),*
-            };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
-                $( let $k = $val; )*
-                let mut vals: [Option<&Value>; 32] = [None; 32];
-                let mut i = 1;
-                $(
-                    event!(@ ignore $val);
-                    vals[i] = Some(&$k);
-                    i += 1;
-                )*
-                let values = ValueSet::new(meta.fields(), vals);
-                let message = meta.fields().iter().next()
-                    .expect("missing field for message; this is a bug");
-                Event::builder(meta, values)
-                    .with_message(message, format_args!( $($arg)+ ))
-                    .record();
-            }
-        }
+        event!(target: $target, $lvl, { message = format_args!($($arg)+), $( $k = $val ),* })
     });
     (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr ),+ ) => (
         event!(target: $target, $lvl, { $($k = $val),+ })
@@ -573,7 +555,7 @@ macro_rules! event {
         event!(target: $target, $lvl, { }, $($arg)+)
     );
     ( $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $lvl, { $($k = $val),* }, $($arg)+)
+        event!(target: module_path!(), $lvl, { message = format_args!($($arg)+), $($k = $val),* })
     );
     ( $lvl:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(), $lvl, { $($k = $val),* })
