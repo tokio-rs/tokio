@@ -559,7 +559,7 @@ impl<U> List<U> {
         }
     }
 
-    /// Prepends an element to the back of the list
+    /// Appends an element to the back of the list
     fn push_back(&mut self, node: Arc<Node<U>>) -> *const Node<U> {
         let ptr = arc2ptr(node);
 
