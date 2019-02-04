@@ -52,22 +52,6 @@ struct RecordingSubscriber(Mutex<String>);
 struct Recorder<'a>(MutexGuard<'a, String>);
 
 impl<'a> field::Record for Recorder<'a> {
-    fn record_i64(&mut self, field: &field::Field, value: i64) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_u64(&mut self, field: &field::Field, value: u64) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_bool(&mut self, field: &field::Field, value: bool) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_str(&mut self, field: &field::Field, value: &str) {
-        self.record_debug(field, &value)
-    }
-
     fn record_debug(&mut self, _field: &field::Field, value: &fmt::Debug) {
         use std::fmt::Write;
         let _ = write!(&mut *self.0, "{:?}", value);

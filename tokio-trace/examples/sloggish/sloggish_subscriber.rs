@@ -118,44 +118,12 @@ impl Span {
 }
 
 impl Record for Span {
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.record_debug(field, &value)
-    }
-
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
         self.kvs.push((field.name(), format!("{:?}", value)))
     }
 }
 
 impl<'a> Record for Event<'a> {
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        self.record_debug(field, &value)
-    }
-
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.record_debug(field, &value)
-    }
-
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
         write!(
             &mut self.stderr,

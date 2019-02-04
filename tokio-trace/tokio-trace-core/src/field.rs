@@ -115,22 +115,6 @@ pub struct Iter {
 /// }
 ///
 /// impl<'a> Record for StringRecorder<'a> {
-///     fn record_i64(&mut self, field: &Field, value: i64) {
-///         self.record_debug(field, &value)
-///     }
-///
-///     fn record_u64(&mut self, field: &Field, value: u64) {
-///         self.record_debug(field, &value)
-///     }
-///
-///     fn record_bool(&mut self, field: &Field, value: bool) {
-///         self.record_debug(field, &value)
-///     }
-///
-///    fn record_str(&mut self, field: &Field, value: &str) {
-///         self.record_debug(field, &value)
-///     }
-///
 ///     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
 ///         write!(self.string, "{} = {:?}; ", field.name(), value).unwrap();
 ///     }
@@ -168,14 +152,6 @@ pub struct Iter {
 ///         self.sum += value as i64;
 ///     }
 ///
-///     fn record_bool(&mut self, _field: &Field, _value: bool) {
-///         // Do nothing
-///     }
-///
-///    fn record_str(&mut self, _field: &Field, _value: &str) {
-///         // Do nothing
-///     }
-///
 ///     fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {
 ///         // Do nothing
 ///     }
@@ -197,16 +173,24 @@ pub struct Iter {
 /// [`ValueSet`]: ::field::ValueSet
 pub trait Record {
     /// Record a signed 64-bit integer value.
-    fn record_i64(&mut self, field: &Field, value: i64);
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.record_debug(field, &value)
+    }
 
     /// Record an umsigned 64-bit integer value.
-    fn record_u64(&mut self, field: &Field, value: u64);
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.record_debug(field, &value)
+    }
 
     /// Record a boolean value.
-    fn record_bool(&mut self, field: &Field, value: bool);
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.record_debug(field, &value)
+    }
 
     /// Record a string value.
-    fn record_str(&mut self, field: &Field, value: &str);
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.record_debug(field, &value)
+    }
 
     /// Record a value implementing `fmt::Debug`.
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug);
