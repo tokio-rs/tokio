@@ -1,3 +1,8 @@
+# 0.2.10 (February 4, 2019)
+
+### Fixed
+- `DelayQueue` when multiple delays are reset (#871).
+
 # 0.2.9 (January 24, 2019)
 
 ### Fixed
