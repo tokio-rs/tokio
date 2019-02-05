@@ -555,12 +555,19 @@ impl<'a> ValueSet<'a> {
 
 impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut dbg = f.debug_struct("ValueSet");
+        // TODO: this might be handy as a public impl?
+        impl<'a, 'b> Record for fmt::DebugStruct<'a, 'b> {
+            fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+                self.field(field.name(), value);
+            }
+        }
         self.values
             .iter()
-            .fold(&mut dbg, |d, (k, v)| {
-                let f = if v.is_some() { "Some(...)" } else { "None" };
-                d.field(k.name(), &format_args!("{}", f))
+            .fold(&mut f.debug_struct("ValueSet"), |dbg, (key, v)| {
+                if let Some(val) = v {
+                    val.record(key, dbg);
+                }
+                dbg
             })
             .finish()
     }
