@@ -1,8 +1,7 @@
 //! Events represent single points in time during the execution of a program.
-use std::fmt;
 use {
     dispatcher,
-    field::{self, Value},
+    field,
     Metadata,
 };
 
@@ -27,7 +26,7 @@ pub struct Event<'a> {
     metadata: &'a Metadata<'a>,
 }
 
-/// Constructs an `Event`.
+/// Constructs `Event`s.
 #[derive(Debug)]
 pub struct Builder<'a> {
     metadata: &'a Metadata<'a>,
