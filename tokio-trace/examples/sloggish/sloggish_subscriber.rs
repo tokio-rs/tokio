@@ -225,7 +225,7 @@ impl Subscriber for SloggishSubscriber {
         }
     }
 
-    fn add_follows_from(&self, _span: &tokio_trace::Id, _follows: tokio_trace::Id) {
+    fn record_follows_from(&self, _span: &tokio_trace::Id, _follows: &tokio_trace::Id) {
         // unimplemented
     }
 

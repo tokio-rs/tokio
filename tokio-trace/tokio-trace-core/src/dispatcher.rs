@@ -122,11 +122,11 @@ impl Dispatch {
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
     ///
-    /// This calls the [`add_follows_from`](::Subscriber::add_follows_from)
+    /// This calls the [`record_follows_from`](::Subscriber::record_follows_from)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn add_follows_from(&self, span: &Span, follows: Span) {
-        self.subscriber.add_follows_from(span, follows)
+    pub fn record_follows_from(&self, span: &Span, follows: &Span) {
+        self.subscriber.record_follows_from(span, follows)
     }
 
     /// Returns true if a span with the specified [metadata] would be
@@ -225,7 +225,7 @@ impl Subscriber for NoSubscriber {
 
     fn record(&self, _span: &Span, _values: &field::ValueSet) {}
 
-    fn add_follows_from(&self, _span: &Span, _follows: Span) {}
+    fn record_follows_from(&self, _span: &Span, _follows: &Span) {}
 
     #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {

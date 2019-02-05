@@ -156,7 +156,7 @@ pub trait Subscriber {
     /// subscriber knows about, or if a cyclical relationship would be created
     /// (i.e., some span _a_ which proceeds some other span _b_ may not also
     /// follow from _b_), it may silently do nothing.
-    fn add_follows_from(&self, span: &Span, follows: Span);
+    fn record_follows_from(&self, span: &Span, follows: &Span);
 
     /// Records that an [`Event`] has occurred.
     ///

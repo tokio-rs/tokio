@@ -83,7 +83,7 @@ impl Subscriber for CounterSubscriber {
         Id::from_u64(id as u64)
     }
 
-    fn add_follows_from(&self, _span: &Id, _follows: Id) {
+    fn record_follows_from(&self, _span: &Id, _follows: &Id) {
         // unimplemented
     }
 

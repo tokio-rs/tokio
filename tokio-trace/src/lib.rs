@@ -252,7 +252,7 @@
 //! #   fn new_span(&self, _: &Metadata, _: &ValueSet) -> Id { Id::from_u64(0) }
 //! #   fn record(&self, _: &Id, _: &ValueSet) {}
 //! #   fn event(&self, _: &tokio_trace::Event) {}
-//! #   fn add_follows_from(&self, _: &Id, _: Id) {}
+//! #   fn record_follows_from(&self, _: &Id, _: Id) {}
 //! #   fn enabled(&self, _: &Metadata) -> bool { false }
 //! #   fn enter(&self, _: &Id) {}
 //! #   fn exit(&self, _: &Id) {}

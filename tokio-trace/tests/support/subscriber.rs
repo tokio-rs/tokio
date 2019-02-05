@@ -168,7 +168,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         }
     }
 
-    fn add_follows_from(&self, _span: &Id, _follows: Id) {
+    fn record_follows_from(&self, _span: &Id, _follows: &Id) {
         // TODO: it should be possible to expect spans to follow from other spans
     }
 

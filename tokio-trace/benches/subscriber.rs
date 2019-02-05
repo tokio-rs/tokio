@@ -28,7 +28,7 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         let _ = (span, values);
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) {
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
         let _ = (span, follows);
     }
 
@@ -75,7 +75,7 @@ impl tokio_trace::Subscriber for RecordingSubscriber {
         event.record(&mut recorder);
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) {
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
         let _ = (span, follows);
     }
 

@@ -346,7 +346,7 @@ impl<'a> Span<'a> {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
-    pub fn follows_from(&self, from: Id) -> &Self {
+    pub fn follows_from(&self, from: &Id) -> &Self {
         if let Some(ref inner) = self.inner {
             inner.follows_from(from);
         }
@@ -413,8 +413,8 @@ impl<'a> Enter<'a> {
     /// If this span is disabled, this function will do nothing. Otherwise, it
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
-    fn follows_from(&self, from: Id) {
-        self.subscriber.add_follows_from(&self.id, from)
+    fn follows_from(&self, from: &Id) {
+        self.subscriber.record_follows_from(&self.id, &from)
     }
 
     /// Returns the span's ID.
