@@ -358,9 +358,8 @@ macro_rules! callsite {
                 callsite: &MyCallsite,
             }
         };
-        // ATOMIC_USIZE_INIT is now deprecated as `::new()` is a const fn;
-        // however, this isn't the case on older Rust versions, so we have
-        // to continue using the deprecated API.
+        // FIXME: Rust 1.34 deprecated ATOMIC_USIZE_INIT. When Tokio's minimum
+        // supported version is 1.34, replace this with the const fn `::new`.
         #[allow(deprecated)]
         static INTEREST: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();
@@ -460,27 +459,6 @@ macro_rules! span {
             }
         }
     };
-    (@ ignore $v:tt) => {}
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! valueset {
-    ($fields:expr, $($k:ident $( = $val:expr )* ) ,*) => {
-        {
-            let mut iter = $fields.iter();
-            $fields.value_set(&[
-                $((
-                    &iter.next().expect("FieldSet corrupted (this is a bug)"),
-                    valueset!(@val $k $(= $val)*)
-                )),*
-            ])
-        }
-    };
-    (@val $k:ident = $val:expr) => {
-        Some(&$val as &$crate::field::Value)
-    };
-    (@val $k:ident) => { None };
 }
 
 /// Constructs a new `Event`.
@@ -560,7 +538,6 @@ macro_rules! event {
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
     );
-    (@ ignore $v:tt) => {}
 }
 
 /// Constructs an event at the trace level.
@@ -816,6 +793,26 @@ macro_rules! is_enabled {
             $crate::dispatcher::with(|current| current.enabled(meta))
         }
     }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! valueset {
+    ($fields:expr, $($k:ident $( = $val:expr )* ) ,*) => {
+        {
+            let mut iter = $fields.iter();
+            $fields.value_set(&[
+                $((
+                    &iter.next().expect("FieldSet corrupted (this is a bug)"),
+                    valueset!(@val $k $(= $val)*)
+                )),*
+            ])
+        }
+    };
+    (@val $k:ident = $val:expr) => {
+        Some(&$val as &$crate::field::Value)
+    };
+    (@val $k:ident) => { None };
 }
 pub mod field;
 pub mod span;
