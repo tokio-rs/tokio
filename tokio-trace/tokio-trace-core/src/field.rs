@@ -496,7 +496,6 @@ impl Iterator for Iter {
 // ===== impl ValueSet =====
 
 impl<'a> ValueSet<'a> {
-
     /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
     /// identifies the callsite that defines the fields this `ValueSet` refers to.
     #[inline]
@@ -521,7 +520,9 @@ impl<'a> ValueSet<'a> {
     }
 
     fn contains_inner(&self, field: &Field) -> bool {
-        self.values.iter().any(|(key, val)| *key == field && val.is_some())
+        self.values
+            .iter()
+            .any(|(key, val)| *key == field && val.is_some())
     }
 
     /// Returns true if this `ValueSet` contains _all_ the fields defined on the
@@ -541,9 +542,10 @@ impl<'a> ValueSet<'a> {
     /// Returns true if this `ValueSet` contains _no_ values.
     pub fn is_empty(&self) -> bool {
         let my_callsite = self.callsite();
-        !self.values.iter().any(|(key, val)| {
-            key.callsite() == my_callsite && val.is_some()
-        })
+        !self
+            .values
+            .iter()
+            .any(|(key, val)| key.callsite() == my_callsite && val.is_some())
     }
 
     pub(crate) fn field_set(&self) -> &FieldSet {
@@ -554,10 +556,12 @@ impl<'a> ValueSet<'a> {
 impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut dbg = f.debug_struct("ValueSet");
-        self.values.iter().fold(&mut dbg, |d, (k, v)| {
-            let f = if v.is_some() { "Some(...)" } else { "None" };
-            d.field(k.name(), &format_args!("{}", f))
-        })
-        .finish()
+        self.values
+            .iter()
+            .fold(&mut dbg, |d, (k, v)| {
+                let f = if v.is_some() { "Some(...)" } else { "None" };
+                d.field(k.name(), &format_args!("{}", f))
+            })
+            .finish()
     }
 }

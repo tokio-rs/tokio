@@ -1,9 +1,5 @@
 //! Events represent single points in time during the execution of a program.
-use {
-    dispatcher,
-    field,
-    Metadata,
-};
+use {dispatcher, field, Metadata};
 
 /// `Event`s represent single points in time where something occurred during the
 /// execution of a program.
@@ -64,9 +60,7 @@ impl<'a> Event<'a> {
 impl<'a> Builder<'a> {
     /// Returns a new event `Builder`.
     pub fn new(metadata: &'a Metadata<'a>) -> Self {
-        Self {
-            metadata,
-        }
+        Self { metadata }
     }
 
     /// Records the constructed `Event` with a set of values.

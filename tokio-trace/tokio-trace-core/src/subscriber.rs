@@ -106,7 +106,6 @@ pub trait Subscriber {
     /// [metadata]: ::Metadata
     fn enabled(&self, metadata: &Metadata) -> bool;
 
-
     /// Record the construction of a new [`Span`], returning a new ID for the
     /// span being constructed.
     ///
