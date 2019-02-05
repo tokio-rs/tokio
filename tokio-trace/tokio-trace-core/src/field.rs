@@ -127,11 +127,15 @@ pub struct Iter {
 /// been recorded, the `StringRecorder` may be dropped, allowing the string
 /// to be printed or stored in some other data structure.
 ///
-/// While the `StringRecorder` implements the `record_i64`, `record_u64`,
-/// `record_bool`, and `record_str` functions by forwarding to `record_debug`,
-/// other recorders may implement type-specific behavior in those functions.
+/// The `Record` trait provides default implementations for `record_i64`,
+/// `record_u64`, `record_bool`, and `record_str` which simply forward the
+/// recorded value to `record_debug`. Thus, `record_debug` is the only method
+/// which a `Record` implementation *must* implement. However, recorders may
+/// override the default implementations of these functions in order to
+/// implement type-specific behavior.
+///
 /// Additionally, when a recorder recieves a value of a type it does not care
-/// about, it is free to ignore those values completely – for example, a
+/// about, it is free to ignore those values completely. For example, a
 /// recorder which only records numeric data might look like this:
 ///
 /// ```
@@ -158,6 +162,7 @@ pub struct Iter {
 /// }
 /// # }
 /// ```
+///
 /// This recorder (which is probably not particularly useful) keeps a running
 /// sum of all the numeric values it records, and ignores all other values. A
 /// more practical example of recording typed values is presented in
