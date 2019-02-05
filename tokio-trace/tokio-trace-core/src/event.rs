@@ -43,11 +43,13 @@ impl<'a> Event<'a> {
     /// Returns all the fields on this `Event` with the specified [recorder].
     ///
     /// [recorder]: ::field::Record
+    #[inline]
     pub fn record(&self, recorder: &mut field::Record) {
+        debug_assert!(self.fields.is_complete());
         self.fields.record(recorder);
     }
 
-    /// Returns an iterator over the fields in this event.
+    /// Returns a reference to the set of values on this `Event`.
     pub fn fields(&self) -> field::Iter {
         self.fields.field_set().iter()
     }

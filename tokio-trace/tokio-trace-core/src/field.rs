@@ -441,6 +441,17 @@ impl FieldSet {
         }
     }
 
+    /// Returns a new `ValueSet` with entries for this `FieldSet`'s values.
+    pub fn value_set<'v>(
+        &'v self,
+        values: &'v [(&'v Field, Option<&'v (Value + 'v)>)],
+    ) -> ValueSet<'v> {
+        ValueSet {
+            fields: self,
+            values,
+        }
+    }
+
     /// Returns the number of fields in this `FieldSet`.
     #[inline]
     pub fn len(&self) -> usize {
@@ -485,13 +496,6 @@ impl Iterator for Iter {
 // ===== impl ValueSet =====
 
 impl<'a> ValueSet<'a> {
-    /// Returns a new `ValueSet`.
-    pub fn new(fields: &'a FieldSet, values: &'a [(&'a Field, Option<&'a (Value + 'a)>)]) -> Self {
-        ValueSet {
-            values,
-            fields,
-        }
-    }
 
     /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
     /// identifies the callsite that defines the fields this `ValueSet` refers to.
@@ -504,12 +508,7 @@ impl<'a> ValueSet<'a> {
     ///
     /// [recorder]: ::field::Record
     pub fn record(&self, recorder: &mut Record) {
-        let my_callsite = self.callsite();
         for (field, value) in self.values {
-            // Ensure that the field actually belongs to this span.
-            if field.callsite() != my_callsite {
-                continue;
-            }
             if let Some(value) = value {
                 value.record(field, recorder);
             }
@@ -554,9 +553,11 @@ impl<'a> ValueSet<'a> {
 
 impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ValueSet")
-            .field("fields", &self.fields)
-            .field("values", &format_args!("{}", "[...]"))
-            .finish()
+        let mut dbg = f.debug_struct("ValueSet");
+        self.values.iter().fold(&mut dbg, |d, (k, v)| {
+            let f = if v.is_some() { "Some(...)" } else { "None" };
+            d.field(k.name(), &format_args!("{}", f))
+        })
+        .finish()
     }
 }

@@ -469,15 +469,12 @@ macro_rules! valueset {
     ($fields:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
             let mut iter = $fields.iter();
-            $crate::field::ValueSet::new(
-                $fields,
-                &[
-                    $((
-                        &iter.next()
-                            .expect("FieldSet corrupted (this is a bug)"),
-                        valueset!(@val $k $(= $val)*)
-                    )),*
-                ])
+            $fields.value_set(&[
+                $((
+                    &iter.next().expect("FieldSet corrupted (this is a bug)"),
+                    valueset!(@val $k $(= $val)*)
+                )),*
+            ])
         }
     };
     (@val $k:ident = $val:expr) => {

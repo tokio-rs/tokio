@@ -293,7 +293,7 @@ impl<'a> Span<'a> {
         if let Some(ref mut inner) = self.inner {
             let meta = inner.metadata();
             if let Some(field) = field.as_field(meta) {
-                inner.record(&field::ValueSet::new(meta.fields(), &[(&field, Some(value))]))
+                inner.record(&meta.fields().value_set(&[(&field, Some(value))]))
             }
         }
         self
