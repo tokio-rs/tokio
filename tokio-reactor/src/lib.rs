@@ -74,6 +74,8 @@ use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
+#[cfg(all(unix, not(target_os = "fuchsia")))]
+use std::os::unix::io::{AsRawFd, RawFd};
 
 use log::Level;
 use mio::event::Evented;
@@ -424,6 +426,13 @@ impl Reactor {
         if let Some(task) = wr {
             task.notify();
         }
+    }
+}
+
+#[cfg(all(unix, not(target_os = "fuchsia")))]
+impl AsRawFd for Reactor {
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.io.as_raw_fd()
     }
 }
 
