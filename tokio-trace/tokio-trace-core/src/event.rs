@@ -23,16 +23,17 @@ pub struct Event<'a> {
 }
 
 impl<'a> Event<'a> {
-    /// Constructs a new `Event` with the specified metadata and set of values.
+    /// Constructs a new `Event` with the specified metadata and set of values,
+    /// and observes it with the current subscriber.
     #[inline]
-    pub fn new(
-        metadata: &'a Metadata<'a>,
-        fields: &'a field::ValueSet,
-    ) -> Self {
-        Event {
+    pub fn observe(metadata: &'a Metadata<'a>, fields: &'a field::ValueSet) {
+        let event = Event {
             metadata,
             fields,
-        }
+        };
+        ::dispatcher::with(|current| {
+            current.event(&event);
+        });
     }
 
     /// Records all the fields on this `Event` with the specified [recorder].

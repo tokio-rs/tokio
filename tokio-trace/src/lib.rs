@@ -515,10 +515,7 @@ macro_rules! event {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                let event = Event::new(meta, &valueset!(meta.fields(), $( $k = $val),* ));
-                dispatcher::with(|current| {
-                    current.event(&event);
-                });
+                Event::observe(meta, &valueset!(meta.fields(), $( $k = $val),* ));
             }
         }
     });
