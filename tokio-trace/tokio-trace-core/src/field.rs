@@ -221,6 +221,17 @@ pub struct DisplayValue<T: fmt::Display>(T);
 #[derive(Debug, Clone)]
 pub struct DebugValue<T: fmt::Debug>(T);
 
+/// Marker trait implemented by arrays which are of valid length to
+/// construct a `ValueSet`.
+///
+/// `ValueSet`s may only be constructed from arrays containing 32 or fewer
+/// elements, to ensure the array is small enough to always be allocated on the
+/// stack. This trait is only implemented by arrays of an appropriate length,
+/// ensuring that the correct size arrays are used at compile-time.
+pub trait ValidLen<'a>: ::sealed::Sealed +
+    Borrow<[(&'a Field, Option<&'a (Value + 'a)>)]>
+{}
+
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
 /// recorded using its `Display` implementation.
 pub fn display<T>(t: T) -> DisplayValue<T>
@@ -447,14 +458,20 @@ impl FieldSet {
     }
 
     /// Returns a new `ValueSet` with entries for this `FieldSet`'s values.
+    ///
+    /// Note that a `ValueSet` may not be constructed with arrays of over 32
+    /// elements.
     #[doc(hidden)]
-    pub fn value_set<'v>(
+    pub fn value_set<'v, V>(
         &'v self,
-        values: &'v [(&'v Field, Option<&'v (Value + 'v)>)],
-    ) -> ValueSet<'v> {
+        values: &'v V,
+    ) -> ValueSet<'v>
+    where
+        V: ValidLen<'v>,
+    {
         ValueSet {
             fields: self,
-            values,
+            values: &values.borrow()[..]
         }
     }
 
@@ -565,6 +582,25 @@ impl<'a> fmt::Debug for ValueSet<'a> {
     }
 }
 
+// ===== impl ValidLen =====
+
+macro_rules! impl_valid_len {
+    ( $( $len:tt ),+ ) => {
+        $(
+            impl<'a> ::sealed::Sealed for
+                [(&'a Field, Option<&'a (Value + 'a)>); $len] {}
+            impl<'a> ValidLen<'a> for
+                [(&'a Field, Option<&'a (Value + 'a)>); $len] {}
+        )+
+    }
+}
+
+impl_valid_len! {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+    21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+}
+
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -616,7 +652,7 @@ mod test {
             (&fields.field("bar").unwrap(), None),
             (&fields.field("baz").unwrap(), None),
         ];
-        let valueset = fields.value_set(&values[..]);
+        let valueset = fields.value_set(values);
         assert!(valueset.is_empty());
     }
 
@@ -635,7 +671,7 @@ mod test {
             (&fields.field("bar").unwrap(), Some(&2 as &Value)),
             (&fields.field("baz").unwrap(), Some(&3 as &Value)),
         ];
-        let valueset = TEST_META_2.fields().value_set(&values[..]);
+        let valueset = TEST_META_2.fields().value_set(values);
         assert!(valueset.is_empty())
     }
 
@@ -647,7 +683,7 @@ mod test {
             (&fields.field("bar").unwrap(), Some(&57 as &Value)),
             (&fields.field("baz").unwrap(), None),
         ];
-        let valueset = fields.value_set(&values[..]);
+        let valueset = fields.value_set(values);
         assert!(!valueset.is_empty());
     }
 
@@ -666,7 +702,7 @@ mod test {
                 assert_eq!(field.callsite(), TEST_META_1.callsite())
             }
         }
-        let valueset = fields.value_set(&values[..]);
+        let valueset = fields.value_set(values);
         valueset.record(&mut MyRecorder);
     }
 }

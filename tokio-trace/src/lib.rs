@@ -443,6 +443,21 @@ macro_rules! callsite {
 /// my_span.record("bar", &7);
 /// # }
 /// ```
+///
+/// Note that a span may have up to 32 fields. The following will not compile:
+/// ```rust,compile_fail
+///  # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// span!(
+///     "too many fields!",
+///     a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8, i = 9,
+///     j = 10, k = 11, l = 12, m = 13, n = 14, o = 15, p = 16, q = 17,
+///     r = 18, s = 19, t = 20, u = 21, v = 22, w = 23, x = 24, y = 25,
+///     z = 26, aa = 27, bb = 28, cc = 29, dd = 30, ee = 31, ff = 32, gg = 33
+/// );
+/// # }
+/// ```
 #[macro_export]
 macro_rules! span {
     ($name:expr) => { span!($name,) };
@@ -499,6 +514,20 @@ macro_rules! span {
 /// # fn main() {
 ///     event!(Level::Info, foo = 5, bad_field, bar = field::display("hello"))
 /// #}
+/// ```
+///
+/// Events may have up to 32 fields. The following will not compile:
+/// ```rust,compile_fail
+///  # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// event!(tokio_trace::Level::INFO,
+///     a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8, i = 9,
+///     j = 10, k = 11, l = 12, m = 13, n = 14, o = 15, p = 16, q = 17,
+///     r = 18, s = 19, t = 20, u = 21, v = 22, w = 23, x = 24, y = 25,
+///     z = 26, aa = 27, bb = 28, cc = 29, dd = 30, ee = 31, ff = 32, gg = 33
+/// );
+/// # }
 /// ```
 #[macro_export]
 macro_rules! event {
