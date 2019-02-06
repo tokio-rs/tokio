@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{dispatcher, Dispatch, Level, Span};
+use tokio_trace::{
+    dispatcher,
+    field::{debug, display},
+    Dispatch, Level, Span,
+};
 
 #[test]
 fn closed_handle_cannot_be_entered() {
@@ -146,7 +150,7 @@ fn dropping_a_span_calls_drop_span() {
 fn span_closes_after_event() {
     let (subscriber, handle) = subscriber::mock()
         .enter(span::mock().named("foo"))
-        .event()
+        .event(event::mock())
         .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .done()
@@ -164,7 +168,7 @@ fn span_closes_after_event() {
 fn new_span_after_event() {
     let (subscriber, handle) = subscriber::mock()
         .enter(span::mock().named("foo"))
-        .event()
+        .event(event::mock())
         .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .enter(span::mock().named("bar"))
@@ -185,7 +189,7 @@ fn new_span_after_event() {
 #[test]
 fn event_outside_of_span() {
     let (subscriber, handle) = subscriber::mock()
-        .event()
+        .event(event::mock())
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
@@ -299,6 +303,155 @@ fn entering_a_closed_span_again_is_a_no_op() {
             // This should do nothing.
         });
         assert!(foo.is_closed());
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn moved_field() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&display("hello from my span"))
+                    .only(),
+            ),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let from = "my span";
+        let mut span = span!("foo", bar = display(format!("hello from {}", from)));
+        span.enter(|| {});
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn borrowed_field() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&display("hello from my span"))
+                    .only(),
+            ),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let from = "my span";
+        let mut message = format!("hello from {}", from);
+        let mut span = span!("foo", bar = display(&message));
+        span.enter(|| {
+            message.insert_str(10, " inside");
+        });
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn move_field_out_of_struct() {
+    #[derive(Debug)]
+    struct Position {
+        x: f32,
+        y: f32,
+    }
+
+    let pos = Position {
+        x: 3.234,
+        y: -1.223,
+    };
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("x")
+                    .with_value(&debug(3.234))
+                    .and(field::mock("y").with_value(&debug(-1.223)))
+                    .only(),
+            ),
+        )
+        .new_span(
+            span::mock()
+                .named("bar")
+                .with_field(field::mock("position").with_value(&debug(&pos)).only()),
+        )
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let pos = Position {
+            x: 3.234,
+            y: -1.223,
+        };
+        let mut foo = span!("foo", x = debug(pos.x), y = debug(pos.y));
+        let mut bar = span!("bar", position = debug(pos));
+        foo.enter(|| {});
+        bar.enter(|| {});
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn add_field_after_new_span() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock()
+                .named("foo")
+                .with_field(field::mock("bar").with_value(&5).only()),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let mut span = span!("foo", bar = 5, baz);
+        span.record("baz", &true);
+        span.enter(|| {})
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn add_fields_only_after_new_span() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .record(
+            span::mock().named("foo"),
+            field::mock("bar").with_value(&5).only(),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    dispatcher::with_default(Dispatch::new(subscriber), || {
+        let mut span = span!("foo", bar, baz);
+        span.record("bar", &5);
+        span.record("baz", &true);
+        span.enter(|| {})
     });
 
     handle.assert_finished();

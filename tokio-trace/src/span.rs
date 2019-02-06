@@ -145,9 +145,7 @@ use std::{
 };
 use {
     dispatcher::{self, Dispatch},
-    field,
-    subscriber::Interest,
-    Metadata,
+    field, Metadata,
 };
 
 /// A handle representing a span, with the capability to enter the span if it
@@ -169,28 +167,6 @@ pub struct Span<'a> {
     /// never enabled (and thus the inner state was never created), or if the
     /// previously entered, but it is now closed.
     is_closed: bool,
-}
-
-/// `Event`s represent single points in time where something occurred during the
-/// execution of a program.
-///
-/// An event can be compared to a log record in unstructured logging, but with
-/// two key differences:
-/// - Events exist _within the context of a [`Span`]_. Unlike log lines, they may
-///   be located within the trace tree, allowing visibility into the context in
-///   which the event occurred.
-/// - Events have structured key-value data known as _fields_, as well as a
-///   textual message. In general, a majority of the data associated with an
-///   event should be in the event's fields rather than in the textual message,
-///   as the fields are more structed.
-///
-/// [`Span`]: ::span::Span
-#[derive(PartialEq, Hash)]
-pub struct Event<'a> {
-    /// A handle used to enter the span when it is not executing.
-    ///
-    /// If this is `None`, then the span has either closed or was never enabled.
-    inner: Option<Enter<'a>>,
 }
 
 /// A handle representing the capacity to enter a span which is known to exist.
@@ -233,39 +209,32 @@ struct Entered<'a> {
 // ===== impl Span =====
 
 impl<'a> Span<'a> {
-    /// Constructs a new `Span` originating from the given [`Callsite`].
+    /// Constructs a new `Span` with the given [metadata] and set of [field values].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
-    /// with the [current span] as its parent (if one exists).
+    /// with the current span as its parent (if one exists).
     ///
     /// After the span is constructed, [field values] and/or [`follows_from`]
     /// annotations may be added to it.
     ///
-    /// [`Callsite`]: ::callsite::Callsite
+    /// [metadata]: ::metadata::Metadata
     /// [`Subscriber`]: ::subscriber::Subscriber
-    /// [current span]: ::span::Span::current
-    /// [field values]: ::span::Span::record
+    /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new(interest: Interest, meta: &'a Metadata<'a>) -> Span<'a> {
-        if interest.is_never() {
-            return Self::new_disabled();
+    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+        let inner = dispatcher::with(move |dispatch| {
+            let id = dispatch.new_span(meta, values);
+            Some(Enter::new(id, dispatch, meta))
+        });
+        Self {
+            inner,
+            is_closed: false,
         }
-        dispatcher::with(|dispatch| {
-            if interest.is_sometimes() && !dispatch.enabled(meta) {
-                return Span::new_disabled();
-            }
-            let id = dispatch.new_span(meta);
-            let inner = Some(Enter::new(id, dispatch, meta));
-            Self {
-                inner,
-                is_closed: false,
-            }
-        })
     }
 
     /// Constructs a new disabled span.
-    #[inline]
+    #[inline(always)]
     pub fn new_disabled() -> Span<'a> {
         Span {
             inner: None,
@@ -316,13 +285,24 @@ impl<'a> Span<'a> {
     }
 
     /// Records that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
+    pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsField,
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
-            value.record(field, inner);
+            let meta = inner.metadata();
+            if let Some(field) = field.as_field(meta) {
+                inner.record(&meta.fields().value_set(&[(&field, Some(value))]))
+            }
+        }
+        self
+    }
+
+    /// Record all the fields in the span
+    pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
+        if let Some(ref mut inner) = self.inner {
+            inner.record(&values);
         }
         self
     }
@@ -366,7 +346,7 @@ impl<'a> Span<'a> {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
-    pub fn follows_from(&self, from: Id) -> &Self {
+    pub fn follows_from(&self, from: &Id) -> &Self {
         if let Some(ref inner) = self.inner {
             inner.follows_from(from);
         }
@@ -393,125 +373,6 @@ impl<'a> fmt::Debug for Span<'a> {
             span.field("disabled", &true)
         }
         .finish()
-    }
-}
-
-// ===== impl Event =====
-
-impl<'a> Event<'a> {
-    /// Constructs a new `Event` originating from the given [`Callsite`].
-    ///
-    /// The new span will be constructed by the currently-active [`Subscriber`],
-    /// with the [current span] as its parent (if one exists).
-    ///
-    /// After the event is constructed, [field values] and/or [`follows_from`]
-    /// annotations may be added to it.
-    ///
-    /// [`Callsite`]: ::callsite::Callsite
-    /// [`Subscriber`]: ::subscriber::Subscriber
-    /// [current span]: ::span::Span::current
-    /// [field values]: ::span::Evemt::record
-    /// [`follows_from`]: ::span::Event::follows_from
-    #[inline]
-    pub fn new(interest: Interest, meta: &'a Metadata<'a>) -> Self {
-        if interest.is_never() {
-            return Self::new_disabled();
-        }
-        dispatcher::with(|dispatch| {
-            if interest.is_sometimes() && !dispatch.enabled(meta) {
-                return Self::new_disabled();
-            }
-            let id = dispatch.new_span(meta);
-            let inner = Enter::new(id, dispatch, meta);
-            Self { inner: Some(inner) }
-        })
-    }
-
-    /// Returns a new disabled `Event`.
-    #[inline]
-    pub fn new_disabled() -> Self {
-        Self {
-            inner: None,
-        }
-    }
-
-    /// Adds a formattable message describing the event that occurred.
-    pub fn message(&mut self, key: &field::Field, message: fmt::Arguments) -> &mut Self {
-        if let Some(ref mut inner) = self.inner {
-            inner.subscriber.record_debug(&inner.id, key, &message);
-        }
-        self
-    }
-
-    /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
-    /// one exists,
-    pub fn field<Q>(&self, name: &Q) -> Option<field::Field>
-    where
-        Q: Borrow<str>,
-    {
-        self.inner
-            .as_ref()
-            .and_then(|inner| inner.meta.fields().field(name))
-    }
-
-    /// Returns true if this `Event` has a field for the given
-    /// [`Field`](::field::Field) or field name.
-    pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
-    where
-        Q: field::AsField,
-    {
-        self.metadata()
-            .and_then(|meta| field.as_field(meta))
-            .is_some()
-    }
-
-    /// Records that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
-    where
-        Q: field::AsField,
-        V: field::Value,
-    {
-        if let Some(ref mut inner) = self.inner {
-            value.record(field, inner);
-        }
-        self
-    }
-
-    /// Returns `true` if this span was disabled by the subscriber and does not
-    /// exist.
-    pub fn is_disabled(&self) -> bool {
-        self.inner.is_none()
-    }
-
-    /// Indicates that the span with the given ID has an indirect causal
-    /// relationship with this event.
-    ///
-    /// This relationship differs somewhat from the parent-child relationship: a
-    /// span may have any number of prior spans, rather than a single one; and
-    /// spans are not considered to be executing _inside_ of the spans they
-    /// follow from. This means that a span may close even if subsequent spans
-    /// that follow from it are still open, and time spent inside of a
-    /// subsequent span should not be included in the time its precedents were
-    /// executing. This is used to model causal relationships such as when a
-    /// single future spawns several related background tasks, et cetera.
-    ///
-    /// If this event is disabled, or the resulting follows-from relationship
-    /// would be invalid, this function will do nothing.
-    pub fn follows_from(&self, from: Id) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.follows_from(from);
-        }
-        self
-    }
-
-    /// Returns this span's `Id`, if it is enabled.
-    pub fn id(&self) -> Option<Id> {
-        self.inner.as_ref().map(Enter::id)
-    }
-
-    /// Returns this span's `Metadata`, if it is enabled.
-    pub fn metadata(&self) -> Option<&'a Metadata<'a>> {
-        self.inner.as_ref().map(|inner| inner.metadata())
     }
 }
 
@@ -552,8 +413,8 @@ impl<'a> Enter<'a> {
     /// If this span is disabled, this function will do nothing. Otherwise, it
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
-    fn follows_from(&self, from: Id) {
-        self.subscriber.add_follows_from(&self.id, from)
+    fn follows_from(&self, from: &Id) {
+        self.subscriber.record_follows_from(&self.id, &from)
     }
 
     /// Returns the span's ID.
@@ -566,29 +427,10 @@ impl<'a> Enter<'a> {
         self.meta
     }
 
-    /// Record a signed 64-bit integer value.
-    fn record_value_i64(&self, field: &field::Field, value: i64) {
-        self.subscriber.record_i64(&self.id, field, value)
-    }
-
-    /// Record an unsigned 64-bit integer value.
-    fn record_value_u64(&self, field: &field::Field, value: u64) {
-        self.subscriber.record_u64(&self.id, field, value)
-    }
-
-    /// Record a boolean value.
-    fn record_value_bool(&self, field: &field::Field, value: bool) {
-        self.subscriber.record_bool(&self.id, field, value)
-    }
-
-    /// Record a string value.
-    fn record_value_str(&self, field: &field::Field, value: &str) {
-        self.subscriber.record_str(&self.id, field, value)
-    }
-
-    /// Record a value implementing `fmt::Debug`.
-    fn record_value_debug(&self, field: &field::Field, value: &fmt::Debug) {
-        self.subscriber.record_debug(&self.id, field, value)
+    fn record(&mut self, values: &field::ValueSet) {
+        if values.callsite() == self.meta.callsite() {
+            self.subscriber.record(&self.id, &values)
+        }
     }
 
     fn new(id: Id, subscriber: &Dispatch, meta: &'a Metadata<'a>) -> Self {
@@ -626,60 +468,6 @@ impl<'a> Clone for Enter<'a> {
             subscriber: self.subscriber.clone(),
             closed: self.closed,
             meta: self.meta,
-        }
-    }
-}
-
-impl<'a> ::sealed::Sealed for Enter<'a> {}
-
-impl<'a> field::Record for Enter<'a> {
-    #[inline]
-    fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_i64(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_u64<Q: ?Sized>(&mut self, field: &Q, value: u64)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_u64(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_bool<Q: ?Sized>(&mut self, field: &Q, value: bool)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_bool(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_str<Q: ?Sized>(&mut self, field: &Q, value: &str)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_str(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_debug<Q: ?Sized>(&mut self, field: &Q, value: &fmt::Debug)
-    where
-        Q: field::AsField,
-    {
-        if let Some(key) = field.as_field(self.metadata()) {
-            self.record_value_debug(&key, value);
         }
     }
 }

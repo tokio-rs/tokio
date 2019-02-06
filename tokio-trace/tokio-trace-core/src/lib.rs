@@ -156,6 +156,7 @@ macro_rules! metadata {
 
 pub mod callsite;
 pub mod dispatcher;
+pub mod event;
 pub mod field;
 pub mod metadata;
 pub mod span;
@@ -164,8 +165,13 @@ pub mod subscriber;
 pub use self::{
     callsite::Callsite,
     dispatcher::Dispatch,
+    event::Event,
     field::Field,
     metadata::{Level, Metadata},
     span::Span,
     subscriber::{Interest, Subscriber},
 };
+
+mod sealed {
+    pub trait Sealed {}
+}

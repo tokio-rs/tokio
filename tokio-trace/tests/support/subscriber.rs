@@ -1,5 +1,9 @@
 #![allow(missing_docs)]
-use super::span::MockSpan;
+use super::{
+    event::MockEvent,
+    field as mock_field,
+    span::{MockSpan, NewSpan},
+};
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -8,21 +12,17 @@ use std::{
         Arc, Mutex,
     },
 };
-use tokio_trace::{field, Id, Metadata, Subscriber};
-
-#[derive(Debug, Eq, PartialEq)]
-struct ExpectEvent {
-    // TODO: implement
-}
+use tokio_trace::{field, Event, Id, Metadata, Subscriber};
 
 #[derive(Debug, Eq, PartialEq)]
 enum Expect {
-    #[allow(dead_code)] // TODO: implement!
-    Event(ExpectEvent),
+    Event(MockEvent),
     Enter(MockSpan),
     Exit(MockSpan),
     CloneSpan(MockSpan),
     DropSpan(MockSpan),
+    Record(MockSpan, mock_field::Expect),
+    NewSpan(NewSpan),
     Nothing,
 }
 
@@ -58,9 +58,8 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
         self
     }
 
-    pub fn event(mut self) -> Self {
-        // TODO: expect message/fields!
-        self.expected.push_back(Expect::Event(ExpectEvent {}));
+    pub fn event(mut self, event: MockEvent) -> Self {
+        self.expected.push_back(Expect::Event(event));
         self
     }
 
@@ -81,6 +80,22 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
 
     pub fn done(mut self) -> Self {
         self.expected.push_back(Expect::Nothing);
+        self
+    }
+
+    pub fn record<I>(mut self, span: MockSpan, fields: I) -> Self
+    where
+        I: Into<mock_field::Expect>,
+    {
+        self.expected.push_back(Expect::Record(span, fields.into()));
+        self
+    }
+
+    pub fn new_span<I>(mut self, new_span: I) -> Self
+    where
+        I: Into<NewSpan>,
+    {
+        self.expected.push_back(Expect::NewSpan(new_span.into()));
         self
     }
 
@@ -117,15 +132,47 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         (self.filter)(meta)
     }
 
-    fn record_debug(&self, _span: &Id, _field: &field::Field, _value: &fmt::Debug) {
-        // TODO: it would be nice to be able to expect field values...
+    fn record(&self, id: &Id, values: &field::ValueSet) {
+        let spans = self.spans.lock().unwrap();
+        let mut expected = self.expected.lock().unwrap();
+        let span = spans
+            .get(id)
+            .unwrap_or_else(|| panic!("no span for ID {:?}", id));
+        println!("record: {}; id={:?}; values={:?};", span.name, id, values);
+        let was_expected = if let Some(Expect::Record(_, _)) = expected.front() {
+            true
+        } else {
+            false
+        };
+        if was_expected {
+            if let Expect::Record(expected_span, mut expected_values) =
+                expected.pop_front().unwrap()
+            {
+                if let Some(name) = expected_span.name() {
+                    assert_eq!(name, span.name);
+                }
+                let mut checker = expected_values.checker(format!("span {}: ", span.name));
+                values.record(&mut checker);
+                checker.finish();
+            }
+        }
     }
 
-    fn add_follows_from(&self, _span: &Id, _follows: Id) {
+    fn event(&self, event: &Event) {
+        let name = event.metadata().name();
+        println!("event: {};", name);
+        match self.expected.lock().unwrap().pop_front() {
+            None => {}
+            Some(Expect::Event(expected)) => expected.check(event),
+            Some(ex) => ex.bad(format_args!("observed event {:?}", event)),
+        }
+    }
+
+    fn record_follows_from(&self, _span: &Id, _follows: &Id) {
         // TODO: it should be possible to expect spans to follow from other spans
     }
 
-    fn new_span(&self, meta: &Metadata) -> Id {
+    fn new_span(&self, meta: &Metadata, values: &field::ValueSet) -> Id {
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         println!(
@@ -134,6 +181,23 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             meta.target(),
             id
         );
+        let mut expected = self.expected.lock().unwrap();
+        let was_expected = match expected.front() {
+            Some(Expect::NewSpan(_)) => true,
+            _ => false,
+        };
+        if was_expected {
+            if let Expect::NewSpan(mut expected) = expected.pop_front().unwrap() {
+                let name = meta.name();
+                expected
+                    .span
+                    .metadata
+                    .check(meta, format_args!("span `{}`", name));
+                let mut checker = expected.fields.checker(format!("{}", name));
+                values.record(&mut checker);
+                checker.finish();
+            }
+        }
         self.spans.lock().unwrap().insert(
             id.clone(),
             SpanState {
@@ -150,32 +214,12 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             println!("enter: {}; id={:?};", span.name, id);
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
-                Some(Expect::Event(_)) => panic!(
-                    "expected an event, but entered span {:?} instead",
-                    span.name
-                ),
                 Some(Expect::Enter(ref expected_span)) => {
-                    if let Some(name) = expected_span.name {
+                    if let Some(name) = expected_span.name() {
                         assert_eq!(name, span.name);
                     }
-                    // TODO: expect fields
                 }
-                Some(Expect::Exit(ref expected_span)) => panic!(
-                    "expected to exit {}, but entered span {:?} instead",
-                    expected_span, span.name
-                ),
-                Some(Expect::CloneSpan(ref expected_span)) => panic!(
-                    "expected to clone {}, but entered span {:?} instead",
-                    expected_span, span.name
-                ),
-                Some(Expect::DropSpan(ref expected_span)) => panic!(
-                    "expected to drop {}, but entered span {:?} instead",
-                    expected_span, span.name
-                ),
-                Some(Expect::Nothing) => panic!(
-                    "expected nothing else to happen, but entered span {:?}",
-                    span.name,
-                ),
+                Some(ex) => ex.bad(format_args!("entered span {:?}", span.name)),
             }
         };
     }
@@ -188,31 +232,12 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         println!("exit: {}; id={:?};", span.name, id);
         match self.expected.lock().unwrap().pop_front() {
             None => {}
-            Some(Expect::Event(_)) => {
-                panic!("expected an event, but exited span {:?} instead", span.name)
-            }
-            Some(Expect::Enter(ref expected_span)) => panic!(
-                "expected to enter {}, but exited span {:?} instead",
-                expected_span, span.name
-            ),
             Some(Expect::Exit(ref expected_span)) => {
-                if let Some(name) = expected_span.name {
+                if let Some(name) = expected_span.name() {
                     assert_eq!(name, span.name);
                 }
-                // TODO: expect fields
             }
-            Some(Expect::CloneSpan(ref expected_span)) => panic!(
-                "expected to clone {}, but exited span {:?} instead",
-                expected_span, span.name
-            ),
-            Some(Expect::DropSpan(ref expected_span)) => panic!(
-                "expected to drop {}, but exited span {:?} instead",
-                expected_span, span.name
-            ),
-            Some(Expect::Nothing) => panic!(
-                "expected nothing else to happen, but exited span {:?}",
-                span.name,
-            ),
+            Some(ex) => ex.bad(format_args!("exited span {:?}", span.name)),
         };
     }
 
@@ -228,7 +253,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         }
         let mut expected = self.expected.lock().unwrap();
         let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
-            assert_eq!(name, span.name);
+            assert_eq!(name, span.name());
             true
         } else {
             false
@@ -263,7 +288,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                     // Don't assert if this function was called while panicking,
                     // as failing the assertion can cause a double panic.
                     if !::std::thread::panicking() {
-                        assert_eq!(name, span.name);
+                        assert_eq!(name, span.name());
                     }
                     true
                 }
@@ -290,6 +315,23 @@ impl MockHandle {
                 "more notifications expected: {:?}",
                 **expected
             );
+        }
+    }
+}
+
+impl Expect {
+    fn bad<'a>(&self, what: fmt::Arguments<'a>) {
+        match self {
+            Expect::Event(e) => panic!("expected event {}, but {} instead", e, what,),
+            Expect::Enter(e) => panic!("expected to enter {} but {} instead", e, what,),
+            Expect::Exit(e) => panic!("expected to exit {} but {} instead", e, what,),
+            Expect::CloneSpan(e) => panic!("expected to clone {} but {} instead", e, what,),
+            Expect::DropSpan(e) => panic!("expected to drop {} but {} instead", e, what,),
+            Expect::Record(e, fields) => {
+                panic!("expected {} to record {} but {} instead", e, fields, what,)
+            }
+            Expect::NewSpan(e) => panic!("expected {} but {} instead", e, what),
+            Expect::Nothing => panic!("expected nothing else to happen, but {} instead", what,),
         }
     }
 }

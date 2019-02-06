@@ -107,7 +107,7 @@ impl Eq for Identifier {}
 
 impl fmt::Debug for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("Identifier(...)")
+        write!(f, "Identifier({:p})", self.0)
     }
 }
 

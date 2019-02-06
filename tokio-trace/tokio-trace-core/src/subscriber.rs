@@ -1,7 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, Metadata, Span};
-
-use std::fmt;
+use {field, Event, Metadata, Span};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -25,7 +23,7 @@ use std::fmt;
 ///
 /// When a span is entered or exited, the subscriber is provided only with the
 /// [ID] with which it tagged that span when it was created. This means
-/// that it is up to the subscriber to determine whether or not span _data_ —
+/// that it is up to the subscriber to determine whether and how span _data_ —
 /// the fields and metadata describing the span — should be stored. The
 /// [`new_span`] function is called when a new span is created, and at that
 /// point, the subscriber _may_ choose to store the associated data if it will
@@ -99,8 +97,21 @@ pub trait Subscriber {
         }
     }
 
+    /// Returns true if a span with the specified [metadata] would be
+    /// recorded.
+    ///
+    /// This is used by the dispatcher to avoid allocating for span construction
+    /// if the span would be discarded anyway.
+    ///
+    /// [metadata]: ::Metadata
+    fn enabled(&self, metadata: &Metadata) -> bool;
+
     /// Record the construction of a new [`Span`], returning a new ID for the
     /// span being constructed.
+    ///
+    /// The provided `ValueSet` contains any field values that were provided
+    /// when the span was created. The subscriber may pass a [recorder] to the
+    /// `ValueSet`'s [`record` method] to record these values.
     ///
     /// IDs are used to uniquely identify spans and events within the context of a
     /// subscriber, so span equality will be based on the returned ID. Thus, if
@@ -111,71 +122,21 @@ pub trait Subscriber {
     /// return a distinct ID every time this function is called, regardless of
     /// the metadata.
     ///
-    /// Subscribers which do not rely on the implementations of `PartialEq`,
-    /// `Eq`, and `Hash` for `Span`s are free to return span IDs with value 0
-    /// from all calls to this function, if they so choose.
-    ///
     /// [`Span`]: ::span::Span
-    fn new_span(&self, metadata: &Metadata) -> Span;
+    /// [recorder]: ::field::Record
+    /// [`record` method]: ::field::ValueSet::record
+    fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span;
 
-    /// Record a signed 64-bit integer value.
-    ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to signed integers may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_i64(&self, span: &Span, field: &field::Field, value: i64) {
-        self.record_debug(span, field, &value)
-    }
+    // === Notification methods ===============================================
 
-    /// Record an unsigned 64-bit integer value.
+    /// Record a set of values on a span.
     ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to unsigned integers may override the default
-    /// implementation.
+    /// The subscriber is expected to provide a [recorder] to the `ValueSet`'s
+    /// [`record` method] in order to record the added values.
     ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_u64(&self, span: &Span, field: &field::Field, value: u64) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record a boolean value.
-    ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to booleans may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_bool(&self, span: &Span, field: &field::Field, value: bool) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record a string value.
-    ///
-    /// This defaults to calling `self.record_debug()`; implementations wishing to
-    /// provide behaviour specific to strings may override the default
-    /// implementation.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_str(&self, span: &Span, field: &field::Field, value: &str) {
-        self.record_debug(span, field, &value)
-    }
-
-    /// Record a value implementing `fmt::Debug`.
-    ///
-    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
-    /// field has already been recorded, and so on), the subscriber may silently
-    /// do nothing.
-    fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug);
+    /// [recorder]: ::field::Record
+    /// [`record` method]: ::field::ValueSet::record
+    fn record(&self, span: &Span, values: &field::ValueSet);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -195,20 +156,18 @@ pub trait Subscriber {
     /// subscriber knows about, or if a cyclical relationship would be created
     /// (i.e., some span _a_ which proceeds some other span _b_ may not also
     /// follow from _b_), it may silently do nothing.
-    fn add_follows_from(&self, span: &Span, follows: Span);
+    fn record_follows_from(&self, span: &Span, follows: &Span);
 
-    // === Filtering methods ==================================================
-
-    /// Returns true if a span with the specified [metadata] would be
-    /// recorded.
+    /// Records that an [`Event`] has occurred.
     ///
-    /// This is used by the dispatcher to avoid allocating for span construction
-    /// if the span would be discarded anyway.
+    /// The provided `Event` struct contains any field values attached to the
+    /// event. The subscriber may pass a [recorder] to the `Event`'s
+    /// [`record` method] to record these values.
     ///
-    /// [metadata]: ::Metadata
-    fn enabled(&self, metadata: &Metadata) -> bool;
-
-    // === Notification methods ===============================================
+    /// [`Event`]: ::event::Event
+    /// [recorder]: ::field::Record
+    /// [`record` method]: ::event::Event::record
+    fn event(&self, event: &Event);
 
     /// Records that a [`Span`] has been entered.
     ///

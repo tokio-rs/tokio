@@ -247,11 +247,12 @@
 //! #[macro_use]
 //! extern crate tokio_trace;
 //! # pub struct FooSubscriber;
-//! # use tokio_trace::{span::Id, field::Field, Metadata};
+//! # use tokio_trace::{span::Id, Metadata, field::ValueSet};
 //! # impl tokio_trace::Subscriber for FooSubscriber {
-//! #   fn new_span(&self, _: &Metadata) -> Id { Id::from_u64(0) }
-//! #   fn record_debug(&self, _: &Id, _: &Field, _: &::std::fmt::Debug) {}
-//! #   fn add_follows_from(&self, _: &Id, _: Id) {}
+//! #   fn new_span(&self, _: &Metadata, _: &ValueSet) -> Id { Id::from_u64(0) }
+//! #   fn record(&self, _: &Id, _: &ValueSet) {}
+//! #   fn event(&self, _: &tokio_trace::Event) {}
+//! #   fn record_follows_from(&self, _: &Id, _: &Id) {}
 //! #   fn enabled(&self, _: &Metadata) -> bool { false }
 //! #   fn enter(&self, _: &Id) {}
 //! #   fn exit(&self, _: &Id) {}
@@ -302,10 +303,11 @@ use tokio_trace_core::*;
 
 pub use self::{
     dispatcher::Dispatch,
+    event::Event,
     field::Value,
-    span::{Event, Span},
+    span::Span,
     subscriber::Subscriber,
-    tokio_trace_core::{dispatcher, Level, Metadata},
+    tokio_trace_core::{dispatcher, event, Level, Metadata},
 };
 
 #[doc(hidden)]
@@ -321,31 +323,30 @@ pub use self::{
 #[doc(hidden)]
 #[macro_export]
 macro_rules! callsite {
-    (span: $name:expr, $( $field_name:ident ),*) => ({
-        callsite!(@
+    (name: $name:expr, fields: $( $field_name:ident ),* $(,)*) => ({
+        callsite! {
             name: $name,
             target: module_path!(),
             level: $crate::Level::TRACE,
-            fields: &[ $(stringify!($field_name)),* ]
-        )
+            fields: $( $field_name ),*
+        }
     });
-    (event: $lvl:expr, $( $field_name:ident ),*) =>
-        (callsite!(event: $lvl, target: module_path!(), $( $field_name ),* ));
-    (event: $lvl:expr, target: $target:expr, $( $field_name:ident ),*) => ({
-        callsite!(@
-            name: concat!("event at ", file!(), ":", line!()),
-            target: $target,
+    (name: $name:expr, level: $lvl:expr, fields: $( $field_name:ident ),* $(,)*) => ({
+        callsite! {
+            name: $name,
+            target: module_path!(),
             level: $lvl,
-            fields: &[ "message", $(stringify!($field_name)),* ]
-        )
+            fields: $( $field_name ),*
+        }
     });
-    (@
+    (
         name: $name:expr,
         target: $target:expr,
         level: $lvl:expr,
-        fields: $field_names:expr
+        fields: $( $field_name:ident ),*
+        $(,)*
     ) => ({
-        use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
+        use std::sync::{Once, atomic::{self, AtomicUsize, Ordering}};
         use $crate::{callsite, Metadata, subscriber::Interest};
         struct MyCallsite;
         static META: Metadata<'static> = {
@@ -353,11 +354,14 @@ macro_rules! callsite {
                 name: $name,
                 target: $target,
                 level: $lvl,
-                fields: $field_names,
+                fields: &[ $( stringify!($field_name) ),* ],
                 callsite: &MyCallsite,
             }
         };
-        static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
+        // FIXME: Rust 1.34 deprecated ATOMIC_USIZE_INIT. When Tokio's minimum
+        // supported version is 1.34, replace this with the const fn `::new`.
+        #[allow(deprecated)]
+        static INTEREST: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();
         impl MyCallsite {
             #[inline]
@@ -444,37 +448,17 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
-            #[allow(unused_imports)]
-            use $crate::{callsite, field::{Value, AsField}, Span};
+            use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
-            let callsite = callsite! { span: $name, $( $k ),* };
-            let interest = callsite.interest();
-            if interest.is_never() {
-                Span::new_disabled()
+            let callsite = callsite! { name: $name, fields: $( $k ),* };
+            if is_enabled!(callsite) {
+                let meta = callsite.metadata();
+                Span::new(meta, &valueset!(meta.fields(), $($k $( = $val)*),*))
             } else {
-                let mut span = Span::new(interest, callsite.metadata());
-                // Depending on how many fields are generated, this may or may
-                // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)] {
-                    if !span.is_disabled() {
-                        let mut keys = callsite.metadata().fields().into_iter();
-                        $(
-                            let key = keys.next()
-                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                            span!(@ record: span, $k, &key, $($val)*);
-                        )*
-                    };
-                }
-                span
+                Span::new_disabled()
             }
         }
     };
-    (@ record: $span:expr, $k:expr, $i:expr, $val:expr) => (
-        $span.record($i, &$val)
-    );
-    (@ record: $span:expr, $k:expr, $i:expr,) => (
-        // skip
-    );
 }
 
 /// Constructs a new `Event`.
@@ -501,95 +485,57 @@ macro_rules! span {
 /// event!(Level::INFO, the_answer = data.0);
 /// # }
 /// ```
+///
+/// Note that *unlike `span!`*, `event!` requires a value for all fields. As
+/// events are recorded immediately when the macro is invoked, there is no
+/// opportunity for fields to be recorded later.
+///
+/// For example, the following does not compile:
+/// ```rust,compile_fail
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// use tokio_trace::{Level, field};
+///
+/// # fn main() {
+///     event!(Level::Info, foo = 5, bad_field, bar = field::display("hello"))
+/// #}
+/// ```
 #[macro_export]
 macro_rules! event {
-    (target: $target:expr, $lvl:expr, $( $k:ident $( = $val:expr )* ),+ ) => (
-        event!(target: $target, $lvl, { $( $k $( = $val)* ),+ })
+    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* $(,)*} )=> ({
+        {
+            #[allow(unused_imports)]
+            use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
+            use $crate::callsite::Callsite;
+            let callsite = callsite! {
+                name: concat!("event ", file!(), ":", line!()),
+                target: $target,
+                level: $lvl,
+                fields: $( $k ),*
+            };
+            if is_enabled!(callsite) {
+                let meta = callsite.metadata();
+                Event::observe(meta, &valueset!(meta.fields(), $( $k = $val),* ));
+            }
+        }
+    });
+    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => ({
+        event!(target: $target, $lvl, { message = format_args!($($arg)+), $( $k = $val ),* })
+    });
+    (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr ),+ ) => (
+        event!(target: $target, $lvl, { $($k = $val),+ })
     );
-    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
-        {
-            #[allow(unused_imports)]
-            use $crate::{callsite, Id, Subscriber, Event, field::{Value, AsField}};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! { event:
-                $lvl,
-                target:
-                $target, $( $k ),*
-            };
-            let interest = callsite.interest();
-            if interest.is_never() {
-                Event::new_disabled()
-            } else {
-                let mut event = Event::new(callsite.interest(), callsite.metadata());
-                // Depending on how many fields are generated, this may or may
-                // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)] {
-                    if !event.is_disabled() {
-                        let mut keys = callsite.metadata().fields().into_iter();
-                        let msg_key = keys.next()
-                            .expect("event metadata should define a key for the message");
-                        event.message(&msg_key, format_args!( $($arg)+ ));
-                        $(
-                            let key = keys.next()
-                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                            event!(@ record: event, $k, &key, $($val)*);
-                        )*
-                    }
-                }
-                event
-            }
-        }
-    });
-    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* } ) => ({
-        {
-            #[allow(unused_imports)]
-            use $crate::{callsite, Id, Subscriber, Event, field::{Value, AsField}};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! { event:
-                $lvl,
-                target:
-                $target, $( $k ),*
-            };
-            let interest = callsite.interest();
-            if interest.is_never() {
-                Event::new_disabled()
-            } else {
-                let mut event = Event::new(callsite.interest(), callsite.metadata());
-                // Depending on how many fields are generated, this may or may
-                // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)] {
-                    if !event.is_disabled() {
-                        let mut keys = callsite.metadata().fields().into_iter();
-                        let msg_key = keys.next()
-                            .expect("event metadata should define a key for the message");
-                        $(
-                            let key = keys.next()
-                                .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                            event!(@ record: event, $k, &key, $($val)*);
-                        )*
-                    }
-                }
-                event
-            }
-        }
-    });
     (target: $target:expr, $lvl:expr, $($arg:tt)+ ) => (
         event!(target: $target, $lvl, { }, $($arg)+)
     );
-    ( $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* }, $($arg)+)
+    ( $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $lvl, { message = format_args!($($arg)+), $($k = $val),* })
     );
-    ( $lvl:expr, $( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* })
+    ( $lvl:expr, $( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(), $lvl, { $($k = $val),* })
     );
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { }, $($arg)+)
-    );
-    (@ record: $ev:expr, $k:expr, $i:expr, $val:expr) => (
-        $ev.record($i, &$val);
-    );
-    (@ record: $ev:expr, $k:expr, $i:expr,) => (
-        // skip
     );
 }
 
@@ -620,7 +566,7 @@ macro_rules! event {
 ///
 /// trace!(position = field::debug(pos), origin_dist = field::debug(origin_dist));
 /// trace!(target: "app_events",
-///         { pos = field::debug(pos) },
+///         { position = field::debug(pos) },
 ///         "x is {} and y is {}",
 ///        if pos.x >= 0.0 { "positive" } else { "negative" },
 ///        if pos.y >= 0.0 { "positive" } else { "negative" });
@@ -628,11 +574,11 @@ macro_rules! event {
 /// ```
 #[macro_export]
 macro_rules! trace {
-    (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: $target, $crate::Level::TRACE, { $($k $( = $val)* ),* }, $($arg)+)
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: $target, $crate::Level::TRACE, { $($k $( = $val)* ),* })
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+        event!(target: $target, $crate::Level::TRACE, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         // When invoking this macro with `log`-style syntax (no fields), we
@@ -642,11 +588,11 @@ macro_rules! trace {
         // the handle won't be used later to add values to them.
         drop(event!(target: $target, $crate::Level::TRACE, {}, $($arg)+));
     );
-    ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* }, $($arg)+)
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* })
+    ($( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::TRACE, {}, $($arg)+));
@@ -675,20 +621,20 @@ macro_rules! trace {
 /// ```
 #[macro_export]
 macro_rules! debug {
-    (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: $target, $crate::Level::DEBUG, { $($k $( = $val)* ),* }, $($arg)+)
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: $target, $crate::Level::DEBUG, { $($k $( = $val)* ),* })
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+        event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::DEBUG, {}, $($arg)+));
     );
-    ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $crate::Level::DEBUG, { $($k $( = $val)* ),* }, $($arg)+)
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(), $crate::Level::DEBUG, { $($k $( = $val)* ),* })
+    ($( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::DEBUG, {}, $($arg)+));
@@ -724,20 +670,20 @@ macro_rules! debug {
 /// ```
 #[macro_export]
 macro_rules! info {
-    (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: $target, $crate::Level::INFO, { $($k $( = $val)* ),* }, $($arg)+)
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: $target, $crate::Level::INFO, { $($k $( = $val)* ),* })
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+        event!(target: $target, $crate::Level::INFO, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::INFO, {}, $($arg)+));
     );
-    ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $crate::Level::INFO, { $($k $( = $val)* ),* }, $($arg)+)
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(), $crate::Level::INFO, { $($k $( = $val)* ),* })
+    ($( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::INFO, {}, $($arg)+));
@@ -770,20 +716,20 @@ macro_rules! info {
 /// ```
 #[macro_export]
 macro_rules! warn {
-    (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: $target, $crate::Level::WARN, { $($k $( = $val)* ),* }, $($arg)+)
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: $target, $crate::Level::WARN, { $($k $( = $val)* ),* })
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+        event!(target: $target, $crate::Level::WARN, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::WARN, {}, $($arg)+));
     );
-    ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(),  $crate::Level::WARN, { $($k $( = $val)* ),* }, $($arg)+)
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(),  $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(),  $crate::Level::WARN,{ $($k $( = $val)* ),* })
+    ($( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(),  $crate::Level::WARN,{ $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
         drop(event!(target: module_path!(),  $crate::Level::WARN, {}, $($arg)+));
@@ -811,26 +757,62 @@ macro_rules! warn {
 /// ```
 #[macro_export]
 macro_rules! error {
-    (target: $target:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: $target, $crate::Level::ERROR, { $($k $( = $val)* ),* }, $($arg)+)
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: $target, $crate::Level::ERROR, { $($k $( = $val)* ),* })
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+        event!(target: $target, $crate::Level::ERROR, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::ERROR, {}, $($arg)+));
     );
-    ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $crate::Level::ERROR, { $($k $( = $val)* ),* }, $($arg)+)
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident $( = $val:expr )* ),* ) => (
-        event!(target: module_path!(), $crate::Level::ERROR, { $($k $( = $val)* ),* })
+    ($( $k:ident = $val:expr ),* ) => (
+        event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
         drop(event!(target: module_path!(), $crate::Level::ERROR, {}, $($arg)+));
     );
 }
 
+#[macro_export]
+// TODO: determine if this ought to be public API?
+#[doc(hidden)]
+macro_rules! is_enabled {
+    ($callsite:expr) => {{
+        let interest = $callsite.interest();
+        if interest.is_never() {
+            false
+        } else if interest.is_always() {
+            true
+        } else {
+            let meta = $callsite.metadata();
+            $crate::dispatcher::with(|current| current.enabled(meta))
+        }
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! valueset {
+    ($fields:expr, $($k:ident $( = $val:expr )* ) ,*) => {
+        {
+            let mut iter = $fields.iter();
+            $fields.value_set(&[
+                $((
+                    &iter.next().expect("FieldSet corrupted (this is a bug)"),
+                    valueset!(@val $k $(= $val)*)
+                )),*
+            ])
+        }
+    };
+    (@val $k:ident = $val:expr) => {
+        Some(&$val as &$crate::field::Value)
+    };
+    (@val $k:ident) => { None };
+}
 pub mod field;
 pub mod span;
 pub mod subscriber;

@@ -13,7 +13,11 @@
 extern crate ansi_term;
 extern crate humantime;
 use self::ansi_term::{Color, Style};
-use super::tokio_trace::{self, Id, Level, Subscriber};
+use super::tokio_trace::{
+    self,
+    field::{Field, Record},
+    Id, Level, Subscriber,
+};
 
 use std::{
     cell::RefCell,
@@ -70,73 +74,83 @@ pub struct SloggishSubscriber {
     stderr: io::Stderr,
     stack: Mutex<Vec<Id>>,
     spans: Mutex<HashMap<Id, Span>>,
-    events: Mutex<HashMap<Id, Event>>,
     ids: AtomicUsize,
 }
 
 struct Span {
     parent: Option<Id>,
-    kvs: Vec<(String, String)>,
+    kvs: Vec<(&'static str, String)>,
 }
 
-struct Event {
-    level: tokio_trace::Level,
-    target: String,
-    message: String,
-    kvs: Vec<(String, String)>,
+struct Event<'a> {
+    stderr: io::StderrLock<'a>,
+    comma: bool,
 }
 
-struct ColorLevel(Level);
+struct ColorLevel<'a>(&'a Level);
 
-impl fmt::Display for ColorLevel {
+impl<'a> fmt::Display for ColorLevel<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.0 {
-            Level::TRACE => Color::Purple.paint("TRACE"),
-            Level::DEBUG => Color::Blue.paint("DEBUG"),
-            Level::INFO => Color::Green.paint("INFO"),
-            Level::WARN => Color::Yellow.paint("WARN "),
-            Level::ERROR => Color::Red.paint("ERROR"),
+            &Level::TRACE => Color::Purple.paint("TRACE"),
+            &Level::DEBUG => Color::Blue.paint("DEBUG"),
+            &Level::INFO => Color::Green.paint("INFO "),
+            &Level::WARN => Color::Yellow.paint("WARN "),
+            &Level::ERROR => Color::Red.paint("ERROR"),
         }
         .fmt(f)
     }
 }
 
 impl Span {
-    fn new(parent: Option<Id>, _meta: &tokio_trace::Metadata) -> Self {
-        Self {
+    fn new(
+        parent: Option<Id>,
+        _meta: &tokio_trace::Metadata,
+        values: &tokio_trace::field::ValueSet,
+    ) -> Self {
+        let mut span = Self {
             parent,
             kvs: Vec::new(),
-        }
-    }
-
-    fn record(&mut self, key: &tokio_trace::field::Field, value: fmt::Arguments) {
-        // TODO: shouldn't have to alloc the key...
-        let k = key.name().to_owned();
-        let v = fmt::format(value);
-        self.kvs.push((k, v));
+        };
+        values.record(&mut span);
+        span
     }
 }
 
-impl Event {
-    fn new(meta: &tokio_trace::Metadata) -> Self {
-        Self {
-            target: meta.target.to_owned(),
-            level: meta.level.clone(),
-            message: String::new(),
-            kvs: Vec::new(),
-        }
+impl Record for Span {
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+        self.kvs.push((field.name(), format!("{:?}", value)))
     }
+}
 
-    fn record(&mut self, key: &tokio_trace::field::Field, value: fmt::Arguments) {
-        if key.name() == "message" {
-            self.message = fmt::format(value);
-            return;
+impl<'a> Record for Event<'a> {
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+        write!(
+            &mut self.stderr,
+            "{comma} ",
+            comma = if self.comma { "," } else { "" },
+        )
+        .unwrap();
+        let name = field.name();
+        if name == "message" {
+            write!(
+                &mut self.stderr,
+                "{}",
+                // Have to alloc here due to `ansi_term`'s API...
+                Style::new().bold().paint(format!("{:?}", value))
+            )
+            .unwrap();
+            self.comma = true;
+        } else {
+            write!(
+                &mut self.stderr,
+                "{}: {:?}",
+                Style::new().bold().paint(name),
+                value
+            )
+            .unwrap();
+            self.comma = true;
         }
-
-        // TODO: shouldn't have to alloc the key...
-        let k = key.name().to_owned();
-        let v = fmt::format(value);
-        self.kvs.push((k, v));
     }
 }
 
@@ -148,7 +162,6 @@ impl SloggishSubscriber {
             stderr: io::stderr(),
             stack: Mutex::new(vec![]),
             spans: Mutex::new(HashMap::new()),
-            events: Mutex::new(HashMap::new()),
             ids: AtomicUsize::new(0),
         }
     }
@@ -193,39 +206,26 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_span(&self, span: &tokio_trace::Metadata) -> tokio_trace::Id {
+    fn new_span(
+        &self,
+        span: &tokio_trace::Metadata,
+        values: &tokio_trace::field::ValueSet,
+    ) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
-        if span.name.contains("event") {
-            self.events
-                .lock()
-                .unwrap()
-                .insert(id.clone(), Event::new(span));
-        } else {
-            self.spans
-                .lock()
-                .unwrap()
-                .insert(id.clone(), Span::new(self.current.id(), span));
-        }
+        let span = Span::new(self.current.id(), span, values);
+        self.spans.lock().unwrap().insert(id.clone(), span);
         id
     }
 
-    fn record_debug(
-        &self,
-        span: &tokio_trace::Id,
-        name: &tokio_trace::field::Field,
-        value: &fmt::Debug,
-    ) {
-        if let Some(event) = self.events.lock().expect("mutex poisoned!").get_mut(span) {
-            return event.record(name, format_args!("{:?}", value));
-        };
+    fn record(&self, span: &tokio_trace::Id, values: &tokio_trace::field::ValueSet) {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         if let Some(span) = spans.get_mut(span) {
-            span.record(name, format_args!("{:?}", value))
+            values.record(span);
         }
     }
 
-    fn add_follows_from(&self, _span: &tokio_trace::Id, _follows: tokio_trace::Id) {
+    fn record_follows_from(&self, _span: &tokio_trace::Id, _follows: &tokio_trace::Id) {
         // unimplemented
     }
 
@@ -261,34 +261,33 @@ impl Subscriber for SloggishSubscriber {
         }
     }
 
+    fn event(&self, event: &tokio_trace::Event) {
+        let mut stderr = self.stderr.lock();
+        let indent = self.stack.lock().unwrap().len();
+        self.print_indent(&mut stderr, indent).unwrap();
+        write!(
+            &mut stderr,
+            "{timestamp} {level} {target}",
+            timestamp = humantime::format_rfc3339_seconds(SystemTime::now()),
+            level = ColorLevel(event.metadata().level()),
+            target = &event.metadata().target(),
+        )
+        .unwrap();
+        let mut recorder = Event {
+            stderr,
+            comma: false,
+        };
+        event.record(&mut recorder);
+        write!(&mut recorder.stderr, "\n").unwrap();
+    }
+
     #[inline]
     fn exit(&self, _span: &tokio_trace::Id) {
         // TODO: unify stack with current span
         self.current.exit();
     }
 
-    fn drop_span(&self, id: tokio_trace::Id) {
-        if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
-            let mut stderr = self.stderr.lock();
-            let indent = self.stack.lock().unwrap().len();
-            self.print_indent(&mut stderr, indent).unwrap();
-            write!(
-                &mut stderr,
-                "{timestamp} {level} {target} {message}",
-                timestamp = humantime::format_rfc3339_seconds(SystemTime::now()),
-                level = ColorLevel(event.level),
-                target = &event.target,
-                message = Style::new().bold().paint(event.message),
-            )
-            .unwrap();
-            self.print_kvs(
-                &mut stderr,
-                event.kvs.iter().map(|&(ref k, ref v)| (k, v)),
-                ", ",
-            )
-            .unwrap();
-            write!(&mut stderr, "\n").unwrap();
-        }
+    fn drop_span(&self, _id: tokio_trace::Id) {
         // TODO: GC unneeded spans.
     }
 }

@@ -5,23 +5,30 @@ extern crate tokio_trace;
 extern crate test;
 use test::Bencher;
 
-use std::sync::Mutex;
-use tokio_trace::{field, span, Id, Metadata};
+use std::{
+    fmt,
+    sync::{Mutex, MutexGuard},
+};
+use tokio_trace::{field, span, Event, Id, Metadata};
 
 /// A subscriber that is enabled but otherwise does nothing.
 struct EnabledSubscriber;
 
 impl tokio_trace::Subscriber for EnabledSubscriber {
-    fn new_span(&self, span: &Metadata) -> Id {
-        let _ = span;
+    fn new_span(&self, span: &Metadata, values: &field::ValueSet) -> Id {
+        let _ = (span, values);
         Id::from_u64(0)
     }
 
-    fn record_debug(&self, span: &Id, field: &field::Field, value: &::std::fmt::Debug) {
-        let _ = (span, field, value);
+    fn event(&self, event: &Event) {
+        let _ = event;
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) {
+    fn record(&self, span: &Id, values: &field::ValueSet) {
+        let _ = (span, values);
+    }
+
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
         let _ = (span, follows);
     }
 
@@ -40,19 +47,35 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
 }
 
 /// Simulates a subscriber that records span data.
-struct Record(Mutex<Option<String>>);
+struct RecordingSubscriber(Mutex<String>);
 
-impl tokio_trace::Subscriber for Record {
-    fn new_span(&self, span: &Metadata) -> Id {
-        *self.0.lock().unwrap() = Some(span.name().to_string());
+struct Recorder<'a>(MutexGuard<'a, String>);
+
+impl<'a> field::Record for Recorder<'a> {
+    fn record_debug(&mut self, _field: &field::Field, value: &fmt::Debug) {
+        use std::fmt::Write;
+        let _ = write!(&mut *self.0, "{:?}", value);
+    }
+}
+
+impl tokio_trace::Subscriber for RecordingSubscriber {
+    fn new_span(&self, _span: &Metadata, values: &field::ValueSet) -> Id {
+        let mut recorder = Recorder(self.0.lock().unwrap());
+        values.record(&mut recorder);
         Id::from_u64(0)
     }
 
-    fn record_debug(&self, _span: &Id, _field: &field::Field, value: &::std::fmt::Debug) {
-        *self.0.lock().unwrap() = Some(format!("{:?}", value));
+    fn record(&self, _span: &Id, values: &field::ValueSet) {
+        let mut recorder = Recorder(self.0.lock().unwrap());
+        values.record(&mut recorder);
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) {
+    fn event(&self, event: &Event) {
+        let mut recorder = Recorder(self.0.lock().unwrap());
+        event.record(&mut recorder);
+    }
+
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
         let _ = (span, follows);
     }
 
@@ -107,7 +130,8 @@ fn span_with_fields(b: &mut Bencher) {
 
 #[bench]
 fn span_with_fields_record(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(Record(Mutex::new(None)), || {
+    let subscriber = RecordingSubscriber(Mutex::new(String::from("")));
+    tokio_trace::subscriber::with_default(subscriber, || {
         b.iter(|| {
             span!(
                 "span",

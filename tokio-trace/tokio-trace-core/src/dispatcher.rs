@@ -2,7 +2,7 @@
 use {
     callsite, field,
     subscriber::{self, Subscriber},
-    Metadata, Span,
+    Event, Metadata, Span,
 };
 
 use std::{
@@ -106,63 +106,27 @@ impl Dispatch {
     ///
     /// [`Span`]: ::span::Span
     #[inline]
-    pub fn new_span(&self, metadata: &Metadata) -> Span {
-        self.subscriber.new_span(metadata)
+    pub fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span {
+        self.subscriber.new_span(metadata, values)
     }
 
-    /// Record a signed 64-bit integer value.
+    /// Record a set of values on a span.
     ///
-    /// This calls the [`record_i64`](::Subscriber::record_i64)
+    /// This calls the [`record`](::Subscriber::record)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn record_i64(&self, span: &Span, field: &field::Field, value: i64) {
-        self.subscriber.record_i64(span, field, value)
-    }
-
-    /// Record an unsigned 64-bit integer value.
-    ///
-    /// This calls the [`record_u64`](::Subscriber::record_u64)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_u64(&self, span: &Span, field: &field::Field, value: u64) {
-        self.subscriber.record_u64(span, field, value)
-    }
-
-    /// Record a boolean value.
-    ///
-    /// This calls the [`record_bool`](::Subscriber::record_bool)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_bool(&self, span: &Span, field: &field::Field, value: bool) {
-        self.subscriber.record_bool(span, field, value)
-    }
-
-    /// Record a string value.
-    ///
-    /// This calls the [`record_str`](::Subscriber::record_str)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_str(&self, span: &Span, field: &field::Field, value: &str) {
-        self.subscriber.record_str(span, field, value)
-    }
-
-    /// Record a value implementing `fmt::Debug`.
-    ///
-    /// This calls the [`record_debug`](::Subscriber::record_debug)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
-    #[inline]
-    pub fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug) {
-        self.subscriber.record_debug(span, field, value)
+    pub fn record(&self, span: &Span, values: &field::ValueSet) {
+        self.subscriber.record(span, &values)
     }
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
     ///
-    /// This calls the [`add_follows_from`](::Subscriber::add_follows_from)
+    /// This calls the [`record_follows_from`](::Subscriber::record_follows_from)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn add_follows_from(&self, span: &Span, follows: Span) {
-        self.subscriber.add_follows_from(span, follows)
+    pub fn record_follows_from(&self, span: &Span, follows: &Span) {
+        self.subscriber.record_follows_from(span, follows)
     }
 
     /// Returns true if a span with the specified [metadata] would be
@@ -175,6 +139,17 @@ impl Dispatch {
     #[inline]
     pub fn enabled(&self, metadata: &Metadata) -> bool {
         self.subscriber.enabled(metadata)
+    }
+
+    /// Records that an [`Event`] has occurred.
+    ///
+    /// This calls the [`event`](::Subscriber::event) function on
+    /// the `Subscriber` that this `Dispatch` forwards to.
+    ///
+    /// [`Event`]: ::event::Event
+    #[inline]
+    pub fn event(&self, event: &Event) {
+        self.subscriber.event(event)
     }
 
     /// Records that a [`Span`] has been entered.
@@ -242,13 +217,15 @@ impl Subscriber for NoSubscriber {
         subscriber::Interest::never()
     }
 
-    fn new_span(&self, _meta: &Metadata) -> Span {
+    fn new_span(&self, _meta: &Metadata, _vals: &field::ValueSet) -> Span {
         Span::from_u64(0)
     }
 
-    fn record_debug(&self, _span: &Span, _field: &field::Field, _value: &fmt::Debug) {}
+    fn event(&self, _event: &Event) {}
 
-    fn add_follows_from(&self, _span: &Span, _follows: Span) {}
+    fn record(&self, _span: &Span, _values: &field::ValueSet) {}
+
+    fn record_follows_from(&self, _span: &Span, _follows: &Span) {}
 
     #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {
