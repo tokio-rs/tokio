@@ -1,5 +1,5 @@
 //! Events represent single points in time during the execution of a program.
-use {dispatcher, field, Metadata};
+use {field, Metadata};
 
 /// `Event`s represent single points in time where something occurred during the
 /// execution of a program.
@@ -22,20 +22,20 @@ pub struct Event<'a> {
     metadata: &'a Metadata<'a>,
 }
 
-/// Constructs `Event`s.
-#[derive(Debug)]
-pub struct Builder<'a> {
-    metadata: &'a Metadata<'a>,
-}
-
 impl<'a> Event<'a> {
-    /// Returns a new `Builder` for constructing an `Event` with the specified
-    /// `metadata`.
-    pub fn builder(metadata: &'a Metadata<'a>) -> Builder<'a> {
-        Builder::new(metadata)
+    /// Constructs a new `Event` with the specified metadata and set of values.
+    #[inline]
+    pub fn new(
+        metadata: &'a Metadata<'a>,
+        fields: &'a field::ValueSet,
+    ) -> Self {
+        Event {
+            metadata,
+            fields,
+        }
     }
 
-    /// Returns all the fields on this `Event` with the specified [recorder].
+    /// Records all the fields on this `Event` with the specified [recorder].
     ///
     /// [recorder]: ::field::Record
     #[inline]
@@ -54,23 +54,5 @@ impl<'a> Event<'a> {
     /// [metadata]: ::metadata::Metadata
     pub fn metadata(&self) -> &Metadata {
         self.metadata
-    }
-}
-
-impl<'a> Builder<'a> {
-    /// Returns a new event `Builder`.
-    pub fn new(metadata: &'a Metadata<'a>) -> Self {
-        Self { metadata }
-    }
-
-    /// Records the constructed `Event` with a set of values.
-    pub fn record(&self, fields: &'a field::ValueSet<'a>) {
-        let event = Event {
-            metadata: self.metadata,
-            fields,
-        };
-        dispatcher::with(|current| {
-            current.event(&event);
-        });
     }
 }
