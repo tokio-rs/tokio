@@ -560,3 +560,109 @@ impl<'a> fmt::Debug for ValueSet<'a> {
             .finish()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use ::{Metadata, Level};
+
+    struct TestCallsite1;
+    static TEST_CALLSITE_1: TestCallsite1 = TestCallsite1;
+    static TEST_META_1: Metadata<'static> = metadata! {
+        name: "field_test1",
+        target: module_path!(),
+        level: Level::INFO,
+        fields: &["foo", "bar", "baz"],
+        callsite: &TEST_CALLSITE_1,
+    };
+
+    impl ::callsite::Callsite for TestCallsite1 {
+        fn add_interest(&self, _: ::subscriber::Interest) {}
+        fn clear_interest(&self) {}
+
+        fn metadata(&self) -> &Metadata {
+            &TEST_META_1
+        }
+    }
+
+    struct TestCallsite2;
+    static TEST_CALLSITE_2: TestCallsite2 = TestCallsite2;
+    static TEST_META_2: Metadata<'static> = metadata! {
+        name: "field_test2",
+        target: module_path!(),
+        level: Level::INFO,
+        fields: &["foo", "bar", "baz"],
+        callsite: &TEST_CALLSITE_2,
+    };
+
+    impl ::callsite::Callsite for TestCallsite2 {
+        fn add_interest(&self, _: ::subscriber::Interest) {}
+        fn clear_interest(&self) {}
+
+        fn metadata(&self) -> &Metadata {
+            &TEST_META_2
+        }
+    }
+
+    #[test]
+    fn value_set_with_no_values_is_empty() {
+        let fields = TEST_META_1.fields();
+        let values = &[
+            (&fields.field("foo").unwrap(), None),
+            (&fields.field("bar").unwrap(), None),
+            (&fields.field("baz").unwrap(), None),
+        ];
+        let valueset = fields.value_set(&values[..]);
+        assert!(valueset.is_empty());
+    }
+
+    #[test]
+    fn empty_value_set_is_empty() {
+        let fields = TEST_META_1.fields();
+        let valueset = fields.value_set(&[]);
+        assert!(valueset.is_empty());
+    }
+
+    #[test]
+    fn value_sets_with_fields_from_other_callsites_are_empty() {
+        let fields = TEST_META_1.fields();
+        let values = &[
+            (&fields.field("foo").unwrap(), Some(&1 as &Value)),
+            (&fields.field("bar").unwrap(), Some(&2 as &Value)),
+            (&fields.field("baz").unwrap(), Some(&3 as &Value)),
+        ];
+        let valueset = TEST_META_2.fields().value_set(&values[..]);
+        assert!(valueset.is_empty())
+    }
+
+    #[test]
+    fn sparse_value_sets_are_not_empty() {
+        let fields = TEST_META_1.fields();
+        let values = &[
+            (&fields.field("foo").unwrap(), None),
+            (&fields.field("bar").unwrap(), Some(&57 as &Value)),
+            (&fields.field("baz").unwrap(), None),
+        ];
+        let valueset = fields.value_set(&values[..]);
+        assert!(!valueset.is_empty());
+    }
+
+    #[test]
+    fn fields_from_other_callsets_are_skipped() {
+        let fields = TEST_META_1.fields();
+        let values = &[
+            (&fields.field("foo").unwrap(), None),
+            (&TEST_META_2.fields().field("bar").unwrap(), Some(&57 as &Value)),
+            (&fields.field("baz").unwrap(), None),
+        ];
+
+        struct MyRecorder;
+        impl Record for MyRecorder {
+            fn record_debug(&mut self, field: &Field, _: &::std::fmt::Debug) {
+                assert_eq!(field.callsite(), TEST_META_1.callsite())
+            }
+        }
+        let valueset = fields.value_set(&values[..]);
+        valueset.record(&mut MyRecorder);
+    }
+}
