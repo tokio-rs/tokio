@@ -530,10 +530,10 @@ impl<'a> ValueSet<'a> {
     /// Returns true if this `ValueSet` contains _no_ values.
     pub fn is_empty(&self) -> bool {
         let my_callsite = self.callsite();
-        !self
+        self
             .values
             .iter()
-            .any(|(key, val)| key.callsite() == my_callsite && val.is_some())
+            .all(|(key, val)| val.is_none() || key.callsite() != my_callsite)
     }
 
     pub(crate) fn field_set(&self) -> &FieldSet {

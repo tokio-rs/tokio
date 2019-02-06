@@ -40,7 +40,6 @@ impl<'a> Event<'a> {
     /// [recorder]: ::field::Record
     #[inline]
     pub fn record(&self, recorder: &mut field::Record) {
-        debug_assert!(self.fields.is_complete());
         self.fields.record(recorder);
     }
 
