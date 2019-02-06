@@ -447,6 +447,7 @@ impl FieldSet {
     }
 
     /// Returns a new `ValueSet` with entries for this `FieldSet`'s values.
+    #[doc(hidden)]
     pub fn value_set<'v>(
         &'v self,
         values: &'v [(&'v Field, Option<&'v (Value + 'v)>)],
