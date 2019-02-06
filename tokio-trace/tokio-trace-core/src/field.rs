@@ -513,7 +513,11 @@ impl<'a> ValueSet<'a> {
     ///
     /// [recorder]: ::field::Record
     pub fn record(&self, recorder: &mut Record) {
+        let my_callsite = self.callsite();
         for (field, value) in self.values {
+            if field.callsite() != my_callsite {
+                continue;
+            }
             if let Some(value) = value {
                 value.record(field, recorder);
             }
