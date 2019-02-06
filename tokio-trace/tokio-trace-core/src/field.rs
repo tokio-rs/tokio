@@ -522,27 +522,9 @@ impl<'a> ValueSet<'a> {
 
     /// Returns `true` if this `ValueSet` contains a value for the given `Field`.
     pub fn contains(&self, field: &Field) -> bool {
-        field.callsite() == self.callsite() && self.contains_inner(field)
-    }
-
-    fn contains_inner(&self, field: &Field) -> bool {
-        self.values
+        field.callsite() == self.callsite() && self.values
             .iter()
             .any(|(key, val)| *key == field && val.is_some())
-    }
-
-    /// Returns true if this `ValueSet` contains _all_ the fields defined on the
-    /// span or event it corresponds to.
-    pub fn is_complete(&self) -> bool {
-        if self.values.len() < self.fields.names.len() {
-            return false;
-        }
-        for ref field in self.fields.iter() {
-            if !self.contains_inner(field) {
-                return false;
-            }
-        }
-        true
     }
 
     /// Returns true if this `ValueSet` contains _no_ values.
