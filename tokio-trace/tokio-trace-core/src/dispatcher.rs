@@ -73,7 +73,6 @@ impl Dispatch {
 
     /// Returns a `Dispatch` to the given [`Subscriber`](::Subscriber).
     pub fn new<S>(subscriber: S) -> Self
-    // TODO: Add some kind of `UnsyncDispatch`?
     where
         S: Subscriber + Send + Sync + 'static,
     {
@@ -207,6 +206,16 @@ impl Dispatch {
 impl fmt::Debug for Dispatch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("Dispatch(...)")
+    }
+}
+
+impl<S> From<S> for Dispatch
+where
+    S: Subscriber + Send + Sync + 'static,
+{
+    #[inline]
+    fn from(subscriber: S) -> Self {
+        Dispatch::new(subscriber)
     }
 }
 
