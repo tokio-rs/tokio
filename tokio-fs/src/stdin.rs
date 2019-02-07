@@ -7,6 +7,12 @@ use std::io::{self, Read, Stdin as StdStdin};
 /// The handle implements the [`AsyncRead`] trait, but beware that concurrent
 /// reads of `Stdin` must be executed with care.
 ///
+/// As an additional caveat, reading from the handle may block the calling
+/// future indefinitely, if there is not enough data available. This makes this
+/// handle unsuitable for use in any circumstance where immediate reaction to
+/// available data is required, e.g. interactive use or when implementing a
+/// subprocess driven by requests on the standard input.
+///
 /// Created by the [`stdin`] function.
 ///
 /// [`stdin`]: fn.stdin.html
