@@ -241,8 +241,6 @@ where
     DisplayValue(t)
 }
 
-// ===== impl Value =====
-
 /// Wraps a type implementing `fmt::Debug` as a `Value` that can be
 /// recorded using its `Debug` implementation.
 pub fn debug<T>(t: T) -> DebugValue<T>
@@ -251,6 +249,31 @@ where
 {
     DebugValue(t)
 }
+
+// ===== impl Record =====
+
+impl<'a, 'b> Record for fmt::DebugStruct<'a, 'b> {
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+        self.field(field.name(), value);
+    }
+}
+
+impl<'a, 'b> Record for fmt::DebugMap<'a, 'b> {
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+        self.entry(&format_args!("{}", field), value);
+    }
+}
+
+impl<F> Record for F
+where
+    F: FnMut(&Field, &fmt::Debug),
+{
+    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
+        (self)(field, value)
+    }
+}
+
+// ===== impl Value =====
 
 macro_rules! impl_values {
     ( $( $record:ident( $( $whatever:tt)+ ) ),+ ) => {
@@ -564,12 +587,6 @@ impl<'a> ValueSet<'a> {
 
 impl<'a> fmt::Debug for ValueSet<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: this might be handy as a public impl?
-        impl<'a, 'b> Record for fmt::DebugStruct<'a, 'b> {
-            fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
-                self.field(field.name(), value);
-            }
-        }
         self.values
             .iter()
             .fold(&mut f.debug_struct("ValueSet"), |dbg, (key, v)| {
@@ -704,5 +721,22 @@ mod test {
         }
         let valueset = fields.value_set(values);
         valueset.record(&mut MyRecorder);
+    }
+
+    #[test]
+    fn record_debug_fn() {
+        let fields = TEST_META_1.fields();
+        let values = &[
+            (&fields.field("foo").unwrap(), Some(&1 as &Value)),
+            (&fields.field("bar").unwrap(), Some(&2 as &Value)),
+            (&fields.field("baz").unwrap(), Some(&3 as &Value)),
+        ];
+        let valueset = fields.value_set(values);
+        let mut result = String::new();
+        valueset.record(&mut |_: &Field, value: &fmt::Debug| {
+            use std::fmt::Write;
+            write!(&mut result, "{:?}", value).unwrap();
+        });
+        assert_eq!(result, "123".to_owned());
     }
 }
