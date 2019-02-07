@@ -323,7 +323,7 @@ pub use self::{
 #[doc(hidden)]
 #[macro_export]
 macro_rules! callsite {
-    (name: $name:expr, fields: $( $field_name:ident ),* $(,)*) => ({
+    (name: $name:expr, fields: $( $field_name:expr ),* $(,)*) => ({
         callsite! {
             name: $name,
             target: module_path!(),
@@ -331,7 +331,7 @@ macro_rules! callsite {
             fields: $( $field_name ),*
         }
     });
-    (name: $name:expr, level: $lvl:expr, fields: $( $field_name:ident ),* $(,)*) => ({
+    (name: $name:expr, level: $lvl:expr, fields: $( $field_name:expr ),* $(,)*) => ({
         callsite! {
             name: $name,
             target: module_path!(),
@@ -343,7 +343,7 @@ macro_rules! callsite {
         name: $name:expr,
         target: $target:expr,
         level: $lvl:expr,
-        fields: $( $field_name:ident ),*
+        fields: $( $field_name:expr ),*
         $(,)*
     ) => ({
         use std::sync::{Once, atomic::{self, AtomicUsize, Ordering}};
