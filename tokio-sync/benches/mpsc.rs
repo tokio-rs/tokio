@@ -87,6 +87,22 @@ mod tokio {
     }
 
     #[bench]
+    fn unbounded_rx_not_ready_x5(b: &mut Bencher) {
+        let (_tx, mut rx) = unbounded_channel::<i32>();
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
     fn bounded_uncontended_1(b: &mut Bencher) {
         b.iter(|| {
             let (mut tx, mut rx) = channel(1_000);
@@ -280,6 +296,22 @@ mod legacy {
         let (_tx, mut rx) = unbounded::<i32>();
         b.iter(|| {
             future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn unbounded_rx_not_ready_x5(b: &mut Bencher) {
+        let (_tx, mut rx) = unbounded::<i32>();
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
+                assert!(rx.poll().unwrap().is_not_ready());
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
