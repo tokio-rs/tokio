@@ -1,6 +1,6 @@
+use loom::futures::AtomicTask;
 use super::list;
 use futures::Poll;
-use futures::task::AtomicTask;
 
 use std::cell::UnsafeCell;
 use std::process;
