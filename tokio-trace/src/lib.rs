@@ -548,19 +548,19 @@ macro_rules! event {
             }
         }
     });
-    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => ({
+    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => ({
         event!(target: $target, $lvl, { message = format_args!($($arg)+), $( $k = $val ),* })
     });
-    (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr ),+ ) => (
+    (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr $(,)* ),+ ) => (
         event!(target: $target, $lvl, { $($k = $val),+ })
     );
     (target: $target:expr, $lvl:expr, $($arg:tt)+ ) => (
         event!(target: $target, $lvl, { }, $($arg)+)
     );
-    ( $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    ( $lvl:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { message = format_args!($($arg)+), $($k = $val),* })
     );
-    ( $lvl:expr, $( $k:ident = $val:expr ),* ) => (
+    ( $lvl:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: module_path!(), $lvl, { $($k = $val),* })
     );
     ( $lvl:expr, $($arg:tt)+ ) => (
@@ -603,10 +603,10 @@ macro_rules! event {
 /// ```
 #[macro_export]
 macro_rules! trace {
-    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: $target, $crate::Level::TRACE, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
@@ -617,10 +617,10 @@ macro_rules! trace {
         // the handle won't be used later to add values to them.
         drop(event!(target: $target, $crate::Level::TRACE, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr ),* ) => (
+    ($( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -650,19 +650,19 @@ macro_rules! trace {
 /// ```
 #[macro_export]
 macro_rules! debug {
-    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::DEBUG, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr ),* ) => (
+    ($( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -699,19 +699,19 @@ macro_rules! debug {
 /// ```
 #[macro_export]
 macro_rules! info {
-    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: $target, $crate::Level::INFO, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::INFO, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr ),* ) => (
+    ($( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -745,19 +745,19 @@ macro_rules! info {
 /// ```
 #[macro_export]
 macro_rules! warn {
-    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: $target, $crate::Level::WARN, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::WARN, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(),  $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr ),* ) => (
+    ($( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: module_path!(),  $crate::Level::WARN,{ $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -786,19 +786,19 @@ macro_rules! warn {
 /// ```
 #[macro_export]
 macro_rules! error {
-    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
+    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: $target, $crate::Level::ERROR, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::ERROR, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr ),* ) => (
+    ($( $k:ident = $val:expr $(,)* ),* ) => (
         event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
