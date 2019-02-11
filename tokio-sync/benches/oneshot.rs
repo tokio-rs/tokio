@@ -10,6 +10,13 @@ mod tokio {
     use test::{Bencher};
 
     #[bench]
+    fn new(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = ::test::black_box(&oneshot::channel::<i32>());
+        })
+    }
+
+    #[bench]
     fn same_thread_send_recv(b: &mut Bencher) {
         b.iter(|| {
             let (tx, mut rx) = oneshot::channel();
@@ -112,6 +119,13 @@ mod legacy {
     use futures::{future, Async, Future};
     use futures::sync::oneshot;
     use test::{Bencher};
+
+    #[bench]
+    fn new(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = ::test::black_box(&oneshot::channel::<i32>());
+        })
+    }
 
     #[bench]
     fn same_thread_send_recv(b: &mut Bencher) {
