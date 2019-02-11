@@ -6,9 +6,23 @@ extern crate test;
 
 mod tokio {
     use tokio_sync::mpsc::*;
-    use futures::{Async, Stream, Sink};
+    use futures::{future, Async, Future, Stream, Sink};
     use test::{self, Bencher};
     use std::thread;
+
+    #[bench]
+    fn bounded_new(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&channel::<i32>(1_000));
+        })
+    }
+
+    #[bench]
+    fn unbounded_new(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&unbounded_channel::<i32>());
+        })
+    }
 
     #[bench]
     fn send_one_message(b: &mut Bencher) {
@@ -24,7 +38,56 @@ mod tokio {
     }
 
     #[bench]
-    fn unbounded_uncontended_1(b: &mut Bencher) {
+    fn bounded_rx_not_ready(b: &mut Bencher) {
+        let (_tx, mut rx) = channel::<i32>(1_000);
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn bounded_tx_poll_ready(b: &mut Bencher) {
+        let (mut tx, rx) = channel::<i32>(1);
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(tx.poll_ready().unwrap().is_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn bounded_tx_poll_not_ready(b: &mut Bencher) {
+        let (mut tx, rx) = channel::<i32>(1);
+        tx.try_send(1).unwrap();
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(tx.poll_ready().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn unbounded_rx_not_ready(b: &mut Bencher) {
+        let (_tx, mut rx) = unbounded_channel::<i32>();
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn bounded_uncontended_1(b: &mut Bencher) {
         b.iter(|| {
             let (mut tx, mut rx) = channel(1_000);
 
@@ -37,7 +100,7 @@ mod tokio {
     }
 
     #[bench]
-    fn unbounded_uncontended_2(b: &mut Bencher) {
+    fn bounded_uncontended_2(b: &mut Bencher) {
         b.iter(|| {
             let (mut tx, mut rx) = channel(1000);
 
@@ -143,10 +206,24 @@ mod tokio {
 }
 
 mod legacy {
-    use futures::{Async, Stream, Sink};
+    use futures::{future, Async, Future, Stream, Sink};
     use futures::sync::mpsc::*;
     use test::{self, Bencher};
     use std::thread;
+
+    #[bench]
+    fn bounded_new(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&channel::<i32>(1_000));
+        })
+    }
+
+    #[bench]
+    fn unbounded_new(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&unbounded::<i32>());
+        })
+    }
 
     #[bench]
     fn send_one_message(b: &mut Bencher) {
@@ -158,6 +235,55 @@ mod legacy {
 
             // Receive
             assert_eq!(Ok(Async::Ready(Some(1))), rx.poll());
+        })
+    }
+
+    #[bench]
+    fn bounded_rx_not_ready(b: &mut Bencher) {
+        let (_tx, mut rx) = channel::<i32>(1_000);
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn bounded_tx_poll_ready(b: &mut Bencher) {
+        let (mut tx, rx) = channel::<i32>(0);
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(tx.poll_ready().unwrap().is_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn bounded_tx_poll_not_ready(b: &mut Bencher) {
+        let (mut tx, rx) = channel::<i32>(0);
+        tx.try_send(1).unwrap();
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(tx.poll_ready().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
+        })
+    }
+
+    #[bench]
+    fn unbounded_rx_not_ready(b: &mut Bencher) {
+        let (_tx, mut rx) = unbounded::<i32>();
+        b.iter(|| {
+            future::lazy(|| {
+                assert!(rx.poll().unwrap().is_not_ready());
+
+                Ok::<_, ()>(())
+            }).wait().unwrap();
         })
     }
 
