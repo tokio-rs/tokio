@@ -434,6 +434,21 @@ macro_rules! callsite {
 /// # }
 /// ```
 ///
+/// Note that trailing commas for fields are valid.
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// span!(
+///     "my span",
+///     foo = 2,
+///     bar = "a string",
+/// ).enter(|| {
+///     // do work inside the span...
+/// });
+/// # }
+/// ```
+///
 /// Field values may be recorded after the span is created:
 /// ```
 /// # #[macro_use]
@@ -461,7 +476,10 @@ macro_rules! callsite {
 #[macro_export]
 macro_rules! span {
     ($name:expr) => { span!($name,) };
-    ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
+    ($name:expr, $($k:ident $( = $val:expr )* ),*,) => {
+        span!($name, $($k $( = $val)* ),*)
+    };
+    ($name:expr, $($k:ident $( = $val:expr )* ),*) => {
         {
             use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
@@ -493,7 +511,7 @@ macro_rules! span {
 /// event!(Level::ERROR, { error = field::display(error) }, "Received error");
 /// event!(target: "app_events", Level::WARN, {
 ///         private_data = private_data,
-///         data = field::debug(data)
+///         data = field::debug(data),
 ///     },
 ///     "App warning: {}", error
 /// );
@@ -503,7 +521,8 @@ macro_rules! span {
 ///
 /// Note that *unlike `span!`*, `event!` requires a value for all fields. As
 /// events are recorded immediately when the macro is invoked, there is no
-/// opportunity for fields to be recorded later.
+/// opportunity for fields to be recorded later. Trailing commas for fields
+/// are valid.
 ///
 /// For example, the following does not compile:
 /// ```rust,compile_fail
@@ -548,19 +567,31 @@ macro_rules! event {
             }
         }
     });
-    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => ({
+    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => ({
         event!(target: $target, $lvl, { message = format_args!($($arg)+), $( $k = $val ),* })
     });
-    (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr $(,)* ),+ ) => (
+    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => ({
+        event!(target: $target, $lvl, { message = format_args!($($arg)+), $( $k = $val ),* })
+    });
+    (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr ),+, ) => (
+        event!(target: $target, $lvl, { $($k = $val),+ })
+    );
+    (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr ),+ ) => (
         event!(target: $target, $lvl, { $($k = $val),+ })
     );
     (target: $target:expr, $lvl:expr, $($arg:tt)+ ) => (
         event!(target: $target, $lvl, { }, $($arg)+)
     );
-    ( $lvl:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    ( $lvl:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { message = format_args!($($arg)+), $($k = $val),* })
     );
-    ( $lvl:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
+    ( $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $lvl, { message = format_args!($($arg)+), $($k = $val),* })
+    );
+    ( $lvl:expr, $( $k:ident = $val:expr ),*, ) => (
+        event!(target: module_path!(), $lvl, { $($k = $val),* })
+    );
+    ( $lvl:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(), $lvl, { $($k = $val),* })
     );
     ( $lvl:expr, $($arg:tt)+ ) => (
@@ -572,6 +603,7 @@ macro_rules! event {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
+/// Trailing commas for fields are valid.
 ///
 /// # Examples
 ///
@@ -603,10 +635,16 @@ macro_rules! event {
 /// ```
 #[macro_export]
 macro_rules! trace {
-    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),*, ) => (
+        event!(target: $target, $crate::Level::TRACE, { $($k = $val),* })
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: $target, $crate::Level::TRACE, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
@@ -617,10 +655,16 @@ macro_rules! trace {
         // the handle won't be used later to add values to them.
         drop(event!(target: $target, $crate::Level::TRACE, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr $(,)* ),* ) => (
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
+    );
+    ($( $k:ident = $val:expr ),*, ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* })
+    );
+    ($( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(), $crate::Level::TRACE, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -632,6 +676,7 @@ macro_rules! trace {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
+/// Trailing commas for fields are valid.
 ///
 /// # Examples
 ///
@@ -650,19 +695,31 @@ macro_rules! trace {
 /// ```
 #[macro_export]
 macro_rules! debug {
-    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),*, ) => (
+        event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* })
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::DEBUG, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr $(,)* ),* ) => (
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
+    );
+    ($( $k:ident = $val:expr ),*, ) => (
+        event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* })
+    );
+    ($( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(), $crate::Level::DEBUG, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -674,6 +731,7 @@ macro_rules! debug {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
+/// Trailing commas for fields are valid.
 ///
 /// # Examples
 ///
@@ -699,19 +757,31 @@ macro_rules! debug {
 /// ```
 #[macro_export]
 macro_rules! info {
-    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),*, ) => (
+        event!(target: $target, $crate::Level::INFO, { $($k = $val),* })
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: $target, $crate::Level::INFO, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::INFO, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr $(,)* ),* ) => (
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
+    );
+    ($( $k:ident = $val:expr ),*, ) => (
+        event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* })
+    );
+    ($( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(), $crate::Level::INFO, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -723,6 +793,7 @@ macro_rules! info {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
+/// Trailing commas for fields are valid.
 ///
 /// # Examples
 ///
@@ -745,19 +816,31 @@ macro_rules! info {
 /// ```
 #[macro_export]
 macro_rules! warn {
-    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),*, ) => (
+        event!(target: $target, $crate::Level::WARN, { $($k = $val),* })
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: $target, $crate::Level::WARN, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::WARN, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: module_path!(),  $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr $(,)* ),* ) => (
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(),  $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
+    );
+    ($( $k:ident = $val:expr ),*, ) => (
+        event!(target: module_path!(),  $crate::Level::WARN,{ $($k = $val),* })
+    );
+    ($( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(),  $crate::Level::WARN,{ $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
@@ -769,6 +852,7 @@ macro_rules! warn {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
+/// Trailing commas for fields are valid.
 ///
 /// # Examples
 ///
@@ -786,19 +870,31 @@ macro_rules! warn {
 /// ```
 #[macro_export]
 macro_rules! error {
-    (target: $target:expr, { $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
     );
-    (target: $target:expr, $( $k:ident = $val:expr $(,)* ),* ) => (
+    (target: $target:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),*, ) => (
+        event!(target: $target, $crate::Level::ERROR, { $($k = $val),* })
+    );
+    (target: $target:expr, $( $k:ident = $val:expr ),* ) => (
         event!(target: $target, $crate::Level::ERROR, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
         drop(event!(target: $target, $crate::Level::ERROR, {}, $($arg)+));
     );
-    ({ $( $k:ident = $val:expr $(,)* ),* }, $($arg:tt)+ ) => (
+    ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
     );
-    ($( $k:ident = $val:expr $(,)* ),* ) => (
+    ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
+    );
+    ($( $k:ident = $val:expr ),*, ) => (
+        event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* })
+    );
+    ($( $k:ident = $val:expr ),* ) => (
         event!(target: module_path!(), $crate::Level::ERROR, { $($k = $val),* })
     );
     ($($arg:tt)+ ) => (
