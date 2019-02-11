@@ -434,7 +434,7 @@ macro_rules! callsite {
 /// # }
 /// ```
 ///
-/// Note that trailing commas for fields are valid.
+/// Note that a trailing comma on the final field is valid.
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -521,8 +521,8 @@ macro_rules! span {
 ///
 /// Note that *unlike `span!`*, `event!` requires a value for all fields. As
 /// events are recorded immediately when the macro is invoked, there is no
-/// opportunity for fields to be recorded later. Trailing commas for fields
-/// are valid.
+/// opportunity for fields to be recorded later. A trailing comma on the final
+/// field is valid.
 ///
 /// For example, the following does not compile:
 /// ```rust,compile_fail
@@ -603,7 +603,7 @@ macro_rules! event {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
-/// Trailing commas for fields are valid.
+/// A trailing comma on the final field is valid.
 ///
 /// # Examples
 ///
@@ -676,7 +676,7 @@ macro_rules! trace {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
-/// Trailing commas for fields are valid.
+/// A trailing comma on the final field is valid.
 ///
 /// # Examples
 ///
@@ -731,7 +731,7 @@ macro_rules! debug {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
-/// Trailing commas for fields are valid.
+/// A trailing comma on the final field is valid.
 ///
 /// # Examples
 ///
@@ -793,7 +793,7 @@ macro_rules! info {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
-/// Trailing commas for fields are valid.
+/// A trailing comma on the final field is valid.
 ///
 /// # Examples
 ///
@@ -852,7 +852,7 @@ macro_rules! warn {
 ///
 /// When both a message and fields are included, curly braces (`{` and `}`) are
 /// used to delimit the list of fields from the format string for the message.
-/// Trailing commas for fields are valid.
+/// A trailing comma on the final field is valid.
 ///
 /// # Examples
 ///
