@@ -434,7 +434,7 @@ macro_rules! callsite {
 /// # }
 /// ```
 ///
-/// Note that a trailing comma on the final field is valid.
+/// Note that a trailing comma on the final field is valid:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -443,9 +443,22 @@ macro_rules! callsite {
 ///     "my span",
 ///     foo = 2,
 ///     bar = "a string",
-/// ).enter(|| {
-///     // do work inside the span...
-/// });
+/// );
+/// # }
+/// ```
+///
+/// Creating a span with custom target and log level:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// span!(
+///     target: "app_span",
+///     level: tokio_trace::Level::TRACE,
+///     "my span",
+///     foo = 3,
+///     bar = "another string"
+/// );
 /// # }
 /// ```
 ///
@@ -475,15 +488,19 @@ macro_rules! callsite {
 /// ```
 #[macro_export]
 macro_rules! span {
-    ($name:expr) => { span!($name,) };
-    ($name:expr, $($k:ident $( = $val:expr )* ),*,) => {
-        span!($name, $($k $( = $val)* ),*)
+    (target: $target:expr, level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
+        span!(target: $target, level: $lvl, $name, $($k $( = $val)*),*)
     };
-    ($name:expr, $($k:ident $( = $val:expr )* ),*) => {
+    (target: $target:expr, level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
         {
             use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
-            let callsite = callsite! { name: $name, fields: $( $k ),* };
+            let callsite = callsite! {
+                name: $name,
+                target: $target,
+                level: $lvl,
+                fields: $($k),*
+            };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
                 Span::new(meta, &valueset!(meta.fields(), $($k $( = $val)*),*))
@@ -492,6 +509,25 @@ macro_rules! span {
             }
         }
     };
+    (target: $target:expr, level: $lvl:expr, $name:expr) => {
+        span!(target: $target, level: $lvl, $name,)
+    };
+    (level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
+        span!(target: module_path!(), level: $lvl, $name, $($k $( = $val)*),*)
+    };
+    (level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
+        span!(target: module_path!(), level: $lvl, $name, $($k $( = $val)*),*)
+    };
+    (level: $lvl:expr, $name:expr) => {
+        span!(target: module_path!(), level: $lvl, $name,)
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        span!(target: module_path!(), level: $crate::Level::TRACE, $name, $($k $( = $val)*),*)
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(target: module_path!(), level: $crate::Level::TRACE, $name, $($k $( = $val)*),*)
+    };
+    ($name:expr) => { span!(target: module_path!(), level: $crate::Level::TRACE, $name,) };
 }
 
 /// Constructs a new `Event`.
