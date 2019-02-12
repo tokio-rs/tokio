@@ -443,9 +443,7 @@ macro_rules! callsite {
 ///     "my span",
 ///     foo = 2,
 ///     bar = "a string",
-/// ).enter(|| {
-///     // do work inside the span...
-/// });
+/// );
 /// # }
 /// ```
 ///
@@ -460,9 +458,7 @@ macro_rules! callsite {
 ///     "my span",
 ///     foo = 3,
 ///     bar = "another string"
-/// ).enter(|| {
-///     // do work inside the span...
-/// });
+/// );
 /// # }
 /// ```
 ///
@@ -526,12 +522,12 @@ macro_rules! span {
         span!(target: module_path!(), level: $lvl, $name,)
     };
     ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
-        span!(target: module_path!(), level: $crate::Level::DEBUG, $name, $($k $( = $val)*),*)
+        span!(target: module_path!(), level: $crate::Level::TRACE, $name, $($k $( = $val)*),*)
     };
     ($name:expr, $($k:ident $( = $val:expr)*),*) => {
-        span!(target: module_path!(), level: $crate::Level::DEBUG, $name, $($k $( = $val)*),*)
+        span!(target: module_path!(), level: $crate::Level::TRACE, $name, $($k $( = $val)*),*)
     };
-    ($name:expr) => { span!(target: module_path!(), level: $crate::Level::DEBUG, $name,) };
+    ($name:expr) => { span!(target: module_path!(), level: $crate::Level::TRACE, $name,) };
 }
 
 /// Constructs a new `Event`.

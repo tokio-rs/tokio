@@ -7,6 +7,7 @@ use std::thread;
 use tokio_trace::{
     dispatcher,
     field::{debug, display},
+    subscriber::with_default,
     Dispatch, Level, Span,
 };
 
@@ -452,6 +453,25 @@ fn add_fields_only_after_new_span() {
         span.record("bar", &5);
         span.record("baz", &true);
         span.enter(|| {})
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn new_span_with_target_and_log_level() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock()
+                .named("foo")
+                .with_target("app_span")
+                .at_level(tokio_trace::Level::DEBUG),
+        )
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        span!(target: "app_span", level: tokio_trace::Level::DEBUG, "foo");
     });
 
     handle.assert_finished();
