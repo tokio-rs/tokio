@@ -7,6 +7,22 @@ extern crate tokio_trace;
 // failures, and producing them with a macro would muddy the waters a bit.
 
 #[test]
+fn span() {
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 3);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 4,);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "bar",);
+    span!(level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 3);
+    span!(level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 4,);
+    span!(level: tokio_trace::Level::DEBUG, "foo");
+    span!(level: tokio_trace::Level::DEBUG, "bar",);
+    span!("foo", bar = 2, baz = 3);
+    span!("foo", bar = 2, baz = 4,);
+    span!("foo");
+    span!("bar",);
+}
+
+#[test]
 fn event() {
     event!(tokio_trace::Level::DEBUG, foo = 3, bar = 2, baz = false);
     event!(tokio_trace::Level::DEBUG, foo = 3, bar = 3,);
