@@ -1,5 +1,4 @@
-use {Reactor, Handle};
-use atomic_task::AtomicTask;
+use {AtomicTask, Reactor, Handle};
 
 use futures::{Future, Async, Poll, task};
 
