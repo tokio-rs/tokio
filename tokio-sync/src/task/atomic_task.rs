@@ -242,6 +242,15 @@ impl AtomicTask {
     /// If `register` has not been called yet, then this does nothing.
     pub fn notify(&self) {
         debug!(" + notify");
+        if let Some(task) = self.take_task() {
+            task.notify();
+        }
+    }
+
+    /// Attempts to take the `Task` value out of the `AtomicTask` with the
+    /// intention that the caller will notify the task later.
+    pub fn take_task(&self) -> Option<Task> {
+        debug!(" + take_task");
         // AcqRel ordering is used in order to acquire the value of the `task`
         // cell as well as to establish a `release` ordering with whatever
         // memory the `AtomicTask` is associated with.
@@ -253,11 +262,9 @@ impl AtomicTask {
 
                 // Release the lock
                 self.state.fetch_and(!NOTIFYING, Release);
-                debug!(" + Done notifying");
+                debug!(" + Done taking");
 
-                if let Some(task) = task {
-                    task.notify();
-                }
+                task
             }
             state => {
                 debug!(" + state = {:?}", state);
@@ -272,6 +279,7 @@ impl AtomicTask {
                     state == REGISTERING ||
                     state == REGISTERING | NOTIFYING ||
                     state == NOTIFYING);
+                None
             }
         }
     }
