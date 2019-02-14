@@ -43,8 +43,8 @@ extern crate parking_lot;
 extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
+extern crate tokio_sync;
 
-mod atomic_task;
 pub(crate) mod background;
 mod poll_evented;
 mod registration;
@@ -58,12 +58,12 @@ pub use self::poll_evented::PollEvented;
 
 // ===== Private imports =====
 
-use atomic_task::AtomicTask;
 use sharded_rwlock::RwLock;
 
 use futures::task::Task;
 use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
+use tokio_sync::task::AtomicTask;
 
 use std::{fmt, usize};
 use std::error::Error;
@@ -409,11 +409,11 @@ impl Reactor {
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
             if ready.is_writable() || platform::is_hup(&ready) {
-                wr = io.writer.take_to_notify();
+                wr = io.writer.take_task();
             }
 
             if !(ready & (!mio::Ready::writable())).is_empty() {
-                rd = io.reader.take_to_notify();
+                rd = io.reader.take_task();
             }
         }
 
