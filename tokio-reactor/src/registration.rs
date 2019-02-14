@@ -504,6 +504,7 @@ impl Inner {
             sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
         if ready.is_empty() && notify {
+            debug!("scheduling {:?} for: {}", direction, self.token);
             let task = task();
             // Update the task info
             match direction {

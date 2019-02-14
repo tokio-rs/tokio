@@ -640,25 +640,30 @@ impl Inner {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
-        let mut io_dispatch = self.io_dispatch.write();
+        let key = {
+            // Block to contain the write lock
+            let mut io_dispatch = self.io_dispatch.write();
 
-        if io_dispatch.len() == MAX_SOURCES {
-            return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
-                                      registered I/O resources"));
-        }
+            if io_dispatch.len() == MAX_SOURCES {
+                return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
+                                          registered I/O resources"));
+            }
 
-        // Acquire a write lock
-        let key = io_dispatch.insert(ScheduledIo {
-            aba_guard,
-            readiness: AtomicUsize::new(0),
-            reader: AtomicTask::new(),
-            writer: AtomicTask::new(),
-        });
+            io_dispatch.insert(ScheduledIo {
+                aba_guard,
+                readiness: AtomicUsize::new(0),
+                reader: AtomicTask::new(),
+                writer: AtomicTask::new(),
+            })
+        };
 
-        try!(self.io.register(source,
-                              mio::Token(aba_guard | key),
-                              mio::Ready::all(),
-                              mio::PollOpt::edge()));
+        let token = aba_guard | key;
+        debug!("adding I/O source: {}", token);
+
+        self.io.register(source,
+                         mio::Token(token),
+                         mio::Ready::all(),
+                         mio::PollOpt::edge())?;
 
         Ok(key)
     }
@@ -675,7 +680,7 @@ impl Inner {
 
     /// Registers interest in the I/O resource associated with `token`.
     fn register(&self, token: usize, dir: Direction, t: Task) {
-        debug!("scheduling direction for: {}", token);
+        debug!("scheduling {:?} for: {}", dir, token);
         let io_dispatch = self.io_dispatch.read();
         let sched = io_dispatch.get(token).unwrap();
 
