@@ -7,6 +7,25 @@ use tokio_io;
 /// contents of `contents` to it.
 ///
 /// This is the async equivalent of `std::fs::write`.
+///
+/// # Examples
+///
+/// ```no_run
+/// # extern crate tokio;
+/// use tokio::prelude::Future;
+/// fn main() {
+///     let buffer = b"Hello world!";
+///     let task = tokio::fs::write("foo.txt", buffer).map(|data| {
+///         // `data` has now been written to foo.txt. The buffer is being
+///         // returned so it can be used for other things.
+///         println!("foo.txt now had {} bytes written to it", data.len());
+///     }).map_err(|e| {
+///         // handle errors
+///         eprintln!("IO error: {:?}", e);
+///     });
+///     tokio::run(task);
+/// }
+/// ```
 pub fn write<P, C: AsRef<[u8]>>(path: P, contents: C) -> WriteFile<P, C>
 where
     P: AsRef<Path> + Send + 'static,
