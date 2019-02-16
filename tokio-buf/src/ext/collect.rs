@@ -1,4 +1,5 @@
-use super::{BufStream, FromBufStream};
+use BufStream;
+use super::{BufStreamExt, FromBufStream};
 
 use futures::{Future, Poll};
 
@@ -29,7 +30,7 @@ enum Error<T, U> {
 
 impl<T, U> Collect<T, U>
 where
-    T: BufStream,
+    T: BufStreamExt,
     U: FromBufStream<T::Item>,
 {
     pub(crate) fn new(stream: T) -> Collect<T, U> {
@@ -44,7 +45,7 @@ where
 
 impl<T, U> Future for Collect<T, U>
 where
-    T: BufStream,
+    T: BufStreamExt,
     U: FromBufStream<T::Item>,
 {
     type Item = U;

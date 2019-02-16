@@ -1,4 +1,4 @@
-use super::{BufStream, SizeHint};
+use BufStream;
 
 use either::Either;
 use futures::Poll;
@@ -42,10 +42,5 @@ where
 
         let res = try_ready!(self.right.poll_buf());
         Ok(res.map(Either::Right).into())
-    }
-
-    fn size_hint(&self) -> SizeHint {
-        // TODO: Implement
-        SizeHint::default()
     }
 }
