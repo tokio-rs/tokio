@@ -14,12 +14,12 @@ extern crate either;
 #[macro_use]
 extern crate futures;
 
-#[cfg(not(feature = "core"))]
+#[cfg(feature = "ext")]
 pub mod ext;
 mod size_hint;
 
 #[doc(inline)]
-#[cfg(not(feature = "core"))]
+#[cfg(feature = "ext")]
 pub use ext::BufStreamExt;
 pub use self::size_hint::SizeHint;
 

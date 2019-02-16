@@ -22,4 +22,5 @@ either = "1.5"
 futures = "0.1.23"
 
 [features]
-core = []
+default = ["ext"]
+ext = []
