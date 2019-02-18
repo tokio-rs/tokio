@@ -11,12 +11,15 @@
 
 extern crate bytes;
 extern crate either;
+#[allow(unused)]
 #[macro_use]
 extern crate futures;
 
 #[cfg(feature = "ext")]
 pub mod ext;
+pub mod errors;
 mod size_hint;
+mod str;
 
 #[doc(inline)]
 #[cfg(feature = "ext")]

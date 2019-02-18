@@ -1,3 +1,5 @@
+#![cfg(feature = "ext")]
+
 extern crate tokio_buf;
 extern crate bytes;
 extern crate futures;

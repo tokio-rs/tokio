@@ -3,15 +3,17 @@
 mod bytes;
 mod chain;
 mod collect;
-pub mod errors;
 mod from;
 mod limit;
-mod str;
 
 pub use self::chain::Chain;
 pub use self::collect::Collect;
 pub use self::from::FromBufStream;
 pub use self::limit::Limit;
+
+pub use self::collect::CollectError;
+pub use self::from::CollectVecError;
+pub use self::limit::LimitError;
 
 use BufStream;
 

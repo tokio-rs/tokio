@@ -1,5 +1,5 @@
 use BufStream;
-use ext::errors::internal::Never;
+use errors::internal::Never;
 
 use bytes::{Bytes, BytesMut};
 use futures::Poll;
