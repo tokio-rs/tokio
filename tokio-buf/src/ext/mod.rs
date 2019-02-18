@@ -1,6 +1,5 @@
 //! Types and utilities for working with `BufStream`.
 
-mod bytes;
 mod chain;
 mod collect;
 mod from;
