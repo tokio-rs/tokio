@@ -1,5 +1,4 @@
 use BufStream;
-use super::BufStreamExt;
 
 use bytes::Buf;
 use futures::Poll;
@@ -29,7 +28,7 @@ impl<T> Limit<T> {
 
 impl<T> BufStream for Limit<T>
 where
-    T: BufStreamExt,
+    T: BufStream,
 {
     type Item = T::Item;
     type Error = LimitError<T::Error>;
