@@ -10,6 +10,7 @@
 //! `Buf` (i.e, byte collections).
 
 extern crate bytes;
+#[cfg(feature = "ext")]
 extern crate either;
 #[allow(unused)]
 #[macro_use]

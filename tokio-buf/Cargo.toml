@@ -18,9 +18,9 @@ categories = ["asynchronous"]
 
 [dependencies]
 bytes = { version = "0.4.10" }
-either = "1.5"
+either = { version =  "1.5", optional = true}
 futures = "0.1.23"
 
 [features]
 default = ["ext"]
-ext = ["bytes/either"]
+ext = ["bytes/either", "either"]
