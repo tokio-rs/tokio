@@ -1,0 +1,18 @@
+[package]
+name = "tokio-trace-core"
+version = "0.1.0"
+authors = ["Eliza Weisman <eliza@buoyant.io>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+description = """
+Core primitives for tokio-trace.
+"""
+categories = ["development-tools::debugging"]
+keywords = ["logging", "tracing"]
+
+# Not yet ready for production.
+publish = false
+
+[dependencies]
+lazy_static = "1.0.0"
