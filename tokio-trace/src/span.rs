@@ -225,7 +225,7 @@ impl<'a> Span<'a> {
     pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
         let inner = dispatcher::with(move |dispatch| {
             let id = dispatch.new_span(meta, values);
-            Some(Enter::new(id, dispatch, meta))
+            Some(Inner::new(id, dispatch, meta))
         });
         Self {
             inner,
@@ -356,12 +356,12 @@ impl<'a> Span<'a> {
 
     /// Returns this span's `Id`, if it is enabled.
     pub fn id(&self) -> Option<Id> {
-        self.inner.as_ref().map(Enter::id)
+        self.inner.as_ref().map(Inner::id)
     }
 
     /// Returns this span's `Metadata`, if it is enabled.
     pub fn metadata(&self) -> Option<&'a Metadata<'a>> {
-        self.inner.as_ref().map(|inner| inner.metadata())
+        self.inner.as_ref().map(Inner::metadata)
     }
 }
 
@@ -476,7 +476,7 @@ impl<'a> Clone for Inner<'a> {
 // ===== impl Entered =====
 
 impl<'a> Entered<'a> {
-    /// Exit the `Entered` guard, returning an `Enter` handle that may be used
+    /// Exit the `Entered` guard, returning an `Inner` handle that may be used
     /// to re-enter the span, or `None` if the span closed while performing the
     /// exit.
     fn exit(self) -> Option<Inner<'a>> {
