@@ -159,7 +159,7 @@ pub struct Span<'a> {
     /// A handle used to enter the span when it is not executing.
     ///
     /// If this is `None`, then the span has either closed or was never enabled.
-    inner: Option<Enter<'a>>,
+    inner: Option<Inner<'a>>,
 
     /// Set to `true` when the span closes.
     ///
@@ -175,7 +175,7 @@ pub struct Span<'a> {
 /// enabled by the current filter. This type is primarily used for implementing
 /// span handles; users should typically not need to interact with it directly.
 #[derive(Debug)]
-pub(crate) struct Enter<'a> {
+pub(crate) struct Inner<'a> {
     /// The span's ID, as provided by `subscriber`.
     id: Id,
 
@@ -203,7 +203,7 @@ pub(crate) struct Enter<'a> {
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
 struct Entered<'a> {
-    inner: Enter<'a>,
+    inner: Inner<'a>,
 }
 
 // ===== impl Span =====
@@ -377,9 +377,9 @@ impl<'a> fmt::Debug for Span<'a> {
     }
 }
 
-// ===== impl Enter =====
+// ===== impl Inner =====
 
-impl<'a> Enter<'a> {
+impl<'a> Inner<'a> {
     /// Indicates that this handle will not be reused to enter the span again.
     ///
     /// After calling `close`, the `Entered` guard returned by `self.enter()`
@@ -435,7 +435,7 @@ impl<'a> Enter<'a> {
     }
 
     fn new(id: Id, subscriber: &Dispatch, meta: &'a Metadata<'a>) -> Self {
-        Self {
+        Inner {
             id,
             subscriber: subscriber.clone(),
             closed: false,
@@ -444,27 +444,27 @@ impl<'a> Enter<'a> {
     }
 }
 
-impl<'a> cmp::PartialEq for Enter<'a> {
+impl<'a> cmp::PartialEq for Inner<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<'a> Hash for Enter<'a> {
+impl<'a> Hash for Inner<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
-impl<'a> Drop for Enter<'a> {
+impl<'a> Drop for Inner<'a> {
     fn drop(&mut self) {
         self.subscriber.drop_span(self.id.clone());
     }
 }
 
-impl<'a> Clone for Enter<'a> {
+impl<'a> Clone for Inner<'a> {
     fn clone(&self) -> Self {
-        Self {
+        Inner {
             id: self.subscriber.clone_span(&self.id),
             subscriber: self.subscriber.clone(),
             closed: self.closed,
@@ -479,7 +479,7 @@ impl<'a> Entered<'a> {
     /// Exit the `Entered` guard, returning an `Enter` handle that may be used
     /// to re-enter the span, or `None` if the span closed while performing the
     /// exit.
-    fn exit(self) -> Option<Enter<'a>> {
+    fn exit(self) -> Option<Inner<'a>> {
         self.inner.subscriber.exit(&self.inner.id);
         if self.inner.closed {
             // Dropping `inner` will allow it to perform the closure if
