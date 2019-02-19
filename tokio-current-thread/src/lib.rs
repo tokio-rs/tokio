@@ -194,17 +194,21 @@ struct CurrentRunner {
     id: Cell<Option<u64>>,
 }
 
-/// Current thread's task runner. This is set in `TaskRunner::with`
-thread_local!(static CURRENT: CurrentRunner = CurrentRunner {
-    spawn: Cell::new(None),
-    id: Cell::new(None),
-});
+thread_local!{
+    /// Current thread's task runner. This is set in `TaskRunner::with`
+    static CURRENT: CurrentRunner = CurrentRunner {
+        spawn: Cell::new(None),
+        id: Cell::new(None),
+    }
+}
 
-/// Unique ID to assign to each new executor launched on this thread.
-///
-/// The unique ID is used to determine if the currently running executor matches the one referred
-/// to by a `Handle` so that direct task dispatch can be used.
-thread_local!(static EXECUTOR_ID: Cell<u64> = Cell::new(0));
+thread_local!{
+    /// Unique ID to assign to each new executor launched on this thread.
+    ///
+    /// The unique ID is used to determine if the currently running executor matches the one
+    /// referred to by a `Handle` so that direct task dispatch can be used.
+    static EXECUTOR_ID: Cell<u64> = Cell::new(0)
+}
 
 /// Run the executor bootstrapping the execution with the provided future.
 ///

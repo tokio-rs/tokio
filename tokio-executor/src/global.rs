@@ -64,8 +64,10 @@ enum State {
     Active
 }
 
-/// Thread-local tracking the current executor
-thread_local!(static EXECUTOR: Cell<State> = Cell::new(State::Empty));
+thread_local!{
+    /// Thread-local tracking the current executor
+    static EXECUTOR: Cell<State> = Cell::new(State::Empty)
+}
 
 // ===== impl DefaultExecutor =====
 
