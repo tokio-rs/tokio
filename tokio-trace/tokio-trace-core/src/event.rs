@@ -27,10 +27,7 @@ impl<'a> Event<'a> {
     /// and observes it with the current subscriber.
     #[inline]
     pub fn observe(metadata: &'a Metadata<'a>, fields: &'a field::ValueSet) {
-        let event = Event {
-            metadata,
-            fields,
-        };
+        let event = Event { metadata, fields };
         ::dispatcher::with(|current| {
             current.event(&event);
         });

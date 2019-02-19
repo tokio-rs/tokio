@@ -228,9 +228,7 @@ pub struct DebugValue<T: fmt::Debug>(T);
 /// elements, to ensure the array is small enough to always be allocated on the
 /// stack. This trait is only implemented by arrays of an appropriate length,
 /// ensuring that the correct size arrays are used at compile-time.
-pub trait ValidLen<'a>: ::sealed::Sealed +
-    Borrow<[(&'a Field, Option<&'a (Value + 'a)>)]>
-{}
+pub trait ValidLen<'a>: ::sealed::Sealed + Borrow<[(&'a Field, Option<&'a (Value + 'a)>)]> {}
 
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
 /// recorded using its `Display` implementation.
@@ -485,16 +483,13 @@ impl FieldSet {
     /// Note that a `ValueSet` may not be constructed with arrays of over 32
     /// elements.
     #[doc(hidden)]
-    pub fn value_set<'v, V>(
-        &'v self,
-        values: &'v V,
-    ) -> ValueSet<'v>
+    pub fn value_set<'v, V>(&'v self, values: &'v V) -> ValueSet<'v>
     where
         V: ValidLen<'v>,
     {
         ValueSet {
             fields: self,
-            values: &values.borrow()[..]
+            values: &values.borrow()[..],
         }
     }
 
@@ -566,16 +561,17 @@ impl<'a> ValueSet<'a> {
 
     /// Returns `true` if this `ValueSet` contains a value for the given `Field`.
     pub fn contains(&self, field: &Field) -> bool {
-        field.callsite() == self.callsite() && self.values
-            .iter()
-            .any(|(key, val)| *key == field && val.is_some())
+        field.callsite() == self.callsite()
+            && self
+                .values
+                .iter()
+                .any(|(key, val)| *key == field && val.is_some())
     }
 
     /// Returns true if this `ValueSet` contains _no_ values.
     pub fn is_empty(&self) -> bool {
         let my_callsite = self.callsite();
-        self
-            .values
+        self.values
             .iter()
             .all(|(key, val)| val.is_none() || key.callsite() != my_callsite)
     }
@@ -617,11 +613,10 @@ impl_valid_len! {
     21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use ::{Metadata, Level};
+    use {Level, Metadata};
 
     struct TestCallsite1;
     static TEST_CALLSITE_1: TestCallsite1 = TestCallsite1;
@@ -709,7 +704,10 @@ mod test {
         let fields = TEST_META_1.fields();
         let values = &[
             (&fields.field("foo").unwrap(), None),
-            (&TEST_META_2.fields().field("bar").unwrap(), Some(&57 as &Value)),
+            (
+                &TEST_META_2.fields().field("bar").unwrap(),
+                Some(&57 as &Value),
+            ),
             (&fields.field("baz").unwrap(), None),
         ];
 
