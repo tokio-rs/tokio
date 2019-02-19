@@ -44,8 +44,10 @@ pub(crate) struct HandlePriv {
     inner: Weak<Inner>,
 }
 
-/// Tracks the timer for the current execution context.
-thread_local!(static CURRENT_TIMER: RefCell<Option<HandlePriv>> = RefCell::new(None));
+thread_local!{
+    /// Tracks the timer for the current execution context.
+    static CURRENT_TIMER: RefCell<Option<HandlePriv>> = RefCell::new(None)
+}
 
 /// Set the default timer for the duration of the closure.
 ///
