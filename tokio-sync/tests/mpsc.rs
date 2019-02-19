@@ -66,6 +66,40 @@ fn send_recv_with_buffer() {
 }
 
 #[test]
+fn start_send_past_cap() {
+    let (mut tx1, mut rx) = mpsc::channel(1);
+    let mut tx2 = tx1.clone();
+
+    let mut task1 = MockTask::new();
+    let mut task2 = MockTask::new();
+
+    let res = tx1.start_send(()).unwrap();
+    assert!(res.is_ready());
+
+    task1.enter(|| {
+        let res = tx1.start_send(()).unwrap();
+        assert!(!res.is_ready());
+    });
+
+    task2.enter(|| {
+        assert_not_ready!(tx2.poll_ready());
+    });
+
+    drop(tx1);
+
+    let val = assert_ready!(rx.poll());
+    assert!(val.is_some());
+
+    assert!(task2.is_notified());
+    assert!(!task1.is_notified());
+
+    drop(tx2);
+
+    let val = assert_ready!(rx.poll());
+    assert!(val.is_none());
+}
+
+#[test]
 #[should_panic]
 fn buffer_gteq_one() {
     mpsc::channel::<i32>(0);
