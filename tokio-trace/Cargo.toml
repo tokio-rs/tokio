@@ -11,6 +11,9 @@ A scoped, structured logging and diagnostics system.
 categories = ["development-tools::debugging", "asynchronous"]
 keywords = ["logging", "tracing"]
 
+# Not yet ready for production.
+publish = false
+
 [dependencies]
 tokio-trace-core = { path = "tokio-trace-core" }
 

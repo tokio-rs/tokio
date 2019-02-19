@@ -11,5 +11,8 @@ Core primitives for tokio-trace.
 categories = ["development-tools::debugging"]
 keywords = ["logging", "tracing"]
 
+# Not yet ready for production.
+publish = false
+
 [dependencies]
 lazy_static = "1.0.0"
