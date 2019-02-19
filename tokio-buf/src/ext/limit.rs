@@ -1,4 +1,4 @@
-use super::{BufStream, SizeHint};
+use BufStream;
 
 use bytes::Buf;
 use futures::Poll;
@@ -58,22 +58,6 @@ where
         }
 
         res
-    }
-
-    fn size_hint(&self) -> SizeHint {
-        let mut hint = self.stream.size_hint();
-
-        let upper = hint.upper()
-            .map(|upper| upper.min(self.remaining))
-            .unwrap_or(self.remaining);
-
-        hint.set_upper(upper);
-        hint
-    }
-
-    fn consume_hint(&mut self, amount: usize) {
-        // TODO: Should this be capped by `self.remaining`?
-        self.stream.consume_hint(amount)
     }
 }
 

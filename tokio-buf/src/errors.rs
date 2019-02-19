@@ -1,8 +1,11 @@
 //! Error types
 
-pub use super::collect::CollectError;
-pub use super::from::CollectVecError;
-pub use super::limit::LimitError;
+#[cfg(feature = "ext")]
+pub use ext::CollectError;
+#[cfg(feature = "ext")]
+pub use ext::CollectVecError;
+#[cfg(feature = "ext")]
+pub use ext::LimitError;
 
 // Being crate-private, we should be able to swap the type out in a
 // backwards compatible way.

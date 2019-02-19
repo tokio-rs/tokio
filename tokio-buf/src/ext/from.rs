@@ -1,4 +1,4 @@
-use super::SizeHint;
+use SizeHint;
 
 use bytes::{Buf, BufMut};
 

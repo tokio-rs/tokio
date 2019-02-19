@@ -1,4 +1,5 @@
-use super::{BufStream, FromBufStream};
+use BufStream;
+use super::FromBufStream;
 
 use futures::{Future, Poll};
 
