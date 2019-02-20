@@ -20,7 +20,7 @@ impl Span {
         Span(u)
     }
 
-    /// Return the inner `u64` from a span ID.
+    /// Returns the span's ID as a  `u64`.
     pub fn into_u64(&self) -> u64 {
         self.0
     }
