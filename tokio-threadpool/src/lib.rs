@@ -9,7 +9,7 @@
 //! I/O. Usually, users will not create a `ThreadPool` instance directly, but
 //! will use one via a [`runtime`].
 //!
-//! The `TheadPool` structure manages two sets of threads:
+//! The `ThreadPool` structure manages two sets of threads:
 //!
 //! * Worker threads.
 //! * Backup threads.
