@@ -292,7 +292,7 @@
 //! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
 //! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
 //! [metadata]: struct.Metadata.html
-//! [`tokio-trace-nursury`]: https://github.com/tokio-rs/tokio-trace-nursery
+//! [`tokio-trace-nursery`]: https://github.com/tokio-rs/tokio-trace-nursery
 extern crate tokio_trace_core;
 
 // Somehow this `use` statement is necessary for us to re-export the `core`
