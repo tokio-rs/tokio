@@ -111,7 +111,7 @@ pub struct RecvError(());
 /// }));
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
-    assert_eq!(buffer >= 1, true);
+    assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
     let semaphore = (::semaphore::Semaphore::new(buffer), buffer);
     let (tx, rx) = chan::channel(semaphore);
 
