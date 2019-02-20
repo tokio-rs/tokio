@@ -2,6 +2,8 @@
 
 A scoped, structured logging and diagnostics system.
 
+[Documentation](https://tokio-rs.github.io/tokio/tokio_trace/index.html)
+
 ## Overview
 
 `tokio-trace` is a framework for instrumenting Rust programs to collect
@@ -156,6 +158,7 @@ be used with the `tokio-trace` ecosystem. It includes a collection of
 `Subscriber` implementations, as well as utility and adapter crates.
 
 [`log`]: https://docs.rs/log/0.4.6/log/
+[`tokio-trace-nursery`]: https://github.com/tokio-rs/tokio-trace-nursery
 
 ## License
 
