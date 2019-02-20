@@ -20,8 +20,10 @@ pub struct Clock {
     now: Option<Arc<Now>>,
 }
 
-/// Thread-local tracking the current clock
-thread_local!(static CLOCK: Cell<Option<*const Clock>> = Cell::new(None));
+thread_local!{
+    /// Thread-local tracking the current clock
+    static CLOCK: Cell<Option<*const Clock>> = Cell::new(None)
+}
 
 /// Returns an `Instant` corresponding to "now".
 ///

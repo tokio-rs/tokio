@@ -149,7 +149,7 @@ impl AtomicTask {
     ///
     /// This is the same as calling `register_task` with `task::current()`.
     pub fn register(&self) {
-        self.register_task(task::current());
+        self.do_register(CurrentTask);
     }
 
     /// Registers the provided task to be notified on calls to `notify`.
@@ -168,12 +168,19 @@ impl AtomicTask {
     /// tasks to be notified. One of the callers will win and have its task set,
     /// but there is no guarantee as to which caller will succeed.
     pub fn register_task(&self, task: Task) {
+        self.do_register(ExactTask(task));
+    }
+
+    fn do_register<R>(&self, reg: R)
+    where
+        R: Register,
+    {
         debug!(" + register_task");
         match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
             WAITING => {
                 unsafe {
                     // Locked acquired, update the waker cell
-                    self.task.with_mut(|t| *t = Some(task));
+                    self.task.with_mut(|t| reg.register(&mut *t));
 
                     // Release the lock. If the state transitioned to include
                     // the `NOTIFYING` bit, this means that a notify has been
@@ -213,7 +220,7 @@ impl AtomicTask {
                 // Currently in the process of notifying the task, i.e.,
                 // `notify` is currently being called on the old task handle.
                 // So, we call notify on the new task handle
-                task.notify();
+                reg.notify();
             }
             state => {
                 // In this case, a concurrent thread is holding the
@@ -235,6 +242,15 @@ impl AtomicTask {
     /// If `register` has not been called yet, then this does nothing.
     pub fn notify(&self) {
         debug!(" + notify");
+        if let Some(task) = self.take_task() {
+            task.notify();
+        }
+    }
+
+    /// Attempts to take the `Task` value out of the `AtomicTask` with the
+    /// intention that the caller will notify the task later.
+    pub fn take_task(&self) -> Option<Task> {
+        debug!(" + take_task");
         // AcqRel ordering is used in order to acquire the value of the `task`
         // cell as well as to establish a `release` ordering with whatever
         // memory the `AtomicTask` is associated with.
@@ -246,11 +262,9 @@ impl AtomicTask {
 
                 // Release the lock
                 self.state.fetch_and(!NOTIFYING, Release);
-                debug!(" + Done notifying");
+                debug!(" + Done taking");
 
-                if let Some(task) = task {
-                    task.notify();
-                }
+                task
             }
             state => {
                 debug!(" + state = {:?}", state);
@@ -265,6 +279,7 @@ impl AtomicTask {
                     state == REGISTERING ||
                     state == REGISTERING | NOTIFYING ||
                     state == NOTIFYING);
+                None
             }
         }
     }
@@ -284,3 +299,40 @@ impl fmt::Debug for AtomicTask {
 
 unsafe impl Send for AtomicTask {}
 unsafe impl Sync for AtomicTask {}
+
+trait Register {
+    fn register(self, slot: &mut Option<Task>);
+    fn notify(self);
+}
+
+struct CurrentTask;
+
+impl Register for CurrentTask {
+    fn register(self, slot: &mut Option<Task>) {
+        let should_update = (&*slot).as_ref()
+            .map(|prev| !prev.will_notify_current())
+            .unwrap_or(true);
+        if should_update {
+            *slot = Some(task::current());
+        }
+    }
+
+    fn notify(self) {
+        task::current().notify();
+    }
+}
+
+struct ExactTask(Task);
+
+impl Register for ExactTask {
+    fn register(self, slot: &mut Option<Task>) {
+        // When calling register_task with an exact task, it doesn't matter
+        // if the previous task would have notified current. We *always* want
+        // to save that exact task.
+        *slot = Some(self.0);
+    }
+
+    fn notify(self) {
+        self.0.notify();
+    }
+}

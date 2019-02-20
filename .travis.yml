@@ -102,6 +102,7 @@ script: |
       # Limit the execution time of loom tests.
       export LOOM_MAX_DURATION=10
       cargo test --all --no-fail-fast
+      cargo test -p tokio-buf --no-default-features
       cargo doc --all
   fi
 

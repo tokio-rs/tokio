@@ -1,3 +1,4 @@
+use loom::futures::AtomicTask;
 use super::list;
 use futures::Poll;
 
@@ -357,9 +358,7 @@ impl Semaphore for (::semaphore::Semaphore, usize) {
     }
 
     fn drop_permit(&self, permit: &mut Permit) {
-        if permit.is_acquired() {
-            permit.release(&self.0);
-        }
+        permit.release(&self.0);
     }
 
     fn add_permit(&self) {

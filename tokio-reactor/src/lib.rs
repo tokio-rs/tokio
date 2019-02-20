@@ -43,8 +43,8 @@ extern crate parking_lot;
 extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
+extern crate tokio_sync;
 
-mod atomic_task;
 pub(crate) mod background;
 mod poll_evented;
 mod registration;
@@ -58,12 +58,12 @@ pub use self::poll_evented::PollEvented;
 
 // ===== Private imports =====
 
-use atomic_task::AtomicTask;
 use sharded_rwlock::RwLock;
 
 use futures::task::Task;
 use tokio_executor::Enter;
 use tokio_executor::park::{Park, Unpark};
+use tokio_sync::task::AtomicTask;
 
 use std::{fmt, usize};
 use std::error::Error;
@@ -167,8 +167,10 @@ pub(crate) enum Direction {
 /// The global fallback reactor.
 static HANDLE_FALLBACK: AtomicUsize = AtomicUsize::new(0);
 
-/// Tracks the reactor for the current execution context.
-thread_local!(static CURRENT_REACTOR: RefCell<Option<HandlePriv>> = RefCell::new(None));
+thread_local!{
+    /// Tracks the reactor for the current execution context.
+    static CURRENT_REACTOR: RefCell<Option<HandlePriv>> = RefCell::new(None)
+}
 
 const TOKEN_SHIFT: usize = 22;
 
@@ -409,11 +411,11 @@ impl Reactor {
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
             if ready.is_writable() || platform::is_hup(&ready) {
-                wr = io.writer.take_to_notify();
+                wr = io.writer.take_task();
             }
 
             if !(ready & (!mio::Ready::writable())).is_empty() {
-                rd = io.reader.take_to_notify();
+                rd = io.reader.take_task();
             }
         }
 
@@ -640,25 +642,30 @@ impl Inner {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
-        let mut io_dispatch = self.io_dispatch.write();
+        let key = {
+            // Block to contain the write lock
+            let mut io_dispatch = self.io_dispatch.write();
 
-        if io_dispatch.len() == MAX_SOURCES {
-            return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
-                                      registered I/O resources"));
-        }
+            if io_dispatch.len() == MAX_SOURCES {
+                return Err(io::Error::new(io::ErrorKind::Other, "reactor at max \
+                                          registered I/O resources"));
+            }
 
-        // Acquire a write lock
-        let key = io_dispatch.insert(ScheduledIo {
-            aba_guard,
-            readiness: AtomicUsize::new(0),
-            reader: AtomicTask::new(),
-            writer: AtomicTask::new(),
-        });
+            io_dispatch.insert(ScheduledIo {
+                aba_guard,
+                readiness: AtomicUsize::new(0),
+                reader: AtomicTask::new(),
+                writer: AtomicTask::new(),
+            })
+        };
 
-        try!(self.io.register(source,
-                              mio::Token(aba_guard | key),
-                              mio::Ready::all(),
-                              mio::PollOpt::edge()));
+        let token = aba_guard | key;
+        debug!("adding I/O source: {}", token);
+
+        self.io.register(source,
+                         mio::Token(token),
+                         mio::Ready::all(),
+                         mio::PollOpt::edge())?;
 
         Ok(key)
     }
@@ -675,7 +682,7 @@ impl Inner {
 
     /// Registers interest in the I/O resource associated with `token`.
     fn register(&self, token: usize, dir: Direction, t: Task) {
-        debug!("scheduling direction for: {}", token);
+        debug!("scheduling {:?} for: {}", dir, token);
         let io_dispatch = self.io_dispatch.read();
         let sched = io_dispatch.get(token).unwrap();
 
