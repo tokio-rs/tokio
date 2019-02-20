@@ -1,7 +1,10 @@
+#![deny(warnings)]
+
 extern crate futures;
 #[macro_use]
 extern crate loom;
 
+#[allow(dead_code)]
 #[path = "../src/task/atomic_task.rs"]
 mod atomic_task;
 
