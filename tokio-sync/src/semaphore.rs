@@ -643,14 +643,10 @@ impl Permit {
     }
 
     /// Release a permit back to the semaphore
-    ///
-    /// # Panics
-    ///
-    /// This function panics if called when the permit has not yet been
-    /// acquired.
     pub fn release(&mut self, semaphore: &Semaphore) {
-        self.forget();
-        semaphore.add_permits(1);
+        if self.forget2() {
+            semaphore.add_permits(1);
+        }
     }
 
     /// Forget the permit **without** releasing it back to the semaphore.
@@ -660,14 +656,27 @@ impl Permit {
     ///
     /// Repeatedly calling `forget` without associated calls to `add_permit`
     /// will result in the semaphore losing all permits.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if called when the permit has not yet been
-    /// acquired.
     pub fn forget(&mut self) {
-        assert!(self.is_acquired(), "permit not acquired; state = {:?}", self.state);
-        self.state = PermitState::Idle;
+        self.forget2();
+    }
+
+    /// Returns `true` if the permit was acquired
+    fn forget2(&mut self) -> bool {
+        match self.state {
+            PermitState::Idle => false,
+            PermitState::Waiting => {
+                let ret = self.waiter
+                    .as_ref()
+                    .unwrap()
+                    .cancel_interest();
+                self.state = PermitState::Idle;
+                ret
+            }
+            PermitState::Acquired => {
+                self.state = PermitState::Idle;
+                true
+            }
+        }
     }
 }
 
@@ -774,6 +783,32 @@ impl WaiterNode {
 
     fn register(&self) {
         self.task.register()
+    }
+
+    /// Returns `true` if the permit has been acquired
+    fn cancel_interest(&self) -> bool {
+        use self::NodeState::*;
+
+        match Queued.compare_exchange(&self.state, QueuedWaiting, AcqRel, Acquire) {
+            // Successfully removed interest from the queued node. The permit
+            // has not been assigned to the node.
+            Ok(_) => false,
+            // The semaphore has been closed, there is no further action to
+            // take.
+            Err(Closed) => false,
+            // The permit has been assigned. It must be acquired in order to
+            // be released back to the semaphore.
+            Err(Assigned) => {
+                match self.acquire2() {
+                    Ok(true) => true,
+                    // Not a reachable state
+                    Ok(false) => panic!(),
+                    // The semaphore has been closed, no further action to take.
+                    Err(_) => false,
+                }
+            }
+            Err(state) => panic!("unexpected state = {:?}", state),
+        }
     }
 
     /// Transition the state to `QueuedWaiting`.

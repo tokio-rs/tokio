@@ -77,6 +77,36 @@ fn basic_usage() {
 }
 
 #[test]
+fn release() {
+    loom::fuzz(|| {
+        let semaphore = Arc::new(Semaphore::new(1));
+
+        {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || {
+                let mut permit = Permit::new();
+
+                block_on(future::lazy(|| {
+                    permit.poll_acquire(&semaphore).unwrap();
+                    Ok::<_, ()>(())
+
+                })).unwrap();
+
+                permit.release(&semaphore);
+            });
+        }
+
+        let mut permit = Permit::new();
+
+        block_on(future::poll_fn(|| {
+            permit.poll_acquire(&semaphore)
+        })).unwrap();
+
+        permit.release(&semaphore);
+    });
+}
+
+#[test]
 fn basic_closing() {
     const NUM: usize = 2;
 
