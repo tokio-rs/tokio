@@ -12,8 +12,8 @@ use futures::Future;
 use rand::{distributions, thread_rng, Rng};
 use tempfile::Builder as TmpBuilder;
 
-use std::fs::File as StdFile;
-use std::io::{Read, SeekFrom};
+use std::fs;
+use std::io::SeekFrom;
 
 mod pool;
 
@@ -48,11 +48,7 @@ fn read_write() {
             })
     });
 
-    let mut file = StdFile::open(&file_path).unwrap();
-
-    let mut dst = vec![];
-    file.read_to_end(&mut dst).unwrap();
-
+    let dst = fs::read(&file_path).unwrap();
     assert_eq!(dst, contents);
 
     pool::run({
@@ -63,6 +59,39 @@ fn read_write() {
                 assert_eq!(buf, contents);
                 Ok(())
             })
+    });
+}
+
+#[test]
+fn read_write_helpers() {
+    const NUM_CHARS: usize = 16 * 1_024;
+
+    let dir = TmpBuilder::new()
+        .prefix("tokio-fs-tests")
+        .tempdir()
+        .unwrap();
+    let file_path = dir.path().join("read_write_all.txt");
+
+    let contents: Vec<u8> = thread_rng()
+        .sample_iter(&distributions::Alphanumeric)
+        .take(NUM_CHARS)
+        .collect::<String>()
+        .into();
+
+    pool::run(write(file_path.clone(), contents.clone()).then(|res| {
+        let _ = res.unwrap();
+        Ok(())
+    }));
+
+    let dst = fs::read(&file_path).unwrap();
+    assert_eq!(dst, contents);
+
+    pool::run({
+        read(file_path).then(move |res| {
+            let buf = res.unwrap();
+            assert_eq!(buf, contents);
+            Ok(())
+        })
     });
 }
 
