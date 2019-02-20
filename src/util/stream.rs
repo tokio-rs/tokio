@@ -13,8 +13,8 @@ pub use util::enumerate::Enumerate;
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
 ///
-/// Currently, there only is a [`timeout`] function, but this will increase
-/// over time.
+/// Currently, there are only [`timeout`] and [`throttle`] functions, but
+/// this will increase over time.
 ///
 /// Users are not expected to implement this trait. All types that implement
 /// `Stream` already implement `StreamExt`.
