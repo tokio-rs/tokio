@@ -5,7 +5,11 @@ use futures::{Future, Poll};
 use std::io;
 
 /// Future returned by `File::try_clone`.
+///
 /// Clones a file handle into two file handles.
+///
+/// # Panics
+///
 /// Will panic if polled after returning an item or error.
 #[derive(Debug)]
 pub struct CloneFuture {
