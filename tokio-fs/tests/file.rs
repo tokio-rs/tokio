@@ -125,3 +125,35 @@ fn seek() {
             })
     });
 }
+
+#[test]
+fn clone() {
+    let dir = TmpBuilder::new()
+        .prefix("tokio-fs-tests")
+        .tempdir()
+        .unwrap();
+    let file_path = dir.path().join("clone.txt");
+
+    pool::run(
+        File::create(file_path.clone())
+            .and_then(|file| {
+                file.try_clone()
+                    .map_err(|(_file, err)| err)
+                    .and_then(|(file, clone)| {
+                        io::write_all(file, "clone ")
+                            .and_then(|_| io::write_all(clone, "successful"))
+                    })
+            })
+            .then(|res| {
+                let _ = res.unwrap();
+                Ok(())
+            }),
+    );
+
+    let mut file = StdFile::open(&file_path).unwrap();
+
+    let mut dst = vec![];
+    file.read_to_end(&mut dst).unwrap();
+
+    assert_eq!(dst, b"clone successful")
+}

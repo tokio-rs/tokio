@@ -2,12 +2,14 @@
 //!
 //! [`File`]: file/struct.File.html
 
+mod clone;
 mod create;
 mod metadata;
 mod open;
 mod open_options;
 mod seek;
 
+pub use self::clone::CloneFuture;
 pub use self::create::CreateFuture;
 pub use self::metadata::MetadataFuture;
 pub use self::open::OpenFuture;
@@ -405,6 +407,38 @@ impl File {
             let std = self.std().try_clone()?;
             Ok(File::from_std(std))
         })
+    }
+
+    /// Create a new `File` instance that shares the same underlying file handle
+    /// as the existing `File` instance. Reads, writes, and seeks will affect both
+    /// File instances simultaneously.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # extern crate tokio;
+    /// use tokio::prelude::Future;
+    ///
+    /// fn main() {
+    ///     let task = tokio::fs::File::create("foo.txt")
+    ///         .and_then(|file| {
+    ///             file.try_clone()
+    ///                 .map(|(file, clone)| {
+    ///                     // do something with the file and the clone
+    ///                     # println!("{:?} {:?}", file, clone);
+    ///                 })
+    ///                 .map_err(|(file, err)| {
+    ///                     // you get the original file back if there's an error
+    ///                     # println!("{:?}", file);
+    ///                     err
+    ///                 })
+    ///         })
+    ///         .map_err(|err| eprintln!("IO error: {:?}", err));
+    ///
+    ///     tokio::run(task);
+    /// }
+    /// ```
+    pub fn try_clone(self) -> CloneFuture {
+        CloneFuture::new(self)
     }
 
     /// Changes the permissions on the underlying file.

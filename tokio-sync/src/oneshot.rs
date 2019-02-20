@@ -156,13 +156,17 @@ impl<T> Sender<T> {
         }
 
         if state.is_tx_task_set() {
-            let tx_task = unsafe { inner.tx_task() };
+            let will_notify = inner.tx_task.with(|ptr| unsafe {
+                (&*ptr).will_notify_current()
+            });
 
-            if !tx_task.will_notify_current() {
+            if !will_notify {
                 state = State::unset_tx_task(&inner.state);
 
                 if state.is_closed() {
                     return Ok(Async::Ready(()));
+                } else {
+                    unsafe { inner.drop_tx_task() };
                 }
             }
         }
@@ -294,8 +298,9 @@ impl<T> Inner<T> {
         }
 
         if prev.is_rx_task_set() {
-            let rx_task = unsafe { self.rx_task() };
-            rx_task.notify();
+            self.rx_task.with(|ptr| unsafe {
+                (&*ptr).notify()
+            });
         }
 
         true
@@ -316,18 +321,21 @@ impl<T> Inner<T> {
             Err(RecvError(()))
         } else {
             if state.is_rx_task_set() {
-                let rx_task = unsafe { self.rx_task() };
+                let will_notify = self.rx_task.with(|ptr| unsafe {
+                    (&*ptr).will_notify_current()
+                });
 
                 // Check if the task is still the same
-                if !rx_task.will_notify_current() {
+                if !will_notify {
                     // Unset the task
                     state = State::unset_rx_task(&self.state);
-
                     if state.is_complete() {
                         return match unsafe { self.consume_value() } {
                             Some(value) => Ok(Ready(value)),
                             None => Err(RecvError(())),
                         };
+                    } else {
+                        unsafe { self.drop_rx_task() };
                     }
                 }
             }
@@ -358,8 +366,9 @@ impl<T> Inner<T> {
         let prev = State::set_closed(&self.state);
 
         if prev.is_tx_task_set() && !prev.is_complete() {
-            let tx_task = unsafe { self.tx_task() };
-            tx_task.notify();
+            self.tx_task.with(|ptr| unsafe {
+                (&*ptr).notify()
+            });
         }
     }
 
@@ -370,18 +379,22 @@ impl<T> Inner<T> {
         })
     }
 
-    unsafe fn rx_task(&self) -> &Task {
-        &*self.rx_task.with(|ptr| ptr)
+    unsafe fn drop_rx_task(&self) {
+        self.rx_task.with_mut(|ptr| {
+            ManuallyDrop::drop(&mut *ptr)
+        })
+    }
+
+    unsafe fn drop_tx_task(&self) {
+        self.tx_task.with_mut(|ptr| {
+            ManuallyDrop::drop(&mut *ptr)
+        })
     }
 
     unsafe fn set_rx_task(&self) {
         self.rx_task.with_mut(|ptr| {
             *ptr = ManuallyDrop::new(task::current())
         });
-    }
-
-    unsafe fn tx_task(&self) -> &Task {
-        &*self.tx_task.with(|ptr| ptr)
     }
 
     unsafe fn set_tx_task(&self) {

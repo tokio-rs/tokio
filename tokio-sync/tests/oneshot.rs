@@ -208,9 +208,15 @@ fn receiver_changes_task() {
         assert_not_ready!(rx.poll());
     });
 
+    assert_eq!(2, task1.notifier_ref_count());
+    assert_eq!(1, task2.notifier_ref_count());
+
     task2.enter(|| {
         assert_not_ready!(rx.poll());
     });
+
+    assert_eq!(1, task1.notifier_ref_count());
+    assert_eq!(2, task2.notifier_ref_count());
 
     tx.send(1).unwrap();
 
@@ -231,9 +237,15 @@ fn sender_changes_task() {
         assert_not_ready!(tx.poll_close());
     });
 
+    assert_eq!(2, task1.notifier_ref_count());
+    assert_eq!(1, task2.notifier_ref_count());
+
     task2.enter(|| {
         assert_not_ready!(tx.poll_close());
     });
+
+    assert_eq!(1, task1.notifier_ref_count());
+    assert_eq!(2, task2.notifier_ref_count());
 
     drop(rx);
 
