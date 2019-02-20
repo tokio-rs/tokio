@@ -20,8 +20,6 @@ use futures::{Stream, future::poll_fn};
 use loom::futures::block_on;
 use loom::thread;
 
-use std::sync::Arc;
-
 #[test]
 fn closing_tx() {
     loom::fuzz(|| {
