@@ -6,14 +6,14 @@ extern crate tokio_timer;
 use tokio_executor::park::{Park, Unpark, UnparkThread};
 use tokio_timer::*;
 
-use futures::{Future, Stream};
 use futures::stream::FuturesUnordered;
+use futures::{Future, Stream};
 use rand::Rng;
 
 use std::cmp;
-use std::sync::{Arc, Barrier};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -52,23 +52,20 @@ fn hammer_complete() {
                 barrier.wait();
 
                 for _ in 0..PER_THREAD {
-                    let deadline = Instant::now() + Duration::from_millis(
-                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline =
+                        Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
                     exec.push({
-                        handle.delay(deadline)
-                            .and_then(move |_| {
-                                let now = Instant::now();
-                                assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
-                                Ok(())
-                            })
+                        handle.delay(deadline).and_then(move |_| {
+                            let now = Instant::now();
+                            assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
+                            Ok(())
+                        })
                     });
                 }
 
                 // Run the logic
-                exec.for_each(|_| Ok(()))
-                    .wait()
-                    .unwrap();
+                exec.for_each(|_| Ok(())).wait().unwrap();
 
                 if 1 == done.rem.fetch_sub(1, SeqCst) {
                     done.unpark.unpark();
@@ -112,11 +109,11 @@ fn hammer_cancel() {
                 barrier.wait();
 
                 for _ in 0..PER_THREAD {
-                    let deadline1 = Instant::now() + Duration::from_millis(
-                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline1 =
+                        Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
-                    let deadline2 = Instant::now() + Duration::from_millis(
-                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline2 =
+                        Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
                     let deadline = cmp::min(deadline1, deadline2);
 
@@ -124,24 +121,22 @@ fn hammer_cancel() {
                     let join = handle.deadline(delay, deadline2);
 
                     exec.push({
-                        join
-                            .and_then(move |_| {
-                                let now = Instant::now();
-                                assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
-                                Ok(())
-                            })
+                        join.and_then(move |_| {
+                            let now = Instant::now();
+                            assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
+                            Ok(())
+                        })
                     });
                 }
 
                 // Run the logic
-                exec
-                    .or_else(|e| {
-                        assert!(e.is_elapsed());
-                        Ok::<_, ()>(())
-                    })
-                    .for_each(|_| Ok(()))
-                    .wait()
-                    .unwrap();
+                exec.or_else(|e| {
+                    assert!(e.is_elapsed());
+                    Ok::<_, ()>(())
+                })
+                .for_each(|_| Ok(()))
+                .wait()
+                .unwrap();
 
                 if 1 == done.rem.fetch_sub(1, SeqCst) {
                     done.unpark.unpark();
@@ -185,17 +180,18 @@ fn hammer_reset() {
                 barrier.wait();
 
                 for _ in 0..PER_THREAD {
-                    let deadline1 = Instant::now() + Duration::from_millis(
-                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline1 =
+                        Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
-                    let deadline2 = deadline1 + Duration::from_millis(
-                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline2 =
+                        deadline1 + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
-                    let deadline3 = deadline2 + Duration::from_millis(
-                        rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline3 =
+                        deadline2 + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
                     exec.push({
-                        handle.delay(deadline1)
+                        handle
+                            .delay(deadline1)
                             // Select over a second delay
                             .select2(handle.delay(deadline2))
                             .map_err(|e| panic!("boom; err={:?}", e))
@@ -203,7 +199,11 @@ fn hammer_reset() {
                                 use futures::future::Either::*;
 
                                 let now = Instant::now();
-                                assert!(now >= deadline1, "deadline greater by {:?}", deadline1 - now);
+                                assert!(
+                                    now >= deadline1,
+                                    "deadline greater by {:?}",
+                                    deadline1 - now
+                                );
 
                                 let mut other = match res {
                                     A((_, other)) => other,
@@ -215,17 +215,18 @@ fn hammer_reset() {
                             })
                             .and_then(move |_| {
                                 let now = Instant::now();
-                                assert!(now >= deadline3, "deadline greater by {:?}", deadline3 - now);
+                                assert!(
+                                    now >= deadline3,
+                                    "deadline greater by {:?}",
+                                    deadline3 - now
+                                );
                                 Ok(())
                             })
                     });
                 }
 
                 // Run the logic
-                exec
-                    .for_each(|_| Ok(()))
-                    .wait()
-                    .unwrap();
+                exec.for_each(|_| Ok(())).wait().unwrap();
 
                 if 1 == done.rem.fetch_sub(1, SeqCst) {
                     done.unpark.unpark();

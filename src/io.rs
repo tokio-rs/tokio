@@ -45,51 +45,18 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
-pub use tokio_io::{
-    AsyncRead,
-    AsyncWrite,
-};
+pub use tokio_io::{AsyncRead, AsyncWrite};
 
 // standard input, output, and error
 #[cfg(feature = "fs")]
-pub use tokio_fs::{
-    stdin,
-    Stdin,
-    stdout,
-    Stdout,
-    stderr,
-    Stderr,
-};
+pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
 
 // Utils
 pub use tokio_io::io::{
-    copy,
-    Copy,
-    flush,
-    Flush,
-    lines,
-    Lines,
-    read,
-    read_exact,
-    ReadExact,
-    read_to_end,
-    ReadToEnd,
-    read_until,
-    ReadUntil,
-    ReadHalf,
-    shutdown,
-    Shutdown,
-    write_all,
-    WriteAll,
-    WriteHalf,
+    copy, flush, lines, read, read_exact, read_to_end, read_until, shutdown, write_all, Copy,
+    Flush, Lines, ReadExact, ReadHalf, ReadToEnd, ReadUntil, Shutdown, WriteAll, WriteHalf,
 };
 
 // Re-export io::Error so that users don't have to deal
 // with conflicts when `use`ing `futures::io` and `std::io`.
-pub use ::std::io::{
-    Error,
-    ErrorKind,
-    Result,
-    Read,
-    Write,
-};
+pub use std::io::{Error, ErrorKind, Read, Result, Write};

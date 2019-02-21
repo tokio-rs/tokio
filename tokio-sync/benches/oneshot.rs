@@ -1,14 +1,14 @@
 #![feature(test)]
 #![cfg_attr(test, deny(warnings))]
 
-extern crate tokio_sync;
 extern crate futures;
 extern crate test;
+extern crate tokio_sync;
 
 mod tokio {
     use futures::{future, Async, Future};
+    use test::Bencher;
     use tokio_sync::oneshot;
-    use test::{Bencher};
 
     #[bench]
     fn new(b: &mut Bencher) {
@@ -43,7 +43,9 @@ mod tokio {
                 assert_eq!(Async::Ready(1), rx.poll().unwrap());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         });
     }
 
@@ -58,7 +60,7 @@ mod tokio {
             loop {
                 match f.poll() {
                     Ok(Ready(v)) => return Ok(v),
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(e) => return Err(e),
                 }
             }
@@ -95,7 +97,9 @@ mod tokio {
                 }
 
                 Ok::<(), ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         });
 
         future::lazy(|| {
@@ -112,14 +116,16 @@ mod tokio {
             });
 
             Ok::<(), ()>(())
-        }).wait().unwrap();
+        })
+        .wait()
+        .unwrap();
     }
 }
 
 mod legacy {
-    use futures::{future, Async, Future};
     use futures::sync::oneshot;
-    use test::{Bencher};
+    use futures::{future, Async, Future};
+    use test::Bencher;
 
     #[bench]
     fn new(b: &mut Bencher) {
@@ -154,7 +160,9 @@ mod legacy {
                 assert_eq!(Async::Ready(1), rx.poll().unwrap());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         });
     }
 
@@ -169,7 +177,7 @@ mod legacy {
             loop {
                 match f.poll() {
                     Ok(Ready(v)) => return Ok(v),
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(e) => return Err(e),
                 }
             }
@@ -206,7 +214,9 @@ mod legacy {
                 }
 
                 Ok::<(), ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         });
 
         future::lazy(|| {
@@ -223,6 +233,8 @@ mod legacy {
             });
 
             Ok::<(), ()>(())
-        }).wait().unwrap();
+        })
+        .wait()
+        .unwrap();
     }
 }

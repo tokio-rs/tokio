@@ -6,8 +6,8 @@ extern crate tokio_tcp;
 use tokio_reactor::Reactor;
 use tokio_tcp::TcpListener;
 
-use futures::{Future, Stream};
 use futures::executor::{spawn, Notify, Spawn};
+use futures::{Future, Stream};
 
 use std::mem;
 use std::net::TcpStream;
@@ -62,7 +62,8 @@ fn test_drop_on_notify() {
 
     // Define a task that just drains the listener
     let task = Box::new({
-        listener.incoming()
+        listener
+            .incoming()
             .for_each(|_| Ok(()))
             .map_err(|_| panic!())
     }) as Box<Future<Item = (), Error = ()>>;
@@ -75,7 +76,8 @@ fn test_drop_on_notify() {
     tokio_reactor::with_default(&reactor.handle(), &mut enter, |_| {
         let id = &*task as *const Task as usize;
 
-        task.lock().unwrap()
+        task.lock()
+            .unwrap()
             .poll_future_notify(&notify, id)
             .unwrap();
     });

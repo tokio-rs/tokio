@@ -4,11 +4,7 @@ mod state;
 
 pub(crate) use self::backup::{Backup, BackupId};
 pub(crate) use self::backup_stack::MAX_BACKUP;
-pub(crate) use self::state::{
-    State,
-    Lifecycle,
-    MAX_FUTURES,
-};
+pub(crate) use self::state::{Lifecycle, State, MAX_FUTURES};
 
 use self::backup::Handoff;
 use self::backup_stack::BackupStack;
@@ -22,8 +18,8 @@ use futures::Poll;
 
 use std::cell::Cell;
 use std::num::Wrapping;
-use std::sync::atomic::Ordering::{Acquire, AcqRel};
 use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::{Arc, Weak};
 use std::thread;
 
@@ -100,15 +96,15 @@ impl Pool {
         //
         // This is `backup + pool_size` because the core thread pool running the
         // workers is spawned from backup as well.
-        let backup = (0..total_size).map(|_| {
-            Backup::new()
-        }).collect::<Vec<_>>().into_boxed_slice();
+        let backup = (0..total_size)
+            .map(|_| Backup::new())
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
 
         let backup_stack = BackupStack::new();
 
         for i in (0..backup.len()).rev() {
-            backup_stack.push(&backup, BackupId(i))
-                .unwrap();
+            backup_stack.push(&backup, BackupId(i)).unwrap();
         }
 
         // Initialize the blocking state
@@ -174,8 +170,10 @@ impl Pool {
                 }
             }
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if state == actual {
                 state = next;
@@ -299,8 +297,7 @@ impl Pool {
             }
         };
 
-        let need_spawn = self.backup[backup_id.0]
-            .worker_handoff(id.clone());
+        let need_spawn = self.backup[backup_id.0].worker_handoff(id.clone());
 
         if !need_spawn {
             return;
@@ -355,8 +352,7 @@ impl Pool {
                 // available for future handoffs.
                 //
                 // This **must** happen before notifying the task.
-                let res = pool.backup_stack
-                    .push(&pool.backup, backup_id);
+                let res = pool.backup_stack.push(&pool.backup, backup_id);
 
                 if res.is_err() {
                     // The pool is being shutdown.
@@ -370,8 +366,7 @@ impl Pool {
                 debug_assert!(pool.backup[backup_id.0].is_running());
 
                 // Wait for a handoff
-                let handoff = pool.backup[backup_id.0]
-                    .wait_for_handoff(pool.config.keep_alive);
+                let handoff = pool.backup[backup_id.0].wait_for_handoff(pool.config.keep_alive);
 
                 match handoff {
                     Handoff::Worker(id) => {
@@ -407,7 +402,8 @@ impl Pool {
 
             debug_assert!(
                 worker_state.lifecycle() != Signaled,
-                "actual={:?}", worker_state.lifecycle(),
+                "actual={:?}",
+                worker_state.lifecycle(),
             );
 
             trace!("signal_work -- notify; idx={}", idx);

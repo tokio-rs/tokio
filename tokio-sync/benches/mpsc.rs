@@ -1,15 +1,15 @@
 #![feature(test)]
 #![cfg_attr(test, deny(warnings))]
 
-extern crate tokio_sync;
 extern crate futures;
 extern crate test;
+extern crate tokio_sync;
 
 mod tokio {
-    use tokio_sync::mpsc::*;
-    use futures::{future, Async, Future, Stream, Sink};
-    use test::{self, Bencher};
+    use futures::{future, Async, Future, Sink, Stream};
     use std::thread;
+    use test::{self, Bencher};
+    use tokio_sync::mpsc::*;
 
     #[bench]
     fn bounded_new(b: &mut Bencher) {
@@ -46,7 +46,9 @@ mod tokio {
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -58,7 +60,9 @@ mod tokio {
                 assert!(tx.poll_ready().unwrap().is_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -71,7 +75,9 @@ mod tokio {
                 assert!(tx.poll_ready().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -83,7 +89,9 @@ mod tokio {
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -99,7 +107,9 @@ mod tokio {
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -160,8 +170,7 @@ mod tokio {
 
             drop(tx);
 
-            let rx = rx.wait()
-                .take(4 * 1_000);
+            let rx = rx.wait().take(4 * 1_000);
 
             for v in rx {
                 let _ = test::black_box(v);
@@ -206,8 +215,7 @@ mod tokio {
 
             drop(tx);
 
-            let rx = rx.wait()
-                .take(THREADS * ITERS);
+            let rx = rx.wait().take(THREADS * ITERS);
 
             for v in rx {
                 let _ = test::black_box(v);
@@ -223,10 +231,10 @@ mod tokio {
 }
 
 mod legacy {
-    use futures::{future, Async, Future, Stream, Sink};
     use futures::sync::mpsc::*;
-    use test::{self, Bencher};
+    use futures::{future, Async, Future, Sink, Stream};
     use std::thread;
+    use test::{self, Bencher};
 
     #[bench]
     fn bounded_new(b: &mut Bencher) {
@@ -263,7 +271,9 @@ mod legacy {
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -275,7 +285,9 @@ mod legacy {
                 assert!(tx.poll_ready().unwrap().is_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -288,7 +300,9 @@ mod legacy {
                 assert!(tx.poll_ready().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -300,7 +314,9 @@ mod legacy {
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -316,7 +332,9 @@ mod legacy {
                 assert!(rx.poll().unwrap().is_not_ready());
 
                 Ok::<_, ()>(())
-            }).wait().unwrap();
+            })
+            .wait()
+            .unwrap();
         })
     }
 
@@ -376,8 +394,7 @@ mod legacy {
 
             drop(tx);
 
-            let rx = rx.wait()
-                .take(4 * 1_000);
+            let rx = rx.wait().take(4 * 1_000);
 
             for v in rx {
                 let _ = test::black_box(v);
@@ -422,8 +439,7 @@ mod legacy {
 
             drop(tx);
 
-            let rx = rx.wait()
-                .take(THREADS * ITERS);
+            let rx = rx.wait().take(THREADS * ITERS);
 
             for v in rx {
                 let _ = test::black_box(v);

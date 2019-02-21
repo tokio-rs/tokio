@@ -61,12 +61,16 @@ fn framed_echo() {
 
         let (sink, stream) = server.split();
 
-        let echo_stream = stream.map(|(msg, addr)| (msg, addr.as_pathname().unwrap().to_path_buf()));
+        let echo_stream =
+            stream.map(|(msg, addr)| (msg, addr.as_pathname().unwrap().to_path_buf()));
 
         // spawn echo server
-        rt.spawn(echo_stream.forward(sink)
-                 .map_err(|e| panic!("err={:?}", e))
-                 .map(|_| ()));
+        rt.spawn(
+            echo_stream
+                .forward(sink)
+                .map_err(|e| panic!("err={:?}", e))
+                .map(|_| ()),
+        );
     }
 
     {
@@ -75,7 +79,8 @@ fn framed_echo() {
 
         let (sink, stream) = client.split();
 
-        rt.block_on(sink.send(("ECHO".to_string(), server_path))).unwrap();
+        rt.block_on(sink.send(("ECHO".to_string(), server_path)))
+            .unwrap();
 
         let response = rt.block_on(stream.take(1).collect()).unwrap();
         assert_eq!(response[0].0, "ECHO");

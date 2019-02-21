@@ -2,12 +2,12 @@ use std::io;
 use std::os::unix::net::SocketAddr;
 use std::path::Path;
 
-use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
+use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 use super::UnixDatagram;
 
+use bytes::{BufMut, BytesMut};
 use tokio_codec::{Decoder, Encoder};
-use bytes::{BytesMut, BufMut};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UnixDatagram`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -67,7 +67,7 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
 
         if !self.flushed {
             match try!(self.poll_complete()) {
-                Async::Ready(()) => {},
+                Async::Ready(()) => {}
                 Async::NotReady => return Ok(AsyncSink::NotReady(item)),
             }
         }
@@ -83,14 +83,19 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
 
     fn poll_complete(&mut self) -> Poll<(), C::Error> {
         if self.flushed {
-            return Ok(Async::Ready(()))
+            return Ok(Async::Ready(()));
         }
 
         let n = {
             let out_path = match self.out_addr {
                 Some(ref out_path) => out_path.as_ref(),
-                None => return Err(io::Error::new(io::ErrorKind::Other,
-                                                      "internal error: addr not available while data not flushed").into()),
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "internal error: addr not available while data not flushed",
+                    )
+                    .into());
+                }
             };
 
             trace!("flushing frame; length={}", self.wr.len());
@@ -107,8 +112,11 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
             self.out_addr = None;
             Ok(Async::Ready(()))
         } else {
-            Err(io::Error::new(io::ErrorKind::Other,
-                               "failed to write entire datagram to socket").into())
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to write entire datagram to socket",
+            )
+            .into())
         }
     }
 

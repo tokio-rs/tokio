@@ -11,13 +11,13 @@ mod semaphore;
 
 use semaphore::*;
 
-use futures::{future, Future, Async, Poll};
-use loom::thread;
+use futures::{future, Async, Future, Poll};
 use loom::futures::block_on;
+use loom::thread;
 
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 
 #[test]
 fn basic_usage() {
@@ -38,12 +38,13 @@ fn basic_usage() {
         type Error = ();
 
         fn poll(&mut self) -> Poll<(), ()> {
-            try_ready!(
-                self.waiter.poll_acquire(&self.shared.semaphore)
+            try_ready!(self
+                .waiter
+                .poll_acquire(&self.shared.semaphore)
                 .map_err(|_| ()));
 
             let actual = self.shared.active.fetch_add(1, SeqCst);
-            assert!(actual <= NUM-1);
+            assert!(actual <= NUM - 1);
 
             let actual = self.shared.active.fetch_sub(1, SeqCst);
             assert!(actual <= NUM);
@@ -67,14 +68,16 @@ fn basic_usage() {
                 block_on(Actor {
                     waiter: Permit::new(),
                     shared,
-                }).unwrap();
+                })
+                .unwrap();
             });
         }
 
         block_on(Actor {
             waiter: Permit::new(),
-            shared
-        }).unwrap();
+            shared,
+        })
+        .unwrap();
     });
 }
 
@@ -91,8 +94,8 @@ fn release() {
                 block_on(future::lazy(|| {
                     permit.poll_acquire(&semaphore).unwrap();
                     Ok::<_, ()>(())
-
-                })).unwrap();
+                }))
+                .unwrap();
 
                 permit.release(&semaphore);
             });
@@ -100,9 +103,7 @@ fn release() {
 
         let mut permit = Permit::new();
 
-        block_on(future::poll_fn(|| {
-            permit.poll_acquire(&semaphore)
-        })).unwrap();
+        block_on(future::poll_fn(|| permit.poll_acquire(&semaphore))).unwrap();
 
         permit.release(&semaphore);
     });
@@ -123,8 +124,7 @@ fn basic_closing() {
 
                 for _ in 0..2 {
                     block_on(future::poll_fn(|| {
-                        permit.poll_acquire(&semaphore)
-                            .map_err(|_| ())
+                        permit.poll_acquire(&semaphore).map_err(|_| ())
                     }))?;
                     permit.release(&semaphore);
                 }
@@ -151,8 +151,7 @@ fn concurrent_close() {
                 let mut permit = Permit::new();
 
                 block_on(future::poll_fn(|| {
-                    permit.poll_acquire(&semaphore)
-                        .map_err(|_| ())
+                    permit.poll_acquire(&semaphore).map_err(|_| ())
                 }))?;
 
                 permit.release(&semaphore);

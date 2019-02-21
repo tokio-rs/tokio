@@ -30,7 +30,7 @@ impl<T: Sink + Unpin + ?Sized> Future for Send<'_, T> {
 
     fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
-        use futures::AsyncSink::{Ready, NotReady};
+        use futures::AsyncSink::{NotReady, Ready};
 
         if let Some(item) = self.item.take() {
             match self.sink.start_send(item) {

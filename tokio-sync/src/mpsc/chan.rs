@@ -1,14 +1,14 @@
 use super::list;
 use futures::Poll;
 
-use ::loom::{
+use loom::{
     futures::AtomicTask,
-    sync::{Arc, CausalCell},
     sync::atomic::AtomicUsize,
+    sync::{Arc, CausalCell},
 };
 
-use std::process;
 use std::fmt;
+use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 /// Channel sender
@@ -18,8 +18,9 @@ pub(crate) struct Tx<T, S: Semaphore> {
 }
 
 impl<T, S: Semaphore> fmt::Debug for Tx<T, S>
-where S::Permit: fmt::Debug,
-      S: fmt::Debug
+where
+    S::Permit: fmt::Debug,
+    S: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Tx")
@@ -35,12 +36,11 @@ pub(crate) struct Rx<T, S: Semaphore> {
 }
 
 impl<T, S: Semaphore> fmt::Debug for Rx<T, S>
-where S: fmt::Debug
+where
+    S: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Rx")
-            .field("inner", &self.inner)
-            .finish()
+        fmt.debug_struct("Rx").field("inner", &self.inner).finish()
     }
 }
 
@@ -95,7 +95,9 @@ struct Chan<T, S> {
     rx_fields: CausalCell<RxFields<T>>,
 }
 
-impl<T, S> fmt::Debug for Chan<T, S> where S: fmt::Debug
+impl<T, S> fmt::Debug for Chan<T, S>
+where
+    S: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Chan")
@@ -117,8 +119,7 @@ struct RxFields<T> {
     rx_closed: bool,
 }
 
-impl<T> fmt::Debug for RxFields<T>
-{
+impl<T> fmt::Debug for RxFields<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("RxFields")
             .field("list", &self.list)
@@ -273,7 +274,7 @@ where
                         }
                         None => {} // fall through
                     }
-                }
+                };
             }
 
             try_recv!();
@@ -285,8 +286,11 @@ where
             // second time here.
             try_recv!();
 
-            debug!("recv; rx_closed = {:?}; is_idle = {:?}",
-                   rx_fields.rx_closed, self.inner.semaphore.is_idle());
+            debug!(
+                "recv; rx_closed = {:?}; is_idle = {:?}",
+                rx_fields.rx_closed,
+                self.inner.semaphore.is_idle()
+            );
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
                 Ok(Ready(None))
@@ -325,8 +329,7 @@ impl<T, S> Drop for Chan<T, S> {
         self.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
-            while let Some(Value(_)) = rx_fields.list.pop(&self.tx) {
-            }
+            while let Some(Value(_)) = rx_fields.list.pop(&self.tx) {}
         });
     }
 }
@@ -369,8 +372,7 @@ impl Semaphore for (::semaphore::Semaphore, usize) {
     }
 
     fn poll_acquire(&self, permit: &mut Permit) -> Poll<(), ()> {
-        permit.poll_acquire(&self.0)
-            .map_err(|_| ())
+        permit.poll_acquire(&self.0).map_err(|_| ())
     }
 
     fn try_acquire(&self, permit: &mut Permit) -> Result<(), TrySendError> {
@@ -395,11 +397,9 @@ use std::usize;
 impl Semaphore for AtomicUsize {
     type Permit = ();
 
-    fn new_permit() {
-    }
+    fn new_permit() {}
 
-    fn drop_permit(&self, _permit: &mut ()) {
-    }
+    fn drop_permit(&self, _permit: &mut ()) {}
 
     fn add_permit(&self) {
         let prev = self.fetch_sub(2, Release);
@@ -416,9 +416,7 @@ impl Semaphore for AtomicUsize {
 
     fn poll_acquire(&self, permit: &mut ()) -> Poll<(), ()> {
         use futures::Async::Ready;
-        self.try_acquire(permit)
-            .map(Ready)
-            .map_err(|_| ())
+        self.try_acquire(permit).map(Ready).map_err(|_| ())
     }
 
     fn try_acquire(&self, _permit: &mut ()) -> Result<(), TrySendError> {
@@ -444,8 +442,7 @@ impl Semaphore for AtomicUsize {
         }
     }
 
-    fn forget(&self, _permit: &mut ()) {
-    }
+    fn forget(&self, _permit: &mut ()) {}
 
     fn close(&self) {
         self.fetch_or(1, Release);

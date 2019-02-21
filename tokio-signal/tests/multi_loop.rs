@@ -22,7 +22,9 @@ fn multi_loop() {
                     let mut rt = CurrentThreadRuntime::new().unwrap();
                     let signal = run_with_timeout(&mut rt, Signal::new(libc::SIGHUP)).unwrap();
                     sender.send(()).unwrap();
-                    run_with_timeout(&mut rt, signal.into_future()).ok().unwrap();
+                    run_with_timeout(&mut rt, signal.into_future())
+                        .ok()
+                        .unwrap();
                 })
             })
             .collect();

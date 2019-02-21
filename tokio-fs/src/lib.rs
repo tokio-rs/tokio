@@ -39,16 +39,16 @@ pub mod file;
 mod hard_link;
 mod metadata;
 pub mod os;
+mod read;
 mod read_dir;
 mod read_link;
-mod read;
 mod remove_dir;
 mod remove_file;
 mod rename;
 mod set_permissions;
+mod stderr;
 mod stdin;
 mod stdout;
-mod stderr;
 mod symlink_metadata;
 mod write;
 
@@ -58,27 +58,28 @@ pub use file::File;
 pub use file::OpenOptions;
 pub use hard_link::{hard_link, HardLinkFuture};
 pub use metadata::{metadata, MetadataFuture};
-pub use read_dir::{read_dir, ReadDirFuture, ReadDir, DirEntry};
-pub use read_link::{read_link, ReadLinkFuture};
 pub use read::{read, ReadFile};
+pub use read_dir::{read_dir, DirEntry, ReadDir, ReadDirFuture};
+pub use read_link::{read_link, ReadLinkFuture};
 pub use remove_dir::{remove_dir, RemoveDirFuture};
 pub use remove_file::{remove_file, RemoveFileFuture};
 pub use rename::{rename, RenameFuture};
 pub use set_permissions::{set_permissions, SetPermissionsFuture};
+pub use stderr::{stderr, Stderr};
 pub use stdin::{stdin, Stdin};
 pub use stdout::{stdout, Stdout};
-pub use stderr::{stderr, Stderr};
 pub use symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
 pub use write::{write, WriteFile};
 
-use futures::Poll;
 use futures::Async::*;
+use futures::Poll;
 
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
 
 fn blocking_io<F, T>(f: F) -> Poll<T, io::Error>
-where F: FnOnce() -> io::Result<T>,
+where
+    F: FnOnce() -> io::Result<T>,
 {
     match tokio_threadpool::blocking(f) {
         Ok(Ready(Ok(v))) => Ok(v.into()),
@@ -89,7 +90,8 @@ where F: FnOnce() -> io::Result<T>,
 }
 
 fn would_block<F, T>(f: F) -> io::Result<T>
-where F: FnOnce() -> io::Result<T>,
+where
+    F: FnOnce() -> io::Result<T>,
 {
     match tokio_threadpool::blocking(f) {
         Ok(Ready(Ok(v))) => Ok(v),
@@ -103,6 +105,9 @@ where F: FnOnce() -> io::Result<T>,
 }
 
 fn blocking_err() -> io::Error {
-    io::Error::new(Other, "`blocking` annotated I/O must be called \
-                   from the context of the Tokio runtime.")
+    io::Error::new(
+        Other,
+        "`blocking` annotated I/O must be called \
+         from the context of the Tokio runtime.",
+    )
 }

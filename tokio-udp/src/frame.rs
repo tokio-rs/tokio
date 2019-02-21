@@ -1,12 +1,12 @@
 use std::io;
-use std::net::{SocketAddr, Ipv4Addr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use futures::{Async, Poll, Stream, Sink, StartSend, AsyncSink};
+use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 use super::UdpSocket;
 
+use bytes::{BufMut, BytesMut};
 use tokio_codec::{Decoder, Encoder};
-use bytes::{BytesMut, BufMut};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -67,7 +67,7 @@ impl<C: Encoder> Sink for UdpFramed<C> {
 
         if !self.flushed {
             match try!(self.poll_complete()) {
-                Async::Ready(()) => {},
+                Async::Ready(()) => {}
                 Async::NotReady => return Ok(AsyncSink::NotReady(item)),
             }
         }
@@ -83,7 +83,7 @@ impl<C: Encoder> Sink for UdpFramed<C> {
 
     fn poll_complete(&mut self) -> Poll<(), C::Error> {
         if self.flushed {
-            return Ok(Async::Ready(()))
+            return Ok(Async::Ready(()));
         }
 
         trace!("flushing frame; length={}", self.wr.len());
@@ -97,8 +97,11 @@ impl<C: Encoder> Sink for UdpFramed<C> {
         if wrote_all {
             Ok(Async::Ready(()))
         } else {
-            Err(io::Error::new(io::ErrorKind::Other,
-                               "failed to write entire datagram to socket").into())
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to write entire datagram to socket",
+            )
+            .into())
         }
     }
 

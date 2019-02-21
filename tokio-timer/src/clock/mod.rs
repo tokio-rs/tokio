@@ -19,5 +19,5 @@
 mod clock;
 mod now;
 
-pub use self::clock::{Clock, now, with_default};
+pub use self::clock::{now, with_default, Clock};
 pub use self::now::Now;

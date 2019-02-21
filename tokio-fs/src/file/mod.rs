@@ -21,7 +21,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use futures::Poll;
 
 use std::fs::{File as StdFile, Metadata, Permissions};
-use std::io::{self, Read, Write, Seek};
+use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 
 /// A reference to an open file on the filesystem.
@@ -43,16 +43,16 @@ use std::path::Path;
 ///
 /// ```no_run
 /// extern crate tokio;
-/// 
+///
 /// use tokio::prelude::{AsyncWrite, Future};
-/// 
+///
 /// fn main() {
 ///     let task = tokio::fs::File::create("foo.txt")
 ///         .and_then(|mut file| file.poll_write(b"hello, world!"))
 ///         .map(|res| {
 ///             println!("{:?}", res);
 ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-/// 
+///
 ///     tokio::run(task);
 /// }
 /// ```
@@ -61,9 +61,9 @@ use std::path::Path;
 ///
 /// ```no_run
 /// extern crate tokio;
-/// 
+///
 /// use tokio::prelude::{AsyncRead, Future};
-/// 
+///
 /// fn main() {
 ///     let task = tokio::fs::File::open("foo.txt")
 ///         .and_then(|mut file| {
@@ -112,7 +112,8 @@ impl File {
     /// }
     /// ```
     pub fn open<P>(path: P) -> OpenFuture<P>
-    where P: AsRef<Path> + Send + 'static,
+    where
+        P: AsRef<Path> + Send + 'static,
     {
         OpenOptions::new().read(true).open(path)
     }
@@ -151,7 +152,8 @@ impl File {
     /// }
     /// ```
     pub fn create<P>(path: P) -> CreateFuture<P>
-    where P: AsRef<Path> + Send + 'static,
+    where
+        P: AsRef<Path> + Send + 'static,
     {
         CreateFuture::new(path)
     }
@@ -165,7 +167,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use std::fs::File;
-    /// 
+    ///
     /// fn main() {
     ///     let std_file = File::open("foo.txt").unwrap();
     ///     let file = tokio::fs::File::from_std(std_file);
@@ -194,7 +196,7 @@ impl File {
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
     /// use std::io::SeekFrom;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::open("foo.txt")
     ///         // move cursor 6 bytes from the start of the file
@@ -202,7 +204,7 @@ impl File {
     ///         .map(|res| {
     ///             println!("{:?}", res);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -223,7 +225,7 @@ impl File {
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
     /// use std::io::SeekFrom;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|file| file.seek(SeekFrom::Start(6)))
@@ -231,7 +233,7 @@ impl File {
     ///             // handle returned file ..
     ///             # println!("{:?}", file);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -249,7 +251,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::{AsyncWrite, Future};
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|mut file| {
@@ -260,7 +262,7 @@ impl File {
     ///             // handle returned result ..
     ///             # println!("{:?}", res);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -282,7 +284,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::{AsyncWrite, Future};
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|mut file| {
@@ -293,7 +295,7 @@ impl File {
     ///             // handle returned result ..
     ///             # println!("{:?}", res);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -318,7 +320,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|mut file| {
@@ -328,7 +330,7 @@ impl File {
     ///             // handle returned result ..
     ///             # println!("{:?}", res);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -343,14 +345,14 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|file| file.metadata())
     ///         .map(|metadata| {
     ///             println!("{:?}", metadata);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -365,7 +367,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|mut file| file.poll_metadata())
@@ -373,7 +375,7 @@ impl File {
     ///             // metadata is of type Async::Ready<Metadata>
     ///             println!("{:?}", metadata);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -390,7 +392,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|mut file| file.poll_try_clone())
@@ -398,7 +400,7 @@ impl File {
     ///             // do something with the clone
     ///             # println!("{:?}", clone);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -462,7 +464,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .and_then(|file| file.metadata())
@@ -474,7 +476,7 @@ impl File {
     ///                 _ => println!("permissions set!"),
     ///             }
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```
@@ -495,7 +497,7 @@ impl File {
     /// ```no_run
     /// # extern crate tokio;
     /// use tokio::prelude::Future;
-    /// 
+    ///
     /// fn main() {
     ///     let task = tokio::fs::File::create("foo.txt")
     ///         .map(|file| {
@@ -503,7 +505,7 @@ impl File {
     ///             // do something with the std::fs::File
     ///             # println!("{:?}", std_file);
     ///         }).map_err(|err| eprintln!("IO error: {:?}", err));
-    /// 
+    ///
     ///     tokio::run(task);
     /// }
     /// ```

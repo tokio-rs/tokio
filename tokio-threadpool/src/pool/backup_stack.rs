@@ -1,7 +1,7 @@
 use pool::{Backup, BackupId};
 
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, AcqRel};
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 
 #[derive(Debug)]
 pub(crate) struct BackupStack {
@@ -65,8 +65,10 @@ impl BackupStack {
             entries[id.0].set_next_sleeper(head);
             next.set_head(id);
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if state == actual {
                 return Ok(());
@@ -110,8 +112,10 @@ impl BackupStack {
                     return Ok(None);
                 }
 
-                let actual = self.state.compare_and_swap(
-                    state.into(), next.into(), AcqRel).into();
+                let actual = self
+                    .state
+                    .compare_and_swap(state.into(), next.into(), AcqRel)
+                    .into();
 
                 if actual != state {
                     state = actual;
@@ -138,8 +142,10 @@ impl BackupStack {
                 next.set_head(next_head);
             }
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 debug_assert!(entries[head.0].is_pushed());

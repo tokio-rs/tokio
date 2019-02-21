@@ -1,7 +1,7 @@
 use std::io;
 use std::mem;
 
-use futures::{Poll, Future};
+use futures::{Future, Poll};
 
 use AsyncRead;
 
@@ -18,11 +18,7 @@ pub struct ReadExact<A, T> {
 
 #[derive(Debug)]
 enum State<A, T> {
-    Reading {
-        a: A,
-        buf: T,
-        pos: usize,
-    },
+    Reading { a: A, buf: T, pos: usize },
     Empty,
 }
 
@@ -37,8 +33,9 @@ enum State<A, T> {
 /// the buffer will be returned, with all data read from the stream appended to
 /// the buffer.
 pub fn read_exact<A, T>(a: A, buf: T) -> ReadExact<A, T>
-    where A: AsyncRead,
-          T: AsMut<[u8]>,
+where
+    A: AsyncRead,
+    T: AsMut<[u8]>,
 {
     ReadExact {
         state: State::Reading {
@@ -54,21 +51,26 @@ fn eof() -> io::Error {
 }
 
 impl<A, T> Future for ReadExact<A, T>
-    where A: AsyncRead,
-          T: AsMut<[u8]>,
+where
+    A: AsyncRead,
+    T: AsMut<[u8]>,
 {
     type Item = (A, T);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(A, T), io::Error> {
         match self.state {
-            State::Reading { ref mut a, ref mut buf, ref mut pos } => {
+            State::Reading {
+                ref mut a,
+                ref mut buf,
+                ref mut pos,
+            } => {
                 let buf = buf.as_mut();
                 while *pos < buf.len() {
                     let n = try_ready!(a.poll_read(&mut buf[*pos..]));
                     *pos += n;
                     if n == 0 {
-                        return Err(eof())
+                        return Err(eof());
                     }
                 }
             }

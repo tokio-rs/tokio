@@ -1,10 +1,9 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.15")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
-#![cfg_attr(feature = "async-await-preview", feature(
-        async_await,
-        await_macro,
-        futures_api,
-        ))]
+#![cfg_attr(
+    feature = "async-await-preview",
+    feature(async_await, await_macro, futures_api,)
+)]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -88,24 +87,24 @@ extern crate bytes;
 extern crate mio;
 #[cfg(feature = "rt-full")]
 extern crate num_cpus;
-#[cfg(feature = "rt-full")]
-extern crate tokio_current_thread;
-#[cfg(feature = "io")]
-extern crate tokio_io;
 #[cfg(feature = "codec")]
 extern crate tokio_codec;
+#[cfg(feature = "rt-full")]
+extern crate tokio_current_thread;
 #[cfg(feature = "fs")]
 extern crate tokio_fs;
+#[cfg(feature = "io")]
+extern crate tokio_io;
 #[cfg(feature = "reactor")]
 extern crate tokio_reactor;
-#[cfg(feature = "rt-full")]
-extern crate tokio_threadpool;
 #[cfg(feature = "sync")]
 extern crate tokio_sync;
-#[cfg(feature = "timer")]
-extern crate tokio_timer;
 #[cfg(feature = "tcp")]
 extern crate tokio_tcp;
+#[cfg(feature = "rt-full")]
+extern crate tokio_threadpool;
+#[cfg(feature = "timer")]
+extern crate tokio_timer;
 #[cfg(feature = "udp")]
 extern crate tokio_udp;
 

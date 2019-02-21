@@ -1,12 +1,12 @@
-use {AtomicTask, Reactor, Handle};
+use {AtomicTask, Handle, Reactor};
 
-use futures::{Future, Async, Poll, task};
+use futures::{task, Async, Future, Poll};
 
 use std::io;
-use std::thread;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
+use std::thread;
 
 /// Handle to the reactor running on a background thread.
 ///
@@ -72,14 +72,10 @@ impl Background {
         let shared2 = shared.clone();
 
         // Start the reactor thread
-        thread::Builder::new()
-            .spawn(move || run(reactor, shared2))?;
+        thread::Builder::new().spawn(move || run(reactor, shared2))?;
 
         Ok(Background {
-            inner: Some(Inner {
-                handle,
-                shared,
-            }),
+            inner: Some(Inner { handle, shared }),
         })
     }
 
@@ -157,9 +153,10 @@ impl Inner {
     /// Notify the reactor thread to shutdown once the reactor transitions to an
     /// idle state.
     fn shutdown_on_idle(&self) {
-       self.shared.shutdown
-           .compare_and_swap(0, SHUTDOWN_IDLE, SeqCst);
-       self.handle.wakeup();
+        self.shared
+            .shutdown
+            .compare_and_swap(0, SHUTDOWN_IDLE, SeqCst);
+        self.handle.wakeup();
     }
 
     /// Notify the reactor thread to shutdown immediately.
@@ -171,7 +168,9 @@ impl Inner {
                 return;
             }
 
-            let act = self.shared.shutdown
+            let act = self
+                .shared
+                .shutdown
                 .compare_and_swap(curr, SHUTDOWN_NOW, SeqCst);
 
             if act == curr {

@@ -1,11 +1,11 @@
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
-use std::net::{self, SocketAddr, Shutdown};
+use std::net::{self, Shutdown, SocketAddr};
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 use iovec::IoVec;
 use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -80,7 +80,7 @@ impl TcpStream {
     /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr)
-    ///     .map(|stream| 
+    ///     .map(|stream|
     ///         println!("successfully connected to {}", stream.local_addr().unwrap()));
     /// # Ok(())
     /// # }
@@ -122,9 +122,7 @@ impl TcpStream {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_std(stream: net::TcpStream, handle: &Handle)
-        -> io::Result<TcpStream>
-    {
+    pub fn from_std(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_stream(stream)?;
         let io = PollEvented::new_with_handle(io, handle)?;
 
@@ -149,11 +147,11 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_std(stream: net::TcpStream,
-                       addr: &SocketAddr,
-                       handle: &Handle)
-        -> ConnectFuture
-    {
+    pub fn connect_std(
+        stream: net::TcpStream,
+        addr: &SocketAddr,
+        handle: &Handle,
+    ) -> ConnectFuture {
         use self::ConnectFutureState::*;
 
         let io = mio::net::TcpStream::connect_stream(stream, addr)
@@ -854,7 +852,7 @@ impl<'a> AsyncRead for &'a TcpStream {
 
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = self.io.poll_read_ready(mio::Ready::readable())? {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
 
         let r = unsafe {
@@ -878,10 +876,22 @@ impl<'a> AsyncRead for &'a TcpStream {
             let b15: &mut [u8] = &mut [0];
             let b16: &mut [u8] = &mut [0];
             let mut bufs: [&mut IoVec; 16] = [
-                b1.into(), b2.into(), b3.into(), b4.into(),
-                b5.into(), b6.into(), b7.into(), b8.into(),
-                b9.into(), b10.into(), b11.into(), b12.into(),
-                b13.into(), b14.into(), b15.into(), b16.into(),
+                b1.into(),
+                b2.into(),
+                b3.into(),
+                b4.into(),
+                b5.into(),
+                b6.into(),
+                b7.into(),
+                b8.into(),
+                b9.into(),
+                b10.into(),
+                b11.into(),
+                b12.into(),
+                b13.into(),
+                b14.into(),
+                b15.into(),
+                b16.into(),
             ];
             let n = buf.bytes_vec_mut(&mut bufs);
             self.io.get_ref().read_bufs(&mut bufs[..n])
@@ -889,7 +899,9 @@ impl<'a> AsyncRead for &'a TcpStream {
 
         match r {
             Ok(n) => {
-                unsafe { buf.advance_mut(n); }
+                unsafe {
+                    buf.advance_mut(n);
+                }
                 Ok(Async::Ready(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -908,7 +920,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
         if let Async::NotReady = self.io.poll_write_ready()? {
-            return Ok(Async::NotReady)
+            return Ok(Async::NotReady);
         }
 
         let r = {
@@ -952,7 +964,8 @@ impl Future for ConnectFuture {
 
 impl ConnectFutureState {
     fn poll_inner<F>(&mut self, f: F) -> Poll<TcpStream, io::Error>
-        where F: FnOnce(&mut PollEvented<mio::net::TcpStream>) -> Poll<mio::Ready, io::Error>
+    where
+        F: FnOnce(&mut PollEvented<mio::net::TcpStream>) -> Poll<mio::Ready, io::Error>,
     {
         {
             let stream = match *self {
@@ -962,7 +975,7 @@ impl ConnectFutureState {
                         ConnectFutureState::Error(e) => e,
                         _ => panic!(),
                     };
-                    return Err(e)
+                    return Err(e);
                 }
                 ConnectFutureState::Empty => panic!("can't poll TCP stream twice"),
             };
@@ -974,11 +987,11 @@ impl ConnectFutureState {
             //
             // If all that succeeded then we ship everything on up.
             if let Async::NotReady = f(&mut stream.io)? {
-                return Ok(Async::NotReady)
+                return Ok(Async::NotReady);
             }
 
             if let Some(e) = try!(stream.io.get_ref().take_error()) {
-                return Err(e)
+                return Err(e);
             }
         }
 
@@ -1000,8 +1013,8 @@ impl Future for ConnectFutureState {
 
 #[cfg(unix)]
 mod sys {
-    use std::os::unix::prelude::*;
     use super::TcpStream;
+    use std::os::unix::prelude::*;
 
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {

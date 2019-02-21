@@ -20,10 +20,7 @@ impl<'a, T: ?Sized> Unpin for ReadExact<'a, T> {}
 
 impl<'a, T: AsyncRead + ?Sized> ReadExact<'a, T> {
     pub(super) fn new(reader: &'a mut T, buf: &'a mut [u8]) -> ReadExact<'a, T> {
-        ReadExact {
-            reader,
-            buf,
-        }
+        ReadExact { reader, buf }
     }
 }
 
@@ -47,7 +44,7 @@ impl<'a, T: AsyncRead + ?Sized> Future for ReadExact<'a, T> {
                 this.buf = rest;
             }
             if n == 0 {
-                return Poll::Ready(Err(eof()))
+                return Poll::Ready(Err(eof()));
             }
         }
 

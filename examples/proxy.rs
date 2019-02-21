@@ -24,10 +24,10 @@
 
 extern crate tokio;
 
-use std::sync::{Arc, Mutex};
 use std::env;
-use std::net::{Shutdown, SocketAddr};
 use std::io::{self, Read, Write};
+use std::net::{Shutdown, SocketAddr};
+use std::sync::{Arc, Mutex};
 
 use tokio::io::{copy, shutdown};
 use tokio::net::{TcpListener, TcpStream};
@@ -45,7 +45,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
-    let done = socket.incoming()
+    let done = socket
+        .incoming()
         .map_err(|e| println!("error accepting socket; error = {:?}", e))
         .for_each(move |client| {
             let server = TcpStream::connect(&server_addr);
@@ -68,25 +69,25 @@ fn main() -> Result<(), Box<std::error::Error>> {
                 // After the copy is done we indicate to the remote side that we've
                 // finished by shutting down the connection.
                 let client_to_server = copy(client_reader, server_writer)
-                    .and_then(|(n, _, server_writer)| {
-                        shutdown(server_writer).map(move |_| n)
-                    });
+                    .and_then(|(n, _, server_writer)| shutdown(server_writer).map(move |_| n));
 
                 let server_to_client = copy(server_reader, client_writer)
-                    .and_then(|(n, _, client_writer)| {
-                        shutdown(client_writer).map(move |_| n)
-                    });
+                    .and_then(|(n, _, client_writer)| shutdown(client_writer).map(move |_| n));
 
                 client_to_server.join(server_to_client)
             });
 
-            let msg = amounts.map(move |(from_client, from_server)| {
-                println!("client wrote {} bytes and received {} bytes",
-                         from_client, from_server);
-            }).map_err(|e| {
-                // Don't panic. Maybe the client just disconnected too soon.
-                println!("error: {}", e);
-            });
+            let msg = amounts
+                .map(move |(from_client, from_server)| {
+                    println!(
+                        "client wrote {} bytes and received {} bytes",
+                        from_client, from_server
+                    );
+                })
+                .map_err(|e| {
+                    // Don't panic. Maybe the client just disconnected too soon.
+                    println!("error: {}", e);
+                });
 
             tokio::spawn(msg);
 

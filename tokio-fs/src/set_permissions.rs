@@ -17,7 +17,7 @@ pub fn set_permissions<P: AsRef<Path>>(path: P, perm: fs::Permissions) -> SetPer
 #[derive(Debug)]
 pub struct SetPermissionsFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     path: P,
     perm: fs::Permissions,
@@ -25,7 +25,7 @@ where
 
 impl<P> SetPermissionsFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     fn new(path: P, perm: fs::Permissions) -> SetPermissionsFuture<P> {
         SetPermissionsFuture {
@@ -37,12 +37,12 @@ where
 
 impl<P> Future for SetPermissionsFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::set_permissions(&self.path, self.perm.clone()) )
+        ::blocking_io(|| fs::set_permissions(&self.path, self.perm.clone()))
     }
 }

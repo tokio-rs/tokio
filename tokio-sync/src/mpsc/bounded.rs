@@ -13,7 +13,9 @@ pub struct Sender<T> {
 
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
-        Sender { chan: self.chan.clone() }
+        Sender {
+            chan: self.chan.clone(),
+        }
     }
 }
 
@@ -144,11 +146,9 @@ impl<T> Stream for Receiver<T> {
     type Error = RecvError;
 
     fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
-        self.chan.recv()
-            .map_err(|_| RecvError(()))
+        self.chan.recv().map_err(|_| RecvError(()))
     }
 }
-
 
 impl<T> Sender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> Sender<T> {
@@ -176,8 +176,7 @@ impl<T> Sender<T> {
     ///   capacity is available;
     /// - `Err(SendError)` if the receiver has been dropped.
     pub fn poll_ready(&mut self) -> Poll<(), SendError> {
-        self.chan.poll_ready()
-            .map_err(|_| SendError(()))
+        self.chan.poll_ready().map_err(|_| SendError(()))
     }
 
     /// Attempts to send a message on this `Sender`, returning the message
@@ -193,17 +192,15 @@ impl<T> Sink for Sender<T> {
     type SinkError = SendError;
 
     fn start_send(&mut self, msg: T) -> StartSend<T, Self::SinkError> {
-        use futures::AsyncSink;
         use futures::Async::*;
+        use futures::AsyncSink;
 
         match self.poll_ready()? {
             Ready(_) => {
                 self.try_send(msg).map_err(|_| SendError(()))?;
                 Ok(AsyncSink::Ready)
             }
-            NotReady => {
-                Ok(AsyncSink::NotReady(msg))
-            }
+            NotReady => Ok(AsyncSink::NotReady(msg)),
         }
     }
 
@@ -283,7 +280,7 @@ impl<T> From<(T, chan::TrySendError)> for TrySendError<T> {
             kind: match err {
                 chan::TrySendError::Closed => ErrorKind::Closed,
                 chan::TrySendError::NoPermits => ErrorKind::NoCapacity,
-            }
+            },
         }
     }
 }

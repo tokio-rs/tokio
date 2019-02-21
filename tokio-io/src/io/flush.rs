@@ -1,6 +1,6 @@
 use std::io;
 
-use futures::{Poll, Future, Async};
+use futures::{Async, Future, Poll};
 
 use AsyncWrite;
 
@@ -23,15 +23,15 @@ pub struct Flush<A> {
 /// otherwise it will repeatedly call `flush` until it sees `Ok(())`, scheduling
 /// a retry if `WouldBlock` is seen along the way.
 pub fn flush<A>(a: A) -> Flush<A>
-    where A: AsyncWrite,
+where
+    A: AsyncWrite,
 {
-    Flush {
-        a: Some(a),
-    }
+    Flush { a: Some(a) }
 }
 
 impl<A> Future for Flush<A>
-    where A: AsyncWrite,
+where
+    A: AsyncWrite,
 {
     type Item = A;
     type Error = io::Error;
@@ -41,4 +41,3 @@ impl<A> Future for Flush<A>
         Ok(Async::Ready(self.a.take().unwrap()))
     }
 }
-

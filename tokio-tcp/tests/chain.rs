@@ -1,21 +1,23 @@
 extern crate futures;
-extern crate tokio_tcp;
 extern crate tokio_io;
+extern crate tokio_tcp;
 
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::thread;
-use std::io::{Write, Read};
 
-use futures::Future;
 use futures::stream::Stream;
+use futures::Future;
 use tokio_io::io::read_to_end;
 use tokio_tcp::TcpListener;
 
 macro_rules! t {
-    ($e:expr) => (match $e {
-        Ok(e) => e,
-        Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-    })
+    ($e:expr) => {
+        match $e {
+            Ok(e) => e,
+            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
+        }
+    };
 }
 
 #[test]

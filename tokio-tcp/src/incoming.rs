@@ -1,9 +1,9 @@
 use super::TcpListener;
 use super::TcpStream;
 
-use std::io;
 use futures::stream::Stream;
-use futures::{Poll, Async};
+use futures::{Async, Poll};
+use std::io;
 
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.

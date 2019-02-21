@@ -1,12 +1,12 @@
-extern crate tokio;
 extern crate env_logger;
 extern crate futures;
+extern crate tokio;
 
 use futures::sync::oneshot;
-use std::sync::{Arc, Mutex, atomic};
+use std::sync::{atomic, Arc, Mutex};
 use std::thread;
 use tokio::io;
-use tokio::net::{TcpStream, TcpListener};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::future::lazy;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
@@ -17,18 +17,22 @@ use tokio::runtime::Runtime;
 pub use futures::future::Executor;
 
 macro_rules! t {
-    ($e:expr) => (match $e {
-        Ok(e) => e,
-        Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-    })
+    ($e:expr) => {
+        match $e {
+            Ok(e) => e,
+            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
+        }
+    };
 }
 
-fn create_client_server_future() -> Box<Future<Item=(), Error=()> + Send> {
+fn create_client_server_future() -> Box<Future<Item = (), Error = ()> + Send> {
     let server = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
     let addr = t!(server.local_addr());
     let client = TcpStream::connect(&addr);
 
-    let server = server.incoming().take(1)
+    let server = server
+        .incoming()
+        .take(1)
         .map_err(|e| panic!("accept err = {:?}", e))
         .for_each(|socket| {
             tokio::spawn({
@@ -48,8 +52,7 @@ fn create_client_server_future() -> Box<Future<Item=(), Error=()> + Send> {
                 .map_err(|e| panic!("read err = {:?}", e))
         });
 
-    let future = server.join(client)
-        .map(|_| ());
+    let future = server.join(client).map(|_| ());
     Box::new(future)
 }
 
@@ -64,8 +67,7 @@ fn runtime_tokio_run() {
 fn runtime_single_threaded() {
     let _ = env_logger::try_init();
 
-    let mut runtime = tokio::runtime::current_thread::Runtime::new()
-        .unwrap();
+    let mut runtime = tokio::runtime::current_thread::Runtime::new().unwrap();
     runtime.block_on(create_client_server_future()).unwrap();
     runtime.run().unwrap();
 }
@@ -82,7 +84,7 @@ mod runtime_single_threaded_block_on_all {
 
     fn test<F>(spawn: F)
     where
-        F: Fn(Box<Future<Item=(), Error=()> + Send>),
+        F: Fn(Box<Future<Item = (), Error = ()> + Send>),
     {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
@@ -103,7 +105,8 @@ mod runtime_single_threaded_block_on_all {
             })));
 
             Ok::<_, ()>("hello")
-        })).unwrap();
+        }))
+        .unwrap();
 
         assert_eq!(2, *cnt.lock().unwrap());
         assert_eq!(msg, "hello");
@@ -111,7 +114,9 @@ mod runtime_single_threaded_block_on_all {
 
     #[test]
     fn spawn() {
-       test(|f| { tokio::spawn(f); })
+        test(|f| {
+            tokio::spawn(f);
+        })
     }
 
     #[test]
@@ -128,10 +133,7 @@ mod runtime_single_threaded_racy {
     use super::*;
     fn test<F>(spawn: F)
     where
-        F: Fn(
-            tokio::runtime::current_thread::Handle,
-            Box<Future<Item=(), Error=()> + Send>,
-        ),
+        F: Fn(tokio::runtime::current_thread::Handle, Box<Future<Item = (), Error = ()> + Send>),
     {
         let (trigger, exit) = futures::sync::oneshot::channel();
         let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
@@ -149,10 +151,13 @@ mod runtime_single_threaded_racy {
         let (tx, rx) = futures::sync::oneshot::channel();
 
         let handle = handle_rx.recv().unwrap();
-        spawn(handle, Box::new(futures::future::lazy(move || {
-            tx.send(()).unwrap();
-            Ok(())
-        })));
+        spawn(
+            handle,
+            Box::new(futures::future::lazy(move || {
+                tx.send(()).unwrap();
+                Ok(())
+            })),
+        );
 
         // signal runtime thread to exit
         trigger.send(()).unwrap();
@@ -165,12 +170,16 @@ mod runtime_single_threaded_racy {
 
     #[test]
     fn spawn() {
-        test(|handle, f| { handle.spawn(f).unwrap(); })
+        test(|handle, f| {
+            handle.spawn(f).unwrap();
+        })
     }
 
     #[test]
     fn execute() {
-        test(|handle, f| { handle.execute(f).unwrap(); })
+        test(|handle, f| {
+            handle.execute(f).unwrap();
+        })
     }
 }
 
@@ -182,24 +191,27 @@ mod runtime_multi_threaded {
     {
         let _ = env_logger::try_init();
 
-        let mut runtime = tokio::runtime::Builder::new()
-            .build()
-            .unwrap();
+        let mut runtime = tokio::runtime::Builder::new().build().unwrap();
         spawn(&mut runtime);
         runtime.shutdown_on_idle().wait().unwrap();
     }
 
     #[test]
     fn spawn() {
-        test(|rt| { rt.spawn(create_client_server_future()); });
+        test(|rt| {
+            rt.spawn(create_client_server_future());
+        });
     }
 
     #[test]
     fn execute() {
-        test(|rt| { rt.executor().execute(create_client_server_future()).unwrap(); });
+        test(|rt| {
+            rt.executor()
+                .execute(create_client_server_future())
+                .unwrap();
+        });
     }
 }
-
 
 #[test]
 fn block_on_timer() {
@@ -223,7 +235,7 @@ mod from_block_on {
 
     fn test<F>(spawn: F)
     where
-        F: Fn(Box<Future<Item=(), Error=()> + Send>) + Send + 'static,
+        F: Fn(Box<Future<Item = (), Error = ()> + Send>) + Send + 'static,
     {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
@@ -305,20 +317,23 @@ mod many {
     const ITER: usize = 200;
     fn test<F>(spawn: F)
     where
-        F: Fn(&mut Runtime, Box<Future<Item=(), Error=()> + Send>),
+        F: Fn(&mut Runtime, Box<Future<Item = (), Error = ()> + Send>),
     {
         let cnt = Arc::new(Mutex::new(0));
         let mut runtime = Runtime::new().unwrap();
 
         for _ in 0..ITER {
             let c = cnt.clone();
-            spawn(&mut runtime, Box::new(lazy(move || {
-                {
-                    let mut x = c.lock().unwrap();
-                    *x = 1 + *x;
-                }
-                Ok::<(), ()>(())
-            })));
+            spawn(
+                &mut runtime,
+                Box::new(lazy(move || {
+                    {
+                        let mut x = c.lock().unwrap();
+                        *x = 1 + *x;
+                    }
+                    Ok::<(), ()>(())
+                })),
+            );
         }
 
         runtime.shutdown_on_idle().wait().unwrap();
@@ -327,26 +342,25 @@ mod many {
 
     #[test]
     fn spawn() {
-        test(|rt, f| { rt.spawn(f); })
+        test(|rt, f| {
+            rt.spawn(f);
+        })
     }
 
     #[test]
     fn execute() {
         test(|rt, f| {
-            rt.executor()
-                .execute(f)
-                .unwrap();
+            rt.executor().execute(f).unwrap();
         })
     }
 }
-
 
 mod from_block_on_all {
     use super::*;
 
     fn test<F>(spawn: F)
     where
-        F: Fn(Box<Future<Item=(), Error=()> + Send>) + Send + 'static,
+        F: Fn(Box<Future<Item = (), Error = ()> + Send>) + Send + 'static,
     {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
@@ -387,19 +401,21 @@ mod from_block_on_all {
 
     #[test]
     fn spawn() {
-        test(|f| { tokio::spawn(f); })
+        test(|f| {
+            tokio::spawn(f);
+        })
     }
 }
 
 mod nested_enter {
     use super::*;
-    use tokio::runtime::current_thread;
     use std::panic;
+    use tokio::runtime::current_thread;
 
     fn test<F1, F2>(first: F1, nested: F2)
     where
-        F1: Fn(Box<Future<Item=(), Error=()> + Send>) + Send + 'static,
-        F2: Fn(Box<Future<Item=(), Error=()> + Send>) + panic::UnwindSafe + Send + 'static,
+        F1: Fn(Box<Future<Item = (), Error = ()> + Send>) + Send + 'static,
+        F2: Fn(Box<Future<Item = (), Error = ()> + Send>) + panic::UnwindSafe + Send + 'static,
     {
         let panicked = Arc::new(Mutex::new(false));
         let panicked2 = panicked.clone();
@@ -421,16 +437,18 @@ mod nested_enter {
         }));
 
         first(Box::new(lazy(move || {
-            panic::catch_unwind(move || {
-                nested(Box::new(lazy(|| { Ok::<(), ()>(()) })))
-            }).expect_err("nested should panic");
+            panic::catch_unwind(move || nested(Box::new(lazy(|| Ok::<(), ()>(())))))
+                .expect_err("nested should panic");
             *panicked2.lock().unwrap() = true;
             Ok::<(), ()>(())
         })));
 
         panic::set_hook(prev_hook);
 
-        assert!(*panicked.lock().unwrap(), "nested call should have panicked");
+        assert!(
+            *panicked.lock().unwrap(),
+            "nested call should have panicked"
+        );
     }
 
     fn threadpool_new() -> Runtime {
@@ -471,10 +489,7 @@ fn runtime_reactor_handle() {
     #![allow(deprecated)]
 
     use futures::Stream;
-    use std::net::{
-        TcpListener as StdListener,
-        TcpStream as StdStream,
-    };
+    use std::net::{TcpListener as StdListener, TcpStream as StdStream};
 
     let rt = Runtime::new().unwrap();
 
@@ -484,10 +499,7 @@ fn runtime_reactor_handle() {
     let addr = tk_listener.local_addr().unwrap();
 
     // Spawn a thread since we are avoiding the runtime
-    let th = thread::spawn(|| {
-        for _ in tk_listener.incoming().take(1).wait() {
-        }
-    });
+    let th = thread::spawn(|| for _ in tk_listener.incoming().take(1).wait() {});
 
     let _ = StdStream::connect(&addr).unwrap();
 
@@ -504,10 +516,14 @@ fn after_start_and_before_stop_is_called() {
     let after_inner = after_start.clone();
     let before_inner = before_stop.clone();
     let runtime = tokio::runtime::Builder::new()
-            .after_start(move || { after_inner.clone().fetch_add(1, atomic::Ordering::Relaxed); })
-            .before_stop(move || { before_inner.clone().fetch_add(1, atomic::Ordering::Relaxed); })
-            .build()
-            .unwrap();
+        .after_start(move || {
+            after_inner.clone().fetch_add(1, atomic::Ordering::Relaxed);
+        })
+        .before_stop(move || {
+            before_inner.clone().fetch_add(1, atomic::Ordering::Relaxed);
+        })
+        .build()
+        .unwrap();
 
     runtime.block_on_all(create_client_server_future()).unwrap();
 

@@ -1,21 +1,21 @@
 use callback::Callback;
 use config::{Config, MAX_WORKERS};
 use park::{BoxPark, BoxedPark, DefaultPark};
-use shutdown::ShutdownTrigger;
 use pool::{Pool, MAX_BACKUP};
+use shutdown::ShutdownTrigger;
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
 
+use std::cmp::max;
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use std::cmp::max;
 
 use crossbeam_deque::Injector;
 use num_cpus;
-use tokio_executor::Enter;
 use tokio_executor::park::Park;
+use tokio_executor::Enter;
 
 /// Builds a thread pool with custom configuration values.
 ///
@@ -93,10 +93,8 @@ impl Builder {
     pub fn new() -> Builder {
         let num_cpus = max(1, num_cpus::get());
 
-        let new_park = Box::new(|_: &WorkerId| {
-            Box::new(BoxedPark::new(DefaultPark::new()))
-                as BoxPark
-        });
+        let new_park =
+            Box::new(|_: &WorkerId| Box::new(BoxedPark::new(DefaultPark::new())) as BoxPark);
 
         Builder {
             pool_size: num_cpus,
@@ -280,7 +278,8 @@ impl Builder {
     ///
     /// [`Worker::run`]: struct.Worker.html#method.run
     pub fn around_worker<F>(&mut self, f: F) -> &mut Self
-        where F: Fn(&Worker, &mut Enter) + Send + Sync + 'static
+    where
+        F: Fn(&Worker, &mut Enter) + Send + Sync + 'static,
     {
         self.config.around_worker = Some(Callback::new(f));
         self
@@ -307,7 +306,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.config.after_start = Some(Arc::new(f));
         self
@@ -333,7 +333,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.config.before_stop = Some(Arc::new(f));
         self
@@ -369,13 +370,12 @@ impl Builder {
     /// # }
     /// ```
     pub fn custom_park<F, P>(&mut self, f: F) -> &mut Self
-    where F: Fn(&WorkerId) -> P + 'static,
-          P: Park + Send + 'static,
-          P::Error: Error,
+    where
+        F: Fn(&WorkerId) -> P + 'static,
+        P: Park + Send + 'static,
+        P::Error: Error,
     {
-        self.new_park = Box::new(move |id| {
-            Box::new(BoxedPark::new(f(id)))
-        });
+        self.new_park = Box::new(move |id| Box::new(BoxedPark::new(f(id))));
 
         self
     }

@@ -7,7 +7,7 @@ use std::time::Instant;
 ///
 /// Implementations must ensure that calls to `now` return monotonically
 /// increasing [`Instant`] values.
-/// 
+///
 /// [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
 pub trait Now: Send + Sync + 'static {
     /// Returns an instant corresponding to "now".

@@ -1,6 +1,6 @@
 use std::io;
-use std::path::Path;
 use std::os::windows::fs;
+use std::path::Path;
 
 use futures::{Future, Poll};
 
@@ -21,7 +21,7 @@ pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> SymlinkDir
 pub struct SymlinkDirFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     src: P,
     dst: Q,
@@ -30,25 +30,22 @@ where
 impl<P, Q> SymlinkDirFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     fn new(src: P, dst: Q) -> SymlinkDirFuture<P, Q> {
-        SymlinkDirFuture {
-            src: src,
-            dst: dst,
-        }
+        SymlinkDirFuture { src: src, dst: dst }
     }
 }
 
 impl<P, Q> Future for SymlinkDirFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::symlink_dir(&self.src, &self.dst) )
+        ::blocking_io(|| fs::symlink_dir(&self.src, &self.dst))
     }
 }

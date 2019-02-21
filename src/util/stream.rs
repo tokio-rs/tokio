@@ -1,8 +1,5 @@
 #[cfg(feature = "timer")]
-use tokio_timer::{
-    throttle::Throttle,
-    Timeout,
-};
+use tokio_timer::{throttle::Throttle, Timeout};
 
 use futures::Stream;
 
@@ -29,7 +26,8 @@ pub trait StreamExt: Stream {
     /// Errors are also delayed.
     #[cfg(feature = "timer")]
     fn throttle(self, duration: Duration) -> Throttle<Self>
-    where Self: Sized
+    where
+        Self: Sized,
     {
         Throttle::new(self, duration)
     }
@@ -47,7 +45,8 @@ pub trait StreamExt: Stream {
     /// an iterator with more than [`std::usize::MAX`] elements either produces the
     /// wrong result or panics.
     fn enumerate(self) -> Enumerate<Self>
-    where Self: Sized,
+    where
+        Self: Sized,
     {
         Enumerate::new(self)
     }
@@ -86,7 +85,8 @@ pub trait StreamExt: Stream {
     /// ```
     #[cfg(feature = "timer")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
-    where Self: Sized,
+    where
+        Self: Sized,
     {
         Timeout::new(self, timeout)
     }

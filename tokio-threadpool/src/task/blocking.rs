@@ -1,14 +1,14 @@
 use pool::Pool;
-use task::{Task, BlockingState};
+use task::{BlockingState, Task};
 
-use futures::{Poll, Async};
+use futures::{Async, Poll};
 
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ptr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Release, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::Arc;
 use std::thread;
 
 /// Manages the state around entering a blocking section and tasks that are
@@ -172,10 +172,10 @@ impl Blocking {
             debug_assert_ne!(curr.0, 0);
             debug_assert_ne!(next.0, 0);
 
-            let actual = self.state.compare_and_swap(
-                curr.into(),
-                next.into(),
-                AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(curr.into(), next.into(), AcqRel)
+                .into();
 
             if curr == actual {
                 break;
@@ -190,8 +190,7 @@ impl Blocking {
 
                 // Finish pushing
                 unsafe {
-                    (*prev).next_blocking
-                        .store(ptr as *mut _, Release);
+                    (*prev).next_blocking.store(ptr as *mut _, Release);
                 }
 
                 // The node was queued to be notified once capacity is made
@@ -245,7 +244,6 @@ impl Blocking {
     pub fn notify_task(&self, pool: &Arc<Pool>) {
         let prev = self.lock.fetch_add(1, AcqRel);
 
-
         if prev != 0 {
             // Another thread has the lock and will be responsible for notifying
             // pending tasks.
@@ -287,8 +285,7 @@ impl Blocking {
     /// there are no more tasks to pop, `rem` is used to set the remaining
     /// capacity.
     fn pop(&self, rem: usize) -> Option<Arc<Task>> {
-        'outer:
-        loop {
+        'outer: loop {
             unsafe {
                 let mut tail = *self.tail.get();
                 let mut next = (*tail).next_blocking.load(Acquire);
@@ -330,10 +327,10 @@ impl Blocking {
                             // pops that will come after the current one.
                             after.add_capacity(rem + 1, &self.stub);
 
-                            let actual: State = self.state.compare_and_swap(
-                                curr.into(),
-                                after.into(),
-                                AcqRel).into();
+                            let actual: State = self
+                                .state
+                                .compare_and_swap(curr.into(), after.into(), AcqRel)
+                                .into();
 
                             if actual == curr {
                                 // Successfully returned the remaining capacity

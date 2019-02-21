@@ -23,8 +23,8 @@ mod platform {
         println!("Waiting for SIGINT or SIGTERM");
         println!(
             "  TIP: use `pkill -sigint multiple` from a second terminal \
-         to send a SIGINT to all processes named 'multiple' \
-         (i.e. this binary)"
+             to send a SIGINT to all processes named 'multiple' \
+             (i.e. this binary)"
         );
         let (item, _rest) = ::tokio::runtime::current_thread::block_on_all(stream.into_future())
             .map_err(|_| "failed to wait for signals")?;
@@ -44,7 +44,9 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    pub fn main() -> Result<(), Box<::std::error::Error>> {Ok(())}
+    pub fn main() -> Result<(), Box<::std::error::Error>> {
+        Ok(())
+    }
 }
 
 fn main() -> Result<(), Box<std::error::Error>> {

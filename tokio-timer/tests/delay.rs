@@ -6,8 +6,8 @@ extern crate tokio_timer;
 mod support;
 use support::*;
 
-use tokio_timer::*;
 use tokio_timer::timer::Handle;
+use tokio_timer::*;
 
 use futures::Future;
 
@@ -52,9 +52,7 @@ fn delayed_delay_level_0() {
 fn sub_ms_delayed_delay() {
     mocked(|timer, time| {
         for _ in 0..5 {
-            let deadline = time.now()
-                + Duration::from_millis(1)
-                + Duration::new(0, 1);
+            let deadline = time.now() + Duration::from_millis(1) + Duration::new(0, 1);
 
             let mut delay = Delay::new(deadline);
 
@@ -282,11 +280,7 @@ fn sorta_long_delay() {
         // The delay has not elapsed.
         assert_not_ready!(delay);
 
-        let cascades = &[
-            262_144,
-            262_144 + 9 * 4096,
-            262_144 + 9 * 4096 + 15 * 64,
-        ];
+        let cascades = &[262_144, 262_144 + 9 * 4096, 262_144 + 9 * 4096 + 15 * 64];
 
         for &elapsed in cascades {
             turn(timer, None);

@@ -34,18 +34,21 @@ pub type IoStream<T> = Box<Stream<Item = T, Error = std_io::Error> + Send>;
 /// it indicates `WouldBlock` or otherwise `Err` is returned.
 #[macro_export]
 macro_rules! try_nb {
-    ($e:expr) => (match $e {
-        Ok(t) => t,
-        Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => {
-            return Ok(::futures::Async::NotReady)
+    ($e:expr) => {
+        match $e {
+            Ok(t) => t,
+            Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => {
+                return Ok(::futures::Async::NotReady);
+            }
+            Err(e) => return Err(e.into()),
         }
-        Err(e) => return Err(e.into()),
-    })
+    };
 }
 
-pub mod io;
 pub mod codec;
+pub mod io;
 
+pub mod _tokio_codec;
 mod allow_std;
 mod async_read;
 mod async_write;
@@ -56,7 +59,6 @@ mod length_delimited;
 mod lines;
 mod split;
 mod window;
-pub mod _tokio_codec;
 
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;

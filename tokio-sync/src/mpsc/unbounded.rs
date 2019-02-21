@@ -1,7 +1,7 @@
 use super::chan;
 
-use loom::sync::atomic::AtomicUsize;
 use futures::{Poll, Sink, StartSend, Stream};
+use loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
 
@@ -15,7 +15,9 @@ pub struct UnboundedSender<T> {
 
 impl<T> Clone for UnboundedSender<T> {
     fn clone(&self) -> Self {
-        UnboundedSender { chan: self.chan.clone() }
+        UnboundedSender {
+            chan: self.chan.clone(),
+        }
     }
 }
 
@@ -97,11 +99,9 @@ impl<T> Stream for UnboundedReceiver<T> {
     type Error = UnboundedRecvError;
 
     fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
-        self.chan.recv()
-            .map_err(|_| UnboundedRecvError(()))
+        self.chan.recv().map_err(|_| UnboundedRecvError(()))
     }
 }
-
 
 impl<T> UnboundedSender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> UnboundedSender<T> {
@@ -109,9 +109,7 @@ impl<T> UnboundedSender<T> {
     }
 
     /// Attempts to send a message on this `UnboundedSender` without blocking.
-    pub fn try_send(&mut self, message: T)
-        -> Result<(), UnboundedTrySendError<T>>
-    {
+    pub fn try_send(&mut self, message: T) -> Result<(), UnboundedTrySendError<T>> {
         self.chan.try_send(message)?;
         Ok(())
     }

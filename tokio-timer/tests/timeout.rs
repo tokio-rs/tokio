@@ -8,8 +8,8 @@ use support::*;
 
 use tokio_timer::*;
 
+use futures::sync::{mpsc, oneshot};
 use futures::{future, Future, Stream};
-use futures::sync::{oneshot, mpsc};
 
 #[test]
 fn simultaneous_deadline_future_completion() {

@@ -1,10 +1,10 @@
-extern crate tokio_io;
 extern crate bytes;
 extern crate futures;
+extern crate tokio_io;
 
-use tokio_io::AsyncRead;
-use bytes::{BytesMut, BufMut};
+use bytes::{BufMut, BytesMut};
 use futures::Async;
+use tokio_io::AsyncRead;
 
 use std::io::{self, Read};
 

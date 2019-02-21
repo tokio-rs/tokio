@@ -8,15 +8,15 @@
 
 #![deny(warnings)]
 
+extern crate env_logger;
 extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_io;
-extern crate env_logger;
 
 use std::net::SocketAddr;
 
+use tokio::net::{UdpFramed, UdpSocket};
 use tokio::prelude::*;
-use tokio::net::{UdpSocket, UdpFramed};
 use tokio_codec::BytesCodec;
 
 fn main() -> Result<(), Box<std::error::Error>> {

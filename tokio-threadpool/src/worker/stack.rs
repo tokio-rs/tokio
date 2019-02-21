@@ -1,9 +1,9 @@
 use config::MAX_WORKERS;
 use worker;
 
-use std::{fmt, usize};
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};
+use std::{fmt, usize};
 
 /// Lock-free stack of sleeping workers.
 ///
@@ -90,8 +90,10 @@ impl Stack {
             entries[idx].set_next_sleeper(head);
             next.set_head(idx);
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if state == actual {
                 return Ok(());
@@ -112,11 +114,12 @@ impl Stack {
     /// Returns the index of the popped worker and the worker's observed state.
     ///
     /// `None` if the stack is empty.
-    pub fn pop(&self, entries: &[worker::Entry],
-                  max_lifecycle: worker::Lifecycle,
-                  terminate: bool)
-        -> Option<(usize, worker::State)>
-    {
+    pub fn pop(
+        &self,
+        entries: &[worker::Entry],
+        max_lifecycle: worker::Lifecycle,
+        terminate: bool,
+    ) -> Option<(usize, worker::State)> {
         // Figure out the empty value
         let terminal = match terminate {
             true => TERMINATED,
@@ -145,8 +148,10 @@ impl Stack {
                     return None;
                 }
 
-                let actual = self.state.compare_and_swap(
-                    state.into(), next.into(), AcqRel).into();
+                let actual = self
+                    .state
+                    .compare_and_swap(state.into(), next.into(), AcqRel)
+                    .into();
 
                 if actual != state {
                     state = actual;
@@ -173,8 +178,10 @@ impl Stack {
                 next.set_head(next_head);
             }
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 // Release ordering is needed to ensure that unsetting the

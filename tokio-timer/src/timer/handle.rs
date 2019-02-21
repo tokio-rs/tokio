@@ -1,5 +1,5 @@
-use {Error, Delay, Deadline, Interval};
 use timer::Inner;
+use {Deadline, Delay, Error, Interval};
 
 use tokio_executor::Enter;
 
@@ -44,7 +44,7 @@ pub(crate) struct HandlePriv {
     inner: Weak<Inner>,
 }
 
-thread_local!{
+thread_local! {
     /// Tracks the timer for the current execution context.
     static CURRENT_TIMER: RefCell<Option<HandlePriv>> = RefCell::new(None)
 }
@@ -61,7 +61,8 @@ thread_local!{
 /// [`Delay`]: ../struct.Delay.html
 /// [`Delay::new`]: ../struct.Delay.html#method.new
 pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
-where F: FnOnce(&mut Enter) -> R
+where
+    F: FnOnce(&mut Enter) -> R,
 {
     // Ensure that the timer is removed from the thread-local context
     // when leaving the scope. This handles cases that involve panicking.
@@ -84,10 +85,14 @@ where F: FnOnce(&mut Enter) -> R
         {
             let mut current = current.borrow_mut();
 
-            assert!(current.is_none(), "default Tokio timer already set \
-                    for execution context");
+            assert!(
+                current.is_none(),
+                "default Tokio timer already set \
+                 for execution context"
+            );
 
-            let handle = handle.as_priv()
+            let handle = handle
+                .as_priv()
                 .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
 
             *current = Some(handle.clone());
@@ -118,23 +123,19 @@ impl Handle {
     /// [`with_default`]: ../fn.with_default.html
     /// [type]: #
     pub fn current() -> Handle {
-        let private = HandlePriv::try_current()
-            .unwrap_or_else(|_| {
-                HandlePriv { inner: Weak::new() }
-            });
+        let private =
+            HandlePriv::try_current().unwrap_or_else(|_| HandlePriv { inner: Weak::new() });
 
-        Handle { inner: Some(private) }
+        Handle {
+            inner: Some(private),
+        }
     }
 
     /// Create a `Delay` driven by this handle's associated `Timer`.
     pub fn delay(&self, deadline: Instant) -> Delay {
         match self.inner {
-            Some(ref handle_priv) => {
-                Delay::new_with_handle(deadline, handle_priv.clone())
-            }
-            None => {
-                Delay::new(deadline)
-            }
+            Some(ref handle_priv) => Delay::new_with_handle(deadline, handle_priv.clone()),
+            None => Delay::new(deadline),
         }
     }
 
@@ -165,11 +166,9 @@ impl HandlePriv {
     ///
     /// Returns `Err` if no handle is found.
     pub(crate) fn try_current() -> Result<HandlePriv, Error> {
-        CURRENT_TIMER.with(|current| {
-            match *current.borrow() {
-                Some(ref handle) => Ok(handle.clone()),
-                None => Err(Error::shutdown()),
-            }
+        CURRENT_TIMER.with(|current| match *current.borrow() {
+            Some(ref handle) => Ok(handle.clone()),
+            None => Err(Error::shutdown()),
         })
     }
 

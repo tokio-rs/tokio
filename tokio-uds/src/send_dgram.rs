@@ -34,11 +34,7 @@ where
 {
     pub(crate) fn new(sock: UnixDatagram, buf: T, addr: P) -> SendDgram<T, P> {
         SendDgram {
-            st: State::Sending {
-                sock,
-                buf,
-                addr,
-            }
+            st: State::Sending { sock, buf, addr },
         }
     }
 }
@@ -70,9 +66,7 @@ where
         } else {
             panic!()
         }
-        if let State::Sending { sock, buf, addr: _ } =
-            mem::replace(&mut self.st, State::Empty)
-        {
+        if let State::Sending { sock, buf, addr: _ } = mem::replace(&mut self.st, State::Empty) {
             Ok(Async::Ready((sock, buf)))
         } else {
             panic!()

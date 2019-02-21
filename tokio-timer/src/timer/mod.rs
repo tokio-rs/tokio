@@ -44,23 +44,23 @@ use self::atomic_stack::AtomicStack;
 use self::entry::Entry;
 use self::stack::Stack;
 
-pub use self::handle::{Handle, with_default};
 pub(crate) use self::handle::HandlePriv;
+pub use self::handle::{with_default, Handle};
 pub use self::now::{Now, SystemNow};
 pub(crate) use self::registration::Registration;
 
-use Error;
 use atomic::AtomicU64;
 use wheel;
+use Error;
 
-use tokio_executor::park::{Park, Unpark, ParkThread};
+use tokio_executor::park::{Park, ParkThread, Unpark};
 
-use std::{cmp, fmt};
-use std::time::{Duration, Instant};
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use std::usize;
+use std::{cmp, fmt};
 
 /// Timer implementation that drives [`Delay`], [`Interval`], and [`Timeout`].
 ///
@@ -171,7 +171,8 @@ const MAX_TIMEOUTS: usize = usize::MAX >> 1;
 // ===== impl Timer =====
 
 impl<T> Timer<T>
-where T: Park
+where
+    T: Park,
 {
     /// Create a new `Timer` instance that uses `park` to block the current
     /// thread.
@@ -201,8 +202,9 @@ impl<T, N> Timer<T, N> {
 }
 
 impl<T, N> Timer<T, N>
-where T: Park,
-      N: Now,
+where
+    T: Park,
+    N: Now,
 {
     /// Create a new `Timer` instance that uses `park` to block the current
     /// thread and `now` to get the current `Instant`.
@@ -268,8 +270,7 @@ where T: Park,
         let mut poll = wheel::Poll::new(now);
 
         while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
-            let when = entry.when_internal()
-                .expect("invalid internal entry state");
+            let when = entry.when_internal().expect("invalid internal entry state");
 
             // Fire the entry
             entry.fire(when);
@@ -345,8 +346,9 @@ impl Default for Timer<ParkThread, SystemNow> {
 }
 
 impl<T, N> Park for Timer<T, N>
-where T: Park,
-      N: Now,
+where
+    T: Park,
+    N: Now,
 {
     type Unpark = T::Unpark;
     type Error = T::Error;
@@ -483,7 +485,6 @@ impl Inner {
 
 impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Inner")
-            .finish()
+        fmt.debug_struct("Inner").finish()
     }
 }

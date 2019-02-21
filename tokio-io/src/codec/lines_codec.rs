@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use bytes::{BufMut, BytesMut};
-use codec::{Encoder, Decoder};
+use codec::{Decoder, Encoder};
 use std::{io, str};
 
 /// A simple `Codec` implementation that splits up data into lines.
@@ -25,10 +25,8 @@ impl LinesCodec {
 }
 
 fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
-    str::from_utf8(buf).map_err(|_|
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Unable to decode input as UTF8"))
+    str::from_utf8(buf)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to decode input as UTF8"))
 }
 
 fn without_carriage_return(s: &[u8]) -> &[u8] {
@@ -44,12 +42,10 @@ impl Decoder for LinesCodec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
-        if let Some(newline_offset) =
-            buf[self.next_index..].iter().position(|b| *b == b'\n')
-        {
+        if let Some(newline_offset) = buf[self.next_index..].iter().position(|b| *b == b'\n') {
             let newline_index = newline_offset + self.next_index;
             let line = buf.split_to(newline_index + 1);
-            let line = &line[..line.len()-1];
+            let line = &line[..line.len() - 1];
             let line = without_carriage_return(line);
             let line = utf8(line)?;
             self.next_index = 0;

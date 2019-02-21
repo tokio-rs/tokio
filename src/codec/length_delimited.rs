@@ -355,19 +355,15 @@
 //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
 use {
-    codec::{
-        Decoder, Encoder, FramedRead, FramedWrite, Framed
-    },
-    io::{
-        AsyncRead, AsyncWrite
-    },
+    codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite},
+    io::{AsyncRead, AsyncWrite},
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
 
-use std::{cmp, fmt};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
+use std::{cmp, fmt};
 
 /// Configure length delimited `LengthDelimitedCodec`s.
 ///
@@ -476,9 +472,10 @@ impl LengthDelimitedCodec {
             };
 
             if n > self.builder.max_frame_len as u64 {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, FrameTooBig {
-                    _priv: (),
-                }));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    FrameTooBig { _priv: () },
+                ));
             }
 
             // The check above ensures there is no overflow
@@ -494,7 +491,12 @@ impl LengthDelimitedCodec {
             // Error handling
             match n {
                 Some(n) => n,
-                None => return Err(io::Error::new(io::ErrorKind::InvalidInput, "provided length would overflow after adjustment")),
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "provided length would overflow after adjustment",
+                    ));
+                }
             }
         };
 
@@ -528,15 +530,13 @@ impl Decoder for LengthDelimitedCodec {
 
     fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
         let n = match self.state {
-            DecodeState::Head => {
-                match try!(self.decode_head(src)) {
-                    Some(n) => {
-                        self.state = DecodeState::Data(n);
-                        n
-                    }
-                    None => return Ok(None),
+            DecodeState::Head => match try!(self.decode_head(src)) {
+                Some(n) => {
+                    self.state = DecodeState::Data(n);
+                    n
                 }
-            }
+                None => return Ok(None),
+            },
             DecodeState::Data(n) => n,
         };
 
@@ -563,9 +563,10 @@ impl Encoder for LengthDelimitedCodec {
         let n = (&data).into_buf().remaining();
 
         if n > self.builder.max_frame_len {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, FrameTooBig {
-                _priv: (),
-            }));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                FrameTooBig { _priv: () },
+            ));
         }
 
         // Adjust `n` with bounds checking
@@ -575,10 +576,12 @@ impl Encoder for LengthDelimitedCodec {
             n.checked_sub(self.builder.length_adjustment as usize)
         };
 
-        let n = n.ok_or_else(|| io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "provided length would overflow after adjustment",
-        ))?;
+        let n = n.ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "provided length would overflow after adjustment",
+            )
+        })?;
 
         // Reserve capacity in the destination buffer to fit the frame and
         // length field (plus adjustment).
@@ -892,7 +895,8 @@ impl Builder {
     /// # pub fn main() {}
     /// ```
     pub fn new_read<T>(&self, upstream: T) -> FramedRead<T, LengthDelimitedCodec>
-        where T: AsyncRead,
+    where
+        T: AsyncRead,
     {
         FramedRead::new(upstream, self.new_codec())
     }
@@ -915,7 +919,8 @@ impl Builder {
     /// # pub fn main() {}
     /// ```
     pub fn new_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedCodec>
-        where T: AsyncWrite,
+    where
+        T: AsyncWrite,
     {
         FramedWrite::new(inner, self.new_codec())
     }
@@ -939,7 +944,8 @@ impl Builder {
     /// # pub fn main() {}
     /// ```
     pub fn new_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedCodec>
-        where T: AsyncRead + AsyncWrite,
+    where
+        T: AsyncRead + AsyncWrite,
     {
         Framed::new(inner, self.new_codec())
     }
@@ -950,17 +956,16 @@ impl Builder {
     }
 
     fn get_num_skip(&self) -> usize {
-        self.num_skip.unwrap_or(self.length_field_offset + self.length_field_len)
+        self.num_skip
+            .unwrap_or(self.length_field_offset + self.length_field_len)
     }
 }
-
 
 // ===== impl FrameTooBig =====
 
 impl fmt::Debug for FrameTooBig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FrameTooBig")
-            .finish()
+        f.debug_struct("FrameTooBig").finish()
     }
 }
 

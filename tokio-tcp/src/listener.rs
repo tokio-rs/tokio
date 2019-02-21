@@ -5,7 +5,7 @@ use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
 
-use futures::{Poll, Async};
+use futures::{Async, Poll};
 use mio;
 use tokio_reactor::{Handle, PollEvented};
 
@@ -235,9 +235,7 @@ impl TcpListener {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_std(listener: net::TcpListener, handle: &Handle)
-        -> io::Result<TcpListener>
-    {
+    pub fn from_std(listener: net::TcpListener, handle: &Handle) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener)?;
         let io = PollEvented::new_with_handle(io, handle)?;
         Ok(TcpListener { io })
@@ -371,8 +369,8 @@ impl fmt::Debug for TcpListener {
 
 #[cfg(unix)]
 mod sys {
-    use std::os::unix::prelude::*;
     use super::TcpListener;
+    use std::os::unix::prelude::*;
 
     impl AsRawFd for TcpListener {
         fn as_raw_fd(&self) -> RawFd {

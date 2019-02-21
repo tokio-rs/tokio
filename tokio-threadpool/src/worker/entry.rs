@@ -4,9 +4,9 @@ use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::atomic::Ordering::{Acquire, AcqRel, Relaxed, Release};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crossbeam_deque::{Steal, Stealer, Worker};
@@ -102,9 +102,10 @@ impl WorkerEntry {
             let mut next = state;
             next.notify();
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(),
-                AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if state == actual {
                 break;
@@ -169,8 +170,10 @@ impl WorkerEntry {
 
             next.set_lifecycle(Signaled);
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 break;
@@ -307,7 +310,9 @@ impl WorkerEntry {
 
     #[inline]
     pub fn set_next_sleeper(&self, val: usize) {
-        unsafe { *self.next_sleeper.get() = val; }
+        unsafe {
+            *self.next_sleeper.get() = val;
+        }
     }
 }
 

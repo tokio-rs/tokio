@@ -7,8 +7,7 @@ use tokio_timer::Timeout;
 use futures::Future;
 
 #[cfg(feature = "timer")]
-use std::time::{Instant, Duration};
-
+use std::time::{Duration, Instant};
 
 /// An extension trait for `Future` that provides a variety of convenient
 /// combinator functions.
@@ -24,7 +23,6 @@ use std::time::{Instant, Duration};
 ///
 /// [`timeout`]: #method.timeout
 pub trait FutureExt: Future {
-
     /// Creates a new future which allows `self` until `timeout`.
     ///
     /// This combinator creates a new future which wraps the receiving future
@@ -60,7 +58,8 @@ pub trait FutureExt: Future {
     /// ```
     #[cfg(feature = "timer")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
-    where Self: Sized,
+    where
+        Self: Sized,
     {
         Timeout::new(self, timeout)
     }
@@ -70,7 +69,8 @@ pub trait FutureExt: Future {
     #[allow(deprecated)]
     #[doc(hidden)]
     fn deadline(self, deadline: Instant) -> Deadline<Self>
-    where Self: Sized,
+    where
+        Self: Sized,
     {
         Deadline::new(self, deadline)
     }

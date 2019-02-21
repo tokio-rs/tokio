@@ -7,9 +7,9 @@
 //! [`FutureExt`]: trait.FutureExt.html
 //! [`StreamExt`]: trait.StreamExt.html
 
+mod enumerate;
 mod future;
 mod stream;
-mod enumerate;
 
 pub use self::future::FutureExt;
 pub use self::stream::StreamExt;

@@ -40,32 +40,16 @@ mod chan;
 mod list;
 mod unbounded;
 
-pub use self::bounded::{
-    channel,
-    Receiver,
-    Sender
-};
+pub use self::bounded::{channel, Receiver, Sender};
 
-pub use self::unbounded::{
-    unbounded_channel,
-    UnboundedReceiver,
-    UnboundedSender,
-};
+pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 pub mod error {
     //! Channel error types
 
-    pub use super::bounded::{
-        SendError,
-        TrySendError,
-        RecvError,
-    };
+    pub use super::bounded::{RecvError, SendError, TrySendError};
 
-    pub use super::unbounded::{
-        UnboundedSendError,
-        UnboundedTrySendError,
-        UnboundedRecvError,
-    };
+    pub use super::unbounded::{UnboundedRecvError, UnboundedSendError, UnboundedTrySendError};
 }
 
 /// The number of values a block can contain.

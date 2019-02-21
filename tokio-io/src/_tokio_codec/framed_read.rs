@@ -2,12 +2,12 @@
 
 use std::fmt;
 
-use AsyncRead;
-use codec::Decoder;
 use super::framed::Fuse;
+use codec::Decoder;
+use AsyncRead;
 
-use futures::{Async, Poll, Stream, Sink, StartSend};
 use bytes::BytesMut;
+use futures::{Async, Poll, Sink, StartSend, Stream};
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 pub struct FramedRead<T, D> {
@@ -26,8 +26,9 @@ const INITIAL_CAPACITY: usize = 8 * 1024;
 // ===== impl FramedRead =====
 
 impl<T, D> FramedRead<T, D>
-    where T: AsyncRead,
-          D: Decoder,
+where
+    T: AsyncRead,
+    D: Decoder,
 {
     /// Creates a new `FramedRead` with the given `decoder`.
     pub fn new(inner: T, decoder: D) -> FramedRead<T, D> {
@@ -79,8 +80,9 @@ impl<T, D> FramedRead<T, D> {
 }
 
 impl<T, D> Stream for FramedRead<T, D>
-    where T: AsyncRead,
-          D: Decoder,
+where
+    T: AsyncRead,
+    D: Decoder,
 {
     type Item = D::Item;
     type Error = D::Error;
@@ -91,15 +93,13 @@ impl<T, D> Stream for FramedRead<T, D>
 }
 
 impl<T, D> Sink for FramedRead<T, D>
-    where T: Sink,
+where
+    T: Sink,
 {
     type SinkItem = T::SinkItem;
     type SinkError = T::SinkError;
 
-    fn start_send(&mut self,
-                  item: Self::SinkItem)
-                  -> StartSend<Self::SinkItem, Self::SinkError>
-    {
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         self.inner.inner.0.start_send(item)
     }
 
@@ -113,8 +113,9 @@ impl<T, D> Sink for FramedRead<T, D>
 }
 
 impl<T, D> fmt::Debug for FramedRead<T, D>
-    where T: fmt::Debug,
-          D: fmt::Debug,
+where
+    T: fmt::Debug,
+    D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("FramedRead")
@@ -170,7 +171,8 @@ impl<T> FramedRead2<T> {
 }
 
 impl<T> Stream for FramedRead2<T>
-    where T: AsyncRead + Decoder,
+where
+    T: AsyncRead + Decoder,
 {
     type Item = T::Item;
     type Error = T::Error;

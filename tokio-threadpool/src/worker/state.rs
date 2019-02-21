@@ -108,11 +108,12 @@ impl From<usize> for Lifecycle {
         use self::Lifecycle::*;
 
         debug_assert!(
-            src == Shutdown as usize ||
-            src == Running as usize ||
-            src == Sleeping as usize ||
-            src == Notified as usize ||
-            src == Signaled as usize);
+            src == Shutdown as usize
+                || src == Running as usize
+                || src == Sleeping as usize
+                || src == Notified as usize
+                || src == Signaled as usize
+        );
 
         unsafe { ::std::mem::transmute(src) }
     }
@@ -128,18 +129,12 @@ impl From<Lifecycle> for usize {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::Lifecycle::*;
+    use super::*;
 
     #[test]
     fn lifecycle_encode() {
-        let lifecycles = &[
-            Shutdown,
-            Running,
-            Sleeping,
-            Notified,
-            Signaled,
-        ];
+        let lifecycles = &[Shutdown, Running, Sleeping, Notified, Signaled];
 
         for &lifecycle in lifecycles {
             let mut v: usize = lifecycle.into();

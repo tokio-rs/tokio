@@ -1,11 +1,11 @@
-use pool::{self, Pool, Lifecycle, MAX_FUTURES};
+use pool::{self, Lifecycle, Pool, MAX_FUTURES};
 use task::Task;
 
-use std::sync::Arc;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
+use std::sync::Arc;
 
-use tokio_executor::{self, SpawnError};
 use futures::{future, Future};
+use tokio_executor::{self, SpawnError};
 
 /// Submit futures to the associated thread pool for execution.
 ///
@@ -77,7 +77,8 @@ impl Sender {
     /// # }
     /// ```
     pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
-    where F: Future<Item = (), Error = ()> + Send + 'static,
+    where
+        F: Future<Item = (), Error = ()> + Send + 'static,
     {
         let mut s = self;
         tokio_executor::Executor::spawn(&mut s, Box::new(future))
@@ -104,8 +105,11 @@ impl Sender {
 
             next.inc_num_futures();
 
-            let actual = self.pool.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .pool
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 trace!("execute; count={:?}", next.num_futures());
@@ -125,9 +129,10 @@ impl tokio_executor::Executor for Sender {
         tokio_executor::Executor::status(&s)
     }
 
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), SpawnError>
-    {
+    fn spawn(
+        &mut self,
+        future: Box<Future<Item = (), Error = ()> + Send>,
+    ) -> Result<(), SpawnError> {
         let mut s = &*self;
         tokio_executor::Executor::spawn(&mut s, future)
     }
@@ -150,9 +155,10 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         Ok(())
     }
 
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), SpawnError>
-    {
+    fn spawn(
+        &mut self,
+        future: Box<Future<Item = (), Error = ()> + Send>,
+    ) -> Result<(), SpawnError> {
         self.prepare_for_spawn()?;
 
         // At this point, the pool has accepted the future, so schedule it for
@@ -171,7 +177,8 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 }
 
 impl<T> future::Executor<T> for Sender
-where T: Future<Item = (), Error = ()> + Send + 'static,
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
 {
     fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
         if let Err(e) = tokio_executor::Executor::status(self) {

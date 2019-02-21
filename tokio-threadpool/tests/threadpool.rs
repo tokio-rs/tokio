@@ -1,19 +1,19 @@
-extern crate tokio_threadpool;
-extern crate tokio_executor;
-extern crate futures;
 extern crate env_logger;
+extern crate futures;
+extern crate tokio_executor;
+extern crate tokio_threadpool;
 
 use tokio_executor::park::{Park, Unpark};
-use tokio_threadpool::*;
 use tokio_threadpool::park::{DefaultPark, DefaultUnpark};
+use tokio_threadpool::*;
 
-use futures::{Poll, Sink, Stream, Async, Future};
 use futures::future::lazy;
+use futures::{Async, Future, Poll, Sink, Stream};
 
 use std::cell::Cell;
-use std::sync::{mpsc, Arc};
-use std::sync::atomic::*;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::*;
+use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 thread_local!(static FOO: Cell<u32> = Cell::new(0));
@@ -56,7 +56,8 @@ fn natural_shutdown_simple_futures() {
 
                     t.send("one").unwrap();
                     Ok(())
-                })).unwrap();
+                }))
+                .unwrap();
                 rx
             };
 
@@ -68,7 +69,8 @@ fn natural_shutdown_simple_futures() {
 
                     t.send("two").unwrap();
                     Ok(())
-                })).unwrap();
+                }))
+                .unwrap();
                 rx
             };
 
@@ -223,7 +225,8 @@ fn many_oneshot_futures() {
             tx.spawn(lazy(move || {
                 cnt.fetch_add(1, Relaxed);
                 Ok(())
-            })).unwrap();
+            }))
+            .unwrap();
         }
 
         // Wait for the pool to shutdown
@@ -257,15 +260,17 @@ fn many_multishot_futures() {
             for _ in 0..CHAIN {
                 let (next_tx, next_rx) = mpsc::channel(10);
 
-                let rx = chain_rx
-                    .map_err(|e| panic!("{:?}", e));
+                let rx = chain_rx.map_err(|e| panic!("{:?}", e));
 
                 // Forward all the messages
-                pool_tx.spawn(next_tx
-                    .send_all(rx)
-                    .map(|_| ())
-                    .map_err(|e| panic!("{:?}", e))
-                ).unwrap();
+                pool_tx
+                    .spawn(
+                        next_tx
+                            .send_all(rx)
+                            .map(|_| ())
+                            .map_err(|e| panic!("{:?}", e)),
+                    )
+                    .unwrap();
 
                 chain_rx = next_rx;
             }
@@ -321,7 +326,8 @@ fn global_executor_is_configured() {
         }));
 
         Ok(())
-    })).unwrap();
+    }))
+    .unwrap();
 
     signal_rx.recv().unwrap();
 
@@ -339,17 +345,12 @@ fn busy_threadpool_is_not_idle() {
     use futures::sync::oneshot;
 
     // let pool = ThreadPool::new();
-    let pool = Builder::new()
-        .pool_size(4)
-        .max_blocking(2)
-        .build();
+    let pool = Builder::new().pool_size(4).max_blocking(2).build();
     let tx = pool.sender().clone();
 
     let (term_tx, term_rx) = oneshot::channel();
 
-    tx.spawn(term_rx.then(|_| {
-        Ok(())
-    })).unwrap();
+    tx.spawn(term_rx.then(|_| Ok(()))).unwrap();
 
     let mut idle = pool.shutdown_on_idle();
 
@@ -426,7 +427,7 @@ fn multi_threadpool() {
 
 #[test]
 fn eagerly_drops_futures() {
-    use futures::future::{Future, lazy, empty};
+    use futures::future::{empty, lazy, Future};
     use futures::task;
     use std::sync::mpsc;
 
@@ -486,12 +487,10 @@ fn eagerly_drops_futures() {
     let notify_on_drop = NotifyOnDrop(drop_tx);
 
     let pool = tokio_threadpool::Builder::new()
-        .custom_park(move |_| {
-            MyPark {
-                inner: DefaultPark::new(),
-                park_tx: park_tx.clone(),
-                unpark_tx: unpark_tx.clone(),
-            }
+        .custom_park(move |_| MyPark {
+            inner: DefaultPark::new(),
+            park_tx: park_tx.clone(),
+            unpark_tx: unpark_tx.clone(),
         })
         .build();
 
@@ -506,7 +505,9 @@ fn eagerly_drops_futures() {
         // `notify_on_drop` handle.
         empty::<(), ()>().then(move |_| {
             // This code path should never be reached.
-            if true { panic!() }
+            if true {
+                panic!()
+            }
 
             // Explicitly drop `notify_on_drop` here, this is mostly to ensure
             // that the `notify_on_drop` handle gets moved into the task. It

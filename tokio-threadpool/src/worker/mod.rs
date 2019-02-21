@@ -2,24 +2,19 @@ mod entry;
 mod stack;
 mod state;
 
-pub(crate) use self::entry::{
-    WorkerEntry as Entry,
-};
+pub(crate) use self::entry::WorkerEntry as Entry;
 pub(crate) use self::stack::Stack;
-pub(crate) use self::state::{
-    State,
-    Lifecycle,
-};
+pub(crate) use self::state::{Lifecycle, State};
 
-use pool::{self, Pool, BackupId};
 use notifier::Notifier;
+use pool::{self, BackupId, Pool};
 use sender::Sender;
 use shutdown::ShutdownTrigger;
-use task::{self, Task, CanBlock};
+use task::{self, CanBlock, Task};
 
 use tokio_executor;
 
-use futures::{Poll, Async};
+use futures::{Async, Poll};
 
 use std::cell::Cell;
 use std::marker::PhantomData;
@@ -339,8 +334,11 @@ impl Worker {
                 }
             }
 
-            let actual = self.entry().state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .entry()
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 break;
@@ -417,8 +415,11 @@ impl Worker {
 
                         self.run_task(task, notify);
 
-                        trace!("try_steal_task -- signal_work; self={}; from={}",
-                               self.id.0, idx);
+                        trace!(
+                            "try_steal_task -- signal_work; self={}; from={}",
+                            self.id.0,
+                            idx
+                        );
 
                         // Signal other workers that work is available
                         //
@@ -485,8 +486,11 @@ impl Worker {
                     let mut next = state;
                     next.dec_num_futures();
 
-                    let actual = self.pool.state.compare_and_swap(
-                        state.into(), next.into(), AcqRel).into();
+                    let actual = self
+                        .pool
+                        .state
+                        .compare_and_swap(state.into(), next.into(), AcqRel)
+                        .into();
 
                     if actual == state {
                         trace!("task complete; state={:?}", next);
@@ -526,11 +530,7 @@ impl Worker {
     ///
     /// Great care is needed to ensure that `current_task` is unset in this
     /// function.
-    fn run_task2(&self,
-                 task: &Arc<Task>,
-                 notify: &Arc<Notifier>)
-        -> task::Run
-    {
+    fn run_task2(&self, task: &Arc<Task>, notify: &Arc<Notifier>) -> task::Run {
         struct Guard<'a> {
             worker: &'a Worker,
         }
@@ -562,9 +562,7 @@ impl Worker {
 
         // Create the guard, this ensures that `current_task` is unset when the
         // function returns, even if the return is caused by a panic.
-        let _g = Guard {
-            worker: self,
-        };
+        let _g = Guard { worker: self };
 
         task.run(notify)
     }
@@ -609,8 +607,11 @@ impl Worker {
                 }
             }
 
-            let actual = self.entry().state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .entry()
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 if state.is_notified() {
@@ -668,8 +669,11 @@ impl Worker {
                         let mut next = state;
                         next.set_lifecycle(Running);
 
-                        let actual = self.entry().state.compare_and_swap(
-                            state.into(), next.into(), AcqRel).into();
+                        let actual = self
+                            .entry()
+                            .state
+                            .compare_and_swap(state.into(), next.into(), AcqRel)
+                            .into();
 
                         if actual == state {
                             return true;

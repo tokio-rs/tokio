@@ -40,10 +40,10 @@ where
             return Err(LimitError { inner: None });
         }
 
-        let res = self.stream.poll_buf()
-            .map_err(|err| {
-                LimitError { inner: Some(err) }
-            });
+        let res = self
+            .stream
+            .poll_buf()
+            .map_err(|err| LimitError { inner: Some(err) });
 
         match res {
             Ok(Ready(Some(ref buf))) => {

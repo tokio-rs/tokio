@@ -23,7 +23,7 @@ macro_rules! if_fuzz {
 }
 
 mod loom;
-pub mod oneshot;
 pub mod mpsc;
+pub mod oneshot;
 pub mod semaphore;
 pub mod task;

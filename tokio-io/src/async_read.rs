@@ -1,11 +1,11 @@
-use std::io as std_io;
 use bytes::BufMut;
 use futures::{Async, Poll};
+use std::io as std_io;
 
-use {framed, split, AsyncWrite};
 #[allow(deprecated)]
 use codec::{Decoder, Encoder, Framed};
 use split::{ReadHalf, WriteHalf};
+use {framed, split, AsyncWrite};
 
 /// Read bytes asynchronously.
 ///
@@ -80,9 +80,7 @@ pub trait AsyncRead: std_io::Read {
     fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, std_io::Error> {
         match self.read(buf) {
             Ok(t) => Ok(Async::Ready(t)),
-            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => {
-                return Ok(Async::NotReady)
-            }
+            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => return Ok(Async::NotReady),
             Err(e) => return Err(e.into()),
         }
     }
@@ -94,7 +92,8 @@ pub trait AsyncRead: std_io::Read {
     /// will be advanced if any bytes were read. Note that this method typically
     /// will not reallocate the buffer provided.
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, std_io::Error>
-        where Self: Sized,
+    where
+        Self: Sized,
     {
         if !buf.has_remaining_mut() {
             return Ok(Async::Ready(0));
@@ -134,7 +133,8 @@ pub trait AsyncRead: std_io::Read {
     #[deprecated(since = "0.1.7", note = "Use tokio_codec::Decoder::framed instead")]
     #[allow(deprecated)]
     fn framed<T: Encoder + Decoder>(self, codec: T) -> Framed<Self, T>
-        where Self: AsyncWrite + Sized,
+    where
+        Self: AsyncWrite + Sized,
     {
         framed::framed(self, codec)
     }
@@ -144,7 +144,8 @@ pub trait AsyncRead: std_io::Read {
     /// The two halves returned implement the `Read` and `Write` traits,
     /// respectively.
     fn split(self) -> (ReadHalf<Self>, WriteHalf<Self>)
-        where Self: AsyncWrite + Sized,
+    where
+        Self: AsyncWrite + Sized,
     {
         split::split(self)
     }

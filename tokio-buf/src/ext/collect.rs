@@ -1,5 +1,5 @@
-use BufStream;
 use super::FromBufStream;
+use BufStream;
 
 use futures::{Future, Poll};
 
@@ -53,29 +53,26 @@ where
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            let res = self.stream.poll_buf()
-                .map_err(|err| {
-                    let inner = Error::Stream(err);
-                    CollectError { inner }
-                });
+            let res = self.stream.poll_buf().map_err(|err| {
+                let inner = Error::Stream(err);
+                CollectError { inner }
+            });
 
             match try_ready!(res) {
                 Some(mut buf) => {
                     let builder = self.builder.as_mut().expect("cannot poll after done");
 
-                    U::extend(builder, &mut buf, &self.stream.size_hint())
-                        .map_err(|err| {
-                            let inner = Error::Collect(err);
-                            CollectError { inner }
-                        })?;
+                    U::extend(builder, &mut buf, &self.stream.size_hint()).map_err(|err| {
+                        let inner = Error::Collect(err);
+                        CollectError { inner }
+                    })?;
                 }
                 None => {
                     let builder = self.builder.take().expect("cannot poll after done");
-                    let value = U::build(builder)
-                        .map_err(|err| {
-                            let inner = Error::Collect(err);
-                            CollectError { inner }
-                        })?;
+                    let value = U::build(builder).map_err(|err| {
+                        let inner = Error::Collect(err);
+                        CollectError { inner }
+                    })?;
                     return Ok(value.into());
                 }
             }

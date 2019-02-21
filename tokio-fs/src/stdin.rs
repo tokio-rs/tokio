@@ -1,4 +1,4 @@
-use tokio_io::{AsyncRead};
+use tokio_io::AsyncRead;
 
 use std::io::{self, Read, Stdin as StdStdin};
 

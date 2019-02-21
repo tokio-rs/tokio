@@ -4,8 +4,8 @@ extern crate futures;
 extern crate tokio_mock_task;
 extern crate tokio_sync;
 
-use tokio_sync::oneshot;
 use tokio_mock_task::*;
+use tokio_sync::oneshot;
 
 use futures::prelude::*;
 
@@ -16,19 +16,18 @@ macro_rules! assert_ready {
             Ok(_) => panic!("not ready"),
             Err(e) => panic!("error = {:?}", e),
         }
-    }}
+    }};
 }
 
 macro_rules! assert_not_ready {
     ($e:expr) => {{
         match $e {
-            Ok(futures::Async::NotReady) => {},
+            Ok(futures::Async::NotReady) => {}
             Ok(futures::Async::Ready(v)) => panic!("ready; value = {:?}", v),
             Err(e) => panic!("error = {:?}", e),
         }
-    }}
+    }};
 }
-
 
 trait AssertSend: Send {}
 impl AssertSend for oneshot::Sender<i32> {}

@@ -11,8 +11,8 @@
 use loom::{
     futures::AtomicTask,
     sync::{
+        atomic::{AtomicPtr, AtomicUsize},
         CausalCell,
-        atomic::{AtomicUsize, AtomicPtr},
     },
     yield_now,
 };
@@ -21,8 +21,8 @@ use futures::Poll;
 
 use std::fmt;
 use std::ptr::{self, NonNull};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 use std::sync::Arc;
-use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed};
 use std::usize;
 
 /// Futures-aware semaphore.
@@ -176,9 +176,7 @@ impl Semaphore {
     }
 
     /// Poll for a permit
-    fn poll_permit(&self, mut permit: Option<&mut Permit>)
-        -> Poll<(), AcquireError>
-    {
+    fn poll_permit(&self, mut permit: Option<&mut Permit>) -> Poll<(), AcquireError> {
         use futures::Async::*;
 
         // Load the current state
@@ -201,7 +199,7 @@ impl Semaphore {
                     let waiter = unsafe { Arc::from_raw(waiter.as_ptr()) };
                     waiter.revert_to_idle();
                 }
-            }
+            };
         }
 
         loop {
@@ -220,7 +218,8 @@ impl Semaphore {
                 if maybe_strong.is_none() {
                     if let Some(ref mut permit) = permit {
                         // Get the Sender's waiter node, or initialize one
-                        let waiter = permit.waiter
+                        let waiter = permit
+                            .waiter
                             .get_or_insert_with(|| Arc::new(WaiterNode::new()));
 
                         waiter.register();
@@ -259,8 +258,7 @@ impl Semaphore {
 
                             // Finish pushing
                             unsafe {
-                                prev_waiter.as_ref()
-                                    .next.store(waiter.as_ptr(), Release);
+                                prev_waiter.as_ref().next.store(waiter.as_ptr(), Release);
                             }
 
                             debug!(" + poll_permit -- waiter pushed");
@@ -327,8 +325,10 @@ impl Semaphore {
 
     fn add_permits_locked(&self, mut rem: usize, mut closed: bool) {
         while rem > 0 || closed {
-            debug!(" + add_permits_locked -- iter; rem = {}; closed = {:?}",
-                   rem, closed);
+            debug!(
+                " + add_permits_locked -- iter; rem = {}; closed = {:?}",
+                rem, closed
+            );
 
             if closed {
                 SemState::fetch_set_closed(&self.state, AcqRel);
@@ -341,13 +341,19 @@ impl Semaphore {
 
             let actual = if closed {
                 let actual = self.rx_lock.fetch_sub(n | 1, AcqRel);
-                debug!(" + add_permits_locked; rx_lock.fetch_sub(n | 1); n = {}; actual={}", n, actual);
+                debug!(
+                    " + add_permits_locked; rx_lock.fetch_sub(n | 1); n = {}; actual={}",
+                    n, actual
+                );
 
                 closed = false;
                 actual
             } else {
                 let actual = self.rx_lock.fetch_sub(n, AcqRel);
-                debug!(" + add_permits_locked; rx_lock.fetch_sub(n); n = {}; actual={}", n, actual);
+                debug!(
+                    " + add_permits_locked; rx_lock.fetch_sub(n); n = {}; actual={}",
+                    n, actual
+                );
 
                 closed = actual & 1 == 1;
                 actual
@@ -389,8 +395,7 @@ impl Semaphore {
     fn pop(&self, rem: usize, closed: bool) -> Option<Arc<WaiterNode>> {
         debug!(" + pop; rem = {}", rem);
 
-        'outer:
-        loop {
+        'outer: loop {
             unsafe {
                 let mut head = self.head.with(|head| *head);
                 let mut next_ptr = head.as_ref().next.load(Acquire);
@@ -502,12 +507,10 @@ impl Semaphore {
         // operation
         stub.as_ref().next.store(ptr::null_mut(), Relaxed);
 
-
         // Update the tail to point to the new node. We need to see the previous
         // node in order to update the next pointer as well as release `task`
         // to any other threads calling `push`.
-        let prev = SemState::new_ptr(stub, closed)
-            .swap(&self.state, AcqRel);
+        let prev = SemState::new_ptr(stub, closed).swap(&self.state, AcqRel);
 
         debug_assert_eq!(closed, prev.is_closed());
 
@@ -523,9 +526,7 @@ impl Semaphore {
     }
 
     fn stub(&self) -> NonNull<WaiterNode> {
-        unsafe {
-            NonNull::new_unchecked(&*self.stub as *const _ as *mut _)
-        }
+        unsafe { NonNull::new_unchecked(&*self.stub as *const _ as *mut _) }
     }
 }
 
@@ -574,9 +575,7 @@ impl Permit {
 
     /// Try to acquire the permit. If no permits are available, the current task
     /// is notified once a new permit becomes available.
-    pub fn poll_acquire(&mut self, semaphore: &Semaphore)
-        -> Poll<(), AcquireError>
-    {
+    pub fn poll_acquire(&mut self, semaphore: &Semaphore) -> Poll<(), AcquireError> {
         use futures::Async::*;
 
         match self.state {
@@ -609,9 +608,7 @@ impl Permit {
     }
 
     /// Try to acquire the permit.
-    pub fn try_acquire(&mut self, semaphore: &Semaphore)
-        -> Result<(), TryAcquireError>
-    {
+    pub fn try_acquire(&mut self, semaphore: &Semaphore) -> Result<(), TryAcquireError> {
         use futures::Async::*;
 
         match self.state {
@@ -636,9 +633,7 @@ impl Permit {
                 self.state = PermitState::Acquired;
                 Ok(())
             }
-            NotReady => {
-                Err(TryAcquireError::no_permits())
-            }
+            NotReady => Err(TryAcquireError::no_permits()),
         }
     }
 
@@ -665,10 +660,7 @@ impl Permit {
         match self.state {
             PermitState::Idle => false,
             PermitState::Waiting => {
-                let ret = self.waiter
-                    .as_ref()
-                    .unwrap()
-                    .cancel_interest();
+                let ret = self.waiter.as_ref().unwrap().cancel_interest();
                 self.state = PermitState::Idle;
                 ret
             }
@@ -709,11 +701,15 @@ impl ::std::error::Error for AcquireError {
 
 impl TryAcquireError {
     fn closed() -> TryAcquireError {
-        TryAcquireError { kind: ErrorKind::Closed }
+        TryAcquireError {
+            kind: ErrorKind::Closed,
+        }
     }
 
     fn no_permits() -> TryAcquireError {
-        TryAcquireError { kind: ErrorKind::NoPermits }
+        TryAcquireError {
+            kind: ErrorKind::NoPermits,
+        }
     }
 
     /// Returns true if the error was caused by a closed semaphore.
@@ -865,22 +861,18 @@ impl WaiterNode {
             };
 
             match next.compare_exchange(&self.state, curr, AcqRel, Acquire) {
-                Ok(_) => {
-                    match curr {
-                        QueuedWaiting => {
-                            debug!(" + notify -- task notified");
-                            self.task.notify();
-                            return true;
-                        }
-                        other => {
-                            debug!(" + notify -- not notified; state = {:?}", other);
-                            return false;
-                        }
+                Ok(_) => match curr {
+                    QueuedWaiting => {
+                        debug!(" + notify -- task notified");
+                        self.task.notify();
+                        return true;
                     }
-                }
-                Err(actual) => {
-                    curr = actual
-                }
+                    other => {
+                        debug!(" + notify -- not notified; state = {:?}", other);
+                        return false;
+                    }
+                },
+                Err(actual) => curr = actual,
             }
         }
     }
@@ -1003,8 +995,7 @@ impl SemState {
     /// Returns the waiter, if one is set.
     fn waiter(&self) -> Option<NonNull<WaiterNode>> {
         if self.is_waiter() {
-            let waiter = NonNull::new(self.as_ptr())
-                .expect("null pointer stored");
+            let waiter = NonNull::new(self.as_ptr()).expect("null pointer stored");
 
             Some(waiter)
         } else {
@@ -1047,22 +1038,25 @@ impl SemState {
     }
 
     /// Compare and exchange the current value into the provided cell
-    fn compare_exchange(&self,
-                        cell: &AtomicUsize,
-                        prev: SemState,
-                        success: Ordering,
-                        failure: Ordering)
-        -> Result<SemState, SemState>
-    {
+    fn compare_exchange(
+        &self,
+        cell: &AtomicUsize,
+        prev: SemState,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<SemState, SemState> {
         debug_assert_eq!(prev.is_closed(), self.is_closed());
 
         let res = cell.compare_exchange(prev.to_usize(), self.to_usize(), success, failure);
 
-        debug!(" + SemState::compare_exchange; prev = {}; next = {}; result = {:?}",
-                 prev.to_usize(), self.to_usize(), res);
+        debug!(
+            " + SemState::compare_exchange; prev = {}; next = {}; result = {:?}",
+            prev.to_usize(),
+            self.to_usize(),
+            res
+        );
 
-        res.map(SemState)
-            .map_err(SemState)
+        res.map(SemState).map_err(SemState)
     }
 
     fn fetch_set_closed(cell: &AtomicUsize, ordering: Ordering) -> SemState {
@@ -1123,13 +1117,13 @@ impl NodeState {
         cell.store(value.to_usize(), ordering);
     }
 
-    fn compare_exchange(&self,
-                        cell: &AtomicUsize,
-                        prev: NodeState,
-                        success: Ordering,
-                        failure: Ordering)
-        -> Result<NodeState, NodeState>
-    {
+    fn compare_exchange(
+        &self,
+        cell: &AtomicUsize,
+        prev: NodeState,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<NodeState, NodeState> {
         cell.compare_exchange(prev.to_usize(), self.to_usize(), success, failure)
             .map(NodeState::from_usize)
             .map_err(NodeState::from_usize)
