@@ -1,17 +1,17 @@
-use Error;
 use atomic::AtomicU64;
 use timer::{HandlePriv, Inner};
+use Error;
 
 use crossbeam_utils::CachePadded;
-use futures::Poll;
 use futures::task::AtomicTask;
+use futures::Poll;
 
 use std::cell::UnsafeCell;
 use std::ptr;
-use std::sync::{Arc, Weak};
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{SeqCst, Relaxed};
-use std::time::{Instant, Duration};
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::{Arc, Weak};
+use std::time::{Duration, Instant};
 use std::u64;
 
 /// Internal state shared between a `Delay` instance and the timer.
@@ -109,10 +109,7 @@ const ERROR: u64 = u64::MAX;
 impl Entry {
     pub fn new(deadline: Instant, duration: Duration) -> Entry {
         Entry {
-            time: CachePadded::new(UnsafeCell::new(Time {
-                deadline,
-                duration,
-            })),
+            time: CachePadded::new(UnsafeCell::new(Time { deadline, duration })),
             inner: None,
             task: AtomicTask::new(),
             state: AtomicU64::new(0),
@@ -147,8 +144,7 @@ impl Entry {
             Err(_) => {
                 // Could not associate the entry with a timer, transition the
                 // state to error
-                Arc::get_mut(me).unwrap()
-                    .transition_to_error();
+                Arc::get_mut(me).unwrap().transition_to_error();
 
                 return;
             }
@@ -168,8 +164,7 @@ impl Entry {
             None => {
                 // Could not associate the entry with a timer, transition the
                 // state to error
-                Arc::get_mut(me).unwrap()
-                    .transition_to_error();
+                Arc::get_mut(me).unwrap().transition_to_error();
 
                 return;
             }
@@ -177,15 +172,13 @@ impl Entry {
 
         // Increment the number of active timeouts
         if inner.increment().is_err() {
-            Arc::get_mut(me).unwrap()
-                .transition_to_error();
+            Arc::get_mut(me).unwrap().transition_to_error();
 
             return;
         }
 
         // Associate the entry with the timer
-        Arc::get_mut(me).unwrap()
-            .inner = Some(handle.into_inner());
+        Arc::get_mut(me).unwrap().inner = Some(handle.into_inner());
 
         let when = inner.normalize_deadline(deadline);
 
@@ -216,7 +209,9 @@ impl Entry {
     }
 
     pub fn set_when_internal(&self, when: Option<u64>) {
-        unsafe { (*self.when.get()) = when; }
+        unsafe {
+            (*self.when.get()) = when;
+        }
     }
 
     /// Called by `Timer` to load the current value of `state` for processing
@@ -361,8 +356,7 @@ impl Entry {
                 notify = true;
             }
 
-            let actual = entry.state.compare_and_swap(
-                curr, next, SeqCst);
+            let actual = entry.state.compare_and_swap(curr, next, SeqCst);
 
             if curr == actual {
                 break;
@@ -377,8 +371,7 @@ impl Entry {
     }
 
     fn upgrade_inner(&self) -> Option<Arc<Inner>> {
-        self.inner.as_ref()
-            .and_then(|inner| inner.upgrade())
+        self.inner.as_ref().and_then(|inner| inner.upgrade())
     }
 }
 

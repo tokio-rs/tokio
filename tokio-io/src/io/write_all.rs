@@ -1,7 +1,7 @@
 use std::io;
 use std::mem;
 
-use futures::{Poll, Future};
+use futures::{Future, Poll};
 
 use AsyncWrite;
 
@@ -17,11 +17,7 @@ pub struct WriteAll<A, T> {
 
 #[derive(Debug)]
 enum State<A, T> {
-    Writing {
-        a: A,
-        buf: T,
-        pos: usize,
-    },
+    Writing { a: A, buf: T, pos: usize },
     Empty,
 }
 
@@ -40,8 +36,9 @@ enum State<A, T> {
 /// The `Window` struct is also available in this crate to provide a different
 /// window into a slice if necessary.
 pub fn write_all<A, T>(a: A, buf: T) -> WriteAll<A, T>
-    where A: AsyncWrite,
-          T: AsRef<[u8]>,
+where
+    A: AsyncWrite,
+    T: AsRef<[u8]>,
 {
     WriteAll {
         state: State::Writing {
@@ -57,21 +54,26 @@ fn zero_write() -> io::Error {
 }
 
 impl<A, T> Future for WriteAll<A, T>
-    where A: AsyncWrite,
-          T: AsRef<[u8]>,
+where
+    A: AsyncWrite,
+    T: AsRef<[u8]>,
 {
     type Item = (A, T);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(A, T), io::Error> {
         match self.state {
-            State::Writing { ref mut a, ref buf, ref mut pos } => {
+            State::Writing {
+                ref mut a,
+                ref buf,
+                ref mut pos,
+            } => {
                 let buf = buf.as_ref();
                 while *pos < buf.len() {
                     let n = try_ready!(a.poll_write(&buf[*pos..]));
                     *pos += n;
                     if n == 0 {
-                        return Err(zero_write())
+                        return Err(zero_write());
                     }
                 }
             }

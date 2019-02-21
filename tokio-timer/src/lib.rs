@@ -53,9 +53,9 @@ mod wheel;
 #[doc(hidden)]
 #[allow(deprecated)]
 pub use self::deadline::{Deadline, DeadlineError};
+pub use self::delay::Delay;
 #[doc(inline)]
 pub use self::delay_queue::DelayQueue;
-pub use self::delay::Delay;
 pub use self::error::Error;
 pub use self::interval::Interval;
 #[doc(inline)]
@@ -92,5 +92,8 @@ fn ms(duration: Duration, round: Round) -> u64 {
         Round::Down => duration.subsec_nanos() / NANOS_PER_MILLI,
     };
 
-    duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
+    duration
+        .as_secs()
+        .saturating_mul(MILLIS_PER_SEC)
+        .saturating_add(millis as u64)
 }

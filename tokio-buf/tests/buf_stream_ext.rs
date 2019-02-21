@@ -1,13 +1,13 @@
 #![cfg(feature = "ext")]
 
-extern crate tokio_buf;
 extern crate bytes;
 extern crate futures;
+extern crate tokio_buf;
 
-use tokio_buf::{BufStream, BufStreamExt};
-use futures::Future;
-use futures::Async::*;
 use bytes::Buf;
+use futures::Async::*;
+use futures::Future;
+use tokio_buf::{BufStream, BufStreamExt};
 
 #[macro_use]
 mod support;
@@ -27,8 +27,7 @@ fn chain() {
     assert_none!(bs.poll_buf());
 
     // Chain multi with multi
-    let mut bs = list(&["foo", "bar"])
-        .chain(list(&["baz", "bok"]));
+    let mut bs = list(&["foo", "bar"]).chain(list(&["baz", "bok"]));
 
     assert_buf_eq!(bs.poll_buf(), "foo");
     assert_buf_eq!(bs.poll_buf(), "bar");
@@ -38,11 +37,7 @@ fn chain() {
 
     // Chain includes a not ready call
     //
-    let mut bs = new_mock(&[
-        Ok(Ready("foo")),
-        Ok(NotReady),
-        Ok(Ready("bar"))
-    ]).chain(one("baz"));
+    let mut bs = new_mock(&[Ok(Ready("foo")), Ok(NotReady), Ok(Ready("bar"))]).chain(one("baz"));
 
     assert_buf_eq!(bs.poll_buf(), "foo");
     assert_not_ready!(bs.poll_buf());
@@ -62,8 +57,7 @@ fn collect_vec() {
     //
     let bs = one("hello world");
 
-    let vec: Vec<u8> = bs.collect()
-        .wait().unwrap();
+    let vec: Vec<u8> = bs.collect().wait().unwrap();
 
     assert_eq!(vec, b"hello world");
     assert_eq!(vec.capacity(), 64);
@@ -73,8 +67,7 @@ fn collect_vec() {
     let mut bs = one("hello world");
     bs.size_hint.set_lower(11);
 
-    let vec: Vec<u8> = bs.collect()
-        .wait().unwrap();
+    let vec: Vec<u8> = bs.collect().wait().unwrap();
 
     assert_eq!(vec, b"hello world");
     assert_eq!(vec.capacity(), 64);
@@ -84,8 +77,7 @@ fn collect_vec() {
     let mut bs = one("hello world");
     bs.size_hint.set_lower(10);
 
-    let vec: Vec<u8> = bs.collect()
-        .wait().unwrap();
+    let vec: Vec<u8> = bs.collect().wait().unwrap();
 
     assert_eq!(vec, b"hello world");
     assert_eq!(vec.capacity(), 64);
@@ -94,8 +86,7 @@ fn collect_vec() {
     //
     let bs = list(&["hello", " ", "world", ", one two three"]);
 
-    let vec: Vec<u8> = bs.collect()
-        .wait().unwrap();
+    let vec: Vec<u8> = bs.collect().wait().unwrap();
 
     assert_eq!(vec, b"hello world, one two three");
 }
@@ -109,42 +100,38 @@ fn limit() {
     let res = one("hello world")
         .limit(100)
         .collect::<Vec<_>>()
-        .wait().unwrap();
+        .wait()
+        .unwrap();
 
     assert_eq!(res, b"hello world");
 
     let res = list(&["hello", " ", "world"])
         .limit(100)
         .collect::<Vec<_>>()
-        .wait().unwrap();
+        .wait()
+        .unwrap();
 
     assert_eq!(res, b"hello world");
 
     let res = list(&["hello", " ", "world"])
         .limit(11)
         .collect::<Vec<_>>()
-        .wait().unwrap();
+        .wait()
+        .unwrap();
 
     assert_eq!(res, b"hello world");
 
     // Limited
 
-    let res = one("hello world")
-        .limit(5)
-        .collect::<Vec<_>>()
-        .wait();
+    let res = one("hello world").limit(5).collect::<Vec<_>>().wait();
 
     assert!(res.is_err());
 
-    let res = one("hello world")
-        .limit(10)
-        .collect::<Vec<_>>()
-        .wait();
+    let res = one("hello world").limit(10).collect::<Vec<_>>().wait();
 
     assert!(res.is_err());
 
-    let mut bs = list(&["hello", " ", "world"])
-        .limit(9);
+    let mut bs = list(&["hello", " ", "world"]).limit(9);
 
     assert_buf_eq!(bs.poll_buf(), "hello");
     assert_buf_eq!(bs.poll_buf(), " ");

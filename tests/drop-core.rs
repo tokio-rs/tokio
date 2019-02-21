@@ -1,8 +1,8 @@
-extern crate tokio;
 extern crate futures;
+extern crate tokio;
 
-use std::thread;
 use std::net;
+use std::thread;
 
 use futures::future;
 use futures::prelude::*;

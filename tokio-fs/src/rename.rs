@@ -21,7 +21,7 @@ pub fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> RenameFuture<P,
 pub struct RenameFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     from: P,
     to: Q,
@@ -30,25 +30,22 @@ where
 impl<P, Q> RenameFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     fn new(from: P, to: Q) -> RenameFuture<P, Q> {
-        RenameFuture {
-            from: from,
-            to: to,
-        }
+        RenameFuture { from: from, to: to }
     }
 }
 
 impl<P, Q> Future for RenameFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::rename(&self.from, &self.to) )
+        ::blocking_io(|| fs::rename(&self.from, &self.to))
     }
 }

@@ -44,8 +44,8 @@
 extern crate tokio;
 
 use std::collections::HashMap;
-use std::io::BufReader;
 use std::env;
+use std::io::BufReader;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
@@ -69,9 +69,18 @@ enum Request {
 
 /// Responses to the `Request` commands above
 enum Response {
-    Value { key: String, value: String },
-    Set { key: String, value: String, previous: Option<String> },
-    Error { msg: String },
+    Value {
+        key: String,
+        value: String,
+    },
+    Set {
+        key: String,
+        value: String,
+        previous: Option<String>,
+    },
+    Error {
+        msg: String,
+    },
 }
 
 fn main() -> Result<(), Box<std::error::Error>> {
@@ -93,7 +102,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
         map: Mutex::new(initial_db),
     });
 
-    let done = listener.incoming()
+    let done = listener
+        .incoming()
         .map_err(|e| println!("error accepting socket; error = {:?}", e))
         .for_each(move |socket| {
             // As with many other small examples, the first thing we'll do is
@@ -124,15 +134,22 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
                 let mut db = db.map.lock().unwrap();
                 match request {
-                    Request::Get { key } => {
-                        match db.get(&key) {
-                            Some(value) => Response::Value { key, value: value.clone() },
-                            None => Response::Error { msg: format!("no key {}", key) },
-                        }
-                    }
+                    Request::Get { key } => match db.get(&key) {
+                        Some(value) => Response::Value {
+                            key,
+                            value: value.clone(),
+                        },
+                        None => Response::Error {
+                            msg: format!("no key {}", key),
+                        },
+                    },
                     Request::Set { key, value } => {
                         let previous = db.insert(key.clone(), value.clone());
-                        Response::Set { key, value, previous }
+                        Response::Set {
+                            key,
+                            value,
+                            previous,
+                        }
                     }
                 }
             });
@@ -169,9 +186,11 @@ impl Request {
                     None => return Err(format!("GET must be followed by a key")),
                 };
                 if parts.next().is_some() {
-                    return Err(format!("GET's key must not be followed by anything"))
+                    return Err(format!("GET's key must not be followed by anything"));
                 }
-                Ok(Request::Get { key: key.to_string() })
+                Ok(Request::Get {
+                    key: key.to_string(),
+                })
             }
             Some("SET") => {
                 let key = match parts.next() {
@@ -182,7 +201,10 @@ impl Request {
                     Some(value) => value,
                     None => return Err(format!("SET needs a value")),
                 };
-                Ok(Request::Set { key: key.to_string(), value: value.to_string() })
+                Ok(Request::Set {
+                    key: key.to_string(),
+                    value: value.to_string(),
+                })
             }
             Some(cmd) => Err(format!("unknown command: {}", cmd)),
             None => Err(format!("empty input")),
@@ -193,15 +215,13 @@ impl Request {
 impl Response {
     fn serialize(&self) -> String {
         match *self {
-            Response::Value { ref key, ref value } => {
-                format!("{} = {}", key, value)
-            }
-            Response::Set { ref key, ref value, ref previous } => {
-                format!("set {} = `{}`, previous: {:?}", key, value, previous)
-            }
-            Response::Error { ref msg } => {
-                format!("error: {}", msg)
-            }
+            Response::Value { ref key, ref value } => format!("{} = {}", key, value),
+            Response::Set {
+                ref key,
+                ref value,
+                ref previous,
+            } => format!("set {} = `{}`, previous: {:?}", key, value, previous),
+            Response::Error { ref msg } => format!("error: {}", msg),
         }
     }
 }

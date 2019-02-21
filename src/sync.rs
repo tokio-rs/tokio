@@ -10,7 +10,4 @@
 //! - [mpsc](mpsc/index.html), a multi-producer, single-consumer channel for
 //!   sending values between tasks.
 
-pub use tokio_sync::{
-    mpsc,
-    oneshot,
-};
+pub use tokio_sync::{mpsc, oneshot};

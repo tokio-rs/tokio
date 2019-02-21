@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
-use bytes::{Bytes, BufMut, BytesMut};
-use codec::{Encoder, Decoder};
+use bytes::{BufMut, Bytes, BytesMut};
+use codec::{Decoder, Encoder};
 use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
@@ -11,7 +11,9 @@ pub struct BytesCodec(());
 
 impl BytesCodec {
     /// Creates a new `BytesCodec` for shipping around raw bytes.
-    pub fn new() -> BytesCodec { BytesCodec(())  }
+    pub fn new() -> BytesCodec {
+        BytesCodec(())
+    }
 }
 
 impl Decoder for BytesCodec {

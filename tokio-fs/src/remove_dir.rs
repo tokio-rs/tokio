@@ -17,30 +17,28 @@ pub fn remove_dir<P: AsRef<Path>>(path: P) -> RemoveDirFuture<P> {
 #[derive(Debug)]
 pub struct RemoveDirFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     path: P,
 }
 
 impl<P> RemoveDirFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     fn new(path: P) -> RemoveDirFuture<P> {
-        RemoveDirFuture {
-            path: path,
-        }
+        RemoveDirFuture { path: path }
     }
 }
 
 impl<P> Future for RemoveDirFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::remove_dir(&self.path) )
+        ::blocking_io(|| fs::remove_dir(&self.path))
     }
 }

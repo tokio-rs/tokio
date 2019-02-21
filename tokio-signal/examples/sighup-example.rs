@@ -16,8 +16,8 @@ mod platform {
         println!("Waiting for SIGHUPS (Ctrl+C to quit)");
         println!(
             "  TIP: use `pkill -sighup sighup-example` from a second terminal \
-         to send a SIGHUP to all processes named 'sighup-example' \
-         (i.e. this binary)"
+             to send a SIGHUP to all processes named 'sighup-example' \
+             (i.e. this binary)"
         );
 
         // for_each is a powerful primitive provided by the Futures crate
@@ -26,8 +26,8 @@ mod platform {
         let future = stream.for_each(|the_signal| {
             println!(
                 "*Got signal {:#x}* I should probably reload my config \
-             or something",
-             the_signal
+                 or something",
+                the_signal
             );
             Ok(())
         });
@@ -43,7 +43,9 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    pub fn main() -> Result<(), Box<::std::error::Error>> {Ok(())}
+    pub fn main() -> Result<(), Box<::std::error::Error>> {
+        Ok(())
+    }
 }
 
 fn main() -> Result<(), Box<std::error::Error>> {

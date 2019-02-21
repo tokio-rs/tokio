@@ -1,14 +1,14 @@
 extern crate futures;
 extern crate tokio_executor;
-extern crate tokio_timer;
 extern crate tokio_mock_task;
+extern crate tokio_timer;
 
 #[macro_use]
 mod support;
 use support::*;
 
-use tokio_timer::*;
 use tokio_mock_task::MockTask;
+use tokio_timer::*;
 
 use futures::Stream;
 
@@ -286,7 +286,6 @@ fn expires_before_last_insert() {
         let mut queue = DelayQueue::new();
         let mut task = MockTask::new();
 
-
         let epoch = time.now();
 
         queue.insert_at("foo", epoch + ms(10_000));
@@ -308,7 +307,6 @@ fn expires_before_last_insert() {
         assert!(task.is_notified());
         let entry = assert_ready!(queue).unwrap().into_inner();
         assert_eq!(entry, "bar");
-
     })
 }
 
@@ -382,7 +380,6 @@ fn expire_second_key_when_reset_to_expire_earlier() {
         assert_eq!(entry, "bar");
     })
 }
-
 
 #[test]
 fn reset_first_expiring_item_to_expire_later() {

@@ -1,16 +1,13 @@
 use loom::{
     self,
+    sync::atomic::{AtomicPtr, AtomicUsize},
     sync::CausalCell,
-    sync::atomic::{
-        AtomicPtr,
-        AtomicUsize,
-    },
 };
 
 use std::mem::{self, ManuallyDrop};
 use std::ops;
 use std::ptr::{self, NonNull};
-use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Release};
 
 /// A block in a linked list.
 ///
@@ -133,9 +130,7 @@ impl<T> Block<T> {
         }
 
         // Get the value
-        let value = self.values[offset].with(|ptr| {
-            ptr::read(ptr)
-        });
+        let value = self.values[offset].with(|ptr| ptr::read(ptr));
 
         Some(Read::Value(ManuallyDrop::into_inner(value)))
     }
@@ -195,7 +190,8 @@ impl<T> Block<T> {
     pub(crate) unsafe fn tx_release(&self, tail_position: usize) {
         // Track the observed tail_position. Any sender targetting a greater
         // tail_position is guaranteed to not access this block.
-        self.observed_tail_position.with_mut(|ptr| *ptr = tail_position);
+        self.observed_tail_position
+            .with_mut(|ptr| *ptr = tail_position);
 
         // Set the released bit, signalling to the receiver that it is safe to
         // free the block's memory as soon as all slots **prior** to
@@ -238,9 +234,8 @@ impl<T> Block<T> {
         let ret = NonNull::new(self.next.load(ordering));
 
         debug_assert!(unsafe {
-            ret.map(|block| {
-                block.as_ref().start_index == self.start_index.wrapping_add(BLOCK_CAP)
-            }).unwrap_or(true)
+            ret.map(|block| block.as_ref().start_index == self.start_index.wrapping_add(BLOCK_CAP))
+                .unwrap_or(true)
         });
 
         ret
@@ -262,14 +257,16 @@ impl<T> Block<T> {
     /// To maintain safety, the caller must ensure:
     ///
     /// * `block` is not freed until it has been removed from the list.
-    pub(crate) unsafe fn try_push(&self, block: &mut NonNull<Block<T>>, ordering: Ordering)
-        -> Result<(), NonNull<Block<T>>>
-    {
-        block.as_mut().start_index =
-            self.start_index.wrapping_add(BLOCK_CAP);
+    pub(crate) unsafe fn try_push(
+        &self,
+        block: &mut NonNull<Block<T>>,
+        ordering: Ordering,
+    ) -> Result<(), NonNull<Block<T>>> {
+        block.as_mut().start_index = self.start_index.wrapping_add(BLOCK_CAP);
 
-        let next_ptr = self.next.compare_and_swap(
-            ptr::null_mut(), block.as_ptr(), ordering);
+        let next_ptr = self
+            .next
+            .compare_and_swap(ptr::null_mut(), block.as_ptr(), ordering);
 
         match NonNull::new(next_ptr) {
             Some(next_ptr) => Err(next_ptr),
@@ -295,12 +292,9 @@ impl<T> Block<T> {
         // Create the new block. It is assumed that the block will become the
         // next one after `&self`. If this turns out to not be the case,
         // `start_index` is updated accordingly.
-        let new_block = Box::new(
-            Block::new(self.start_index + BLOCK_CAP));
+        let new_block = Box::new(Block::new(self.start_index + BLOCK_CAP));
 
-        let mut new_block = unsafe {
-            NonNull::new_unchecked(Box::into_raw(new_block))
-        };
+        let mut new_block = unsafe { NonNull::new_unchecked(Box::into_raw(new_block)) };
 
         // Attempt to store the block. The first compare-and-swap attempt is
         // "unrolled" due to minor differences in logic
@@ -314,9 +308,11 @@ impl<T> Block<T> {
         //
         // `Release` ensures that the newly allocated block is available to
         // other threads acquiring the next pointer.
-        let next = NonNull::new(
-            self.next.compare_and_swap(
-                ptr::null_mut(), new_block.as_ptr(), AcqRel));
+        let next = NonNull::new(self.next.compare_and_swap(
+            ptr::null_mut(),
+            new_block.as_ptr(),
+            AcqRel,
+        ));
 
         let next = match next {
             Some(next) => next,
@@ -339,9 +335,7 @@ impl<T> Block<T> {
 
         // TODO: Should this iteration be capped?
         loop {
-            let actual = unsafe {
-                curr.as_ref().try_push(&mut new_block, AcqRel)
-            };
+            let actual = unsafe { curr.as_ref().try_push(&mut new_block, AcqRel) };
 
             curr = match actual {
                 Ok(_) => {

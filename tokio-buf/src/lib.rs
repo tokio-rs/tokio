@@ -16,21 +16,21 @@ extern crate either;
 #[macro_use]
 extern crate futures;
 
+pub mod errors;
 #[cfg(feature = "ext")]
 pub mod ext;
-pub mod errors;
 mod size_hint;
 mod str;
 
+pub use self::size_hint::SizeHint;
 #[doc(inline)]
 #[cfg(feature = "ext")]
 pub use ext::BufStreamExt;
-pub use self::size_hint::SizeHint;
 
-use futures::Poll;
 use bytes::{Buf, Bytes, BytesMut};
-use std::io;
 use errors::internal::Never;
+use futures::Poll;
+use std::io;
 
 /// An asynchronous stream of bytes.
 ///
@@ -151,9 +151,7 @@ impl BufStream for BytesMut {
     }
 }
 
-fn poll_bytes<T: Default>(buf: &mut T)
-    -> Poll<Option<io::Cursor<T>>, Never>
-{
+fn poll_bytes<T: Default>(buf: &mut T) -> Poll<Option<io::Cursor<T>>, Never> {
     use std::mem;
 
     let bytes = mem::replace(buf, Default::default());

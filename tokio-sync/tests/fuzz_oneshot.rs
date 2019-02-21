@@ -8,8 +8,8 @@ extern crate loom;
 mod oneshot;
 
 use futures::{Async, Future};
-use loom::thread;
 use loom::futures::block_on;
+use loom::thread;
 
 #[test]
 fn smoke() {
@@ -35,30 +35,26 @@ fn changing_rx_task() {
         });
 
         let rx = thread::spawn(move || {
-            let t1 = block_on(futures::future::poll_fn(|| {
-                Ok::<_, ()>(rx.poll().into())
-            })).unwrap();
+            let t1 = block_on(futures::future::poll_fn(|| Ok::<_, ()>(rx.poll().into()))).unwrap();
 
             match t1 {
                 Ok(Async::Ready(value)) => {
                     // ok
                     assert_eq!(1, value);
                     None
-                },
-                Ok(Async::NotReady) => {
-                    Some(rx)
-                },
+                }
+                Ok(Async::NotReady) => Some(rx),
                 Err(_) => unreachable!(),
             }
-        }).join().unwrap();
-
+        })
+        .join()
+        .unwrap();
 
         if let Some(rx) = rx {
             // Previous task parked, use a new task...
             let value = block_on(rx).unwrap();
             assert_eq!(1, value);
         }
-
     });
 }
 
@@ -74,25 +70,21 @@ fn changing_tx_task() {
         let tx = thread::spawn(move || {
             let t1 = block_on(futures::future::poll_fn(|| {
                 Ok::<_, ()>(tx.poll_close().into())
-            })).unwrap();
+            }))
+            .unwrap();
 
             match t1 {
-                Ok(Async::Ready(())) => {
-                    None
-                },
-                Ok(Async::NotReady) => {
-                    Some(tx)
-                },
+                Ok(Async::Ready(())) => None,
+                Ok(Async::NotReady) => Some(tx),
                 Err(_) => unreachable!(),
             }
-        }).join().unwrap();
-
+        })
+        .join()
+        .unwrap();
 
         if let Some(mut tx) = tx {
             // Previous task parked, use a new task...
-            block_on(futures::future::poll_fn(move || {
-                tx.poll_close()
-            })).unwrap();
+            block_on(futures::future::poll_fn(move || tx.poll_close())).unwrap();
         }
     });
 }

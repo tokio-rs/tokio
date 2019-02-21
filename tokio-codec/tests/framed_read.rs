@@ -1,17 +1,17 @@
-extern crate tokio_codec;
-extern crate tokio_io;
 extern crate bytes;
 extern crate futures;
+extern crate tokio_codec;
+extern crate tokio_io;
 
+use tokio_codec::{Decoder, FramedRead};
 use tokio_io::AsyncRead;
-use tokio_codec::{FramedRead, Decoder};
 
-use bytes::{BytesMut, Buf, IntoBuf};
+use bytes::{Buf, BytesMut, IntoBuf};
+use futures::Async::{NotReady, Ready};
 use futures::Stream;
-use futures::Async::{Ready, NotReady};
 
-use std::io::{self, Read};
 use std::collections::VecDeque;
+use std::io::{self, Read};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
@@ -212,5 +212,4 @@ impl Read for Mock {
     }
 }
 
-impl AsyncRead for Mock {
-}
+impl AsyncRead for Mock {}

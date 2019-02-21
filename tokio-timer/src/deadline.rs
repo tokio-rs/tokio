@@ -2,7 +2,7 @@
 
 use Delay;
 
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
 use std::error;
 use std::fmt;
@@ -42,10 +42,7 @@ impl<T> Deadline<T> {
     }
 
     pub(crate) fn new_with_delay(future: T, delay: Delay) -> Deadline<T> {
-        Deadline {
-            future,
-            delay,
-        }
+        Deadline { future, delay }
     }
 
     /// Gets a reference to the underlying future in this deadline.
@@ -65,7 +62,8 @@ impl<T> Deadline<T> {
 }
 
 impl<T> Future for Deadline<T>
-where T: Future,
+where
+    T: Future,
 {
     type Item = T::Item;
     type Error = DeadlineError<T::Error>;
@@ -81,9 +79,7 @@ where T: Future,
         // Now check the timer
         match self.delay.poll() {
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Ok(Async::Ready(_)) => {
-                Err(DeadlineError::elapsed())
-            },
+            Ok(Async::Ready(_)) => Err(DeadlineError::elapsed()),
             Err(e) => Err(DeadlineError::timer(e)),
         }
     }

@@ -25,12 +25,11 @@ impl Future for SeekFuture {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let pos = try_ready!(
-            self.inner
-                .as_mut()
-                .expect("Cannot poll `SeekFuture` after it resolves")
-                .poll_seek(self.pos)
-        );
+        let pos = try_ready!(self
+            .inner
+            .as_mut()
+            .expect("Cannot poll `SeekFuture` after it resolves")
+            .poll_seek(self.pos));
         let inner = self.inner.take().unwrap();
         Ok((inner, pos).into())
     }

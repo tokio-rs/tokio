@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
-use tokio_io::_tokio_codec::{Encoder, Decoder};
 use std::{cmp, io, str, usize};
+use tokio_io::_tokio_codec::{Decoder, Encoder};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -103,10 +103,8 @@ impl LinesCodec {
 }
 
 fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
-    str::from_utf8(buf).map_err(|_|
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Unable to decode input as UTF8"))
+    str::from_utf8(buf)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to decode input as UTF8"))
 }
 
 fn without_carriage_return(s: &[u8]) -> &[u8] {
@@ -153,7 +151,7 @@ impl Decoder for LinesCodec {
                     self.is_discarding = true;
                     Err(io::Error::new(
                         io::ErrorKind::Other,
-                        "line length limit exceeded"
+                        "line length limit exceeded",
                     ))
                 } else {
                     // We didn't find a line or reach the length limit, so the next

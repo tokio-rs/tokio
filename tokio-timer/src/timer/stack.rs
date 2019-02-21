@@ -49,7 +49,6 @@ impl wheel::Stack for Stack {
 
             // Set this entry's next pointer
             *entry.next_stack.get() = old;
-
         }
 
         // Update the head pointer
@@ -117,7 +116,6 @@ impl wheel::Stack for Stack {
     }
 
     fn when(item: &Entry, _: &()) -> u64 {
-        item.when_internal()
-            .expect("invalid internal state")
+        item.when_internal().expect("invalid internal state")
     }
 }

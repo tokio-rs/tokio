@@ -1,11 +1,11 @@
-use ::loom::{
+use loom::{
     futures::task::{self, Task},
-    sync::CausalCell,
     sync::atomic::AtomicUsize,
+    sync::CausalCell,
 };
 
 use std::fmt;
-use std::sync::atomic::Ordering::{Acquire, Release, AcqRel};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
 /// A synchronization primitive for task notification.
 ///
@@ -189,8 +189,9 @@ impl AtomicTask {
                     //
                     // Start by assuming that the state is `REGISTERING` as this
                     // is what we jut set it to.
-                    let res = self.state.compare_exchange(
-                        REGISTERING, WAITING, AcqRel, Acquire);
+                    let res = self
+                        .state
+                        .compare_exchange(REGISTERING, WAITING, AcqRel, Acquire);
 
                     match res {
                         Ok(_) => {}
@@ -230,9 +231,7 @@ impl AtomicTask {
                 //
                 // We just want to maintain memory safety. It is ok to drop the
                 // call to `register`.
-                debug_assert!(
-                    state == REGISTERING ||
-                    state == REGISTERING | NOTIFYING);
+                debug_assert!(state == REGISTERING || state == REGISTERING | NOTIFYING);
             }
         }
     }
@@ -276,9 +275,8 @@ impl AtomicTask {
                 // not.
                 //
                 debug_assert!(
-                    state == REGISTERING ||
-                    state == REGISTERING | NOTIFYING ||
-                    state == NOTIFYING);
+                    state == REGISTERING || state == REGISTERING | NOTIFYING || state == NOTIFYING
+                );
                 None
             }
         }
@@ -309,7 +307,8 @@ struct CurrentTask;
 
 impl Register for CurrentTask {
     fn register(self, slot: &mut Option<Task>) {
-        let should_update = (&*slot).as_ref()
+        let should_update = (&*slot)
+            .as_ref()
             .map(|prev| !prev.will_notify_current())
             .unwrap_or(true);
         if should_update {

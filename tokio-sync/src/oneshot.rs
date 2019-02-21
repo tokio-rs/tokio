@@ -2,16 +2,16 @@
 
 use loom::{
     futures::task::{self, Task},
-    sync::CausalCell,
     sync::atomic::AtomicUsize,
+    sync::CausalCell,
 };
 
 use futures::{Async, Future, Poll};
 
 use std::fmt;
 use std::mem::{self, ManuallyDrop};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
 use std::sync::Arc;
-use std::sync::atomic::Ordering::{self, Acquire, AcqRel};
 
 /// Sends a value to the associated `Receiver`.
 ///
@@ -102,7 +102,9 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
         rx_task: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
     });
 
-    let tx = Sender { inner: Some(inner.clone()) };
+    let tx = Sender {
+        inner: Some(inner.clone()),
+    };
     let rx = Receiver { inner: Some(inner) };
 
     (tx, rx)
@@ -121,14 +123,14 @@ impl<T> Sender<T> {
     pub fn send(mut self, t: T) -> Result<(), T> {
         let inner = self.inner.take().unwrap();
 
-        inner.value.with_mut(|ptr| {
-            unsafe { *ptr = Some(t); }
+        inner.value.with_mut(|ptr| unsafe {
+            *ptr = Some(t);
         });
 
         if !inner.complete() {
-            return Err(inner.value.with_mut(|ptr| {
-                unsafe { (*ptr).take() }.unwrap()
-            }));
+            return Err(inner
+                .value
+                .with_mut(|ptr| unsafe { (*ptr).take() }.unwrap()));
         }
 
         Ok(())
@@ -156,9 +158,9 @@ impl<T> Sender<T> {
         }
 
         if state.is_tx_task_set() {
-            let will_notify = inner.tx_task.with(|ptr| unsafe {
-                (&*ptr).will_notify_current()
-            });
+            let will_notify = inner
+                .tx_task
+                .with(|ptr| unsafe { (&*ptr).will_notify_current() });
 
             if !will_notify {
                 state = State::unset_tx_task(&inner.state);
@@ -173,7 +175,9 @@ impl<T> Sender<T> {
 
         if !state.is_tx_task_set() {
             // Attempt to set the task
-            unsafe { inner.set_tx_task(); }
+            unsafe {
+                inner.set_tx_task();
+            }
 
             // Update the state
             state = State::set_tx_task(&inner.state);
@@ -185,7 +189,6 @@ impl<T> Sender<T> {
 
         Ok(Async::NotReady)
     }
-
 
     /// Check if the associated [`Receiver`] handle has been dropped.
     ///
@@ -271,7 +274,7 @@ impl<T> Future for Receiver<T> {
     type Error = RecvError;
 
     fn poll(&mut self) -> Poll<T, RecvError> {
-        use futures::Async::{Ready, NotReady};
+        use futures::Async::{NotReady, Ready};
 
         // If `inner` is `None`, then `poll()` has already completed.
         let ret = if let Some(inner) = self.inner.as_ref() {
@@ -298,16 +301,14 @@ impl<T> Inner<T> {
         }
 
         if prev.is_rx_task_set() {
-            self.rx_task.with(|ptr| unsafe {
-                (&*ptr).notify()
-            });
+            self.rx_task.with(|ptr| unsafe { (&*ptr).notify() });
         }
 
         true
     }
 
     fn poll_recv(&self) -> Poll<T, RecvError> {
-        use futures::Async::{Ready, NotReady};
+        use futures::Async::{NotReady, Ready};
 
         // Load the state
         let mut state = State::load(&self.state, Acquire);
@@ -321,9 +322,9 @@ impl<T> Inner<T> {
             Err(RecvError(()))
         } else {
             if state.is_rx_task_set() {
-                let will_notify = self.rx_task.with(|ptr| unsafe {
-                    (&*ptr).will_notify_current()
-                });
+                let will_notify = self
+                    .rx_task
+                    .with(|ptr| unsafe { (&*ptr).will_notify_current() });
 
                 // Check if the task is still the same
                 if !will_notify {
@@ -342,7 +343,9 @@ impl<T> Inner<T> {
 
             if !state.is_rx_task_set() {
                 // Attempt to set the task
-                unsafe { self.set_rx_task(); }
+                unsafe {
+                    self.set_rx_task();
+                }
 
                 // Update the state
                 state = State::set_rx_task(&self.state);
@@ -366,41 +369,31 @@ impl<T> Inner<T> {
         let prev = State::set_closed(&self.state);
 
         if prev.is_tx_task_set() && !prev.is_complete() {
-            self.tx_task.with(|ptr| unsafe {
-                (&*ptr).notify()
-            });
+            self.tx_task.with(|ptr| unsafe { (&*ptr).notify() });
         }
     }
 
     /// Consume the value. This function does not check `state`.
     unsafe fn consume_value(&self) -> Option<T> {
-        self.value.with_mut(|ptr| {
-            (*ptr).take()
-        })
+        self.value.with_mut(|ptr| (*ptr).take())
     }
 
     unsafe fn drop_rx_task(&self) {
-        self.rx_task.with_mut(|ptr| {
-            ManuallyDrop::drop(&mut *ptr)
-        })
+        self.rx_task.with_mut(|ptr| ManuallyDrop::drop(&mut *ptr))
     }
 
     unsafe fn drop_tx_task(&self) {
-        self.tx_task.with_mut(|ptr| {
-            ManuallyDrop::drop(&mut *ptr)
-        })
+        self.tx_task.with_mut(|ptr| ManuallyDrop::drop(&mut *ptr))
     }
 
     unsafe fn set_rx_task(&self) {
-        self.rx_task.with_mut(|ptr| {
-            *ptr = ManuallyDrop::new(task::current())
-        });
+        self.rx_task
+            .with_mut(|ptr| *ptr = ManuallyDrop::new(task::current()));
     }
 
     unsafe fn set_tx_task(&self) {
-        self.tx_task.with_mut(|ptr| {
-            *ptr = ManuallyDrop::new(task::current())
-        });
+        self.tx_task
+            .with_mut(|ptr| *ptr = ManuallyDrop::new(task::current()));
     }
 }
 
@@ -412,18 +405,14 @@ impl<T> Drop for Inner<T> {
         let state = State(*self.state.get_mut());
 
         if state.is_rx_task_set() {
-            self.rx_task.with_mut(|ptr| {
-                unsafe {
-                    ManuallyDrop::drop(&mut *ptr);
-                }
+            self.rx_task.with_mut(|ptr| unsafe {
+                ManuallyDrop::drop(&mut *ptr);
             });
         }
 
         if state.is_tx_task_set() {
-            self.tx_task.with_mut(|ptr| {
-                unsafe {
-                    ManuallyDrop::drop(&mut *ptr);
-                }
+            self.tx_task.with_mut(|ptr| unsafe {
+                ManuallyDrop::drop(&mut *ptr);
             });
         }
     }
@@ -440,8 +429,8 @@ impl<T: fmt::Debug> fmt::Debug for Inner<T> {
 }
 
 const RX_TASK_SET: usize = 0b00001;
-const VALUE_SENT: usize  = 0b00010;
-const CLOSED: usize      = 0b00100;
+const VALUE_SENT: usize = 0b00010;
+const CLOSED: usize = 0b00100;
 const TX_TASK_SET: usize = 0b01000;
 
 impl State {

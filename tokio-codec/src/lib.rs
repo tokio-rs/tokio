@@ -19,14 +19,7 @@ extern crate tokio_io;
 mod bytes_codec;
 mod lines_codec;
 
-pub use tokio_io::_tokio_codec::{
-    Decoder,
-    Encoder,
-    Framed,
-    FramedParts,
-    FramedRead,
-    FramedWrite,
-};
+pub use tokio_io::_tokio_codec::{Decoder, Encoder, Framed, FramedParts, FramedRead, FramedWrite};
 
 pub use bytes_codec::BytesCodec;
 pub use lines_codec::LinesCodec;

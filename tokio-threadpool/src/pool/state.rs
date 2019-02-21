@@ -82,8 +82,7 @@ impl State {
     }
 
     pub fn is_terminated(&self) -> bool {
-        self.lifecycle() == Lifecycle::ShutdownNow &&
-            self.num_futures() == 0
+        self.lifecycle() == Lifecycle::ShutdownNow && self.num_futures() == 0
     }
 }
 
@@ -115,9 +114,10 @@ impl From<usize> for Lifecycle {
         use self::Lifecycle::*;
 
         debug_assert!(
-            src == Running as usize ||
-            src == ShutdownOnIdle as usize ||
-            src == ShutdownNow as usize);
+            src == Running as usize
+                || src == ShutdownOnIdle as usize
+                || src == ShutdownNow as usize
+        );
 
         unsafe { ::std::mem::transmute(src) }
     }

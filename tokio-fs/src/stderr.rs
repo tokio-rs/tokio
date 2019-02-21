@@ -1,8 +1,8 @@
-use tokio_io::{AsyncWrite};
+use tokio_io::AsyncWrite;
 
 use futures::Poll;
 
-use std::io::{self, Write, Stderr as StdStderr};
+use std::io::{self, Stderr as StdStderr, Write};
 
 /// A handle to the standard error stream of a process.
 ///
@@ -42,4 +42,3 @@ impl AsyncWrite for Stderr {
         Ok(().into())
     }
 }
-

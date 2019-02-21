@@ -10,8 +10,8 @@ extern crate mio;
 extern crate mio_uds;
 extern crate signal_hook;
 
-use std::io::{self, Error, ErrorKind};
 use std::io::prelude::*;
+use std::io::{self, Error, ErrorKind};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
@@ -21,24 +21,28 @@ use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async, Future};
 use futures::{Poll, Stream};
-use tokio_reactor::{Handle, PollEvented};
 use tokio_io::IoFuture;
+use tokio_reactor::{Handle, PollEvented};
 
-pub use self::libc::{SIGUSR1, SIGUSR2, SIGINT, SIGTERM};
 pub use self::libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
+pub use self::libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
 
 /// BSD-specific definitions
 #[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+pub mod bsd {
+    #[cfg(any(
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd",
-))]
-pub mod bsd {
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd",
-              target_os = "macos", target_os = "netbsd",
-              target_os = "openbsd"))]
+        target_os = "openbsd"
+    ))]
     pub use super::libc::SIGINFO;
 }
 
@@ -150,7 +154,10 @@ fn action(slot: &SignalInfo, mut sender: &UnixStream) {
 /// returning any error along the way if that fails.
 fn signal_enable(signal: c_int) -> io::Result<()> {
     if signal_hook::FORBIDDEN.contains(&signal) {
-        return Err(Error::new(ErrorKind::Other, format!("Refusing to register signal {}", signal)));
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("Refusing to register signal {}", signal),
+        ));
     }
 
     let globals = globals();
@@ -173,7 +180,10 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     if siginfo.initialized.load(Ordering::Relaxed) {
         Ok(())
     } else {
-        Err(Error::new(ErrorKind::Other, "Failed to register signal handler"))
+        Err(Error::new(
+            ErrorKind::Other,
+            "Failed to register signal handler",
+        ))
     }
 }
 
@@ -214,9 +224,7 @@ impl Driver {
         let stream = globals().receiver.try_clone()?;
         let wakeup = PollEvented::new_with_handle(stream, handle)?;
 
-        Ok(Driver {
-            wakeup: wakeup,
-        })
+        Ok(Driver { wakeup: wakeup })
     }
 
     /// Drain all data in the global receiver, ensuring we'll get woken up when
@@ -229,7 +237,7 @@ impl Driver {
         loop {
             match self.wakeup.read(&mut [0; 128]) {
                 Ok(0) => panic!("EOF on self-pipe"),
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
                 Err(e) => panic!("Bad read on self-pipe: {}", e),
             }
@@ -257,10 +265,10 @@ impl Driver {
             // has gone away then we can remove that slot.
             for i in (0..recipients.len()).rev() {
                 match recipients[i].try_send(signum) {
-                    Ok(()) => {},
+                    Ok(()) => {}
                     Err(ref e) if e.is_disconnected() => {
                         recipients.swap_remove(i);
-                    },
+                    }
 
                     // Channel is full, ignore the error since the
                     // receiver has already been woken up
@@ -268,7 +276,7 @@ impl Driver {
                         // Sanity check in case this error type ever gets
                         // additional variants we have not considered.
                         debug_assert!(e.is_full());
-                    },
+                    }
                 }
             }
         }
@@ -417,15 +425,19 @@ mod tests {
 
     #[test]
     fn dropped_signal_senders_are_cleaned_up() {
-        let mut rt = self::tokio::runtime::current_thread::Runtime::new()
-            .expect("failed to init runtime");
+        let mut rt =
+            self::tokio::runtime::current_thread::Runtime::new().expect("failed to init runtime");
 
         let signum = libc::SIGUSR1;
-        let signal = rt.block_on(Signal::new(signum))
+        let signal = rt
+            .block_on(Signal::new(signum))
             .expect("failed to create signal");
 
         {
-            let recipients = globals().signals[signum as usize].recipients.lock().unwrap();
+            let recipients = globals().signals[signum as usize]
+                .recipients
+                .lock()
+                .unwrap();
             assert!(!recipients.is_empty());
         }
 
@@ -436,7 +448,10 @@ mod tests {
         }
 
         {
-            let recipients = globals().signals[signum as usize].recipients.lock().unwrap();
+            let recipients = globals().signals[signum as usize]
+                .recipients
+                .lock()
+                .unwrap();
             assert!(recipients.is_empty());
         }
     }

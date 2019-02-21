@@ -1,10 +1,10 @@
-use Error;
 use super::Entry;
+use Error;
 
 use std::ptr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 
 /// A stack of `Entry` nodes
 #[derive(Debug)]
@@ -24,7 +24,9 @@ const SHUTDOWN: *mut Entry = 1 as *mut _;
 
 impl AtomicStack {
     pub fn new() -> AtomicStack {
-        AtomicStack { head: AtomicPtr::new(ptr::null_mut()) }
+        AtomicStack {
+            head: AtomicPtr::new(ptr::null_mut()),
+        }
     }
 
     /// Push an entry onto the stack.

@@ -1,9 +1,9 @@
 mod level;
 mod stack;
 
-pub(crate) use self::stack::Stack;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
+pub(crate) use self::stack::Stack;
 
 use std::borrow::Borrow;
 use std::usize;
@@ -64,14 +64,9 @@ where
 {
     /// Create a new timing wheel
     pub fn new() -> Wheel<T> {
-        let levels = (0..NUM_LEVELS)
-            .map(Level::new)
-            .collect();
+        let levels = (0..NUM_LEVELS).map(Level::new).collect();
 
-        Wheel {
-            elapsed: 0,
-            levels,
-        }
+        Wheel { elapsed: 0, levels }
     }
 
     /// Return the number of milliseconds that have elapsed since the timing
@@ -101,9 +96,12 @@ where
     /// immediately.
     ///
     /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
-    pub fn insert(&mut self, when: u64, item: T::Owned, store: &mut T::Store)
-        -> Result<(), (T::Owned, InsertError)>
-    {
+    pub fn insert(
+        &mut self,
+        when: u64,
+        item: T::Owned,
+        store: &mut T::Store,
+    ) -> Result<(), (T::Owned, InsertError)> {
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
         } else if when - self.elapsed > MAX_DURATION {
@@ -116,7 +114,8 @@ where
         self.levels[level].add_entry(when, item, store);
 
         debug_assert!({
-            self.levels[level].next_expiration(self.elapsed)
+            self.levels[level]
+                .next_expiration(self.elapsed)
                 .map(|e| e.deadline >= self.elapsed)
                 .unwrap_or(true)
         });
@@ -134,23 +133,19 @@ where
 
     /// Instant at which to poll
     pub fn poll_at(&self) -> Option<u64> {
-        self.next_expiration()
-            .map(|expiration| expiration.deadline)
+        self.next_expiration().map(|expiration| expiration.deadline)
     }
 
-    pub fn poll(&mut self, poll: &mut Poll, store: &mut T::Store)
-        -> Option<T::Owned>
-    {
+    pub fn poll(&mut self, poll: &mut Poll, store: &mut T::Store) -> Option<T::Owned> {
         loop {
             if poll.expiration.is_none() {
-                poll.expiration = self.next_expiration()
-                    .and_then(|expiration| {
-                        if expiration.deadline > poll.now {
-                            None
-                        } else {
-                            Some(expiration)
-                        }
-                    });
+                poll.expiration = self.next_expiration().and_then(|expiration| {
+                    if expiration.deadline > poll.now {
+                        None
+                    } else {
+                        Some(expiration)
+                    }
+                });
             }
 
             match poll.expiration {
@@ -181,7 +176,7 @@ where
                 debug_assert!({
                     let mut res = true;
 
-                    for l2 in (level+1)..NUM_LEVELS {
+                    for l2 in (level + 1)..NUM_LEVELS {
                         if let Some(e2) = self.levels[l2].next_expiration(self.elapsed) {
                             if e2.deadline < expiration.deadline {
                                 res = false;
@@ -199,9 +194,11 @@ where
         None
     }
 
-    pub fn poll_expiration(&mut self, expiration: &Expiration, store: &mut T::Store)
-        -> Option<T::Owned>
-    {
+    pub fn poll_expiration(
+        &mut self,
+        expiration: &Expiration,
+        store: &mut T::Store,
+    ) -> Option<T::Owned> {
         while let Some(item) = self.pop_entry(expiration, store) {
             if expiration.level == 0 {
                 debug_assert_eq!(T::when(item.borrow(), store), expiration.deadline);
@@ -212,8 +209,7 @@ where
 
                 let next_level = expiration.level - 1;
 
-                self.levels[next_level]
-                    .add_entry(when, item, store);
+                self.levels[next_level].add_entry(when, item, store);
             }
         }
 
@@ -221,7 +217,12 @@ where
     }
 
     fn set_elapsed(&mut self, when: u64) {
-        assert!(self.elapsed <= when, "elapsed={:?}; when={:?}", self.elapsed, when);
+        assert!(
+            self.elapsed <= when,
+            "elapsed={:?}; when={:?}",
+            self.elapsed,
+            when
+        );
 
         if when > self.elapsed {
             self.elapsed = when;
@@ -263,25 +264,46 @@ mod test {
     #[test]
     fn test_level_for() {
         for pos in 1..64 {
-            assert_eq!(0, level_for(0, pos), "level_for({}) -- binary = {:b}", pos, pos);
+            assert_eq!(
+                0,
+                level_for(0, pos),
+                "level_for({}) -- binary = {:b}",
+                pos,
+                pos
+            );
         }
 
         for level in 1..5 {
             for pos in level..64 {
                 let a = pos * 64_usize.pow(level as u32);
-                assert_eq!(level, level_for(0, a as u64),
-                           "level_for({}) -- binary = {:b}", a, a);
+                assert_eq!(
+                    level,
+                    level_for(0, a as u64),
+                    "level_for({}) -- binary = {:b}",
+                    a,
+                    a
+                );
 
                 if pos > level {
                     let a = a - 1;
-                    assert_eq!(level, level_for(0, a as u64),
-                               "level_for({}) -- binary = {:b}", a, a);
+                    assert_eq!(
+                        level,
+                        level_for(0, a as u64),
+                        "level_for({}) -- binary = {:b}",
+                        a,
+                        a
+                    );
                 }
 
                 if pos < 64 {
                     let a = a + 1;
-                    assert_eq!(level, level_for(0, a as u64),
-                               "level_for({}) -- binary = {:b}", a, a);
+                    assert_eq!(
+                        level,
+                        level_for(0, a as u64),
+                        "level_for({}) -- binary = {:b}",
+                        a,
+                        a
+                    );
                 }
             }
         }

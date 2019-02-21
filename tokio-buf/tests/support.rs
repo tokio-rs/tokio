@@ -1,13 +1,13 @@
 #![allow(unused)]
 
-extern crate tokio_buf;
 extern crate bytes;
 extern crate futures;
+extern crate tokio_buf;
 
-use tokio_buf::{BufStream, SizeHint};
 use bytes::Buf;
-use futures::Poll;
 use futures::Async::*;
+use futures::Poll;
+use tokio_buf::{BufStream, SizeHint};
 
 use std::collections::VecDeque;
 use std::io::Cursor;
@@ -32,7 +32,7 @@ macro_rules! assert_none {
             Ok(Ready(None)) => {}
             actual => panic!("expected None; actual = {:?}", actual),
         }
-    }
+    };
 }
 
 macro_rules! assert_not_ready {
@@ -41,7 +41,7 @@ macro_rules! assert_not_ready {
             Ok(NotReady) => {}
             actual => panic!("expected NotReady; actual = {:?}", actual),
         }
-    }
+    };
 }
 
 // ===== Test utils =====
@@ -130,4 +130,3 @@ impl Buf for MockBuf {
         self.data.advance(cnt)
     }
 }
-

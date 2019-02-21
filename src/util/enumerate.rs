@@ -1,4 +1,4 @@
-use futures::{Async, Poll, Stream, Sink, StartSend};
+use futures::{Async, Poll, Sink, StartSend, Stream};
 
 /// A stream combinator which combines the yields the current item
 /// plus its count starting from 0.
@@ -13,7 +13,10 @@ pub struct Enumerate<T> {
 
 impl<T> Enumerate<T> {
     pub(crate) fn new(stream: T) -> Self {
-        Self { inner: stream, count: 0 }
+        Self {
+            inner: stream,
+            count: 0,
+        }
     }
 
     /// Acquires a reference to the underlying stream that this combinator is
@@ -61,7 +64,8 @@ where
 
 // Forwarding impl of Sink from the underlying stream
 impl<T> Sink for Enumerate<T>
-    where T: Sink
+where
+    T: Sink,
 {
     type SinkItem = T::SinkItem;
     type SinkError = T::SinkError;

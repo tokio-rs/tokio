@@ -14,11 +14,11 @@ use loom::futures::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;
 
-use futures::Async;
 use futures::future::poll_fn;
+use futures::Async;
 
-use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 
 struct Chan {
     num: AtomicUsize,
@@ -52,6 +52,7 @@ fn basic_notification() {
             }
 
             Ok::<_, ()>(Async::NotReady)
-        })).unwrap();
+        }))
+        .unwrap();
     });
 }

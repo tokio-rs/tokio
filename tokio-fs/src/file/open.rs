@@ -14,7 +14,8 @@ pub struct OpenFuture<P> {
 }
 
 impl<P> OpenFuture<P>
-where P: AsRef<Path> + Send + 'static,
+where
+    P: AsRef<Path> + Send + 'static,
 {
     pub(crate) fn new(options: StdOpenOptions, path: P) -> Self {
         OpenFuture { options, path }
@@ -22,15 +23,14 @@ where P: AsRef<Path> + Send + 'static,
 }
 
 impl<P> Future for OpenFuture<P>
-where P: AsRef<Path> + Send + 'static,
+where
+    P: AsRef<Path> + Send + 'static,
 {
     type Item = File;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let std = try_ready!(::blocking_io(|| {
-            self.options.open(&self.path)
-        }));
+        let std = try_ready!(::blocking_io(|| self.options.open(&self.path)));
 
         let file = File::from_std(std);
         Ok(file.into())

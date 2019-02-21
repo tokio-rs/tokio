@@ -20,10 +20,7 @@ impl<'a, T: ?Sized> Unpin for WriteAll<'a, T> {}
 
 impl<'a, T: AsyncWrite + ?Sized> WriteAll<'a, T> {
     pub(super) fn new(writer: &'a mut T, buf: &'a [u8]) -> WriteAll<'a, T> {
-        WriteAll {
-            writer,
-            buf,
-        }
+        WriteAll { writer, buf }
     }
 }
 
@@ -48,7 +45,7 @@ impl<'a, T: AsyncWrite + ?Sized> Future for WriteAll<'a, T> {
             }
 
             if n == 0 {
-                return Poll::Ready(Err(zero_write()))
+                return Poll::Ready(Err(zero_write()));
             }
         }
 

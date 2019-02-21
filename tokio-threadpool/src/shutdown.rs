@@ -2,8 +2,8 @@ use task::Task;
 use worker;
 
 use crossbeam_deque::Injector;
-use futures::{Future, Poll, Async};
 use futures::task::AtomicTask;
+use futures::{Async, Future, Poll};
 
 use std::sync::{Arc, Mutex};
 

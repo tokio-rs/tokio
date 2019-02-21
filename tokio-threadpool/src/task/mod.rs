@@ -9,14 +9,14 @@ use self::state::State;
 use notifier::Notifier;
 use pool::Pool;
 
-use futures::{self, Future, Async};
 use futures::executor::{self, Spawn};
+use futures::{self, Async, Future};
 
-use std::{fmt, panic, ptr};
 use std::cell::{Cell, UnsafeCell};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, AtomicPtr};
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, Relaxed};
+use std::{fmt, panic, ptr};
 
 /// Harness around a future.
 ///
@@ -103,15 +103,20 @@ impl Task {
 
         // Transition task to running state. At this point, the task must be
         // scheduled.
-        let actual: State = self.state.compare_and_swap(
-            Scheduled.into(), Running.into(), AcqRel).into();
+        let actual: State = self
+            .state
+            .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
+            .into();
 
         match actual {
-            Scheduled => {},
+            Scheduled => {}
             _ => panic!("unexpected task state; {:?}", actual),
         }
 
-        trace!("Task::run; state={:?}", State::from(self.state.load(Relaxed)));
+        trace!(
+            "Task::run; state={:?}",
+            State::from(self.state.load(Relaxed))
+        );
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained.
@@ -136,8 +141,10 @@ impl Task {
 
             let mut g = Guard(fut, true);
 
-            let ret = g.0.as_mut().unwrap()
-                .poll_future_notify(unpark, self as *const _ as usize);
+            let ret =
+                g.0.as_mut()
+                    .unwrap()
+                    .poll_future_notify(unpark, self as *const _ as usize);
 
             g.1 = false;
 
@@ -168,8 +175,10 @@ impl Task {
                 // fails, then the task has been unparked concurrent to running,
                 // in which case it transitions immediately back to scheduled
                 // and we return `true`.
-                let prev: State = self.state.compare_and_swap(
-                    Running.into(), Idle.into(), AcqRel).into();
+                let prev: State = self
+                    .state
+                    .compare_and_swap(Running.into(), Idle.into(), AcqRel)
+                    .into();
 
                 match prev {
                     Running => Run::Idle,
@@ -202,10 +211,10 @@ impl Task {
                 }
             }
 
-            let actual = self.state.compare_and_swap(
-                state.into(),
-                Aborted.into(),
-                AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), Aborted.into(), AcqRel)
+                .into();
 
             if actual == state {
                 // The future has been aborted. Drop it immediately to free resources and run drop
@@ -239,10 +248,10 @@ impl Task {
 
         loop {
             // Scheduling can only be done from the `Idle` state.
-            let actual = self.state.compare_and_swap(
-                Idle.into(),
-                Scheduled.into(),
-                AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(Idle.into(), Scheduled.into(), AcqRel)
+                .into();
 
             match actual {
                 Idle => return true,
@@ -250,8 +259,10 @@ impl Task {
                     // The task is already running on another thread. Transition
                     // the state to `Notified`. If this CAS fails, then restart
                     // the logic again from `Idle`.
-                    let actual = self.state.compare_and_swap(
-                        Running.into(), Notified.into(), AcqRel).into();
+                    let actual = self
+                        .state
+                        .compare_and_swap(Running.into(), Notified.into(), AcqRel)
+                        .into();
 
                     match actual {
                         Idle => continue,

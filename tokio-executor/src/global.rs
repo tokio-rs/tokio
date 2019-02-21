@@ -1,4 +1,4 @@
-use super::{Executor, Enter, SpawnError};
+use super::{Enter, Executor, SpawnError};
 
 use futures::{future, Future};
 
@@ -33,24 +33,22 @@ impl DefaultExecutor {
     /// `DefaultExecutor::current()` on thread A and then sending the result to
     /// thread B will _not_ reference the default executor that was set on thread A.
     pub fn current() -> DefaultExecutor {
-        DefaultExecutor {
-            _dummy: (),
-        }
+        DefaultExecutor { _dummy: () }
     }
 
     #[inline]
     fn with_current<F: FnOnce(&mut Executor) -> R, R>(f: F) -> Option<R> {
-        EXECUTOR.with(|current_executor| {
-            match current_executor.replace(State::Active) {
+        EXECUTOR.with(
+            |current_executor| match current_executor.replace(State::Active) {
                 State::Ready(executor_ptr) => {
                     let executor = unsafe { &mut *executor_ptr };
                     let result = f(executor);
                     current_executor.set(State::Ready(executor_ptr));
                     Some(result)
-                },
+                }
                 State::Empty | State::Active => None,
-            }
-        })
+            },
+        )
     }
 }
 
@@ -61,10 +59,10 @@ enum State {
     // default executor is defined and ready to be used
     Ready(*mut Executor),
     // default executor is currently active (used to detect recursive calls)
-    Active
+    Active,
 }
 
-thread_local!{
+thread_local! {
     /// Thread-local tracking the current executor
     static EXECUTOR: Cell<State> = Cell::new(State::Empty)
 }
@@ -72,9 +70,10 @@ thread_local!{
 // ===== impl DefaultExecutor =====
 
 impl super::Executor for DefaultExecutor {
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), SpawnError>
-    {
+    fn spawn(
+        &mut self,
+        future: Box<Future<Item = (), Error = ()> + Send>,
+    ) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
@@ -86,7 +85,8 @@ impl super::Executor for DefaultExecutor {
 }
 
 impl<T> future::Executor<T> for DefaultExecutor
-where T: Future<Item = (), Error = ()> + Send + 'static,
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
 {
     fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
         if let Err(e) = super::Executor::status(self) {
@@ -146,10 +146,10 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
 /// # pub fn main() {}
 /// ```
 pub fn spawn<T>(future: T)
-    where T: Future<Item = (), Error = ()> + Send + 'static,
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
 {
-    DefaultExecutor::current().spawn(Box::new(future))
-        .unwrap()
+    DefaultExecutor::current().spawn(Box::new(future)).unwrap()
 }
 
 /// Set the default executor for the duration of the closure
@@ -158,13 +158,15 @@ pub fn spawn<T>(future: T)
 ///
 /// This function panics if there already is a default executor set.
 pub fn with_default<T, F, R>(executor: &mut T, enter: &mut Enter, f: F) -> R
-where T: Executor,
-      F: FnOnce(&mut Enter) -> R
+where
+    T: Executor,
+    F: FnOnce(&mut Enter) -> R,
 {
     EXECUTOR.with(|cell| {
         match cell.get() {
-            State::Ready(_) | State::Active =>
-                panic!("default executor already set for execution context"),
+            State::Ready(_) | State::Active => {
+                panic!("default executor already set for execution context")
+            }
             _ => {}
         }
 
@@ -202,7 +204,7 @@ unsafe fn hide_lt<'a>(p: *mut (Executor + 'a)) -> *mut (Executor + 'static) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Executor, DefaultExecutor, with_default};
+    use super::{with_default, DefaultExecutor, Executor};
 
     #[test]
     fn default_executor_is_send_and_sync() {

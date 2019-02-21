@@ -2,8 +2,8 @@
 
 use {clock, Delay, Error};
 
-use futures::{Async, Future, Poll, Stream};
 use futures::future::Either;
+use futures::{Async, Future, Poll, Stream};
 
 use std::{
     error::Error as StdError,
@@ -65,17 +65,11 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         if let Some(ref mut delay) = self.delay {
-            try_ready!({
-                delay.poll()
-                    .map_err(ThrottleError::from_timer_err)
-            });
+            try_ready!({ delay.poll().map_err(ThrottleError::from_timer_err) });
         }
 
         self.delay = None;
-        let value = try_ready!({
-            self.stream.poll()
-                .map_err(ThrottleError::from_stream_err)
-        });
+        let value = try_ready!({ self.stream.poll().map_err(ThrottleError::from_stream_err) });
 
         if value.is_some() {
             self.delay = Some(Delay::new(clock::now() + self.duration));

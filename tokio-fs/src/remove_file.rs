@@ -21,30 +21,28 @@ pub fn remove_file<P: AsRef<Path>>(path: P) -> RemoveFileFuture<P> {
 #[derive(Debug)]
 pub struct RemoveFileFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     path: P,
 }
 
 impl<P> RemoveFileFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     fn new(path: P) -> RemoveFileFuture<P> {
-        RemoveFileFuture {
-            path: path,
-        }
+        RemoveFileFuture { path: path }
     }
 }
 
 impl<P> Future for RemoveFileFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::remove_file(&self.path) )
+        ::blocking_io(|| fs::remove_file(&self.path))
     }
 }

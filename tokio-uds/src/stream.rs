@@ -50,8 +50,7 @@ impl UnixStream {
     where
         P: AsRef<Path>,
     {
-        let res = mio_uds::UnixStream::connect(path)
-            .map(UnixStream::new);
+        let res = mio_uds::UnixStream::connect(path).map(UnixStream::new);
 
         let inner = match res {
             Ok(stream) => State::Waiting(stream),
@@ -260,11 +259,11 @@ impl Future for ConnectFuture {
         match self.inner {
             State::Waiting(ref mut stream) => {
                 if let Async::NotReady = stream.io.poll_write_ready()? {
-                    return Ok(Async::NotReady)
+                    return Ok(Async::NotReady);
                 }
 
                 if let Some(e) = try!(stream.io.get_ref().take_error()) {
-                    return Err(e)
+                    return Err(e);
                 }
             }
             State::Error(_) => {
@@ -273,8 +272,8 @@ impl Future for ConnectFuture {
                     _ => unreachable!(),
                 };
 
-                return Err(e)
-            },
+                return Err(e);
+            }
             State::Empty => panic!("can't poll stream twice"),
         }
 

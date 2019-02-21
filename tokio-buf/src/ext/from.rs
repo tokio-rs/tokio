@@ -43,7 +43,9 @@ pub trait FromBufStream<T: Buf>: Sized {
 
 /// Error returned from collecting into a `Vec<u8>`
 #[derive(Debug)]
-pub struct CollectVecError { _p: () }
+pub struct CollectVecError {
+    _p: (),
+}
 
 impl<T: Buf> FromBufStream<T> for Vec<u8> {
     type Builder = Vec<u8>;
@@ -70,7 +72,7 @@ impl<T: Buf> FromBufStream<T> for Vec<u8> {
             Some(upper) if upper <= 64 => {
                 reserve = upper as usize;
             }
-            _ => {},
+            _ => {}
         }
 
         // hint.lower() represents the minimum amount of data that will be

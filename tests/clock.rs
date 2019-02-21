@@ -1,7 +1,7 @@
+extern crate env_logger;
 extern crate futures;
 extern crate tokio;
 extern crate tokio_timer;
-extern crate env_logger;
 
 use tokio::prelude::*;
 use tokio::runtime::{self, current_thread};
@@ -26,10 +26,7 @@ fn clock_and_timer_concurrent() {
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
-    let mut rt = runtime::Builder::new()
-        .clock(clock)
-        .build()
-        .unwrap();
+    let mut rt = runtime::Builder::new().clock(clock).build().unwrap();
 
     let (tx, rx) = mpsc::channel();
 
@@ -53,10 +50,7 @@ fn clock_and_timer_single_threaded() {
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
-    let mut rt = current_thread::Builder::new()
-        .clock(clock)
-        .build()
-        .unwrap();
+    let mut rt = current_thread::Builder::new().clock(clock).build().unwrap();
 
     rt.block_on({
         Delay::new(when)
@@ -65,5 +59,6 @@ fn clock_and_timer_single_threaded() {
                 assert!(Instant::now() < when);
                 Ok(())
             })
-    }).unwrap();
+    })
+    .unwrap();
 }

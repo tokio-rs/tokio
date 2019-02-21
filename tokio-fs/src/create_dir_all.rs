@@ -18,30 +18,28 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> CreateDirAllFuture<P> {
 #[derive(Debug)]
 pub struct CreateDirAllFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     path: P,
 }
 
 impl<P> CreateDirAllFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     fn new(path: P) -> CreateDirAllFuture<P> {
-        CreateDirAllFuture {
-            path: path,
-        }
+        CreateDirAllFuture { path: path }
     }
 }
 
 impl<P> Future for CreateDirAllFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::create_dir_all(&self.path) )
+        ::blocking_io(|| fs::create_dir_all(&self.path))
     }
 }

@@ -12,7 +12,7 @@ use std::time::Instant;
 ///
 /// `Clock` instances return [`Instant`] values corresponding to "now". The source
 /// of these values is configurable. The default source is [`Instant::now`].
-/// 
+///
 /// [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
 /// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 #[derive(Default, Clone)]
@@ -20,7 +20,7 @@ pub struct Clock {
     now: Option<Arc<Now>>,
 }
 
-thread_local!{
+thread_local! {
     /// Thread-local tracking the current clock
     static CLOCK: Cell<Option<*const Clock>> = Cell::new(None)
 }
@@ -43,13 +43,9 @@ thread_local!{
 /// let now = clock::now();
 /// ```
 pub fn now() -> Instant {
-    CLOCK.with(|current| {
-        match current.get() {
-            Some(ptr) => {
-                unsafe { (*ptr).now() }
-            }
-            None => Instant::now(),
-        }
+    CLOCK.with(|current| match current.get() {
+        Some(ptr) => unsafe { (*ptr).now() },
+        None => Instant::now(),
     })
 }
 
@@ -57,13 +53,9 @@ impl Clock {
     /// Return a new `Clock` instance that uses the current execution context's
     /// source of time.
     pub fn new() -> Clock {
-        CLOCK.with(|current| {
-            match current.get() {
-                Some(ptr) => {
-                    unsafe { (*ptr).clone() }
-                }
-                None => Clock::system(),
-            }
+        CLOCK.with(|current| match current.get() {
+            Some(ptr) => unsafe { (*ptr).clone() },
+            None => Clock::system(),
         })
     }
 
@@ -76,12 +68,10 @@ impl Clock {
 
     /// Return a new `Clock` instance that uses [`Instant::now`] as the source
     /// of time.
-    /// 
+    ///
     /// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
     pub fn system() -> Clock {
-        Clock {
-            now: None,
-        }
+        Clock { now: None }
     }
 
     /// Returns an instant corresponding to "now" by using the instance's source
@@ -121,10 +111,14 @@ impl fmt::Debug for Clock {
 ///
 /// This function panics if there already is a default clock set.
 pub fn with_default<F, R>(clock: &Clock, enter: &mut Enter, f: F) -> R
-where F: FnOnce(&mut Enter) -> R
+where
+    F: FnOnce(&mut Enter) -> R,
 {
     CLOCK.with(|cell| {
-        assert!(cell.get().is_none(), "default clock already set for execution context");
+        assert!(
+            cell.get().is_none(),
+            "default clock already set for execution context"
+        );
 
         // Ensure that the clock is removed from the thread-local context
         // when leaving the scope. This handles cases that involve panicking.

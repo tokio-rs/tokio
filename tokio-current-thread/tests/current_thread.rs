@@ -1,6 +1,6 @@
+extern crate futures;
 extern crate tokio_current_thread;
 extern crate tokio_executor;
-extern crate futures;
 
 use tokio_current_thread::{block_on_all, CurrentThread};
 
@@ -10,8 +10,8 @@ use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
 
-use futures::task;
 use futures::future::{self, lazy};
+use futures::task;
 // This is not actually unused --- we need this trait to be in scope for
 // the tests that sue TaskExecutor::current().execute(). The compiler
 // doesn't realise that.
@@ -22,7 +22,7 @@ use futures::sync::oneshot;
 
 mod from_block_on_all {
     use super::*;
-    fn test<F: Fn(Box<Future<Item=(), Error=()>>) + 'static>(spawn: F) {
+    fn test<F: Fn(Box<Future<Item = (), Error = ()>>) + 'static>(spawn: F) {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
 
@@ -36,7 +36,8 @@ mod from_block_on_all {
             })));
 
             Ok::<_, ()>("hello")
-        })).unwrap();
+        }))
+        .unwrap();
 
         assert_eq!(2, cnt.get());
         assert_eq!(msg, "hello");
@@ -72,7 +73,8 @@ fn block_waits() {
     block_on_all(rx.then(move |_| {
         cnt.set(1 + cnt.get());
         Ok::<_, ()>(())
-    })).unwrap();
+    }))
+    .unwrap();
 
     assert_eq!(1, cnt2.get());
 }
@@ -100,11 +102,14 @@ fn spawn_many() {
 mod does_not_set_global_executor_by_default {
     use super::*;
 
-    fn test<F: Fn(Box<Future<Item=(), Error=()> + Send>) -> Result<(), E> + 'static, E>(spawn: F) {
+    fn test<F: Fn(Box<Future<Item = (), Error = ()> + Send>) -> Result<(), E> + 'static, E>(
+        spawn: F,
+    ) {
         block_on_all(lazy(|| {
             spawn(Box::new(lazy(|| ok()))).unwrap_err();
             ok()
-        })).unwrap()
+        }))
+        .unwrap()
     }
 
     #[test]
@@ -123,20 +128,22 @@ mod from_block_on_future {
     use super::*;
 
     fn test<F: Fn(Box<Future<Item = (), Error = ()>>)>(spawn: F) {
-         let cnt = Rc::new(Cell::new(0));
+        let cnt = Rc::new(Cell::new(0));
 
         let mut tokio_current_thread = CurrentThread::new();
 
-        tokio_current_thread.block_on(lazy(|| {
-            let cnt = cnt.clone();
+        tokio_current_thread
+            .block_on(lazy(|| {
+                let cnt = cnt.clone();
 
-            spawn(Box::new(lazy(move || {
-                cnt.set(1 + cnt.get());
-                Ok(())
-            })));
+                spawn(Box::new(lazy(move || {
+                    cnt.set(1 + cnt.get());
+                    Ok(())
+                })));
 
-            Ok::<_, ()>(())
-        })).unwrap();
+                Ok::<_, ()>(())
+            }))
+            .unwrap();
 
         tokio_current_thread.run().unwrap();
 
@@ -150,7 +157,11 @@ mod from_block_on_future {
 
     #[test]
     fn execute() {
-        test(|f| { tokio_current_thread::TaskExecutor::current().execute(f).unwrap(); });
+        test(|f| {
+            tokio_current_thread::TaskExecutor::current()
+                .execute(f)
+                .unwrap();
+        });
     }
 }
 
@@ -170,8 +181,8 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<Future<Item=(), Error=()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<Future<Item=(), Error=()>>)
+        F: Fn(Box<Future<Item = (), Error = ()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<Future<Item = (), Error = ()>>),
     {
         let mut rc = Rc::new(());
 
@@ -189,10 +200,12 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 
         let mut tokio_current_thread = CurrentThread::new();
 
-        tokio_current_thread.block_on(lazy(|| {
-            spawn(Box::new(Never(rc.clone())));
-            Ok::<_, ()>(())
-        })).unwrap();
+        tokio_current_thread
+            .block_on(lazy(|| {
+                spawn(Box::new(Never(rc.clone())));
+                Ok::<_, ()>(())
+            }))
+            .unwrap();
 
         drop(tokio_current_thread);
 
@@ -202,12 +215,15 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn, |rt, f| { rt.spawn(f); })
+        test(tokio_current_thread::spawn, |rt, f| {
+            rt.spawn(f);
+        })
     }
 
     #[test]
     fn execute() {
-        test(|f| {
+        test(
+            |f| {
                 tokio_current_thread::TaskExecutor::current()
                     .execute(f)
                     .unwrap();
@@ -216,7 +232,9 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
             // `futures::Executor`, so we'll call `.spawn(...)` rather than
             // `.execute(...)` for now. If `CurrentThread` is changed to
             // implement Executor, change this to `.execute(...).unwrap()`.
-            |rt, f| { rt.spawn(f); }
+            |rt, f| {
+                rt.spawn(f);
+            },
         );
     }
 }
@@ -225,12 +243,11 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 #[should_panic]
 fn nesting_run() {
     block_on_all(lazy(|| {
-        block_on_all(lazy(|| {
-            ok()
-        })).unwrap();
+        block_on_all(lazy(|| ok())).unwrap();
 
         ok()
-    })).unwrap();
+    }))
+    .unwrap();
 }
 
 mod run_in_future {
@@ -241,13 +258,12 @@ mod run_in_future {
     fn spawn() {
         block_on_all(lazy(|| {
             tokio_current_thread::spawn(lazy(|| {
-                block_on_all(lazy(|| {
-                    ok()
-                })).unwrap();
+                block_on_all(lazy(|| ok())).unwrap();
                 ok()
             }));
             ok()
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     #[test]
@@ -256,17 +272,15 @@ mod run_in_future {
         block_on_all(lazy(|| {
             tokio_current_thread::TaskExecutor::current()
                 .execute(lazy(|| {
-                    block_on_all(lazy(|| {
-                        ok()
-                    })).unwrap();
+                    block_on_all(lazy(|| ok())).unwrap();
                     ok()
                 }))
                 .unwrap();
             ok()
-        })).unwrap();
+        }))
+        .unwrap();
     }
 }
-
 
 #[test]
 fn tick_on_infini_future() {
@@ -288,9 +302,7 @@ fn tick_on_infini_future() {
     }
 
     CurrentThread::new()
-        .spawn(Infini {
-            num: num.clone(),
-        })
+        .spawn(Infini { num: num.clone() })
         .turn(None)
         .unwrap();
 
@@ -347,7 +359,8 @@ mod tasks_are_scheduled_fairly {
             });
 
             ok()
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     #[test]
@@ -359,8 +372,8 @@ mod tasks_are_scheduled_fairly {
     fn execute() {
         test(|f| {
             tokio_current_thread::TaskExecutor::current()
-            .execute(f)
-            .unwrap();
+                .execute(f)
+                .unwrap();
         })
     }
 }
@@ -370,8 +383,8 @@ mod and_turn {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<Future<Item=(), Error=()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<Future<Item=(), Error=()>>)
+        F: Fn(Box<Future<Item = (), Error = ()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<Future<Item = (), Error = ()>>),
     {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
@@ -379,24 +392,25 @@ mod and_turn {
         let mut tokio_current_thread = CurrentThread::new();
 
         // Spawn a basic task to get the executor to turn
-        dotspawn(&mut tokio_current_thread, Box::new(lazy(move || {
-            Ok(())
-        })));
+        dotspawn(&mut tokio_current_thread, Box::new(lazy(move || Ok(()))));
 
         // Turn once...
         tokio_current_thread.turn(None).unwrap();
 
-        dotspawn(&mut tokio_current_thread, Box::new(lazy(move || {
-            c.set(1 + c.get());
-
-            // Spawn!
-            spawn(Box::new(lazy(move || {
+        dotspawn(
+            &mut tokio_current_thread,
+            Box::new(lazy(move || {
                 c.set(1 + c.get());
-                Ok::<(), ()>(())
-            })));
 
-            Ok(())
-        })));
+                // Spawn!
+                spawn(Box::new(lazy(move || {
+                    c.set(1 + c.get());
+                    Ok::<(), ()>(())
+                })));
+
+                Ok(())
+            })),
+        );
 
         // This does not run the newly spawned thread
         tokio_current_thread.turn(None).unwrap();
@@ -409,12 +423,15 @@ mod and_turn {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn, |rt, f| { rt.spawn(f); })
+        test(tokio_current_thread::spawn, |rt, f| {
+            rt.spawn(f);
+        })
     }
 
     #[test]
     fn execute() {
-        test(|f| {
+        test(
+            |f| {
                 tokio_current_thread::TaskExecutor::current()
                     .execute(f)
                     .unwrap();
@@ -423,10 +440,11 @@ mod and_turn {
             // `futures::Executor`, so we'll call `.spawn(...)` rather than
             // `.execute(...)` for now. If `CurrentThread` is changed to
             // implement Executor, change this to `.execute(...).unwrap()`.
-            |rt, f| { rt.spawn(f); }
+            |rt, f| {
+                rt.spawn(f);
+            },
         );
     }
-
 
 }
 
@@ -455,23 +473,24 @@ mod in_drop {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<Future<Item=(), Error=()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<Future<Item=(), Error=()>>)
+        F: Fn(Box<Future<Item = (), Error = ()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<Future<Item = (), Error = ()>>),
     {
-    let mut tokio_current_thread = CurrentThread::new();
+        let mut tokio_current_thread = CurrentThread::new();
 
         let (tx, rx) = oneshot::channel();
 
-        dotspawn(&mut tokio_current_thread, Box::new(
-            MyFuture {
+        dotspawn(
+            &mut tokio_current_thread,
+            Box::new(MyFuture {
                 _data: Box::new(OnDrop(Some(move || {
                     spawn(Box::new(lazy(move || {
                         tx.send(()).unwrap();
                         Ok(())
                     })));
                 }))),
-            }
-        ));
+            }),
+        );
 
         tokio_current_thread.block_on(rx).unwrap();
         tokio_current_thread.run().unwrap();
@@ -479,12 +498,15 @@ mod in_drop {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn, |rt, f| { rt.spawn(f); })
+        test(tokio_current_thread::spawn, |rt, f| {
+            rt.spawn(f);
+        })
     }
 
     #[test]
     fn execute() {
-        test(|f| {
+        test(
+            |f| {
                 tokio_current_thread::TaskExecutor::current()
                     .execute(f)
                     .unwrap();
@@ -493,7 +515,9 @@ mod in_drop {
             // `futures::Executor`, so we'll call `.spawn(...)` rather than
             // `.execute(...)` for now. If `CurrentThread` is changed to
             // implement Executor, change this to `.execute(...).unwrap()`.
-            |rt, f| { rt.spawn(f); }
+            |rt, f| {
+                rt.spawn(f);
+            },
         );
     }
 
@@ -562,13 +586,17 @@ fn turn_has_polled() {
     tokio_current_thread.spawn(receiver.then(|_| Ok(())));
 
     // Turn once...
-    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread
+        .turn(Some(Duration::from_millis(0)))
+        .unwrap();
 
     // Should've polled the receiver once, but considered it not ready
     assert!(res.has_polled());
 
     // Turn another time
-    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread
+        .turn(Some(Duration::from_millis(0)))
+        .unwrap();
 
     // Should've polled nothing, the receiver is not ready yet
     assert!(!res.has_polled());
@@ -577,14 +605,18 @@ fn turn_has_polled() {
     sender.send(()).unwrap();
 
     // Turn another time
-    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread
+        .turn(Some(Duration::from_millis(0)))
+        .unwrap();
 
     // Should've polled the receiver, it's ready now
     assert!(res.has_polled());
 
     // Now the executor should be empty
     assert!(tokio_current_thread.is_idle());
-    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread
+        .turn(Some(Duration::from_millis(0)))
+        .unwrap();
 
     // So should've polled nothing
     assert!(!res.has_polled());
@@ -646,46 +678,41 @@ fn turn_fair() {
 
     // Once an item is received on the oneshot channel, it will immediately
     // immediately make the second oneshot channel ready
-    tokio_current_thread.spawn(receiver
-        .map_err(|_| unreachable!())
-        .and_then(move |_| {
-            sender_2.send(()).unwrap();
-            receiver_1_done_clone.set(true);
+    tokio_current_thread.spawn(receiver.map_err(|_| unreachable!()).and_then(move |_| {
+        sender_2.send(()).unwrap();
+        receiver_1_done_clone.set(true);
 
-            Ok(())
-        })
-    );
+        Ok(())
+    }));
 
     let receiver_2_done = Rc::new(Cell::new(false));
     let receiver_2_done_clone = receiver_2_done.clone();
 
-    tokio_current_thread.spawn(receiver_2
-        .map_err(|_| unreachable!())
-        .and_then(move |_| {
-            receiver_2_done_clone.set(true);
-            Ok(())
-        })
-    );
+    tokio_current_thread.spawn(receiver_2.map_err(|_| unreachable!()).and_then(move |_| {
+        receiver_2_done_clone.set(true);
+        Ok(())
+    }));
 
     // The third receiver is only woken up from our Park implementation, it simulates
     // e.g. a socket that first has to be polled to know if it is ready now
     let receiver_3_done = Rc::new(Cell::new(false));
     let receiver_3_done_clone = receiver_3_done.clone();
 
-    tokio_current_thread.spawn(receiver_3
-        .map_err(|_| unreachable!())
-        .and_then(move |_| {
-            receiver_3_done_clone.set(true);
-            Ok(())
-        })
-    );
+    tokio_current_thread.spawn(receiver_3.map_err(|_| unreachable!()).and_then(move |_| {
+        receiver_3_done_clone.set(true);
+        Ok(())
+    }));
 
     // First turn should've polled both and considered them not ready
-    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread
+        .turn(Some(Duration::from_millis(0)))
+        .unwrap();
     assert!(res.has_polled());
 
     // Next turn should've polled nothing
-    let res = tokio_current_thread.turn(Some(Duration::from_millis(0))).unwrap();
+    let res = tokio_current_thread
+        .turn(Some(Duration::from_millis(0)))
+        .unwrap();
     assert!(!res.has_polled());
 
     assert!(!receiver_1_done.get());
@@ -736,10 +763,12 @@ fn spawn_from_other_thread() {
     let (sender, receiver) = oneshot::channel::<()>();
 
     thread::spawn(move || {
-        handle.spawn(lazy(move || {
-            sender.send(()).unwrap();
-            Ok(())
-        })).unwrap();
+        handle
+            .spawn(lazy(move || {
+                sender.send(()).unwrap();
+                Ok(())
+            }))
+            .unwrap();
     });
 
     let _ = current_thread.block_on(receiver).unwrap();
@@ -758,10 +787,12 @@ fn spawn_from_other_thread_unpark() {
     thread::spawn(move || {
         let _ = receiver_2.recv().unwrap();
 
-        handle.spawn(lazy(move || {
-            sender_1.send(()).unwrap();
-            Ok(())
-        })).unwrap();
+        handle
+            .spawn(lazy(move || {
+                sender_1.send(()).unwrap();
+                Ok(())
+            }))
+            .unwrap();
     });
 
     // Ensure that unparking the executor works correctly. It will first
@@ -769,13 +800,15 @@ fn spawn_from_other_thread_unpark() {
     // lazy future below which will cause the future to be spawned from
     // the other thread. Then the executor will park but should be woken
     // up because *now* we have a new future to schedule
-    let _ = current_thread.block_on(
-        lazy(move || {
-            sender_2.send(()).unwrap();
-            Ok(())
-        })
-        .and_then(|_| receiver_1)
-    ).unwrap();
+    let _ = current_thread
+        .block_on(
+            lazy(move || {
+                sender_2.send(()).unwrap();
+                Ok(())
+            })
+            .and_then(|_| receiver_1),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -785,10 +818,12 @@ fn spawn_from_executor_with_handle() {
     let (tx, rx) = oneshot::channel();
 
     current_thread.spawn(lazy(move || {
-        handle.spawn(lazy(move || {
-            tx.send(()).unwrap();
-            Ok(())
-        })).unwrap();
+        handle
+            .spawn(lazy(move || {
+                tx.send(()).unwrap();
+                Ok(())
+            }))
+            .unwrap();
         Ok::<_, ()>(())
     }));
 

@@ -1,6 +1,6 @@
 use {UnixListener, UnixStream};
 
-use futures::{Stream, Poll};
+use futures::{Poll, Stream};
 
 use std::io;
 
@@ -24,4 +24,3 @@ impl Stream for Incoming {
         Ok(Some(try_ready!(self.inner.poll_accept()).0).into())
     }
 }
-

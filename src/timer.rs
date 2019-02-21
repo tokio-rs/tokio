@@ -82,15 +82,7 @@
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-pub use tokio_timer::{
-    delay_queue,
-    DelayQueue,
-    Error,
-    Interval,
-    Delay,
-    Timeout,
-    timeout,
-};
+pub use tokio_timer::{delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout};
 
 #[deprecated(since = "0.1.8", note = "use Timeout instead")]
 #[allow(deprecated)]

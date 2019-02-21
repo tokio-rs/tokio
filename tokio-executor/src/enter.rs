@@ -1,7 +1,7 @@
-use std::prelude::v1::*;
 use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
+use std::prelude::v1::*;
 
 use futures::{self, Future};
 
@@ -70,7 +70,10 @@ pub fn enter() -> Result<Enter, EnterError> {
 impl Enter {
     /// Register a callback to be invoked if and when the thread
     /// ceased to act as an executor.
-    pub fn on_exit<F>(&mut self, f: F) where F: FnOnce() + 'static {
+    pub fn on_exit<F>(&mut self, f: F)
+    where
+        F: FnOnce() + 'static,
+    {
         self.on_exit.push(Box::new(f));
     }
 
@@ -88,7 +91,6 @@ impl Enter {
     pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
         futures::executor::spawn(f).wait_future()
     }
-
 }
 
 impl fmt::Debug for Enter {
@@ -103,7 +105,7 @@ impl Drop for Enter {
             assert!(c.get());
 
             if self.permanent {
-                return
+                return;
             }
 
             for callback in self.on_exit.drain(..) {

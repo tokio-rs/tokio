@@ -1,11 +1,10 @@
-extern crate tokio_buf;
 extern crate bytes;
 extern crate futures;
+extern crate tokio_buf;
 
-use tokio_buf::{BufStream, SizeHint};
 use bytes::Buf;
 use futures::Async::*;
-
+use tokio_buf::{BufStream, SizeHint};
 
 #[macro_use]
 mod support;

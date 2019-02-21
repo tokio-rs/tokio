@@ -25,9 +25,10 @@ matrix:
     script: |
       cargo check --all
 
-  # Test combinations of enabled features.
+  # Test combinations of enabled features and rustfmt
   - rust: stable
     script: |
+      cargo fmt --all -- --check
       shopt -s expand_aliases
       alias check="cargo check --no-default-features"
       check

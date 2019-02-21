@@ -51,7 +51,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
         "0.0.0.0:0"
     } else {
         "[::]:0"
-    }.parse()?;
+    }
+    .parse()?;
     let socket = UdpSocket::bind(&local_addr)?;
     const MAX_DATAGRAM_SIZE: usize = 65_507;
     socket

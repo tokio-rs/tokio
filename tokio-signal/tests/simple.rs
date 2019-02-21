@@ -8,8 +8,8 @@ use support::*;
 #[test]
 fn simple() {
     let mut rt = CurrentThreadRuntime::new().unwrap();
-    let signal = run_with_timeout(&mut rt, Signal::new(libc::SIGUSR1))
-        .expect("failed to create signal");
+    let signal =
+        run_with_timeout(&mut rt, Signal::new(libc::SIGUSR1)).expect("failed to create signal");
 
     send_signal(libc::SIGUSR1);
 

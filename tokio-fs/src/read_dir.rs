@@ -1,5 +1,5 @@
 use std::ffi::OsString;
-use std::fs::{self, DirEntry as StdDirEntry, ReadDir as StdReadDir, FileType, Metadata};
+use std::fs::{self, DirEntry as StdDirEntry, FileType, Metadata, ReadDir as StdReadDir};
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::DirEntryExt;
@@ -30,12 +30,10 @@ where
 
 impl<P> ReadDirFuture<P>
 where
-    P: AsRef<Path> + Send + 'static
+    P: AsRef<Path> + Send + 'static,
 {
     fn new(path: P) -> ReadDirFuture<P> {
-        ReadDirFuture {
-            path: path,
-        }
+        ReadDirFuture { path: path }
     }
 }
 
@@ -75,12 +73,10 @@ impl Stream for ReadDir {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        ::blocking_io(|| {
-            match self.0.next() {
-                Some(Err(err)) => Err(err),
-                Some(Ok(item)) => Ok(Some(DirEntry(item))),
-                None => Ok(None)
-            }
+        ::blocking_io(|| match self.0.next() {
+            Some(Err(err)) => Err(err),
+            Some(Ok(item)) => Ok(Some(DirEntry(item))),
+            None => Ok(None),
         })
     }
 }

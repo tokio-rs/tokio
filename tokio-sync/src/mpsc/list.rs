@@ -4,12 +4,12 @@ use super::block::{self, Block};
 
 use loom::{
     self,
-    sync::atomic::{AtomicUsize, AtomicPtr},
+    sync::atomic::{AtomicPtr, AtomicUsize},
 };
 
 use std::fmt;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{Acquire, Release, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
 /// List queue transmit handle
 pub(crate) struct Tx<T> {
@@ -59,8 +59,7 @@ impl<T> Tx<T> {
     pub(crate) fn push(&self, value: T) {
         // First, claim a slot for the value. `Acquire` is used here to
         // synchronize with the `fetch_add` in `free_blocks`.
-        let slot_index = self.tail_position
-            .fetch_add(1, Acquire);
+        let slot_index = self.tail_position.fetch_add(1, Acquire);
 
         // Load the current block and write the value
         let block = self.find_block(slot_index);
@@ -78,14 +77,11 @@ impl<T> Tx<T> {
     pub(crate) fn close(&self) {
         // First, claim a slot for the value. This is the last slot that will be
         // claimed.
-        let slot_index = self.tail_position
-            .fetch_add(1, Acquire);
+        let slot_index = self.tail_position.fetch_add(1, Acquire);
 
         let block = self.find_block(slot_index);
 
-        unsafe {
-            block.as_ref().tx_close()
-        }
+        unsafe { block.as_ref().tx_close() }
     }
 
     fn find_block(&self, slot_index: usize) -> NonNull<Block<T>> {
@@ -123,7 +119,8 @@ impl<T> Tx<T> {
                 return unsafe { NonNull::new_unchecked(block_ptr) };
             }
 
-            let next_block = block.load_next(Acquire)
+            let next_block = block
+                .load_next(Acquire)
                 // There is no allocated next block, grow the linked list.
                 .unwrap_or_else(|| block.grow());
 
@@ -146,15 +143,17 @@ impl<T> Tx<T> {
                 //
                 // Acquire is not needed as any "actual" value is not accessed.
                 // At this point, the linked list is walked to acquire blocks.
-                let actual = self.block_tail.compare_and_swap(
-                    block_ptr, next_block.as_ptr(), Release);
+                let actual =
+                    self.block_tail
+                        .compare_and_swap(block_ptr, next_block.as_ptr(), Release);
 
                 if actual == block_ptr {
                     // Synchronize with any senders
-                    let tail_position =
-                        self.tail_position.fetch_add(0, Release);
+                    let tail_position = self.tail_position.fetch_add(0, Release);
 
-                    unsafe { block.tx_release(tail_position); }
+                    unsafe {
+                        block.tx_release(tail_position);
+                    }
                 } else {
                     // A concurrent sender is also working on advancing
                     // `block_tail` and this thread is falling behind.
@@ -207,7 +206,7 @@ impl<T> Tx<T> {
         }
 
         if !reused {
-            let _  = Box::from_raw(block.as_ptr());
+            let _ = Box::from_raw(block.as_ptr());
         }
     }
 }
@@ -286,8 +285,7 @@ impl<T> Rx<T> {
                 // `free_head` to point to the next block.
                 let block = self.free_head;
 
-                let observed_tail_position =
-                    block.as_ref().observed_tail_position();
+                let observed_tail_position = block.as_ref().observed_tail_position();
 
                 let required_index = match observed_tail_position {
                     Some(i) => i,
@@ -302,8 +300,7 @@ impl<T> Rx<T> {
                 // guaranteed that the `free_blocks` routine trails the `recv`
                 // routine. Any memory accessed by `free_blocks` has already
                 // been acquired by `recv`.
-                let next_block =
-                    block.as_ref().load_next(Relaxed);
+                let next_block = block.as_ref().load_next(Relaxed);
 
                 // Update the free list head
                 self.free_head = next_block.unwrap();

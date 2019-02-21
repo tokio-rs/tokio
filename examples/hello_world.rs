@@ -25,20 +25,21 @@ pub fn main() -> Result<(), Box<std::error::Error>> {
     // Open a TCP stream to the socket address.
     //
     // Note that this is the Tokio TcpStream, which is fully async.
-    let client = TcpStream::connect(&addr).and_then(|stream| {
-        println!("created stream");
-        io::write_all(stream, "hello world\n").then(|result| {
-            println!("wrote to stream; success={:?}", result.is_ok());
-            Ok(())
+    let client = TcpStream::connect(&addr)
+        .and_then(|stream| {
+            println!("created stream");
+            io::write_all(stream, "hello world\n").then(|result| {
+                println!("wrote to stream; success={:?}", result.is_ok());
+                Ok(())
+            })
         })
-    })
-    .map_err(|err| {
-        // All tasks must have an `Error` type of `()`. This forces error
-        // handling and helps avoid silencing failures.
-        //
-        // In our example, we are only going to log the error to STDOUT.
-        println!("connection error = {:?}", err);
-    });
+        .map_err(|err| {
+            // All tasks must have an `Error` type of `()`. This forces error
+            // handling and helps avoid silencing failures.
+            //
+            // In our example, we are only going to log the error to STDOUT.
+            println!("connection error = {:?}", err);
+        });
 
     // Start the Tokio runtime.
     //

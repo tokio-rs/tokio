@@ -1,5 +1,5 @@
-use BufStream;
 use errors::internal::Never;
+use BufStream;
 
 use futures::Poll;
 

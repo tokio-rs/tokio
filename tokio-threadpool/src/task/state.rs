@@ -41,8 +41,10 @@ impl From<usize> for State {
         use self::State::*;
 
         debug_assert!(
-            src >= Idle as usize &&
-            src <= Aborted as usize, "actual={}", src);
+            src >= Idle as usize && src <= Aborted as usize,
+            "actual={}",
+            src
+        );
 
         unsafe { ::std::mem::transmute(src) }
     }

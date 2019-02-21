@@ -16,10 +16,12 @@ use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 
 macro_rules! t {
-    ($e:expr) => (match $e {
-        Ok(e) => e,
-        Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-    })
+    ($e:expr) => {
+        match $e {
+            Ok(e) => e,
+            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
+        }
+    };
 }
 
 cfg_if! {
@@ -100,9 +102,8 @@ fn get_host(host: &'static str) -> Error {
         let builder = TlsConnector::builder();
         let cx = builder.build().unwrap();
         let cx = tokio_tls::TlsConnector::from(cx);
-        cx.connect(host, socket).map_err(|e| {
-            Error::new(io::ErrorKind::Other, e)
-        })
+        cx.connect(host, socket)
+            .map_err(|e| Error::new(io::ErrorKind::Other, e))
     });
 
     let res = l.block_on(data);

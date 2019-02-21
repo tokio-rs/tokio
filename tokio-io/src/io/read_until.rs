@@ -1,7 +1,7 @@
 use std::io::{self, BufRead};
 use std::mem;
 
-use futures::{Poll, Future};
+use futures::{Future, Poll};
 
 use AsyncRead;
 
@@ -18,11 +18,7 @@ pub struct ReadUntil<A> {
 
 #[derive(Debug)]
 enum State<A> {
-    Reading {
-        a: A,
-        byte: u8,
-        buf: Vec<u8>,
-    },
+    Reading { a: A, byte: u8, buf: Vec<u8> },
     Empty,
 }
 
@@ -37,32 +33,38 @@ enum State<A> {
 ///
 /// [`BufRead::read_until`]: https://doc.rust-lang.org/std/io/trait.BufRead.html#method.read_until
 pub fn read_until<A>(a: A, byte: u8, buf: Vec<u8>) -> ReadUntil<A>
-    where A: AsyncRead + BufRead,
+where
+    A: AsyncRead + BufRead,
 {
     ReadUntil {
         state: State::Reading {
             a: a,
             byte: byte,
             buf: buf,
-        }
+        },
     }
 }
 
 impl<A> Future for ReadUntil<A>
-    where A: AsyncRead + BufRead
+where
+    A: AsyncRead + BufRead,
 {
     type Item = (A, Vec<u8>);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(A, Vec<u8>), io::Error> {
         match self.state {
-            State::Reading { ref mut a, byte, ref mut buf } => {
+            State::Reading {
+                ref mut a,
+                byte,
+                ref mut buf,
+            } => {
                 // If we get `Ok(n)`, then we know the stream hit EOF or the delimiter.
                 // and just return it, as we are finished.
                 // If we hit "would block" then all the read data so far
                 // is in our buffer, and otherwise we propagate errors.
                 try_nb!(a.read_until(byte, buf));
-            },
+            }
             State::Empty => panic!("poll ReadUntil after it's done"),
         }
 
