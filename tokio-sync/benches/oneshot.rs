@@ -1,4 +1,5 @@
 #![feature(test)]
+#![cfg_attr(test, deny(warnings))]
 
 extern crate tokio_sync;
 extern crate futures;

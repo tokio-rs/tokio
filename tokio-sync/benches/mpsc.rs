@@ -1,4 +1,5 @@
 #![feature(test)]
+#![cfg_attr(test, deny(warnings))]
 
 extern crate tokio_sync;
 extern crate futures;
@@ -51,7 +52,7 @@ mod tokio {
 
     #[bench]
     fn bounded_tx_poll_ready(b: &mut Bencher) {
-        let (mut tx, rx) = channel::<i32>(1);
+        let (mut tx, _rx) = channel::<i32>(1);
         b.iter(|| {
             future::lazy(|| {
                 assert!(tx.poll_ready().unwrap().is_ready());
@@ -63,7 +64,7 @@ mod tokio {
 
     #[bench]
     fn bounded_tx_poll_not_ready(b: &mut Bencher) {
-        let (mut tx, rx) = channel::<i32>(1);
+        let (mut tx, _rx) = channel::<i32>(1);
         tx.try_send(1).unwrap();
         b.iter(|| {
             future::lazy(|| {
@@ -163,7 +164,7 @@ mod tokio {
                 .take(4 * 1_000);
 
             for v in rx {
-                test::black_box(v);
+                let _ = test::black_box(v);
             }
         });
 
@@ -209,7 +210,7 @@ mod tokio {
                 .take(THREADS * ITERS);
 
             for v in rx {
-                test::black_box(v);
+                let _ = test::black_box(v);
             }
         });
 
@@ -268,7 +269,7 @@ mod legacy {
 
     #[bench]
     fn bounded_tx_poll_ready(b: &mut Bencher) {
-        let (mut tx, rx) = channel::<i32>(0);
+        let (mut tx, _rx) = channel::<i32>(0);
         b.iter(|| {
             future::lazy(|| {
                 assert!(tx.poll_ready().unwrap().is_ready());
@@ -280,7 +281,7 @@ mod legacy {
 
     #[bench]
     fn bounded_tx_poll_not_ready(b: &mut Bencher) {
-        let (mut tx, rx) = channel::<i32>(0);
+        let (mut tx, _rx) = channel::<i32>(0);
         tx.try_send(1).unwrap();
         b.iter(|| {
             future::lazy(|| {
@@ -379,7 +380,7 @@ mod legacy {
                 .take(4 * 1_000);
 
             for v in rx {
-                test::black_box(v);
+                let _ = test::black_box(v);
             }
         });
 
@@ -425,7 +426,7 @@ mod legacy {
                 .take(THREADS * ITERS);
 
             for v in rx {
-                test::black_box(v);
+                let _ = test::black_box(v);
             }
         });
 

@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate futures;
 extern crate tokio_mock_task;
 extern crate tokio_sync;
