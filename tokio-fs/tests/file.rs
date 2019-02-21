@@ -157,6 +157,8 @@ fn seek() {
 
 #[test]
 fn clone() {
+    use std::io::prelude::*;
+
     let dir = TmpBuilder::new()
         .prefix("tokio-fs-tests")
         .tempdir()
@@ -179,7 +181,7 @@ fn clone() {
             }),
     );
 
-    let mut file = StdFile::open(&file_path).unwrap();
+    let mut file = std::fs::File::open(&file_path).unwrap();
 
     let mut dst = vec![];
     file.read_to_end(&mut dst).unwrap();
