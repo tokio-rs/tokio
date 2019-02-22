@@ -244,23 +244,24 @@ impl<T> Receiver<T> {
         // Make sure the task is up to date
         self.inner.task.register();
 
-        let version = self.shared.version.load(SeqCst);
+        let state = self.shared.version.load(SeqCst);
+        let version = state & !CLOSED;
 
-        if CLOSED == version & CLOSED {
+        if version != self.ver {
+            // Track the latest version
+            self.ver = version;
+
+            let inner = self.shared.value.read().unwrap();
+
+            return Ok(Some(Ref { inner }).into());
+        }
+
+        if CLOSED == state & CLOSED {
             // The `Store` handle has been dropped.
             return Ok(None.into());
         }
 
-        if self.ver == version {
-            return Ok(Async::NotReady);
-        }
-
-        // Track the latest version
-        self.ver = version;
-
-        let inner = self.shared.value.read().unwrap();
-
-        Ok(Some(Ref { inner }).into())
+        Ok(Async::NotReady)
     }
 }
 

@@ -25,7 +25,7 @@ macro_rules! assert_not_ready {
 }
 
 #[test]
-fn smoke() {
+fn single_rx() {
     let (mut tx, mut rx) = watch::channel("one");
     let mut task = MockTask::new();
 
@@ -59,27 +59,122 @@ fn smoke() {
     });
 }
 
-/*
 #[test]
-fn multiple_watches() {
-    let (mut watch1, mut store) = Watch::new("one");
-    let mut watch2 = watch1.clone();
+fn multi_rx() {
+    let (mut tx, mut rx1) = watch::channel("one");
+    let mut rx2 = rx1.clone();
 
-    {
-        let mut h1 = Harness::poll_fn(|| watch1.poll());
-        let mut h2 = Harness::poll_fn(|| watch2.poll());
+    let mut task1 = MockTask::new();
+    let mut task2 = MockTask::new();
 
-        assert!(!h1.poll().unwrap().is_ready());
+    task1.enter(|| {
+        let res = assert_ready!(rx1.poll());
+        assert_eq!(*res.unwrap(), "one");
+    });
 
-        // Change the value.
-        assert_eq!(store.store("two").unwrap(), "one");
+    task2.enter(|| {
+        let res = assert_ready!(rx2.poll());
+        assert_eq!(*res.unwrap(), "one");
+    });
 
-        // The watch was notified
-        assert!(h1.poll().unwrap().is_ready());
-        assert!(h2.poll().unwrap().is_ready());
-    }
+    tx.send("two").unwrap();
 
-    assert_eq!(*watch1.borrow(), "two");
-    assert_eq!(*watch2.borrow(), "two");
+    assert!(task1.is_notified());
+    assert!(task2.is_notified());
+
+    task1.enter(|| {
+        let res = assert_ready!(rx1.poll());
+        assert_eq!(*res.unwrap(), "two");
+    });
+
+    tx.send("three").unwrap();
+
+    assert!(task1.is_notified());
+    assert!(task2.is_notified());
+
+    task1.enter(|| {
+        let res = assert_ready!(rx1.poll());
+        assert_eq!(*res.unwrap(), "three");
+    });
+
+    task2.enter(|| {
+        let res = assert_ready!(rx2.poll());
+        assert_eq!(*res.unwrap(), "three");
+    });
+
+    tx.send("four").unwrap();
+
+    task1.enter(|| {
+        let res = assert_ready!(rx1.poll());
+        assert_eq!(*res.unwrap(), "four");
+    });
+
+    drop(tx);
+
+    task1.enter(|| {
+        let res = assert_ready!(rx1.poll());
+        assert!(res.is_none());
+    });
+
+    task2.enter(|| {
+        let res = assert_ready!(rx2.poll());
+        assert_eq!(*res.unwrap(), "four");
+    });
+
+    task2.enter(|| {
+        let res = assert_ready!(rx2.poll());
+        assert!(res.is_none());
+    });
 }
-*/
+
+#[test]
+fn rx_observes_final_value() {
+    // Initial value
+
+    let (tx, mut rx) = watch::channel("one");
+    let mut task = MockTask::new();
+
+    drop(tx);
+
+    task.enter(|| {
+        let res = assert_ready!(rx.poll());
+        assert!(res.is_some());
+        assert_eq!(*res.unwrap(), "one");
+    });
+
+    task.enter(|| {
+        let res = assert_ready!(rx.poll());
+        assert!(res.is_none());
+    });
+
+    // Sending a value
+
+    let (mut tx, mut rx) = watch::channel("one");
+    let mut task = MockTask::new();
+
+    tx.send("two").unwrap();
+
+    task.enter(|| {
+        let res = assert_ready!(rx.poll());
+        assert!(res.is_some());
+        assert_eq!(*res.unwrap(), "two");
+    });
+
+    task.enter(|| assert_not_ready!(rx.poll()));
+
+    tx.send("three").unwrap();
+    drop(tx);
+
+    assert!(task.is_notified());
+
+    task.enter(|| {
+        let res = assert_ready!(rx.poll());
+        assert!(res.is_some());
+        assert_eq!(*res.unwrap(), "three");
+    });
+
+    task.enter(|| {
+        let res = assert_ready!(rx.poll());
+        assert!(res.is_none());
+    });
+}
