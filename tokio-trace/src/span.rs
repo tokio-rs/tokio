@@ -135,9 +135,8 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-pub use tokio_trace_core::span::{Parent, Span as Id};
+pub use tokio_trace_core::span::{Parent, NewSpan, Span as Id};
 
-use tokio_trace_core::span::NewSpan;
 use std::{
     borrow::Borrow,
     cmp, fmt,
