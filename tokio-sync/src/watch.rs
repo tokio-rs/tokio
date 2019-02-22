@@ -57,13 +57,13 @@
 //! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
 
 use fnv::FnvHashMap;
-use futures::{Stream, Sink, Poll, Async, AsyncSink, StartSend};
 use futures::task::AtomicTask;
+use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 use std::ops;
-use std::sync::{Arc, Weak, Mutex, RwLock, RwLockReadGuard};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
 
 /// Receives values from the associated `Sender`.
 ///
@@ -188,8 +188,8 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         value: RwLock::new(init),
         version: AtomicUsize::new(2),
         watchers: Mutex::new(Watchers {
-                next_id: INIT_ID + 1,
-                watchers,
+            next_id: INIT_ID + 1,
+            watchers,
         }),
         cancel: AtomicTask::new(),
     });
@@ -287,7 +287,9 @@ impl<T> Drop for Receiver<T> {
 
 impl WatchInner {
     fn new() -> Self {
-        WatchInner { task: AtomicTask::new() }
+        WatchInner {
+            task: AtomicTask::new(),
+        }
     }
 }
 
@@ -326,9 +328,7 @@ impl<T> Sender<T> {
                 shared.cancel.register();
                 Ok(Async::NotReady)
             }
-            None => {
-                Ok(Async::Ready(()))
-            }
+            None => Ok(Async::Ready(())),
         }
     }
 }
