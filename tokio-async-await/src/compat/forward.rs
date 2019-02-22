@@ -1,7 +1,6 @@
 use futures::{Async, Future};
 
 use std::future::Future as StdFuture;
-use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{Poll as StdPoll, Waker};
 

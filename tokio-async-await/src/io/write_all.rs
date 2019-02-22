@@ -4,7 +4,6 @@ use std::future::Future;
 use std::task::{self, Poll};
 
 use std::io;
-use std::marker::Unpin;
 use std::mem;
 use std::pin::Pin;
 

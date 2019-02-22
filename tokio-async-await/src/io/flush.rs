@@ -2,7 +2,6 @@ use tokio_io::AsyncWrite;
 
 use std::future::Future;
 use std::io;
-use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{Poll, Waker};
 

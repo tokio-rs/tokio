@@ -3,7 +3,6 @@ use futures::Sink;
 use std::future::Future;
 use std::task::{self, Poll};
 
-use std::marker::Unpin;
 use std::pin::Pin;
 
 /// Future for the `SinkExt::send_async` combinator, which sends a value to a

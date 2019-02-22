@@ -1,7 +1,6 @@
 use futures::Stream;
 
 use std::future::Future;
-use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{Poll, Waker};
 
