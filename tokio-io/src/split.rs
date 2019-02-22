@@ -12,10 +12,42 @@ pub struct ReadHalf<T> {
     handle: BiLock<T>,
 }
 
+impl<T: AsyncRead + AsyncWrite> ReadHalf<T> {
+    /// Reunite with a previously split `WriteHalf`.
+    ///
+    /// # Panics
+    ///
+    /// If this `ReadHalf` and the given `WriteHalf` do not originate from
+    /// the same `AsyncRead::split` operation this method will panic.
+    pub fn unsplit(self, w: WriteHalf<T>) -> T {
+        if let Ok(x) = self.handle.reunite(w.handle) {
+            x
+        } else {
+            panic!("Unrelated `WriteHalf` passed to `ReadHalf::unsplit`.")
+        }
+    }
+}
+
 /// The writable half of an object returned from `AsyncRead::split`.
 #[derive(Debug)]
 pub struct WriteHalf<T> {
     handle: BiLock<T>,
+}
+
+impl<T: AsyncRead + AsyncWrite> WriteHalf<T> {
+    /// Reunite with a previously split `ReadHalf`.
+    ///
+    /// # panics
+    ///
+    /// If this `WriteHalf` and the given `ReadHalf` do not originate from
+    /// the same `AsyncRead::split` operation this method will panic.
+    pub fn unsplit(self, r: ReadHalf<T>) -> T {
+        if let Ok(x) = self.handle.reunite(r.handle) {
+            x
+        } else {
+            panic!("Unrelated `ReadHalf` passed to `WriteHalf::unsplit`.")
+        }
+    }
 }
 
 pub fn split<T: AsyncRead + AsyncWrite>(t: T) -> (ReadHalf<T>, WriteHalf<T>) {
@@ -170,5 +202,46 @@ mod tests {
             ok::<(), ()>(())
         }))
         .unwrap();
+    }
+
+    #[test]
+    fn unsplit_ok() {
+        let (r, w) = RW.split();
+        r.unsplit(w);
+
+        let (r, w) = RW.split();
+        w.unsplit(r);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unsplit_err1() {
+        let (r, _) = RW.split();
+        let (_, w) = RW.split();
+        r.unsplit(w);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unsplit_err2() {
+        let (_, w) = RW.split();
+        let (r, _) = RW.split();
+        r.unsplit(w);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unsplit_err3() {
+        let (_, w) = RW.split();
+        let (r, _) = RW.split();
+        w.unsplit(r);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unsplit_err4() {
+        let (r, _) = RW.split();
+        let (_, w) = RW.split();
+        w.unsplit(r);
     }
 }

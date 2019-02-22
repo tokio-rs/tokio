@@ -143,6 +143,9 @@ pub trait AsyncRead: std_io::Read {
     ///
     /// The two halves returned implement the `Read` and `Write` traits,
     /// respectively.
+    ///
+    /// To restore this read/write object from its `ReadHalf` and `WriteHalf`
+    /// use `unsplit`.
     fn split(self) -> (ReadHalf<Self>, WriteHalf<Self>)
     where
         Self: AsyncWrite + Sized,
