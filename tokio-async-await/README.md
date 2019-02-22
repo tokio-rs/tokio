@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 edition = "2018"
 
 # In the `[dependencies]` section
-tokio = {version = "0.1.0", features = ["async-await-preview"]}
+tokio = {version = "0.1.15", features = ["async-await-preview"]}
 ```
 
 Then, get started. In your application, add:
