@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, Event, Metadata, Span};
+use {field, span::{self, Span}, Event, Metadata};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -125,7 +125,7 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [recorder]: ::field::Record
     /// [`record` method]: ::field::ValueSet::record
-    fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span;
+    fn new_span(&self, span: &span::NewSpan) -> Span;
 
     // === Notification methods ===============================================
 

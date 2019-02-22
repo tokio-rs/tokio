@@ -1,8 +1,9 @@
 //! Dispatches trace events to `Subscriber`s.
 use {
     callsite, field,
+    span::{self, Span},
     subscriber::{self, Subscriber},
-    Event, Metadata, Span,
+    Event, Metadata,
 };
 
 use std::{
@@ -105,8 +106,8 @@ impl Dispatch {
     ///
     /// [`Span`]: ::span::Span
     #[inline]
-    pub fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span {
-        self.subscriber.new_span(metadata, values)
+    pub fn new_span(&self, span: &span::NewSpan) -> Span {
+        self.subscriber.new_span(span)
     }
 
     /// Record a set of values on a span.
@@ -226,7 +227,7 @@ impl Subscriber for NoSubscriber {
         subscriber::Interest::never()
     }
 
-    fn new_span(&self, _meta: &Metadata, _vals: &field::ValueSet) -> Span {
+    fn new_span(&self, _: &span::NewSpan) -> Span {
         Span::from_u64(0)
     }
 
