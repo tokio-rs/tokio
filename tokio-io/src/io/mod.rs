@@ -27,6 +27,6 @@ pub use self::read_exact::{read_exact, ReadExact};
 pub use self::read_to_end::{read_to_end, ReadToEnd};
 pub use self::read_until::{read_until, ReadUntil};
 pub use self::shutdown::{shutdown, Shutdown};
-pub use split::{ReadHalf, WriteHalf, UnsplitError};
+pub use split::{ReadHalf, WriteHalf};
 pub use window::Window;
 pub use self::write_all::{write_all, WriteAll};

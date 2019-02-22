@@ -1,4 +1,3 @@
-use std::{error, fmt};
 use std::io::{self, Read, Write};
 
 use futures::{Async, Poll};
@@ -16,16 +15,16 @@ pub struct ReadHalf<T> {
 impl<T: AsyncRead + AsyncWrite> ReadHalf<T> {
     /// Reunite with a previously split `WriteHalf`.
     ///
+    /// # panics
+    ///
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from
-    /// the same `AsyncRead::split` operation they will be returned, wrapped
-    /// in an `UnsplitError`.
-    pub fn unsplit(self, w: WriteHalf<T>) -> Result<T, UnsplitError<T>> {
-        self.handle.reunite(w.handle).map_err(|e| {
-            UnsplitError {
-                read_half: ReadHalf { handle: e.0 },
-                write_half: WriteHalf { handle: e.1 }
-            }
-        })
+    /// the same `AsyncRead::split` operation this method will panic.
+    pub fn unsplit(self, w: WriteHalf<T>) -> T {
+        if let Ok(x) = self.handle.reunite(w.handle) {
+            x
+        } else {
+            panic!("Unrelated `WriteHalf` passed to `ReadHalf::unsplit`.")
+        }
     }
 }
 
@@ -38,16 +37,16 @@ pub struct WriteHalf<T> {
 impl<T: AsyncRead + AsyncWrite> WriteHalf<T> {
     /// Reunite with a previously split `ReadHalf`.
     ///
+    /// # panics
+    ///
     /// If this `WriteHalf` and the given `ReadHalf` do not originate from
-    /// the same `AsyncRead::split` operation they will be returned, wrapped
-    /// in an `UnsplitError`.
-    pub fn unsplit(self, r: ReadHalf<T>) -> Result<T, UnsplitError<T>> {
-        self.handle.reunite(r.handle).map_err(|e| {
-            UnsplitError {
-                read_half: ReadHalf { handle: e.0 },
-                write_half: WriteHalf { handle: e.1 }
-            }
-        })
+    /// the same `AsyncRead::split` operation this method will panic.
+    pub fn unsplit(self, r: ReadHalf<T>) -> T {
+        if let Ok(x) = self.handle.reunite(r.handle) {
+            x
+        } else {
+            panic!("Unrelated `ReadHalf` passed to `WriteHalf::unsplit`.")
+        }
     }
 }
 
@@ -108,33 +107,6 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
 
 fn wrap_as_io<T>(t: Async<T>) -> Result<Async<T>, io::Error> {
     Ok(t)
-}
-
-/// Error returned from `unsplit` if reuniting a `ReadHalf` with
-/// another `WriteHalf` fails.
-pub struct UnsplitError<T> {
-    /// The `ReadHalf` passed to `unsplit`.
-    pub read_half: ReadHalf<T>,
-    /// The `WriteHalf` passed to `unsplit`.
-    pub write_half: WriteHalf<T>
-}
-
-impl<T> fmt::Debug for UnsplitError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("UnsplitError")
-    }
-}
-
-impl<T> fmt::Display for UnsplitError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("tried to reunite unrelated read and write halves")
-    }
-}
-
-impl<T> error::Error for UnsplitError<T> {
-    fn description(&self) -> &str {
-        "tried to reunite unrelated read and write halves"
-    }
 }
 
 #[cfg(test)]
@@ -232,22 +204,41 @@ mod tests {
     #[test]
     fn unsplit_ok() {
         let (r, w) = RW.split();
-        assert!(r.unsplit(w).is_ok());
+        r.unsplit(w);
 
         let (r, w) = RW.split();
-        assert!(w.unsplit(r).is_ok())
+        w.unsplit(r);
     }
 
     #[test]
-    fn unsplit_err() {
-        let (r1, w1) = RW.split();
-        let (r2, w2) = RW.split();
-        assert!(r1.unsplit(w2).is_err());
-        assert!(r2.unsplit(w1).is_err());
+    #[should_panic]
+    fn unsplit_err1() {
+        let (r, _) = RW.split();
+        let (_, w) = RW.split();
+        r.unsplit(w);
+    }
 
-        let (r1, w1) = RW.split();
-        let (r2, w2) = RW.split();
-        assert!(w1.unsplit(r2).is_err());
-        assert!(w2.unsplit(r1).is_err())
+    #[test]
+    #[should_panic]
+    fn unsplit_err2() {
+        let (_, w) = RW.split();
+        let (r, _) = RW.split();
+        r.unsplit(w);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unsplit_err3() {
+        let (_, w) = RW.split();
+        let (r, _) = RW.split();
+        w.unsplit(r);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unsplit_err4() {
+        let (r, _) = RW.split();
+        let (_, w) = RW.split();
+        w.unsplit(r);
     }
 }
