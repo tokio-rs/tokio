@@ -2,24 +2,19 @@ mod entry;
 mod stack;
 mod state;
 
-pub(crate) use self::entry::{
-    WorkerEntry as Entry,
-};
+pub(crate) use self::entry::WorkerEntry as Entry;
 pub(crate) use self::stack::Stack;
-pub(crate) use self::state::{
-    State,
-    Lifecycle,
-};
+pub(crate) use self::state::{Lifecycle, State};
 
-use pool::{self, Pool, BackupId};
 use notifier::Notifier;
+use pool::{self, BackupId, Pool};
 use sender::Sender;
 use shutdown::ShutdownTrigger;
-use task::{self, Task, CanBlock};
+use task::{self, CanBlock, Task};
 
 use tokio_executor;
 
-use futures::{Poll, Async};
+use futures::{Async, Poll};
 
 use std::cell::Cell;
 use std::marker::PhantomData;
@@ -339,8 +334,11 @@ impl Worker {
                 }
             }
 
-            let actual = self.entry().state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .entry()
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 break;
@@ -386,16 +384,13 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     fn try_run_owned_task(&self, notify: &Arc<Notifier>) -> bool {
-        use deque::Pop;
-
         // Poll the internal queue for a task to run
         match self.entry().pop_task() {
-            Pop::Data(task) => {
+            Some(task) => {
                 self.run_task(task, notify);
                 true
             }
-            Pop::Empty => false,
-            Pop::Retry => true,
+            None => false,
         }
     }
 
@@ -403,7 +398,7 @@ impl Worker {
     ///
     /// Returns `true` if work was found
     fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
-        use deque::Steal;
+        use crossbeam_deque::Steal;
 
         debug_assert!(!self.is_blocking.get());
 
@@ -415,13 +410,16 @@ impl Worker {
         loop {
             if idx < len {
                 match self.pool.workers[idx].steal_tasks(self.entry()) {
-                    Steal::Data(task) => {
+                    Steal::Success(task) => {
                         trace!("stole task from another worker");
 
                         self.run_task(task, notify);
 
-                        trace!("try_steal_task -- signal_work; self={}; from={}",
-                               self.id.0, idx);
+                        trace!(
+                            "try_steal_task -- signal_work; self={}; from={}",
+                            self.id.0,
+                            idx
+                        );
 
                         // Signal other workers that work is available
                         //
@@ -450,6 +448,13 @@ impl Worker {
 
     fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>) {
         use task::Run::*;
+
+        // If this is the first time this task is being polled, register it so that we can keep
+        // track of tasks that are in progress.
+        if task.reg_worker.get().is_none() {
+            task.reg_worker.set(Some(self.id.0 as u32));
+            self.entry().register_task(&task);
+        }
 
         let run = self.run_task2(&task, notify);
 
@@ -481,8 +486,11 @@ impl Worker {
                     let mut next = state;
                     next.dec_num_futures();
 
-                    let actual = self.pool.state.compare_and_swap(
-                        state.into(), next.into(), AcqRel).into();
+                    let actual = self
+                        .pool
+                        .state
+                        .compare_and_swap(state.into(), next.into(), AcqRel)
+                        .into();
 
                     if actual == state {
                         trace!("task complete; state={:?}", next);
@@ -495,6 +503,16 @@ impl Worker {
                             if next.is_terminated() {
                                 self.pool.terminate_sleeping_workers();
                             }
+                        }
+
+                        // Find which worker polled this task first.
+                        let worker = task.reg_worker.get().unwrap() as usize;
+
+                        // Unregister the task from the worker it was registered in.
+                        if !self.is_blocking.get() && worker == self.id.0 {
+                            self.entry().unregister_task(task);
+                        } else {
+                            self.pool.workers[worker].remotely_complete_task(task);
                         }
 
                         // The worker's run loop will detect the shutdown state
@@ -512,11 +530,7 @@ impl Worker {
     ///
     /// Great care is needed to ensure that `current_task` is unset in this
     /// function.
-    fn run_task2(&self,
-                 task: &Arc<Task>,
-                 notify: &Arc<Notifier>)
-        -> task::Run
-    {
+    fn run_task2(&self, task: &Arc<Task>, notify: &Arc<Notifier>) -> task::Run {
         struct Guard<'a> {
             worker: &'a Worker,
         }
@@ -548,9 +562,7 @@ impl Worker {
 
         // Create the guard, this ensures that `current_task` is unset when the
         // function returns, even if the return is caused by a panic.
-        let _g = Guard {
-            worker: self,
-        };
+        let _g = Guard { worker: self };
 
         task.run(notify)
     }
@@ -595,8 +607,11 @@ impl Worker {
                 }
             }
 
-            let actual = self.entry().state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .entry()
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 if state.is_notified() {
@@ -654,8 +669,11 @@ impl Worker {
                         let mut next = state;
                         next.set_lifecycle(Running);
 
-                        let actual = self.entry().state.compare_and_swap(
-                            state.into(), next.into(), AcqRel).into();
+                        let actual = self
+                            .entry()
+                            .state
+                            .compare_and_swap(state.into(), next.into(), AcqRel)
+                            .into();
 
                         if actual == state {
                             return true;
@@ -672,11 +690,7 @@ impl Worker {
                 }
             }
 
-            unsafe {
-                (*self.entry().park.get())
-                    .park()
-                    .unwrap();
-            }
+            self.entry().park();
 
             trace!("    -> wakeup; idx={}", self.id.0);
         }
@@ -688,19 +702,17 @@ impl Worker {
     ///
     /// Returns `true` if this worker has tasks in its queue.
     fn sleep_light(&self) {
-        const STEAL_COUNT: usize = 32;
+        self.entry().park_timeout(Duration::from_millis(0));
 
-        unsafe {
-            (*self.entry().park.get())
-                .park_timeout(Duration::from_millis(0))
-                .unwrap();
-        }
-
-        for _ in 0..STEAL_COUNT {
-            if let Some(task) = self.pool.queue.pop() {
-                self.pool.submit(task, &self.pool);
-            } else {
-                break;
+        use crossbeam_deque::Steal;
+        loop {
+            match self.pool.queue.steal_batch(&self.entry().worker) {
+                Steal::Success(()) => {
+                    self.pool.signal_work(&self.pool);
+                    break;
+                }
+                Steal::Empty => break,
+                Steal::Retry => {}
             }
         }
     }

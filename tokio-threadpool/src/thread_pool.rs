@@ -3,8 +3,8 @@ use pool::Pool;
 use sender::Sender;
 use shutdown::{Shutdown, ShutdownTrigger};
 
-use futures::{Future, Poll};
 use futures::sync::oneshot;
+use futures::{Future, Poll};
 
 use std::sync::Arc;
 
@@ -36,10 +36,7 @@ impl ThreadPool {
         Builder::new().build()
     }
 
-    pub(crate) fn new2(
-        pool: Arc<Pool>,
-        trigger: Arc<ShutdownTrigger>,
-    ) -> ThreadPool {
+    pub(crate) fn new2(pool: Arc<Pool>, trigger: Arc<ShutdownTrigger>) -> ThreadPool {
         ThreadPool {
             inner: Some(Inner {
                 sender: Sender { pool },
@@ -80,18 +77,19 @@ impl ThreadPool {
     /// This function panics if the spawn fails. Use [`Sender::spawn`] for a
     /// version that returns a `Result` instead of panicking.
     pub fn spawn<F>(&self, future: F)
-    where F: Future<Item = (), Error = ()> + Send + 'static,
+    where
+        F: Future<Item = (), Error = ()> + Send + 'static,
     {
         self.sender().spawn(future).unwrap();
     }
 
-    /// Spawn a future on to the thread pool, return a future representing 
+    /// Spawn a future on to the thread pool, return a future representing
     /// the produced value.
-    /// 
-    /// The SpawnHandle returned is a future that is a proxy for future itself. 
-    /// When future completes on this thread pool then the SpawnHandle will itself 
+    ///
+    /// The SpawnHandle returned is a future that is a proxy for future itself.
+    /// When future completes on this thread pool then the SpawnHandle will itself
     /// be resolved.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -105,7 +103,7 @@ impl ThreadPool {
     /// let thread_pool = ThreadPool::new();
     ///
     /// let handle = thread_pool.spawn_handle(lazy(|| Ok::<_, ()>(42)));
-    /// 
+    ///
     /// let value = handle.wait().unwrap();
     /// assert_eq!(value, 42);
     ///
@@ -116,9 +114,9 @@ impl ThreadPool {
     ///
     /// # Panics
     ///
-    /// This function panics if the spawn fails. 
+    /// This function panics if the spawn fails.
     pub fn spawn_handle<F>(&self, future: F) -> SpawnHandle<F::Item, F::Error>
-    where 
+    where
         F: Future + Send + 'static,
         F::Item: Send + 'static,
         F::Error: Send + 'static,
@@ -201,10 +199,10 @@ impl Drop for ThreadPool {
 }
 
 /// Handle returned from ThreadPool::spawn_handle.
-/// 
-/// This handle is a future representing the completion of a different future 
-/// spawned on to the thread pool. Created through the ThreadPool::spawn_handle 
-/// function this handle will resolve when the future provided resolves on the 
+///
+/// This handle is a future representing the completion of a different future
+/// spawned on to the thread pool. Created through the ThreadPool::spawn_handle
+/// function this handle will resolve when the future provided resolves on the
 /// thread pool.
 #[derive(Debug)]
 pub struct SpawnHandle<T, E>(oneshot::SpawnHandle<T, E>);

@@ -1,12 +1,12 @@
-use {Handle, HandlePriv, Direction, Task};
+use {Direction, Handle, HandlePriv, Task};
 
-use futures::{Async, Poll, task};
+use futures::{task, Async, Poll};
 use mio::{self, Evented};
 
-use std::{io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::{io, ptr, usize};
 
 /// Associates an I/O resource with the reactor instance that drives it.
 ///
@@ -58,6 +58,12 @@ pub struct Registration {
 struct Inner {
     handle: HandlePriv,
     token: usize,
+}
+
+#[derive(PartialEq)]
+enum Notify {
+    Yes,
+    No,
 }
 
 /// Tasks waiting on readiness notifications.
@@ -112,7 +118,8 @@ impl Registration {
     ///
     /// If an error is encountered during registration, `Err` is returned.
     pub fn register<T>(&self, io: &T) -> io::Result<bool>
-    where T: Evented,
+    where
+        T: Evented,
     {
         self.register2(io, || HandlePriv::try_current())
     }
@@ -134,7 +141,8 @@ impl Registration {
     ///
     /// `Err` is returned if an error is encountered.
     pub fn deregister<T>(&mut self, io: &T) -> io::Result<()>
-    where T: Evented,
+    where
+        T: Evented,
     {
         // The state does not need to be checked and coordination is not
         // necessary as this function takes `&mut self`. This guarantees a
@@ -159,25 +167,26 @@ impl Registration {
     ///
     /// If an error is encountered during registration, `Err` is returned.
     pub fn register_with<T>(&self, io: &T, handle: &Handle) -> io::Result<bool>
-    where T: Evented,
+    where
+        T: Evented,
     {
-        self.register2(io, || {
-            match handle.as_priv() {
-                Some(handle) => Ok(handle.clone()),
-                None => HandlePriv::try_current(),
-            }
+        self.register2(io, || match handle.as_priv() {
+            Some(handle) => Ok(handle.clone()),
+            None => HandlePriv::try_current(),
         })
     }
 
     pub(crate) fn register_with_priv<T>(&self, io: &T, handle: &HandlePriv) -> io::Result<bool>
-    where T: Evented,
+    where
+        T: Evented,
     {
         self.register2(io, || Ok(handle.clone()))
     }
 
     fn register2<T, F>(&self, io: &T, f: F) -> io::Result<bool>
-    where T: Evented,
-          F: Fn() -> io::Result<HandlePriv>,
+    where
+        T: Evented,
+        F: Fn() -> io::Result<HandlePriv>,
     {
         let mut state = self.state.load(SeqCst);
 
@@ -198,7 +207,9 @@ impl Registration {
                     // Create the actual registration
                     let (inner, res) = Inner::new(io, handle);
 
-                    unsafe { *self.inner.get() = Some(inner); }
+                    unsafe {
+                        *self.inner.get() = Some(inner);
+                    }
 
                     // Transition out of the locked state. This acquires the
                     // current value, potentially having a list of tasks that
@@ -276,7 +287,7 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Read, true, || task::current())
+        self.poll_ready(Direction::Read, Notify::Yes)
             .map(|v| match v {
                 Some(v) => Async::Ready(v),
                 _ => Async::NotReady,
@@ -291,8 +302,7 @@ impl Registration {
     ///
     /// [`poll_read_ready`]: #method.poll_read_ready
     pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Read, false, || panic!())
-
+        self.poll_ready(Direction::Read, Notify::No)
     }
 
     /// Poll for events on the I/O resource's write readiness stream.
@@ -328,7 +338,7 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Write, true, || task::current())
+        self.poll_ready(Direction::Write, Notify::Yes)
             .map(|v| match v {
                 Some(v) => Async::Ready(v),
                 _ => Async::NotReady,
@@ -343,13 +353,10 @@ impl Registration {
     ///
     /// [`poll_write_ready`]: #method.poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Write, false, || unreachable!())
+        self.poll_ready(Direction::Write, Notify::No)
     }
 
-    fn poll_ready<F>(&self, direction: Direction, notify: bool, task: F)
-        -> io::Result<Option<mio::Ready>>
-        where F: Fn() -> Task
-    {
+    fn poll_ready(&self, direction: Direction, notify: Notify) -> io::Result<Option<mio::Ready>> {
         let mut state = self.state.load(SeqCst);
 
         // Cache the node pointer
@@ -358,22 +365,25 @@ impl Registration {
         loop {
             match state {
                 INIT => {
-                    return Err(io::Error::new(io::ErrorKind::Other, "must call `register`
-                                              before poll_read_ready"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "must call `register`
+                                              before poll_read_ready",
+                    ));
                 }
                 READY => {
                     let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
-                    return inner.poll_ready(direction, notify, task);
+                    return inner.poll_ready(direction, notify);
                 }
                 LOCKED => {
-                    if !notify {
+                    if let Notify::No = notify {
                         // Skip the notification tracking junk.
                         return Ok(None);
                     }
 
                     let next_ptr = (state & !LIFECYCLE_MASK) as *mut Node;
 
-                    let task = task();
+                    let task = task::current();
 
                     // Get the node
                     let mut n = node.take().unwrap_or_else(|| {
@@ -417,7 +427,8 @@ unsafe impl Sync for Registration {}
 
 impl Inner {
     fn new<T>(io: &T, handle: HandlePriv) -> (Self, io::Result<()>)
-    where T: Evented,
+    where
+        T: Evented,
     {
         let mut res = Ok(());
 
@@ -435,10 +446,7 @@ impl Inner {
             }
         };
 
-        let inner = Inner {
-            handle,
-            token,
-        };
+        let inner = Inner { handle, token };
 
         (inner, res)
     }
@@ -462,7 +470,10 @@ impl Inner {
 
     fn deregister<E: Evented>(&self, io: &E) -> io::Result<()> {
         if self.token == ERROR {
-            return Err(io::Error::new(io::ErrorKind::Other, "failed to associate with reactor"));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to associate with reactor",
+            ));
         }
 
         let inner = match self.handle.inner() {
@@ -473,12 +484,12 @@ impl Inner {
         inner.deregister_source(io)
     }
 
-    fn poll_ready<F>(&self, direction: Direction, notify: bool, task: F)
-        -> io::Result<Option<mio::Ready>>
-        where F: FnOnce() -> Task
-    {
+    fn poll_ready(&self, direction: Direction, notify: Notify) -> io::Result<Option<mio::Ready>> {
         if self.token == ERROR {
-            return Err(io::Error::new(io::ErrorKind::Other, "failed to associate with reactor"));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to associate with reactor",
+            ));
         }
 
         let inner = match self.handle.inner() {
@@ -500,20 +511,19 @@ impl Inner {
         // If HUP were to be cleared when `direction` is `Read`, then when
         // `poll_ready` is called again with a _`direction` of `Write`, the HUP
         // state would not be visible.
-        let mut ready = mask & mio::Ready::from_usize(
-            sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+        let mut ready =
+            mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
-        if ready.is_empty() && notify {
-            let task = task();
+        if ready.is_empty() && notify == Notify::Yes {
+            debug!("scheduling {:?} for: {}", direction, self.token);
             // Update the task info
             match direction {
-                Direction::Read => sched.reader.register_task(task),
-                Direction::Write => sched.writer.register_task(task),
+                Direction::Read => sched.reader.register(),
+                Direction::Write => sched.writer.register(),
             }
 
             // Try again
-            ready = mask & mio::Ready::from_usize(
-                sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+            ready = mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
         }
 
         if ready.is_empty() {

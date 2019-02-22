@@ -122,7 +122,8 @@ pub struct BlockingError {
 /// }
 /// ```
 pub fn blocking<F, T>(f: F) -> Poll<T, BlockingError>
-where F: FnOnce() -> T,
+where
+    F: FnOnce() -> T,
 {
     let res = Worker::with_current(|worker| {
         let worker = match worker {
@@ -148,8 +149,7 @@ where F: FnOnce() -> T,
     // back ownership of the worker if the worker handoff didn't complete yet.
     Worker::with_current(|worker| {
         // Worker must be set since it was above.
-        worker.unwrap()
-            .transition_from_blocking();
+        worker.unwrap().transition_from_blocking();
     });
 
     // Return the result

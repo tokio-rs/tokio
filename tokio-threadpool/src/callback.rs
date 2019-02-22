@@ -12,7 +12,8 @@ pub(crate) struct Callback {
 
 impl Callback {
     pub fn new<F>(f: F) -> Self
-        where F: Fn(&Worker, &mut Enter) + Send + Sync + 'static
+    where
+        F: Fn(&Worker, &mut Enter) + Send + Sync + 'static,
     {
         Callback { f: Arc::new(f) }
     }

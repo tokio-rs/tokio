@@ -136,12 +136,7 @@
 //! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 
 pub use tokio_reactor::{
-    Reactor,
-    Handle,
-    Background,
-    Turn,
-    Registration,
-    PollEvented as PollEvented2,
+    Background, Handle, PollEvented as PollEvented2, Reactor, Registration, Turn,
 };
 
 mod poll_evented;

@@ -35,16 +35,16 @@ mod imp {
         }
 
         pub fn compare_and_swap(&self, old: u64, new: u64, ordering: Ordering) -> u64 {
-            self.inner.compare_and_swap(
-                old as usize, new as usize, ordering) as u64
+            self.inner
+                .compare_and_swap(old as usize, new as usize, ordering) as u64
         }
     }
 }
 
 #[cfg(not(target_pointer_width = "64"))]
 mod imp {
-    use std::sync::Mutex;
     use std::sync::atomic::Ordering;
+    use std::sync::Mutex;
 
     #[derive(Debug)]
     pub struct AtomicU64 {

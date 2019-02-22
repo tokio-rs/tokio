@@ -1,9 +1,9 @@
+extern crate env_logger;
 extern crate futures;
 extern crate tokio_threadpool;
-extern crate env_logger;
 
-use tokio_threadpool::*;
 use futures::future::{self, Executor};
+use tokio_threadpool::*;
 
 use std::sync::mpsc;
 
@@ -22,7 +22,9 @@ fn chained_spawn() {
             tx.execute(future::lazy(move || {
                 spawn(tx2, res_tx, n - 1);
                 Ok(())
-            })).ok().unwrap();
+            }))
+            .ok()
+            .unwrap();
         }
     }
 

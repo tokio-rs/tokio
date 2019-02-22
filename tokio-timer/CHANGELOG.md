@@ -1,3 +1,14 @@
+# 0.2.10 (February 4, 2019)
+
+### Fixed
+- `DelayQueue` when multiple delays are reset (#871).
+
+# 0.2.9 (January 24, 2019)
+
+### Fixed
+- `DelayQueue` timing logic when inserting / resetting a delay (#851, #863).
+- Documentation links (#842, #844, #845)
+
 # 0.2.8 (November 21, 2018)
 
 * Implement throttle combinator (#736).

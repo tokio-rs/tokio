@@ -4,12 +4,12 @@
 //!
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-use {Error, Delay};
 use clock::now;
-use wheel::{self, Wheel};
 use timer::Handle;
+use wheel::{self, Wheel};
+use {Delay, Error};
 
-use futures::{Future, Stream, Poll};
+use futures::{Future, Poll, Stream};
 use slab::Slab;
 
 use std::cmp;
@@ -152,7 +152,9 @@ pub struct DelayQueue<T> {
 
 /// An entry in `DelayQueue` that has expired and removed.
 ///
-/// Values are returned by `DelayQueue::poll`.
+/// Values are returned by [`DelayQueue::poll`].
+///
+/// [`DelayQueue::poll`]: struct.DelayQueue.html#method.poll
 #[derive(Debug)]
 pub struct Expired<T> {
     /// The data stored in the queue
@@ -167,10 +169,11 @@ pub struct Expired<T> {
 
 /// Token to a value stored in a `DelayQueue`.
 ///
-/// Instances of `Key` are returned by `DelayQueue::insert`. See [`DelayQueue`]
+/// Instances of `Key` are returned by [`DelayQueue::insert`]. See [`DelayQueue`]
 /// documentation for more details.
 ///
 /// [`DelayQueue`]: struct.DelayQueue.html
+/// [`DelayQueue::insert`]: struct.DelayQueue.html#method.insert
 #[derive(Debug, Clone)]
 pub struct Key {
     index: usize,
@@ -335,6 +338,18 @@ impl<T> DelayQueue<T> {
 
         self.insert_idx(when, key);
 
+        // Set a new delay if the current's deadline is later than the one of the new item
+        let should_set_delay = if let Some(ref delay) = self.delay {
+            let current_exp = self.normalize_deadline(delay.deadline());
+            current_exp > when
+        } else {
+            true
+        };
+
+        if should_set_delay {
+            self.delay = Some(self.handle.delay(self.start + Duration::from_millis(when)));
+        }
+
         Key::new(key)
     }
 
@@ -401,9 +416,7 @@ impl<T> DelayQueue<T> {
                 // The delay is already expired, store it in the expired queue
                 self.expired.push(key, &mut self.slab);
             }
-            Err((_, err)) => {
-                panic!("invalid deadline; err={:?}", err)
-            }
+            Err((_, err)) => panic!("invalid deadline; err={:?}", err),
         }
     }
 
@@ -493,20 +506,21 @@ impl<T> DelayQueue<T> {
 
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
-        let old = self.start + Duration::from_millis(self.slab[key.index].when);
-
 
         self.slab[key.index].when = when;
-
-        if let Some(ref mut delay) = self.delay {
-            debug_assert!(old >= delay.deadline());
-
-            if old == delay.deadline() {
-                delay.reset(self.start + Duration::from_millis(when));
-            }
-        }
-
         self.insert_idx(when, key.index);
+
+        let next_deadline = self.next_deadline();
+        if let (Some(ref mut delay), Some(deadline)) = (&mut self.delay, next_deadline) {
+            delay.reset(deadline);
+        }
+    }
+
+    /// Returns the next time poll as determined by the wheel
+    fn next_deadline(&mut self) -> Option<Instant> {
+        self.wheel
+            .poll_at()
+            .map(|poll_at| self.start + Duration::from_millis(poll_at))
     }
 
     /// Sets the delay of the item associated with `key` to expire after
@@ -676,14 +690,11 @@ impl<T> DelayQueue<T> {
                 return Ok(Some(idx).into());
             }
 
-            let deadline = match self.wheel.poll_at() {
-                Some(poll_at) => {
-                    self.start + Duration::from_millis(poll_at)
-                }
-                None => return Ok(None.into()),
-            };
-
-            self.delay = Some(self.handle.delay(deadline));
+            if let Some(deadline) = self.next_deadline() {
+                self.delay = Some(self.handle.delay(deadline));
+            } else {
+                return Ok(None.into());
+            }
         }
     }
 
@@ -703,18 +714,17 @@ impl<T> Stream for DelayQueue<T> {
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Error> {
-        let item = try_ready!(self.poll_idx())
-            .map(|idx| {
-                let data = self.slab.remove(idx);
-                debug_assert!(data.next.is_none());
-                debug_assert!(data.prev.is_none());
+        let item = try_ready!(self.poll_idx()).map(|idx| {
+            let data = self.slab.remove(idx);
+            debug_assert!(data.next.is_none());
+            debug_assert!(data.prev.is_none());
 
-                Expired {
-                    key: Key::new(idx),
-                    data: data.inner,
-                    deadline: self.start + Duration::from_millis(data.when),
-                }
-            });
+            Expired {
+                key: Key::new(idx),
+                data: data.inner,
+                deadline: self.start + Duration::from_millis(data.when),
+            }
+        });
 
         Ok(item.into())
     }

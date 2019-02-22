@@ -1,7 +1,7 @@
+extern crate env_logger;
 extern crate futures;
 extern crate tokio;
 extern crate tokio_io;
-extern crate env_logger;
 
 use tokio::prelude::*;
 use tokio::timer::*;
@@ -31,7 +31,7 @@ fn timer_with_runtime() {
 
 #[test]
 fn starving() {
-    use futures::{task, Poll, Async};
+    use futures::{task, Async, Poll};
 
     let _ = env_logger::try_init();
 
@@ -60,12 +60,11 @@ fn starving() {
     let (tx, rx) = mpsc::channel();
 
     tokio::run({
-        starve
-            .and_then(move |_ticks| {
-                assert!(Instant::now() >= when);
-                tx.send(()).unwrap();
-                Ok(())
-            })
+        starve.and_then(move |_ticks| {
+            assert!(Instant::now() >= when);
+            tx.send(()).unwrap();
+            Ok(())
+        })
     });
 
     rx.recv().unwrap();
@@ -82,13 +81,11 @@ fn deadline() {
 
     #[allow(deprecated)]
     tokio::run({
-        future::empty::<(), ()>()
-            .deadline(when)
-            .then(move |res| {
-                assert!(res.is_err());
-                tx.send(()).unwrap();
-                Ok(())
-            })
+        future::empty::<(), ()>().deadline(when).then(move |res| {
+            assert!(res.is_err());
+            tx.send(()).unwrap();
+            Ok(())
+        })
     });
 
     rx.recv().unwrap();

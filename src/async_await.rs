@@ -1,4 +1,4 @@
-use std::future::{Future as StdFuture};
+use std::future::Future as StdFuture;
 
 async fn map_ok<T: StdFuture>(future: T) -> Result<(), ()> {
     let _ = await!(future);
@@ -7,7 +7,8 @@ async fn map_ok<T: StdFuture>(future: T) -> Result<(), ()> {
 
 /// Like `tokio::run`, but takes an `async` block
 pub fn run_async<F>(future: F)
-where F: StdFuture<Output = ()> + Send + 'static,
+where
+    F: StdFuture<Output = ()> + Send + 'static,
 {
     use tokio_async_await::compat::backward;
     let future = backward::Compat::new(map_ok(future));
@@ -17,7 +18,8 @@ where F: StdFuture<Output = ()> + Send + 'static,
 
 /// Like `tokio::spawn`, but takes an `async` block
 pub fn spawn_async<F>(future: F)
-where F: StdFuture<Output = ()> + Send + 'static,
+where
+    F: StdFuture<Output = ()> + Send + 'static,
 {
     use tokio_async_await::compat::backward;
     let future = backward::Compat::new(map_ok(future));

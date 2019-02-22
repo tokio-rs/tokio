@@ -11,19 +11,21 @@ extern crate cfg_if;
 use std::io::{self, Read, Write};
 use std::process::Command;
 
-use futures::{Future, Poll};
 use futures::stream::Stream;
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_io::io::{read_to_end, copy, shutdown};
-use tokio::runtime::Runtime;
+use futures::{Future, Poll};
+use native_tls::{Identity, TlsAcceptor, TlsConnector};
 use tokio::net::{TcpListener, TcpStream};
-use native_tls::{TlsConnector, TlsAcceptor, Identity};
+use tokio::runtime::Runtime;
+use tokio_io::io::{copy, read_to_end, shutdown};
+use tokio_io::{AsyncRead, AsyncWrite};
 
 macro_rules! t {
-    ($e:expr) => (match $e {
-        Ok(e) => e,
-        Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-    })
+    ($e:expr) => {
+        match $e {
+            Ok(e) => e,
+            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
+        }
+    };
 }
 
 #[allow(dead_code)]
@@ -45,7 +47,10 @@ fn openssl_keys() -> &'static Keys {
         let certfile = path.join("test.crt");
         let config = path.join("openssl.config");
 
-        File::create(&config).unwrap().write_all(b"\
+        File::create(&config)
+            .unwrap()
+            .write_all(
+                b"\
             [req]\n\
             distinguished_name=dn\n\
             [ dn ]\n\
@@ -55,44 +60,60 @@ fn openssl_keys() -> &'static Keys {
             subjectAltName = @alt_names
             [alt_names]
             DNS.1 = localhost
-        ").unwrap();
+        ",
+            )
+            .unwrap();
 
         let subj = "/C=US/ST=Denial/L=Sprintfield/O=Dis/CN=localhost";
         let output = t!(Command::new("openssl")
-                                .arg("req")
-                                .arg("-nodes")
-                                .arg("-x509")
-                                .arg("-newkey").arg("rsa:2048")
-                                .arg("-config").arg(&config)
-                                .arg("-extensions").arg("ext")
-                                .arg("-subj").arg(subj)
-                                .arg("-keyout").arg(&keyfile)
-                                .arg("-out").arg(&certfile)
-                                .arg("-days").arg("1")
-                                .output());
+            .arg("req")
+            .arg("-nodes")
+            .arg("-x509")
+            .arg("-newkey")
+            .arg("rsa:2048")
+            .arg("-config")
+            .arg(&config)
+            .arg("-extensions")
+            .arg("ext")
+            .arg("-subj")
+            .arg(subj)
+            .arg("-keyout")
+            .arg(&keyfile)
+            .arg("-out")
+            .arg(&certfile)
+            .arg("-days")
+            .arg("1")
+            .output());
         assert!(output.status.success());
 
         let crtout = t!(Command::new("openssl")
-                                .arg("x509")
-                                .arg("-outform").arg("der")
-                                .arg("-in").arg(&certfile)
-                                .output());
+            .arg("x509")
+            .arg("-outform")
+            .arg("der")
+            .arg("-in")
+            .arg(&certfile)
+            .output());
         assert!(crtout.status.success());
         let keyout = t!(Command::new("openssl")
-                                .arg("rsa")
-                                .arg("-outform").arg("der")
-                                .arg("-in").arg(&keyfile)
-                                .output());
+            .arg("rsa")
+            .arg("-outform")
+            .arg("der")
+            .arg("-in")
+            .arg(&keyfile)
+            .output());
         assert!(keyout.status.success());
 
         let pkcs12out = t!(Command::new("openssl")
-                                   .arg("pkcs12")
-                                   .arg("-export")
-                                   .arg("-nodes")
-                                   .arg("-inkey").arg(&keyfile)
-                                   .arg("-in").arg(&certfile)
-                                   .arg("-password").arg("pass:foobar")
-                                   .output());
+            .arg("pkcs12")
+            .arg("-export")
+            .arg("-nodes")
+            .arg("-inkey")
+            .arg(&keyfile)
+            .arg("-in")
+            .arg(&certfile)
+            .arg("-password")
+            .arg("pass:foobar")
+            .output());
         assert!(pkcs12out.status.success());
 
         let keys = Box::new(Keys {
@@ -104,9 +125,7 @@ fn openssl_keys() -> &'static Keys {
             KEYS = Box::into_raw(keys);
         }
     });
-    unsafe {
-        &*KEYS
-    }
+    unsafe { &*KEYS }
 }
 
 cfg_if! {
@@ -509,24 +528,18 @@ fn client_to_server() {
     // Create a future to accept one socket, connect the ssl stream, and then
     // read all the data from it.
     let socket = srv.incoming().take(1).collect();
-    let received = socket.map(|mut socket| {
-        socket.remove(0)
-    }).and_then(move |socket| {
-        server_cx.accept(socket).map_err(native2io)
-    }).and_then(|socket| {
-        read_to_end(socket, Vec::new())
-    });
+    let received = socket
+        .map(|mut socket| socket.remove(0))
+        .and_then(move |socket| server_cx.accept(socket).map_err(native2io))
+        .and_then(|socket| read_to_end(socket, Vec::new()));
 
     // Create a future to connect to our server, connect the ssl stream, and
     // then write a bunch of data to it.
     let client = TcpStream::connect(&addr);
-    let sent = client.and_then(move |socket| {
-        client_cx.connect("localhost", socket).map_err(native2io)
-    }).and_then(|socket| {
-        copy(io::repeat(9).take(AMT), socket)
-    }).and_then(|(amt, _repeat, socket)| {
-        shutdown(socket).map(move |_| amt)
-    });
+    let sent = client
+        .and_then(move |socket| client_cx.connect("localhost", socket).map_err(native2io))
+        .and_then(|socket| copy(io::repeat(9).take(AMT), socket))
+        .and_then(|(amt, _repeat, socket)| shutdown(socket).map(move |_| amt));
 
     // Finally, run everything!
     let (amt, (_, data)) = t!(l.block_on(sent.join(received)));
@@ -546,22 +559,16 @@ fn server_to_client() {
     let (server_cx, client_cx) = contexts();
 
     let socket = srv.incoming().take(1).collect();
-    let sent = socket.map(|mut socket| {
-        socket.remove(0)
-    }).and_then(move |socket| {
-        server_cx.accept(socket).map_err(native2io)
-    }).and_then(|socket| {
-        copy(io::repeat(9).take(AMT), socket)
-    }).and_then(|(amt, _repeat, socket)| {
-        shutdown(socket).map(move |_| amt)
-    });
+    let sent = socket
+        .map(|mut socket| socket.remove(0))
+        .and_then(move |socket| server_cx.accept(socket).map_err(native2io))
+        .and_then(|socket| copy(io::repeat(9).take(AMT), socket))
+        .and_then(|(amt, _repeat, socket)| shutdown(socket).map(move |_| amt));
 
     let client = TcpStream::connect(&addr);
-    let received = client.and_then(move |socket| {
-        client_cx.connect("localhost", socket).map_err(native2io)
-    }).and_then(|socket| {
-        read_to_end(socket, Vec::new())
-    });
+    let received = client
+        .and_then(move |socket| client_cx.connect("localhost", socket).map_err(native2io))
+        .and_then(|socket| read_to_end(socket, Vec::new()));
 
     // Finally, run everything!
     let (amt, (_, data)) = t!(l.block_on(sent.join(received)));
@@ -608,23 +615,23 @@ fn one_byte_at_a_time() {
     let (server_cx, client_cx) = contexts();
 
     let socket = srv.incoming().take(1).collect();
-    let sent = socket.map(|mut socket| {
-        socket.remove(0)
-    }).and_then(move |socket| {
-        server_cx.accept(OneByte { inner: socket }).map_err(native2io)
-    }).and_then(|socket| {
-        copy(io::repeat(9).take(AMT), socket)
-    }).and_then(|(amt, _repeat, socket)| {
-        shutdown(socket).map(move |_| amt)
-    });
+    let sent = socket
+        .map(|mut socket| socket.remove(0))
+        .and_then(move |socket| {
+            server_cx
+                .accept(OneByte { inner: socket })
+                .map_err(native2io)
+        })
+        .and_then(|socket| copy(io::repeat(9).take(AMT), socket))
+        .and_then(|(amt, _repeat, socket)| shutdown(socket).map(move |_| amt));
 
     let client = TcpStream::connect(&addr);
-    let received = client.and_then(move |socket| {
-        let socket = OneByte { inner: socket };
-        client_cx.connect("localhost", socket).map_err(native2io)
-    }).and_then(|socket| {
-        read_to_end(socket, Vec::new())
-    });
+    let received = client
+        .and_then(move |socket| {
+            let socket = OneByte { inner: socket };
+            client_cx.connect("localhost", socket).map_err(native2io)
+        })
+        .and_then(|socket| read_to_end(socket, Vec::new()));
 
     let (amt, (_, data)) = t!(l.block_on(sent.join(received)));
     assert_eq!(amt, AMT);

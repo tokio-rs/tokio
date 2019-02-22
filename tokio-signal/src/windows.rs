@@ -15,15 +15,15 @@ use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
+use self::winapi::shared::minwindef::*;
+use self::winapi::um::wincon::*;
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{Async, Future, IntoFuture, Poll, Stream};
-use tokio_reactor::{Handle, PollEvented};
 use mio::Ready;
-use self::winapi::shared::minwindef::*;
-use self::winapi::um::wincon::*;
+use tokio_reactor::{Handle, PollEvented};
 
 use IoFuture;
 

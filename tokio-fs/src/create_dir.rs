@@ -17,30 +17,28 @@ pub fn create_dir<P: AsRef<Path>>(path: P) -> CreateDirFuture<P> {
 #[derive(Debug)]
 pub struct CreateDirFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     path: P,
 }
 
 impl<P> CreateDirFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     fn new(path: P) -> CreateDirFuture<P> {
-        CreateDirFuture {
-            path: path,
-        }
+        CreateDirFuture { path: path }
     }
 }
 
 impl<P> Future for CreateDirFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::create_dir(&self.path) )
+        ::blocking_io(|| fs::create_dir(&self.path))
     }
 }

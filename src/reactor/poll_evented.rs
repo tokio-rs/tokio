@@ -10,9 +10,9 @@
 
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Mutex;
 
 use futures::{task, Async, Poll};
 use mio::event::Evented;
@@ -41,9 +41,7 @@ struct Inner {
 
 impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("PollEvented")
-         .field("io", &self.io)
-         .finish()
+        f.debug_struct("PollEvented").field("io", &self.io).finish()
     }
 }
 
@@ -51,7 +49,8 @@ impl<E> PollEvented<E> {
     /// Creates a new readiness stream associated with the provided
     /// `loop_handle` and for the given `source`.
     pub fn new(io: E, handle: &Handle) -> io::Result<PollEvented<E>>
-        where E: Evented,
+    where
+        E: Evented,
     {
         let registration = Registration::new();
         registration.register(&io)?;
@@ -153,7 +152,9 @@ impl<E> PollEvented<E> {
         };
 
         // Cache the value
-        self.inner.write_readiness.store(ready2usize(ready), Relaxed);
+        self.inner
+            .write_readiness
+            .store(ready2usize(ready), Relaxed);
 
         ().into()
     }
@@ -334,17 +335,17 @@ impl<E> PollEvented<E> {
     /// method is called, and will likely return an error if this `PollEvented`
     /// was created on a separate event loop from the `handle` specified.
     pub fn deregister(&self) -> io::Result<()>
-        where E: Evented,
+    where
+        E: Evented,
     {
-        self.inner.registration.lock().unwrap()
-            .deregister(&self.io)
+        self.inner.registration.lock().unwrap().deregister(&self.io)
     }
 }
 
 impl<E: Read> Read for PollEvented<E> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_mut().read(buf);
@@ -353,14 +354,14 @@ impl<E: Read> Read for PollEvented<E> {
             self.need_read()?;
         }
 
-        return r
+        return r;
     }
 }
 
 impl<E: Write> Write for PollEvented<E> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_mut().write(buf);
@@ -369,12 +370,12 @@ impl<E: Write> Write for PollEvented<E> {
             self.need_write()?;
         }
 
-        return r
+        return r;
     }
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_mut().flush();
@@ -383,12 +384,11 @@ impl<E: Write> Write for PollEvented<E> {
             self.need_write()?;
         }
 
-        return r
+        return r;
     }
 }
 
-impl<E: Read> AsyncRead for PollEvented<E> {
-}
+impl<E: Read> AsyncRead for PollEvented<E> {}
 
 impl<E: Write> AsyncWrite for PollEvented<E> {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
@@ -430,8 +430,8 @@ fn usize2ready(bits: usize) -> Ready {
 
 #[cfg(unix)]
 mod platform {
-    use mio::Ready;
     use mio::unix::UnixReady;
+    use mio::Ready;
 
     const HUP: usize = 1 << 2;
     const ERROR: usize = 1 << 3;
@@ -476,14 +476,22 @@ mod platform {
         bits
     }
 
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios",
-              target_os = "macos"))]
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    ))]
     fn usize2ready_aio(ready: &mut UnixReady) {
         ready.insert(UnixReady::aio());
     }
 
-    #[cfg(not(any(target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    #[cfg(not(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    )))]
     fn usize2ready_aio(_ready: &mut UnixReady) {
         // aio not available here → empty
     }

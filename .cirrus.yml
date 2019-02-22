@@ -1,0 +1,28 @@
+freebsd_instance:
+  image: freebsd-12-0-release-amd64
+
+# Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
+# same VM.  The binary will be built in 32-bit mode, but will execute on a
+# 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
+# the system's binaries, so the environment shouldn't matter.
+task:
+  name: FreeBSD 12.0
+  env:
+    LOOM_MAX_DURATION: 10
+  setup_script:
+    - pkg install -y curl
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y
+    - . $HOME/.cargo/env
+    - rustup target add i686-unknown-freebsd
+  cargo_cache:
+    folder: $HOME/.cargo/registry
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test --all --no-fail-fast
+    - cargo doc --all
+  i686_test_script:
+    - . $HOME/.cargo/env
+    - cargo test --all --exclude tokio-tls --no-fail-fast --target i686-unknown-freebsd
+  before_cache_script:
+    - rm -rf $HOME/.cargo/registry/index

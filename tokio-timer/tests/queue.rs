@@ -1,14 +1,14 @@
 extern crate futures;
 extern crate tokio_executor;
-extern crate tokio_timer;
 extern crate tokio_mock_task;
+extern crate tokio_timer;
 
 #[macro_use]
 mod support;
 use support::*;
 
-use tokio_timer::*;
 use tokio_mock_task::MockTask;
+use tokio_timer::*;
 
 use futures::Stream;
 
@@ -207,6 +207,64 @@ fn reset_entry() {
 }
 
 #[test]
+fn reset_much_later() {
+    // Reproduces tokio-rs/tokio#849.
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        turn(timer, ms(1));
+
+        let key = queue.insert_at("foo", epoch + ms(200));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        turn(timer, ms(3));
+
+        queue.reset_at(&key, epoch + ms(5));
+
+        turn(timer, ms(20));
+
+        assert!(task.is_notified());
+    });
+}
+
+#[test]
+fn reset_twice() {
+    // Reproduces tokio-rs/tokio#849.
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        turn(timer, ms(1));
+
+        let key = queue.insert_at("foo", epoch + ms(200));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        turn(timer, ms(3));
+
+        queue.reset_at(&key, epoch + ms(50));
+
+        turn(timer, ms(20));
+
+        queue.reset_at(&key, epoch + ms(40));
+
+        turn(timer, ms(20));
+
+        assert!(task.is_notified());
+    });
+}
+
+#[test]
 fn remove_expired_item() {
     mocked(|timer, time| {
         let mut queue = DelayQueue::new();
@@ -219,5 +277,130 @@ fn remove_expired_item() {
 
         let entry = queue.remove(&key);
         assert_eq!(entry.into_inner(), "foo");
+    })
+}
+
+#[test]
+fn expires_before_last_insert() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        queue.insert_at("foo", epoch + ms(10_000));
+
+        // Delay should be set to 8.192s here.
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        // Delay should be set to the delay of the new item here
+        queue.insert_at("bar", epoch + ms(600));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        advance(timer, ms(600));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "bar");
+    })
+}
+
+#[test]
+fn multi_reset() {
+    mocked(|_, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        let foo = queue.insert_at("foo", epoch + ms(200));
+        let bar = queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&foo, epoch + ms(300));
+        queue.reset_at(&bar, epoch + ms(350));
+        queue.reset_at(&foo, epoch + ms(400));
+    })
+}
+
+#[test]
+fn expire_first_key_when_reset_to_expire_earlier() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        let foo = queue.insert_at("foo", epoch + ms(200));
+        queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&foo, epoch + ms(100));
+
+        advance(timer, ms(100));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "foo");
+    })
+}
+
+#[test]
+fn expire_second_key_when_reset_to_expire_earlier() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        queue.insert_at("foo", epoch + ms(200));
+        let bar = queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&bar, epoch + ms(100));
+
+        advance(timer, ms(100));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "bar");
+    })
+}
+
+#[test]
+fn reset_first_expiring_item_to_expire_later() {
+    mocked(|timer, time| {
+        let mut queue = DelayQueue::new();
+        let mut task = MockTask::new();
+
+        let epoch = time.now();
+
+        let foo = queue.insert_at("foo", epoch + ms(200));
+        let bar = queue.insert_at("bar", epoch + ms(250));
+
+        task.enter(|| {
+            assert_not_ready!(queue);
+        });
+
+        queue.reset_at(&foo, epoch + ms(300));
+        advance(timer, ms(250));
+
+        assert!(task.is_notified());
+        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert_eq!(entry, "bar");
     })
 }

@@ -2,7 +2,7 @@
 
 Timer facilities for Tokio
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio_timer/)
+[Documentation](https://docs.rs/tokio-timer/0.2.10/tokio_timer/)
 
 ## Overview
 

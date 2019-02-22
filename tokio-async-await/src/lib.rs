@@ -4,9 +4,8 @@
     arbitrary_self_types,
     async_await,
     await_macro,
-    futures_api,
-    )]
-
+    futures_api
+)]
 #![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.5")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
@@ -23,12 +22,10 @@ macro_rules! try_ready {
     ($x:expr) => {
         match $x {
             std::task::Poll::Ready(Ok(x)) => x,
-            std::task::Poll::Ready(Err(e)) =>
-                return std::task::Poll::Ready(Err(e.into())),
-            std::task::Poll::Pending =>
-                return std::task::Poll::Pending,
+            std::task::Poll::Ready(Err(e)) => return std::task::Poll::Ready(Err(e.into())),
+            std::task::Poll::Pending => return std::task::Poll::Pending,
         }
-    }
+    };
 }
 
 #[macro_use]

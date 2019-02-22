@@ -1,11 +1,11 @@
-use Error;
 use clock::now;
-use timer::{HandlePriv, Entry};
+use timer::{Entry, HandlePriv};
+use Error;
 
 use futures::Poll;
 
 use std::sync::Arc;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// Registration with a timer.
 ///
@@ -21,7 +21,9 @@ impl Registration {
         fn is_send<T: Send + Sync>() {}
         is_send::<Registration>();
 
-        Registration { entry: Arc::new(Entry::new(deadline, duration)) }
+        Registration {
+            entry: Arc::new(Entry::new(deadline, duration)),
+        }
     }
 
     pub fn deadline(&self) -> Instant {

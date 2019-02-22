@@ -19,10 +19,7 @@ impl<'a, T: ?Sized> Unpin for Read<'a, T> {}
 
 impl<'a, T: AsyncRead + ?Sized> Read<'a, T> {
     pub(super) fn new(reader: &'a mut T, buf: &'a mut [u8]) -> Read<'a, T> {
-        Read {
-            reader,
-            buf,
-        }
+        Read { reader, buf }
     }
 }
 

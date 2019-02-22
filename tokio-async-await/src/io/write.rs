@@ -19,10 +19,7 @@ impl<'a, T: ?Sized> Unpin for Write<'a, T> {}
 
 impl<'a, T: AsyncWrite + ?Sized> Write<'a, T> {
     pub(super) fn new(writer: &'a mut T, buf: &'a [u8]) -> Write<'a, T> {
-        Write {
-            writer,
-            buf,
-        }
+        Write { writer, buf }
     }
 }
 

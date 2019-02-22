@@ -8,7 +8,7 @@ use support::*;
 
 use tokio_timer::*;
 
-use futures::{Stream};
+use futures::Stream;
 
 #[test]
 #[should_panic]

@@ -3,16 +3,16 @@ extern crate tokio_threadpool;
 
 use tokio_threadpool::*;
 
-use futures::{Future, Stream, Sink, Poll};
+use futures::{Future, Poll, Sink, Stream};
 
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::*;
+use std::sync::Arc;
 
 #[test]
 fn hammer() {
     use futures::future;
-    use futures::sync::{oneshot, mpsc};
+    use futures::sync::{mpsc, oneshot};
 
     const N: usize = 1000;
     const ITER: usize = 20;
@@ -37,7 +37,7 @@ fn hammer() {
         }
     }
 
-    for _ in 0.. ITER {
+    for _ in 0..ITER {
         let pool = Builder::new()
             // .pool_size(30)
             .build();
@@ -61,14 +61,13 @@ fn hammer() {
                         rx2
                     })
                     .map_err(|e| panic!("e={:?}", e))
-                    .and_then(|_| {
-                        Ok(())
-                    });
+                    .and_then(|_| Ok(()));
 
                     pool.spawn(Counted {
                         inner: task,
                         cnt: c1.clone(),
-                    }).unwrap();
+                    })
+                    .unwrap();
 
                     Ok(())
                 });
@@ -85,17 +84,12 @@ fn hammer() {
             listen_tx.send(tx).unwrap();
 
             pool.spawn({
-                let task = rx
-                    .map_err(|e| panic!("rx err={:?}", e))
-                    .and_then(|tx| {
-                        tx.send(()).unwrap();
-                        Ok(())
-                    });
+                let task = rx.map_err(|e| panic!("rx err={:?}", e)).and_then(|tx| {
+                    tx.send(()).unwrap();
+                    Ok(())
+                });
 
-                Counted {
-                    inner: task,
-                    cnt,
-                }
+                Counted { inner: task, cnt }
             });
         }
 

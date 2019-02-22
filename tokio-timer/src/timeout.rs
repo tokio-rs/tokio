@@ -4,14 +4,14 @@
 //!
 //! [`Timeout`]: struct.Timeout.html
 
-use Delay;
 use clock::now;
+use Delay;
 
-use futures::{Future, Stream, Poll, Async};
+use futures::{Async, Future, Poll, Stream};
 
 use std::error;
 use std::fmt;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// Allows a `Future` or `Stream` to execute for a limited amount of time.
 ///
@@ -127,10 +127,7 @@ impl<T> Timeout<T> {
     pub fn new(value: T, timeout: Duration) -> Timeout<T> {
         let delay = Delay::new_timeout(now() + timeout, timeout);
 
-        Timeout {
-            value,
-            delay,
-        }
+        Timeout { value, delay }
     }
 
     /// Gets a reference to the underlying value in this timeout.
@@ -168,7 +165,8 @@ impl<T: Future> Timeout<T> {
 }
 
 impl<T> Future for Timeout<T>
-where T: Future,
+where
+    T: Future,
 {
     type Item = T::Item;
     type Error = Error<T::Error>;
@@ -184,16 +182,15 @@ where T: Future,
         // Now check the timer
         match self.delay.poll() {
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Ok(Async::Ready(_)) => {
-                Err(Error::elapsed())
-            },
+            Ok(Async::Ready(_)) => Err(Error::elapsed()),
             Err(e) => Err(Error::timer(e)),
         }
     }
 }
 
 impl<T> Stream for Timeout<T>
-where T: Stream,
+where
+    T: Stream,
 {
     type Item = T::Item;
     type Error = Error<T::Error>;
@@ -205,7 +202,7 @@ where T: Stream,
                 if v.is_some() {
                     self.delay.reset_timeout();
                 }
-                return Ok(Async::Ready(v))
+                return Ok(Async::Ready(v));
             }
             Ok(Async::NotReady) => {}
             Err(e) => return Err(Error::inner(e)),
@@ -217,7 +214,7 @@ where T: Stream,
             Ok(Async::Ready(_)) => {
                 self.delay.reset_timeout();
                 Err(Error::elapsed())
-            },
+            }
             Err(e) => Err(Error::timer(e)),
         }
     }

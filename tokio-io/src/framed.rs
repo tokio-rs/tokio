@@ -1,15 +1,15 @@
 #![allow(deprecated)]
 
-use std::io::{self, Read, Write};
 use std::fmt;
+use std::io::{self, Read, Write};
 
-use {AsyncRead, AsyncWrite};
 use codec::{Decoder, Encoder};
 use framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
 use framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
+use {AsyncRead, AsyncWrite};
 
-use futures::{Stream, Sink, StartSend, Poll};
-use bytes::{BytesMut};
+use bytes::BytesMut;
+use futures::{Poll, Sink, StartSend, Stream};
 
 /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -26,8 +26,9 @@ pub struct Framed<T, U> {
 pub struct Fuse<T, U>(pub T, pub U);
 
 pub fn framed<T, U>(inner: T, codec: U) -> Framed<T, U>
-    where T: AsyncRead + AsyncWrite,
-          U: Decoder + Encoder,
+where
+    T: AsyncRead + AsyncWrite,
+    U: Decoder + Encoder,
 {
     Framed {
         inner: framed_read2(framed_write2(Fuse(inner, codec))),
@@ -55,10 +56,12 @@ impl<T, U> Framed<T, U> {
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
-    pub fn from_parts(parts: FramedParts<T>, codec: U) -> Framed<T, U>
-    {
+    pub fn from_parts(parts: FramedParts<T>, codec: U) -> Framed<T, U> {
         Framed {
-            inner: framed_read2_with_buffer(framed_write2_with_buffer(Fuse(parts.inner, codec), parts.writebuf), parts.readbuf),
+            inner: framed_read2_with_buffer(
+                framed_write2_with_buffer(Fuse(parts.inner, codec), parts.writebuf),
+                parts.readbuf,
+            ),
         }
     }
 
@@ -100,7 +103,11 @@ impl<T, U> Framed<T, U> {
     pub fn into_parts(self) -> FramedParts<T> {
         let (inner, readbuf) = self.inner.into_parts();
         let (inner, writebuf) = inner.into_parts();
-        FramedParts { inner: inner.0, readbuf: readbuf, writebuf: writebuf }
+        FramedParts {
+            inner: inner.0,
+            readbuf: readbuf,
+            writebuf: writebuf,
+        }
     }
 
     /// Consumes the `Frame`, returning its underlying I/O stream and the buffer
@@ -116,13 +123,21 @@ impl<T, U> Framed<T, U> {
     pub fn into_parts_and_codec(self) -> (FramedParts<T>, U) {
         let (inner, readbuf) = self.inner.into_parts();
         let (inner, writebuf) = inner.into_parts();
-        (FramedParts { inner: inner.0, readbuf: readbuf, writebuf: writebuf }, inner.1)
+        (
+            FramedParts {
+                inner: inner.0,
+                readbuf: readbuf,
+                writebuf: writebuf,
+            },
+            inner.1,
+        )
     }
 }
 
 impl<T, U> Stream for Framed<T, U>
-    where T: AsyncRead,
-          U: Decoder,
+where
+    T: AsyncRead,
+    U: Decoder,
 {
     type Item = U::Item;
     type Error = U::Error;
@@ -133,17 +148,15 @@ impl<T, U> Stream for Framed<T, U>
 }
 
 impl<T, U> Sink for Framed<T, U>
-    where T: AsyncWrite,
-          U: Encoder,
-          U::Error: From<io::Error>,
+where
+    T: AsyncWrite,
+    U: Encoder,
+    U::Error: From<io::Error>,
 {
     type SinkItem = U::Item;
     type SinkError = U::Error;
 
-    fn start_send(&mut self,
-                  item: Self::SinkItem)
-                  -> StartSend<Self::SinkItem, Self::SinkError>
-    {
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         self.inner.get_mut().start_send(item)
     }
 
@@ -157,14 +170,15 @@ impl<T, U> Sink for Framed<T, U>
 }
 
 impl<T, U> fmt::Debug for Framed<T, U>
-    where T: fmt::Debug,
-          U: fmt::Debug,
+where
+    T: fmt::Debug,
+    U: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Framed")
-         .field("io", &self.inner.get_ref().get_ref().0)
-         .field("codec", &self.inner.get_ref().get_ref().1)
-         .finish()
+            .field("io", &self.inner.get_ref().get_ref().0)
+            .field("codec", &self.inner.get_ref().get_ref().1)
+            .finish()
     }
 }
 
@@ -224,12 +238,11 @@ impl<T, U: Encoder> Encoder for Fuse<T, U> {
 /// It can be used to construct a new `Framed` with a different codec.
 /// It contains all current buffers and the inner transport.
 #[derive(Debug)]
-pub struct FramedParts<T>
-{
+pub struct FramedParts<T> {
     /// The inner transport used to read bytes to and write bytes to
     pub inner: T,
     /// The buffer with read but unprocessed data.
     pub readbuf: BytesMut,
     /// A buffer with unprocessed data which are not written yet.
-    pub writebuf: BytesMut
+    pub writebuf: BytesMut,
 }

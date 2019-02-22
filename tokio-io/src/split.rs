@@ -1,8 +1,8 @@
 use std::io::{self, Read, Write};
 
-use futures::{Async, Poll};
-use futures::sync::BiLock;
 use bytes::{Buf, BufMut};
+use futures::sync::BiLock;
+use futures::{Async, Poll};
 
 use {AsyncRead, AsyncWrite};
 
@@ -98,7 +98,8 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error>
-        where Self: Sized,
+    where
+        Self: Sized,
     {
         let mut l = try_ready!(wrap_as_io(self.handle.poll_lock()));
         l.write_buf(buf)
@@ -115,8 +116,8 @@ mod tests {
 
     use super::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
     use bytes::{BytesMut, IntoBuf};
-    use futures::{Async, Poll, future::lazy, future::ok};
     use futures::sync::BiLock;
+    use futures::{future::lazy, future::ok, Async, Poll};
 
     use std::io::{self, Read, Write};
 
@@ -170,7 +171,8 @@ mod tests {
             assert!(rx.read_buf(&mut buf).unwrap().is_ready());
 
             ok::<(), ()>(())
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     #[test]
@@ -198,7 +200,8 @@ mod tests {
             assert!(tx.write_buf(&mut buf).unwrap().is_ready());
 
             ok::<(), ()>(())
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     #[test]

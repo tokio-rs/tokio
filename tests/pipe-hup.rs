@@ -13,18 +13,20 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
 
+use futures::Future;
 use mio::event::Evented;
-use mio::unix::{UnixReady, EventedFd};
+use mio::unix::{EventedFd, UnixReady};
 use mio::{PollOpt, Ready, Token};
 use tokio::reactor::{Handle, PollEvented2};
 use tokio_io::io::read_to_end;
-use futures::Future;
 
 macro_rules! t {
-    ($e:expr) => (match $e {
-        Ok(e) => e,
-        Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-    })
+    ($e:expr) => {
+        match $e {
+            Ok(e) => e,
+            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
+        }
+    };
 }
 
 struct MyFile(File);
@@ -46,13 +48,23 @@ impl io::Read for MyFile {
 }
 
 impl Evented for MyFile {
-    fn register(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
-                -> io::Result<()> {
+    fn register(
+        &self,
+        poll: &mio::Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt,
+    ) -> io::Result<()> {
         let hup: Ready = UnixReady::hup().into();
         EventedFd(&self.0.as_raw_fd()).register(poll, token, interest | hup, opts)
     }
-    fn reregister(&self, poll: &mio::Poll, token: Token, interest: Ready, opts: PollOpt)
-                  -> io::Result<()> {
+    fn reregister(
+        &self,
+        poll: &mio::Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt,
+    ) -> io::Result<()> {
         let hup: Ready = UnixReady::hup().into();
         EventedFd(&self.0.as_raw_fd()).reregister(poll, token, interest | hup, opts)
     }
@@ -68,8 +80,11 @@ fn hup() {
     let handle = Handle::default();
     unsafe {
         let mut pipes = [0; 2];
-        assert!(libc::pipe(pipes.as_mut_ptr()) != -1,
-                "pipe error: {}", io::Error::last_os_error());
+        assert!(
+            libc::pipe(pipes.as_mut_ptr()) != -1,
+            "pipe error: {}",
+            io::Error::last_os_error()
+        );
         let read = File::from_raw_fd(pipes[0]);
         let mut write = File::from_raw_fd(pipes[1]);
         let t = thread::spawn(move || {

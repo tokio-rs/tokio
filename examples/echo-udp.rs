@@ -16,11 +16,11 @@
 extern crate futures;
 extern crate tokio;
 
-use std::{env, io};
 use std::net::SocketAddr;
+use std::{env, io};
 
-use tokio::prelude::*;
 use tokio::net::UdpSocket;
+use tokio::prelude::*;
 
 struct Server {
     socket: UdpSocket,

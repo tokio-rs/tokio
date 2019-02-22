@@ -9,7 +9,7 @@ use futures::future::{lazy, Future};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 macro_rules! assert_ready {
     ($f:expr) => {{
@@ -56,7 +56,7 @@ macro_rules! assert_not_ready {
 macro_rules! assert_elapsed {
     ($f:expr) => {
         assert!($f.poll().unwrap_err().is_elapsed());
-    }
+    };
 }
 
 #[derive(Debug)]
@@ -128,13 +128,15 @@ pub fn advance(timer: &mut Timer<MockPark>, duration: Duration) {
 }
 
 pub fn mocked<F, R>(f: F) -> R
-where F: FnOnce(&mut Timer<MockPark>, &mut MockTime) -> R
+where
+    F: FnOnce(&mut Timer<MockPark>, &mut MockTime) -> R,
 {
     mocked_with_now(Instant::now(), f)
 }
 
 pub fn mocked_with_now<F, R>(now: Instant, f: F) -> R
-where F: FnOnce(&mut Timer<MockPark>, &mut MockTime) -> R
+where
+    F: FnOnce(&mut Timer<MockPark>, &mut MockTime) -> R,
 {
     let mut time = MockTime::new(now);
     let park = time.mock_park();
@@ -147,9 +149,9 @@ where F: FnOnce(&mut Timer<MockPark>, &mut MockTime) -> R
         let handle = timer.handle();
 
         ::tokio_timer::with_default(&handle, enter, |_| {
-            lazy(|| {
-                Ok::<_, ()>(f(&mut timer, &mut time))
-            }).wait().unwrap()
+            lazy(|| Ok::<_, ()>(f(&mut timer, &mut time)))
+                .wait()
+                .unwrap()
         })
     })
 }
@@ -171,9 +173,7 @@ impl MockTime {
 
     pub fn mock_now(&self) -> MockNow {
         let inner = self.inner.clone();
-        MockNow {
-            inner,
-        }
+        MockNow { inner }
     }
 
     pub fn mock_park(&self) -> MockPark {
@@ -217,8 +217,7 @@ impl Park for MockPark {
     fn park(&mut self) -> Result<(), Self::Error> {
         let mut inner = self.inner.lock().map_err(|_| ())?;
 
-        let duration = inner.park_for.take()
-            .expect("call park_for first");
+        let duration = inner.park_for.take().expect("call park_for first");
 
         inner.advance(duration);
         Ok(())

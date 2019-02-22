@@ -7,6 +7,7 @@
 //! [`FutureExt`]: trait.FutureExt.html
 //! [`StreamExt`]: trait.StreamExt.html
 
+mod enumerate;
 mod future;
 mod stream;
 

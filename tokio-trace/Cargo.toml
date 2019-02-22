@@ -1,0 +1,30 @@
+[package]
+name = "tokio-trace"
+version = "0.0.1"
+authors = ["Eliza Weisman <eliza@buoyant.io>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+description = """
+A scoped, structured logging and diagnostics system.
+"""
+categories = ["development-tools::debugging", "asynchronous"]
+keywords = ["logging", "tracing"]
+
+# Not yet ready for production.
+publish = false
+
+[dependencies]
+tokio-trace-core = { path = "tokio-trace-core" }
+
+[dev-dependencies]
+ansi_term = "0.11"
+humantime = "1.1.1"
+futures = "0.1"
+log = "0.4"
+
+# These are used for the "basic" example from the tokio-trace-prototype repo,
+# which is currently not included as it used the `tokio-trace-log` crate, and
+# that crate is currently unstable.
+# env_logger = "0.5"
+# tokio-trace-log = { path = "../tokio-trace-log" }

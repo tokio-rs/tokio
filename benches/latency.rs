@@ -10,8 +10,8 @@ use std::io;
 use std::net::SocketAddr;
 use std::thread;
 
-use futures::sync::oneshot;
 use futures::sync::mpsc;
+use futures::sync::oneshot;
 use futures::{Future, Poll, Sink, Stream};
 use test::Bencher;
 use tokio::net::UdpSocket;
@@ -57,7 +57,6 @@ fn udp_echo_latency(b: &mut Bencher) {
     let (tx, rx) = oneshot::channel();
 
     let child = thread::spawn(move || {
-
         let socket = tokio::net::UdpSocket::bind(&any_addr).unwrap();
         tx.send(socket.local_addr().unwrap()).unwrap();
 
@@ -66,7 +65,6 @@ fn udp_echo_latency(b: &mut Bencher) {
         let server = server.map_err(|_| ());
         server.wait().unwrap();
     });
-
 
     let client = std::net::UdpSocket::bind(&any_addr).unwrap();
 

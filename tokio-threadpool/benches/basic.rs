@@ -1,11 +1,11 @@
 #![feature(test)]
 #![deny(warnings)]
 
-extern crate tokio_threadpool;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate num_cpus;
 extern crate test;
+extern crate tokio_threadpool;
 
 const NUM_SPAWN: usize = 10_000;
 const NUM_YIELD: usize = 1_000;
@@ -13,12 +13,12 @@ const TASKS_PER_CPU: usize = 50;
 
 mod threadpool {
     use futures::{future, task, Async};
-    use tokio_threadpool::*;
     use num_cpus;
-    use test;
-    use std::sync::{mpsc, Arc};
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
+    use std::sync::{mpsc, Arc};
+    use test;
+    use tokio_threadpool::*;
 
     #[bench]
     fn spawn_many(b: &mut test::Bencher) {
@@ -90,14 +90,14 @@ mod threadpool {
 // See rust-lang-nursery/futures-rs#617
 //
 mod cpupool {
-    use futures::{task, Async};
     use futures::future::{self, Executor};
+    use futures::{task, Async};
     use futures_cpupool::*;
     use num_cpus;
-    use test;
-    use std::sync::{mpsc, Arc};
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
+    use std::sync::{mpsc, Arc};
+    use test;
 
     #[bench]
     fn spawn_many(b: &mut test::Bencher) {
@@ -119,7 +119,9 @@ mod cpupool {
                     }
 
                     Ok(())
-                })).ok().unwrap();
+                }))
+                .ok()
+                .unwrap();
             }
 
             let _ = rx.recv().unwrap();
@@ -151,7 +153,9 @@ mod cpupool {
                         // Not ready
                         Ok(Async::NotReady)
                     }
-                })).ok().unwrap();
+                }))
+                .ok()
+                .unwrap();
             }
 
             for _ in 0..tasks {

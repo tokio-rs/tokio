@@ -90,7 +90,8 @@ impl OpenOptions {
     ///
     /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
     pub fn open<P>(&self, path: P) -> OpenFuture<P>
-    where P: AsRef<Path> + Send + 'static
+    where
+        P: AsRef<Path> + Send + 'static,
     {
         OpenFuture::new(self.0.clone(), path)
     }

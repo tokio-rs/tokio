@@ -1,10 +1,10 @@
 use park::DefaultPark;
-use worker::{WorkerId};
+use worker::WorkerId;
 
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{self, Acquire, AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed};
 use std::time::{Duration, Instant};
 
 /// State associated with a thread in the thread pool.
@@ -100,9 +100,11 @@ impl Backup {
         });
 
         // The handoff value is equal to `worker_id`
-        debug_assert_eq!(unsafe { (*self.handoff.get()).as_ref()  }, Some(worker_id));
+        debug_assert_eq!(unsafe { (*self.handoff.get()).as_ref() }, Some(worker_id));
 
-        unsafe { *self.handoff.get() = None; }
+        unsafe {
+            *self.handoff.get() = None;
+        }
     }
 
     pub fn is_running(&self) -> bool {
@@ -167,10 +169,7 @@ impl Backup {
                     return Handoff::Terminated;
                 }
 
-                let worker_id = unsafe {
-                    (*self.handoff.get()).take()
-                        .expect("no worker handoff")
-                };
+                let worker_id = unsafe { (*self.handoff.get()).take().expect("no worker handoff") };
                 return Handoff::Worker(worker_id);
             }
 
@@ -192,10 +191,10 @@ impl Backup {
                         let mut next = state;
                         next.unset_running();
 
-                        let actual = self.state.compare_and_swap(
-                            state.into(),
-                            next.into(),
-                            AcqRel).into();
+                        let actual = self
+                            .state
+                            .compare_and_swap(state.into(), next.into(), AcqRel)
+                            .into();
 
                         if actual == state {
                             debug_assert!(!next.is_running());
@@ -226,7 +225,9 @@ impl Backup {
 
     #[inline]
     pub fn set_next_sleeper(&self, val: BackupId) {
-        unsafe { *self.next_sleeper.get() = val; }
+        unsafe {
+            *self.next_sleeper.get() = val;
+        }
     }
 }
 
@@ -271,8 +272,9 @@ impl State {
             next.set_running();
             next.unset_pushed();
 
-            let actual = state.compare_and_swap(
-                curr.into(), next.into(), AcqRel).into();
+            let actual = state
+                .compare_and_swap(curr.into(), next.into(), AcqRel)
+                .into();
 
             if actual == curr {
                 return curr;

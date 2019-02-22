@@ -1,9 +1,9 @@
+use timer::{HandlePriv, Registration};
 use Error;
-use timer::{Registration, HandlePriv};
 
 use futures::{Future, Poll};
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// A future that completes at a specified instant in time.
 ///

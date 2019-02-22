@@ -17,30 +17,28 @@ pub fn read_link<P: AsRef<Path>>(path: P) -> ReadLinkFuture<P> {
 #[derive(Debug)]
 pub struct ReadLinkFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     path: P,
 }
 
 impl<P> ReadLinkFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     fn new(path: P) -> ReadLinkFuture<P> {
-        ReadLinkFuture {
-            path: path,
-        }
+        ReadLinkFuture { path: path }
     }
 }
 
 impl<P> Future for ReadLinkFuture<P>
 where
-    P: AsRef<Path>
+    P: AsRef<Path>,
 {
     type Item = PathBuf;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::read_link(&self.path) )
+        ::blocking_io(|| fs::read_link(&self.path))
     }
 }

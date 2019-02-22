@@ -20,7 +20,8 @@ pub struct Lines<A> {
 /// lines that the object contains. The returned stream will reach its end once
 /// `a` reaches EOF.
 pub fn lines<A>(a: A) -> Lines<A>
-    where A: AsyncRead + BufRead,
+where
+    A: AsyncRead + BufRead,
 {
     Lines {
         io: a,
@@ -39,7 +40,8 @@ impl<A> Lines<A> {
 }
 
 impl<A> Stream for Lines<A>
-    where A: AsyncRead + BufRead,
+where
+    A: AsyncRead + BufRead,
 {
     type Item = String;
     type Error = io::Error;
@@ -47,7 +49,7 @@ impl<A> Stream for Lines<A>
     fn poll(&mut self) -> Poll<Option<String>, io::Error> {
         let n = try_nb!(self.io.read_line(&mut self.line));
         if n == 0 && self.line.len() == 0 {
-            return Ok(None.into())
+            return Ok(None.into());
         }
         if self.line.ends_with("\n") {
             self.line.pop();

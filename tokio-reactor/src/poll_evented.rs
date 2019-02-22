@@ -140,11 +140,12 @@ macro_rules! poll_ready {
 
             Ok(mio::Ready::from_usize(cached).into())
         }
-    }}
+    }};
 }
 
 impl<E> PollEvented<E>
-where E: Evented
+where
+    E: Evented,
 {
     /// Creates a new `PollEvented` associated with the default reactor.
     pub fn new(io: E) -> PollEvented<E> {
@@ -154,7 +155,7 @@ where E: Evented
                 registration: Registration::new(),
                 read_readiness: AtomicUsize::new(0),
                 write_readiness: AtomicUsize::new(0),
-            }
+            },
         }
     }
 
@@ -163,7 +164,8 @@ where E: Evented
         let ret = PollEvented::new(io);
 
         if let Some(handle) = handle.as_priv() {
-            ret.inner.registration
+            ret.inner
+                .registration
                 .register_with_priv(ret.io.as_ref().unwrap(), handle)?;
         }
 
@@ -220,7 +222,10 @@ where E: Evented
     pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
         assert!(!mask.is_writable(), "cannot poll for write readiness");
         poll_ready!(
-            self, mask, read_readiness, take_read_ready,
+            self,
+            mask,
+            read_readiness,
+            take_read_ready,
             self.inner.registration.poll_read_ready()
         )
     }
@@ -245,7 +250,9 @@ where E: Evented
         assert!(!ready.is_writable(), "cannot clear write readiness");
         assert!(!::platform::is_hup(&ready), "cannot clear HUP readiness");
 
-        self.inner.read_readiness.fetch_and(!ready.as_usize(), Relaxed);
+        self.inner
+            .read_readiness
+            .fetch_and(!ready.as_usize(), Relaxed);
 
         if self.poll_read_ready(ready)?.is_ready() {
             // Notify the current task
@@ -299,7 +306,9 @@ where E: Evented
     pub fn clear_write_ready(&self) -> io::Result<()> {
         let ready = mio::Ready::writable();
 
-        self.inner.write_readiness.fetch_and(!ready.as_usize(), Relaxed);
+        self.inner
+            .write_readiness
+            .fetch_and(!ready.as_usize(), Relaxed);
 
         if self.poll_write_ready()?.is_ready() {
             // Notify the current task
@@ -311,7 +320,9 @@ where E: Evented
 
     /// Ensure that the I/O resource is registered with the reactor.
     fn register(&self) -> io::Result<()> {
-        self.inner.registration.register(self.io.as_ref().unwrap())?;
+        self.inner
+            .registration
+            .register(self.io.as_ref().unwrap())?;
         Ok(())
     }
 }
@@ -319,11 +330,12 @@ where E: Evented
 // ===== Read / Write impls =====
 
 impl<E> Read for PollEvented<E>
-where E: Evented + Read,
+where
+    E: Evented + Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read_ready(mio::Ready::readable())? {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_mut().read(buf);
@@ -332,16 +344,17 @@ where E: Evented + Read,
             self.clear_read_ready(mio::Ready::readable())?;
         }
 
-        return r
+        return r;
     }
 }
 
 impl<E> Write for PollEvented<E>
-where E: Evented + Write,
+where
+    E: Evented + Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_mut().write(buf);
@@ -350,12 +363,12 @@ where E: Evented + Write,
             self.clear_write_ready()?;
         }
 
-        return r
+        return r;
     }
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_mut().flush();
@@ -364,17 +377,15 @@ where E: Evented + Write,
             self.clear_write_ready()?;
         }
 
-        return r
+        return r;
     }
 }
 
-impl<E> AsyncRead for PollEvented<E>
-where E: Evented + Read,
-{
-}
+impl<E> AsyncRead for PollEvented<E> where E: Evented + Read {}
 
 impl<E> AsyncWrite for PollEvented<E>
-where E: Evented + Write,
+where
+    E: Evented + Write,
 {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
@@ -384,11 +395,13 @@ where E: Evented + Write,
 // ===== &'a Read / &'a Write impls =====
 
 impl<'a, E> Read for &'a PollEvented<E>
-where E: Evented, &'a E: Read,
+where
+    E: Evented,
+    &'a E: Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_read_ready(mio::Ready::readable())? {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_ref().read(buf);
@@ -397,16 +410,18 @@ where E: Evented, &'a E: Read,
             self.clear_read_ready(mio::Ready::readable())?;
         }
 
-        return r
+        return r;
     }
 }
 
 impl<'a, E> Write for &'a PollEvented<E>
-where E: Evented, &'a E: Write,
+where
+    E: Evented,
+    &'a E: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Async::NotReady = self.poll_write_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_ref().write(buf);
@@ -415,12 +430,12 @@ where E: Evented, &'a E: Write,
             self.clear_write_ready()?;
         }
 
-        return r
+        return r;
     }
 
     fn flush(&mut self) -> io::Result<()> {
         if let Async::NotReady = self.poll_write_ready()? {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let r = self.get_ref().flush();
@@ -429,17 +444,21 @@ where E: Evented, &'a E: Write,
             self.clear_write_ready()?;
         }
 
-        return r
+        return r;
     }
 }
 
 impl<'a, E> AsyncRead for &'a PollEvented<E>
-where E: Evented, &'a E: Read,
+where
+    E: Evented,
+    &'a E: Read,
 {
 }
 
 impl<'a, E> AsyncWrite for &'a PollEvented<E>
-where E: Evented, &'a E: Write,
+where
+    E: Evented,
+    &'a E: Write,
 {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
@@ -455,9 +474,7 @@ fn is_wouldblock<T>(r: &io::Result<T>) -> bool {
 
 impl<E: Evented + fmt::Debug> fmt::Debug for PollEvented<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("PollEvented")
-         .field("io", &self.io)
-         .finish()
+        f.debug_struct("PollEvented").field("io", &self.io).finish()
     }
 }
 

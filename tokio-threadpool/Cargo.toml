@@ -2,11 +2,13 @@
 name = "tokio-threadpool"
 # When releasing to crates.io:
 # - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
 # - Update CHANGELOG.md.
-# - Update doc URL.
 # - Create "v0.1.x" git tag.
-version = "0.1.10"
-documentation = "https://docs.rs/tokio-threadpool/0.1.10/tokio_threadpool"
+version = "0.1.11"
+documentation = "https://docs.rs/tokio-threadpool/0.1.11/tokio_threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
@@ -20,11 +22,12 @@ categories = ["concurrency", "asynchronous"]
 [dependencies]
 tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
 futures = "0.1.19"
-crossbeam-channel = "0.3.3"
-crossbeam-deque = "0.6.1"
-crossbeam-utils = "0.6.2"
+crossbeam-deque = "0.7.0"
+crossbeam-queue = "0.1.0"
+crossbeam-utils = "0.6.4"
 num_cpus = "1.2"
 rand = "0.6"
+slab = "0.4.1"
 log = "0.4"
 
 [dev-dependencies]

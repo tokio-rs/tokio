@@ -1,16 +1,9 @@
 use futures::{Future, Poll};
 
+use std::future::Future as StdFuture;
 use std::pin::Pin;
-use std::future::{
-    Future as StdFuture,
-};
 use std::ptr::NonNull;
-use std::task::{
-    LocalWaker,
-    Poll as StdPoll,
-    UnsafeWake,
-    Waker,
-};
+use std::task::{LocalWaker, Poll as StdPoll, UnsafeWake, Waker};
 
 /// Convert an 0.3 `Future` to an 0.1 `Future`.
 #[derive(Debug)]
@@ -31,7 +24,8 @@ pub trait IntoAwaitable {
 }
 
 impl<T> IntoAwaitable for T
-where T: StdFuture,
+where
+    T: StdFuture,
 {
     type Awaitable = Self;
 
@@ -41,7 +35,8 @@ where T: StdFuture,
 }
 
 impl<T, Item, Error> Future for Compat<T>
-where T: StdFuture<Output = Result<Item, Error>>,
+where
+    T: StdFuture<Output = Result<Item, Error>>,
 {
     type Item = Item;
     type Error = Error;
@@ -80,8 +75,7 @@ unsafe impl UnsafeWake for NoopWaker {
         noop_waker()
     }
 
-    unsafe fn drop_raw(&self) {
-    }
+    unsafe fn drop_raw(&self) {}
 
     unsafe fn wake(&self) {
         unimplemented!("async-await-preview currently only supports futures 0.1. Use the compatibility layer of futures 0.3 instead, if you want to use futures 0.3.");

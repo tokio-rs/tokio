@@ -25,8 +25,8 @@ extern crate tokio_io;
 
 use std::io::{self, Read, Write};
 
-use futures::{Poll, Future, Async};
-use native_tls::{HandshakeError, Error};
+use futures::{Async, Future, Poll};
+use native_tls::{Error, HandshakeError};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A wrapper around an underlying raw stream which implements the TLS or SSL
@@ -101,9 +101,7 @@ impl<S: Read + Write> Write for TlsStream<S> {
     }
 }
 
-
-impl<S: AsyncRead + AsyncWrite> AsyncRead for TlsStream<S> {
-}
+impl<S: AsyncRead + AsyncWrite> AsyncRead for TlsStream<S> {}
 
 impl<S: AsyncRead + AsyncWrite> AsyncWrite for TlsStream<S> {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
@@ -126,7 +124,8 @@ impl TlsConnector {
     /// provided here to perform the client half of a connection to a
     /// TLS-powered server.
     pub fn connect<S>(&self, domain: &str, stream: S) -> Connect<S>
-        where S: AsyncRead + AsyncWrite,
+    where
+        S: AsyncRead + AsyncWrite,
     {
         Connect {
             inner: MidHandshake {
@@ -138,9 +137,7 @@ impl TlsConnector {
 
 impl From<native_tls::TlsConnector> for TlsConnector {
     fn from(inner: native_tls::TlsConnector) -> TlsConnector {
-        TlsConnector {
-            inner,
-        }
+        TlsConnector { inner }
     }
 }
 
@@ -156,7 +153,8 @@ impl TlsAcceptor {
     /// `TcpListener`. That socket is then passed to this function to perform
     /// the server half of accepting a client connection.
     pub fn accept<S>(&self, stream: S) -> Accept<S>
-        where S: AsyncRead + AsyncWrite,
+    where
+        S: AsyncRead + AsyncWrite,
     {
         Accept {
             inner: MidHandshake {
@@ -168,9 +166,7 @@ impl TlsAcceptor {
 
 impl From<native_tls::TlsAcceptor> for TlsAcceptor {
     fn from(inner: native_tls::TlsAcceptor) -> TlsAcceptor {
-        TlsAcceptor {
-            inner,
-        }
+        TlsAcceptor { inner }
     }
 }
 
@@ -200,16 +196,14 @@ impl<S: AsyncRead + AsyncWrite> Future for MidHandshake<S> {
         match self.inner.take().expect("cannot poll MidHandshake twice") {
             Ok(stream) => Ok(TlsStream { inner: stream }.into()),
             Err(HandshakeError::Failure(e)) => Err(e),
-            Err(HandshakeError::WouldBlock(s)) => {
-                match s.handshake() {
-                    Ok(stream) => Ok(TlsStream { inner: stream }.into()),
-                    Err(HandshakeError::Failure(e)) => Err(e),
-                    Err(HandshakeError::WouldBlock(s)) => {
-                        self.inner = Some(Err(HandshakeError::WouldBlock(s)));
-                        Ok(Async::NotReady)
-                    }
+            Err(HandshakeError::WouldBlock(s)) => match s.handshake() {
+                Ok(stream) => Ok(TlsStream { inner: stream }.into()),
+                Err(HandshakeError::Failure(e)) => Err(e),
+                Err(HandshakeError::WouldBlock(s)) => {
+                    self.inner = Some(Err(HandshakeError::WouldBlock(s)));
+                    Ok(Async::NotReady)
                 }
-            }
+            },
         }
     }
 }

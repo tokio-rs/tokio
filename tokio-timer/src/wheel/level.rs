@@ -43,7 +43,9 @@ impl<T: Stack> Level<T> {
         // contained by the array be `Copy`. So, here we have to manually
         // initialize every single slot.
         macro_rules! s {
-            () => { T::default() };
+            () => {
+                T::default()
+            };
         };
 
         Level {
@@ -52,14 +54,70 @@ impl<T: Stack> Level<T> {
             slot: [
                 // It does not look like the necessary traits are
                 // derived for [T; 64].
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
-                s!(), s!(), s!(), s!(), s!(), s!(), s!(), s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
+                s!(),
             ],
         }
     }
@@ -84,8 +142,15 @@ impl<T: Stack> Level<T> {
         let level_start = now - (now % level_range);
         let deadline = level_start + slot as u64 * slot_range;
 
-        debug_assert!(deadline >= now, "deadline={}; now={}; level={}; slot={}; occupied={:b}",
-                      deadline, now, self.level, slot, self.occupied);
+        debug_assert!(
+            deadline >= now,
+            "deadline={}; now={}; level={}; slot={}; occupied={:b}",
+            deadline,
+            now,
+            self.level,
+            slot,
+            self.occupied
+        );
 
         Some(Expiration {
             level: self.level,

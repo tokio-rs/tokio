@@ -18,14 +18,14 @@
 #![doc(hidden)]
 #![allow(deprecated)]
 
+mod bytes_codec;
 mod decoder;
 mod encoder;
-mod bytes_codec;
 mod lines_codec;
 
+pub use self::bytes_codec::BytesCodec;
 pub use self::decoder::Decoder;
 pub use self::encoder::Encoder;
-pub use self::bytes_codec::BytesCodec;
 pub use self::lines_codec::LinesCodec;
 
 pub use framed::{Framed, FramedParts};
@@ -374,5 +374,5 @@ pub mod length_delimited {
     //! [`Encoder`]: ../trait.Encoder.html
     //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
-    pub use ::length_delimited::*;
+    pub use length_delimited::*;
 }

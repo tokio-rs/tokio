@@ -21,7 +21,7 @@ pub fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> HardLinkFutu
 pub struct HardLinkFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     src: P,
     dst: Q,
@@ -30,25 +30,22 @@ where
 impl<P, Q> HardLinkFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     fn new(src: P, dst: Q) -> HardLinkFuture<P, Q> {
-        HardLinkFuture {
-            src: src,
-            dst: dst,
-        }
+        HardLinkFuture { src: src, dst: dst }
     }
 }
 
 impl<P, Q> Future for HardLinkFuture<P, Q>
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>
+    Q: AsRef<Path>,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::hard_link(&self.src, &self.dst) )
+        ::blocking_io(|| fs::hard_link(&self.src, &self.dst))
     }
 }

@@ -1,6 +1,6 @@
 use std::io;
 
-use futures::{Poll, Future, Async};
+use futures::{Async, Future, Poll};
 
 use AsyncWrite;
 
@@ -24,15 +24,15 @@ pub struct Shutdown<A> {
 /// otherwise it will repeatedly call `shutdown` until it sees `Ok(())`,
 /// scheduling a retry if `WouldBlock` is seen along the way.
 pub fn shutdown<A>(a: A) -> Shutdown<A>
-    where A: AsyncWrite,
+where
+    A: AsyncWrite,
 {
-    Shutdown {
-        a: Some(a),
-    }
+    Shutdown { a: Some(a) }
 }
 
 impl<A> Future for Shutdown<A>
-    where A: AsyncWrite,
+where
+    A: AsyncWrite,
 {
     type Item = A;
     type Error = io::Error;

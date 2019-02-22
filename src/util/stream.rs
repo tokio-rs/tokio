@@ -1,20 +1,17 @@
 #[cfg(feature = "timer")]
-use tokio_timer::{
-    throttle::Throttle,
-    Timeout,
-};
+use tokio_timer::{throttle::Throttle, Timeout};
 
 use futures::Stream;
 
 #[cfg(feature = "timer")]
 use std::time::Duration;
-
+pub use util::enumerate::Enumerate;
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
 ///
-/// Currently, there only is a [`timeout`] function, but this will increase
-/// over time.
+/// Currently, there are only [`timeout`] and [`throttle`] functions, but
+/// this will increase over time.
 ///
 /// Users are not expected to implement this trait. All types that implement
 /// `Stream` already implement `StreamExt`.
@@ -29,9 +26,29 @@ pub trait StreamExt: Stream {
     /// Errors are also delayed.
     #[cfg(feature = "timer")]
     fn throttle(self, duration: Duration) -> Throttle<Self>
-    where Self: Sized
+    where
+        Self: Sized,
     {
         Throttle::new(self, duration)
+    }
+
+    /// Creates a new stream which gives the current iteration count as well
+    /// as the next value.
+    ///
+    /// The stream returned yields pairs `(i, val)`, where `i` is the
+    /// current index of iteration and `val` is the value returned by the
+    /// iterator.
+    ///
+    /// # Overflow Behavior
+    ///
+    /// The method does no guarding against overflows, so counting elements of
+    /// an iterator with more than [`std::usize::MAX`] elements either produces the
+    /// wrong result or panics.
+    fn enumerate(self) -> Enumerate<Self>
+    where
+        Self: Sized,
+    {
+        Enumerate::new(self)
     }
 
     /// Creates a new stream which allows `self` until `timeout`.
@@ -68,7 +85,8 @@ pub trait StreamExt: Stream {
     /// ```
     #[cfg(feature = "timer")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
-    where Self: Sized,
+    where
+        Self: Sized,
     {
         Timeout::new(self, timeout)
     }

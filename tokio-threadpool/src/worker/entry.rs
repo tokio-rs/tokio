@@ -4,12 +4,15 @@ use worker::state::{State, PUSHED_MASK};
 
 use std::cell::UnsafeCell;
 use std::fmt;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::time::Duration;
 
+use crossbeam_deque::{Steal, Stealer, Worker};
+use crossbeam_queue::SegQueue;
 use crossbeam_utils::CachePadded;
-use deque;
+use slab::Slab;
 
 // TODO: None of the fields should be public
 //
@@ -26,29 +29,43 @@ pub(crate) struct WorkerEntry {
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    worker: deque::Worker<Arc<Task>>,
+    pub worker: Worker<Arc<Task>>,
 
     // Stealer half of deque
-    stealer: deque::Stealer<Arc<Task>>,
+    stealer: Stealer<Arc<Task>>,
 
     // Thread parker
-    pub park: UnsafeCell<BoxPark>,
+    park: UnsafeCell<Option<BoxPark>>,
 
     // Thread unparker
-    pub unpark: BoxUnpark,
+    unpark: UnsafeCell<Option<BoxUnpark>>,
+
+    // Tasks that have been first polled by this worker, but not completed yet.
+    running_tasks: UnsafeCell<Slab<Arc<Task>>>,
+
+    // Tasks that have been first polled by this worker, but completed by another worker.
+    remotely_completed_tasks: SegQueue<Arc<Task>>,
+
+    // Set to `true` when `remotely_completed_tasks` has tasks that need to be removed from
+    // `running_tasks`.
+    needs_drain: AtomicBool,
 }
 
 impl WorkerEntry {
     pub fn new(park: BoxPark, unpark: BoxUnpark) -> Self {
-        let (w, s) = deque::fifo();
+        let w = Worker::new_fifo();
+        let s = w.stealer();
 
         WorkerEntry {
             state: CachePadded::new(AtomicUsize::new(State::default().into())),
             next_sleeper: UnsafeCell::new(0),
             worker: w,
             stealer: s,
-            park: UnsafeCell::new(park),
-            unpark,
+            park: UnsafeCell::new(Some(park)),
+            unpark: UnsafeCell::new(Some(unpark)),
+            running_tasks: UnsafeCell::new(Slab::new()),
+            remotely_completed_tasks: SegQueue::new(),
+            needs_drain: AtomicBool::new(false),
         }
     }
 
@@ -85,9 +102,10 @@ impl WorkerEntry {
             let mut next = state;
             next.notify();
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(),
-                AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if state == actual {
                 break;
@@ -100,7 +118,7 @@ impl WorkerEntry {
             Sleeping => {
                 // The worker is currently sleeping, the condition variable must
                 // be signaled
-                self.wakeup();
+                self.unpark();
                 true
             }
             Shutdown => false,
@@ -152,8 +170,10 @@ impl WorkerEntry {
 
             next.set_lifecycle(Signaled);
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if actual == state {
                 break;
@@ -163,7 +183,7 @@ impl WorkerEntry {
         }
 
         // Wakeup the worker
-        self.wakeup();
+        self.unpark();
     }
 
     /// Pop a task
@@ -171,7 +191,7 @@ impl WorkerEntry {
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
     #[inline]
-    pub fn pop_task(&self) -> deque::Pop<Arc<Task>> {
+    pub fn pop_task(&self) -> Option<Arc<Task>> {
         self.worker.pop()
     }
 
@@ -183,21 +203,97 @@ impl WorkerEntry {
     /// At the same time, this method steals some additional tasks and moves
     /// them into `dest` in order to balance the work distribution among
     /// workers.
-    pub fn steal_tasks(&self, dest: &Self) -> deque::Steal<Arc<Task>> {
-        self.stealer.steal_many(&dest.worker)
+    pub fn steal_tasks(&self, dest: &Self) -> Steal<Arc<Task>> {
+        self.stealer.steal_batch_and_pop(&dest.worker)
     }
 
     /// Drain (and drop) all tasks that are queued for work.
     ///
     /// This is called when the pool is shutting down.
     pub fn drain_tasks(&self) {
-        use deque::Pop::*;
+        while self.worker.pop().is_some() {}
+    }
 
-        loop {
-            match self.worker.pop() {
-                Data(_) => {}
-                Empty => break,
-                Retry => {}
+    /// Parks the worker thread.
+    pub fn park(&self) {
+        if let Some(park) = unsafe { (*self.park.get()).as_mut() } {
+            park.park().unwrap();
+        }
+    }
+
+    /// Parks the worker thread for at most `duration`.
+    pub fn park_timeout(&self, duration: Duration) {
+        if let Some(park) = unsafe { (*self.park.get()).as_mut() } {
+            park.park_timeout(duration).unwrap();
+        }
+    }
+
+    /// Unparks the worker thread.
+    #[inline]
+    pub fn unpark(&self) {
+        if let Some(park) = unsafe { (*self.unpark.get()).as_ref() } {
+            park.unpark();
+        }
+    }
+
+    /// Registers a task in this worker.
+    ///
+    /// Called when the task is being polled for the first time.
+    #[inline]
+    pub fn register_task(&self, task: &Arc<Task>) {
+        let running_tasks = unsafe { &mut *self.running_tasks.get() };
+
+        let key = running_tasks.insert(task.clone());
+        task.reg_index.set(key);
+    }
+
+    /// Unregisters a task from this worker.
+    ///
+    /// Called when the task is completed and was previously registered in this worker.
+    #[inline]
+    pub fn unregister_task(&self, task: Arc<Task>) {
+        let running_tasks = unsafe { &mut *self.running_tasks.get() };
+        running_tasks.remove(task.reg_index.get());
+        self.drain_remotely_completed_tasks();
+    }
+
+    /// Unregisters a task from this worker.
+    ///
+    /// Called when the task is completed by another worker and was previously registered in this
+    /// worker.
+    #[inline]
+    pub fn remotely_complete_task(&self, task: Arc<Task>) {
+        self.remotely_completed_tasks.push(task);
+        self.needs_drain.store(true, Release);
+    }
+
+    /// Drops the remaining incomplete tasks and the parker associated with this worker.
+    ///
+    /// This function is called by the shutdown trigger.
+    pub fn shutdown(&self) {
+        self.drain_remotely_completed_tasks();
+
+        // Abort all incomplete tasks.
+        let running_tasks = unsafe { &mut *self.running_tasks.get() };
+        for (_, task) in running_tasks.iter() {
+            task.abort();
+        }
+        running_tasks.clear();
+
+        unsafe {
+            *self.park.get() = None;
+            *self.unpark.get() = None;
+        }
+    }
+
+    /// Drains the `remotely_completed_tasks` queue and removes tasks from `running_tasks`.
+    #[inline]
+    fn drain_remotely_completed_tasks(&self) {
+        if self.needs_drain.compare_and_swap(true, false, Acquire) {
+            let running_tasks = unsafe { &mut *self.running_tasks.get() };
+
+            while let Ok(task) = self.remotely_completed_tasks.pop() {
+                running_tasks.remove(task.reg_index.get());
             }
         }
     }
@@ -208,18 +304,15 @@ impl WorkerEntry {
     }
 
     #[inline]
-    pub fn wakeup(&self) {
-        self.unpark.unpark();
-    }
-
-    #[inline]
     pub fn next_sleeper(&self) -> usize {
         unsafe { *self.next_sleeper.get() }
     }
 
     #[inline]
     pub fn set_next_sleeper(&self, val: usize) {
-        unsafe { *self.next_sleeper.get() = val; }
+        unsafe {
+            *self.next_sleeper.get() = val;
+        }
     }
 }
 

@@ -1,24 +1,22 @@
 mod blocking;
 mod blocking_state;
-mod queue;
 mod state;
 
 pub(crate) use self::blocking::{Blocking, CanBlock};
-pub(crate) use self::queue::Queue;
 use self::blocking_state::BlockingState;
 use self::state::State;
 
 use notifier::Notifier;
 use pool::Pool;
 
-use futures::{self, Future, Async};
 use futures::executor::{self, Spawn};
+use futures::{self, Async, Future};
 
-use std::{fmt, panic, ptr};
-use std::cell::{UnsafeCell};
+use std::cell::{Cell, UnsafeCell};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, AtomicPtr};
-use std::sync::atomic::Ordering::{AcqRel, Release, Relaxed};
+use std::{fmt, panic, ptr};
 
 /// Harness around a future.
 ///
@@ -33,6 +31,21 @@ pub(crate) struct Task {
 
     /// Next pointer in the queue of tasks pending blocking capacity.
     next_blocking: AtomicPtr<Task>,
+
+    /// ID of the worker that polled this task first.
+    ///
+    /// This field can be a `Cell` because it's only accessed by the worker thread that is
+    /// executing the task.
+    ///
+    /// The worker ID is represented by a `u32` rather than `usize` in order to save some space
+    /// on 64-bit platforms.
+    pub reg_worker: Cell<Option<u32>>,
+
+    /// The key associated with this task in the `Slab` it was registered in.
+    ///
+    /// This field can be a `Cell` because it's only accessed by the worker thread that has
+    /// registered the task.
+    pub reg_index: Cell<usize>,
 
     /// Store the future at the head of the struct
     ///
@@ -61,6 +74,8 @@ impl Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -75,6 +90,8 @@ impl Task {
             state: AtomicUsize::new(State::stub().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
         }
     }
@@ -86,15 +103,20 @@ impl Task {
 
         // Transition task to running state. At this point, the task must be
         // scheduled.
-        let actual: State = self.state.compare_and_swap(
-            Scheduled.into(), Running.into(), AcqRel).into();
+        let actual: State = self
+            .state
+            .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
+            .into();
 
         match actual {
-            Scheduled => {},
+            Scheduled => {}
             _ => panic!("unexpected task state; {:?}", actual),
         }
 
-        trace!("Task::run; state={:?}", State::from(self.state.load(Relaxed)));
+        trace!(
+            "Task::run; state={:?}",
+            State::from(self.state.load(Relaxed))
+        );
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained.
@@ -119,8 +141,10 @@ impl Task {
 
             let mut g = Guard(fut, true);
 
-            let ret = g.0.as_mut().unwrap()
-                .poll_future_notify(unpark, self as *const _ as usize);
+            let ret =
+                g.0.as_mut()
+                    .unwrap()
+                    .poll_future_notify(unpark, self as *const _ as usize);
 
             g.1 = false;
 
@@ -151,8 +175,10 @@ impl Task {
                 // fails, then the task has been unparked concurrent to running,
                 // in which case it transitions immediately back to scheduled
                 // and we return `true`.
-                let prev: State = self.state.compare_and_swap(
-                    Running.into(), Idle.into(), AcqRel).into();
+                let prev: State = self
+                    .state
+                    .compare_and_swap(Running.into(), Idle.into(), AcqRel)
+                    .into();
 
                 match prev {
                     Running => Run::Idle,
@@ -163,6 +189,41 @@ impl Task {
                     _ => unreachable!(),
                 }
             }
+        }
+    }
+
+    /// Aborts this task.
+    ///
+    /// This is called when the threadpool shuts down and the task has already beed polled but not
+    /// completed.
+    pub fn abort(&self) {
+        use self::State::*;
+
+        let mut state = self.state.load(Acquire).into();
+
+        loop {
+            match state {
+                Idle | Scheduled => {}
+                Running | Notified | Complete | Aborted => {
+                    // It is assumed that no worker threads are running so the task must be either
+                    // in the idle or scheduled state.
+                    panic!("unexpected state while aborting task: {:?}", state);
+                }
+            }
+
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), Aborted.into(), AcqRel)
+                .into();
+
+            if actual == state {
+                // The future has been aborted. Drop it immediately to free resources and run drop
+                // handlers.
+                self.drop_future();
+                break;
+            }
+
+            state = actual;
         }
     }
 
@@ -187,10 +248,10 @@ impl Task {
 
         loop {
             // Scheduling can only be done from the `Idle` state.
-            let actual = self.state.compare_and_swap(
-                Idle.into(),
-                Scheduled.into(),
-                AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(Idle.into(), Scheduled.into(), AcqRel)
+                .into();
 
             match actual {
                 Idle => return true,
@@ -198,15 +259,17 @@ impl Task {
                     // The task is already running on another thread. Transition
                     // the state to `Notified`. If this CAS fails, then restart
                     // the logic again from `Idle`.
-                    let actual = self.state.compare_and_swap(
-                        Running.into(), Notified.into(), AcqRel).into();
+                    let actual = self
+                        .state
+                        .compare_and_swap(Running.into(), Notified.into(), AcqRel)
+                        .into();
 
                     match actual {
                         Idle => continue,
                         _ => return false,
                     }
                 }
-                Complete | Notified | Scheduled => return false,
+                Complete | Aborted | Notified | Scheduled => return false,
             }
         }
     }

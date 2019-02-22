@@ -54,7 +54,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // connections made to the server).  The return value of the `for_each`
     // method is itself a future representing processing the entire stream of
     // connections, and ends up being our server.
-    let done = socket.incoming()
+    let done = socket
+        .incoming()
         .map_err(|e| println!("failed to accept socket; error = {:?}", e))
         .for_each(move |socket| {
             // Once we're inside this closure this represents an accepted client
@@ -88,7 +89,6 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
                 Ok(())
             });
-
 
             // And this is where much of the magic of this server happens. We
             // crucially want all clients to make progress concurrently, rather than

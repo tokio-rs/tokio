@@ -4,29 +4,26 @@ mod state;
 
 pub(crate) use self::backup::{Backup, BackupId};
 pub(crate) use self::backup_stack::MAX_BACKUP;
-pub(crate) use self::state::{
-    State,
-    Lifecycle,
-    MAX_FUTURES,
-};
+pub(crate) use self::state::{Lifecycle, State, MAX_FUTURES};
 
 use self::backup::Handoff;
 use self::backup_stack::BackupStack;
 
 use config::Config;
 use shutdown::ShutdownTrigger;
-use task::{Blocking, Queue, Task};
+use task::{Blocking, Task};
 use worker::{self, Worker, WorkerId};
 
 use futures::Poll;
 
 use std::cell::Cell;
 use std::num::Wrapping;
-use std::sync::atomic::Ordering::{Acquire, AcqRel};
 use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::{Arc, Weak};
 use std::thread;
 
+use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use rand;
 
@@ -45,12 +42,6 @@ pub(crate) struct Pool {
     // Stack tracking sleeping workers.
     sleep_stack: CachePadded<worker::Stack>,
 
-    // Number of workers that haven't reached the final state of shutdown
-    //
-    // This is only used to know when to single `shutdown_task` once the
-    // shutdown process has completed.
-    pub num_workers: AtomicUsize,
-
     // Worker state
     //
     // A worker is a thread that is processing the work queue and polling
@@ -63,7 +54,7 @@ pub(crate) struct Pool {
     //
     // Spawned tasks are pushed into this queue. Although worker threads have their own dedicated
     // task queues, they periodically steal tasks from this global queue, too.
-    pub queue: Arc<Queue>,
+    pub queue: Arc<Injector<Arc<Task>>>,
 
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     //
@@ -96,7 +87,7 @@ impl Pool {
         trigger: Weak<ShutdownTrigger>,
         max_blocking: usize,
         config: Config,
-        queue: Arc<Queue>,
+        queue: Arc<Injector<Arc<Task>>>,
     ) -> Pool {
         let pool_size = workers.len();
         let total_size = max_blocking + pool_size;
@@ -105,15 +96,15 @@ impl Pool {
         //
         // This is `backup + pool_size` because the core thread pool running the
         // workers is spawned from backup as well.
-        let backup = (0..total_size).map(|_| {
-            Backup::new()
-        }).collect::<Vec<_>>().into_boxed_slice();
+        let backup = (0..total_size)
+            .map(|_| Backup::new())
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
 
         let backup_stack = BackupStack::new();
 
         for i in (0..backup.len()).rev() {
-            backup_stack.push(&backup, BackupId(i))
-                .unwrap();
+            backup_stack.push(&backup, BackupId(i)).unwrap();
         }
 
         // Initialize the blocking state
@@ -122,7 +113,6 @@ impl Pool {
         let ret = Pool {
             state: CachePadded::new(AtomicUsize::new(State::new().into())),
             sleep_stack: CachePadded::new(worker::Stack::new()),
-            num_workers: AtomicUsize::new(0),
             workers,
             queue,
             trigger,
@@ -180,8 +170,10 @@ impl Pool {
                 }
             }
 
-            let actual = self.state.compare_and_swap(
-                state.into(), next.into(), AcqRel).into();
+            let actual = self
+                .state
+                .compare_and_swap(state.into(), next.into(), AcqRel)
+                .into();
 
             if state == actual {
                 state = next;
@@ -305,15 +297,13 @@ impl Pool {
             }
         };
 
-        let need_spawn = self.backup[backup_id.0]
-            .worker_handoff(id.clone());
+        let need_spawn = self.backup[backup_id.0].worker_handoff(id.clone());
 
         if !need_spawn {
             return;
         }
 
         let trigger = match self.trigger.upgrade() {
-            // The pool is shutting down.
             None => {
                 // The pool is shutting down.
                 return;
@@ -362,8 +352,7 @@ impl Pool {
                 // available for future handoffs.
                 //
                 // This **must** happen before notifying the task.
-                let res = pool.backup_stack
-                    .push(&pool.backup, backup_id);
+                let res = pool.backup_stack.push(&pool.backup, backup_id);
 
                 if res.is_err() {
                     // The pool is being shutdown.
@@ -377,8 +366,7 @@ impl Pool {
                 debug_assert!(pool.backup[backup_id.0].is_running());
 
                 // Wait for a handoff
-                let handoff = pool.backup[backup_id.0]
-                    .wait_for_handoff(pool.config.keep_alive);
+                let handoff = pool.backup[backup_id.0].wait_for_handoff(pool.config.keep_alive);
 
                 match handoff {
                     Handoff::Worker(id) => {
@@ -414,7 +402,8 @@ impl Pool {
 
             debug_assert!(
                 worker_state.lifecycle() != Signaled,
-                "actual={:?}", worker_state.lifecycle(),
+                "actual={:?}",
+                worker_state.lifecycle(),
             );
 
             trace!("signal_work -- notify; idx={}", idx);

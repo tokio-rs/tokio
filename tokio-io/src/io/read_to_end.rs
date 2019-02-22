@@ -1,7 +1,7 @@
 use std::io;
 use std::mem;
 
-use futures::{Poll, Future};
+use futures::{Future, Poll};
 
 use AsyncRead;
 
@@ -18,10 +18,7 @@ pub struct ReadToEnd<A> {
 
 #[derive(Debug)]
 enum State<A> {
-    Reading {
-        a: A,
-        buf: Vec<u8>,
-    },
+    Reading { a: A, buf: Vec<u8> },
     Empty,
 }
 
@@ -32,30 +29,32 @@ enum State<A> {
 /// the error yielded. In the case of success both the object and the buffer
 /// will be returned, with all data read from the stream appended to the buffer.
 pub fn read_to_end<A>(a: A, buf: Vec<u8>) -> ReadToEnd<A>
-    where A: AsyncRead,
+where
+    A: AsyncRead,
 {
     ReadToEnd {
-        state: State::Reading {
-            a: a,
-            buf: buf,
-        }
+        state: State::Reading { a: a, buf: buf },
     }
 }
 
 impl<A> Future for ReadToEnd<A>
-    where A: AsyncRead,
+where
+    A: AsyncRead,
 {
     type Item = (A, Vec<u8>);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(A, Vec<u8>), io::Error> {
         match self.state {
-            State::Reading { ref mut a, ref mut buf } => {
+            State::Reading {
+                ref mut a,
+                ref mut buf,
+            } => {
                 // If we get `Ok`, then we know the stream hit EOF and we're done. If we
                 // hit "would block" then all the read data so far is in our buffer, and
                 // otherwise we propagate errors
                 try_nb!(a.read_to_end(buf));
-            },
+            }
             State::Empty => panic!("poll ReadToEnd after it's done"),
         }
 

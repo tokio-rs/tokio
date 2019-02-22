@@ -57,10 +57,10 @@
 extern crate tokio;
 extern crate tokio_codec;
 
-use tokio_codec::BytesCodec;
+use tokio::codec::Decoder;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
-use tokio::codec::Decoder;
+use tokio_codec::BytesCodec;
 
 use std::env;
 use std::net::SocketAddr;

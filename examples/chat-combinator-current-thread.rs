@@ -26,21 +26,20 @@
 
 #![deny(warnings)]
 
-extern crate tokio;
 extern crate futures;
+extern crate tokio;
 
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 use tokio::runtime::current_thread::{Runtime, TaskExecutor};
 
-use std::collections::HashMap;
-use std::iter;
-use std::env;
-use std::io::{BufReader};
-use std::rc::Rc;
 use std::cell::RefCell;
-
+use std::collections::HashMap;
+use std::env;
+use std::io::BufReader;
+use std::iter;
+use std::rc::Rc;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let mut runtime = Runtime::new().unwrap();
@@ -58,8 +57,12 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     // The server task asynchronously iterates over and processes each incoming
     // connection.
-    let srv = socket.incoming()
-        .map_err(|e| {println!("failed to accept socket; error = {:?}", e); e})
+    let srv = socket
+        .incoming()
+        .map_err(|e| {
+            println!("failed to accept socket; error = {:?}", e);
+            e
+        })
         .for_each(move |stream| {
             // The client's socket address
             let addr = stream.peer_addr()?;
@@ -102,9 +105,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
                 // Convert the bytes we read into a string, and then send that
                 // string to all other connected clients.
-                let line = line.map(|(reader, vec)| {
-                    (reader, String::from_utf8(vec))
-                });
+                let line = line.map(|(reader, vec)| (reader, String::from_utf8(vec)));
 
                 // Move the connection state into the closure below.
                 let connections = connections_inner.clone();
@@ -116,15 +117,17 @@ fn main() -> Result<(), Box<std::error::Error>> {
                     if let Ok(msg) = message {
                         // For each open connection except the sender, send the
                         // string via the channel.
-                        let iter = conns.iter_mut()
-                                        .filter(|&(&k, _)| k != addr)
-                                        .map(|(_, v)| v);
+                        let iter = conns
+                            .iter_mut()
+                            .filter(|&(&k, _)| k != addr)
+                            .map(|(_, v)| v);
                         for tx in iter {
                             tx.unbounded_send(format!("{}: {}", addr, msg)).unwrap();
                         }
                     } else {
                         let tx = conns.get_mut(&addr).unwrap();
-                        tx.unbounded_send("You didn't send valid UTF-8.".to_string()).unwrap();
+                        tx.unbounded_send("You didn't send valid UTF-8.".to_string())
+                            .unwrap();
                     }
 
                     reader
@@ -147,12 +150,14 @@ fn main() -> Result<(), Box<std::error::Error>> {
             let connection = socket_reader.map(|_| ()).select(socket_writer.map(|_| ()));
 
             // Spawn locally a task to process the connection
-            TaskExecutor::current().spawn_local(Box::new(connection.then(move |_| {
-                let mut conns = connections.borrow_mut();
-                conns.remove(&addr);
-                println!("Connection {} closed.", addr);
-                Ok(())
-            }))).unwrap();
+            TaskExecutor::current()
+                .spawn_local(Box::new(connection.then(move |_| {
+                    let mut conns = connections.borrow_mut();
+                    conns.remove(&addr);
+                    println!("Connection {} closed.", addr);
+                    Ok(())
+                })))
+                .unwrap();
 
             Ok(())
         })

@@ -1,8 +1,9 @@
-use task::Queue;
+use task::Task;
 use worker;
 
-use futures::{Future, Poll, Async};
+use crossbeam_deque::Injector;
 use futures::task::AtomicTask;
+use futures::{Async, Future, Poll};
 
 use std::sync::{Arc, Mutex};
 
@@ -62,14 +63,17 @@ impl Future for Shutdown {
 pub(crate) struct ShutdownTrigger {
     inner: Arc<Mutex<Inner>>,
     workers: Arc<[worker::Entry]>,
-    queue: Arc<Queue>,
+    queue: Arc<Injector<Arc<Task>>>,
 }
 
 unsafe impl Send for ShutdownTrigger {}
 unsafe impl Sync for ShutdownTrigger {}
 
 impl ShutdownTrigger {
-    pub(crate) fn new(workers: Arc<[worker::Entry]>, queue: Arc<Queue>) -> ShutdownTrigger {
+    pub(crate) fn new(
+        workers: Arc<[worker::Entry]>,
+        queue: Arc<Injector<Arc<Task>>>,
+    ) -> ShutdownTrigger {
         ShutdownTrigger {
             inner: Arc::new(Mutex::new(Inner {
                 task: AtomicTask::new(),
@@ -84,7 +88,12 @@ impl ShutdownTrigger {
 impl Drop for ShutdownTrigger {
     fn drop(&mut self) {
         // Drain the global task queue.
-        while self.queue.pop().is_some() {}
+        while !self.queue.steal().is_empty() {}
+
+        // Drop the remaining incomplete tasks and parkers assosicated with workers.
+        for worker in self.workers.iter() {
+            worker.shutdown();
+        }
 
         // Notify the task interested in shutdown.
         let mut inner = self.inner.lock().unwrap();

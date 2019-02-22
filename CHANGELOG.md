@@ -1,6 +1,12 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.15 (January 24, 2019)
+
+### Added
+- Re-export tokio-sync APIs (#839).
+- Stream enumerate combinator (#832).
+
 # 0.1.14 (January 6, 2019)
 
 * Use feature flags to break up the crate, allowing users to pick & choose

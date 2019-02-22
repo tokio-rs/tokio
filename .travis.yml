@@ -14,8 +14,6 @@ matrix:
   - rust: nightly
     env: ALLOW_FAILURES=true
   - os: osx
-  - env: TARGET=x86_64-unknown-freebsd
-  - env: TARGET=i686-unknown-freebsd
   - env: TARGET=i686-unknown-linux-gnu
 
   # This represents the minimum Rust version supported by Tokio. Updating this
@@ -27,9 +25,10 @@ matrix:
     script: |
       cargo check --all
 
-  # Test combinations of enabled features.
+  # Test combinations of enabled features and rustfmt
   - rust: stable
     script: |
+      cargo fmt --all -- --check
       shopt -s expand_aliases
       alias check="cargo check --no-default-features"
       check
@@ -86,6 +85,7 @@ matrix:
   # This runs cargo +nightly doc
   - name: nightly_docs
     rust: nightly
+    env: ALLOW_FAILURES=true
     script: cargo doc
 
   allow_failures:
@@ -100,7 +100,11 @@ script: |
       cargo check --all --exclude tokio-tls --target $TARGET
       cargo check --tests --all --exclude tokio-tls --target $TARGET
   else
+      # Limit the execution time of loom tests.
+      export LOOM_MAX_DURATION=10
       cargo test --all --no-fail-fast
+      cargo test -p tokio-buf --no-default-features
+      cargo doc --all
   fi
 
 before_deploy:

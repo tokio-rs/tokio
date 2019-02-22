@@ -6,24 +6,21 @@ extern crate rand;
 
 use tokio_threadpool::*;
 
-use futures::*;
 use futures::future::{lazy, poll_fn};
+use futures::*;
 use rand::*;
 
-use std::sync::*;
-use std::sync::atomic::*;
 use std::sync::atomic::Ordering::*;
-use std::time::Duration;
+use std::sync::atomic::*;
+use std::sync::*;
 use std::thread;
+use std::time::Duration;
 
 #[test]
 fn basic() {
     let _ = ::env_logger::try_init();
 
-    let pool = Builder::new()
-        .pool_size(1)
-        .max_blocking(1)
-        .build();
+    let pool = Builder::new().pool_size(1).max_blocking(1).build();
 
     let (tx1, rx1) = mpsc::channel();
     let (tx2, rx2) = mpsc::channel();
@@ -32,7 +29,8 @@ fn basic() {
         let res = blocking(|| {
             let v = rx1.recv().unwrap();
             tx2.send(v).unwrap();
-        }).unwrap();
+        })
+        .unwrap();
 
         assert!(res.is_ready());
         Ok(().into())
@@ -50,10 +48,7 @@ fn basic() {
 fn notify_task_on_capacity() {
     const BLOCKING: usize = 10;
 
-    let pool = Builder::new()
-        .pool_size(1)
-        .max_blocking(1)
-        .build();
+    let pool = Builder::new().pool_size(1).max_blocking(1).build();
 
     let rem = Arc::new(AtomicUsize::new(BLOCKING));
     let (tx, rx) = mpsc::channel();
@@ -71,7 +66,8 @@ fn notify_task_on_capacity() {
                     if prev == 1 {
                         tx.send(()).unwrap();
                     }
-                }).map_err(|e| panic!("blocking err {:?}", e))
+                })
+                .map_err(|e| panic!("blocking err {:?}", e))
             })
         }));
     }
@@ -83,17 +79,14 @@ fn notify_task_on_capacity() {
 
 #[test]
 fn capacity_is_use_it_or_lose_it() {
-    use futures::*;
-    use futures::Async::*;
     use futures::sync::oneshot;
     use futures::task::Task;
+    use futures::Async::*;
+    use futures::*;
 
     // TODO: Run w/ bigger pool size
 
-    let pool = Builder::new()
-        .pool_size(1)
-        .max_blocking(1)
-        .build();
+    let pool = Builder::new().pool_size(1).max_blocking(1).build();
 
     let (tx1, rx1) = mpsc::channel();
     let (tx2, rx2) = oneshot::channel();
@@ -105,24 +98,24 @@ fn capacity_is_use_it_or_lose_it() {
         poll_fn(move || {
             blocking(|| {
                 rx1.recv().unwrap();
-            }).map_err(|_| panic!())
+            })
+            .map_err(|_| panic!())
         })
     }));
 
     pool.spawn(lazy(move || {
-        rx2
-            .map_err(|_| panic!())
-            .and_then(|task: Task| {
-                poll_fn(move || {
-                    blocking(|| {
-                        // Notify the other task
-                        task.notify();
+        rx2.map_err(|_| panic!()).and_then(|task: Task| {
+            poll_fn(move || {
+                blocking(|| {
+                    // Notify the other task
+                    task.notify();
 
-                        // Block until woken
-                        rx3.recv().unwrap();
-                    }).map_err(|_| panic!())
+                    // Block until woken
+                    rx3.recv().unwrap();
                 })
+                .map_err(|_| panic!())
             })
+        })
     }));
 
     // Spawn a future that will try to block, get notified, then not actually
@@ -136,8 +129,7 @@ fn capacity_is_use_it_or_lose_it() {
                 0 => {
                     i = 1;
 
-                    let res = blocking(|| unreachable!())
-                        .map_err(|_| panic!());
+                    let res = blocking(|| unreachable!()).map_err(|_| panic!());
 
                     assert!(res.unwrap().is_not_ready());
 
@@ -157,8 +149,7 @@ fn capacity_is_use_it_or_lose_it() {
                     return Ok(NotReady);
                 }
                 2 => {
-                    let res = blocking(|| unreachable!())
-                        .map_err(|_| panic!());
+                    let res = blocking(|| unreachable!()).map_err(|_| panic!());
 
                     assert!(res.unwrap().is_not_ready());
 
@@ -177,10 +168,7 @@ fn capacity_is_use_it_or_lose_it() {
 
 #[test]
 fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
-    let pool = Builder::new()
-        .pool_size(2)
-        .max_blocking(1)
-        .build();
+    let pool = Builder::new().pool_size(2).max_blocking(1).build();
 
     let (enter_tx, enter_rx) = mpsc::channel();
     let (exit_tx, exit_rx) = mpsc::channel();
@@ -197,7 +185,8 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
                     enter_tx.send(()).unwrap();
                     exit_rx.recv().unwrap();
                     exited.store(true, Relaxed);
-                }).map_err(|_| panic!())
+                })
+                .map_err(|_| panic!())
             })
         }));
     }
@@ -208,13 +197,9 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
     // Spawn another task that attempts to block
     pool.spawn(lazy(move || {
         poll_fn(move || {
-            let res = blocking(|| {
+            let res = blocking(|| {}).unwrap();
 
-            }).unwrap();
-
-            assert_eq!(
-                res.is_ready(),
-                exited.load(Relaxed));
+            assert_eq!(res.is_ready(), exited.load(Relaxed));
 
             try_tx.send(res.is_ready()).unwrap();
 
@@ -242,10 +227,7 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
     const BLOCKING: usize = 2;
 
     for _ in 0..ITER {
-        let pool = Builder::new()
-            .pool_size(4)
-            .max_blocking(1)
-            .build();
+        let pool = Builder::new().pool_size(4).max_blocking(1).build();
 
         let rem = Arc::new(AtomicUsize::new(BLOCKING));
         let (tx, rx) = mpsc::channel();
@@ -259,7 +241,8 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
                     // First block
                     let res = blocking(|| {
                         thread::sleep(Duration::from_millis(100));
-                    }).map_err(|e| panic!("blocking err {:?}", e));
+                    })
+                    .map_err(|e| panic!("blocking err {:?}", e));
 
                     try_ready!(res);
 
@@ -302,8 +285,12 @@ fn shutdown() {
             Builder::new()
                 .pool_size(1)
                 .max_blocking(BLOCKING)
-                .after_start(move || { num_inc.fetch_add(1, Relaxed); })
-                .before_stop(move || { num_dec.fetch_add(1, Relaxed); })
+                .after_start(move || {
+                    num_inc.fetch_add(1, Relaxed);
+                })
+                .before_stop(move || {
+                    num_dec.fetch_add(1, Relaxed);
+                })
                 .build()
         };
 
@@ -317,7 +304,8 @@ fn shutdown() {
                 let res = blocking(|| {
                     barrier.wait();
                     Ok::<_, ()>(())
-                }).unwrap();
+                })
+                .unwrap();
 
                 tx.send(()).unwrap();
 
@@ -394,7 +382,8 @@ fn hammer() {
                             }
 
                             cnt_block.fetch_add(1, Relaxed);
-                        }).map_err(|_| panic!())
+                        })
+                        .map_err(|_| panic!())
                     })
                 }));
             }

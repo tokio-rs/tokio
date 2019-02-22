@@ -1,16 +1,16 @@
-extern crate tokio_codec;
-extern crate tokio_io;
 extern crate bytes;
 extern crate futures;
+extern crate tokio_codec;
+extern crate tokio_io;
 
-use tokio_io::AsyncWrite;
 use tokio_codec::{Encoder, FramedWrite};
+use tokio_io::AsyncWrite;
 
-use futures::{Sink, Poll};
-use bytes::{BytesMut, BufMut};
+use bytes::{BufMut, BytesMut};
+use futures::{Poll, Sink};
 
-use std::io::{self, Write};
 use std::collections::VecDeque;
+use std::io::{self, Write};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
