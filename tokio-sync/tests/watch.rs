@@ -39,7 +39,7 @@ fn single_rx() {
 
     assert!(!task.is_notified());
 
-    tx.send("two").unwrap();
+    tx.broadcast("two").unwrap();
 
     assert!(task.is_notified());
 
@@ -76,7 +76,7 @@ fn stream_impl() {
 
     assert!(!task.is_notified());
 
-    tx.send("two").unwrap();
+    tx.broadcast("two").unwrap();
 
     assert!(task.is_notified());
 
@@ -115,7 +115,7 @@ fn multi_rx() {
         assert_eq!(*res.unwrap(), "one");
     });
 
-    tx.send("two").unwrap();
+    tx.broadcast("two").unwrap();
 
     assert!(task1.is_notified());
     assert!(task2.is_notified());
@@ -125,7 +125,7 @@ fn multi_rx() {
         assert_eq!(*res.unwrap(), "two");
     });
 
-    tx.send("three").unwrap();
+    tx.broadcast("three").unwrap();
 
     assert!(task1.is_notified());
     assert!(task2.is_notified());
@@ -140,7 +140,7 @@ fn multi_rx() {
         assert_eq!(*res.unwrap(), "three");
     });
 
-    tx.send("four").unwrap();
+    tx.broadcast("four").unwrap();
 
     task1.enter(|| {
         let res = assert_ready!(rx1.poll_ref());
@@ -190,7 +190,7 @@ fn rx_observes_final_value() {
     let (mut tx, mut rx) = watch::channel("one");
     let mut task = MockTask::new();
 
-    tx.send("two").unwrap();
+    tx.broadcast("two").unwrap();
 
     task.enter(|| {
         let res = assert_ready!(rx.poll_ref());
@@ -200,7 +200,7 @@ fn rx_observes_final_value() {
 
     task.enter(|| assert_not_ready!(rx.poll_ref()));
 
-    tx.send("three").unwrap();
+    tx.broadcast("three").unwrap();
     drop(tx);
 
     assert!(task.is_notified());
@@ -230,5 +230,5 @@ fn poll_close() {
 
     task.enter(|| assert_ready!(tx.poll_close()));
 
-    assert!(tx.send("two").is_err());
+    assert!(tx.broadcast("two").is_err());
 }

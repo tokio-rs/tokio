@@ -12,7 +12,8 @@
 //! either this initial value or the latest value that has been sent by
 //! `Sender`.
 //!
-//! Calls to [`Receiver::poll`] will always yield the latest value.
+//! Calls to [`Receiver::poll`] and [`Receiver::poll_ref`] will always yield
+//! the latest value.
 //!
 //! # Examples
 //!
@@ -24,14 +25,14 @@
 //! use tokio::sync::watch;
 //!
 //! # tokio::run(futures::future::lazy(|| {
-//! let (tx, rx) = watch::channel("hello");
+//! let (mut tx, rx) = watch::channel("hello");
 //!
 //! tokio::spawn(rx.for_each(|value| {
 //!     println!("received = {:?}", value);
 //!     Ok(())
-//! }));
+//! }).map_err(|_| ()));
 //!
-//! tx.send("world").unwrap();
+//! tx.broadcast("world").unwrap();
 //! # Ok(())
 //! # }));
 //! ```
@@ -52,6 +53,8 @@
 //! [`Receiver`]: struct.Receiver.html
 //! [`channel`]: fn.channel.html
 //! [`Sender::poll_close`]: struct.Sender.html#method.poll_close
+//! [`Receiver::poll`]: struct.Receiver.html#method.poll
+//! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
 
 use fnv::FnvHashMap;
 use futures::{Stream, Sink, Poll, Async, AsyncSink, StartSend};
@@ -80,39 +83,34 @@ pub struct Receiver<T> {
     ver: usize,
 }
 
-/// Update the inner value of a `Watch` cell.
+/// Sends values to the associated `Receiver`.
 ///
-/// The [`store`] function sets the inner value of the cell, returning the
-/// previous value. Alternatively, `Store` implements `Sink` such that values
-/// pushed into the `Sink` are stored in the cell.
-///
-/// See crate level documentation for more details.
-///
-/// [`store`]: #method.store
+/// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Weak<Shared<T>>,
 }
 
-/// Borrowed reference
+/// Returns a reference to the inner value
 ///
-/// See [`Watch::borrow`] for more details.
-///
-/// [`Watch::borrow`]: struct.Watch.html#method.borrow
+/// Outstanding borrows hold a read lock on the inner value. This means that
+/// long lived borrows could cause the produce half to block. It is recommended
+/// to keep the borrow as short lived as possible.
 #[derive(Debug)]
 pub struct Ref<'a, T: 'a> {
     inner: RwLockReadGuard<'a, T>,
 }
 
-/// TODO: Dox
 pub mod error {
-    /// Errors produced by `Watch`.
+    //! Watch error types
+
+    /// Error produced when receiving a value fails.
     #[derive(Debug)]
     pub struct RecvError {
         pub(crate) _p: (),
     }
 
-    /// Errors produced by `Store`.
+    /// Error produced when sending a value fails.
     #[derive(Debug)]
     pub struct SendError<T> {
         pub(crate) inner: T,
@@ -150,19 +148,32 @@ struct WatchInner {
 
 const CLOSED: usize = 1;
 
-/// Create a new watch cell, returning the consumer / producer halves.
+/// Create a new watch channel, returning the "send" and "receive" handles.
 ///
-/// All values stored by the `Store` will become visible to the `Watch`
-/// handles. Only the last value stored is made available to the `Watch`
-/// half. All intermediate values are dropped.
+/// All values sent by `Sender` will become visible to the `Receiver` handles.
+/// Only the last value sent is made available to the `Receiver` half. All
+/// intermediate values are dropped.
 ///
 /// # Examples
 ///
 /// ```
-/// # use futures_watch::*;
-/// let (watch, mut store) = Watch::new("hello");
-/// store.store("goodbye");
-/// assert_eq!(*watch.borrow(), "goodbye");
+/// # extern crate futures;
+/// extern crate tokio;
+///
+/// use tokio::prelude::*;
+/// use tokio::sync::watch;
+///
+/// # tokio::run(futures::future::lazy(|| {
+/// let (mut tx, rx) = watch::channel("hello");
+///
+/// tokio::spawn(rx.for_each(|value| {
+///     println!("received = {:?}", value);
+///     Ok(())
+/// }).map_err(|_| ()));
+///
+/// tx.broadcast("world").unwrap();
+/// # Ok(())
+/// # }));
 /// ```
 pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
     const INIT_ID: u64 = 0;
@@ -198,7 +209,14 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Receiver<T> {
-    /// TODO: Dox
+    /// Attempts to receive the latest value sent via the channel.
+    ///
+    /// If a new, unobserved, value has been sent, a reference to it is
+    /// returned. If no new value has been sent, then `NotReady` is returned and
+    /// the current task is notified once a new value is sent.
+    ///
+    /// Only the **most recent** value is returned. If the receiver is falling
+    /// behind the sender, intermediate values are dropped.
     pub fn poll_ref(&mut self) -> Poll<Option<Ref<T>>, error::RecvError> {
         // Make sure the task is up to date
         self.inner.task.register();
@@ -274,18 +292,8 @@ impl WatchInner {
 }
 
 impl<T> Sender<T> {
-    /// Store a new value in the cell, notifying all watchers. The previous
-    /// value is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use futures_watch::*;
-    /// let (watch, mut borrow) = Watch::new("hello");
-    /// assert_eq!(borrow.store("goodbye").unwrap(), "hello");
-    /// assert_eq!(*watch.borrow(), "goodbye");
-    /// ```
-    pub fn send(&mut self, value: T) -> Result<(), error::SendError<T>> {
+    /// Broadcast a new value via the channel, notifying all receivers.
+    pub fn broadcast(&mut self, value: T) -> Result<(), error::SendError<T>> {
         let shared = match self.shared.upgrade() {
             Some(shared) => shared,
             // All `Watch` handles have been canceled
@@ -308,7 +316,7 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    /// Returns `Ready` when all watchers have dropped.
+    /// Returns `Ready` when all receivers have dropped.
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
@@ -330,7 +338,7 @@ impl<T> Sink for Sender<T> {
     type SinkError = error::SendError<T>;
 
     fn start_send(&mut self, item: T) -> StartSend<T, error::SendError<T>> {
-        let _ = self.send(item)?;
+        let _ = self.broadcast(item)?;
         Ok(AsyncSink::Ready)
     }
 
