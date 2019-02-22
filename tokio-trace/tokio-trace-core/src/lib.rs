@@ -7,16 +7,18 @@
 //! structured, event-based diagnostic information. This crate defines the core
 //! primitives of `tokio-trace`.
 //!
-//! The crate provides:
+//! This crate provides:
 //!
 //! * [`Span`] identifies a span within the execution of a program.
+//!
+//! * [`Event`] represents a single event within a trace.
 //!
 //! * [`Subscriber`], the trait implemented to collect trace data.
 //!
 //! * [`Metadata`] and [`Callsite`] provide information describing `Span`s.
 //!
-//! * [`Field`] and [`FieldSet`] describe and access the structured data attached to
-//!   a `Span`.
+//! * [`Field`], [`FieldSet`], [`Value`], and [`ValueSet`] represent the
+//!   structured data attached to a `Span`.
 //!
 //! * [`Dispatch`] allows span events to be dispatched to `Subscriber`s.
 //!
@@ -28,15 +30,21 @@
 //! fully-featured API. However, this crate's API will change very infrequently,
 //! so it may be used when dependencies must be very stable.
 //!
-//! [`Span`]: ::span::Span
-//! [`Subscriber`]: ::subscriber::Subscriber
-//! [`Metadata`]: ::metadata::Metadata
-//! [`Callsite`]: ::callsite::Callsite
-//! [`Field`]: ::field::Field
-//! [`FieldSet`]: ::field::FieldSet
-//! [`Dispatch`]: ::dispatcher::Dispatch
+//! The [`tokio-trace-nursery`] repository contains less stable crates designed to
+//! be used with the `tokio-trace` ecosystem. It includes a collection of
+//! `Subscriber` implementations, as well as utility and adapter crates.
 //!
-
+//! [`Span`]: span/struct.Span.html
+//! [`Event`]: event/struct.Event.html
+//! [`Subscriber`]: subscriber/trait.Subscriber.html
+//! [`Metadata`]: metadata/struct.Metadata.html
+//! [`Callsite`]: callsite/trait.Callsite.html
+//! [`Field`]: field/struct.Field.html
+//! [`FieldSet`]: field/struct.FieldSet.html
+//! [`Value`]: field/trait.Value.html
+//! [`ValueSet`]: field/struct.ValueSet.html
+//! [`Dispatch`]: dispatcher/struct.Dispatch.html
+//! [`tokio-trace-nursery`]: https://github.com/tokio-rs/tokio-trace-nursery
 #[macro_use]
 extern crate lazy_static;
 
