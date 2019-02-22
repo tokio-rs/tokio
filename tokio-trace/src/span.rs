@@ -135,9 +135,9 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-// TODO: remove this re-export?
-pub use tokio_trace_core::span::Span as Id;
+pub use tokio_trace_core::span::{Parent, Span as Id};
 
+use tokio_trace_core::span::NewSpan;
 use std::{
     borrow::Borrow,
     cmp, fmt,
@@ -209,7 +209,8 @@ struct Entered<'a> {
 // ===== impl Span =====
 
 impl<'a> Span<'a> {
-    /// Constructs a new `Span` with the given [metadata] and set of [field values].
+    /// Constructs a new `Span` with the given [metadata], set of [field
+    /// values], and [parent].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
     /// with the current span as its parent (if one exists).
@@ -220,11 +221,13 @@ impl<'a> Span<'a> {
     /// [metadata]: ::metadata::Metadata
     /// [`Subscriber`]: ::subscriber::Subscriber
     /// [field values]: ::field::ValueSet
+    /// [parent]: ::span::Parent
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet, parent: Parent) -> Span<'a> {
+        let new_span = NewSpan::new(meta, values, parent);
         let inner = dispatcher::with(move |dispatch| {
-            let id = dispatch.new_span(meta, values);
+            let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))
         });
         Self {

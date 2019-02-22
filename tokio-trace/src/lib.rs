@@ -488,10 +488,28 @@ macro_rules! callsite {
 /// ```
 #[macro_export]
 macro_rules! span {
-    (target: $target:expr, level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
-        span!(target: $target, level: $lvl, $name, $($k $( = $val)*),*)
+    (
+        target: $target:expr,
+        level: $lvl:expr,
+        parent: $parent:expr,
+        $name:expr,
+        $($k:ident $( = $val:expr )* ),*,
+    ) => {
+        span!(
+            target: $target,
+            level: $lvl,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
     };
-    (target: $target:expr, level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
+    (
+        target: $target:expr,
+        level: $lvl:expr,
+        parent: $parent:expr,
+        $name:expr,
+        $($k:ident $( = $val:expr )* ),*
+    ) => {
         {
             use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
             use $crate::callsite::Callsite;
@@ -503,17 +521,112 @@ macro_rules! span {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                Span::new(meta, &valueset!(meta.fields(), $($k $( = $val)*),*))
+                Span::new(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*),
+                    $parent,
+                )
             } else {
                 Span::new_disabled()
             }
         }
     };
+    (target: $target:expr, level: $lvl:expr, parent: $parent:expr, $name:expr) => {
+        span!(target: $target, level: $lvl, parent: $parent, $name,)
+    };
+    (level: $lvl:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
+        span!(
+            target: module_path!(),
+            level: $lvl,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (level: $lvl:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
+        span!(
+            target: module_path!(),
+            level: $lvl,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (level: $lvl:expr, parent: $parent:expr, $name:expr) => {
+        span!(target: module_path!(), level: $lvl, parent: $parent, $name,)
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        span!(
+            target: module_path!(),
+            level: $crate::Level::TRACE,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            target: module_path!(),
+            level: $crate::Level::TRACE,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr) => {
+        span!(
+            target: module_path!(),
+            level: $crate::Level::TRACE,
+            parent: $parent,
+            $name,
+        )
+    };
+    (
+        target: $target:expr,
+        level: $lvl:expr,
+        $name:expr,
+        $($k:ident $( = $val:expr )* ),*,
+    ) => {
+        span!(
+            target: $target,
+            level: $lvl,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (
+        target: $target:expr,
+        level: $lvl:expr,
+        $name:expr,
+        $($k:ident $( = $val:expr )* ),*
+    ) => {
+        span!(
+            target: $target,
+            level: $lvl,
+            parent: $crate::span::Parent::current(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
     (target: $target:expr, level: $lvl:expr, $name:expr) => {
         span!(target: $target, level: $lvl, $name,)
     };
+    (target: $target:expr, level: $lvl:expr, $name:expr,) => {
+        span!(
+            target: $target,
+            level: $lvl,
+            parent: $crate::span::Parent::current(),
+            $name,
+        )
+    };
     (level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
-        span!(target: module_path!(), level: $lvl, $name, $($k $( = $val)*),*)
+        span!(
+            target: module_path!(),
+            level: $lvl,
+            parent: $crate::span::Parent::current(),
+            $name,
+            $($k $( = $val)*),*
+        )
     };
     (level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
         span!(target: module_path!(), level: $lvl, $name, $($k $( = $val)*),*)
@@ -525,7 +638,13 @@ macro_rules! span {
         span!(target: module_path!(), level: $crate::Level::TRACE, $name, $($k $( = $val)*),*)
     };
     ($name:expr, $($k:ident $( = $val:expr)*),*) => {
-        span!(target: module_path!(), level: $crate::Level::TRACE, $name, $($k $( = $val)*),*)
+        span!(
+            target: module_path!(),
+            level: $crate::Level::TRACE,
+            parent: $crate::span::Parent::current(),
+            $name,
+            $($k $( = $val)*),*
+        )
     };
     ($name:expr) => { span!(target: module_path!(), level: $crate::Level::TRACE, $name,) };
 }

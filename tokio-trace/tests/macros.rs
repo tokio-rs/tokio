@@ -8,6 +8,19 @@ extern crate tokio_trace;
 
 #[test]
 fn span() {
+    use tokio_trace::span::Parent;
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: Parent::none(), "foo", bar = 2, baz = 3);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: Parent::none(), "foo", bar = 2, baz = 4,);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: Parent::none(), "foo");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: Parent::none(), "bar",);
+    span!(level: tokio_trace::Level::DEBUG, parent: Parent::none(), "foo", bar = 2, baz = 3);
+    span!(level: tokio_trace::Level::DEBUG, parent: Parent::none(), "foo", bar = 2, baz = 4,);
+    span!(level: tokio_trace::Level::DEBUG, parent: Parent::none(), "foo");
+    span!(level: tokio_trace::Level::DEBUG, parent: Parent::none(), "bar",);
+    span!(parent: Parent::none(), "foo", bar = 2, baz = 3);
+    span!(parent: Parent::none(), "foo", bar = 2, baz = 4,);
+    span!(parent: Parent::none(), "foo");
+    span!(parent: Parent::none(), "bar",);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 3);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 4,);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo");
