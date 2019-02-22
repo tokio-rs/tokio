@@ -15,7 +15,7 @@ pub struct ReadHalf<T> {
 impl<T: AsyncRead + AsyncWrite> ReadHalf<T> {
     /// Reunite with a previously split `WriteHalf`.
     ///
-    /// # panics
+    /// # Panics
     ///
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from
     /// the same `AsyncRead::split` operation this method will panic.
