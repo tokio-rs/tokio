@@ -32,9 +32,36 @@ jobs:
       displayName: Install rust (windows)
   # All platforms.
   - script: |
-        rustc -Vv
-        cargo -V
+        cargo check --all
     displayName: Query rust and cargo versions
+    condition: eq(variables['rustup_toolchain'], '1.26.0')
+
+  - script: |
+      $HOME/.cargo/bin/cargo fmt -- --check
+      alias check="$HOME/.cargo/bin/cargo check --no-default-features"
+      shopt -s expand_aliases
+      check
+      check --features codec
+      check --features fs
+      check --features io
+      check --features reactor
+      check --features rt-full
+      check --features tcp
+      check --features timer
+      check --features udp
+      check --features uds
+    displayName: Run rustfmt and cargo check
+    condition: eq(variables['rustup_toolchain'], 'stable')
+
+  # Test the async / await preview. We don't want to block PRs on this failing though.
+  - script: |
+      cd tokio-async-await
+      cargo check --all
+    displayName: Test async/await
+    continueOnError: true
+    condition: eq(variables['rustup_toolchain'], 'nightly')
+
+  # This runs TSAN against nightly and allows failures to propagate up.
   - bash: |
         set -e
         # Make sure the benchmarks compile
@@ -63,7 +90,15 @@ jobs:
         # Run thread sanitizer
         RUSTFLAGS="-Z sanitizer=thread" \
         cargo test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
-    displayName: Build and run tests part 1
+    displayName: Run thread sanitizer checks on nightly
+    env: { TSAN: 'yes' }
+    condition: eq(variables['rustup_toolchain'], 'nightly')
+
+  - bash: cargo doc
+    displayName: Run cargo doc on nightly
+    continueOnError: true
+    condition: eq(variables['rustup_toolchain'], 'nightly')
+
   - bash: |
         set -e
         if [[ "$TARGET" ]]
@@ -78,4 +113,4 @@ jobs:
             cargo test -p tokio-buf --no-default-features
             cargo doc --all
         fi
-    displayName: Build and run tests part 2
+    displayName: Build and run tests on all targets
