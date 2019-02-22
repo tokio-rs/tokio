@@ -7,6 +7,7 @@
 //! This crate provides primitives for synchronizing asynchronous tasks.
 
 extern crate fnv;
+#[macro_use]
 extern crate futures;
 
 macro_rules! debug {

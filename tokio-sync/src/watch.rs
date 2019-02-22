@@ -1,92 +1,60 @@
-//! A multi-consumer, single producer cell that receives notifications when the inner value is
-//! changed.
+//! A single-producer, multi-consumer channel that only retains the *last* sent
+//! value.
+//!
+//! This channel is useful for watching for changes to a value from multiple
+//! points in the code base, for example, changes to configuration values.
 //!
 //! # Usage
 //!
-//! [`Watch::new`] returns a [`Watch`] / [`Store`] pair. These are the consumer and
-//! producer halves of the cell. The watch cell is created with an initial
-//! value. Calls to [`Watch::borrow`] will always yield the latest value.
+//! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are the producer
+//! and sender halves of the channel. The channel is created with an initial
+//! value. `Receiver::poll` will always be ready upon creation and will yield
+//! either this initial value or the latest value that has been sent by
+//! `Sender`.
 //!
-//! ```
-//! # use futures_watch::*;
-//! let (watch, store) = Watch::new("hello");
-//! assert_eq!(*watch.borrow(), "hello");
-//! # drop(store);
-//! ```
+//! Calls to [`Receiver::poll`] will always yield the latest value.
 //!
-//! Using the [`Store`] handle, the cell value can be updated.
-//!
-//! ```
-//! # use futures_watch::*;
-//! let (watch, mut store) = Watch::new("hello");
-//! store.store("goodbye");
-//! assert_eq!(*watch.borrow(), "goodbye");
-//! ```
-//!
-//! [`Watch`] handles are future-aware and will receive notifications whenever
-//! the inner value is changed.
+//! # Examples
 //!
 //! ```
 //! # extern crate futures;
-//! # extern crate futures_watch;
-//! # pub fn main() {
-//! # use futures::*;
-//! # use futures_watch::*;
-//! # use std::thread;
-//! # use std::time::Duration;
-//! let (watch, mut store) = Watch::new("hello");
+//! extern crate tokio;
 //!
-//! thread::spawn(move || {
-//!     thread::sleep(Duration::from_millis(100));
-//!     store.store("goodbye");
-//! });
+//! use tokio::prelude::*;
+//! use tokio::sync::watch;
 //!
-//! watch.into_future()
-//!     .and_then(|(_, watch)| {
-//!         assert_eq!(*watch.borrow(), "goodbye");
-//!         Ok(())
-//!     })
-//!     .wait().unwrap();
-//! # }
+//! # tokio::run(futures::future::lazy(|| {
+//! let (tx, rx) = watch::channel("hello");
+//!
+//! tokio::spawn(rx.for_each(|value| {
+//!     println!("received = {:?}", value);
+//!     Ok(())
+//! }));
+//!
+//! tx.send("world").unwrap();
+//! # Ok(())
+//! # }));
 //! ```
 //!
-//! [`Watch::borrow`] will yield the most recently stored value. All
-//! intermediate values are dropped.
+//! # Closing
 //!
-//! ```
-//! # use futures_watch::*;
-//! let (watch, mut store) = Watch::new("hello");
-//!
-//! store.store("two");
-//! store.store("three");
-//!
-//! assert_eq!(*watch.borrow(), "three");
-//! ```
-//!
-//! # Cancellation
-//!
-//! [`Store::poll_cancel`] allows the producer to detect when all [`Watch`]
+//! [`Sender::poll_close`] allows the producer to detect when all [`Sender`]
 //! handles have been dropped. This indicates that there is no further interest
 //! in the values being produced and work can be stopped.
 //!
-//! When the [`Store`] is dropped, the watch handles will be notified and
-//! [`Watch::is_final`] will return true.
-//!
 //! # Thread safety
 //!
-//! Both [`Watch`] and [`Store`] are thread safe. They can be moved to other
-//! threads and can be used in a concurrent environment. Clones of [`Watch`]
+//! Both [`Sender`] and [`Receiver`] are thread safe. They can be moved to other
+//! threads and can be used in a concurrent environment. Clones of [`Receiver`]
 //! handles may be moved to separate threads and also used concurrently.
 //!
-//! [`Watch`]: struct.Watch.html
-//! [`Store`]: struct.Store.html
-//! [`Watch::new`]: struct.Watch.html#method.new
-//! [`Watch::borrow`]: struct.Watch.html#method.borrow
-//! [`Watch::is_final`]: struct.Watch.html#method.is_final
-//! [`Store::poll_cancel`]: struct.Store.html#method.poll_cancel
+//! [`Sender`]: struct.Sender.html
+//! [`Receiver`]: struct.Receiver.html
+//! [`channel`]: fn.channel.html
+//! [`Sender::poll_close`]: struct.Sender.html#method.poll_close
 
 use fnv::FnvHashMap;
-use futures::{Sink, Poll, Async, AsyncSink, StartSend};
+use futures::{Stream, Sink, Poll, Async, AsyncSink, StartSend};
 use futures::task::AtomicTask;
 
 use std::ops;
@@ -94,18 +62,9 @@ use std::sync::{Arc, Weak, Mutex, RwLock, RwLockReadGuard};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 
-/// A future-aware cell that receives notifications when the inner value is
-/// changed.
+/// Receives values from the associated `Sender`.
 ///
-/// `Watch` implements `Stream`, yielding `()` whenever the inner value is
-/// changed. This allows a user to monitor this stream to get notified of change
-/// events.
-///
-/// `Watch` handles may be cloned in order to create additional watchers. Each
-/// watcher operates independently and can be used to notify separate tasks.
-/// Each watcher handle must be used from only a single task.
-///
-/// See crate level documentation for more details.
+/// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state
@@ -240,7 +199,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 
 impl<T> Receiver<T> {
     /// TODO: Dox
-    pub fn poll(&mut self) -> Poll<Option<Ref<T>>, error::RecvError> {
+    pub fn poll_ref(&mut self) -> Poll<Option<Ref<T>>, error::RecvError> {
         // Make sure the task is up to date
         self.inner.task.register();
 
@@ -262,6 +221,16 @@ impl<T> Receiver<T> {
         }
 
         Ok(Async::NotReady)
+    }
+}
+
+impl<T: Clone> Stream for Receiver<T> {
+    type Item = T;
+    type Error = error::RecvError;
+
+    fn poll(&mut self) -> Poll<Option<T>, error::RecvError> {
+        let item = try_ready!(self.poll_ref());
+        Ok(Async::Ready(item.map(|v_ref| v_ref.clone())))
     }
 }
 
