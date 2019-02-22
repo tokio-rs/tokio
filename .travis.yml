@@ -49,6 +49,7 @@ matrix:
     script: |
       cd tokio-async-await
       cargo check --all
+      cargo check --features async-await-preview
 
   # This runs TSAN against nightly and allows failures to propagate up.
   - rust: nightly-2018-11-18
