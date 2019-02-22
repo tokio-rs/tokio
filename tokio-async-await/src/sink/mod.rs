@@ -6,8 +6,6 @@ pub use self::send::Send;
 
 use futures::Sink;
 
-use std::marker::Unpin;
-
 /// An extension trait which adds utility methods to `Sink` types.
 pub trait SinkExt: Sink {
     /// Send an item into the sink.

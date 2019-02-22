@@ -2,8 +2,8 @@ use futures::{Future, Poll};
 
 use std::future::Future as StdFuture;
 use std::pin::Pin;
-use std::ptr::NonNull;
-use std::task::{LocalWaker, Poll as StdPoll, UnsafeWake, Waker};
+use std::ptr;
+use std::task::{Poll as StdPoll, RawWaker, RawWakerVTable, Waker};
 
 /// Convert an 0.3 `Future` to an 0.1 `Future`.
 #[derive(Debug)]
@@ -44,9 +44,9 @@ where
     fn poll(&mut self) -> Poll<Item, Error> {
         use futures::Async::*;
 
-        let local_waker = noop_local_waker();
+        let waker = noop_waker();
 
-        let res = self.0.as_mut().poll(&local_waker);
+        let res = self.0.as_mut().poll(&waker);
 
         match res {
             StdPoll::Ready(Ok(val)) => Ok(Ready(val)),
@@ -58,26 +58,26 @@ where
 
 // ===== NoopWaker =====
 
-struct NoopWaker;
-
-fn noop_local_waker() -> LocalWaker {
-    let w: NonNull<NoopWaker> = NonNull::dangling();
-    unsafe { LocalWaker::new(w) }
+fn noop_raw_waker() -> RawWaker {
+    RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)
 }
 
 fn noop_waker() -> Waker {
-    let w: NonNull<NoopWaker> = NonNull::dangling();
-    unsafe { Waker::new(w) }
+    unsafe { Waker::new_unchecked(noop_raw_waker()) }
 }
 
-unsafe impl UnsafeWake for NoopWaker {
-    unsafe fn clone_raw(&self) -> Waker {
-        noop_waker()
-    }
-
-    unsafe fn drop_raw(&self) {}
-
-    unsafe fn wake(&self) {
-        unimplemented!("async-await-preview currently only supports futures 0.1. Use the compatibility layer of futures 0.3 instead, if you want to use futures 0.3.");
-    }
+unsafe fn clone_raw(_data: *const ()) -> RawWaker {
+    noop_raw_waker()
 }
+
+unsafe fn drop_raw(_data: *const ()) {}
+
+unsafe fn wake(_data: *const ()) {
+    unimplemented!("async-await-preview currently only supports futures 0.1. Use the compatibility layer of futures 0.3 instead, if you want to use futures 0.3.");
+}
+
+const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable {
+    clone: clone_raw,
+    drop: drop_raw,
+    wake,
+};

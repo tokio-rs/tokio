@@ -4,7 +4,6 @@ use std::future::Future;
 use std::task::{self, Poll};
 
 use std::io;
-use std::marker::Unpin;
 use std::pin::Pin;
 
 /// A future used to write data.
@@ -26,7 +25,7 @@ impl<'a, T: AsyncWrite + ?Sized> Write<'a, T> {
 impl<'a, T: AsyncWrite + ?Sized> Future for Write<'a, T> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<io::Result<usize>> {
+    fn poll(mut self: Pin<&mut Self>, _waker: &task::Waker) -> Poll<io::Result<usize>> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

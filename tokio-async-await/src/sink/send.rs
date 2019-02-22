@@ -3,7 +3,6 @@ use futures::Sink;
 use std::future::Future;
 use std::task::{self, Poll};
 
-use std::marker::Unpin;
 use std::pin::Pin;
 
 /// Future for the `SinkExt::send_async` combinator, which sends a value to a
@@ -28,7 +27,7 @@ impl<'a, T: Sink + Unpin + ?Sized> Send<'a, T> {
 impl<T: Sink + Unpin + ?Sized> Future for Send<'_, T> {
     type Output = Result<(), T::SinkError>;
 
-    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _waker: &task::Waker) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
         use futures::AsyncSink::{NotReady, Ready};
 

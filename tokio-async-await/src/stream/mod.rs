@@ -6,8 +6,6 @@ pub use self::next::Next;
 
 use futures::Stream;
 
-use std::marker::Unpin;
-
 /// An extension trait which adds utility methods to `Stream` types.
 pub trait StreamExt: Stream {
     /// Creates a future that resolves to the next item in the stream.

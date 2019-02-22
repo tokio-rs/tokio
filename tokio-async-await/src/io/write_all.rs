@@ -4,7 +4,6 @@ use std::future::Future;
 use std::task::{self, Poll};
 
 use std::io;
-use std::marker::Unpin;
 use std::mem;
 use std::pin::Pin;
 
@@ -31,7 +30,7 @@ fn zero_write() -> io::Error {
 impl<'a, T: AsyncWrite + ?Sized> Future for WriteAll<'a, T> {
     type Output = io::Result<()>;
 
-    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<io::Result<()>> {
+    fn poll(mut self: Pin<&mut Self>, _waker: &task::Waker) -> Poll<io::Result<()>> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

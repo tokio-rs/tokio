@@ -9,7 +9,7 @@ guarantees. You are living on the edge here.**
 ## Usage
 
 To use this crate, you need to start with a Rust 2018 edition crate, with rustc
-1.33.0-nightly or later.
+1.34.0-nightly or later.
 
 Add this to your `Cargo.toml`:
 

@@ -4,7 +4,6 @@ use std::future::Future;
 use std::task::{self, Poll};
 
 use std::io;
-use std::marker::Unpin;
 use std::pin::Pin;
 
 /// A future which can be used to read bytes.
@@ -26,7 +25,7 @@ impl<'a, T: AsyncRead + ?Sized> Read<'a, T> {
 impl<'a, T: AsyncRead + ?Sized> Future for Read<'a, T> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, _lw: &task::LocalWaker) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _waker: &task::Waker) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;
