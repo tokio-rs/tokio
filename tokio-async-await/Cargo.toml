@@ -3,12 +3,12 @@ name = "tokio-async-await"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-async-await/0.1.3"
+documentation = "https://docs.rs/tokio-async-await/0.1.6"
 description = """
 Experimental async/await support for Tokio
 """

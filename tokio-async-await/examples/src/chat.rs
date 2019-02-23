@@ -61,7 +61,7 @@ async fn process(stream: TcpStream, state: Arc<Mutex<Shared>>) -> io::Result<()>
     tokio::spawn_async(async move {
         while let Some(line) = await!(rx.next()) {
             let line = line.unwrap();
-            await!(lines_tx.send_async(line));
+            await!(lines_tx.send_async(line)).unwrap();
         }
     });
 
