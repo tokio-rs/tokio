@@ -135,7 +135,7 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-pub use tokio_trace_core::span::{Parent, NewSpan, Span as Id};
+pub use tokio_trace_core::span::{NewSpan, Span as Id};
 
 use std::{
     borrow::Borrow,
@@ -208,8 +208,8 @@ struct Entered<'a> {
 // ===== impl Span =====
 
 impl<'a> Span<'a> {
-    /// Constructs a new `Span` with the given [metadata], set of [field
-    /// values], and [parent].
+    /// Constructs a new `Span` with the given [metadata] and set of [field
+    /// values].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
     /// with the current span as its parent (if one exists).
@@ -220,19 +220,39 @@ impl<'a> Span<'a> {
     /// [metadata]: ::metadata::Metadata
     /// [`Subscriber`]: ::subscriber::Subscriber
     /// [field values]: ::field::ValueSet
-    /// [parent]: ::span::Parent
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet, parent: Parent) -> Span<'a> {
-        let new_span = NewSpan::new(meta, values, parent);
-        let inner = dispatcher::with(move |dispatch| {
-            let id = dispatch.new_span(&new_span);
-            Some(Inner::new(id, dispatch, meta))
-        });
-        Self {
-            inner,
-            is_closed: false,
-        }
+    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+        let new_span = NewSpan::new(meta, values);
+        Self::make(meta, new_span)
+    }
+
+
+    /// Constructs a new `Span` as the root of its own trace tree, with the
+    /// given [metadata] and set of [field values].
+    ///
+    /// After the span is constructed, [field values] and/or [`follows_from`]
+    /// annotations may be added to it.
+    ///
+    /// [metadata]: ::metadata::Metadata
+    /// [field values]: ::field::ValueSet
+    /// [`follows_from`]: ::span::Span::follows_from
+    #[inline]
+    pub fn new_root(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+        Self::make(meta, NewSpan::new_root(meta, values))
+    }
+
+    /// Constructs a new `Span` as child of the given parent span, with the
+    /// given [metadata] and set of [field values].
+    ///
+    /// After the span is constructed, [field values] and/or [`follows_from`]
+    /// annotations may be added to it.
+    ///
+    /// [metadata]: ::metadata::Metadata
+    /// [field values]: ::field::ValueSet
+    /// [`follows_from`]: ::span::Span::follows_from
+    pub fn child_of(parent: Id, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+        Self::make(meta, NewSpan::child_of(parent, meta, values))
     }
 
     /// Constructs a new disabled span.
@@ -240,6 +260,18 @@ impl<'a> Span<'a> {
     pub fn new_disabled() -> Span<'a> {
         Span {
             inner: None,
+            is_closed: false,
+        }
+    }
+
+    #[inline(always)]
+    fn make(meta: &'a Metadata<'a>, new_span: NewSpan) -> Span<'a> {
+        let inner = dispatcher::with(move |dispatch| {
+            let id = dispatch.new_span(&new_span);
+            Some(Inner::new(id, dispatch, meta))
+        });
+        Self {
+            inner,
             is_closed: false,
         }
     }

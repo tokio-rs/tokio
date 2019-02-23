@@ -23,16 +23,8 @@ pub struct NewSpan<'a> {
     parent: Parent,
 }
 
-/// Describes the parent span a [`NewSpan`] is a child of.
-///
-/// [`NewSpan`]: ../struct.NewSpan.html
 #[derive(Debug)]
-pub struct Parent {
-    kind: ParentKind,
-}
-
-#[derive(Debug)]
-enum ParentKind {
+enum Parent {
     /// The new span will be a root span.
     Root,
     /// The new span will be rooted in the current span.
@@ -58,12 +50,32 @@ impl Span {
 // ===== impl NewSpan =====
 
 impl<'a> NewSpan<'a> {
-    /// Returns a new `NewSpan` with the specified metadata, values, and parent.
-    pub fn new(metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>, parent: Parent) -> Self {
+    /// Returns a new `NewSpan` as a child of the current span, with the
+    /// specified metadata and values.
+    pub fn new(metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
         Self {
             metadata,
             values,
-            parent,
+            parent: Parent::Current,
+        }
+    }
+
+    /// Returns a new `NewSpan` at the root of its own trace tree, with the specified metadata and values.
+    pub fn new_root(metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
+        Self {
+            metadata,
+            values,
+            parent: Parent::Root,
+        }
+    }
+
+    /// Returns a new `NewSpan` as a child of the specified parent span, with the
+    /// specified metadata and values.
+    pub fn child_of(parent: Span, metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
+        Self {
+            metadata,
+            values,
+            parent: Parent::Explicit(parent)
         }
     }
 
@@ -80,24 +92,16 @@ impl<'a> NewSpan<'a> {
 
     /// Returns true if the new span shoold be a root.
     pub fn is_root(&self) -> bool {
-        match self.parent.kind {
-            ParentKind::Root => true,
+        match self.parent {
+            Parent::Root => true,
             _ => false,
         }
     }
 
     /// Returns true if the new span should be a child of the current span.
     pub fn is_in_current(&self) -> bool {
-        match self.parent.kind {
-            ParentKind::Current => true,
-            _ => false,
-        }
-    }
-
-    /// Returns true if the new span has an explicit parent specified.
-    pub fn has_parent(&self) -> bool {
-        match self.parent.kind {
-            ParentKind::Explicit(_) => true,
+        match self.parent {
+            Parent::Current => true,
             _ => false,
         }
     }
@@ -107,34 +111,9 @@ impl<'a> NewSpan<'a> {
     /// Otherwise (if the new span is a root or is a child of the current span),
     /// returns false.
     pub fn parent(&self) -> Option<&Span> {
-        match self.parent.kind {
-            ParentKind::Explicit(ref p) => Some(p),
+        match self.parent {
+            Parent::Explicit(ref p) => Some(p),
             _ => None,
-        }
-    }
-}
-
-// ===== impl Parent =====
-
-impl Parent {
-    /// Indicates that a new span's parent should be the specified span.
-    pub fn new(span: Span) -> Self {
-        Self {
-            kind: ParentKind::Explicit(span),
-        }
-    }
-
-    /// Indicates that a new span should be the root of its own trace tree.
-    pub fn none() -> Self {
-        Self {
-            kind: ParentKind::Root,
-        }
-    }
-
-    /// Indicates that a new span should be a child of the current span.
-    pub fn current() -> Self {
-        Self {
-            kind: ParentKind::Current,
         }
     }
 }
