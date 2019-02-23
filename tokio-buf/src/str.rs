@@ -1,4 +1,4 @@
-use errors::internal::Never;
+use never::Never;
 use BufStream;
 
 use futures::Poll;

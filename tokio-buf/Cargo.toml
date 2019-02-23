@@ -22,5 +22,5 @@ either = { version =  "1.5", optional = true}
 futures = "0.1.23"
 
 [features]
-default = ["ext"]
-ext = ["bytes/either", "either"]
+default = ["util"]
+util = ["bytes/either", "either"]

@@ -10,9 +10,13 @@ pub use self::collect::Collect;
 pub use self::from::FromBufStream;
 pub use self::limit::Limit;
 
-pub use self::collect::CollectError;
-pub use self::from::CollectVecError;
-pub use self::limit::LimitError;
+pub mod error {
+    //! Error types
+
+    pub use super::collect::CollectError;
+    pub use super::from::CollectVecError;
+    pub use super::limit::LimitError;
+}
 
 use BufStream;
 
