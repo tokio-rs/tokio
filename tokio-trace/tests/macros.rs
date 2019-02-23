@@ -8,18 +8,6 @@ extern crate tokio_trace;
 
 #[test]
 fn span() {
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo");
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "bar",);
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo");
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "bar",);
-    span!(parent: None, "foo", bar = 2, baz = 3);
-    span!(parent: None, "foo", bar = 2, baz = 4,);
-    span!(parent: None, "foo");
-    span!(parent: None, "bar",);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 3);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 4,);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo");
@@ -32,6 +20,39 @@ fn span() {
     span!("foo", bar = 2, baz = 4,);
     span!("foo");
     span!("bar",);
+}
+
+#[test]
+fn span_root() {
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "bar",);
+    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
+    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
+    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo");
+    span!(level: tokio_trace::Level::DEBUG, parent: None, "bar",);
+    span!(parent: None, "foo", bar = 2, baz = 3);
+    span!(parent: None, "foo", bar = 2, baz = 4,);
+    span!(parent: None, "foo");
+    span!(parent: None, "bar",);
+}
+
+#[test]
+fn span_with_parent() {
+    let p = span!("im_a_parent!");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: p.id(), "foo", bar = 2, baz = 3);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: p.id(), "foo", bar = 2, baz = 4,);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: p.id(), "foo");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: p.id(), "bar",);
+    span!(level: tokio_trace::Level::DEBUG, parent: p.id(), "foo", bar = 2, baz = 3);
+    span!(level: tokio_trace::Level::DEBUG, parent: p.id(), "foo", bar = 2, baz = 4,);
+    span!(level: tokio_trace::Level::DEBUG, parent: p.id(), "foo");
+    span!(level: tokio_trace::Level::DEBUG, parent: p.id(), "bar",);
+    span!(parent: p.id(), "foo", bar = 2, baz = 3);
+    span!(parent: p.id(), "foo", bar = 2, baz = 4,);
+    span!(parent: p.id(), "foo");
+    span!(parent: p.id(), "bar",);
 }
 
 #[test]
