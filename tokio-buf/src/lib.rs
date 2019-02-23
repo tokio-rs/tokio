@@ -1,5 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-buf/0.1.0")]
-#![deny(missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, unreachable_pub)]
 #![cfg_attr(test, deny(warnings))]
 
 //! Asynchronous stream of bytes.
@@ -10,27 +10,26 @@
 //! `Buf` (i.e, byte collections).
 
 extern crate bytes;
-#[cfg(feature = "ext")]
+#[cfg(feature = "util")]
 extern crate either;
 #[allow(unused)]
 #[macro_use]
 extern crate futures;
 
-pub mod errors;
-#[cfg(feature = "ext")]
-pub mod ext;
+mod never;
+#[cfg(feature = "util")]
+pub mod util;
 mod size_hint;
 mod str;
+mod u8;
 
 pub use self::size_hint::SizeHint;
 #[doc(inline)]
-#[cfg(feature = "ext")]
-pub use ext::BufStreamExt;
+#[cfg(feature = "util")]
+pub use util::BufStreamExt;
 
-use bytes::{Buf, Bytes, BytesMut};
-use errors::internal::Never;
+use bytes::Buf;
 use futures::Poll;
-use std::io;
 
 /// An asynchronous stream of bytes.
 ///
@@ -97,65 +96,4 @@ pub trait BufStream {
     fn size_hint(&self) -> SizeHint {
         SizeHint::default()
     }
-}
-
-impl BufStream for Vec<u8> {
-    type Item = io::Cursor<Vec<u8>>;
-    type Error = Never;
-
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        if self.is_empty() {
-            return Ok(None.into());
-        }
-
-        poll_bytes(self)
-    }
-}
-
-impl BufStream for &'static [u8] {
-    type Item = io::Cursor<&'static [u8]>;
-    type Error = Never;
-
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        if self.is_empty() {
-            return Ok(None.into());
-        }
-
-        poll_bytes(self)
-    }
-}
-
-impl BufStream for Bytes {
-    type Item = io::Cursor<Bytes>;
-    type Error = Never;
-
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        if self.is_empty() {
-            return Ok(None.into());
-        }
-
-        poll_bytes(self)
-    }
-}
-
-impl BufStream for BytesMut {
-    type Item = io::Cursor<BytesMut>;
-    type Error = Never;
-
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        if self.is_empty() {
-            return Ok(None.into());
-        }
-
-        poll_bytes(self)
-    }
-}
-
-fn poll_bytes<T: Default>(buf: &mut T) -> Poll<Option<io::Cursor<T>>, Never> {
-    use std::mem;
-
-    let bytes = mem::replace(buf, Default::default());
-    let buf = io::Cursor::new(bytes);
-
-    Ok(Some(buf).into())
 }
