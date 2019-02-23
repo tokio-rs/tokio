@@ -6,6 +6,8 @@
 //!
 //! This crate provides primitives for synchronizing asynchronous tasks.
 
+extern crate fnv;
+#[macro_use]
 extern crate futures;
 
 macro_rules! debug {
@@ -27,3 +29,4 @@ pub mod mpsc;
 pub mod oneshot;
 pub mod semaphore;
 pub mod task;
+pub mod watch;

@@ -9,5 +9,7 @@
 //!   from one task to another.
 //! - [mpsc](mpsc/index.html), a multi-producer, single-consumer channel for
 //!   sending values between tasks.
+//! - [watch](watch/index.html), a single-producer, multi-consumer channel that
+//!   only stores the **most recently** sent value.
 
-pub use tokio_sync::{mpsc, oneshot};
+pub use tokio_sync::{mpsc, oneshot, watch};

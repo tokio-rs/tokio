@@ -19,6 +19,7 @@ Synchronization utilities.
 categories = ["asynchronous"]
 
 [dependencies]
+fnv = "1.0.6"
 futures = "0.1.19"
 
 [dev-dependencies]
