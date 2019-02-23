@@ -511,7 +511,7 @@ macro_rules! span {
         $($k:ident $( = $val:expr )* ),*
     ) => {
         {
-            use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
+            use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
@@ -521,12 +521,12 @@ macro_rules! span {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                Span::new_root(
+                $crate::Span::new_root(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                Span::new_disabled()
+                $crate::Span::new_disabled()
             }
         }
     };
@@ -538,7 +538,7 @@ macro_rules! span {
         $($k:ident $( = $val:expr )* ),*
     ) => {
         {
-            use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
+            use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
@@ -548,13 +548,13 @@ macro_rules! span {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                Span::child_of(
+                $crate::Span::child_of(
                     $parent,
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                Span::new_disabled()
+                $crate::Span::new_disabled()
             }
         }
     };
@@ -565,7 +565,7 @@ macro_rules! span {
         $($k:ident $( = $val:expr )* ),*
     ) => {
         {
-            use $crate::{callsite, field::{Value, ValueSet, AsField}, Span};
+            use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
@@ -575,12 +575,12 @@ macro_rules! span {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                Span::new(
+                $crate::Span::new(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                Span::new_disabled()
+                $crate::Span::new_disabled()
             }
         }
     };
