@@ -251,8 +251,15 @@ impl<'a> Span<'a> {
     /// [metadata]: ::metadata::Metadata
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
-    pub fn child_of(parent: Id, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
-        Self::make(meta, NewSpan::child_of(parent, meta, values))
+    pub fn child_of<I>(parent: I, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a>
+    where
+        I: Into<Option<Id>>
+    {
+        let new_span = match parent.into() {
+            Some(parent) => NewSpan::child_of(parent, meta, values),
+            None => NewSpan::new_root(meta, values),
+        };
+        Self::make(meta, new_span)
     }
 
     /// Constructs a new disabled span.
@@ -411,6 +418,12 @@ impl<'a> fmt::Debug for Span<'a> {
             span.field("disabled", &true)
         }
         .finish()
+    }
+}
+
+impl<'a> Into<Option<Id>> for &'a Span<'a> {
+    fn into(self) -> Option<Id> {
+        self.id()
     }
 }
 
