@@ -209,6 +209,25 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Receiver<T> {
+    /// Returns a reference to the most recently sent value
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # use tokio::sync::watch;
+    /// let (_, rx) = watch::channel("hello");
+    /// assert_eq!(*rx.get_ref(), "hello");
+    /// ```
+    pub fn get_ref(&self) -> Ref<T> {
+        let inner = self.shared.value.read().unwrap();
+        Ref { inner }
+    }
+
     /// Attempts to receive the latest value sent via the channel.
     ///
     /// If a new, unobserved, value has been sent, a reference to it is
