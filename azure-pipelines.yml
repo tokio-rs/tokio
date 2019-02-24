@@ -9,7 +9,7 @@ jobs:
         curl https://sh.rustup.rs -sSf | sh -s -- -y
         echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
       displayName: Install Rust
-    - bash: |
+    - script: |
         rustup component add rustfmt
       displayName: Install rustfmt
     - script: |
