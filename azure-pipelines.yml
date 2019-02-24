@@ -12,7 +12,7 @@ jobs:
       parameters:
         platform: Linux
         # Pin the version of Rust in case rustfmt changes.
-        rust_version: 1.33.0
+        rust_version: 1.32.0
     - bash: |
         rustup component add rustfmt
       displayName: Install rustfmt
