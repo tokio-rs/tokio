@@ -23,15 +23,18 @@ jobs:
 # Basic test run on all platforms
 - template: ci/azure-test-stable.yml
   parameters:
-    name: Linux + Stable Rust
+    name: Linux_Stable
+    displayName: Linux + Stable Rust
     vmImage: ubuntu-16.04
 
 - template: ci/azure-test-stable.yml
   parameters:
-    name: OS X + Stable Rust
+    name: MacOS_Stable
+    displayName: OS X + Stable Rust
     vmImage: macOS-10.13
 
 - template: ci/azure-test-stable.yml
   parameters:
-    name: Windows + Stable Rust
+    name: Windows_Stable
+    displayName: Windows + Stable Rust
     vmImage: vs2017-win2016

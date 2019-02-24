@@ -1,5 +1,6 @@
 jobs:
 - job: ${{ parameters.name }}
+  displayName: ${{ parameters.displayName }}
   pool:
     vmImage: ${{ parameters.vmImage }}
   steps:
