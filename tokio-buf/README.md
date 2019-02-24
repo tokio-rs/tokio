@@ -10,7 +10,7 @@ First, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tokio-buf = "0.1"
+tokio-buf = "0.1.0"
 ```
 
 Next, add this to your crate:
