@@ -27,6 +27,8 @@ matrix:
 
   # Test combinations of enabled features and rustfmt
   - rust: stable
+    before_script: |
+      rustup component add rustfmt
     script: |
       set -e
 
