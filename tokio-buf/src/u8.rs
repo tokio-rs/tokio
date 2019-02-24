@@ -1,8 +1,8 @@
-use BufStream;
-use never::Never;
 use bytes::{Bytes, BytesMut};
 use futures::Poll;
+use never::Never;
 use std::io;
+use BufStream;
 
 impl BufStream for Vec<u8> {
     type Item = io::Cursor<Vec<u8>>;

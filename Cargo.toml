@@ -59,7 +59,7 @@ default = [
   "uds",
 ]
 
-codec = ["tokio-codec"]
+codec = ["io", "tokio-codec"]
 fs = ["tokio-fs"]
 io = ["bytes", "tokio-io"]
 reactor = ["io", "mio", "tokio-reactor"]
