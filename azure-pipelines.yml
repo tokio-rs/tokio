@@ -1,0 +1,14 @@
+jobs:
+
+- job: check_formatting
+  displayName: Check formatting
+  pool:
+    vmImage: ubuntu-16.04
+  steps:
+    - script: |
+        curl https://sh.rustup.rs -sSf | sh -s -- -y
+        $HOME/.cargo/bin/rustup component add rustfmt
+      displayName: Install stable Rust
+    - script: |
+        cargo fmt --all -- --check
+      displayName: Check formatting
