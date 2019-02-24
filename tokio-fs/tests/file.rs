@@ -182,3 +182,30 @@ fn clone() {
 
     assert_eq!(dst, b"clone successful")
 }
+
+#[test]
+#[allow(unused_imports)]
+fn poll_seek_deprecated() {
+    // bring AsyncSeek into scope to test for potential collision with
+    // poll_seek
+    use tokio_io::AsyncSeek;
+
+    let dir = TmpBuilder::new()
+        .prefix("tokio-fs-tests")
+        .tempdir()
+        .unwrap();
+
+    let file_path = dir.path().join("seek.txt");
+
+    pool::run({
+        OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(file_path)
+            .and_then(|mut file| {
+                let _poll = file.poll_seek(SeekFrom::Start(0));
+                Ok(())
+            })
+    });
+}
