@@ -1,17 +1,37 @@
-jobs:
+trigger: ["master"]
+pr: ["master"]
 
-- job: check_formatting
-  displayName: Check formatting
+jobs:
+# Check formatting
+- job: rustfmt
+  displayName: Check rustfmt
   pool:
     vmImage: ubuntu-16.04
   steps:
-    - script: |
-        curl https://sh.rustup.rs -sSf | sh -s -- -y
-        echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
-      displayName: Install Rust
-    - script: |
+    - template: ci/azure-install-rust.yml
+      parameters:
+        platform: Linux
+        # Pin the version of Rust in case rustfmt changes.
+        rust_version: 1.33.0
+    - bash: |
         rustup component add rustfmt
       displayName: Install rustfmt
-    - script: |
+    - bash: |
         cargo fmt --all -- --check
       displayName: Check formatting
+
+# Basic test run on all platforms
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: Linux + Stable Rust
+    vmImage: ubuntu-16.04
+
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: OS X + Stable Rust
+    vmImage: macOS-10.13
+
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: Windows + Stable Rust
+    vmImage: vs2017-win2016
