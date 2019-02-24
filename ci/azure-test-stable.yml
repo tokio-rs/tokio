@@ -7,7 +7,7 @@ jobs:
   - template: azure-install-rust.yml
     parameters:
       platform: ${{parameters.name}}
-      rust_version: $(RUSTUP_TOOLCHAIN)
+      rust_version: stable
   - bash: |
       # Limit the execution time of loom tests.
       export LOOM_MAX_DURATION=10
