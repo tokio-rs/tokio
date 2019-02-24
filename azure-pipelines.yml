@@ -7,8 +7,8 @@ jobs:
   steps:
     - script: |
         curl https://sh.rustup.rs -sSf | sh -s -- -y
-        $HOME/.cargo/bin/rustup component add rustfmt
-      displayName: Install stable Rust
+        echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
+      displayName: Install Rust
     - script: |
         cargo fmt --all -- --check
       displayName: Check formatting
