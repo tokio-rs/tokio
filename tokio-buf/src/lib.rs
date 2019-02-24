@@ -17,11 +17,11 @@ extern crate either;
 extern crate futures;
 
 mod never;
-#[cfg(feature = "util")]
-pub mod util;
 mod size_hint;
 mod str;
 mod u8;
+#[cfg(feature = "util")]
+pub mod util;
 
 pub use self::size_hint::SizeHint;
 #[doc(inline)]

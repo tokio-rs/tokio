@@ -27,7 +27,11 @@ matrix:
 
   # Test combinations of enabled features and rustfmt
   - rust: stable
+    before_script: |
+      rustup component add rustfmt
     script: |
+      set -e
+
       cargo fmt --all -- --check
       shopt -s expand_aliases
       alias check="cargo check --no-default-features"
