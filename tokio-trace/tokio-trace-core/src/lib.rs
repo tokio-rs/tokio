@@ -176,7 +176,6 @@ pub use self::{
     event::Event,
     field::Field,
     metadata::{Level, Metadata},
-    span::Span,
     subscriber::{Interest, Subscriber},
 };
 

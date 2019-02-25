@@ -135,7 +135,7 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-pub use tokio_trace_core::span::{Attributes, Span as Id};
+pub use tokio_trace_core::span::{Attributes, Id};
 
 use std::{
     borrow::Borrow,
