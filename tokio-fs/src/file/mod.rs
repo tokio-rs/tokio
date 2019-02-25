@@ -192,9 +192,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    #[deprecated(since = "0.1.7", note = "use tokio::io::AsyncSeek instead")]
     #[doc(hidden)]
-    #[allow(deprecated)]
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
         crate::blocking_io(|| self.std().seek(pos))
     }
