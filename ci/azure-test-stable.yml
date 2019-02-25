@@ -9,6 +9,7 @@ jobs:
       platform: ${{parameters.name}}
       rust_version: stable
   - bash: |
+      export CI=True
       cargo test --all
     env:
       LOOM_MAX_DURATION: 10
