@@ -135,7 +135,7 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-pub use tokio_trace_core::span::{NewSpan, Span as Id};
+pub use tokio_trace_core::span::{Attributes, Span as Id};
 
 use std::{
     borrow::Borrow,
@@ -223,7 +223,7 @@ impl<'a> Span<'a> {
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
     pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
-        let new_span = NewSpan::new(meta, values);
+        let new_span = Attributes::new(meta, values);
         Self::make(meta, new_span)
     }
 
@@ -239,7 +239,7 @@ impl<'a> Span<'a> {
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
     pub fn new_root(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
-        Self::make(meta, NewSpan::new_root(meta, values))
+        Self::make(meta, Attributes::new_root(meta, values))
     }
 
     /// Constructs a new `Span` as child of the given parent span, with the
@@ -256,8 +256,8 @@ impl<'a> Span<'a> {
         I: Into<Option<Id>>
     {
         let new_span = match parent.into() {
-            Some(parent) => NewSpan::child_of(parent, meta, values),
-            None => NewSpan::new_root(meta, values),
+            Some(parent) => Attributes::child_of(parent, meta, values),
+            None => Attributes::new_root(meta, values),
         };
         Self::make(meta, new_span)
     }
@@ -272,7 +272,7 @@ impl<'a> Span<'a> {
     }
 
     #[inline(always)]
-    fn make(meta: &'a Metadata<'a>, new_span: NewSpan) -> Span<'a> {
+    fn make(meta: &'a Metadata<'a>, new_span: Attributes) -> Span<'a> {
         let inner = dispatcher::with(move |dispatch| {
             let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))

@@ -17,7 +17,7 @@ pub struct Span(u64);
 /// Attributes provided to a `Subscriber` describing a new span when it is
 /// created.
 #[derive(Debug)]
-pub struct NewSpan<'a> {
+pub struct Attributes<'a> {
     metadata: &'a Metadata<'a>,
     values: &'a field::ValueSet<'a>,
     parent: Parent,
@@ -47,32 +47,33 @@ impl Span {
     }
 }
 
-// ===== impl NewSpan =====
+// ===== impl Attributes =====
 
-impl<'a> NewSpan<'a> {
-    /// Returns a new `NewSpan` as a child of the current span, with the
-    /// specified metadata and values.
+impl<'a> Attributes<'a> {
+    /// Returns `Attributes` describing a new child span of the current span,
+    /// with the provided metadata and values.
     pub fn new(metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
-        Self {
+        Attributes {
             metadata,
             values,
             parent: Parent::Current,
         }
     }
 
-    /// Returns a new `NewSpan` at the root of its own trace tree, with the specified metadata and values.
+    /// Returns `Attributes` describing a new span at the root of its own trace
+    /// tree, with the provided metadata and values.
     pub fn new_root(metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
-        Self {
+        Attributes {
             metadata,
             values,
             parent: Parent::Root,
         }
     }
 
-    /// Returns a new `NewSpan` as a child of the specified parent span, with the
-    /// specified metadata and values.
+    /// Returns `Attributes` describing a new child span of the specified
+    /// parent span, with the provided metadata and values.
     pub fn child_of(parent: Span, metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
-        Self {
+        Attributes {
             metadata,
             values,
             parent: Parent::Explicit(parent)

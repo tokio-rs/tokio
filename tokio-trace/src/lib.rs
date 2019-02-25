@@ -247,9 +247,9 @@
 //! #[macro_use]
 //! extern crate tokio_trace;
 //! # pub struct FooSubscriber;
-//! # use tokio_trace::{span::{Id, NewSpan}, Metadata, field::ValueSet};
+//! # use tokio_trace::{span::{Id, Attributes}, Metadata, field::ValueSet};
 //! # impl tokio_trace::Subscriber for FooSubscriber {
-//! #   fn new_span(&self, _: &NewSpan) -> Id { Id::from_u64(0) }
+//! #   fn new_span(&self, _: &Attributes) -> Id { Id::from_u64(0) }
 //! #   fn record(&self, _: &Id, _: &ValueSet) {}
 //! #   fn event(&self, _: &tokio_trace::Event) {}
 //! #   fn record_follows_from(&self, _: &Id, _: &Id) {}

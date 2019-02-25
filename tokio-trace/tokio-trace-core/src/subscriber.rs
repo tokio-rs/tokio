@@ -125,7 +125,7 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [recorder]: ::field::Record
     /// [`record` method]: ::field::ValueSet::record
-    fn new_span(&self, span: &span::NewSpan) -> Span;
+    fn new_span(&self, span: &span::Attributes) -> Span;
 
     // === Notification methods ===============================================
 

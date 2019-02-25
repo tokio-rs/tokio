@@ -208,7 +208,7 @@ impl Subscriber for SloggishSubscriber {
 
     fn new_span(
         &self,
-        span: &tokio_trace::span::NewSpan,
+        span: &tokio_trace::span::Attributes,
     ) -> tokio_trace::Id {
         let meta = span.metadata();
         let values = span.values();

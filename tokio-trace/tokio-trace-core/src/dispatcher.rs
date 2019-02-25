@@ -106,7 +106,7 @@ impl Dispatch {
     ///
     /// [`Span`]: ::span::Span
     #[inline]
-    pub fn new_span(&self, span: &span::NewSpan) -> Span {
+    pub fn new_span(&self, span: &span::Attributes) -> Span {
         self.subscriber.new_span(span)
     }
 
@@ -227,7 +227,7 @@ impl Subscriber for NoSubscriber {
         subscriber::Interest::never()
     }
 
-    fn new_span(&self, _: &span::NewSpan) -> Span {
+    fn new_span(&self, _: &span::Attributes) -> Span {
         Span::from_u64(0)
     }
 
