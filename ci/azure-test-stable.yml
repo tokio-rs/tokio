@@ -11,4 +11,4 @@ jobs:
   - bash: |
       cargo test --all
     env:
-      - LOOM_MAX_DURATION: 10
+      LOOM_MAX_DURATION: 10
