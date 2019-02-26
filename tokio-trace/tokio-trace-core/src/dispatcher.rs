@@ -1,7 +1,6 @@
 //! Dispatches trace events to `Subscriber`s.
 use {
-    callsite, field,
-    span,
+    callsite, field, span,
     subscriber::{self, Subscriber},
     Event, Metadata,
 };

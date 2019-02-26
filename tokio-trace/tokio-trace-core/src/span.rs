@@ -1,6 +1,6 @@
 //! Spans represent periods of time in the execution of a program.
 
-use ::{Metadata, field};
+use {field, Metadata};
 
 /// Identifies a span within the context of a subscriber.
 ///
@@ -69,11 +69,15 @@ impl<'a> Attributes<'a> {
 
     /// Returns `Attributes` describing a new child span of the specified
     /// parent span, with the provided metadata and values.
-    pub fn child_of(parent: Id, metadata: &'a Metadata<'a>, values: &'a field::ValueSet<'a>) -> Self {
+    pub fn child_of(
+        parent: Id,
+        metadata: &'a Metadata<'a>,
+        values: &'a field::ValueSet<'a>,
+    ) -> Self {
         Attributes {
             metadata,
             values,
-            parent: Parent::Explicit(parent)
+            parent: Parent::Explicit(parent),
         }
     }
 

@@ -12,7 +12,11 @@ use std::{
         Arc, Mutex,
     },
 };
-use tokio_trace::{field, Event, span::{Attributes, Id}, Metadata, Subscriber};
+use tokio_trace::{
+    field,
+    span::{Attributes, Id},
+    Event, Metadata, Subscriber,
+};
 
 #[derive(Debug, Eq, PartialEq)]
 enum Expect {

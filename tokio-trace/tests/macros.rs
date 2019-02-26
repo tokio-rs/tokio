@@ -28,8 +28,20 @@ fn span_root() {
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo");
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "bar",);
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: None,
+        "foo",
+        bar = 2,
+        baz = 3
+    );
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: None,
+        "foo",
+        bar = 2,
+        baz = 4,
+    );
     span!(level: tokio_trace::Level::DEBUG, parent: None, "foo");
     span!(level: tokio_trace::Level::DEBUG, parent: None, "bar",);
     span!(parent: None, "foo", bar = 2, baz = 3);
@@ -45,8 +57,20 @@ fn span_with_parent() {
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 4,);
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo");
     span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "bar",);
-    span!(level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 3);
-    span!(level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 4,);
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: &p,
+        "foo",
+        bar = 2,
+        baz = 3
+    );
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: &p,
+        "foo",
+        bar = 2,
+        baz = 4,
+    );
     span!(level: tokio_trace::Level::DEBUG, parent: &p, "foo");
     span!(level: tokio_trace::Level::DEBUG, parent: &p, "bar",);
     span!(parent: &p, "foo", bar = 2, baz = 3);

@@ -227,7 +227,6 @@ impl<'a> Span<'a> {
         Self::make(meta, new_span)
     }
 
-
     /// Constructs a new `Span` as the root of its own trace tree, with the
     /// given [metadata] and set of [field values].
     ///
@@ -253,7 +252,7 @@ impl<'a> Span<'a> {
     /// [`follows_from`]: ::span::Span::follows_from
     pub fn child_of<I>(parent: I, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a>
     where
-        I: Into<Option<Id>>
+        I: Into<Option<Id>>,
     {
         let new_span = match parent.into() {
             Some(parent) => Attributes::child_of(parent, meta, values),
