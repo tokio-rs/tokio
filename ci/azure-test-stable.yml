@@ -8,8 +8,18 @@ jobs:
     parameters:
       platform: ${{parameters.name}}
       rust_version: stable
+
   - bash: |
       export CI=True
       cargo test --all
     env:
       LOOM_MAX_DURATION: 10
+    displayName: cargo test
+
+  - bash: |
+      rustup target add $TARGET
+      cargo check --all --exclude tokio-tls --target $TARGET
+      cargo check --tests --all --exclude tokio-tls --target $TARGET
+    condition: eq(variables['agent.os'], 'Linux')
+    env: { TARGET: 'i686-unknown-linux-gnu' }
+    displayName: cross compilation
