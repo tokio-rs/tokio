@@ -11,7 +11,7 @@ jobs:
 
   - bash: |
       export CI=True
-      # cargo test --all
+      cargo test --all
     env:
       LOOM_MAX_DURATION: 10
     displayName: cargo test
