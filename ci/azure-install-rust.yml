@@ -21,6 +21,9 @@ steps:
       displayName: Install rust (windows)
   # All platforms.
   - bash: |
+        rustup install nightly
+    displayName: Install nightly
+  - bash: |
         rustc -Vv
         cargo -V
     displayName: Query rust and cargo versions

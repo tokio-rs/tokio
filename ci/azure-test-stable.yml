@@ -24,3 +24,10 @@ jobs:
     condition: eq(variables['agent.os'], 'Linux')
     env: { TARGET: 'i686-unknown-linux-gnu' }
     displayName: cross compilation
+
+  - bash: |
+      cd tokio-async-await
+      cargo +nightly check --all
+      cargo +nightly check --features async-await-preview
+    continueOnError: true
+    displayName: async/await support
