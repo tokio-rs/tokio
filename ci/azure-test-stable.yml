@@ -2,6 +2,7 @@ jobs:
 - job: ${{ parameters.name }}
   variables:
     rust_minimum_version: 1.26.0
+    sanitizer_nightly_version: nightly-2018-11-18
   displayName: ${{ parameters.displayName }}
   pool:
     vmImage: ${{ parameters.vmImage }}
@@ -57,26 +58,25 @@ jobs:
   
   - bash: |
       # Install the right nightly version
-      rustup toolchain install $(nightly_version)
+      rustup toolchain install $(sanitizer_nightly_version)
       # Make sure the benchmarks compile
-      cargo +$(nightly_version) build --benches --all
+      cargo +$(sanitizer_nightly_version) build --benches --all
       export ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0"
       export TSAN_OPTIONS="suppressions=`pwd`/ci/tsan"
       export RUST_BACKTRACE=1
       # === tokio-timer ====
       # Run address sanitizer
       RUSTFLAGS="-Z sanitizer=address" \
-      cargo +$(nightly_version) test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
+      cargo +$(sanitizer_nightly_version) test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
       # Run thread sanitizer
       RUSTFLAGS="-Z sanitizer=thread" \
-      cargo +$(nightly_version) test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
+      cargo +$(sanitizer_nightly_version) test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
       # === tokio-threadpool ====
       # Run address sanitizer
       RUSTFLAGS="-Z sanitizer=address" \
-      cargo +$(nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
+      cargo +$(sanitizer_nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
       # Run thread sanitizer
       RUSTFLAGS="-Z sanitizer=thread" \
-      cargo +$(nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
-    variables: { nightly_version: nightly-2018-11-18 }
+      cargo +$(sanitizer_nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
     env: { TSAN: 'yes' }
     displayName: Run thread sanitizer checks 
