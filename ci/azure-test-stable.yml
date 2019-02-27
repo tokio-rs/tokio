@@ -79,4 +79,5 @@ jobs:
       RUSTFLAGS="-Z sanitizer=thread" \
       cargo +$(sanitizer_nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
     env: { TSAN: 'yes' }
+    condition: eq(variables['agent.os'], 'Linux')
     displayName: Run thread sanitizer checks 
