@@ -46,6 +46,11 @@ jobs:
   variables: 
     sanitizer_nightly_version: nightly-2018-11-18
   steps:
+  - template: ci/azure-install-rust.yml
+    parameters:
+      platform: Linux
+      rust_version: stable
+
   - bash: |
       # Install the right nightly version
       rustup toolchain install $(sanitizer_nightly_version)
