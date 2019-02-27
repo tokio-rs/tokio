@@ -1,8 +1,7 @@
-variables:
-  rust_minimum_version: 1.26.0
-
 jobs:
 - job: ${{ parameters.name }}
+  variables:
+    rust_minimum_version: 1.26.0
   displayName: ${{ parameters.displayName }}
   pool:
     vmImage: ${{ parameters.vmImage }}
