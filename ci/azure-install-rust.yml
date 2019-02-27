@@ -20,9 +20,10 @@ steps:
         RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
       displayName: Install rust (windows)
   # All platforms.
-  - bash: |
-        rustup install nightly
+  - bash: rustup install nightly
     displayName: Install nightly
+  - bash: rustup toolchain install ${{parameters.rust_minimum_version}}
+    displayName: Install minimum version
   - bash: |
         rustc -Vv
         cargo -V

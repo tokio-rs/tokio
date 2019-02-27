@@ -1,3 +1,6 @@
+variables:
+  rust_minimum_version: 1.26.0
+
 jobs:
 - job: ${{ parameters.name }}
   displayName: ${{ parameters.displayName }}
@@ -8,13 +11,34 @@ jobs:
     parameters:
       platform: ${{parameters.name}}
       rust_version: stable
+      rust_minimum_version: $(rust_minimum_version)
 
   - bash: |
-      export CI=True
-      cargo test --all
+      cargo test --all --no-fail-fast
+      cargo test -p tokio-buf --no-default-features
+      cargo doc --all
     env:
       LOOM_MAX_DURATION: 10
+      CI: 'True'
     displayName: cargo test
+
+  - bash: cargo +$(rust_minimum_version) check --all
+    displayName: Minimum version support
+
+  - bash: |
+      shopt -s expand_aliases
+      alias check="cargo check --no-default-features"
+      check
+      check --features codec
+      check --features fs
+      check --features io
+      check --features reactor
+      check --features rt-full
+      check --features tcp
+      check --features timer
+      check --features udp
+      check --features uds
+    displayName: cargo check
 
   - bash: |
       sudo apt-get install gcc-multilib
@@ -23,7 +47,7 @@ jobs:
       cargo check --tests --all --exclude tokio-tls --target $TARGET
     condition: eq(variables['agent.os'], 'Linux')
     env: { TARGET: 'i686-unknown-linux-gnu' }
-    displayName: cross compilation
+    displayName: Cross compilation
 
   - bash: |
       cd tokio-async-await
