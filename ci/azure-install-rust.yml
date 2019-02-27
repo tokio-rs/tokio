@@ -23,6 +23,7 @@ steps:
   - bash: rustup install nightly
     displayName: Install nightly
   - bash: rustup toolchain install ${{parameters.rust_minimum_version}}
+    condition: ne(${{parameters.rust_minimum_version}}, '')
     displayName: Install minimum version
   - bash: |
         rustc -Vv
