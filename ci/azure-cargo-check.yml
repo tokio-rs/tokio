@@ -12,6 +12,6 @@ jobs:
       rust_version: stable
 
   - ${{ each crate in parameters.crates }}:
-    - ${{ each feature in crate.value }}
+    - ${{ each feature in crate.value }}:
       - script: cargo check -p $(crate.key) --no-default-features $(feature)
         displayName: cargo check -p $(crate.key) --no-default-features $(feature)
