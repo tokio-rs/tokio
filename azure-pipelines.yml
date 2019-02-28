@@ -46,7 +46,7 @@ jobs:
       - tokio-threadpool
       - tokio-timer
       - tokio-trace
-      - tokio-trace-core
+      - tokio-trace/tokio-trace-core
 
 - template: ci/azure-cargo-check.yml
   parameters:
