@@ -12,7 +12,35 @@ jobs:
   parameters:
     name: test
     displayName: Test
-    # vmImage: ubuntu-16.04
+
+- template: ci/azure-cargo-check.yml
+  parameters:
+    name: features
+    features:
+      - codec
+      - fs
+      - io
+      - reactor
+      - rt-full
+      - tcp
+      - timer
+      - udp
+      - uds
+
+# This represents the minimum Rust version supported by Tokio. Updating this
+# should be done in a dedicated PR and cannot be greater than two 0.x
+# releases prior to the current stable.
+#
+# Tests are not run as tests may require newer versions of rust.
+- template: ci/azure-check-minrust.yml
+  parameters:
+    name: minrust
+    rust_version: 1.26.0
+
+- template: ci/azure-tsan.yml
+  parameters:
+    name: tsan
+
 
     # 
     # - template: ci/azure-test-stable.yml

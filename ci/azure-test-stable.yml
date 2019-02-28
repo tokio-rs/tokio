@@ -1,6 +1,3 @@
-parameters:
-  crates: []
-
 jobs:
 - job: ${{ parameters.name }}
   strategy:
