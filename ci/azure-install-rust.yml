@@ -7,7 +7,7 @@ steps:
     env:
       RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
     displayName: Install rust
-    condition: eq(variables['Agent.OS'], 'Windows_NT')
+    condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
 
   # Windows.
   - script: |
@@ -19,7 +19,7 @@ steps:
     env:
       RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
     displayName: Install rust (windows)
-    condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
+    condition: eq(variables['Agent.OS'], 'Windows_NT')
 
   # All platforms.
   - script: |
