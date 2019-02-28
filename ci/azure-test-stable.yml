@@ -20,14 +20,14 @@ jobs:
       rust_version: stable
 
   - ${{ each crate in parameters.crates }}:
-    - ${{ if eq(crate.key, 'tokio') }}:
+    - ${{ if eq(crate, 'tokio') }}:
       - script: cargo test
         env:
           LOOM_MAX_DURATION: 10
           CI: 'True'
         displayName: cargo test
 
-    - ${{ if not(eq(crate.key, 'tokio')) }}:
+    - ${{ if not(eq(crate, 'tokio')) }}:
       - script: cargo test
         env:
           LOOM_MAX_DURATION: 10
