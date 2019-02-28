@@ -9,9 +9,9 @@ jobs:
       parameters:
         # Pin the version of Rust in case rustfmt changes.
         rust_version: 1.32.0
-    - bash: |
+    - script: |
         rustup component add rustfmt
       displayName: Install rustfmt
-    - bash: |
+    - script: |
         cargo fmt --all -- --check
       displayName: Check formatting
