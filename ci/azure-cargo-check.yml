@@ -1,5 +1,5 @@
-parameters:
-  features: []
+# parameters:
+#   features: []
 
 jobs:
 - job: ${{ parameters.name }}
@@ -11,6 +11,7 @@ jobs:
     parameters:
       rust_version: stable
 
-  - ${{ each feature in parameters.features }}:
-    - script: cargo check --no-default-features $(feature)
-      displayName: cargo check --no-default-features $(feature)
+  - ${{ each crate in parameters.crates }}:
+    - ${{ each feature in crate.value }}
+      - script: cargo check -p ${{ crate.key }} --no-default-features $(feature)
+        displayName: cargo check -p ${{ crate.key }} --no-default-features $(feature)
