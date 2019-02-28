@@ -7,11 +7,46 @@ jobs:
   parameters:
     name: rustfmt
 
-# Basic test run on all platforms
+# Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
     name: test
     displayName: Test
+    cross: true
+    crates:
+      - tokio
+
+# Test crates that are platform specific
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test
+    displayName: Test
+    cross: true
+    crates:
+      - tokio-fs
+      - tokio-reactor
+      - tokio-signal
+      - tokio-tcp
+      - tokio-tls
+      - tokio-udp
+      - tokio-uds
+
+# Test crates that are NOT platform specific
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test
+    displayName: Test
+    crates:
+      - tokio-buf
+      - tokio-codec
+      - tokio-current-thread
+      - tokio-executor
+      - tokio-io
+      - tokio-sync
+      - tokio-threadpool
+      - tokio-timer
+      - tokio-trace
+      - tokio-trace-core
 
 - template: ci/azure-cargo-check.yml
   parameters:
@@ -37,7 +72,7 @@ jobs:
   parameters:
     name: async_await
     displayName: Async / Await
-    rust: nightly
+    rust: nightly-2019-02-01
     crates:
       tokio:
         - async-await-preview

@@ -1,30 +1,27 @@
 jobs:
 - job: ${{ parameters.name }}
+  displayName: ${{ parameters.displayName }}
   strategy:
     matrix:
       Linux:
         vmImage: ubuntu-16.04
-      MacOS:
-        vmImage: macOS-10.13
-      Windows:
-        vmImage: vs2017-win2016
 
-      # ${{ each crate in parameters.crates }}:
-      #   tokio-${{ crate }}:
-      #     crate: tower-${{ crate }}
-
-        # variables:
-        #   rust_minimum_version: 1.26.0
-  displayName: ${{ parameters.displayName }}
+      ${{ if parameters.cross }}:
+        MacOS:
+          vmImage: macOS-10.13
+        Windows:
+          vmImage: vs2017-win2016
   pool:
     vmImage: $(vmImage)
+
   steps:
   - template: azure-install-rust.yml
     parameters:
       rust_version: stable
 
-  - script: cargo test --all
-    env:
-      LOOM_MAX_DURATION: 10
-      CI: 'True'
-    displayName: cargo test --all
+  - ${{ each crate in parameters.crates }}:
+    - script: cargo test -p ${{ crate }}
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+      displayName: cargo test -p ${{ crate }}
