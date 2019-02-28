@@ -10,8 +10,8 @@ jobs:
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
-    name: test
-    displayName: Test
+    name: test_tokio
+    displayName: Test tokio
     cross: true
     crates:
       - tokio
@@ -19,8 +19,8 @@ jobs:
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml
   parameters:
-    name: test
-    displayName: Test
+    name: test_sub_cross
+    displayName: Test sub crates
     cross: true
     crates:
       - tokio-fs
@@ -34,8 +34,8 @@ jobs:
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
   parameters:
-    name: test
-    displayName: Test
+    name: test_linux
+    displayName: test sub crates platform independent
     crates:
       - tokio-buf
       - tokio-codec
