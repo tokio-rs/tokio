@@ -1,5 +1,5 @@
-# parameters:
-#   features: []
+parameters:
+  noDefaultFeatures: '--no-default-features'
 
 jobs:
 - job: ${{ parameters.name }}
@@ -14,10 +14,10 @@ jobs:
   - ${{ each crate in parameters.crates }}:
     - ${{ each feature in crate.value }}:
       - ${{ if eq(crate.key, 'tokio') }}:
-        - script: cargo check --no-default-features --features ${{ feature }}
+        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
           displayName: Check features = ${{ feature }}
 
       - ${{ if not(eq(crate.key, 'tokio')) }}:
-        - script: cargo check --no-default-features --features ${{ feature }}
+        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
           displayName: Check `${{ crate.key }}`, features = ${{ feature }}
           workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
