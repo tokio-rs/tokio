@@ -1,6 +1,6 @@
 jobs:
 - job: ${{ parameters.name }}
-  displayName: Check feature permutations
+  displayName: TSAN
   pool:
     vmImage: ubuntu-16.04
   steps:

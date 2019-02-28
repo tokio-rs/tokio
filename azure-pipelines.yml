@@ -27,6 +27,12 @@ jobs:
       - udp
       - uds
 
+# Try cross compiling
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross_32bit_linux
+    target: i686-unknown-linux-gnu
+
 # This represents the minimum Rust version supported by Tokio. Updating this
 # should be done in a dedicated PR and cannot be greater than two 0.x
 # releases prior to the current stable.
@@ -40,62 +46,3 @@ jobs:
 - template: ci/azure-tsan.yml
   parameters:
     name: tsan
-
-
-    # 
-    # - template: ci/azure-test-stable.yml
-    #   parameters:
-    #     name: MacOS_Stable
-    #     displayName: OS X + Stable Rust
-    #     vmImage: macOS-10.13
-    # 
-    # - template: ci/azure-test-stable.yml
-    #   parameters:
-    #     name: Windows_Stable
-    #     displayName: Windows + Stable Rust
-    #     vmImage: vs2017-win2016
-    # 
-    # - job: linux
-    #   displayName: Linux Specific
-    #   pool:
-    #     vmImage: ubuntu-16.04
-    #   variables:
-    #     sanitizer_nightly_version: nightly-2018-11-18
-    #   steps:
-    #   - template: ci/azure-install-rust.yml
-    #     parameters:
-    #       platform: Linux
-    #       rust_version: stable
-    # 
-    #   - bash: |
-    #       # Install the right nightly version
-    #       rustup toolchain install $(sanitizer_nightly_version)
-    #       # Make sure the benchmarks compile
-    #       cargo +$(sanitizer_nightly_version) build --benches --all
-    #       export ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0"
-    #       export TSAN_OPTIONS="suppressions=`pwd`/ci/tsan"
-    #       export RUST_BACKTRACE=1
-    #       # === tokio-timer ====
-    #       # Run address sanitizer
-    #       RUSTFLAGS="-Z sanitizer=address" \
-    #       cargo +$(sanitizer_nightly_version) test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
-    #       # Run thread sanitizer
-    #       RUSTFLAGS="-Z sanitizer=thread" \
-    #       cargo +$(sanitizer_nightly_version) test -p tokio-timer --test hammer --target x86_64-unknown-linux-gnu
-    #       # === tokio-threadpool ====
-    #       # Run address sanitizer
-    #       RUSTFLAGS="-Z sanitizer=address" \
-    #       cargo +$(sanitizer_nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
-    #       # Run thread sanitizer
-    #       RUSTFLAGS="-Z sanitizer=thread" \
-    #       cargo +$(sanitizer_nightly_version) test -p tokio-threadpool --tests --target x86_64-unknown-linux-gnu
-    #     env: { TSAN: 'yes' }
-    #     displayName: Run thread sanitizer checks 
-    # 
-    #   - bash: |
-    #       sudo apt-get install gcc-multilib
-    #       rustup target add $TARGET
-    #       cargo check --all --exclude tokio-tls --target $TARGET
-    #       cargo check --tests --all --exclude tokio-tls --target $TARGET
-    #     env: { TARGET: 'i686-unknown-linux-gnu' }
-    #     displayName: Test cross compilation
