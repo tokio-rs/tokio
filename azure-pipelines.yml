@@ -16,6 +16,7 @@ jobs:
 - template: ci/azure-cargo-check.yml
   parameters:
     name: features
+    displayName: Check feature permtuations
     rust: stable
     crates:
       tokio:
@@ -34,7 +35,8 @@ jobs:
 # Check async / await
 - template: ci/azure-cargo-check.yml
   parameters:
-    name: async-await
+    name: async_await
+    displayName: Async / Await
     rust: nightly
     crates:
       tokio:
