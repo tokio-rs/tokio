@@ -20,8 +20,17 @@ jobs:
       rust_version: stable
 
   - ${{ each crate in parameters.crates }}:
-    - script: cargo test -p ${{ crate }}
-      env:
-        LOOM_MAX_DURATION: 10
-        CI: 'True'
-      displayName: cargo test -p ${{ crate }}
+    - ${{ if eq(crate.key, 'tokio') }}:
+      - script: cargo test
+        env:
+          LOOM_MAX_DURATION: 10
+          CI: 'True'
+        displayName: cargo test
+
+    - ${{ if not(eq(crate.key, 'tokio')) }}:
+      - script: cargo test
+        env:
+          LOOM_MAX_DURATION: 10
+          CI: 'True'
+        displayName: cargo test -p ${{ crate }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
