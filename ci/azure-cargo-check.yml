@@ -9,9 +9,9 @@ jobs:
   steps:
   - template: azure-install-rust.yml
     parameters:
-      rust_version: stable
+      rust_version: ${{ parameters.rust }}
 
   - ${{ each crate in parameters.crates }}:
     - ${{ each feature in crate.value }}:
-      - script: cargo check -p ${{ crate.key }} --no-default-features ${{ feature }}
-        displayName: cargo check -p ${{ crate.key }} --no-default-features ${{ feature }}
+      - script: cargo check -p ${{ crate.key }} --no-default-features --features ${{ feature }}
+        displayName: Check `${{ crate.key }}`, features = ${{ feature }}
