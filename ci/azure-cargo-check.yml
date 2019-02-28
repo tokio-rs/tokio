@@ -13,5 +13,5 @@ jobs:
 
   - ${{ each crate in parameters.crates }}:
     - ${{ each feature in crate.value }}
-      - script: cargo check -p ${{ crate.key }} --no-default-features $(feature)
-        displayName: cargo check -p ${{ crate.key }} --no-default-features $(feature)
+      - script: cargo check -p $(crate.key) --no-default-features $(feature)
+        displayName: cargo check -p $(crate.key) --no-default-features $(feature)
