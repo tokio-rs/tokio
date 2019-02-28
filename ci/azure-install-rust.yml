@@ -22,7 +22,7 @@ steps:
     condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
 
   # All platforms.
-  - bash: |
+  - script: |
         rustc -Vv
         cargo -V
     displayName: Query rust and cargo versions
