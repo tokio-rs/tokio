@@ -1,0 +1,17 @@
+jobs:
+# Check formatting
+- job: ${{ parameters.name }}
+  displayName: Check rustfmt
+  pool:
+    vmImage: ubuntu-16.04
+  steps:
+    - template: azure-install-rust.yml
+      parameters:
+        # Pin the version of Rust in case rustfmt changes.
+        rust_version: 1.32.0
+    - bash: |
+        rustup component add rustfmt
+      displayName: Install rustfmt
+    - bash: |
+        cargo fmt --all -- --check
+      displayName: Check formatting

@@ -1,47 +1,33 @@
+parameters:
+  crates: []
+
 jobs:
 - job: ${{ parameters.name }}
-  variables:
-    rust_minimum_version: 1.26.0
+  strategy:
+    matrix:
+      Linux:
+        vmImage: ubuntu-16.04
+      MacOS:
+        vmImage: macOS-10.13
+      Windows:
+        vmImage: vs2017-win2016
+
+      # ${{ each crate in parameters.crates }}:
+      #   tokio-${{ crate }}:
+      #     crate: tower-${{ crate }}
+
+        # variables:
+        #   rust_minimum_version: 1.26.0
   displayName: ${{ parameters.displayName }}
   pool:
-    vmImage: ${{ parameters.vmImage }}
+    vmImage: $(vmImage)
   steps:
   - template: azure-install-rust.yml
     parameters:
-      platform: ${{parameters.name}}
       rust_version: stable
-      rust_minimum_version: $(rust_minimum_version)
 
-  - bash: |
-      cargo test --all --no-fail-fast
-      cargo test -p tokio-buf --no-default-features
-      cargo doc --all
+  - script: cargo test --all
     env:
       LOOM_MAX_DURATION: 10
       CI: 'True'
-    displayName: cargo test
-
-  - bash: cargo +$(rust_minimum_version) check --all
-    displayName: Minimum version support
-
-  - bash: |
-      shopt -s expand_aliases
-      alias check="cargo check --no-default-features"
-      check
-      check --features codec
-      check --features fs
-      check --features io
-      check --features reactor
-      check --features rt-full
-      check --features tcp
-      check --features timer
-      check --features udp
-      check --features uds
-    displayName: cargo check
-
-  - bash: |
-      cd tokio-async-await
-      cargo +nightly check --all
-      cargo +nightly check --features async-await-preview
-    continueOnError: true
-    displayName: Test async/await support
+    displayName: cargo test --all

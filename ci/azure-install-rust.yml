@@ -1,5 +1,5 @@
 steps:
-  - ${{ if not(startsWith(parameters.platform, 'Windows')) }}:
+  - ${{ if not(startsWith(Agent.OS, 'Windows')) }}:
     # Linux and macOS.
     - script: |
         set -e
@@ -8,7 +8,8 @@ steps:
       env:
         RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
       displayName: Install rust
-  - ${{ if startsWith(parameters.platform, 'Windows') }}:
+
+  - ${{ if startsWith(Agent.OS, 'Windows') }}:
     # Windows.
     - script: |
         echo "windows"
@@ -19,12 +20,8 @@ steps:
       env:
         RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
       displayName: Install rust (windows)
+
   # All platforms.
-  - bash: rustup install nightly
-    displayName: Install nightly
-  - bash: rustup toolchain install ${{parameters.rust_minimum_version}}
-    condition: ${{or(parameters.rust_minimum_version, false)}}
-    displayName: Install minimum version
   - bash: |
         rustc -Vv
         cargo -V
