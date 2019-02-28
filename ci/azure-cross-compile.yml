@@ -8,7 +8,7 @@ jobs:
     parameters:
       rust_version: stable
 
-  - script: apt-get install gcc-multilib
+  - script: sudo apt-get install gcc-multilib
     displayName: "Install gcc-multilib"
 
   - script: rustup target add ${{ parameters.target }}
