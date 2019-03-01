@@ -14,6 +14,16 @@ macro_rules! t_trace {
     };
 }
 
+#[cfg(not(feature = "trace"))]
+macro_rules! span {
+    ($msg:expr) => {
+        $crate::trace::Span::new()
+    };
+    ($msg:expr, $($k:ident = $v:expr),* ) => {
+        $crate::trace::Span::new()
+    };
+}
+
 pub use self::imp::*;
 
 #[cfg(feature = "trace")]
@@ -26,29 +36,29 @@ mod imp {
 
 #[cfg(not(feature = "trace"))]
 mod imp {
-    use std::fmt;
+    use std::{fmt, marker::PhantomData};
 
     #[derive(Clone, Debug)]
-    pub struct Span {
-        _p: (),
+    pub struct Span<'a> {
+        _p: PhantomData<&'a ()>,
     }
 
-    /// A `Value` which serializes as a string using `fmt::Display`.
-    #[derive(Clone)]
-    pub struct DisplayValue<T: fmt::Display>(T);
+    // /// A `Value` which serializes as a string using `fmt::Display`.
+    // #[derive(Clone)]
+    // pub struct DisplayValue<T: fmt::Display>(T);
 
     /// A `Value` which serializes as a string using `fmt::Debug`.
     #[derive(Clone)]
     pub struct DebugValue<T: fmt::Debug>(T);
 
-    /// Wraps a type implementing `fmt::Display` as a `Value` that can be
-    /// recorded using its `Display` implementation.
-    pub fn display<T>(t: T) -> DisplayValue<T>
-    where
-        T: fmt::Display,
-    {
-        DisplayValue(t)
-    }
+    // /// Wraps a type implementing `fmt::Display` as a `Value` that can be
+    // /// recorded using its `Display` implementation.
+    // pub fn display<T>(t: T) -> DisplayValue<T>
+    // where
+    //     T: fmt::Display,
+    // {
+    //     DisplayValue(t)
+    // }
 
     /// Wraps a type implementing `fmt::Debug` as a `Value` that can be
     /// recorded using its `Debug` implementation.
@@ -59,19 +69,23 @@ mod imp {
         DebugValue(t)
     }
 
-    impl Span {
+    impl<'a> Span<'a> {
+        pub fn new() -> Self {
+            Self { _p: PhantomData }
+        }
+
         #[inline(always)]
         pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
             f()
         }
     }
 
-    impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
-        #[inline]
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            fmt::Display::fmt(&self.0, f)
-        }
-    }
+    // impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
+    //     #[inline]
+    //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    //         fmt::Display::fmt(&self.0, f)
+    //     }
+    // }
 
     impl<T: fmt::Debug> fmt::Debug for DebugValue<T> {
         #[inline]

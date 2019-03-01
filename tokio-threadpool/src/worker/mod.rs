@@ -11,6 +11,7 @@ use pool::{self, BackupId, Pool};
 use sender::Sender;
 use shutdown::ShutdownTrigger;
 use task::{self, CanBlock, Task};
+// use trace;
 
 use tokio_executor;
 
@@ -58,6 +59,8 @@ pub struct Worker {
 
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     trigger: Arc<ShutdownTrigger>,
+
+    // span: trace::Span<'static>,
 
     // Keep the value on the current thread.
     _p: PhantomData<Rc<()>>,
@@ -122,13 +125,16 @@ impl Worker {
             // Enter an execution context
             let mut enter = tokio_executor::enter().unwrap();
 
-            tokio_executor::with_default(&mut sender, &mut enter, |enter| {
-                if let Some(ref callback) = self.pool.config.around_worker {
-                    callback.call(self, enter);
-                } else {
-                    self.run();
-                }
-            });
+            // Enter a trace span for this worker
+            span!("worker", id = self.id.0).enter(|| {
+                tokio_executor::with_default(&mut sender, &mut enter, |enter| {
+                    if let Some(ref callback) = self.pool.config.around_worker {
+                        callback.call(self, enter);
+                    } else {
+                        self.run();
+                    }
+                });
+            })
         });
 
         // Can't be in blocking mode and finalization mode
@@ -577,7 +583,7 @@ impl Worker {
         // due to the fact that a worker can be notified without it being popped
         // from the sleep stack. Extra care is needed to deal with this.
 
-        t_trace!("Worker::sleep;", worker = self.id);
+        t_trace!("Worker::sleep;", worker = self.id.0);
 
         let mut state: State = self.entry().state.load(Acquire).into();
 
