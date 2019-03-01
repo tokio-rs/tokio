@@ -18,7 +18,4 @@ jobs:
     displayName: Check source
 
   - script: cargo check --tests --all --exclude tokio-tls --target ${{ parameters.target }}
-    displayName: Check source
-
-  - script: cargo check --all
-    displayName: cargo check --all
+    displayName: Check tests

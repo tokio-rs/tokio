@@ -1,4 +1,5 @@
 parameters:
+  benches: false
   noDefaultFeatures: '--no-default-features'
 
 jobs:
@@ -21,3 +22,7 @@ jobs:
         - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
           displayName: Check `${{ crate.key }}`, features = ${{ feature }}
           workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+
+  - ${{ if parameters.benches }}:
+    - script: cargo check --benches --all
+      displayName: Check benchmarks

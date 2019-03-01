@@ -74,6 +74,7 @@ jobs:
     displayName: Async / Await
     rust: nightly-2019-02-22
     noDefaultFeatures: ''
+    benches: true
     crates:
       tokio:
         - async-await-preview
