@@ -2,7 +2,7 @@
 
 A scoped, structured logging and diagnostics system.
 
-[Documentation](https://tokio-rs.github.io/tokio/tokio_trace/index.html)
+[Documentation](https://tokio-rs.github.io/tokio/doc/tokio_trace/)
 
 ## Overview
 
