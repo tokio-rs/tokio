@@ -33,7 +33,7 @@ the Rust programming language. It is:
 
 The API docs for the master branch are published [here][master-dox].
 
-[master-dox]: https://tokio-rs.github.io/tokio/tokio/
+[master-dox]: https://tokio-rs.github.io/tokio/doc/tokio/
 
 ## Overview
 
