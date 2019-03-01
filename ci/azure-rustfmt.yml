@@ -7,8 +7,7 @@ jobs:
   steps:
     - template: azure-install-rust.yml
       parameters:
-        # Pin the version of Rust in case rustfmt changes.
-        rust_version: 1.32.0
+        rust_version: stable
     - script: |
         rustup component add rustfmt
       displayName: Install rustfmt
