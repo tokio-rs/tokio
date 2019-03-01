@@ -1,8 +1,8 @@
 //! Dispatches trace events to `Subscriber`s.
 use {
-    callsite, field,
+    callsite, field, span,
     subscriber::{self, Subscriber},
-    Event, Metadata, Span,
+    Event, Metadata,
 };
 
 use std::{
@@ -23,12 +23,12 @@ thread_local! {
 
 /// Sets this dispatch as the default for the duration of a closure.
 ///
-/// The default dispatcher is used when creating a new [`Span`] or
+/// The default dispatcher is used when creating a new [span] or
 /// [`Event`], _if no span is currently executing_. If a span is currently
 /// executing, new spans or events are dispatched to the subscriber that
 /// tagged that span, instead.
 ///
-/// [`Span`]: ::span::Span
+/// [span]: ../span/index.html
 /// [`Subscriber`]: ::Subscriber
 /// [`Event`]: ::Event
 pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
@@ -97,16 +97,16 @@ impl Dispatch {
         self.subscriber.register_callsite(metadata)
     }
 
-    /// Record the construction of a new [`Span`], returning a new ID for the
+    /// Record the construction of a new span, returning a new [ID] for the
     /// span being constructed.
     ///
     /// This calls the [`new_span`](::Subscriber::new_span)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     ///
-    /// [`Span`]: ::span::Span
+    /// [ID]: ../span/struct.Id.html
     #[inline]
-    pub fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span {
-        self.subscriber.new_span(metadata, values)
+    pub fn new_span(&self, span: &span::Attributes) -> span::Id {
+        self.subscriber.new_span(span)
     }
 
     /// Record a set of values on a span.
@@ -114,7 +114,7 @@ impl Dispatch {
     /// This calls the [`record`](::Subscriber::record)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn record(&self, span: &Span, values: &field::ValueSet) {
+    pub fn record(&self, span: &span::Id, values: &field::ValueSet) {
         self.subscriber.record(span, &values)
     }
 
@@ -124,7 +124,7 @@ impl Dispatch {
     /// This calls the [`record_follows_from`](::Subscriber::record_follows_from)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn record_follows_from(&self, span: &Span, follows: &Span) {
+    pub fn record_follows_from(&self, span: &span::Id, follows: &span::Id) {
         self.subscriber.record_follows_from(span, follows)
     }
 
@@ -151,29 +151,25 @@ impl Dispatch {
         self.subscriber.event(event)
     }
 
-    /// Records that a [`Span`] has been entered.
+    /// Records that a span has been entered.
     ///
     /// This calls the [`enter`](::Subscriber::enter) function on the
     /// `Subscriber` that this `Dispatch` forwards to.
-    ///
-    /// [`Span`]: ::span::Span
     #[inline]
-    pub fn enter(&self, span: &Span) {
+    pub fn enter(&self, span: &span::Id) {
         self.subscriber.enter(span)
     }
 
-    /// Records that a [`Span`] has been exited.
+    /// Records that a span has been exited.
     ///
     /// This calls the [`exit`](::Subscriber::exit) function on the `Subscriber`
     /// that this `Dispatch` forwards to.
-    ///
-    /// [`Span`]: ::span::Span
     #[inline]
-    pub fn exit(&self, span: &Span) {
+    pub fn exit(&self, span: &span::Id) {
         self.subscriber.exit(span)
     }
 
-    /// Notifies the subscriber that a [`Span`] has been cloned.
+    /// Notifies the subscriber that a [span ID] has been cloned.
     ///
     /// This function is guaranteed to only be called with span IDs that were
     /// returned by this `Dispatch`'s `new_span` function.
@@ -181,14 +177,13 @@ impl Dispatch {
     /// This calls the [`clone_span`](::Subscriber::clone_span) function on
     /// the `Subscriber` that this `Dispatch` forwards to.
     ///
-    /// [`Span`]: ::span::Span
+    /// [span ID]: ../span/struct.Id.html
     #[inline]
-    pub fn clone_span(&self, id: &Span) -> Span {
+    pub fn clone_span(&self, id: &span::Id) -> span::Id {
         self.subscriber.clone_span(&id)
     }
 
-    /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
-    /// been dropped.
+    /// Notifies the subscriber that a [span ID] handle has been dropped.
     ///
     /// This function is guaranteed to only be called with span IDs that were
     /// returned by this `Dispatch`'s `new_span` function.
@@ -196,9 +191,9 @@ impl Dispatch {
     /// This calls the [`drop_span`](::Subscriber::drop_span) function on
     /// the `Subscriber` that this `Dispatch` forwards to.
     ///
-    /// [`Span`]: ::span::Span
+    /// [span ID]: ../span/struct.Id.html
     #[inline]
-    pub fn drop_span(&self, id: Span) {
+    pub fn drop_span(&self, id: span::Id) {
         self.subscriber.drop_span(id)
     }
 }
@@ -226,23 +221,23 @@ impl Subscriber for NoSubscriber {
         subscriber::Interest::never()
     }
 
-    fn new_span(&self, _meta: &Metadata, _vals: &field::ValueSet) -> Span {
-        Span::from_u64(0)
+    fn new_span(&self, _: &span::Attributes) -> span::Id {
+        span::Id::from_u64(0)
     }
 
     fn event(&self, _event: &Event) {}
 
-    fn record(&self, _span: &Span, _values: &field::ValueSet) {}
+    fn record(&self, _span: &span::Id, _values: &field::ValueSet) {}
 
-    fn record_follows_from(&self, _span: &Span, _follows: &Span) {}
+    fn record_follows_from(&self, _span: &span::Id, _follows: &span::Id) {}
 
     #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {
         false
     }
 
-    fn enter(&self, _span: &Span) {}
-    fn exit(&self, _span: &Span) {}
+    fn enter(&self, _span: &span::Id) {}
+    fn exit(&self, _span: &span::Id) {}
 }
 
 impl Registrar {

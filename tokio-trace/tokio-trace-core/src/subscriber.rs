@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, Event, Metadata, Span};
+use {field, span, Event, Metadata};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -106,7 +106,7 @@ pub trait Subscriber {
     /// [metadata]: ::Metadata
     fn enabled(&self, metadata: &Metadata) -> bool;
 
-    /// Record the construction of a new [`Span`], returning a new ID for the
+    /// Record the construction of a new span, returning a new [span ID] for the
     /// span being constructed.
     ///
     /// The provided `ValueSet` contains any field values that were provided
@@ -122,10 +122,10 @@ pub trait Subscriber {
     /// return a distinct ID every time this function is called, regardless of
     /// the metadata.
     ///
-    /// [`Span`]: ::span::Span
+    /// [span ID]: ../span/struct.Id.html
     /// [recorder]: ::field::Record
     /// [`record` method]: ::field::ValueSet::record
-    fn new_span(&self, metadata: &Metadata, values: &field::ValueSet) -> Span;
+    fn new_span(&self, span: &span::Attributes) -> span::Id;
 
     // === Notification methods ===============================================
 
@@ -136,7 +136,7 @@ pub trait Subscriber {
     ///
     /// [recorder]: ::field::Record
     /// [`record` method]: ::field::ValueSet::record
-    fn record(&self, span: &Span, values: &field::ValueSet);
+    fn record(&self, span: &span::Id, values: &field::ValueSet);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -156,7 +156,7 @@ pub trait Subscriber {
     /// subscriber knows about, or if a cyclical relationship would be created
     /// (i.e., some span _a_ which proceeds some other span _b_ may not also
     /// follow from _b_), it may silently do nothing.
-    fn record_follows_from(&self, span: &Span, follows: &Span);
+    fn record_follows_from(&self, span: &span::Id, follows: &span::Id);
 
     /// Records that an [`Event`] has occurred.
     ///
@@ -169,29 +169,29 @@ pub trait Subscriber {
     /// [`record` method]: ::event::Event::record
     fn event(&self, event: &Event);
 
-    /// Records that a [`Span`] has been entered.
+    /// Records that a spanhas been entered.
     ///
     /// When entering a span, this method is called to notify the subscriber
-    /// that the span has been entered. The subscriber is provided with the ID
-    /// of the entered span, and should update any internal state tracking the
-    /// current span accordingly.
+    /// that the span has been entered. The subscriber is provided with the
+    /// [span ID] of the entered span, and should update any internal state
+    /// tracking the current span accordingly.
     ///
-    /// [`Span`]: ::span::Span
-    fn enter(&self, span: &Span);
+    /// [span ID]: ../span/struct.Id.html
+    fn enter(&self, span: &span::Id);
 
-    /// Records that a [`Span`] has been exited.
+    /// Records that a span has been exited.
     ///
     /// When entering a span, this method is called to notify the subscriber
-    /// that the span has been exited. The subscriber is provided with the ID
-    /// of the exited span, and should update any internal state tracking the
-    /// current span accordingly.
+    /// that the span has been exited. The subscriber is provided with the
+    /// [span ID] of the exited span, and should update any internal state
+    /// tracking the current span accordingly.
     ///
     /// Exiting a span does not imply that the span will not be re-entered.
     ///
-    /// [`Span`]: ::span::Span
-    fn exit(&self, span: &Span);
+    /// [span ID]: ../span/struct.Id.html
+    fn exit(&self, span: &span::Id);
 
-    /// Notifies the subscriber that a [`Span`] has been cloned.
+    /// Notifies the subscriber that a [span ID] has been cloned.
     ///
     /// This function is guaranteed to only be called with span IDs that were
     /// returned by this subscriber's `new_span` function.
@@ -209,20 +209,20 @@ pub trait Subscriber {
     /// kind this can be used as a hook to "clone" the pointer, depending on
     /// what that means for the specified pointer.
     ///
-    /// [`Span`]: ::span::Span,
+    /// [span ID]: ../span/struct.Id.html
     /// [`drop_span`]: ::subscriber::Subscriber::drop_span
-    fn clone_span(&self, id: &Span) -> Span {
+    fn clone_span(&self, id: &span::Id) -> span::Id {
         id.clone()
     }
 
-    /// Notifies the subscriber that a [`Span`] has been dropped.
+    /// Notifies the subscriber that a [span ID] has been dropped.
     ///
     /// This function is guaranteed to only be called with span IDs that were
     /// returned by this subscriber's `new_span` function.
     ///
     /// It's guaranteed that if this function has been called once more than the
     /// number of times `clone_span` was called with the same `id`, then no more
-    /// `Span`s using that `id` exist. This means that it can be used in
+    /// spans using that `id` exist. This means that it can be used in
     /// conjunction with [`clone_span`] to track the number of handles
     /// capable of `enter`ing a span. When all the handles have been dropped
     /// (i.e., `drop_span` has been called one more time than `clone_span` for a
@@ -235,9 +235,9 @@ pub trait Subscriber {
     /// inside of a `drop_span` function may cause a double panic, if the span
     /// was dropped due to a thread unwinding.
     ///
-    /// [`Span`]: ::span::Span,
+    /// [span ID]: ../span/struct.Id.html
     /// [`drop_span`]: ::subscriber::Subscriber::drop_span
-    fn drop_span(&self, id: Span) {
+    fn drop_span(&self, id: span::Id) {
         let _ = id;
     }
 }
