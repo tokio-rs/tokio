@@ -1,5 +1,4 @@
 parameters:
-  benches: false
   noDefaultFeatures: '--no-default-features'
 
 jobs:
