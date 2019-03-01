@@ -4,8 +4,7 @@ extern crate tokio_sync;
 
 use tokio_sync::mpsc::error;
 
-fn is_error<T: ::std::error::Error + Send + Sync>() {
-}
+fn is_error<T: ::std::error::Error + Send + Sync>() {}
 
 #[test]
 fn error_bound() {
