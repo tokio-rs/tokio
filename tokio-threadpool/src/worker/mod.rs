@@ -11,7 +11,7 @@ use pool::{self, BackupId, Pool};
 use sender::Sender;
 use shutdown::ShutdownTrigger;
 use task::{self, CanBlock, Task};
-// use trace;
+use trace;
 
 use tokio_executor;
 
@@ -60,7 +60,7 @@ pub struct Worker {
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     trigger: Arc<ShutdownTrigger>,
 
-    // span: trace::Span<'static>,
+    span: trace::Span<'static>,
 
     // Keep the value on the current thread.
     _p: PhantomData<Rc<()>>,
@@ -94,6 +94,7 @@ impl Worker {
         pool: Arc<Pool>,
         trigger: Arc<ShutdownTrigger>,
     ) -> Worker {
+        let span = span!("worker", id = &id.0);
         Worker {
             pool,
             id,
@@ -102,6 +103,7 @@ impl Worker {
             is_blocking: Cell::new(false),
             should_finalize: Cell::new(false),
             trigger,
+            span,
             _p: PhantomData,
         }
     }
@@ -116,6 +118,7 @@ impl Worker {
     pub(crate) fn do_run(&self) -> bool {
         // Create another worker... It's ok, this is just a new type around
         // `Pool` that is expected to stay on the current thread.
+        let mut span = self.span.clone();
         CURRENT_WORKER.with(|c| {
             c.set(self as *const _);
 
@@ -126,7 +129,7 @@ impl Worker {
             let mut enter = tokio_executor::enter().unwrap();
 
             // Enter a trace span for this worker
-            span!("worker", id = self.id.0).enter(|| {
+            span.enter(|| {
                 tokio_executor::with_default(&mut sender, &mut enter, |enter| {
                     if let Some(ref callback) = self.pool.config.around_worker {
                         callback.call(self, enter);
