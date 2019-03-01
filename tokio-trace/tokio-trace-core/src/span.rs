@@ -100,8 +100,14 @@ impl<'a> Attributes<'a> {
         }
     }
 
-    /// Returns true if the new span should be a child of the current span.
-    pub fn is_in_current(&self) -> bool {
+    /// Returns true if the new span's parent should be determined based on the
+    /// current context.
+    ///
+    /// If this is true and the current thread is currently inside a span, then
+    /// that span should be the new span's parent. Otherwise, if the current
+    /// thread is _not_ inside a span, then the new span will be the root of its
+    /// own trace tree.
+    pub fn is_contextual(&self) -> bool {
         match self.parent {
             Parent::Current => true,
             _ => false,
