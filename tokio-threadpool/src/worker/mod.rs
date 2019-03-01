@@ -493,7 +493,7 @@ impl Worker {
                         .into();
 
                     if actual == state {
-                        t_trace!("task complete;", state = &format_args!("{:?}", next));
+                        t_trace!("task complete;", state = ::trace::debug(next));
 
                         if state.num_futures() == 1 {
                             // If the thread pool has been flagged as shutdown,

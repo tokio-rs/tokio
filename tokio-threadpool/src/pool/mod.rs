@@ -135,7 +135,7 @@ impl Pool {
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
 
-        t_trace!("shutdown", state = format_args!("{:?}", state));
+        t_trace!("shutdown", state = ::trace::debug(state));
 
         // For now, this must be true
         debug_assert!(!purge_queue || now);
