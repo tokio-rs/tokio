@@ -1,3 +1,9 @@
+# 0.1.3 (March 1, 2019)
+
+### Added
+- `Watch`, a single value broadcast channel (#922).
+- `std::error::Error` implementation for more `mpsc` types (#937).
+
 # 0.1.2 (February 20, 2019)
 
 ### Fixes
