@@ -135,7 +135,7 @@ impl Pool {
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
 
-        trace!("shutdown; state={:?}", state);
+        t_trace!("shutdown", state = format_args!("{:?}", state));
 
         // For now, this must be true
         debug_assert!(!purge_queue || now);
@@ -183,7 +183,7 @@ impl Pool {
             state = actual;
         }
 
-        trace!("  -> transitioned to shutdown");
+        t_trace!("  -> transitioned to shutdown");
 
         // Only transition to terminate if there are no futures currently on the
         // pool
@@ -204,7 +204,7 @@ impl Pool {
     pub fn terminate_sleeping_workers(&self) {
         use worker::Lifecycle::Signaled;
 
-        trace!("  -> shutting down workers");
+        t_trace!("  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
         // transition, and terminate.
         while let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, true) {
@@ -245,7 +245,7 @@ impl Pool {
                 if !worker.is_blocking() && *self == *worker.pool {
                     let idx = worker.id.0;
 
-                    trace!("    -> submit internal; idx={}", idx);
+                    t_trace!("    -> submit internal;", idx = idx);
 
                     worker.pool.workers[idx].submit_internal(task);
                     worker.pool.signal_work(pool);
@@ -264,7 +264,7 @@ impl Pool {
     pub fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
-        trace!("    -> submit external");
+        t_trace!("    -> submit external");
 
         self.queue.push(task);
         self.signal_work(pool);
@@ -406,10 +406,10 @@ impl Pool {
                 worker_state.lifecycle(),
             );
 
-            trace!("signal_work -- notify; idx={}", idx);
+            t_trace!("signal_work -- notify;", idx = idx);
 
             if !entry.notify(worker_state) {
-                trace!("signal_work -- spawn; idx={}", idx);
+                t_trace!("signal_work -- spawn;", idx = idx);
                 self.spawn_thread(WorkerId(idx), pool);
             }
         }

@@ -192,7 +192,7 @@ impl Worker {
             return Ok(().into());
         }
 
-        trace!("transition to blocking state");
+        t_trace!("transition to blocking state");
 
         // Transitioning to blocking requires handing over the worker state to
         // another thread so that the work queue can continue to be processed.
@@ -371,7 +371,7 @@ impl Worker {
         // started, which results in the thread pool permanently being at 2
         // workers even though it should reach 4.
         if !first && state.is_signaled() {
-            trace!("Worker::check_run_state; delegate signal");
+            t_trace!("Worker::check_run_state; delegate signal");
             // This worker is not ready to be signaled, so delegate the signal
             // to another worker.
             self.pool.signal_work(&self.pool);
@@ -411,14 +411,14 @@ impl Worker {
             if idx < len {
                 match self.pool.workers[idx].steal_tasks(self.entry()) {
                     Steal::Success(task) => {
-                        trace!("stole task from another worker");
+                        t_trace!("stole task from another worker");
 
                         self.run_task(task, notify);
 
-                        trace!(
-                            "try_steal_task -- signal_work; self={}; from={}",
-                            self.id.0,
-                            idx
+                        t_trace!(
+                            "try_steal_task -- signal_work;",
+                            self = self.id.0,
+                            from = idx
                         );
 
                         // Signal other workers that work is available
@@ -493,7 +493,7 @@ impl Worker {
                         .into();
 
                     if actual == state {
-                        trace!("task complete; state={:?}", next);
+                        t_trace!("task complete;", state = &format_args!("{:?}", next));
 
                         if state.num_futures() == 1 {
                             // If the thread pool has been flagged as shutdown,
@@ -577,7 +577,7 @@ impl Worker {
         // due to the fact that a worker can be notified without it being popped
         // from the sleep stack. Extra care is needed to deal with this.
 
-        trace!("Worker::sleep; worker={:?}", self.id);
+        t_trace!("Worker::sleep;", worker = self.id);
 
         let mut state: State = self.entry().state.load(Acquire).into();
 
@@ -623,12 +623,12 @@ impl Worker {
                 if !state.is_pushed() {
                     debug_assert!(next.is_pushed());
 
-                    trace!("  sleeping -- push to stack; idx={}", self.id.0);
+                    t_trace!("  sleeping -- push to stack;", idx = self.id.0);
 
                     // We obtained permission to push the worker into the
                     // sleeper queue.
                     if let Err(_) = self.pool.push_sleeper(self.id.0) {
-                        trace!("  sleeping -- push to stack failed; idx={}", self.id.0);
+                        t_trace!("  sleeping -- push to stack failed;", idx = self.id.0);
                         // The push failed due to the pool being terminated.
                         //
                         // This is true because the "work" being woken up for is
@@ -643,7 +643,7 @@ impl Worker {
             state = actual;
         }
 
-        trace!("    -> starting to sleep; idx={}", self.id.0);
+        t_trace!("    -> starting to sleep;", idx = self.id.0);
 
         // Do a quick check to see if there are any notifications in the
         // reactor or new tasks in the global queue. Since this call will
@@ -692,7 +692,7 @@ impl Worker {
 
             self.entry().park();
 
-            trace!("    -> wakeup; idx={}", self.id.0);
+            t_trace!("    -> wakeup;", idx = self.id.0);
         }
     }
 
@@ -725,7 +725,7 @@ impl Worker {
 
 impl Drop for Worker {
     fn drop(&mut self) {
-        trace!("shutting down thread; idx={}", self.id.0);
+        t_trace!("shutting down thread;", idx = self.id.0);
 
         if self.should_finalize.get() {
             // Drain the work queue

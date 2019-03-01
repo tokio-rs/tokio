@@ -88,8 +88,29 @@ extern crate num_cpus;
 extern crate rand;
 extern crate slab;
 
+#[cfg(not(feature = "trace"))]
 #[macro_use]
 extern crate log;
+
+#[cfg(feature = "trace")]
+#[macro_use]
+extern crate tokio_trace;
+
+#[cfg(not(feature = "trace"))]
+macro_rules! t_trace {
+    ($msg:expr) => { trace!($msg) };
+    ($msg:expr, $($k:ident = $v:expr),* ) => {
+        trace!( concat!( $msg, $( stringify!($k), "={:?}; "),* ), $($v),* )
+    };
+}
+
+#[cfg(feature = "trace")]
+macro_rules! t_trace {
+    ($msg:expr) => { trace!($msg) };
+    ($msg:expr, $($k:ident = $v:expr),* ) => {
+        trace!(message = $msg, $($k = $v),* )
+    };
+}
 
 // ## Crate layout
 //

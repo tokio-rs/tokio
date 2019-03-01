@@ -112,7 +112,7 @@ impl Sender {
                 .into();
 
             if actual == state {
-                trace!("execute; count={:?}", next.num_futures());
+                t_trace!("execute;", count = next.num_futures());
                 break;
             }
 

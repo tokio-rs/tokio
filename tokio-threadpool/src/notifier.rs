@@ -22,7 +22,7 @@ struct Forget<T>(Option<T>);
 
 impl Notify for Notifier {
     fn notify(&self, id: usize) {
-        trace!("Notifier::notify; id=0x{:x}", id);
+        t_trace!("Notifier::notify", id=&format_args!("0x{:#x}", id));
 
         unsafe {
             let ptr = id as *const Task;
