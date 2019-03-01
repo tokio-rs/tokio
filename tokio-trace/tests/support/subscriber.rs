@@ -38,6 +38,7 @@ struct SpanState {
 struct Running<F: Fn(&Metadata) -> bool> {
     spans: Mutex<HashMap<Id, SpanState>>,
     expected: Arc<Mutex<VecDeque<Expect>>>,
+    current: Mutex<Vec<Id>>,
     ids: AtomicUsize,
     filter: F,
 }
@@ -124,6 +125,7 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
         let subscriber = Running {
             spans: Mutex::new(HashMap::new()),
             expected,
+            current: Mutex::new(Vec::new()),
             ids: AtomicUsize::new(0),
             filter: self.filter,
         };
@@ -177,6 +179,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
     }
 
     fn new_span(&self, span: &Attributes) -> Id {
+        use span::Parent;
         let meta = span.metadata();
         let values = span.values();
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
@@ -192,6 +195,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             Some(Expect::NewSpan(_)) => true,
             _ => false,
         };
+        let mut spans = self.spans.lock().unwrap();
         if was_expected {
             if let Expect::NewSpan(mut expected) = expected.pop_front().unwrap() {
                 let name = meta.name();
@@ -202,9 +206,47 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                 let mut checker = expected.fields.checker(format!("{}", name));
                 values.record(&mut checker);
                 checker.finish();
+                match expected.parent {
+                    Some(Parent::ExplicitRoot) => {
+                        assert!(
+                            span.is_root(),
+                            "expected {:?} to be an explicit root span",
+                            name
+                        );
+                    }
+                    Some(Parent::Explicit(expected_parent)) => {
+                        let actual_parent =
+                            span.parent().and_then(|id| spans.get(id)).map(|s| s.name);
+                        assert_eq!(Some(expected_parent.as_ref()), actual_parent);
+                    }
+                    Some(Parent::ContextualRoot) => {
+                        assert!(
+                            span.is_contextual(),
+                            "expected {:?} to have a contextual parent",
+                            name
+                        );
+                        assert!(
+                            self.current.lock().unwrap().last().is_none(),
+                            "expected {:?} to be a root, but we were inside a span",
+                            name
+                        );
+                    }
+                    Some(Parent::Contextual(expected_parent)) => {
+                        assert!(
+                            span.is_contextual(),
+                            "expected {:?} to have a contextual parent",
+                            name
+                        );
+                        let stack = self.current.lock().unwrap();
+                        let actual_parent =
+                            stack.last().and_then(|id| spans.get(id)).map(|s| s.name);
+                        assert_eq!(Some(expected_parent.as_ref()), actual_parent);
+                    }
+                    None => {}
+                }
             }
         }
-        self.spans.lock().unwrap().insert(
+        spans.insert(
             id.clone(),
             SpanState {
                 name: meta.name(),
@@ -228,6 +270,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                 Some(ex) => ex.bad(format_args!("entered span {:?}", span.name)),
             }
         };
+        self.current.lock().unwrap().push(id.clone());
     }
 
     fn exit(&self, id: &Id) {
@@ -242,6 +285,14 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                 if let Some(name) = expected_span.name() {
                     assert_eq!(name, span.name);
                 }
+                let curr = self.current.lock().unwrap().pop();
+                assert_eq!(
+                    Some(id),
+                    curr.as_ref(),
+                    "exited span {:?}, but the current span was {:?}",
+                    span.name,
+                    curr.as_ref().and_then(|id| spans.get(id)).map(|s| s.name)
+                );
             }
             Some(ex) => ex.bad(format_args!("exited span {:?}", span.name)),
         };

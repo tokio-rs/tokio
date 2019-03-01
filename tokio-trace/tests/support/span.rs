@@ -11,10 +11,19 @@ pub struct MockSpan {
     pub(in support) metadata: metadata::Expect,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub(in support) enum Parent {
+    ContextualRoot,
+    Contextual(String),
+    ExplicitRoot,
+    Explicit(String),
+}
+
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct NewSpan {
     pub(in support) span: MockSpan,
     pub(in support) fields: field::Expect,
+    pub(in support) parent: Option<Parent>,
 }
 
 pub fn mock() -> MockSpan {
@@ -60,6 +69,30 @@ impl MockSpan {
         }
     }
 
+    pub fn with_explicit_parent(self, parent: Option<&str>) -> NewSpan {
+        let parent = match parent {
+            Some(name) => Parent::Explicit(name.into()),
+            None => Parent::ExplicitRoot,
+        };
+        NewSpan {
+            parent: Some(parent),
+            span: self,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_contextual_parent(self, parent: Option<&str>) -> NewSpan {
+        let parent = match parent {
+            Some(name) => Parent::Contextual(name.into()),
+            None => Parent::ContextualRoot,
+        };
+        NewSpan {
+            parent: Some(parent),
+            span: self,
+            ..Default::default()
+        }
+    }
+
     pub fn name(&self) -> Option<&str> {
         self.metadata.name.as_ref().map(String::as_ref)
     }
@@ -71,6 +104,7 @@ impl MockSpan {
         NewSpan {
             span: self,
             fields: fields.into(),
+            ..Default::default()
         }
     }
 
@@ -94,6 +128,40 @@ impl Into<NewSpan> for MockSpan {
         NewSpan {
             span: self,
             ..Default::default()
+        }
+    }
+}
+
+impl NewSpan {
+    pub fn with_explicit_parent(self, parent: Option<&str>) -> NewSpan {
+        let parent = match parent {
+            Some(name) => Parent::Explicit(name.into()),
+            None => Parent::ExplicitRoot,
+        };
+        NewSpan {
+            parent: Some(parent),
+            ..self
+        }
+    }
+
+    pub fn with_contextual_parent(self, parent: Option<&str>) -> NewSpan {
+        let parent = match parent {
+            Some(name) => Parent::Contextual(name.into()),
+            None => Parent::ContextualRoot,
+        };
+        NewSpan {
+            parent: Some(parent),
+            ..self
+        }
+    }
+
+    pub fn with_field<I>(self, fields: I) -> NewSpan
+    where
+        I: Into<field::Expect>,
+    {
+        NewSpan {
+            fields: fields.into(),
+            ..self
         }
     }
 }
