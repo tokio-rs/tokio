@@ -476,3 +476,108 @@ fn new_span_with_target_and_log_level() {
 
     handle.assert_finished();
 }
+
+#[test]
+fn explicit_root_span_is_root() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo").with_explicit_parent(None))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        span!(parent: None, "foo");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn explicit_root_span_is_root_regardless_of_ctx() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .enter(span::mock().named("foo"))
+        .new_span(span::mock().named("bar").with_explicit_parent(None))
+        .exit(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        span!("foo").enter(|| {
+            span!(parent: None, "bar");
+        })
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn explicit_child() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .new_span(span::mock().named("bar").with_explicit_parent(Some("foo")))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let foo = span!("foo");
+        span!(parent: foo.id(), "bar");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn explicit_child_regardless_of_ctx() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .new_span(span::mock().named("bar"))
+        .enter(span::mock().named("bar"))
+        .new_span(span::mock().named("baz").with_explicit_parent(Some("foo")))
+        .exit(span::mock().named("bar"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let foo = span!("foo");
+        span!("bar").enter(|| span!(parent: foo.id(), "baz"))
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn contextual_root() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo").with_contextual_parent(None))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        span!("foo");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn contextual_child() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .enter(span::mock().named("foo"))
+        .new_span(
+            span::mock()
+                .named("bar")
+                .with_contextual_parent(Some("foo")),
+        )
+        .exit(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        span!("foo").enter(|| {
+            span!("bar");
+        })
+    });
+
+    handle.assert_finished();
+}
