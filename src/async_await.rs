@@ -10,11 +10,7 @@ struct MapOk<T>(T);
 
 impl<T> MapOk<T> {
     fn future<'a>(self: Pin<&'a mut Self>) -> Pin<&'a mut T> {
-        unsafe {
-            Pin::map_unchecked_mut(
-                self, |x| &mut x.0
-            )
-        }
+        unsafe { Pin::map_unchecked_mut(self, |x| &mut x.0) }
     }
 }
 
