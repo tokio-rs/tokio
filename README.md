@@ -14,18 +14,15 @@ the Rust programming language. It is:
 
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
-[![Travis Build Status][travis-badge]][travis-url]
-[![Appveyor Build Status][appveyor-badge]][appveyor-url]
+[![Build Status][azure-badge]][azure-url]
 [![Gitter chat][gitter-badge]][gitter-url]
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [mit-url]: LICENSE-MIT
-[travis-badge]: https://travis-ci.org/tokio-rs/tokio.svg?branch=master
-[travis-url]: https://travis-ci.org/tokio-rs/tokio
-[appveyor-badge]: https://ci.appveyor.com/api/projects/status/s83yxhy9qeb58va7/branch/master?svg=true
-[appveyor-url]: https://ci.appveyor.com/project/carllerche/tokio/branch/master
+[azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
+[azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
 [gitter-badge]: https://img.shields.io/gitter/room/tokio-rs/tokio.svg
 [gitter-url]: https://gitter.im/tokio-rs/tokio
 
