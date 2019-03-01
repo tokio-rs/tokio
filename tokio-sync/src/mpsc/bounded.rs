@@ -284,3 +284,18 @@ impl<T> From<(T, chan::TrySendError)> for TrySendError<T> {
         }
     }
 }
+
+// ===== impl RecvError =====
+
+impl fmt::Display for RecvError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::error::Error;
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl ::std::error::Error for RecvError {
+    fn description(&self) -> &str {
+        "channel closed"
+    }
+}
