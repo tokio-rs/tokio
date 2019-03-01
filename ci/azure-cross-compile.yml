@@ -1,0 +1,21 @@
+jobs:
+- job: ${{ parameters.name }}
+  displayName: ${{ parameters.displayName }}
+  pool:
+    vmImage: ubuntu-16.04
+  steps:
+  - template: azure-install-rust.yml
+    parameters:
+      rust_version: stable
+
+  - script: sudo apt-get install gcc-multilib
+    displayName: "Install gcc-multilib"
+
+  - script: rustup target add ${{ parameters.target }}
+    displayName: "Add target"
+
+  - script: cargo check --all --exclude tokio-tls --target ${{ parameters.target }}
+    displayName: Check source
+
+  - script: cargo check --tests --all --exclude tokio-tls --target ${{ parameters.target }}
+    displayName: Check tests

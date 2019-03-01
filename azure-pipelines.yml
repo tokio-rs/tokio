@@ -1,0 +1,115 @@
+trigger: ["master"]
+pr: ["master"]
+
+jobs:
+# Check formatting
+- template: ci/azure-rustfmt.yml
+  parameters:
+    name: rustfmt
+
+# Test top level crate
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_tokio
+    displayName: Test tokio
+    cross: true
+    crates:
+      - tokio
+
+# Test crates that are platform specific
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_sub_cross
+    displayName: Test sub crates -
+    cross: true
+    crates:
+      - tokio-fs
+      - tokio-reactor
+      - tokio-signal
+      - tokio-tcp
+      - tokio-tls
+      - tokio-udp
+      - tokio-uds
+
+# Test crates that are NOT platform specific
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_linux
+    displayName: Test sub crates - Any
+    crates:
+      - tokio-buf
+      - tokio-codec
+      - tokio-current-thread
+      - tokio-executor
+      - tokio-io
+      - tokio-sync
+      - tokio-threadpool
+      - tokio-timer
+      - tokio-trace
+      - tokio-trace/tokio-trace-core
+
+- template: ci/azure-cargo-check.yml
+  parameters:
+    name: features
+    displayName: Check feature permtuations
+    rust: stable
+    crates:
+      tokio:
+        - codec
+        - fs
+        - io
+        - reactor
+        - rt-full
+        - tcp
+        - timer
+        - udp
+        - uds
+      tokio-buf:
+        - util
+
+# Check async / await
+- template: ci/azure-cargo-check.yml
+  parameters:
+    name: async_await
+    displayName: Async / Await
+    rust: nightly-2019-02-22
+    noDefaultFeatures: ''
+    benches: true
+    crates:
+      tokio:
+        - async-await-preview
+
+# Try cross compiling
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross_32bit_linux
+    target: i686-unknown-linux-gnu
+
+# This represents the minimum Rust version supported by
+# Tokio. Updating this should be done in a dedicated PR and
+# cannot be greater than two 0.x releases prior to the
+# current stable.
+#
+# Tests are not run as tests may require newer versions of
+# rust.
+- template: ci/azure-check-minrust.yml
+  parameters:
+    name: minrust
+    rust_version: 1.26.0
+
+- template: ci/azure-tsan.yml
+  parameters:
+    name: tsan
+
+- template: ci/azure-deploy-docs.yml
+  parameters:
+    dependsOn:
+      - rustfmt
+      - test_tokio
+      - test_sub_cross
+      - test_linux
+      - features
+      - async_await
+      - cross_32bit_linux
+      - minrust
+      - tsan
