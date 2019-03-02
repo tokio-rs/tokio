@@ -1,3 +1,8 @@
+# 0.1.5 (March 1, 2019)
+
+### Fixed
+- Documentation typos (#882).
+
 # 0.1.4 (November 21, 2018)
 
 * Fix shutdown on idle (#763).

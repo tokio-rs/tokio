@@ -1,3 +1,9 @@
+# 0.1.6 (March 1, 2019)
+
+### Added
+- File::try_clone() (#850).
+- Async equivalent of read / write file helpers being added to `std` (#896).
+
 # 0.1.5 (January 6, 2019)
 
 * Add examples to `File` API docs (#786).

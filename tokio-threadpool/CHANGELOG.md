@@ -1,3 +1,11 @@
+# 0.1.12 (March 1, 2019)
+
+### Fixed
+- Documentation typos (#915).
+
+### Changed
+- Update crossbeam dependencies (#874).
+
 # 0.1.11 (January 24, 2019)
 
 ### Fixed
