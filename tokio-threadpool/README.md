@@ -3,7 +3,7 @@
 A library for scheduling execution of futures concurrently across a pool of
 threads.
 
-[Documentation](https://docs.rs/tokio-threadpool/0.1.11/tokio_threadpool)
+[Documentation](https://docs.rs/tokio-threadpool/0.1.12/tokio_threadpool)
 
 ### Why not Rayon?
 

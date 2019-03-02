@@ -2,7 +2,7 @@
 
 Event loop that drives Tokio I/O resources.
 
-[Documentation](https://docs.rs/tokio-reactor/0.1.8/tokio_reactor)
+[Documentation](https://docs.rs/tokio-reactor/0.1.9/tokio_reactor)
 
 ## Overview
 
@@ -25,10 +25,10 @@ are building a custom I/O resource.
 
 [`mio`]: http://github.com/carllerche/mio
 [`futures`]: http://github.com/rust-lang-nursery/futures-rs
-[`Reactor`]: https://docs.rs/tokio-reactor/0.1.8/tokio_reactor/struct.Reactor.html
-[`Handle`]: https://docs.rs/tokio-reactor/0.1.8/tokio_reactor/struct.Handle.html
-[`Registration`]: https://docs.rs/tokio-reactor/0.1.8/tokio_reactor/struct.Registration.html
-[`PollEvented`]: https://docs.rs/tokio-reactor/0.1.8/tokio_reactor/struct.PollEvented.html
+[`Reactor`]: https://docs.rs/tokio-reactor/0.1.9/tokio_reactor/struct.Reactor.html
+[`Handle`]: https://docs.rs/tokio-reactor/0.1.9/tokio_reactor/struct.Handle.html
+[`Registration`]: https://docs.rs/tokio-reactor/0.1.9/tokio_reactor/struct.Registration.html
+[`PollEvented`]: https://docs.rs/tokio-reactor/0.1.9/tokio_reactor/struct.PollEvented.html
 [`tokio`]: ../
 
 ## License

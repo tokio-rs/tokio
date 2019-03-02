@@ -1,3 +1,8 @@
+# 0.1.12 (March 1, 2019)
+
+### Added
+- Add `unsplit` to join previously split `AsyncRead + AsyncWrite` (#807).
+
 # 0.1.11 (January 6, 2019)
 
 * Fix minor error in Decoder::decode API documentation (#797).
