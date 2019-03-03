@@ -96,11 +96,22 @@ struct Inner {
 ///
 /// [mod]: ../index.html
 pub fn run<F>(future: F)
-where F: Future<Item = (), Error = ()> + Send + 'static,
+where
+    F: Future<Item = (), Error = ()> + Send + 'static,
 {
     // Check enter before creating a new Runtime...
     let mut entered = enter().expect("nested tokio::run");
-    let mut runtime = Runtime::new().expect("failed to start new Runtime");
+
+    #[cfg(not(feature = "trace"))]
+    let runtime = Runtime::new();
+
+    #[cfg(feature = "trace")]
+    let runtime = {
+        let dispatch = ::tokio_trace_core::dispatcher::with(|curr| curr.clone());
+        Builder::new().subscriber(dispatch).build()
+    };
+
+    let mut runtime = runtime.expect("failed to start new Runtime");
     runtime.spawn(future);
     entered
         .block_on(runtime.shutdown_on_idle())
@@ -236,7 +247,8 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
-    where F: Future<Item = (), Error = ()> + Send + 'static,
+    where
+        F: Future<Item = (), Error = ()> + Send + 'static,
     {
         self.inner_mut().pool.sender().spawn(future).unwrap();
         self
@@ -291,10 +303,7 @@ impl Runtime {
         self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
         let block = rx
             .map_err(|_| unreachable!())
-            .and_then(move |r| {
-                self.shutdown_on_idle()
-                    .map(move |()| r)
-            });
+            .and_then(move |r| self.shutdown_on_idle().map(move |()| r));
         entered.block_on(block).unwrap()
     }
 

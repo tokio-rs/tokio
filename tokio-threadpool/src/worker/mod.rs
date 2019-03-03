@@ -94,7 +94,7 @@ impl Worker {
         pool: Arc<Pool>,
         trigger: Arc<ShutdownTrigger>,
     ) -> Worker {
-        let span = span!("worker", id = &id.0);
+        let span = span!("worker", id = &id.0, is_blocking);
         Worker {
             pool,
             id,
@@ -202,7 +202,7 @@ impl Worker {
         }
 
         t_trace!("transition to blocking state");
-
+        self.span.clone().record("is_blocking", &true);
         // Transitioning to blocking requires handing over the worker state to
         // another thread so that the work queue can continue to be processed.
 

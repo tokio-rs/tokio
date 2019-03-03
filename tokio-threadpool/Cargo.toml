@@ -41,3 +41,10 @@ env_logger = "0.5"
 # For comparison benchmarks
 futures-cpupool = "0.1.7"
 threadpool = "1.7.1"
+
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace = { path = "../tokio-trace"}
+
+[patch."https://github.com/tokio-rs/tokio"]
+tokio-trace = { path = "../tokio-trace" }
+tokio-trace-core = { path = "../tokio-trace/tokio-trace-core"}

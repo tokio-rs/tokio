@@ -12,6 +12,9 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
+#[cfg(feature = "trace")]
+use tokio_trace_core::dispatcher::{self, Dispatch};
+
 /// Builds Tokio Runtime with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -61,6 +64,10 @@ pub struct Builder {
 
     /// The clock to use
     clock: Clock,
+
+    /// The tokio-trace dispatcher to use.
+    #[cfg(feature = "trace")]
+    dispatch: Option<Dispatch>,
 }
 
 impl Builder {
@@ -79,6 +86,8 @@ impl Builder {
             threadpool_builder,
             core_threads,
             clock: Clock::new(),
+            #[cfg(feature = "trace")]
+            dispatch: None,
         }
     }
 
@@ -90,10 +99,11 @@ impl Builder {
 
     /// Set builder to set up the thread pool instance.
     #[deprecated(
-        since="0.1.9",
-        note="use the `core_threads`, `blocking_threads`, `name_prefix`, \
-              `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
-              instead")]
+        since = "0.1.9",
+        note = "use the `core_threads`, `blocking_threads`, `name_prefix`, \
+                `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
+                instead"
+    )]
     #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
@@ -261,7 +271,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.threadpool_builder.after_start(f);
         self
@@ -287,9 +298,21 @@ impl Builder {
     /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.threadpool_builder.before_stop(f);
+        self
+    }
+
+    /// Configures the runtime to set the provided `tokio-trace` subscriber as
+    /// the default for all worker threads.
+    #[cfg(feature = "trace")]
+    pub fn subscriber<I>(&mut self, subscriber: I) -> &mut Self
+    where
+        I: Into<Dispatch>,
+    {
+        self.dispatch = Some(subscriber.into());
         self
     }
 
@@ -330,26 +353,49 @@ impl Builder {
         // Get a handle to the clock for the runtime.
         let clock = self.clock.clone();
 
-        let pool = self.threadpool_builder
+        // If tokio-trace is enabled, get a handle to the runtime's trace dispatcher.
+        #[cfg(feature = "trace")]
+        let dispatch = self
+            .dispatch
+            .as_ref()
+            .cloned()
+            // XXX: is it better to default to no dispatcher, or to
+            // the current thread's default one when `build()` is invoked?
+            .unwrap_or_else(Dispatch::none);
+
+        let pool = self
+            .threadpool_builder
             .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
+                #[cfg(not(feature = "trace"))]
+                {
+                    tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
+                        clock::with_default(&clock, enter, |enter| {
+                            timer::with_default(&timer_handles[index], enter, |_| {
+                                w.run();
+                            });
+                        })
+                    });
+                }
 
-                tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
-                    clock::with_default(&clock, enter, |enter| {
-                        timer::with_default(&timer_handles[index], enter, |_| {
-                            w.run();
-                        });
-                    })
-                });
+                #[cfg(feature = "trace")]
+                {
+                    tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
+                        let dispatch = dispatch.clone();
+                        clock::with_default(&clock, enter, |enter| {
+                            timer::with_default(&timer_handles[index], enter, |_| {
+                                dispatcher::with_default(dispatch, || {
+                                    w.run();
+                                });
+                            });
+                        })
+                    });
+                }
             })
             .custom_park(move |worker_id| {
                 let index = worker_id.to_usize();
 
-                timers[index]
-                    .lock()
-                    .unwrap()
-                    .take()
-                    .unwrap()
+                timers[index].lock().unwrap().take().unwrap()
             })
             .build();
 

@@ -105,6 +105,8 @@ extern crate tokio_tcp;
 extern crate tokio_threadpool;
 #[cfg(feature = "timer")]
 extern crate tokio_timer;
+#[cfg(feature = "trace")]
+extern crate tokio_trace_core;
 #[cfg(feature = "udp")]
 extern crate tokio_udp;
 
