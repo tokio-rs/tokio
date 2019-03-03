@@ -22,6 +22,7 @@ async-await-preview = ["futures/nightly"]
 [dependencies]
 futures = "0.1.23"
 tokio-io = "0.1.7"
+tokio-udp = "0.1.3"
 
 [dev-dependencies]
 bytes = "0.4.9"

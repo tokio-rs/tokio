@@ -21,6 +21,14 @@ name = "echo_server"
 path = "src/echo_server.rs"
 
 [[bin]]
+name = "udp_echo_client"
+path = "src/udp_echo_client.rs"
+
+[[bin]]
+name = "udp_echo_server"
+path = "src/udp_echo_server.rs"
+
+[[bin]]
 name = "hyper"
 path = "src/hyper.rs"
 

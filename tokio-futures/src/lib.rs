@@ -8,6 +8,7 @@
 
 extern crate futures;
 extern crate tokio_io;
+extern crate tokio_udp;
 
 /// Extracts the successful type of a `Poll<Result<T, E>>`.
 ///
@@ -28,6 +29,7 @@ pub mod compat;
 pub mod io;
 pub mod sink;
 pub mod stream;
+pub mod udp;
 
 // Rename the `await` macro in `std`. This is used by the redefined
 // `await` macro in this crate.

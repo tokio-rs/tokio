@@ -25,4 +25,5 @@ pub use tokio_futures::{
     io::{AsyncReadExt, AsyncWriteExt},
     sink::SinkExt,
     stream::StreamExt as StreamAsyncExt,
+    udp::UdpSocketAsyncExt,
 };
