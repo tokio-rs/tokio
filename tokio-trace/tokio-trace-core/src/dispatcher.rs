@@ -14,7 +14,7 @@ use std::{
 /// `Dispatch` trace data to a [`Subscriber`](::Subscriber).
 #[derive(Clone)]
 pub struct Dispatch {
-    subscriber: Arc<Subscriber + Send + Sync>,
+    subscriber: Arc<Subscriber + Send + Sync + 'static>,
 }
 
 thread_local! {
@@ -61,7 +61,7 @@ where
         .unwrap_or_else(|_| f(&Dispatch::none()))
 }
 
-pub(crate) struct Registrar(Weak<Subscriber + Send + Sync>);
+pub(crate) struct Registrar(Weak<Subscriber + Send + Sync + 'static>);
 
 impl Dispatch {
     /// Returns a new `Dispatch` that discards events and spans.
