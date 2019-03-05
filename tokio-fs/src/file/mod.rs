@@ -106,7 +106,7 @@ struct ReadBuffer {
 impl ReadBuffer {
     fn new() -> ReadBuffer {
         ReadBuffer {
-            buf: vec![0; 1024],
+            buf: vec![],
             start: 0,
             end: 0,
         }
@@ -125,6 +125,10 @@ impl ReadBuffer {
 
     fn write<R: Read>(&mut self, mut reader: R) -> io::Result<usize> {
         assert_eq!(self.len(), 0);
+
+        if self.buf.is_empty() {
+            self.buf = vec![0; 1024];
+        }
 
         let res = reader.read(&mut self.buf[..]);
         if let Ok(n) = res {
