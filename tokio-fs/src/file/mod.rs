@@ -104,6 +104,7 @@ struct ReadBuffer {
 }
 
 impl ReadBuffer {
+    /// Creates a new read buffer.
     fn new() -> ReadBuffer {
         ReadBuffer {
             buf: vec![],
@@ -112,10 +113,12 @@ impl ReadBuffer {
         }
     }
 
+    /// Returns the number of bytes in the buffer.
     fn len(&self) -> usize {
         self.end - self.start
     }
 
+    /// Reads some bytes into `buf` and returns the number of bytes read.
     fn read(&mut self, buf: &mut [u8]) -> usize {
         let len = self.len().min(buf.len());
         buf[0..len].copy_from_slice(&self.buf[self.start..self.start + len]);
@@ -123,6 +126,7 @@ impl ReadBuffer {
         len
     }
 
+    /// Writes some bytes from `reader` into this buffer and returns the number of bytes written.
     fn write<R: Read>(&mut self, mut reader: R) -> io::Result<usize> {
         assert_eq!(self.len(), 0);
 
@@ -589,6 +593,9 @@ impl File {
         }
     }
 
+    /// Polls the asynchronous task this file handle is blocked on.
+    ///
+    /// If it's not blocked on any asynchronous tasks, `Ok(Async::Ready(()))` is returned.
     fn poll_job(&mut self) -> Poll<(), io::Error> {
         match self.state.take().unwrap() {
             state @ State::Idle(_) => {
