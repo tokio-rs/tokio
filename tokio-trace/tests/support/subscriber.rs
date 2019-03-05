@@ -25,7 +25,7 @@ enum Expect {
     Exit(MockSpan),
     CloneSpan(MockSpan),
     DropSpan(MockSpan),
-    Record(MockSpan, mock_field::Expect),
+    Visit(MockSpan, mock_field::Expect),
     NewSpan(NewSpan),
     Nothing,
 }
@@ -92,7 +92,7 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
     where
         I: Into<mock_field::Expect>,
     {
-        self.expected.push_back(Expect::Record(span, fields.into()));
+        self.expected.push_back(Expect::Visit(span, fields.into()));
         self
     }
 
@@ -145,13 +145,13 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             .get(id)
             .unwrap_or_else(|| panic!("no span for ID {:?}", id));
         println!("record: {}; id={:?}; values={:?};", span.name, id, values);
-        let was_expected = if let Some(Expect::Record(_, _)) = expected.front() {
+        let was_expected = if let Some(Expect::Visit(_, _)) = expected.front() {
             true
         } else {
             false
         };
         if was_expected {
-            if let Expect::Record(expected_span, mut expected_values) =
+            if let Expect::Visit(expected_span, mut expected_values) =
                 expected.pop_front().unwrap()
             {
                 if let Some(name) = expected_span.name() {
@@ -384,7 +384,7 @@ impl Expect {
             Expect::Exit(e) => panic!("expected to exit {} but {} instead", e, what,),
             Expect::CloneSpan(e) => panic!("expected to clone {} but {} instead", e, what,),
             Expect::DropSpan(e) => panic!("expected to drop {} but {} instead", e, what,),
-            Expect::Record(e, fields) => {
+            Expect::Visit(e, fields) => {
                 panic!("expected {} to record {} but {} instead", e, fields, what,)
             }
             Expect::NewSpan(e) => panic!("expected {} but {} instead", e, what),

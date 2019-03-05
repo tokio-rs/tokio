@@ -97,7 +97,7 @@ impl Dispatch {
         self.subscriber.register_callsite(metadata)
     }
 
-    /// Record the construction of a new span, returning a new [ID] for the
+    /// Visit the construction of a new span, returning a new [ID] for the
     /// span being constructed.
     ///
     /// This calls the [`new_span`](::Subscriber::new_span)
@@ -109,7 +109,7 @@ impl Dispatch {
         self.subscriber.new_span(span)
     }
 
-    /// Record a set of values on a span.
+    /// Visit a set of values on a span.
     ///
     /// This calls the [`record`](::Subscriber::record)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
@@ -140,7 +140,7 @@ impl Dispatch {
         self.subscriber.enabled(metadata)
     }
 
-    /// Records that an [`Event`] has occurred.
+    /// Visits that an [`Event`] has occurred.
     ///
     /// This calls the [`event`](::Subscriber::event) function on
     /// the `Subscriber` that this `Dispatch` forwards to.
@@ -151,7 +151,7 @@ impl Dispatch {
         self.subscriber.event(event)
     }
 
-    /// Records that a span has been entered.
+    /// Visits that a span has been entered.
     ///
     /// This calls the [`enter`](::Subscriber::enter) function on the
     /// `Subscriber` that this `Dispatch` forwards to.
@@ -160,7 +160,7 @@ impl Dispatch {
         self.subscriber.enter(span)
     }
 
-    /// Records that a span has been exited.
+    /// Visits that a span has been exited.
     ///
     /// This calls the [`exit`](::Subscriber::exit) function on the `Subscriber`
     /// that this `Dispatch` forwards to.

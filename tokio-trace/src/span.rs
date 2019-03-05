@@ -324,7 +324,7 @@ impl<'a> Span<'a> {
             .is_some()
     }
 
-    /// Records that the field described by `field` has the value `value`.
+    /// Visits that the field described by `field` has the value `value`.
     pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsField,
@@ -343,7 +343,7 @@ impl<'a> Span<'a> {
         self
     }
 
-    /// Record all the fields in the span
+    /// Visit all the fields in the span
     pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
             inner.record(&values);
