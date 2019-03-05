@@ -1,6 +1,6 @@
 use tokio_trace::{
     callsite::Callsite,
-    field::{self, Field, Visit, Value},
+    field::{self, Field, Value, Visit},
 };
 
 use std::{collections::HashMap, fmt};
