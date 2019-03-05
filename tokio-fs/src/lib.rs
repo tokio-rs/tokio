@@ -1,4 +1,4 @@
-#![deny(missing_docs, missing_debug_implementations, warnings)]
+// #![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.5")]
 
 //! Asynchronous file and standard stream adaptation.
@@ -30,9 +30,12 @@
 
 #[macro_use]
 extern crate futures;
+#[macro_use]
+extern crate lazy_static;
 extern crate tokio_io;
 extern crate tokio_threadpool;
 
+mod blocking_pool;
 mod create_dir;
 mod create_dir_all;
 pub mod file;

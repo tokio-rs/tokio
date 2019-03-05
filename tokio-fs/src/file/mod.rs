@@ -9,6 +9,8 @@ mod open;
 mod open_options;
 mod seek;
 
+use blocking_pool::{spawn_blocking, BlockingFuture};
+
 pub use self::clone::CloneFuture;
 pub use self::create::CreateFuture;
 pub use self::metadata::MetadataFuture;
@@ -18,9 +20,10 @@ pub use self::seek::SeekFuture;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use futures::Poll;
+use futures::{Async, Future, Poll};
 
 use std::fs::{File as StdFile, Metadata, Permissions};
+use std::io::ErrorKind::WouldBlock;
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 
@@ -78,7 +81,58 @@ use std::path::Path;
 /// ```
 #[derive(Debug)]
 pub struct File {
+    state: Option<State>,
+}
+
+#[derive(Debug)]
+struct Inner {
     std: Option<StdFile>,
+    read_buf: ReadBuffer,
+}
+
+#[derive(Debug)]
+enum State {
+    Idle(Inner),
+    Blocked(BlockingFuture<io::Result<Inner>>),
+}
+
+#[derive(Debug)]
+struct ReadBuffer {
+    buf: Vec<u8>,
+    start: usize,
+    end: usize,
+}
+
+impl ReadBuffer {
+    fn new() -> ReadBuffer {
+        ReadBuffer {
+            buf: vec![0; 1024],
+            start: 0,
+            end: 0,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    fn read(&mut self, buf: &mut [u8]) -> usize {
+        let len = self.len().min(buf.len());
+        buf[0..len].copy_from_slice(&self.buf[self.start..self.start + len]);
+        self.start += len;
+        len
+    }
+
+    fn write<R: Read>(&mut self, mut reader: R) -> io::Result<usize> {
+        assert_eq!(self.len(), 0);
+
+        let res = reader.read(&mut self.buf[..]);
+        if let Ok(n) = res {
+            self.start = 0;
+            self.end = n;
+        }
+        res
+    }
 }
 
 impl File {
@@ -174,7 +228,12 @@ impl File {
     /// }
     /// ```
     pub fn from_std(std: StdFile) -> File {
-        File { std: Some(std) }
+        File {
+            state: Some(State::Idle(Inner {
+                std: Some(std),
+                read_buf: ReadBuffer::new(),
+            })),
+        }
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -510,17 +569,79 @@ impl File {
     /// }
     /// ```
     pub fn into_std(mut self) -> StdFile {
-        self.std.take().expect("`File` instance already shutdown")
+        match self.state.take().unwrap() {
+            State::Idle(inner) => inner.std.expect("`File` instance already shutdown"),
+            State::Blocked(_) => panic!("`File` instance blocked on an async operation"),
+        }
     }
 
     fn std(&mut self) -> &mut StdFile {
-        self.std.as_mut().expect("`File` instance already shutdown")
+        match self.state.as_mut().unwrap() {
+            State::Idle(inner) => inner
+                .std
+                .as_mut()
+                .expect("`File` instance already shutdown"),
+            State::Blocked(_) => panic!("`File` instance blocked on an async operation"),
+        }
+    }
+
+    fn poll_job(&mut self) -> Poll<(), io::Error> {
+        match self.state.take().unwrap() {
+            state @ State::Idle(_) => {
+                self.state = Some(state);
+                return Ok(Async::Ready(()));
+            }
+            State::Blocked(mut job) => match job.poll().unwrap() {
+                Async::Ready(Ok(inner)) => {
+                    self.state = Some(State::Idle(inner));
+                    Ok(Async::Ready(()))
+                }
+                Async::Ready(Err(err)) => {
+                    // TODO: restore inner? or what?
+                    return Err(err);
+                }
+                Async::NotReady => {
+                    self.state = Some(State::Blocked(job));
+                    return Ok(Async::NotReady);
+                }
+            },
+        }
     }
 }
 
 impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().read(buf))
+        loop {
+            match self.poll_job() {
+                Ok(Async::Ready(())) => {}
+                Ok(Async::NotReady) => return Err(WouldBlock.into()),
+                Err(err) => return Err(err),
+            }
+
+            match self.state.take().unwrap() {
+                State::Idle(mut inner) => {
+                    if inner.read_buf.len() > 0 {
+                        let n = inner.read_buf.read(buf);
+                        return Ok(n);
+                    }
+
+                    if tokio_threadpool::entered() {
+                        self.state = Some(State::Idle(inner));
+                        return ::would_block(|| self.std().read(buf));
+                    }
+
+                    let mut read_buf = inner.read_buf;
+                    let mut std = inner.std;
+
+                    self.state = Some(State::Blocked(spawn_blocking(move || {
+                        read_buf
+                            .write(std.as_mut().expect("`File` instance already shutdown"))
+                            .map(move |_| Inner { std, read_buf })
+                    })))
+                }
+                State::Blocked(_) => unreachable!(),
+            }
+        }
     }
 }
 
@@ -542,18 +663,36 @@ impl Write for File {
 
 impl AsyncWrite for File {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| {
-            self.std = None;
-            Ok(())
-        })
+        loop {
+            try_ready!(self.poll_job());
+
+            if tokio_threadpool::entered() {
+                return ::blocking_io(|| {
+                    self.state = None;
+                    Ok(())
+                });
+            }
+
+            match self.state.take().unwrap() {
+                State::Idle(mut inner) => {
+                    if inner.std.is_none() {
+                        return Ok(Async::Ready(()));
+                    }
+
+                    self.state = Some(State::Blocked(spawn_blocking(move || {
+                        inner.std.take();
+                        Ok(inner)
+                    })));
+                }
+                State::Blocked(_) => unreachable!(),
+            }
+        }
     }
 }
 
 impl Drop for File {
     fn drop(&mut self) {
-        if let Some(_std) = self.std.take() {
-            // This is probably fine as closing a file *shouldn't* be a blocking
-            // operation. That said, ideally `shutdown` is called first.
-        }
+        // This is probably fine as closing a file *shouldn't* be a blocking
+        // operation. That said, ideally `shutdown` is called first.
     }
 }

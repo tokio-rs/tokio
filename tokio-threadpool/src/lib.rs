@@ -160,4 +160,4 @@ pub use builder::Builder;
 pub use sender::Sender;
 pub use shutdown::Shutdown;
 pub use thread_pool::{SpawnHandle, ThreadPool};
-pub use worker::{Worker, WorkerId};
+pub use worker::{entered, Worker, WorkerId};
