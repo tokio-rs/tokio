@@ -61,7 +61,7 @@ impl<'a> field::Visit for Visitor<'a> {
 impl tokio_trace::Subscriber for VisitingSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
         let mut visitor = Visitor(self.0.lock().unwrap());
-        span.values().record(&mut visitor);
+        span.record(&mut visitor);
         Id::from_u64(0)
     }
 
