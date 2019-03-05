@@ -13,8 +13,7 @@ use std::{
     },
 };
 use tokio_trace::{
-    field,
-    span::{Attributes, Id},
+    span::{self, Attributes, Id},
     Event, Metadata, Subscriber,
 };
 
@@ -138,7 +137,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
         (self.filter)(meta)
     }
 
-    fn record(&self, id: &Id, values: &field::ValueSet) {
+    fn record(&self, id: &Id, values: &span::Record) {
         let spans = self.spans.lock().unwrap();
         let mut expected = self.expected.lock().unwrap();
         let span = spans
@@ -151,8 +150,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
             false
         };
         if was_expected {
-            if let Expect::Visit(expected_span, mut expected_values) =
-                expected.pop_front().unwrap()
+            if let Expect::Visit(expected_span, mut expected_values) = expected.pop_front().unwrap()
             {
                 if let Some(name) = expected_span.name() {
                     assert_eq!(name, span.name);

@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, span, Event, Metadata};
+use {span, Event, Metadata};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -131,12 +131,12 @@ pub trait Subscriber {
 
     /// Visit a set of values on a span.
     ///
-    /// The subscriber is expected to provide a [visitor] to the `ValueSet`'s
+    /// The subscriber is expected to provide a [visitor] to the `Record`'s
     /// [`record` method] in order to record the added values.
     ///
     /// [visitor]: ::field::Visit
-    /// [`record` method]: ::field::ValueSet::record
-    fn record(&self, span: &span::Id, values: &field::ValueSet);
+    /// [`record` method]: ::span::Record::record
+    fn record(&self, span: &span::Id, values: &span::Record);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.

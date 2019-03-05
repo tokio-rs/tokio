@@ -216,7 +216,7 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn record(&self, span: &tokio_trace::Id, values: &tokio_trace::field::ValueSet) {
+    fn record(&self, span: &tokio_trace::Id, values: &tokio_trace::span::Record) {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         if let Some(span) = spans.get_mut(span) {
             values.record(span);

@@ -20,6 +20,12 @@ pub struct Attributes<'a> {
     parent: Parent,
 }
 
+/// A set of fields recorded by a span.
+#[derive(Debug)]
+pub struct Record<'a> {
+    values: &'a field::ValueSet<'a>,
+}
+
 #[derive(Debug)]
 enum Parent {
     /// The new span will be a root span.
@@ -123,5 +129,31 @@ impl<'a> Attributes<'a> {
             Parent::Explicit(ref p) => Some(p),
             _ => None,
         }
+    }
+}
+
+// ===== impl Record =====
+
+impl<'a> Record<'a> {
+    /// Constructs a new `Record` from a `ValueSet`.
+    pub fn new(values: &'a field::ValueSet<'a>) -> Self {
+        Self { values }
+    }
+
+    /// Records all the fields in this `Record` with the provided [Visitor].
+    ///
+    /// [visitor]: ::field::Visit
+    pub fn record(&self, visitor: &mut field::Visit) {
+        self.values.record(visitor)
+    }
+
+    /// Returns `true` if this `Record` contains a value for the given `Field`.
+    pub fn contains(&self, field: &field::Field) -> bool {
+        self.values.contains(field)
+    }
+
+    /// Returns true if this `Record` contains _no_ values.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
     }
 }

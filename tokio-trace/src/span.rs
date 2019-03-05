@@ -135,7 +135,7 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-pub use tokio_trace_core::span::{Attributes, Id};
+pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
     borrow::Borrow,
@@ -479,7 +479,7 @@ impl<'a> Inner<'a> {
 
     fn record(&mut self, values: &field::ValueSet) {
         if values.callsite() == self.meta.callsite() {
-            self.subscriber.record(&self.id, &values)
+            self.subscriber.record(&self.id, &Record::new(values))
         }
     }
 

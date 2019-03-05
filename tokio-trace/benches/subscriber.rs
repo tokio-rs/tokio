@@ -24,7 +24,7 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         let _ = event;
     }
 
-    fn record(&self, span: &Id, values: &field::ValueSet) {
+    fn record(&self, span: &Id, values: &span::Record) {
         let _ = (span, values);
     }
 
@@ -65,7 +65,7 @@ impl tokio_trace::Subscriber for VisitingSubscriber {
         Id::from_u64(0)
     }
 
-    fn record(&self, _span: &Id, values: &field::ValueSet) {
+    fn record(&self, _span: &Id, values: &span::Record) {
         let mut visitor = Visitor(self.0.lock().unwrap());
         values.record(&mut visitor);
     }

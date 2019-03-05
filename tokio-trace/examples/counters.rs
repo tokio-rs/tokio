@@ -87,7 +87,7 @@ impl Subscriber for CounterSubscriber {
         // unimplemented
     }
 
-    fn record(&self, _: &Id, values: &field::ValueSet) {
+    fn record(&self, _: &Id, values: &span::Record) {
         values.record(&mut self.visitor())
     }
 

@@ -1,6 +1,6 @@
 //! Dispatches trace events to `Subscriber`s.
 use {
-    callsite, field, span,
+    callsite, span,
     subscriber::{self, Subscriber},
     Event, Metadata,
 };
@@ -114,7 +114,7 @@ impl Dispatch {
     /// This calls the [`record`](::Subscriber::record)
     /// function on the `Subscriber` that this `Dispatch` forwards to.
     #[inline]
-    pub fn record(&self, span: &span::Id, values: &field::ValueSet) {
+    pub fn record(&self, span: &span::Id, values: &span::Record) {
         self.subscriber.record(span, &values)
     }
 
@@ -227,7 +227,7 @@ impl Subscriber for NoSubscriber {
 
     fn event(&self, _event: &Event) {}
 
-    fn record(&self, _span: &span::Id, _values: &field::ValueSet) {}
+    fn record(&self, _span: &span::Id, _values: &span::Record) {}
 
     fn record_follows_from(&self, _span: &span::Id, _follows: &span::Id) {}
 
