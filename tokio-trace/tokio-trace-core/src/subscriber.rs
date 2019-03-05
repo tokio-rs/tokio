@@ -33,7 +33,7 @@ use {field, span, Event, Metadata};
 ///
 /// [ID]: ::span::Span
 /// [`new_span`]: ::Span::new_span
-pub trait Subscriber {
+pub trait Subscriber: 'static {
     // === Span registry methods ==============================================
 
     /// Registers a new callsite with this subscriber, returning whether or not
