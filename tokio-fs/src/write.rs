@@ -2,6 +2,7 @@ use crate::{file, File};
 use futures::{try_ready, Async, Future, Poll};
 use std::{fmt, io, mem, path::Path};
 use tokio_io;
+use tokio_io::AsyncWrite;
 
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.
@@ -45,6 +46,7 @@ pub struct WriteFile<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]>> {
 enum State<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]>> {
     Create(file::CreateFuture<P>, Option<C>),
     Write(tokio_io::io::WriteAll<File, C>),
+    Flush(File, Option<C>),
 }
 
 impl<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + fmt::Debug> Future for WriteFile<P, C> {
@@ -59,13 +61,17 @@ impl<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + fmt::Debug> Future for Wr
                 State::Write(write)
             }
             State::Write(ref mut write) => {
-                let (_, contents) = try_ready!(write.poll());
-                return Ok(Async::Ready(contents));
+                let (file, contents) = try_ready!(write.poll());
+                State::Flush(file, Some(contents))
+            }
+            State::Flush(file, contents) => {
+                try_ready!(file.poll_flush());
+                return Ok(Async::Ready(contents.take().unwrap()));
             }
         };
 
         mem::replace(&mut self.state, new_state);
-        // We just entered the Write state, need to poll it before returning.
+        // We just entered the Write or Flush state, need to poll it before returning.
         self.poll()
     }
 }

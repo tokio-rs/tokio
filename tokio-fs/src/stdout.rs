@@ -2,6 +2,8 @@ use futures::Poll;
 use std::io::{self, Stdout as StdStdout, Write};
 use tokio_io::AsyncWrite;
 
+// TODO(stjepang): Implement support for single-threaded runtimes.
+
 /// A handle to the standard output stream of a process.
 ///
 /// The handle implements the [`AsyncWrite`] trait, but beware that concurrent
@@ -27,11 +29,11 @@ pub fn stdout() -> Stdout {
 
 impl Write for Stdout {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        crate::would_block(|| self.std.write(buf))
+        crate::would_block(crate::blocking_io(|| self.std.write(buf)))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        crate::would_block(|| self.std.flush())
+        crate::would_block(crate::blocking_io(|| self.std.flush()))
     }
 }
 

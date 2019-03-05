@@ -1,4 +1,5 @@
-use futures::{Future, Poll};
+use super::blocking_pool::{blocking, Blocking};
+use futures::{future, Future, Poll};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -11,40 +12,59 @@ use std::path::Path;
 /// This is an async version of [`std::fs::rename`][std]
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.rename.html
-pub fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> RenameFuture<P, Q> {
+pub fn rename<P, Q>(from: P, to: Q) -> RenameFuture<P, Q>
+where
+    P: AsRef<Path> + Send + 'static,
+    Q: AsRef<Path> + Send + 'static,
+{
     RenameFuture::new(from, to)
 }
 
 /// Future returned by `rename`.
 #[derive(Debug)]
-pub struct RenameFuture<P, Q>
+pub struct RenameFuture<P, Q>(Mode<P, Q>)
 where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static,
+    Q: AsRef<Path> + Send + 'static;
+
+#[derive(Debug)]
+enum Mode<P, Q>
+where
+    P: AsRef<Path> + Send + 'static,
+    Q: AsRef<Path> + Send + 'static,
 {
-    from: P,
-    to: Q,
+    Native { from: P, to: Q },
+    Fallback(Blocking<(), io::Error>),
 }
 
 impl<P, Q> RenameFuture<P, Q>
 where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static,
+    Q: AsRef<Path> + Send + 'static,
 {
     fn new(from: P, to: Q) -> RenameFuture<P, Q> {
-        RenameFuture { from: from, to: to }
+        RenameFuture(if tokio_threadpool::entered() {
+            Mode::Native { from, to }
+        } else {
+            Mode::Fallback(blocking(future::lazy(move || {
+                fs::rename(&from, &to)
+            })))
+        })
     }
 }
 
 impl<P, Q> Future for RenameFuture<P, Q>
 where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
+    P: AsRef<Path> + Send,
+    Q: AsRef<Path> + Send,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        crate::blocking_io(|| fs::rename(&self.from, &self.to))
+        match &mut self.0 {
+            Mode::Native { from, to } => crate::blocking_io(|| fs::rename(from, to)),
+            Mode::Fallback(job) => job.poll(),
+        }
     }
 }

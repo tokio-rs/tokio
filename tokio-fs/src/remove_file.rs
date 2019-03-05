@@ -1,4 +1,5 @@
-use futures::{Future, Poll};
+use super::blocking_pool::{blocking, Blocking};
+use futures::{future, Future, Poll};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -12,36 +13,52 @@ use std::path::Path;
 /// This is an async version of [`std::fs::remove_file`][std]
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.remove_file.html
-pub fn remove_file<P: AsRef<Path>>(path: P) -> RemoveFileFuture<P> {
+pub fn remove_file<P>(path: P) -> RemoveFileFuture<P>
+where
+    P: AsRef<Path> + Send + 'static,
+{
     RemoveFileFuture::new(path)
 }
 
 /// Future returned by `remove_file`.
 #[derive(Debug)]
-pub struct RemoveFileFuture<P>
+pub struct RemoveFileFuture<P>(Mode<P>)
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static;
+
+#[derive(Debug)]
+enum Mode<P>
+where
+    P: AsRef<Path> + Send + 'static,
 {
-    path: P,
+    Native { path: P },
+    Fallback(Blocking<(), io::Error>),
 }
 
 impl<P> RemoveFileFuture<P>
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static,
 {
     fn new(path: P) -> RemoveFileFuture<P> {
-        RemoveFileFuture { path: path }
+        RemoveFileFuture(if tokio_threadpool::entered() {
+            Mode::Native { path }
+        } else {
+            Mode::Fallback(blocking(future::lazy(move || fs::remove_file(&path))))
+        })
     }
 }
 
 impl<P> Future for RemoveFileFuture<P>
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static,
 {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        crate::blocking_io(|| fs::remove_file(&self.path))
+        match &mut self.0 {
+            Mode::Native { path } => crate::blocking_io(|| fs::remove_file(path)),
+            Mode::Fallback(job) => job.poll(),
+        }
     }
 }

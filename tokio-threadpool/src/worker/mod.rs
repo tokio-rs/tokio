@@ -82,6 +82,11 @@ pub struct WorkerId(pub(crate) usize);
 // Pointer to the current worker info
 thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
 
+/// Returns `true` when inside a `tokio-threadpool`.
+pub fn entered() -> bool {
+    CURRENT_WORKER.with(|worker| !worker.get().is_null())
+}
+
 impl Worker {
     pub(crate) fn new(
         id: WorkerId,

@@ -1,5 +1,5 @@
-use super::blocking_io;
-use futures::{Future, Poll};
+use super::blocking_pool::{blocking, Blocking};
+use futures::{future, Future, Poll};
 use std::fs::{self, Metadata};
 use std::io;
 use std::path::Path;
@@ -18,11 +18,17 @@ where
 
 /// Future returned by `symlink_metadata`.
 #[derive(Debug)]
-pub struct SymlinkMetadataFuture<P>
+pub struct SymlinkMetadataFuture<P>(Mode<P>)
+where
+    P: AsRef<Path> + Send + 'static;
+
+#[derive(Debug)]
+enum Mode<P>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    path: P,
+    Native { path: P },
+    Fallback(Blocking<Metadata, io::Error>),
 }
 
 impl<P> SymlinkMetadataFuture<P>
@@ -30,7 +36,11 @@ where
     P: AsRef<Path> + Send + 'static,
 {
     pub(crate) fn new(path: P) -> Self {
-        Self { path }
+        SymlinkMetadataFuture(if tokio_threadpool::entered() {
+            Mode::Native { path }
+        } else {
+            Mode::Fallback(blocking(future::lazy(move || fs::symlink_metadata(path))))
+        })
     }
 }
 
@@ -42,6 +52,9 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        blocking_io(|| fs::symlink_metadata(&self.path))
+        match &mut self.0 {
+            Mode::Native { path } => crate::blocking_io(|| fs::symlink_metadata(path)),
+            Mode::Fallback(job) => job.poll(),
+        }
     }
 }

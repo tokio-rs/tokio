@@ -1,5 +1,6 @@
 use super::blocking_io;
-use futures::{Future, Poll};
+use super::blocking_pool::{blocking, Blocking};
+use futures::{future, Future, Poll};
 use std::fs::{self, Metadata};
 use std::io;
 use std::path::Path;
@@ -14,11 +15,17 @@ where
 
 /// Future returned by `metadata`.
 #[derive(Debug)]
-pub struct MetadataFuture<P>
+pub struct MetadataFuture<P>(Mode<P>)
+where
+    P: AsRef<Path> + Send + 'static;
+
+#[derive(Debug)]
+enum Mode<P>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    path: P,
+    Native { path: P },
+    Fallback(Blocking<Metadata, io::Error>),
 }
 
 impl<P> MetadataFuture<P>
@@ -26,7 +33,11 @@ where
     P: AsRef<Path> + Send + 'static,
 {
     pub(crate) fn new(path: P) -> Self {
-        Self { path }
+        MetadataFuture(if tokio_threadpool::entered() {
+            Mode::Native { path }
+        } else {
+            Mode::Fallback(blocking(future::lazy(move || fs::metadata(&path))))
+        })
     }
 }
 
@@ -38,6 +49,9 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        blocking_io(|| fs::metadata(&self.path))
+        match &mut self.0 {
+            Mode::Native { path } => blocking_io(|| fs::metadata(path)),
+            Mode::Fallback(job) => job.poll(),
+        }
     }
 }

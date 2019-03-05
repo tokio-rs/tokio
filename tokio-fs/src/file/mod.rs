@@ -4,10 +4,13 @@
 
 mod clone;
 mod create;
+mod fallback;
 mod metadata;
 mod open;
 mod open_options;
 mod seek;
+
+use self::fallback::Fallback;
 
 pub use self::clone::CloneFuture;
 pub use self::create::CreateFuture;
@@ -21,6 +24,7 @@ use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_threadpool;
 
 /// A reference to an open file on the filesystem.
 ///
@@ -68,11 +72,20 @@ use tokio_io::{AsyncRead, AsyncWrite};
 /// tokio::run(task);
 /// ```
 #[derive(Debug)]
-pub struct File {
-    std: Option<StdFile>,
+pub struct File(Mode);
+
+#[derive(Debug)]
+enum Mode {
+    Native(Option<StdFile>),
+    Fallback(Fallback),
 }
 
 impl File {
+    /// Creates a `File` from a `Fallback`.
+    pub(crate) fn from_fallback(fallback: Fallback) -> File {
+        File(Mode::Fallback(fallback))
+    }
+
     /// Attempts to open a file in read-only mode.
     ///
     /// See [`OpenOptions`] for more details.
@@ -160,7 +173,11 @@ impl File {
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
     pub fn from_std(std: StdFile) -> File {
-        File { std: Some(std) }
+        File(if tokio_threadpool::entered() {
+            Mode::Native(Some(std))
+        } else {
+            Mode::Fallback(Fallback::new(std))
+        })
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -192,7 +209,14 @@ impl File {
     /// tokio::run(task);
     /// ```
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
-        crate::blocking_io(|| self.std().seek(pos))
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .seek(pos)
+            }),
+            Mode::Fallback(fallback) => fallback.poll_seek(pos),
+        }
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -244,7 +268,14 @@ impl File {
     /// tokio::run(task);
     /// ```
     pub fn poll_sync_all(&mut self) -> Poll<(), io::Error> {
-        crate::blocking_io(|| self.std().sync_all())
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .sync_all()
+            }),
+            Mode::Fallback(fallback) => fallback.poll_sync_all(),
+        }
     }
 
     /// This function is similar to `poll_sync_all`, except that it may not
@@ -274,7 +305,14 @@ impl File {
     /// tokio::run(task);
     /// ```
     pub fn poll_sync_data(&mut self) -> Poll<(), io::Error> {
-        crate::blocking_io(|| self.std().sync_data())
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .sync_data()
+            }),
+            Mode::Fallback(fallback) => fallback.poll_sync_data(),
+        }
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -306,7 +344,14 @@ impl File {
     /// tokio::run(task);
     /// ```
     pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
-        crate::blocking_io(|| self.std().set_len(size))
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .set_len(size)
+            }),
+            Mode::Fallback(fallback) => fallback.poll_set_len(size),
+        }
     }
 
     /// Queries metadata about the underlying file.
@@ -345,7 +390,14 @@ impl File {
     /// tokio::run(task);
     /// ```
     pub fn poll_metadata(&mut self) -> Poll<Metadata, io::Error> {
-        crate::blocking_io(|| self.std().metadata())
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .metadata()
+            }),
+            Mode::Fallback(fallback) => fallback.poll_metadata(),
+        }
     }
 
     /// Create a new `File` instance that shares the same underlying file handle
@@ -367,10 +419,16 @@ impl File {
     /// tokio::run(task);
     /// ```
     pub fn poll_try_clone(&mut self) -> Poll<File, io::Error> {
-        crate::blocking_io(|| {
-            let std = self.std().try_clone()?;
-            Ok(File::from_std(std))
-        })
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                let std = std
+                    .as_mut()
+                    .expect("`File` instance closed")
+                    .try_clone()?;
+                Ok(File::from_std(std))
+            }),
+            Mode::Fallback(fallback) => fallback.poll_try_clone(),
+        }
     }
 
     /// Create a new `File` instance that shares the same underlying file handle
@@ -437,15 +495,22 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_set_permissions(&mut self, perm: Permissions) -> Poll<(), io::Error> {
-        crate::blocking_io(|| self.std().set_permissions(perm))
+    pub fn poll_set_permissions(&mut self, perms: Permissions) -> Poll<(), io::Error> {
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .set_permissions(perms)
+            }),
+            Mode::Fallback(fallback) => fallback.poll_set_permissions(perms),
+        }
     }
 
     /// Destructures the `tokio_fs::File` into a [`std::fs::File`][std].
     ///
     /// # Panics
     ///
-    /// This function will panic if `shutdown` has been called.
+    /// This function will panic if `closed` has been called.
     ///
     /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
     ///
@@ -463,18 +528,24 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn into_std(mut self) -> StdFile {
-        self.std.take().expect("`File` instance already shutdown")
-    }
-
-    fn std(&mut self) -> &mut StdFile {
-        self.std.as_mut().expect("`File` instance already shutdown")
+    pub fn into_std(self) -> StdFile {
+        match self.0 {
+            Mode::Native(std) => std.expect("`File` instance closed"),
+            Mode::Fallback(fallback) => fallback.into_std(),
+        }
     }
 }
 
 impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        crate::would_block(|| self.std().read(buf))
+        match &mut self.0 {
+            Mode::Native(std) => crate::would_block(crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .read(buf)
+            })),
+            Mode::Fallback(fallback) => crate::would_block(fallback.poll_read(buf)),
+        }
     }
 }
 
@@ -486,28 +557,36 @@ impl AsyncRead for File {
 
 impl Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        crate::would_block(|| self.std().write(buf))
+        match &mut self.0 {
+            Mode::Native(std) => crate::would_block(crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .write(buf)
+            })),
+            Mode::Fallback(fallback) => crate::would_block(fallback.poll_write(buf)),
+        }
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        crate::would_block(|| self.std().flush())
+        match &mut self.0 {
+            Mode::Native(std) => crate::would_block(crate::blocking_io(|| {
+                std.as_mut()
+                    .expect("`File` instance closed")
+                    .flush()
+            })),
+            Mode::Fallback(fallback) => crate::would_block(fallback.poll_flush()),
+        }
     }
 }
 
 impl AsyncWrite for File {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        crate::blocking_io(|| {
-            self.std = None;
-            Ok(())
-        })
-    }
-}
-
-impl Drop for File {
-    fn drop(&mut self) {
-        if let Some(_std) = self.std.take() {
-            // This is probably fine as closing a file *shouldn't* be a blocking
-            // operation. That said, ideally `shutdown` is called first.
+        match &mut self.0 {
+            Mode::Native(std) => crate::blocking_io(|| {
+                *std = None;
+                Ok(())
+            }),
+            Mode::Fallback(fallback) => fallback.poll_close(),
         }
     }
 }

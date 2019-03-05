@@ -148,4 +148,4 @@ pub use crate::builder::Builder;
 pub use crate::sender::Sender;
 pub use crate::shutdown::Shutdown;
 pub use crate::thread_pool::{SpawnHandle, ThreadPool};
-pub use crate::worker::{Worker, WorkerId};
+pub use crate::worker::{entered, Worker, WorkerId};

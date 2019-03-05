@@ -27,10 +27,12 @@ publish = false
 futures = "0.1.21"
 tokio-threadpool = { version = "0.2.0", path = "../tokio-threadpool" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
+lazy_static = "1.3.0"
 
 [dev-dependencies]
 rand = "0.6"
 tempfile = "3"
 tempdir = "0.3"
 tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
+tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
 tokio = { version = "0.2.0", path = "../tokio" }

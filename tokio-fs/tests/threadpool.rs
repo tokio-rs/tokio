@@ -1,10 +1,11 @@
-use futures;
-use tokio_threadpool;
-
 use self::tokio_threadpool::Builder;
+use futures;
 use futures::sync::oneshot;
 use futures::Future;
 use std::io;
+use tokio_threadpool;
+
+mod common;
 
 pub fn run<F>(f: F)
 where

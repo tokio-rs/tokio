@@ -1,6 +1,8 @@
 use std::io::{self, Read, Stdin as StdStdin};
 use tokio_io::AsyncRead;
 
+// TODO(stjepang): Implement support for single-threaded runtimes.
+
 /// A handle to the standard input stream of a process.
 ///
 /// The handle implements the [`AsyncRead`] trait, but beware that concurrent
@@ -32,7 +34,7 @@ pub fn stdin() -> Stdin {
 
 impl Read for Stdin {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        crate::would_block(|| self.std.read(buf))
+        crate::would_block(crate::blocking_io(|| self.std.read(buf)))
     }
 }
 

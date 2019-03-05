@@ -1,19 +1,18 @@
 #![deny(warnings, rust_2018_idioms)]
 
+use crate::run;
 use futures::{Future, Stream};
 use std::fs;
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
 use tokio_fs::*;
 
-mod pool;
-
 #[test]
 fn create() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
 
-    pool::run({ create_dir(new_dir.clone()) });
+    run({ create_dir(new_dir.clone()) });
 
     assert!(new_dir.is_dir());
 }
@@ -23,7 +22,7 @@ fn create_all() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo").join("bar");
 
-    pool::run({ create_dir_all(new_dir.clone()) });
+    run({ create_dir_all(new_dir.clone()) });
 
     assert!(new_dir.is_dir());
 }
@@ -35,7 +34,7 @@ fn remove() {
 
     fs::create_dir(new_dir.clone()).unwrap();
 
-    pool::run({ remove_dir(new_dir.clone()) });
+    run({ remove_dir(new_dir.clone()) });
 
     assert!(!new_dir.exists());
 }
@@ -53,7 +52,7 @@ fn read() {
 
     let f = files.clone();
     let p = p.to_path_buf();
-    pool::run({
+    run({
         read_dir(p).flatten_stream().for_each(move |e| {
             let s = e.file_name().to_str().unwrap().to_string();
             f.lock().unwrap().push(s);

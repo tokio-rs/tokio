@@ -30,6 +30,7 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
+mod blocking_pool;
 mod create_dir;
 mod create_dir_all;
 pub mod file;
@@ -73,6 +74,7 @@ use futures::Poll;
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
 
+/// Executes a function inside `blocking()` and returns a `Poll<T, io::Error>`.
 fn blocking_io<F, T>(f: F) -> Poll<T, io::Error>
 where
     F: FnOnce() -> io::Result<T>,
@@ -85,18 +87,17 @@ where
     }
 }
 
-fn would_block<F, T>(f: F) -> io::Result<T>
-where
-    F: FnOnce() -> io::Result<T>,
-{
-    match tokio_threadpool::blocking(f) {
-        Ok(Ready(Ok(v))) => Ok(v),
-        Ok(Ready(Err(err))) => {
+/// Converts a `Poll<T, io::Error>` into `io::Result<T>`.
+///
+/// The `Ok(NotReady)` case will be converted to `Err(io::ErrorKind::WouldBlock.into())`.
+fn would_block<T>(poll: Poll<T, io::Error>) -> io::Result<T> {
+    match poll {
+        Ok(Ready(v)) => Ok(v),
+        Ok(NotReady) => Err(WouldBlock.into()),
+        Err(err) => {
             debug_assert_ne!(err.kind(), WouldBlock);
             Err(err)
         }
-        Ok(NotReady) => Err(WouldBlock.into()),
-        Err(_) => Err(blocking_err()),
     }
 }
 

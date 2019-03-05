@@ -1,5 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 
+use crate::run;
 use futures::future::poll_fn;
 use futures::Future;
 use rand::{distributions, thread_rng, Rng};
@@ -8,8 +9,7 @@ use std::io::SeekFrom;
 use tempfile::Builder as TmpBuilder;
 use tokio_fs::*;
 use tokio_io::io;
-
-mod pool;
+use tokio_io::AsyncWrite;
 
 #[test]
 fn read_write() {
@@ -27,7 +27,7 @@ fn read_write() {
         .collect::<String>()
         .into();
 
-    pool::run({
+    run({
         let file_path = file_path.clone();
         let contents = contents.clone();
 
@@ -45,7 +45,7 @@ fn read_write() {
     let dst = fs::read(&file_path).unwrap();
     assert_eq!(dst, contents);
 
-    pool::run({
+    run({
         File::open(file_path)
             .and_then(|file| io::read_to_end(file, vec![]))
             .then(move |res| {
@@ -72,15 +72,17 @@ fn read_write_helpers() {
         .collect::<String>()
         .into();
 
-    pool::run(write(file_path.clone(), contents.clone()).then(|res| {
-        let _ = res.unwrap();
-        Ok(())
-    }));
+    run({
+        write(file_path.clone(), contents.clone()).then(|res| {
+            let _ = res.unwrap();
+            Ok(())
+        })
+    });
 
     let dst = fs::read(&file_path).unwrap();
     assert_eq!(dst, contents);
 
-    pool::run({
+    run({
         read(file_path).then(move |res| {
             let buf = res.unwrap();
             assert_eq!(buf, contents);
@@ -97,7 +99,7 @@ fn metadata() {
         .unwrap();
     let file_path = dir.path().join("metadata.txt");
 
-    pool::run({
+    run({
         let file_path = file_path.clone();
         let file_path2 = file_path.clone();
         let file_path3 = file_path.clone();
@@ -124,7 +126,7 @@ fn seek() {
         .unwrap();
     let file_path = dir.path().join("seek.txt");
 
-    pool::run({
+    run({
         OpenOptions::new()
             .create(true)
             .read(true)
@@ -159,7 +161,7 @@ fn clone() {
         .unwrap();
     let file_path = dir.path().join("clone.txt");
 
-    pool::run(
+    run({
         File::create(file_path.clone())
             .and_then(|file| {
                 file.try_clone()
@@ -167,13 +169,14 @@ fn clone() {
                     .and_then(|(file, clone)| {
                         io::write_all(file, "clone ")
                             .and_then(|_| io::write_all(clone, "successful"))
+                            .and_then(|(mut file, _)| poll_fn(move || file.poll_flush()))
                     })
             })
             .then(|res| {
                 let _ = res.unwrap();
                 Ok(())
-            }),
-    );
+            })
+    });
 
     let mut file = std::fs::File::open(&file_path).unwrap();
 
