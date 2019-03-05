@@ -77,8 +77,8 @@ impl Subscriber for CounterSubscriber {
         interest
     }
 
-    fn new_span(&self, _new_span: &Metadata, values: &field::ValueSet) -> Id {
-        values.record(&mut self.recorder());
+    fn new_span(&self, new_span: &span::Attributes) -> Id {
+        new_span.values().record(&mut self.recorder());
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         Id::from_u64(id as u64)
     }

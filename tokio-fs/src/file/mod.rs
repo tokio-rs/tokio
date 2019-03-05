@@ -597,7 +597,7 @@ impl File {
                     Ok(Async::Ready(()))
                 }
                 Async::Ready(Err(err)) => {
-                    // TODO: restore inner? or what?
+                    // TODO(stjepang): Should we restore inner here?
                     return Err(err);
                 }
                 Async::NotReady => {

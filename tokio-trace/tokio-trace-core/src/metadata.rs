@@ -124,7 +124,7 @@ pub struct Metadata<'a> {
     pub fields: field::FieldSet,
 }
 
-/// Describes the level of verbosity of a `Span`.
+/// Describes the level of verbosity of a span or event.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Level(LevelInner);
 

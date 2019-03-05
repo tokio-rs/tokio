@@ -1,3 +1,12 @@
+# 0.1.9 (March 1, 2019)
+
+### Added
+- impl `AsRawFd` for `Reactor` on unix platforms (#890).
+
+### Changed
+- perf: reduce unnecessary task clones (#899).
+- perf: release lock before issuing syscall (#894).
+
 # 0.1.8 (January 6, 2019)
 
 * Update to `parking_lot` 0.7 (#778).

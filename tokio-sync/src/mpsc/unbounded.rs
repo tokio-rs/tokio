@@ -180,3 +180,18 @@ impl<T> From<(T, chan::TrySendError)> for UnboundedTrySendError<T> {
         UnboundedTrySendError(value)
     }
 }
+
+// ===== impl UnboundedRecvError =====
+
+impl fmt::Display for UnboundedRecvError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use std::error::Error;
+        write!(fmt, "{}", self.description())
+    }
+}
+
+impl ::std::error::Error for UnboundedRecvError {
+    fn description(&self) -> &str {
+        "channel closed"
+    }
+}

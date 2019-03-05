@@ -785,7 +785,7 @@ impl TcpStream {
         // Rationale for deprecation:
         // - https://github.com/tokio-rs/tokio/pull/824
         // - https://github.com/tokio-rs/tokio/issues/774#issuecomment-451059317
-        let msg = "`TcpStream::split()` is deprecated because it doesn't work as intended";
+        let msg = "`TcpStream::try_clone()` is deprecated because it doesn't work as intended";
         Err(io::Error::new(io::ErrorKind::Other, msg))
     }
 }

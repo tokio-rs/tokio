@@ -31,10 +31,10 @@ executor, including:
 
 * [`Park`] abstracts over blocking and unblocking the current thread.
 
-[`Executor`]: https://tokio-rs.github.io/tokio/tokio_executor/trait.Executor.html
-[`enter`]: https://tokio-rs.github.io/tokio/tokio_executor/fn.enter.html
-[`DefaultExecutor`]: https://tokio-rs.github.io/tokio/tokio_executor/struct.DefaultExecutor.html
-[`Park`]: https://tokio-rs.github.io/tokio/tokio_executor/park/index.html
+[`Executor`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/trait.Executor.html
+[`enter`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/fn.enter.html
+[`DefaultExecutor`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/struct.DefaultExecutor.html
+[`Park`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/park/trait.Park.html
 
 ## License
 

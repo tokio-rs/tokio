@@ -1,0 +1,27 @@
+parameters:
+  noDefaultFeatures: '--no-default-features'
+
+jobs:
+- job: ${{ parameters.name }}
+  displayName: ${{ parameters.displayName }}
+  pool:
+    vmImage: ubuntu-16.04
+  steps:
+  - template: azure-install-rust.yml
+    parameters:
+      rust_version: ${{ parameters.rust }}
+
+  - ${{ each crate in parameters.crates }}:
+    - ${{ each feature in crate.value }}:
+      - ${{ if eq(crate.key, 'tokio') }}:
+        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
+          displayName: Check features = ${{ feature }}
+
+      - ${{ if not(eq(crate.key, 'tokio')) }}:
+        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
+          displayName: Check `${{ crate.key }}`, features = ${{ feature }}
+          workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+
+  - ${{ if parameters.benches }}:
+    - script: cargo check --benches --all
+      displayName: Check benchmarks

@@ -206,14 +206,12 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_span(
-        &self,
-        span: &tokio_trace::Metadata,
-        values: &tokio_trace::field::ValueSet,
-    ) -> tokio_trace::Id {
+    fn new_span(&self, span: &tokio_trace::span::Attributes) -> tokio_trace::Id {
+        let meta = span.metadata();
+        let values = span.values();
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
-        let span = Span::new(self.current.id(), span, values);
+        let span = Span::new(self.current.id(), meta, values);
         self.spans.lock().unwrap().insert(id.clone(), span);
         id
     }

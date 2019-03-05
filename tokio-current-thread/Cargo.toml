@@ -3,11 +3,13 @@ name = "tokio-current-thread"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-# - Update doc URL
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.4"
-documentation = "https://docs.rs/tokio-current-thread/0.1.4/tokio_current_thread"
+version = "0.1.5"
+documentation = "https://docs.rs/tokio-current-thread/0.1.5/tokio_current_thread"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"

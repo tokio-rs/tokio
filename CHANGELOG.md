@@ -1,6 +1,15 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.16 (March 1, 2019)
+
+### Fixed
+- async-await: track latest nightly changes (#940).
+
+### Added
+- `sync::Watch`, a single value broadcast channel (#922).
+- Async equivalent of read / write file helpers being added to `std` (#896).
+
 # 0.1.15 (January 24, 2019)
 
 ### Added

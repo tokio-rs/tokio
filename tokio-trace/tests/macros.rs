@@ -23,6 +23,63 @@ fn span() {
 }
 
 #[test]
+fn span_root() {
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "bar",);
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: None,
+        "foo",
+        bar = 2,
+        baz = 3
+    );
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: None,
+        "foo",
+        bar = 2,
+        baz = 4,
+    );
+    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo");
+    span!(level: tokio_trace::Level::DEBUG, parent: None, "bar",);
+    span!(parent: None, "foo", bar = 2, baz = 3);
+    span!(parent: None, "foo", bar = 2, baz = 4,);
+    span!(parent: None, "foo");
+    span!(parent: None, "bar",);
+}
+
+#[test]
+fn span_with_parent() {
+    let p = span!("im_a_parent!");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 3);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 4,);
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo");
+    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "bar",);
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: &p,
+        "foo",
+        bar = 2,
+        baz = 3
+    );
+    span!(
+        level: tokio_trace::Level::DEBUG,
+        parent: &p,
+        "foo",
+        bar = 2,
+        baz = 4,
+    );
+    span!(level: tokio_trace::Level::DEBUG, parent: &p, "foo");
+    span!(level: tokio_trace::Level::DEBUG, parent: &p, "bar",);
+    span!(parent: &p, "foo", bar = 2, baz = 3);
+    span!(parent: &p, "foo", bar = 2, baz = 4,);
+    span!(parent: &p, "foo");
+    span!(parent: &p, "bar",);
+}
+
+#[test]
 fn event() {
     event!(tokio_trace::Level::DEBUG, foo = 3, bar = 2, baz = false);
     event!(tokio_trace::Level::DEBUG, foo = 3, bar = 3,);

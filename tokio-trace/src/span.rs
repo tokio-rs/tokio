@@ -135,8 +135,7 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-// TODO: remove this re-export?
-pub use tokio_trace_core::span::Span as Id;
+pub use tokio_trace_core::span::{Attributes, Id};
 
 use std::{
     borrow::Borrow,
@@ -209,7 +208,8 @@ struct Entered<'a> {
 // ===== impl Span =====
 
 impl<'a> Span<'a> {
-    /// Constructs a new `Span` with the given [metadata] and set of [field values].
+    /// Constructs a new `Span` with the given [metadata] and set of [field
+    /// values].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
     /// with the current span as its parent (if one exists).
@@ -223,14 +223,42 @@ impl<'a> Span<'a> {
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
     pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
-        let inner = dispatcher::with(move |dispatch| {
-            let id = dispatch.new_span(meta, values);
-            Some(Inner::new(id, dispatch, meta))
-        });
-        Self {
-            inner,
-            is_closed: false,
-        }
+        let new_span = Attributes::new(meta, values);
+        Self::make(meta, new_span)
+    }
+
+    /// Constructs a new `Span` as the root of its own trace tree, with the
+    /// given [metadata] and set of [field values].
+    ///
+    /// After the span is constructed, [field values] and/or [`follows_from`]
+    /// annotations may be added to it.
+    ///
+    /// [metadata]: ::metadata::Metadata
+    /// [field values]: ::field::ValueSet
+    /// [`follows_from`]: ::span::Span::follows_from
+    #[inline]
+    pub fn new_root(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+        Self::make(meta, Attributes::new_root(meta, values))
+    }
+
+    /// Constructs a new `Span` as child of the given parent span, with the
+    /// given [metadata] and set of [field values].
+    ///
+    /// After the span is constructed, [field values] and/or [`follows_from`]
+    /// annotations may be added to it.
+    ///
+    /// [metadata]: ::metadata::Metadata
+    /// [field values]: ::field::ValueSet
+    /// [`follows_from`]: ::span::Span::follows_from
+    pub fn child_of<I>(parent: I, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a>
+    where
+        I: Into<Option<Id>>,
+    {
+        let new_span = match parent.into() {
+            Some(parent) => Attributes::child_of(parent, meta, values),
+            None => Attributes::new_root(meta, values),
+        };
+        Self::make(meta, new_span)
     }
 
     /// Constructs a new disabled span.
@@ -238,6 +266,18 @@ impl<'a> Span<'a> {
     pub fn new_disabled() -> Span<'a> {
         Span {
             inner: None,
+            is_closed: false,
+        }
+    }
+
+    #[inline(always)]
+    fn make(meta: &'a Metadata<'a>, new_span: Attributes) -> Span<'a> {
+        let inner = dispatcher::with(move |dispatch| {
+            let id = dispatch.new_span(&new_span);
+            Some(Inner::new(id, dispatch, meta))
+        });
+        Self {
+            inner,
             is_closed: false,
         }
     }
@@ -377,6 +417,12 @@ impl<'a> fmt::Debug for Span<'a> {
             span.field("disabled", &true)
         }
         .finish()
+    }
+}
+
+impl<'a> Into<Option<Id>> for &'a Span<'a> {
+    fn into(self) -> Option<Id> {
+        self.id()
     }
 }
 
