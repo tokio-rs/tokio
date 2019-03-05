@@ -1,4 +1,5 @@
 //! Subscribers collect and record trace data.
+use std::any::TypeId;
 use {field, span, Event, Metadata};
 
 /// Trait representing the functions required to collect trace data.
@@ -239,6 +240,15 @@ pub trait Subscriber {
     /// [`drop_span`]: ::subscriber::Subscriber::drop_span
     fn drop_span(&self, id: span::Id) {
         let _ = id;
+    }
+
+    /// Gets the `TypeId` of `self`
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId
+    where
+        Self: 'static,
+    {
+        TypeId::of::<Self>()
     }
 }
 

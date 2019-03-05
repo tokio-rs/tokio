@@ -196,6 +196,32 @@ impl Dispatch {
     pub fn drop_span(&self, id: span::Id) {
         self.subscriber.drop_span(id)
     }
+
+    /// Returns `true` if this `Dispatch` forwards to a subscriber of type `T`
+    #[inline]
+    pub fn is<T>(&self) -> bool
+    where
+        T: Subscriber + Send + Sync + 'static,
+    {
+        use std::any::TypeId;
+
+        TypeId::of::<T>() == self.subscriber.type_id()
+    }
+
+    /// Returns a reference to the `Subscriber` this `Dispatch` forwards to if
+    /// it is of type `T`, or `None` if it isn't.
+    #[inline]
+    pub fn downcast_ref<T>(&self) -> Option<&T>
+    where
+        T: Subscriber + Send + Sync + 'static,
+    {
+        if self.is::<T>() {
+            let inner = self.subscriber.as_ref();
+            unsafe { Some(&*(inner as *const Subscriber as *const T)) }
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Debug for Dispatch {
