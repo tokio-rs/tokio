@@ -130,6 +130,25 @@ impl<'a> Attributes<'a> {
             _ => None,
         }
     }
+
+    /// Records all the fields in this set of `Attributes` with the provided
+    /// [Visitor].
+    ///
+    /// [visitor]: ::field::Visit
+    pub fn record(&self, visitor: &mut field::Visit) {
+        self.values.record(visitor)
+    }
+
+    /// Returns `true` if this set of `Attributes` contains a value for the
+    /// given `Field`.
+    pub fn contains(&self, field: &field::Field) -> bool {
+        self.values.contains(field)
+    }
+
+    /// Returns true if this set of `Attributes` contains _no_ values.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
 }
 
 // ===== impl Record =====

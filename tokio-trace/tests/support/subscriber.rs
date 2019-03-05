@@ -202,7 +202,7 @@ impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
                     .metadata
                     .check(meta, format_args!("span `{}`", name));
                 let mut checker = expected.fields.checker(format!("{}", name));
-                values.record(&mut checker);
+                span.record(&mut checker);
                 checker.finish();
                 match expected.parent {
                     Some(Parent::ExplicitRoot) => {

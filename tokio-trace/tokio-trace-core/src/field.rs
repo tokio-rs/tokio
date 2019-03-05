@@ -547,7 +547,7 @@ impl<'a> ValueSet<'a> {
     /// Visits all the fields in this `ValueSet` with the provided [visitor].
     ///
     /// [visitor]: ::field::Visit
-    pub fn record(&self, visitor: &mut Visit) {
+    pub(crate) fn record(&self, visitor: &mut Visit) {
         let my_callsite = self.callsite();
         for (field, value) in self.values {
             if field.callsite() != my_callsite {
@@ -560,7 +560,7 @@ impl<'a> ValueSet<'a> {
     }
 
     /// Returns `true` if this `ValueSet` contains a value for the given `Field`.
-    pub fn contains(&self, field: &Field) -> bool {
+    pub(crate) fn contains(&self, field: &Field) -> bool {
         field.callsite() == self.callsite()
             && self
                 .values
@@ -569,7 +569,7 @@ impl<'a> ValueSet<'a> {
     }
 
     /// Returns true if this `ValueSet` contains _no_ values.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         let my_callsite = self.callsite();
         self.values
             .iter()

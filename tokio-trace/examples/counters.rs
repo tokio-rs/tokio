@@ -78,7 +78,7 @@ impl Subscriber for CounterSubscriber {
     }
 
     fn new_span(&self, new_span: &span::Attributes) -> Id {
-        new_span.values().record(&mut self.visitor());
+        new_span.record(&mut self.visitor());
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         Id::from_u64(id as u64)
     }
