@@ -31,8 +31,8 @@ use {span, Event, Metadata};
 /// not be needed by the implementations of `enter` and `exit`, the subscriber
 /// may freely discard that data without allocating space to store it.
 ///
-/// [ID]: ::span::Span
-/// [`new_span`]: ::Span::new_span
+/// [ID]: ../span/struct.Id.html
+/// [`new_span`]: trait.Subscriber.html#method.new_span
 pub trait Subscriber: 'static {
     // === Span registry methods ==============================================
 
@@ -51,7 +51,7 @@ pub trait Subscriber: 'static {
     /// preallocate storage for that callsite, or perform any other actions it
     /// wishes to perform once for each callsite.
     ///
-    /// The subscriber should then return an [`Interest`](Interest), indicating
+    /// The subscriber should then return an [`Interest`], indicating
     /// whether it is interested in being notified about that callsite in the
     /// future. This may be `Always` indicating that the subscriber always
     /// wishes to be notified about the callsite, and its filter need not be
@@ -88,8 +88,9 @@ pub trait Subscriber: 'static {
     /// callsite, it _may_ still see spans and events originating from that
     /// callsite, if another subscriber expressed interest in it.
     ///
-    /// [metadata]: ::Metadata
-    /// [`enabled`]: ::Subscriber::enabled
+    /// [metadata]: ../metadata/struct.Metadata.html
+    /// [`Interest`]: struct.Interest.html
+    /// [`enabled`]: #method.enabled
     fn register_callsite(&self, metadata: &Metadata) -> Interest {
         match self.enabled(metadata) {
             true => Interest::always(),
@@ -103,15 +104,15 @@ pub trait Subscriber: 'static {
     /// This is used by the dispatcher to avoid allocating for span construction
     /// if the span would be discarded anyway.
     ///
-    /// [metadata]: ::Metadata
+    /// [metadata]: ../metadata/struct.Metadata.html
     fn enabled(&self, metadata: &Metadata) -> bool;
 
     /// Visit the construction of a new span, returning a new [span ID] for the
     /// span being constructed.
     ///
-    /// The provided `ValueSet` contains any field values that were provided
+    /// The provided [`Attributes`] contains any field values that were provided
     /// when the span was created. The subscriber may pass a [visitor] to the
-    /// `ValueSet`'s [`record` method] to record these values.
+    /// `Attributes`' [`record` method] to record these values.
     ///
     /// IDs are used to uniquely identify spans and events within the context of a
     /// subscriber, so span equality will be based on the returned ID. Thus, if
@@ -123,8 +124,9 @@ pub trait Subscriber: 'static {
     /// the metadata.
     ///
     /// [span ID]: ../span/struct.Id.html
-    /// [visitor]: ::field::Visit
-    /// [`record` method]: ::field::ValueSet::record
+    /// [`Attributes`]: ../span/struct.Attributes.html
+    /// [visitor]: ../field/trait.Visit.html
+    /// [`record` method]: ../span/struct.Attributes.html#method.record
     fn new_span(&self, span: &span::Attributes) -> span::Id;
 
     // === Notification methods ===============================================
@@ -134,8 +136,8 @@ pub trait Subscriber: 'static {
     /// The subscriber is expected to provide a [visitor] to the `Record`'s
     /// [`record` method] in order to record the added values.
     ///
-    /// [visitor]: ::field::Visit
-    /// [`record` method]: ::span::Record::record
+    /// [visitor]: ../field/trait.Visit.html
+    /// [`record` method]: ../span/struct.Record.html#method.record
     fn record(&self, span: &span::Id, values: &span::Record);
 
     /// Adds an indication that `span` follows from the span with the id
@@ -164,9 +166,9 @@ pub trait Subscriber: 'static {
     /// event. The subscriber may pass a [visitor] to the `Event`'s
     /// [`record` method] to record these values.
     ///
-    /// [`Event`]: ::event::Event
-    /// [visitor]: ::field::Visit
-    /// [`record` method]: ::event::Event::record
+    /// [`Event`]: ../event/struct.Event.html
+    /// [visitor]: ../field/trait.Visit.html
+    /// [`record` method]: ../event/struct.Event.html#method.record
     fn event(&self, event: &Event);
 
     /// Visits that a spanhas been entered.
@@ -210,7 +212,7 @@ pub trait Subscriber: 'static {
     /// what that means for the specified pointer.
     ///
     /// [span ID]: ../span/struct.Id.html
-    /// [`drop_span`]: ::subscriber::Subscriber::drop_span
+    /// [`drop_span`]: trait.Subscriber.html#method.drop_span
     fn clone_span(&self, id: &span::Id) -> span::Id {
         id.clone()
     }
@@ -236,7 +238,7 @@ pub trait Subscriber: 'static {
     /// was dropped due to a thread unwinding.
     ///
     /// [span ID]: ../span/struct.Id.html
-    /// [`drop_span`]: ::subscriber::Subscriber::drop_span
+    /// [`clone_span`]: trait.Subscriber.html#method.clone_span
     fn drop_span(&self, id: span::Id) {
         let _ = id;
     }
