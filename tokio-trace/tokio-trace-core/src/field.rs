@@ -447,8 +447,8 @@ impl FieldSet {
     /// Returns an [`Identifier`] that uniquely identifies the [`Callsite`]
     /// which defines this set of fields..
     ///
-    /// [`Identifier`]: ../../callsite/struct.Identifier.html
-    /// [`Callsite`]: ../../callsite/trait.Callsite.html
+    /// [`Identifier`]: ../callsite/struct.Identifier.html
+    /// [`Callsite`]: ../callsite/trait.Callsite.html
     pub(crate) fn callsite(&self) -> callsite::Identifier {
         callsite::Identifier(self.callsite.0)
     }
@@ -555,8 +555,8 @@ impl<'a> ValueSet<'a> {
     /// Returns an [`Identifier`] that uniquely identifies the [`Callsite`]
     /// defining the fields this `ValueSet` refers to.
     ///
-    /// [`Identifier`]: ../../callsite/struct.Identifier.html
-    /// [`Callsite`]: ../../callsite/trait.Callsite.html
+    /// [`Identifier`]: ../callsite/struct.Identifier.html
+    /// [`Callsite`]: ../callsite/trait.Callsite.html
     #[inline]
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
