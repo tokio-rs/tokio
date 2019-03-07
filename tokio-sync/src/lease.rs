@@ -71,23 +71,23 @@ use std::sync::Arc;
 /// The code will also panic if you attempt to drop a `Lease` without first restoring the leased
 /// value.
 #[derive(Debug)]
-pub struct Lease<S> {
-    inner: Arc<State<S>>,
+pub struct Lease<T> {
+    inner: Arc<State<T>>,
     permit: semaphore::Permit,
 }
 
-// As long as S: Send, it's fine to send Lease<S> to other threads.
-// If S was not Send, sending a Lease<S> would be bad, since you can access S through Lease<S>.
-unsafe impl<S> Send for Lease<S> where S: Send {}
+// As long as T: Send, it's fine to send Lease<T> to other threads.
+// If T was not Send, sending a Lease<T> would be bad, since you can access T through Lease<T>.
+unsafe impl<T> Send for Lease<T> where T: Send {}
 
 #[derive(Debug)]
-struct State<S> {
-    c: UnsafeCell<Option<S>>,
+struct State<T> {
+    c: UnsafeCell<Option<T>>,
     s: semaphore::Semaphore,
 }
 
-impl<S> Lease<S> {
-    fn option(&mut self) -> &mut Option<S> {
+impl<T> Lease<T> {
+    fn option(&mut self) -> &mut Option<T> {
         unsafe { &mut *self.inner.c.get() }
     }
 
@@ -141,7 +141,7 @@ impl<S> Lease<S> {
     ///
     /// Note that you _must_ call `restore` on this lease before you drop it to return the leased
     /// value to other waiting clients. If you do not, dropping the lease will panic.
-    pub fn take(&mut self) -> S {
+    pub fn take(&mut self) -> T {
         assert!(self.permit.is_acquired());
         self.option()
             .take()
@@ -153,7 +153,7 @@ impl<S> Lease<S> {
     /// This method will panic if you attempt to call it without first having acquired the lease.
     ///
     /// Note that once you return the leased value, the lease is no longer considered acquired.
-    pub fn restore(&mut self, state: S) {
+    pub fn restore(&mut self, state: T) {
         assert!(self.permit.is_acquired());
         unsafe { *self.inner.c.get() = Some(state) };
         // Finally, we can now release the permit since we're done with the connection
@@ -161,14 +161,14 @@ impl<S> Lease<S> {
     }
 }
 
-impl<S> Drop for Lease<S> {
+impl<T> Drop for Lease<T> {
     fn drop(&mut self) {
         self.release();
     }
 }
 
-impl<S> Deref for Lease<S> {
-    type Target = S;
+impl<T> Deref for Lease<T> {
+    type Target = T;
     fn deref(&self) -> &Self::Target {
         assert!(self.permit.is_acquired());
         let s = unsafe { &*self.inner.c.get() };
@@ -177,7 +177,7 @@ impl<S> Deref for Lease<S> {
     }
 }
 
-impl<S> DerefMut for Lease<S> {
+impl<T> DerefMut for Lease<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         assert!(self.permit.is_acquired());
         let s = unsafe { &mut *self.inner.c.get() };
@@ -186,8 +186,8 @@ impl<S> DerefMut for Lease<S> {
     }
 }
 
-impl<S> From<S> for Lease<S> {
-    fn from(s: S) -> Self {
+impl<T> From<T> for Lease<T> {
+    fn from(s: T) -> Self {
         Self {
             inner: Arc::new(State {
                 c: UnsafeCell::new(Some(s)),
@@ -198,7 +198,7 @@ impl<S> From<S> for Lease<S> {
     }
 }
 
-impl<S> Clone for Lease<S> {
+impl<T> Clone for Lease<T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -207,11 +207,11 @@ impl<S> Clone for Lease<S> {
     }
 }
 
-impl<S> Default for Lease<S>
+impl<T> Default for Lease<T>
 where
-    S: Default,
+    T: Default,
 {
     fn default() -> Self {
-        Self::from(S::default())
+        Self::from(T::default())
     }
 }
