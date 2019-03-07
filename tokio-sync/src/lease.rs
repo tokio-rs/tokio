@@ -76,7 +76,9 @@ pub struct Lease<S> {
     permit: semaphore::Permit,
 }
 
-unsafe impl<S> Send for Lease<S> where S: Send + Sync {}
+// As long as S: Send, it's fine to send Lease<S> to other threads.
+// If S was not Send, sending a Lease<S> would be bad, since you can access S through Lease<S>.
+unsafe impl<S> Send for Lease<S> where S: Send {}
 
 #[derive(Debug)]
 struct State<S> {
