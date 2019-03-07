@@ -139,6 +139,10 @@ pub trait Subscriber: 'static {
     /// return a distinct ID every time this function is called, regardless of
     /// the metadata.
     ///
+    /// Note that the subscriber is free to assign span IDs based on whatever
+    /// scheme it sees fit. Any guarantees about uniqueness, ordering, or ID
+    /// reuse are left up to the subscriber implementation to determine.
+    ///
     /// [span ID]: ../span/struct.Id.html
     /// [`Attributes`]: ../span/struct.Attributes.html
     /// [visitor]: ../field/trait.Visit.html
@@ -260,7 +264,13 @@ pub trait Subscriber: 'static {
     }
 }
 
-/// Indicates a `Subscriber`'s interest in a particular callsite.
+/// Indicates a [`Subscriber`]'s interest in a particular callsite.
+///
+/// `Subscriber`s return an `Interest` from their [`register_callsite`] methods
+/// in order to determine whether that span should be enabled or disabled.
+///
+/// [`Subscriber`] trait.Subscriber.html
+/// [clone_span]: trait.Subscriber.html#method.register_callsite
 #[derive(Clone, Debug)]
 pub struct Interest(InterestKind);
 
