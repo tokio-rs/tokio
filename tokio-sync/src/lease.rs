@@ -26,7 +26,7 @@
 //! }
 //! ```
 //!
-//! `Lease` allwos you to do this. Specifically, `poll_ready` attempts to acquire the lease using
+//! `Lease` allows you to do this. Specifically, `poll_ready` attempts to acquire the lease using
 //! `Lease::poll_acquire`, and `call` _transfers_ that lease into the returned future. When the
 //! future eventually resolves, we _restore_ the leased value so that `poll_ready` returns `Ready`
 //! again to anyone else who may want to take the value. The example above would thus look like
