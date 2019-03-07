@@ -740,7 +740,7 @@ macro_rules! event {
             };
             if is_enabled!(callsite) {
                 let meta = callsite.metadata();
-                Event::observe(meta, &valueset!(meta.fields(), $( $k = $val),* ));
+                Event::dispatch(meta, &valueset!(meta.fields(), $( $k = $val),* ));
             }
         }
     });
@@ -1091,7 +1091,7 @@ macro_rules! is_enabled {
             true
         } else {
             let meta = $callsite.metadata();
-            $crate::dispatcher::with(|current| current.enabled(meta))
+            $crate::dispatcher::get_default(|current| current.enabled(meta))
         }
     }};
 }
