@@ -21,7 +21,7 @@
 //! allow `Subscriber` implementations to provide type-specific behaviour for
 //! consuming values of each type.
 //!
-//! Instances of the `Record` trait are provided by `Subscriber`s to record the
+//! Instances of the `Visit` trait are provided by `Subscriber`s to record the
 //! values attached to `Span`s and `Event`. This trait represents the behavior
 //! used to record values of various types. For example, we might record
 //! integers by incrementing counters for their field names, rather than printing
@@ -89,65 +89,65 @@ pub struct Iter {
     fields: FieldSet,
 }
 
-/// Records typed values.
+/// Visits typed values.
 ///
-/// An instance of `Record` ("a recorder") represents the logic necessary to
+/// An instance of `Visit` ("a visitor") represents the logic necessary to
 /// record field values of various types. When an implementor of [`Value`] is
-/// [recorded], it calls the appropriate method on the provided recorder to
+/// [recorded], it calls the appropriate method on the provided visitor to
 /// indicate the type that value should be recorded as.
 ///
 /// When a [`Subscriber`] implementation [records an `Event`] or a
-/// [set of `Value`s added to a `Span`], it can pass an `&mut Record` to the
-/// `record` method on the provided [`ValueSet`] or [`Event`]. This recorder
+/// [set of `Value`s added to a `Span`], it can pass an `&mut Visit` to the
+/// `record` method on the provided [`ValueSet`] or [`Event`]. This visitor
 /// will then be used to record all the field-value pairs present on that
 /// `Event` or `ValueSet`.
 ///
 /// # Examples
 ///
-/// A simple recorder that writes to a string might be implemented like so:
+/// A simple visitor that writes to a string might be implemented like so:
 /// ```
 /// # extern crate tokio_trace_core as tokio_trace;
 /// use std::fmt::{self, Write};
-/// use tokio_trace::field::{Value, Record, Field};
+/// use tokio_trace::field::{Value, Visit, Field};
 /// # fn main() {
-/// pub struct StringRecorder<'a> {
+/// pub struct StringVisitor<'a> {
 ///     string: &'a mut String,
 /// }
 ///
-/// impl<'a> Record for StringRecorder<'a> {
+/// impl<'a> Visit for StringVisitor<'a> {
 ///     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
 ///         write!(self.string, "{} = {:?}; ", field.name(), value).unwrap();
 ///     }
 /// }
 /// # }
 /// ```
-/// This recorder will format each recorded value using `fmt::Debug`, and
+/// This visitor will format each recorded value using `fmt::Debug`, and
 /// append the field name and formatted value to the provided string,
 /// regardless of the type of the recorded value. When all the values have
-/// been recorded, the `StringRecorder` may be dropped, allowing the string
+/// been recorded, the `StringVisitor` may be dropped, allowing the string
 /// to be printed or stored in some other data structure.
 ///
-/// The `Record` trait provides default implementations for `record_i64`,
+/// The `Visit` trait provides default implementations for `record_i64`,
 /// `record_u64`, `record_bool`, and `record_str` which simply forward the
 /// recorded value to `record_debug`. Thus, `record_debug` is the only method
-/// which a `Record` implementation *must* implement. However, recorders may
+/// which a `Visit` implementation *must* implement. However, visitors may
 /// override the default implementations of these functions in order to
 /// implement type-specific behavior.
 ///
-/// Additionally, when a recorder recieves a value of a type it does not care
+/// Additionally, when a visitor recieves a value of a type it does not care
 /// about, it is free to ignore those values completely. For example, a
-/// recorder which only records numeric data might look like this:
+/// visitor which only records numeric data might look like this:
 ///
 /// ```
 /// # extern crate tokio_trace_core as tokio_trace;
 /// # use std::fmt::{self, Write};
-/// # use tokio_trace::field::{Value, Record, Field};
+/// # use tokio_trace::field::{Value, Visit, Field};
 /// # fn main() {
-/// pub struct SumRecorder {
+/// pub struct SumVisitor {
 ///     sum: i64,
 /// }
 ///
-/// impl Record for SumRecorder {
+/// impl Visit for SumVisitor {
 ///     fn record_i64(&mut self, _field: &Field, value: i64) {
 ///        self.sum += value;
 ///     }
@@ -163,7 +163,7 @@ pub struct Iter {
 /// # }
 /// ```
 ///
-/// This recorder (which is probably not particularly useful) keeps a running
+/// This visitor (which is probably not particularly useful) keeps a running
 /// sum of all the numeric values it records, and ignores all other values. A
 /// more practical example of recording typed values is presented in
 /// `examples/counters.rs`, which demonstrates a very simple metrics system
@@ -176,41 +176,41 @@ pub struct Iter {
 /// [set of `Value`s added to a `Span`]: ::subscriber::Subscriber::record
 /// [`Event`]: ::event::Event
 /// [`ValueSet`]: ::field::ValueSet
-pub trait Record {
-    /// Record a signed 64-bit integer value.
+pub trait Visit {
+    /// Visit a signed 64-bit integer value.
     fn record_i64(&mut self, field: &Field, value: i64) {
         self.record_debug(field, &value)
     }
 
-    /// Record an umsigned 64-bit integer value.
+    /// Visit an umsigned 64-bit integer value.
     fn record_u64(&mut self, field: &Field, value: u64) {
         self.record_debug(field, &value)
     }
 
-    /// Record a boolean value.
+    /// Visit a boolean value.
     fn record_bool(&mut self, field: &Field, value: bool) {
         self.record_debug(field, &value)
     }
 
-    /// Record a string value.
+    /// Visit a string value.
     fn record_str(&mut self, field: &Field, value: &str) {
         self.record_debug(field, &value)
     }
 
-    /// Record a value implementing `fmt::Debug`.
+    /// Visit a value implementing `fmt::Debug`.
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug);
 }
 
 /// A field value of an erased type.
 ///
 /// Implementors of `Value` may call the appropriate typed recording methods on
-/// the [recorder] passed to their `record` method in order to indicate how
+/// the [visitor] passed to their `record` method in order to indicate how
 /// their data should be recorded.
 ///
-/// [recorder]: ::field::Record
+/// [visitor]: ::field::Visit
 pub trait Value: ::sealed::Sealed {
-    /// Records this value with the given `Recorder`.
-    fn record(&self, key: &Field, recorder: &mut Record);
+    /// Visits this value with the given `Visitor`.
+    fn record(&self, key: &Field, visitor: &mut Visit);
 }
 
 /// A `Value` which serializes as a string using `fmt::Display`.
@@ -248,21 +248,21 @@ where
     DebugValue(t)
 }
 
-// ===== impl Record =====
+// ===== impl Visit =====
 
-impl<'a, 'b> Record for fmt::DebugStruct<'a, 'b> {
+impl<'a, 'b> Visit for fmt::DebugStruct<'a, 'b> {
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
         self.field(field.name(), value);
     }
 }
 
-impl<'a, 'b> Record for fmt::DebugMap<'a, 'b> {
+impl<'a, 'b> Visit for fmt::DebugMap<'a, 'b> {
     fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
         self.entry(&format_args!("{}", field), value);
     }
 }
 
-impl<F> Record for F
+impl<F> Visit for F
 where
     F: FnMut(&Field, &fmt::Debug),
 {
@@ -288,9 +288,9 @@ macro_rules! impl_value {
                 fn record(
                     &self,
                     key: &$crate::field::Field,
-                    recorder: &mut $crate::field::Record,
+                    visitor: &mut $crate::field::Visit,
                 ) {
-                    recorder.$record(key, *self)
+                    visitor.$record(key, *self)
                 }
             }
         )+
@@ -302,9 +302,9 @@ macro_rules! impl_value {
                 fn record(
                     &self,
                     key: &$crate::field::Field,
-                    recorder: &mut $crate::field::Record,
+                    visitor: &mut $crate::field::Visit,
                 ) {
-                    recorder.$record(key, *self as $as_ty)
+                    visitor.$record(key, *self as $as_ty)
                 }
             }
         )+
@@ -324,8 +324,8 @@ impl_values! {
 impl ::sealed::Sealed for str {}
 
 impl Value for str {
-    fn record(&self, key: &Field, recorder: &mut Record) {
-        recorder.record_str(key, &self)
+    fn record(&self, key: &Field, visitor: &mut Visit) {
+        visitor.record_str(key, &self)
     }
 }
 
@@ -335,16 +335,16 @@ impl<'a, T: ?Sized> Value for &'a T
 where
     T: Value + 'a,
 {
-    fn record(&self, key: &Field, recorder: &mut Record) {
-        (*self).record(key, recorder)
+    fn record(&self, key: &Field, visitor: &mut Visit) {
+        (*self).record(key, visitor)
     }
 }
 
 impl<'a> ::sealed::Sealed for fmt::Arguments<'a> {}
 
 impl<'a> Value for fmt::Arguments<'a> {
-    fn record(&self, key: &Field, recorder: &mut Record) {
-        recorder.record_debug(key, self)
+    fn record(&self, key: &Field, visitor: &mut Visit) {
+        visitor.record_debug(key, self)
     }
 }
 
@@ -356,8 +356,8 @@ impl<T> Value for DisplayValue<T>
 where
     T: fmt::Display,
 {
-    fn record(&self, key: &Field, recorder: &mut Record) {
-        recorder.record_debug(key, &format_args!("{}", self.0))
+    fn record(&self, key: &Field, visitor: &mut Visit) {
+        visitor.record_debug(key, &format_args!("{}", self.0))
     }
 }
 
@@ -369,8 +369,8 @@ impl<T: fmt::Debug> Value for DebugValue<T>
 where
     T: fmt::Debug,
 {
-    fn record(&self, key: &Field, recorder: &mut Record) {
-        recorder.record_debug(key, &self.0)
+    fn record(&self, key: &Field, visitor: &mut Visit) {
+        visitor.record_debug(key, &self.0)
     }
 }
 
@@ -544,23 +544,23 @@ impl<'a> ValueSet<'a> {
         self.fields.callsite()
     }
 
-    /// Records all the fields in this `ValueSet` with the provided [recorder].
+    /// Visits all the fields in this `ValueSet` with the provided [visitor].
     ///
-    /// [recorder]: ::field::Record
-    pub fn record(&self, recorder: &mut Record) {
+    /// [visitor]: ::field::Visit
+    pub(crate) fn record(&self, visitor: &mut Visit) {
         let my_callsite = self.callsite();
         for (field, value) in self.values {
             if field.callsite() != my_callsite {
                 continue;
             }
             if let Some(value) = value {
-                value.record(field, recorder);
+                value.record(field, visitor);
             }
         }
     }
 
     /// Returns `true` if this `ValueSet` contains a value for the given `Field`.
-    pub fn contains(&self, field: &Field) -> bool {
+    pub(crate) fn contains(&self, field: &Field) -> bool {
         field.callsite() == self.callsite()
             && self
                 .values
@@ -569,7 +569,7 @@ impl<'a> ValueSet<'a> {
     }
 
     /// Returns true if this `ValueSet` contains _no_ values.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         let my_callsite = self.callsite();
         self.values
             .iter()
@@ -711,14 +711,14 @@ mod test {
             (&fields.field("baz").unwrap(), None),
         ];
 
-        struct MyRecorder;
-        impl Record for MyRecorder {
+        struct MyVisitor;
+        impl Visit for MyVisitor {
             fn record_debug(&mut self, field: &Field, _: &::std::fmt::Debug) {
                 assert_eq!(field.callsite(), TEST_META_1.callsite())
             }
         }
         let valueset = fields.value_set(values);
-        valueset.record(&mut MyRecorder);
+        valueset.record(&mut MyVisitor);
     }
 
     #[test]

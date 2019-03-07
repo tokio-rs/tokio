@@ -135,7 +135,7 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-pub use tokio_trace_core::span::{Attributes, Id};
+pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
     borrow::Borrow,
@@ -324,7 +324,7 @@ impl<'a> Span<'a> {
             .is_some()
     }
 
-    /// Records that the field described by `field` has the value `value`.
+    /// Visits that the field described by `field` has the value `value`.
     pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsField,
@@ -343,7 +343,7 @@ impl<'a> Span<'a> {
         self
     }
 
-    /// Record all the fields in the span
+    /// Visit all the fields in the span
     pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
             inner.record(&values);
@@ -479,7 +479,7 @@ impl<'a> Inner<'a> {
 
     fn record(&mut self, values: &field::ValueSet) {
         if values.callsite() == self.meta.callsite() {
-            self.subscriber.record(&self.id, &values)
+            self.subscriber.record(&self.id, &Record::new(values))
         }
     }
 

@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, span, Event, Metadata};
+use {span, Event, Metadata};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -14,7 +14,7 @@ use {field, span, Event, Metadata};
 /// - Registering new spans as they are created, and providing them with span
 ///   IDs. Implicitly, this means the subscriber may determine the strategy for
 ///   determining span equality.
-/// - Recording the attachment of field values and follows-from annotations to
+/// - Visiting the attachment of field values and follows-from annotations to
 ///   spans.
 /// - Filtering spans and events, and determining when those filters must be
 ///   invalidated.
@@ -106,11 +106,11 @@ pub trait Subscriber: 'static {
     /// [metadata]: ::Metadata
     fn enabled(&self, metadata: &Metadata) -> bool;
 
-    /// Record the construction of a new span, returning a new [span ID] for the
+    /// Visit the construction of a new span, returning a new [span ID] for the
     /// span being constructed.
     ///
     /// The provided `ValueSet` contains any field values that were provided
-    /// when the span was created. The subscriber may pass a [recorder] to the
+    /// when the span was created. The subscriber may pass a [visitor] to the
     /// `ValueSet`'s [`record` method] to record these values.
     ///
     /// IDs are used to uniquely identify spans and events within the context of a
@@ -123,20 +123,20 @@ pub trait Subscriber: 'static {
     /// the metadata.
     ///
     /// [span ID]: ../span/struct.Id.html
-    /// [recorder]: ::field::Record
+    /// [visitor]: ::field::Visit
     /// [`record` method]: ::field::ValueSet::record
     fn new_span(&self, span: &span::Attributes) -> span::Id;
 
     // === Notification methods ===============================================
 
-    /// Record a set of values on a span.
+    /// Visit a set of values on a span.
     ///
-    /// The subscriber is expected to provide a [recorder] to the `ValueSet`'s
+    /// The subscriber is expected to provide a [visitor] to the `Record`'s
     /// [`record` method] in order to record the added values.
     ///
-    /// [recorder]: ::field::Record
-    /// [`record` method]: ::field::ValueSet::record
-    fn record(&self, span: &span::Id, values: &field::ValueSet);
+    /// [visitor]: ::field::Visit
+    /// [`record` method]: ::span::Record::record
+    fn record(&self, span: &span::Id, values: &span::Record);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -158,18 +158,18 @@ pub trait Subscriber: 'static {
     /// follow from _b_), it may silently do nothing.
     fn record_follows_from(&self, span: &span::Id, follows: &span::Id);
 
-    /// Records that an [`Event`] has occurred.
+    /// Visits that an [`Event`] has occurred.
     ///
     /// The provided `Event` struct contains any field values attached to the
-    /// event. The subscriber may pass a [recorder] to the `Event`'s
+    /// event. The subscriber may pass a [visitor] to the `Event`'s
     /// [`record` method] to record these values.
     ///
     /// [`Event`]: ::event::Event
-    /// [recorder]: ::field::Record
+    /// [visitor]: ::field::Visit
     /// [`record` method]: ::event::Event::record
     fn event(&self, event: &Event);
 
-    /// Records that a spanhas been entered.
+    /// Visits that a spanhas been entered.
     ///
     /// When entering a span, this method is called to notify the subscriber
     /// that the span has been entered. The subscriber is provided with the
@@ -179,7 +179,7 @@ pub trait Subscriber: 'static {
     /// [span ID]: ../span/struct.Id.html
     fn enter(&self, span: &span::Id);
 
-    /// Records that a span has been exited.
+    /// Visits that a span has been exited.
     ///
     /// When entering a span, this method is called to notify the subscriber
     /// that the span has been exited. The subscriber is provided with the

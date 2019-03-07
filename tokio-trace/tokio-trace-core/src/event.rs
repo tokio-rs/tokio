@@ -33,12 +33,12 @@ impl<'a> Event<'a> {
         });
     }
 
-    /// Records all the fields on this `Event` with the specified [recorder].
+    /// Visits all the fields on this `Event` with the specified [visitor].
     ///
-    /// [recorder]: ::field::Record
+    /// [visitor]: ::field::Visit
     #[inline]
-    pub fn record(&self, recorder: &mut field::Record) {
-        self.fields.record(recorder);
+    pub fn record(&self, visitor: &mut field::Visit) {
+        self.fields.record(visitor);
     }
 
     /// Returns a reference to the set of values on this `Event`.

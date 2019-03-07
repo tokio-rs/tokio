@@ -24,7 +24,7 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         let _ = event;
     }
 
-    fn record(&self, span: &Id, values: &field::ValueSet) {
+    fn record(&self, span: &Id, values: &span::Record) {
         let _ = (span, values);
     }
 
@@ -47,32 +47,32 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
 }
 
 /// Simulates a subscriber that records span data.
-struct RecordingSubscriber(Mutex<String>);
+struct VisitingSubscriber(Mutex<String>);
 
-struct Recorder<'a>(MutexGuard<'a, String>);
+struct Visitor<'a>(MutexGuard<'a, String>);
 
-impl<'a> field::Record for Recorder<'a> {
+impl<'a> field::Visit for Visitor<'a> {
     fn record_debug(&mut self, _field: &field::Field, value: &fmt::Debug) {
         use std::fmt::Write;
         let _ = write!(&mut *self.0, "{:?}", value);
     }
 }
 
-impl tokio_trace::Subscriber for RecordingSubscriber {
+impl tokio_trace::Subscriber for VisitingSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
-        let mut recorder = Recorder(self.0.lock().unwrap());
-        span.values().record(&mut recorder);
+        let mut visitor = Visitor(self.0.lock().unwrap());
+        span.record(&mut visitor);
         Id::from_u64(0)
     }
 
-    fn record(&self, _span: &Id, values: &field::ValueSet) {
-        let mut recorder = Recorder(self.0.lock().unwrap());
-        values.record(&mut recorder);
+    fn record(&self, _span: &Id, values: &span::Record) {
+        let mut visitor = Visitor(self.0.lock().unwrap());
+        values.record(&mut visitor);
     }
 
     fn event(&self, event: &Event) {
-        let mut recorder = Recorder(self.0.lock().unwrap());
-        event.record(&mut recorder);
+        let mut visitor = Visitor(self.0.lock().unwrap());
+        event.record(&mut visitor);
     }
 
     fn record_follows_from(&self, span: &Id, follows: &Id) {
@@ -130,7 +130,7 @@ fn span_with_fields(b: &mut Bencher) {
 
 #[bench]
 fn span_with_fields_record(b: &mut Bencher) {
-    let subscriber = RecordingSubscriber(Mutex::new(String::from("")));
+    let subscriber = VisitingSubscriber(Mutex::new(String::from("")));
     tokio_trace::subscriber::with_default(subscriber, || {
         b.iter(|| {
             span!(

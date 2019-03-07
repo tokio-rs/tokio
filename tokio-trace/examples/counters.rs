@@ -2,7 +2,7 @@
 extern crate tokio_trace;
 
 use tokio_trace::{
-    field::{self, Field, Record},
+    field::{self, Field, Visit},
     span,
     subscriber::{self, Subscriber},
     Event, Id, Metadata,
@@ -29,7 +29,7 @@ struct Count<'a> {
     counters: RwLockReadGuard<'a, HashMap<String, AtomicUsize>>,
 }
 
-impl<'a> Record for Count<'a> {
+impl<'a> Visit for Count<'a> {
     fn record_i64(&mut self, field: &Field, value: i64) {
         if let Some(counter) = self.counters.get(field.name()) {
             if value > 0 {
@@ -52,7 +52,7 @@ impl<'a> Record for Count<'a> {
 }
 
 impl CounterSubscriber {
-    fn recorder(&self) -> Count {
+    fn visitor(&self) -> Count {
         Count {
             counters: self.counters.0.read().unwrap(),
         }
@@ -78,7 +78,7 @@ impl Subscriber for CounterSubscriber {
     }
 
     fn new_span(&self, new_span: &span::Attributes) -> Id {
-        new_span.values().record(&mut self.recorder());
+        new_span.record(&mut self.visitor());
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         Id::from_u64(id as u64)
     }
@@ -87,12 +87,12 @@ impl Subscriber for CounterSubscriber {
         // unimplemented
     }
 
-    fn record(&self, _: &Id, values: &field::ValueSet) {
-        values.record(&mut self.recorder())
+    fn record(&self, _: &Id, values: &span::Record) {
+        values.record(&mut self.visitor())
     }
 
     fn event(&self, event: &Event) {
-        event.record(&mut self.recorder())
+        event.record(&mut self.visitor())
     }
 
     fn enabled(&self, metadata: &Metadata) -> bool {

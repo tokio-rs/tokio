@@ -1,6 +1,6 @@
 use tokio_trace::{
     callsite::Callsite,
-    field::{self, Field, Record, Value},
+    field::{self, Field, Value, Visit},
 };
 
 use std::{collections::HashMap, fmt};
@@ -106,8 +106,8 @@ impl Expect {
         }
     }
 
-    pub fn checker<'a>(&'a mut self, ctx: String) -> CheckRecorder<'a> {
-        CheckRecorder { expect: self, ctx }
+    pub fn checker<'a>(&'a mut self, ctx: String) -> CheckVisitor<'a> {
+        CheckVisitor { expect: self, ctx }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -128,12 +128,12 @@ impl fmt::Display for MockValue {
     }
 }
 
-pub struct CheckRecorder<'a> {
+pub struct CheckVisitor<'a> {
     expect: &'a mut Expect,
     ctx: String,
 }
 
-impl<'a> Record for CheckRecorder<'a> {
+impl<'a> Visit for CheckVisitor<'a> {
     fn record_i64(&mut self, field: &Field, value: i64) {
         self.expect
             .compare_or_panic(field.name(), &value, &self.ctx[..])
@@ -160,7 +160,7 @@ impl<'a> Record for CheckRecorder<'a> {
     }
 }
 
-impl<'a> CheckRecorder<'a> {
+impl<'a> CheckVisitor<'a> {
     pub fn finish(self) {
         assert!(
             self.expect.fields.is_empty(),
@@ -177,7 +177,7 @@ impl<'a> From<&'a Value> for MockValue {
             value: Option<MockValue>,
         }
 
-        impl Record for MockValueBuilder {
+        impl Visit for MockValueBuilder {
             fn record_i64(&mut self, _: &Field, value: i64) {
                 self.value = Some(MockValue::I64(value));
             }
