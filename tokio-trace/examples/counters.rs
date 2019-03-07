@@ -2,7 +2,7 @@
 extern crate tokio_trace;
 
 use tokio_trace::{
-    field::{self, Field, Visit},
+    field::{Field, Visit},
     span,
     subscriber::{self, Subscriber},
     Event, Id, Metadata,

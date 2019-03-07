@@ -185,7 +185,6 @@ where
     fn new_span(&self, span: &Attributes) -> Id {
         use span::Parent;
         let meta = span.metadata();
-        let values = span.values();
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         println!(
