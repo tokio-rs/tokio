@@ -11,7 +11,9 @@ use std::{
     sync::{Arc, Weak},
 };
 
-/// `Dispatch` trace data to a [`Subscriber`](::Subscriber).
+/// `Dispatch` trace data to a [`Subscriber`].
+///
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 #[derive(Clone)]
 pub struct Dispatch {
     subscriber: Arc<Subscriber + Send + Sync>,
@@ -29,8 +31,8 @@ thread_local! {
 /// tagged that span, instead.
 ///
 /// [span]: ../span/index.html
-/// [`Subscriber`]: ::Subscriber
-/// [`Event`]: ::Event
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+/// [`Event`]: ../event/struct.Event.html
 pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
     // A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
     // Using this (rather than simply resetting after calling `f`) ensures
@@ -51,7 +53,9 @@ pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
     f()
 }
 
-/// Executes a closure with a reference to this thread's current dispatcher.
+/// Executes a closure with a reference to this thread's current [dispatcher].
+///
+/// [dispatcher]: ../dispatcher/struct.Dispatch.html
 pub fn with<T, F>(mut f: F) -> T
 where
     F: FnMut(&Dispatch) -> T,
@@ -71,7 +75,9 @@ impl Dispatch {
         }
     }
 
-    /// Returns a `Dispatch` to the given [`Subscriber`](::Subscriber).
+    /// Returns a `Dispatch` that forwards to the given [`Subscriber`].
+    ///
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
     pub fn new<S>(subscriber: S) -> Self
     where
         S: Subscriber + Send + Sync + 'static,
@@ -90,39 +96,50 @@ impl Dispatch {
     /// Registers a new callsite with this subscriber, returning whether or not
     /// the subscriber is interested in being notified about the callsite.
     ///
-    /// This calls the [`register_callsite`](::Subscriber::register_callsite)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`register_callsite`] function on the [`Subscriber`]
+    /// that this `Dispatch` forwards to.
+    ///
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`register_callsite`]: ../subscriber/trait.Subscriber.html#method.register_callsite
     #[inline]
     pub fn register_callsite(&self, metadata: &Metadata) -> subscriber::Interest {
         self.subscriber.register_callsite(metadata)
     }
 
-    /// Visit the construction of a new span, returning a new [ID] for the
+    /// Record the construction of a new span, returning a new [ID] for the
     /// span being constructed.
     ///
-    /// This calls the [`new_span`](::Subscriber::new_span)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`new_span`] function on the [`Subscriber`] that this
+    /// `Dispatch` forwards to.
     ///
     /// [ID]: ../span/struct.Id.html
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
     #[inline]
     pub fn new_span(&self, span: &span::Attributes) -> span::Id {
         self.subscriber.new_span(span)
     }
 
-    /// Visit a set of values on a span.
+    /// Record a set of values on a span.
     ///
-    /// This calls the [`record`](::Subscriber::record)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`record`] function on the [`Subscriber`] that this
+    /// `Dispatch` forwards to.
+    ///
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`record`]: ../subscriber/trait.Subscriber.html#method.record
     #[inline]
     pub fn record(&self, span: &span::Id, values: &span::Record) {
-        self.subscriber.record(span, &values)
+        self.subscriber.record(span, values)
     }
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
     ///
-    /// This calls the [`record_follows_from`](::Subscriber::record_follows_from)
-    /// function on the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`record_follows_from`] function on the [`Subscriber`]
+    /// that this `Dispatch` forwards to.
+    ///
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`record_follows_from`]: ../subscriber/trait.Subscriber.html#method.record_follows_from
     #[inline]
     pub fn record_follows_from(&self, span: &span::Id, follows: &span::Id) {
         self.subscriber.record_follows_from(span, follows)
@@ -131,36 +148,43 @@ impl Dispatch {
     /// Returns true if a span with the specified [metadata] would be
     /// recorded.
     ///
-    /// This calls the [`enabled`](::Subscriber::enabled) function on
-    /// the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`enabled`] function on the [`Subscriber`] that this
+    /// `Dispatch` forwards to.
     ///
-    /// [metadata]: ::Metadata
+    /// [metadata]: ../metadata/struct.Metadata.html
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`enabled`]: ../subscriber/trait.Subscriber.html#method.enabled
     #[inline]
     pub fn enabled(&self, metadata: &Metadata) -> bool {
         self.subscriber.enabled(metadata)
     }
 
-    /// Visits that an [`Event`] has occurred.
+    /// Records that an [`Event`] has occurred.
     ///
-    /// This calls the [`event`](::Subscriber::event) function on
-    /// the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`event`] function on the [`Subscriber`] that this
+    /// `Dispatch` forwards to.
     ///
-    /// [`Event`]: ::event::Event
+    /// [`Event`]: ../event/struct.Event.html
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`event`]: ../subscriber/trait.Subscriber.html#method.event
     #[inline]
     pub fn event(&self, event: &Event) {
         self.subscriber.event(event)
     }
 
-    /// Visits that a span has been entered.
+    /// Records that a span has been entered.
     ///
-    /// This calls the [`enter`](::Subscriber::enter) function on the
-    /// `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`enter`] function on the [`Subscriber`] that this
+    /// `Dispatch` forwards to.
+    ///
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`event`]: ../subscriber/trait.Subscriber.html#method.event
     #[inline]
     pub fn enter(&self, span: &span::Id) {
         self.subscriber.enter(span)
     }
 
-    /// Visits that a span has been exited.
+    /// Records that a span has been exited.
     ///
     /// This calls the [`exit`](::Subscriber::exit) function on the `Subscriber`
     /// that this `Dispatch` forwards to.
@@ -172,26 +196,32 @@ impl Dispatch {
     /// Notifies the subscriber that a [span ID] has been cloned.
     ///
     /// This function is guaranteed to only be called with span IDs that were
-    /// returned by this `Dispatch`'s `new_span` function.
+    /// returned by this `Dispatch`'s [`new_span`] function.
     ///
-    /// This calls the [`clone_span`](::Subscriber::clone_span) function on
-    /// the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`clone_span`] function on the `Subscriber` that this
+    /// `Dispatch` forwards to.
     ///
     /// [span ID]: ../span/struct.Id.html
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`clone_span`]: ../subscriber/trait.Subscriber.html#method.clone_span
+    /// [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
     #[inline]
     pub fn clone_span(&self, id: &span::Id) -> span::Id {
         self.subscriber.clone_span(&id)
     }
 
-    /// Notifies the subscriber that a [span ID] handle has been dropped.
+    /// Notifies the subscriber that a [span ID] has been dropped.
     ///
     /// This function is guaranteed to only be called with span IDs that were
-    /// returned by this `Dispatch`'s `new_span` function.
+    /// returned by this `Dispatch`'s [`new_span`] function.
     ///
-    /// This calls the [`drop_span`](::Subscriber::drop_span) function on
-    /// the `Subscriber` that this `Dispatch` forwards to.
+    /// This calls the [`drop_span`]  function on the [`Subscriber`] that this
+    ///  `Dispatch` forwards to.
     ///
     /// [span ID]: ../span/struct.Id.html
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [`clone_span`]: ../subscriber/trait.Subscriber.html#method.clone_span
+    /// [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
     #[inline]
     pub fn drop_span(&self, id: span::Id) {
         self.subscriber.drop_span(id)

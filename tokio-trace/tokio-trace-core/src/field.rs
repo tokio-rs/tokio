@@ -1,36 +1,42 @@
-//! `Span` and `Event` key-value data.
+//! Span and `Event` key-value data.
 //!
 //! Spans and events  may be annotated with key-value data, referred to as known
 //! as _fields_. These fields consist of a mapping from a key (corresponding to
-//! a `&str` but represented internally as an array index) to a `Value`.
+//! a `&str` but represented internally as an array index) to a [`Value`].
 //!
 //! # `Value`s and `Subscriber`s
 //!
-//! `Subscriber`s consume `Value`s as fields attached to `Span`s or `Event`s.
-//! The set of field keys on a given `Span` or is defined on its `Metadata`.
-//! When a `Span` is created, it provides a `ValueSet` to the `Subscriber`'s
+//! `Subscriber`s consume `Value`s as fields attached to [span]s or [`Event`]s.
+//! The set of field keys on a given span or is defined on its [`Metadata`].
+//! When a span is created, it provides [`Attributes`] to the `Subscriber`'s
 //! [`new_span`] method, containing any fields whose values were provided when
 //! the span was created; and may call the `Subscriber`'s [`record`] method
-//! with additional `ValueSet`s if values are added for more of its fields.
+//! with additional [`Record`]s if values are added for more of its fields.
 //! Similarly, the [`Event`] type passed to the subscriber's [`event`] method
 //! will contain any fields attached to each event.
 //!
 //! `tokio_trace` represents values as either one of a set of Rust primitives
 //! (`i64`, `u64`, `bool`, and `&str`) or using a `fmt::Display` or `fmt::Debug`
-//! implementation. The `record_` trait functions on the `Subscriber` trait
+//! implementation. The [`record`] trait method on the `Subscriber` trait
 //! allow `Subscriber` implementations to provide type-specific behaviour for
 //! consuming values of each type.
 //!
-//! Instances of the `Visit` trait are provided by `Subscriber`s to record the
-//! values attached to `Span`s and `Event`. This trait represents the behavior
+//! Instances of the [`Visit`] trait are provided by `Subscriber`s to record the
+//! values attached to spans and `Event`. This trait represents the behavior
 //! used to record values of various types. For example, we might record
 //! integers by incrementing counters for their field names, rather than printing
 //! them.
 //!
-//! [`new_span`]: ::subscriber::Subscriber::new_span
-//! [`record`]: ::subscriber::Subscriber::record
-//! [`Event`]: ::event::Event
-//! [`event`]: ::subscriber::Subscriber::event
+//! [`Value`]: trait.Value.html
+//! [span]: ../span/
+//! [`Event`]: ../event/struct.Event.html
+//! [`Metadata`]: ../metadata/struct.Metadata.html
+//! [`Attributes`]:  ../span/struct.Attributes.html
+//! [`Record`]: ../span/struct.Record.html
+//! [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
+//! [`record`]: ../subscriber/trait.Subscriber.html#method.record
+//! [`event`]:  ../subscriber/trait.Subscriber.html#method.record
+//! [`Visit`]: trait.Visit.html
 use callsite;
 use std::{
     borrow::Borrow,
@@ -169,13 +175,13 @@ pub struct Iter {
 /// `examples/counters.rs`, which demonstrates a very simple metrics system
 /// implemented using `tokio-trace`.
 ///
-/// [`Value`]: ::field::Value
-/// [recorded]: ::field::Value::record
-/// [`Subscriber`]: ::subscriber::Subscriber
-/// [records an `Event`]: ::subscriber::Subscriber::event
-/// [set of `Value`s added to a `Span`]: ::subscriber::Subscriber::record
-/// [`Event`]: ::event::Event
-/// [`ValueSet`]: ::field::ValueSet
+/// [`Value`]: trait.Value.html
+/// [recorded]: trait.Value.html#method.record
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+/// [records an `Event`]: ../subscriber/trait.Subscriber.html#method.event
+/// [set of `Value`s added to a `Span`]: ../subscriber/trait.Subscriber.html#method.record
+/// [`Event`]: ../event/struct.Event.html
+/// [`ValueSet`]: struct.ValueSet.html
 pub trait Visit {
     /// Visit a signed 64-bit integer value.
     fn record_i64(&mut self, field: &Field, value: i64) {
@@ -207,7 +213,7 @@ pub trait Visit {
 /// the [visitor] passed to their `record` method in order to indicate how
 /// their data should be recorded.
 ///
-/// [visitor]: ::field::Visit
+/// [visitor]: trait.Visit.html
 pub trait Value: ::sealed::Sealed {
     /// Visits this value with the given `Visitor`.
     fn record(&self, key: &Field, visitor: &mut Visit);
@@ -377,8 +383,11 @@ where
 // ===== impl Field =====
 
 impl Field {
-    /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
-    /// identifies the callsite that defines the field this key refers to.
+    /// Returns an [`Identifier`] that uniquely identifies the [`Callsite`]
+    /// which defines this field.
+    ///
+    /// [`Identifier`]: ../callsite/struct.Identifier.html
+    /// [`Callsite`]: ../callsite/trait.Callsite.html
     #[inline]
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
@@ -435,12 +444,18 @@ impl Clone for Field {
 // ===== impl FieldSet =====
 
 impl FieldSet {
+    /// Returns an [`Identifier`] that uniquely identifies the [`Callsite`]
+    /// which defines this set of fields..
+    ///
+    /// [`Identifier`]: ../callsite/struct.Identifier.html
+    /// [`Callsite`]: ../callsite/trait.Callsite.html
     pub(crate) fn callsite(&self) -> callsite::Identifier {
         callsite::Identifier(self.callsite.0)
     }
 
-    /// Returns the [`Field`](::field::Field) named `name`, or `None` if no such
-    /// field exists.
+    /// Returns the [`Field`] named `name`, or `None` if no such field exists.
+    ///
+    /// [`Field`]: ../struct.Field.html
     pub fn field<Q: ?Sized>(&self, name: &Q) -> Option<Field>
     where
         Q: Borrow<str>,
@@ -537,8 +552,11 @@ impl Iterator for Iter {
 // ===== impl ValueSet =====
 
 impl<'a> ValueSet<'a> {
-    /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
-    /// identifies the callsite that defines the fields this `ValueSet` refers to.
+    /// Returns an [`Identifier`] that uniquely identifies the [`Callsite`]
+    /// defining the fields this `ValueSet` refers to.
+    ///
+    /// [`Identifier`]: ../callsite/struct.Identifier.html
+    /// [`Callsite`]: ../callsite/trait.Callsite.html
     #[inline]
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
@@ -546,7 +564,7 @@ impl<'a> ValueSet<'a> {
 
     /// Visits all the fields in this `ValueSet` with the provided [visitor].
     ///
-    /// [visitor]: ::field::Visit
+    /// [visitor]: ../trait.Visit.html
     pub(crate) fn record(&self, visitor: &mut Visit) {
         let my_callsite = self.callsite();
         for (field, value) in self.values {

@@ -78,9 +78,9 @@ extern crate lazy_static;
 /// # }
 /// ```
 ///
-/// [`Identifier`]: ::callsite::Identifier
-/// [`Callsite`]: ::callsite::Callsite
-/// [`Callsite::id`]: ::callsite::Callsite::id
+/// [`Identifier`]: callsite/struct.Identifier.html
+/// [`Callsite`]: callsite/trait.Callsite.html
+/// [`Callsite`]: callsite/trait.Callsite.html#method.id
 #[macro_export]
 macro_rules! identify_callsite {
     ($callsite:expr) => {
@@ -121,8 +121,8 @@ macro_rules! identify_callsite {
 /// # }
 /// ```
 ///
-/// [metadata]: ::metadata::Metadata
-/// [`Metadata::new`]: ::metadata::Metadata::new
+/// [metadata]: metadata/struct.Metadata.html
+/// [`Metadata::new`]: metadata/struct.Metadata.html#method.new
 #[macro_export]
 macro_rules! metadata {
     (
