@@ -57,7 +57,10 @@ pub fn mock() -> MockSubscriber<fn(&Metadata) -> bool> {
     }
 }
 
-impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
+impl<F> MockSubscriber<F>
+where
+    F: Fn(&Metadata) -> bool + 'static,
+{
     pub fn enter(mut self, span: MockSpan) -> Self {
         self.expected.push_back(Expect::Enter(span));
         self
@@ -106,7 +109,7 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
 
     pub fn with_filter<G>(self, filter: G) -> MockSubscriber<G>
     where
-        G: Fn(&Metadata) -> bool,
+        G: Fn(&Metadata) -> bool + 'static,
     {
         MockSubscriber {
             filter,
@@ -133,7 +136,10 @@ impl<F: Fn(&Metadata) -> bool> MockSubscriber<F> {
     }
 }
 
-impl<F: Fn(&Metadata) -> bool> Subscriber for Running<F> {
+impl<F> Subscriber for Running<F>
+where
+    F: Fn(&Metadata) -> bool + 'static,
+{
     fn enabled(&self, meta: &Metadata) -> bool {
         (self.filter)(meta)
     }
