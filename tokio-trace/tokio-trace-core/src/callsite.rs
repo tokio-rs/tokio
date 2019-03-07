@@ -32,25 +32,27 @@ pub trait Callsite: Sync {
     /// If the interest is greater than or equal to the callsite's current
     /// interest, this should change whether or not the callsite is enabled.
     ///
-    /// [`Interest`]: ::subscriber::Interest
-    /// [registering]: ::subscriber::Subscriber::register_callsite
-    /// [dispatcher]: ::Dispatch
+    /// [`Interest`]: ../subscriber/struct.Interest.html
+    /// [registering]: ../subscriber/trait.Subscriber.html#method.register_callsite
+    /// [dispatcher]: ../dispatcher/struct.Dispatch.html
     fn add_interest(&self, interest: Interest);
 
     /// Remove _all_ [`Interest`] from the callsite, disabling it.
     ///
-    /// [`Interest`]: ::subscriber::Interest
+    /// [`Interest`]: ../subscriber/struct.Interest.html
     fn clear_interest(&self);
 
     /// Returns the [metadata] associated with the callsite.
     ///
-    /// [metadata]: ::Metadata
+    /// [metadata]: ../metadata/struct.Metadata.html
     fn metadata(&self) -> &Metadata;
 }
 
-/// Uniquely identifies a [`Callsite`](::callsite::Callsite).
+/// Uniquely identifies a [`Callsite`]
 ///
 /// Two `Identifier`s are equal if they both refer to the same callsite.
+///
+/// [`Callsite`]: ../callsite/trait.Callsite.html
 #[derive(Clone)]
 pub struct Identifier(
     /// **Warning**: The fields on this type are currently `pub` because it must

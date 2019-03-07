@@ -6,16 +6,17 @@ use {field, Metadata};
 ///
 /// An `Event` can be compared to a log record in unstructured logging, but with
 /// two key differences:
-/// - `Event`s exist _within the context of a [`Span`]_. Unlike log lines, they
+/// - `Event`s exist _within the context of a [span]_. Unlike log lines, they
 ///   may be located within the trace tree, allowing visibility into the
 ///   _temporal_ context in which the event occurred, as well as the source
 ///   code location.
-/// - Like spans, `Event`s have structured key-value data known as _fields_,
+/// - Like spans, `Event`s have structured key-value data known as _[fields]_,
 ///   which may include textual message. In general, a majority of the data
 ///   associated with an event should be in the event's fields rather than in
 ///   the textual message, as the fields are more structed.
 ///
-/// [`Span`]: ::span::Span
+/// [span]: ../span
+/// [fields]: ../field
 #[derive(Debug)]
 pub struct Event<'a> {
     fields: &'a field::ValueSet<'a>,
@@ -35,20 +36,20 @@ impl<'a> Event<'a> {
 
     /// Visits all the fields on this `Event` with the specified [visitor].
     ///
-    /// [visitor]: ::field::Visit
+    /// [visitor]: ../field/trait.Visit.html
     #[inline]
     pub fn record(&self, visitor: &mut field::Visit) {
         self.fields.record(visitor);
     }
 
-    /// Returns a reference to the set of values on this `Event`.
+    /// Returns an iterator over the set of values on this `Event`.
     pub fn fields(&self) -> field::Iter {
         self.fields.field_set().iter()
     }
 
     /// Returns [metadata] describing this `Event`.
     ///
-    /// [metadata]: ::metadata::Metadata
+    /// [metadata]: ../metadata/struct.Metadata.html
     pub fn metadata(&self) -> &Metadata {
         self.metadata
     }

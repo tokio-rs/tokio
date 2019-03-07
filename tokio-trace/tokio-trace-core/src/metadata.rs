@@ -5,7 +5,7 @@ use super::{
 };
 use std::fmt;
 
-/// Metadata describing a [`Span`].
+/// Metadata describing a [span] or [event].
 ///
 /// This includes the source code location where the span occurred, the names of
 /// its fields, et cetera.
@@ -25,10 +25,10 @@ use std::fmt;
 /// originated. This can be used for determining if two Metadata correspond to
 /// the same callsite.
 ///
-/// [`Span`]: ::span::Span
-/// [`Subscriber`]: ::Subscriber
-/// [`Metadata::id()`]: ::metadata::Metadata::id
-/// [callsite identifier]: ::callsite::Identifier
+/// [span]: ../span
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+/// [`Metadata::id()`]: struct.Metadata.html#method.id
+/// [callsite identifier]: ../callsite/struct.Identifier.html
 // TODO: When `const fn` is stable, make this type's fields private.
 pub struct Metadata<'a> {
     /// The name of the span described by this metadata.
