@@ -45,6 +45,8 @@ use std::{
     ops::Range,
 };
 
+use self::private::ValidLen;
+
 /// An opaque key allowing _O_(1) access to a field in a `Span`'s key-value
 /// data.
 ///
@@ -226,15 +228,6 @@ pub struct DisplayValue<T: fmt::Display>(T);
 /// A `Value` which serializes as a string using `fmt::Debug`.
 #[derive(Debug, Clone)]
 pub struct DebugValue<T: fmt::Debug>(T);
-
-/// Marker trait implemented by arrays which are of valid length to
-/// construct a `ValueSet`.
-///
-/// `ValueSet`s may only be constructed from arrays containing 32 or fewer
-/// elements, to ensure the array is small enough to always be allocated on the
-/// stack. This trait is only implemented by arrays of an appropriate length,
-/// ensuring that the correct size arrays are used at compile-time.
-pub trait ValidLen<'a>: ::sealed::Sealed + Borrow<[(&'a Field, Option<&'a (Value + 'a)>)]> {}
 
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
 /// recorded using its `Display` implementation.
@@ -615,12 +608,23 @@ impl<'a> fmt::Debug for ValueSet<'a> {
 
 // ===== impl ValidLen =====
 
+mod private {
+    use super::*;
+
+    /// Marker trait implemented by arrays which are of valid length to
+    /// construct a `ValueSet`.
+    ///
+    /// `ValueSet`s may only be constructed from arrays containing 32 or fewer
+    /// elements, to ensure the array is small enough to always be allocated on the
+    /// stack. This trait is only implemented by arrays of an appropriate length,
+    /// ensuring that the correct size arrays are used at compile-time.
+    pub trait ValidLen<'a>: Borrow<[(&'a Field, Option<&'a (Value + 'a)>)]> {}
+}
+
 macro_rules! impl_valid_len {
     ( $( $len:tt ),+ ) => {
         $(
-            impl<'a> ::sealed::Sealed for
-                [(&'a Field, Option<&'a (Value + 'a)>); $len] {}
-            impl<'a> ValidLen<'a> for
+            impl<'a> private::ValidLen<'a> for
                 [(&'a Field, Option<&'a (Value + 'a)>); $len] {}
         )+
     }

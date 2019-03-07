@@ -52,11 +52,10 @@ pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
     let _guard = ResetGuard(prior.ok());
     f()
 }
-
 /// Executes a closure with a reference to this thread's current [dispatcher].
 ///
 /// [dispatcher]: ../dispatcher/struct.Dispatch.html
-pub fn with<T, F>(mut f: F) -> T
+pub fn get_default<T, F>(mut f: F) -> T
 where
     F: FnMut(&Dispatch) -> T,
 {

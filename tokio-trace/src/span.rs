@@ -272,7 +272,7 @@ impl<'a> Span<'a> {
 
     #[inline(always)]
     fn make(meta: &'a Metadata<'a>, new_span: Attributes) -> Span<'a> {
-        let inner = dispatcher::with(move |dispatch| {
+        let inner = dispatcher::get_default(move |dispatch| {
             let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))
         });

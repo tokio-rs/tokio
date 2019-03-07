@@ -27,9 +27,9 @@ impl<'a> Event<'a> {
     /// Constructs a new `Event` with the specified metadata and set of values,
     /// and observes it with the current subscriber.
     #[inline]
-    pub fn observe(metadata: &'a Metadata<'a>, fields: &'a field::ValueSet) {
+    pub fn dispatch(metadata: &'a Metadata<'a>, fields: &'a field::ValueSet) {
         let event = Event { metadata, fields };
-        ::dispatcher::with(|current| {
+        ::dispatcher::get_default(|current| {
             current.event(&event);
         });
     }
