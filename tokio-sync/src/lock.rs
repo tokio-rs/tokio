@@ -107,7 +107,7 @@ impl<T> Drop for LockGuard<T> {
             // A guard _should_ always hold its permit, but if the thread is already panicking,
             // we don't want to generate a panic-while-panicing, since that's just unhelpful!
         } else {
-            unreachable!("Permit not help when LockGuard was dropped")
+            unreachable!("Permit not held when LockGuard was dropped")
         }
     }
 }
