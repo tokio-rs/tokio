@@ -90,9 +90,11 @@ impl<T> Lock<T> {
         }
 
         // We want to move the acquired permit into the guard,
-        // and leave an unacquire one in self.
-        let mut acquired = self.clone();
-        ::std::mem::swap(self, &mut acquired);
+        // and leave an unacquired one in self.
+        let acquired = Self {
+            inner: self.inner.clone(),
+            permit: ::std::mem::replace(&mut self.permit, semaphore::Permit::new()),
+        };
         Async::Ready(LockGuard(acquired))
     }
 }
