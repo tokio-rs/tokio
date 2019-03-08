@@ -99,8 +99,14 @@ impl<T> Lock<T> {
 
 impl<T> Drop for LockGuard<T> {
     fn drop(&mut self) {
-        assert!(self.0.permit.is_acquired());
-        self.0.permit.release(&self.0.inner.s);
+        if self.0.permit.is_acquired() {
+            self.0.permit.release(&self.0.inner.s);
+        } else if ::std::thread::panicking() {
+            // A guard _should_ always hold its permit, but if the thread is already panicking,
+            // we don't want to generate a panic-while-panicing, since that's just unhelpful!
+        } else {
+            unreachable!("Permit not help when LockGuard was dropped")
+        }
     }
 }
 
