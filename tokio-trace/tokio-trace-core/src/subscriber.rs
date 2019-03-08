@@ -39,7 +39,7 @@ pub trait Subscriber: 'static {
     /// Registers a new callsite with this subscriber, returning whether or not
     /// the subscriber is interested in being notified about the callsite.
     ///
-    /// By default, this function assumes that the subscriber's filter
+    /// By default, this function assumes that the subscriber's [filter]
     /// represents an unchanging view of its interest in the callsite. However,
     /// if this is not the case, subscribers may override this function to
     /// indicate different interests, or to implement behaviour that should run
@@ -62,12 +62,14 @@ pub trait Subscriber: 'static {
     /// never be enabled unless a new subscriber expresses interest in it.
     ///
     /// `Subscriber`s which require their filters to be run every time an event
-    /// occurs or a span is entered/exited should return `Interest::Sometimes`.
+    /// occurs or a span is entered/exited should return `Interest::sometimes`.
+    /// If a subscriber returns `Interest::sometimes`, then its' [`enabled`] method
+    /// will be called every time an event or span is created from that callsite.
     ///
     /// For example, suppose a sampling subscriber is implemented by
     /// incrementing a counter every time `enabled` is called and only returning
     /// `true` when the counter is divisible by a specified sampling rate. If
-    /// that subscriber returns `Interest::Always` from `register_callsite`, then
+    /// that subscriber returns `Interest::always` from `register_callsite`, then
     /// the filter will not be re-evaluated once it has been applied to a given
     /// set of metadata. Thus, the counter will not be incremented, and the span
     /// or event that correspands to the metadata will never be `enabled`.
@@ -78,16 +80,17 @@ pub trait Subscriber: 'static {
     ///
     /// A subscriber which manages fanout to multiple other subscribers
     /// should proxy this decision to all of its child subscribers,
-    /// returning `Interest::Never` only if _all_ such children return
-    /// `Interest::Never`. If the set of subscribers to which spans are
+    /// returning `Interest::never` only if _all_ such children return
+    /// `Interest::never`. If the set of subscribers to which spans are
     /// broadcast may change dynamically, the subscriber should also never
     /// return `Interest::Never`, as a new subscriber may be added that _is_
     /// interested.
     ///
-    /// **Note**: If a subscriber returns `Interest::Never` for a particular
+    /// **Note**: If a subscriber returns `Interest::never` for a particular
     /// callsite, it _may_ still see spans and events originating from that
     /// callsite, if another subscriber expressed interest in it.
     ///
+    /// [filter]: #method.enabled
     /// [metadata]: ../metadata/struct.Metadata.html
     /// [`Interest`]: struct.Interest.html
     /// [`enabled`]: #method.enabled
@@ -98,13 +101,26 @@ pub trait Subscriber: 'static {
         }
     }
 
-    /// Returns true if a span with the specified [metadata] would be
+    /// Returns true if a span or event with the specified [metadata] would be
     /// recorded.
     ///
-    /// This is used by the dispatcher to avoid allocating for span construction
-    /// if the span would be discarded anyway.
+    /// By default, it is assumed that this filter needs only be evaluated once
+    /// for each callsite, so it is called by [`register_callsite`] when each
+    /// callsite is registered. The result is used to determine if the subscriber
+    /// is always [interested] or never interested in that callsite. This is intended
+    /// primarily as an optimization, so that expensive filters (such as those
+    /// involving string search, et cetera) need not be re-evaluated.
+    ///
+    /// However, if the subscriber's interest in a particular span or event may
+    /// change, or depends on contexts only determined dynamically at runtime,
+    /// then the `register_callsite` method should be overridden to return
+    /// [`Interest::sometimes`]. In that case, this function will be called every
+    /// time that span or event occurs.
     ///
     /// [metadata]: ../metadata/struct.Metadata.html
+    /// [interested]: struct.Interest.html
+    /// [`Interest::sometimes`]: struct.Interest.html#method.sometimes
+    /// [`register_callsite`]: #method.register_callsite
     fn enabled(&self, metadata: &Metadata) -> bool;
 
     /// Visit the construction of a new span, returning a new [span ID] for the
@@ -123,6 +139,10 @@ pub trait Subscriber: 'static {
     /// return a distinct ID every time this function is called, regardless of
     /// the metadata.
     ///
+    /// Note that the subscriber is free to assign span IDs based on whatever
+    /// scheme it sees fit. Any guarantees about uniqueness, ordering, or ID
+    /// reuse are left up to the subscriber implementation to determine.
+    ///
     /// [span ID]: ../span/struct.Id.html
     /// [`Attributes`]: ../span/struct.Attributes.html
     /// [visitor]: ../field/trait.Visit.html
@@ -131,7 +151,7 @@ pub trait Subscriber: 'static {
 
     // === Notification methods ===============================================
 
-    /// Visit a set of values on a span.
+    /// Record a set of values on a span.
     ///
     /// The subscriber is expected to provide a [visitor] to the `Record`'s
     /// [`record` method] in order to record the added values.
@@ -160,7 +180,7 @@ pub trait Subscriber: 'static {
     /// follow from _b_), it may silently do nothing.
     fn record_follows_from(&self, span: &span::Id, follows: &span::Id);
 
-    /// Visits that an [`Event`] has occurred.
+    /// Records that an [`Event`] has occurred.
     ///
     /// The provided `Event` struct contains any field values attached to the
     /// event. The subscriber may pass a [visitor] to the `Event`'s
@@ -171,7 +191,7 @@ pub trait Subscriber: 'static {
     /// [`record` method]: ../event/struct.Event.html#method.record
     fn event(&self, event: &Event);
 
-    /// Visits that a spanhas been entered.
+    /// Records that a span has been entered.
     ///
     /// When entering a span, this method is called to notify the subscriber
     /// that the span has been entered. The subscriber is provided with the
@@ -181,7 +201,7 @@ pub trait Subscriber: 'static {
     /// [span ID]: ../span/struct.Id.html
     fn enter(&self, span: &span::Id);
 
-    /// Visits that a span has been exited.
+    /// Records that a span has been exited.
     ///
     /// When entering a span, this method is called to notify the subscriber
     /// that the span has been exited. The subscriber is provided with the
@@ -244,7 +264,13 @@ pub trait Subscriber: 'static {
     }
 }
 
-/// Indicates a `Subscriber`'s interest in a particular callsite.
+/// Indicates a [`Subscriber`]'s interest in a particular callsite.
+///
+/// `Subscriber`s return an `Interest` from their [`register_callsite`] methods
+/// in order to determine whether that span should be enabled or disabled.
+///
+/// [`Subscriber`] trait.Subscriber.html
+/// [clone_span]: trait.Subscriber.html#method.register_callsite
 #[derive(Clone, Debug)]
 pub struct Interest(InterestKind);
 

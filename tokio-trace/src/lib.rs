@@ -283,6 +283,19 @@
 //! to be used with the `tokio-trace` ecosystem. It includes a collection of
 //! `Subscriber` implementations, as well as utility and adapter crates.
 //!
+//! In particular, the following `tokio-trace-nursery` crates are likely to be
+//! of interest:
+//!
+//! - [`tokio-trace-futures`] provides a compatibility layer with the `futures`
+//!   crate, allowing spans to be attached to `Future`s, `Stream`s, and `Executor`s.
+//! - [`tokio-trace-fmt`] provides a `Subscriber` implementation for
+//!   logging formatted trace data to stdout, with similar filtering and
+//!   formatting to the `env-logger` crate.
+//! - [`tokio-trace-log`] provides a compatibility layer with the `log` crate,
+//!   allowing log `Record`s to be recorded as `tokio-trace` `Event`s within the
+//!   trace tree. This is useful when a project using `tokio-trace` have
+//!   dependencies which use `log`.
+//!
 //! [`log`]: https://docs.rs/log/0.4.6/log/
 //! [`Span`]: span/struct.Span
 //! [`Event`]: struct.Event.html
@@ -293,6 +306,9 @@
 //! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
 //! [metadata]: struct.Metadata.html
 //! [`tokio-trace-nursery`]: https://github.com/tokio-rs/tokio-trace-nursery
+//! [`tokio-trace-futures`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-futures
+//! [`tokio-trace-fmt`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-fmt
+//! [`tokio-trace-log`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-log
 extern crate tokio_trace_core;
 
 // Somehow this `use` statement is necessary for us to re-export the `core`
