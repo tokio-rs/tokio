@@ -104,6 +104,8 @@ pub struct Ref<'a, T: 'a> {
 pub mod error {
     //! Watch error types
 
+    use std::fmt;
+
     /// Error produced when receiving a value fails.
     #[derive(Debug)]
     pub struct RecvError {
@@ -114,6 +116,36 @@ pub mod error {
     #[derive(Debug)]
     pub struct SendError<T> {
         pub(crate) inner: T,
+    }
+
+    // ===== impl RecvError =====
+
+    impl fmt::Display for RecvError {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            use std::error::Error;
+            write!(fmt, "{}", self.description())
+        }
+    }
+
+    impl ::std::error::Error for RecvError {
+        fn description(&self) -> &str {
+            "channel closed"
+        }
+    }
+
+    // ===== impl SendError =====
+
+    impl<T: fmt::Debug> fmt::Display for SendError<T> {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            use std::error::Error;
+            write!(fmt, "{}", self.description())
+        }
+    }
+
+    impl<T: fmt::Debug> ::std::error::Error for SendError<T> {
+        fn description(&self) -> &str {
+            "channel closed"
+        }
     }
 }
 

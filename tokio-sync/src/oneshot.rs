@@ -32,6 +32,8 @@ pub struct Receiver<T> {
 pub mod error {
     //! Oneshot error types
 
+    use std::fmt;
+
     /// Error returned by the `Future` implementation for `Receiver`.
     #[derive(Debug)]
     pub struct RecvError(pub(super) ());
@@ -39,6 +41,36 @@ pub mod error {
     /// Error returned by the `try_recv` function on `Receiver`.
     #[derive(Debug)]
     pub struct TryRecvError(pub(super) ());
+
+    // ===== impl RecvError =====
+
+    impl fmt::Display for RecvError {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            use std::error::Error;
+            write!(fmt, "{}", self.description())
+        }
+    }
+
+    impl ::std::error::Error for RecvError {
+        fn description(&self) -> &str {
+            "channel closed"
+        }
+    }
+
+    // ===== impl TryRecvError =====
+
+    impl fmt::Display for TryRecvError {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            use std::error::Error;
+            write!(fmt, "{}", self.description())
+        }
+    }
+
+    impl ::std::error::Error for TryRecvError {
+        fn description(&self) -> &str {
+            "channel closed"
+        }
+    }
 }
 
 use self::error::*;
