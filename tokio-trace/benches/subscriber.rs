@@ -101,6 +101,13 @@ fn span_no_fields(b: &mut Bencher) {
 }
 
 #[bench]
+fn enter_span(b: &mut Bencher) {
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+        b.iter(|| test::black_box(span!("span").enter(|| {})))
+    });
+}
+
+#[bench]
 fn span_repeatedly(b: &mut Bencher) {
     #[inline]
     fn mk_span(i: u64) -> tokio_trace::Span<'static> {
