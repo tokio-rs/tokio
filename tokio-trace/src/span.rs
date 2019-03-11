@@ -297,7 +297,7 @@ impl<'a> Span<'a> {
                 let result = f();
                 self.inner = guard.exit();
                 result
-            },
+            }
             None => f(),
         }
     }

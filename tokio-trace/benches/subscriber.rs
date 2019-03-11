@@ -102,10 +102,9 @@ fn span_no_fields(b: &mut Bencher) {
 
 #[bench]
 fn enter_span(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || b.iter(|| {
-        test::black_box(span!("span").enter(|| {
-        }))
-    }));
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+        b.iter(|| test::black_box(span!("span").enter(|| {})))
+    });
 }
 
 #[bench]
