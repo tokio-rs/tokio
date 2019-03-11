@@ -1,6 +1,8 @@
 //! Subscribers collect and record trace data.
 use {span, Event, Metadata};
 
+use std::any::{Any, TypeId};
+
 /// Trait representing the functions required to collect trace data.
 ///
 /// Crates that provide implementations of methods for collecting or recording
@@ -261,6 +263,37 @@ pub trait Subscriber: 'static {
     /// [`clone_span`]: trait.Subscriber.html#method.clone_span
     fn drop_span(&self, id: span::Id) {
         let _ = id;
+    }
+
+    // === Downcasting methods ================================================
+
+    /// Gets the `TypeId` of `Self`.
+    ///
+    /// Implementations of `Subscriber` are **not** expected to override this!
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    /// If `self` is the type with the
+    fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
+        if id == self.type_id() {
+            Some(self as *const Self as *const ())
+        } else {
+            None
+        }
+    }
+}
+
+impl Subscriber {
+    pub fn is<T: Any>(&self) -> bool {
+        self.downcast_raw(TypeId::of::<T>()).is_some()
+    }
+
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        self.downcast_raw(TypeId::of::<T>()).map(|raw| unsafe {
+            &*(raw as *const _)
+        })
     }
 }
 
