@@ -525,7 +525,7 @@ macro_rules! trace {
 /// debug!(target: "app_events", { position = field::debug(pos) }, "New position");
 /// # }
 /// ```
-#[macro_export]
+#[macro_export(local_inner_macros)]
 macro_rules! debug {
     (target: $target:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
