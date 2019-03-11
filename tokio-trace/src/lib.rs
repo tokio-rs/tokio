@@ -317,8 +317,6 @@ extern crate tokio_trace_core;
 #[doc(hidden)]
 use tokio_trace_core::*;
 
-
-
 pub use self::{
     dispatcher::Dispatch,
     event::Event,

@@ -946,7 +946,6 @@ macro_rules! valueset {
     (@val $k:ident) => { None };
 }
 
-
 // The macros above cannot invoke format_args directly because they use
 // local_inner_macros. A format_args invocation there would resolve to
 // $crate::format_args, which does not exist. Instead invoke format_args here
@@ -996,7 +995,6 @@ macro_rules! __tokio_trace_concat {
         concat!($($e),*)
     };
 }
-
 
 #[doc(hidden)]
 #[macro_export]
