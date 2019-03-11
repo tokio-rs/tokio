@@ -3,7 +3,7 @@ extern crate tokio_trace;
 mod support;
 
 use self::support::*;
-use tokio_trace::{dispatcher, Dispatch};
+use tokio_trace::subscriber::with_default;
 
 #[test]
 fn dispatcher_is_sticky() {
@@ -20,12 +20,12 @@ fn dispatcher_is_sticky() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    let mut foo = dispatcher::with_default(Dispatch::new(subscriber1), || {
+    let mut foo = with_default(subscriber1, || {
         let mut foo = span!("foo");
         foo.enter(|| {});
         foo
     });
-    dispatcher::with_default(Dispatch::new(subscriber::mock().done().run()), move || {
+    with_default(subscriber::mock().done().run(), move || {
         foo.enter(|| span!("bar").enter(|| {}))
     });
 
@@ -57,13 +57,13 @@ fn dispatcher_isnt_too_sticky() {
         .done()
         .run_with_handle();
 
-    let mut foo = dispatcher::with_default(Dispatch::new(subscriber1), || {
+    let mut foo = with_default(subscriber1, || {
         let mut foo = span!("foo");
         foo.enter(|| {});
         foo
     });
-    let mut baz = dispatcher::with_default(Dispatch::new(subscriber2), || span!("baz"));
-    dispatcher::with_default(Dispatch::new(subscriber::mock().done().run()), move || {
+    let mut baz = with_default(subscriber2, || span!("baz"));
+    with_default(subscriber::mock().done().run(), move || {
         foo.enter(|| span!("bar").enter(|| {}));
         baz.enter(|| span!("quux").enter(|| {}))
     });

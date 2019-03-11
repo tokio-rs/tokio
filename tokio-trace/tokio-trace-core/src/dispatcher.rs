@@ -33,7 +33,7 @@ thread_local! {
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
-pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
+pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
     // A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
     // Using this (rather than simply resetting after calling `f`) ensures
     // that we always reset to the prior dispatcher even if `f` panics.
@@ -48,6 +48,7 @@ pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
         }
     }
 
+    let dispatcher = dispatcher.clone();
     let prior = CURRENT_DISPATCH.try_with(|current| current.replace(dispatcher));
     let _guard = ResetGuard(prior.ok());
     f()
