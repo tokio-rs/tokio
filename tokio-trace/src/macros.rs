@@ -355,11 +355,29 @@ macro_rules! event {
             }
         }
     });
-    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => ({
-        event!(target: $target, $lvl, { message = __tokio_trace_format_args!($($arg)+), $( $k = $val ),* })
+    (
+        target: $target:expr,
+        $lvl:expr,
+        { $( $k:ident = $val:expr ),*, },
+        $($arg:tt)+
+    ) => ({
+        event!(
+            target: $target,
+            $lvl,
+            { message = __tokio_trace_format_args!($($arg)+), $( $k = $val ),* }
+        )
     });
-    (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => ({
-        event!(target: $target, $lvl, { message = __tokio_trace_format_args!($($arg)+), $( $k = $val ),* })
+    (
+        target: $target:expr,
+        $lvl:expr,
+        { $( $k:ident = $val:expr ),* },
+        $($arg:tt)+
+    ) => ({
+        event!(
+            target: $target,
+            $lvl,
+            { message = __tokio_trace_format_args!($($arg)+), $( $k = $val ),* }
+        )
     });
     (target: $target:expr, $lvl:expr, $( $k:ident = $val:expr ),+, ) => (
         event!(target: $target, $lvl, { $($k = $val),+ })
@@ -371,10 +389,18 @@ macro_rules! event {
         event!(target: $target, $lvl, { }, $($arg)+)
     );
     ( $lvl:expr, { $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $lvl, { message = __tokio_trace_format_args!($($arg)+), $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $lvl,
+            { message = __tokio_trace_format_args!($($arg)+), $($k = $val),* }
+        )
     );
     ( $lvl:expr, { $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $lvl, { message = __tokio_trace_format_args!($($arg)+), $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $lvl,
+            { message = __tokio_trace_format_args!($($arg)+), $($k = $val),* }
+        )
     );
     ( $lvl:expr, $( $k:ident = $val:expr ),*, ) => (
         event!(target: __tokio_trace_module_path!(), $lvl, { $($k = $val),* })
@@ -436,27 +462,45 @@ macro_rules! trace {
         event!(target: $target, $crate::Level::TRACE, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
-        // When invoking this macro with `log`-style syntax (no fields), we
-        // drop the event immediately — the `log` crate's macros don't
-        // expand to an item, and if this did, it would break drop-in
-        // compatibility with `log`'s macros. Since it defines no fields,
-        // the handle won't be used later to add values to them.
         drop(event!(target: $target, $crate::Level::TRACE, {}, $($arg)+));
     );
     ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::TRACE,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::TRACE, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::TRACE,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ($( $k:ident = $val:expr ),*, ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::TRACE, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::TRACE,
+            { $($k = $val),* }
+        )
     );
     ($( $k:ident = $val:expr ),* ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::TRACE, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::TRACE,
+            { $($k = $val),* }
+        )
     );
     ($($arg:tt)+ ) => (
-        drop(event!(target: __tokio_trace_module_path!(), $crate::Level::TRACE, {}, $($arg)+));
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::TRACE,
+            {},
+            $($arg)+
+        )
     );
 }
 
@@ -496,22 +540,41 @@ macro_rules! debug {
         event!(target: $target, $crate::Level::DEBUG, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
-        drop(event!(target: $target, $crate::Level::DEBUG, {}, $($arg)+));
+        event!(target: $target, $crate::Level::DEBUG, {}, $($arg)+)
     );
     ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
     );
     ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::DEBUG, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::DEBUG,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ($( $k:ident = $val:expr ),*, ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::DEBUG, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::DEBUG,
+            { $($k = $val),* }
+        )
     );
     ($( $k:ident = $val:expr ),* ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::DEBUG, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::DEBUG,
+            { $($k = $val),*
+        )
     );
     ($($arg:tt)+ ) => (
-        drop(event!(target: __tokio_trace_module_path!(), $crate::Level::DEBUG, {}, $($arg)+));
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::DEBUG,
+            {},
+            $($arg)+
+        )
     );
 }
 
@@ -558,22 +621,45 @@ macro_rules! info {
         event!(target: $target, $crate::Level::INFO, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
-        drop(event!(target: $target, $crate::Level::INFO, {}, $($arg)+));
+        event!(target: $target, $crate::Level::INFO, {}, $($arg)+)
     );
     ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::INFO,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::INFO, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::INFO,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ($( $k:ident = $val:expr ),*, ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::INFO, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::INFO,
+            { $($k = $val),* }
+        )
     );
     ($( $k:ident = $val:expr ),* ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::INFO, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::INFO,
+            { $($k = $val),* }
+        )
     );
     ($($arg:tt)+ ) => (
-        drop(event!(target: __tokio_trace_module_path!(), $crate::Level::INFO, {}, $($arg)+));
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::INFO,
+            {},
+            $($arg)+
+        )
     );
 }
 
@@ -620,19 +706,41 @@ macro_rules! warn {
         drop(event!(target: $target, $crate::Level::WARN, {}, $($arg)+));
     );
     ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(),  $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),  '
+            $crate::Level::WARN,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(),  $crate::Level::WARN, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::WARN,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ($( $k:ident = $val:expr ),*, ) => (
-        event!(target: __tokio_trace_module_path!(),  $crate::Level::WARN,{ $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::WARN,{ $($k = $val),* }
+        )
     );
     ($( $k:ident = $val:expr ),* ) => (
-        event!(target: __tokio_trace_module_path!(),  $crate::Level::WARN,{ $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::WARN,
+            { $($k = $val),* }
+        )
     );
     ($($arg:tt)+ ) => (
-        drop(event!(target: __tokio_trace_module_path!(),  $crate::Level::WARN, {}, $($arg)+));
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::WARN,
+            {},
+            $($arg)+
+        )
     );
 }
 
@@ -671,22 +779,45 @@ macro_rules! error {
         event!(target: $target, $crate::Level::ERROR, { $($k = $val),* })
     );
     (target: $target:expr, $($arg:tt)+ ) => (
-        drop(event!(target: $target, $crate::Level::ERROR, {}, $($arg)+));
+        event!(target: $target, $crate::Level::ERROR, {}, $($arg)+)
     );
     ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::ERROR,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ({ $( $k:ident = $val:expr ),* }, $($arg:tt)+ ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::ERROR, { $($k = $val),* }, $($arg)+)
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::ERROR,
+            { $($k = $val),* },
+            $($arg)+
+        )
     );
     ($( $k:ident = $val:expr ),*, ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::ERROR, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::ERROR,
+            { $($k = $val),* }
+        )
     );
     ($( $k:ident = $val:expr ),* ) => (
-        event!(target: __tokio_trace_module_path!(), $crate::Level::ERROR, { $($k = $val),* })
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::ERROR,
+            { $($k = $val),* }
+        )
     );
     ($($arg:tt)+ ) => (
-        drop(event!(target: __tokio_trace_module_path!(), $crate::Level::ERROR, {}, $($arg)+));
+        event!(
+            target: __tokio_trace_module_path!(),
+            $crate::Level::ERROR,
+            {},
+            $($arg)+
+        )
     );
 }
 
