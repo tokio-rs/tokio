@@ -275,7 +275,22 @@ pub trait Subscriber: 'static {
         TypeId::of::<Self>()
     }
 
-    /// If `self` is the type with the
+    /// If `self` is the same type as the provided `TypeId`, returns an untyped
+    /// `*const` pointer to that type. Otherwise, returns `None`.
+    ///
+    /// If you wish to downcast a `Subscriber`, it is strongly advised to use
+    /// the safe API provided by [`downcast_ref`] instead.
+    ///
+    /// This API is required for `downcast_raw` to be a trait method; a method
+    /// signature like [`downcast_ref`] (with a generic type parameter) is not
+    /// object-safe, and thus cannot be a trait method for `Subscriber`. This
+    /// means that if we only exposed `downcast_ref`, `Subscriber`
+    /// implementations could not override the downcasting behavior
+    ///
+    /// This method may be overridden by "fan out" or "chained" subscriber
+    /// implementations which consist of multiple composed types. Such
+    /// subscribers might allow `downcast_raw` by returning references to those
+    /// component if they contain components with the given `TypeId`.
     fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
         if id == self.type_id() {
             Some(self as *const Self as *const ())
@@ -286,10 +301,13 @@ pub trait Subscriber: 'static {
 }
 
 impl Subscriber {
+    /// Returns `true` if this `Subscriber` is the same type as `T`.
     pub fn is<T: Any>(&self) -> bool {
         self.downcast_raw(TypeId::of::<T>()).is_some()
     }
 
+    /// Returns some reference to this `Subscriber` value if it is of type `T`,
+    /// or `None` if it isn't.
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         self.downcast_raw(TypeId::of::<T>()).map(|raw| unsafe {
             &*(raw as *const _)
