@@ -5,10 +5,9 @@ mod support;
 use self::support::*;
 use std::thread;
 use tokio_trace::{
-    dispatcher,
     field::{debug, display},
     subscriber::with_default,
-    Dispatch, Level, Span,
+    Level, Span,
 };
 
 #[test]
