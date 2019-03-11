@@ -707,7 +707,7 @@ macro_rules! warn {
     );
     ({ $( $k:ident = $val:expr ),*, }, $($arg:tt)+ ) => (
         event!(
-            target: __tokio_trace_module_path!(),  '
+            target: __tokio_trace_module_path!(),
             $crate::Level::WARN,
             { $($k = $val),* },
             $($arg)+
