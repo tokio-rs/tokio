@@ -22,7 +22,7 @@ fn closed_handle_cannot_be_entered() {
         .exit(span::mock().named("foo"))
         .run();
 
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         span!("foo").enter(|| {
             let bar = span!("bar");
             let mut another_bar = bar.clone();
@@ -138,7 +138,7 @@ fn dropping_a_span_calls_drop_span() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let mut span = span!("foo");
         span.enter(|| {});
         drop(span);
@@ -156,7 +156,7 @@ fn span_closes_after_event() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         span!("foo").enter(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
@@ -177,7 +177,7 @@ fn new_span_after_event() {
         .drop_span(span::mock().named("bar"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         span!("foo").enter(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
@@ -196,7 +196,7 @@ fn event_outside_of_span() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         debug!("my event!");
         span!("foo").enter(|| {});
     });
@@ -209,7 +209,7 @@ fn cloning_a_span_calls_clone_span() {
     let (subscriber, handle) = subscriber::mock()
         .clone_span(span::mock().named("foo"))
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let span = span!("foo");
         let _span2 = span.clone();
     });
@@ -224,7 +224,7 @@ fn drop_span_when_exiting_dispatchers_context() {
         .drop_span(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let span = span!("foo");
         let _span2 = span.clone();
         drop(span);
@@ -271,7 +271,7 @@ fn span_closes_when_exited() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let mut foo = span!("foo");
         assert!(!foo.is_closed());
 
@@ -295,7 +295,7 @@ fn entering_a_closed_span_again_is_a_no_op() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let mut foo = span!("foo");
 
         foo.close();
@@ -323,7 +323,7 @@ fn moved_field() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let from = "my span";
         let mut span = span!("foo", bar = display(format!("hello from {}", from)));
         span.enter(|| {});
@@ -348,7 +348,7 @@ fn borrowed_field() {
         .done()
         .run_with_handle();
 
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let from = "my span";
         let mut message = format!("hello from {}", from);
         let mut span = span!("foo", bar = display(&message));
@@ -388,7 +388,7 @@ fn move_field_out_of_struct() {
         )
         .run_with_handle();
 
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let pos = Position {
             x: 3.234,
             y: -1.223,
@@ -420,7 +420,7 @@ fn add_field_after_new_span() {
         .done()
         .run_with_handle();
 
-    with_default(subscriber,|| {
+    with_default(subscriber, || {
         let mut span = span!("foo", bar = 5, baz);
         span.record("baz", &true);
         span.enter(|| {})
