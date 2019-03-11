@@ -927,7 +927,7 @@ macro_rules! is_enabled {
 }
 
 #[doc(hidden)]
-#[macro_export]
+#[macro_export(local_inner_macros)]
 macro_rules! valueset {
     ($fields:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
