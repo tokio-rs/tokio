@@ -565,7 +565,7 @@ macro_rules! debug {
         event!(
             target: __tokio_trace_module_path!(),
             $crate::Level::DEBUG,
-            { $($k = $val),*
+            { $($k = $val),* }
         )
     );
     ($($arg:tt)+ ) => (
