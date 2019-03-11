@@ -309,9 +309,8 @@ impl Subscriber {
     /// Returns some reference to this `Subscriber` value if it is of type `T`,
     /// or `None` if it isn't.
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        self.downcast_raw(TypeId::of::<T>()).map(|raw| unsafe {
-            &*(raw as *const _)
-        })
+        self.downcast_raw(TypeId::of::<T>())
+            .map(|raw| unsafe { &*(raw as *const _) })
     }
 }
 
