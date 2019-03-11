@@ -852,7 +852,7 @@ macro_rules! callsite {
         use $crate::{callsite, Metadata, subscriber::Interest};
         struct MyCallsite;
         static META: Metadata<'static> = {
-            __tokio_trace_metadata! {
+            metadata! {
                 name: $name,
                 target: $target,
                 level: $lvl,
@@ -1004,39 +1004,4 @@ macro_rules! __tokio_trace_stringify {
     ($s:expr) => {
         stringify!($s)
     };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __tokio_trace_metadata {
-    (
-        name: $name:expr,
-        target: $target:expr,
-        level: $level:expr,
-        fields: $fields:expr,
-        callsite: $callsite:expr
-    ) => {
-        metadata! {
-            name: $name,
-            target: $target,
-            level: $level,
-            fields: $fields,
-            callsite: $callsite,
-        }
-    };
-    (
-        name: $name:expr,
-        target: $target:expr,
-        level: $level:expr,
-        fields: $fields:expr,
-        callsite: $callsite:expr,
-    ) => {
-        metadata! {
-            name: $name,
-            target: $target,
-            level: $level,
-            fields: $fields,
-            callsite: $callsite,
-        }
-    }
 }
