@@ -123,7 +123,7 @@ macro_rules! identify_callsite {
 ///
 /// [metadata]: metadata/struct.Metadata.html
 /// [`Metadata::new`]: metadata/struct.Metadata.html#method.new
-#[macro_export]
+#[macro_export(local_inner_macros)]
 macro_rules! metadata {
     (
         name: $name:expr,
@@ -151,14 +151,38 @@ macro_rules! metadata {
             name: $name,
             target: $target,
             level: $level,
-            file: Some(file!()),
-            line: Some(line!()),
-            module_path: Some(module_path!()),
+            file: Some(__tokio_trace_core_file!()),
+            line: Some(__tokio_trace_core_line!()),
+            module_path: Some(__tokio_trace_core_module_path!()),
             fields: $crate::field::FieldSet {
                 names: $fields,
                 callsite: identify_callsite!($callsite),
             },
         }
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_core_module_path {
+    () => {
+        module_path!()
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_core_file {
+    () => {
+        file!()
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_core_line {
+    () => {
+        line!()
     };
 }
 
