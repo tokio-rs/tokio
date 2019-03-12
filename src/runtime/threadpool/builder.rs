@@ -341,12 +341,11 @@ impl Builder {
             .threadpool_builder
             .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
-                let dispatch = dispatch.clone();
 
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
                         timer::with_default(&timer_handles[index], enter, |_| {
-                            dispatcher::with_default(dispatch, || {
+                            dispatcher::with_default(&dispatch, || {
                                 w.run();
                             })
                         });
