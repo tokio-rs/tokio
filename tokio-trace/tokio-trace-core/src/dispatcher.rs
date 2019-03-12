@@ -252,7 +252,7 @@ impl Subscriber for NoSubscriber {
     }
 
     fn new_span(&self, _: &span::Attributes) -> span::Id {
-        span::Id::from_u64(0)
+        span::Id::from_u64(0xDEAD)
     }
 
     fn event(&self, _event: &Event) {}
