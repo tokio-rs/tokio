@@ -11,7 +11,7 @@ use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
-use tokio_trace_core::dispatcher::{self, Dispatch};
+use tokio_trace_core as trace;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -335,7 +335,7 @@ impl Builder {
         // TODO(eliza): when `tokio-trace-core` is stable enough to take a
         // public API dependency, we should allow users to set a custom
         // subscriber for the runtime.
-        let dispatch = dispatcher::get_default(Dispatch::clone);
+        let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
 
         let pool = self
             .threadpool_builder
@@ -345,7 +345,7 @@ impl Builder {
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
                         timer::with_default(&timer_handles[index], enter, |_| {
-                            dispatcher::with_default(&dispatch, || {
+                            trace::dispatcher::with_default(&dispatch, || {
                                 w.run();
                             })
                         });
