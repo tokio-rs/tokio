@@ -102,7 +102,7 @@ pub type IoStream<T> = Box<Stream<Item = T, Error = io::Error> + Send>;
 /// read up on the documentation in the `unix` or `windows` module to take a
 /// peek.
 pub fn ctrl_c() -> IoFuture<IoStream<()>> {
-    ctrl_c_handle(&Handle::current())
+    ctrl_c_handle(&Handle::default())
 }
 
 /// Creates a stream which receives "ctrl-c" notifications sent to a process.
