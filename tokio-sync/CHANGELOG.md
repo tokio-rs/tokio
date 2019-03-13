@@ -1,3 +1,11 @@
+# 0.1.4 (March 13, 2019)
+
+### Fixed
+- Fix memory leak on channel drop (#917).
+
+### Added
+- `std::error::Error` implementation for `oneshot`, `watch` error types (#967).
+
 # 0.1.3 (March 1, 2019)
 
 ### Added
