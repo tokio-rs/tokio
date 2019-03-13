@@ -21,7 +21,7 @@ extern crate tokio_reactor;
 
 mod datagram;
 mod frame;
-mod frame_peer;
+mod frame_connected;
 mod incoming;
 mod listener;
 mod recv_dgram2;
@@ -33,7 +33,7 @@ mod ucred;
 
 pub use datagram::UnixDatagram;
 pub use frame::UnixDatagramFramed;
-pub use frame_peer::UnixDatagramPeerFramed;
+pub use frame_connected::UnixDatagramConnectedFramed;
 pub use incoming::Incoming;
 pub use listener::UnixListener;
 pub use recv_dgram_from::RecvDgramFrom;

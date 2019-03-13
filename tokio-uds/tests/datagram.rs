@@ -95,7 +95,7 @@ fn unnamed_pair_peer_framed_echo() {
     let (s1, s2) = UnixDatagram::pair().unwrap();
 
     {
-        let server = UnixDatagramPeerFramed::new(s1, StringDatagramCodec);
+        let server = UnixDatagramConnectedFramed::new(s1, StringDatagramCodec);
 
         let (sink, stream) = server.split();
 
@@ -109,7 +109,7 @@ fn unnamed_pair_peer_framed_echo() {
     }
 
     {
-        let client = UnixDatagramPeerFramed::new(s2, StringDatagramCodec);
+        let client = UnixDatagramConnectedFramed::new(s2, StringDatagramCodec);
 
         let (sink, stream) = client.split();
 

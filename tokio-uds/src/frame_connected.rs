@@ -34,7 +34,7 @@ use tokio_codec::{Decoder, Encoder};
 /// [unnamed pair]: struct.UnixDatagram.html#method.pair
 #[must_use = "sinks do nothing unless polled"]
 #[derive(Debug)]
-pub struct UnixDatagramPeerFramed<C> {
+pub struct UnixDatagramConnectedFramed<C> {
     socket: UnixDatagram,
     codec: C,
     rd: BytesMut,
@@ -42,7 +42,7 @@ pub struct UnixDatagramPeerFramed<C> {
     flushed: bool,
 }
 
-impl<C: Decoder> Stream for UnixDatagramPeerFramed<C> {
+impl<C: Decoder> Stream for UnixDatagramConnectedFramed<C> {
     type Item = C::Item;
     type Error = C::Error;
 
@@ -63,7 +63,7 @@ impl<C: Decoder> Stream for UnixDatagramPeerFramed<C> {
     }
 }
 
-impl<C: Encoder> Sink for UnixDatagramPeerFramed<C> {
+impl<C: Encoder> Sink for UnixDatagramConnectedFramed<C> {
     type SinkItem = C::Item;
     type SinkError = C::Error;
 
@@ -119,12 +119,12 @@ impl<C: Encoder> Sink for UnixDatagramPeerFramed<C> {
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
 const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
-impl<C> UnixDatagramPeerFramed<C> {
+impl<C> UnixDatagramConnectedFramed<C> {
     /// Create a new `UnixDatagramFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
-    pub fn new(socket: UnixDatagram, codec: C) -> UnixDatagramPeerFramed<C> {
-        UnixDatagramPeerFramed {
+    pub fn new(socket: UnixDatagram, codec: C) -> UnixDatagramConnectedFramed<C> {
+        UnixDatagramConnectedFramed {
             socket: socket,
             codec: codec,
             rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
