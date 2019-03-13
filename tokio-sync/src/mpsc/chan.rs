@@ -326,10 +326,13 @@ impl<T, S> Drop for Chan<T, S> {
     fn drop(&mut self) {
         use super::block::Read::Value;
 
+        // Safety: the only owner of the rx fields is Chan, and eing
+        // inside its own Drop means we're the last ones to touch it.
         self.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
             while let Some(Value(_)) = rx_fields.list.pop(&self.tx) {}
+            unsafe { rx_fields.list.free_blocks() };
         });
     }
 }
