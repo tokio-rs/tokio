@@ -86,3 +86,37 @@ fn framed_echo() {
         assert_eq!(response[0].0, "ECHO");
     }
 }
+
+#[test]
+fn unnamed_pair_peer_framed_echo() {
+
+    let mut rt = Runtime::new().unwrap();
+
+    let (s1, s2) = UnixDatagram::pair().unwrap();
+
+    {
+        let server = UnixDatagramPeerFramed::new(s1, StringDatagramCodec);
+
+        let (sink, stream) = server.split();
+
+        // spawn echo server
+        rt.spawn(
+            stream
+                .forward(sink)
+                .map_err(|e| panic!("err={:?}", e))
+                .map(|_| ()),
+        );
+    }
+
+    {
+        let client = UnixDatagramPeerFramed::new(s2, StringDatagramCodec);
+
+        let (sink, stream) = client.split();
+
+        rt.block_on(sink.send("ECHO".to_string()))
+            .unwrap();
+
+        let response = rt.block_on(stream.take(1).collect()).unwrap();
+        assert_eq!(response[0], "ECHO");
+    }
+}

@@ -1,4 +1,4 @@
-use {RecvDgram, SendDgram};
+use {RecvDgramFrom, RecvDgram2, RecvDgram, SendDgramTo, SendDgram, SendDgram2};
 
 use tokio_reactor::{Handle, PollEvented};
 
@@ -126,12 +126,31 @@ impl UnixDatagram {
         }
     }
 
-    /// Returns a future for receiving a datagram. See the documentation on RecvDgram for details.
+    #[deprecated(since = "0.2.6", note = "use recv_dgram_from instead")]
+    #[doc(hidden)]
     pub fn recv_dgram<T>(self, buf: T) -> RecvDgram<T>
     where
         T: AsMut<[u8]>,
     {
-        RecvDgram::new(self, buf)
+        self.recv_dgram_from(buf)
+    }
+
+    /// A future for receiving datagrams through a Unix datagram socket. See the documentation on RecvDgramFrom
+    /// for details.
+    pub fn recv_dgram_from<T>(self, buf: T) -> RecvDgramFrom<T>
+    where
+        T: AsMut<[u8]>,
+    {
+        RecvDgramFrom::new(self, buf)
+    }
+
+    /// A future for receiving datagrams from the previously connected peer through a Unix datagram socket.
+    /// See the documentation on RecvDgramFrom for details.
+    pub fn recv_dgram2<T>(self, buf: T) -> RecvDgram2<T>
+    where
+        T: AsMut<[u8]>,
+    {
+        RecvDgram2::new(self, buf)
     }
 
     /// Sends data on the socket to the specified address.
@@ -172,13 +191,31 @@ impl UnixDatagram {
         }
     }
 
-    /// Returns a future sending the data in buf to the socket at path.
+    #[deprecated(since = "0.2.6", note = "use send_dgram_to instead")]
+    #[doc(hidden)]
     pub fn send_dgram<T, P>(self, buf: T, path: P) -> SendDgram<T, P>
     where
         T: AsRef<[u8]>,
         P: AsRef<Path>,
     {
-        SendDgram::new(self, buf, path)
+        self.send_dgram_to(buf, path)
+    }
+
+    /// Returns a future for sending datagrams to a previously connected peer through a Unix datagram socket.
+    pub fn send_dgram2<T>(self, buf: T) -> SendDgram2<T>
+    where
+        T: AsRef<[u8]>,
+    {
+        SendDgram2::new(self, buf)
+    }
+
+    /// Returns a future for sending datagram through a Unix datagram socket.
+    pub fn send_dgram_to<T, P>(self, buf: T, path: P) -> SendDgramTo<T, P>
+    where
+        T: AsRef<[u8]>,
+        P: AsRef<Path>,
+    {
+        SendDgramTo::new(self, buf, path)
     }
 
     /// Returns the value of the `SO_ERROR` option.

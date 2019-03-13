@@ -6,9 +6,9 @@ use std::io;
 use std::mem;
 use std::path::Path;
 
-/// A future for writing a buffer to a Unix datagram socket.
+/// Future for sending datagram through a Unix datagram socket.
 #[derive(Debug)]
-pub struct SendDgram<T, P> {
+pub struct SendDgramTo<T, P> {
     st: State<T, P>,
 }
 
@@ -27,19 +27,19 @@ enum State<T, P> {
     Empty,
 }
 
-impl<T, P> SendDgram<T, P>
+impl<T, P> SendDgramTo<T, P>
 where
     T: AsRef<[u8]>,
     P: AsRef<Path>,
 {
-    pub(crate) fn new(sock: UnixDatagram, buf: T, addr: P) -> SendDgram<T, P> {
-        SendDgram {
+    pub(crate) fn new(sock: UnixDatagram, buf: T, addr: P) -> SendDgramTo<T, P> {
+        SendDgramTo {
             st: State::Sending { sock, buf, addr },
         }
     }
 }
 
-impl<T, P> Future for SendDgram<T, P>
+impl<T, P> Future for SendDgramTo<T, P>
 where
     T: AsRef<[u8]>,
     P: AsRef<Path>,
