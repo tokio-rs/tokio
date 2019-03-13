@@ -89,7 +89,6 @@ fn framed_echo() {
 
 #[test]
 fn unnamed_pair_peer_framed_echo() {
-
     let mut rt = Runtime::new().unwrap();
 
     let (s1, s2) = UnixDatagram::pair().unwrap();
@@ -113,8 +112,7 @@ fn unnamed_pair_peer_framed_echo() {
 
         let (sink, stream) = client.split();
 
-        rt.block_on(sink.send("ECHO".to_string()))
-            .unwrap();
+        rt.block_on(sink.send("ECHO".to_string())).unwrap();
 
         let response = rt.block_on(stream.take(1).collect()).unwrap();
         assert_eq!(response[0], "ECHO");

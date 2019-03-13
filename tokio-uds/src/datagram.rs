@@ -1,4 +1,4 @@
-use {RecvDgramFrom, RecvDgram2, RecvDgram, SendDgramTo, SendDgram, SendDgram2};
+use {RecvDgram, RecvDgram2, RecvDgramFrom, SendDgram, SendDgram2, SendDgramTo};
 
 use tokio_reactor::{Handle, PollEvented};
 

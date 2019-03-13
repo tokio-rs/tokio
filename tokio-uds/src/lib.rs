@@ -25,8 +25,8 @@ mod frame_connected;
 mod incoming;
 mod listener;
 mod recv_dgram2;
-mod send_dgram2;
 mod recv_dgram_from;
+mod send_dgram2;
 mod send_dgram_to;
 mod stream;
 mod ucred;
@@ -36,15 +36,15 @@ pub use frame::UnixDatagramFramed;
 pub use frame_connected::UnixDatagramConnectedFramed;
 pub use incoming::Incoming;
 pub use listener::UnixListener;
+pub use recv_dgram2::RecvDgram2;
 pub use recv_dgram_from::RecvDgramFrom;
-pub use send_dgram_to::SendDgramTo;
 #[deprecated(since = "0.2.6", note = "use RecvDgramFrom instead")]
 #[doc(hidden)]
 pub use recv_dgram_from::RecvDgramFrom as RecvDgram;
+pub use send_dgram2::SendDgram2;
+pub use send_dgram_to::SendDgramTo;
 #[deprecated(since = "0.2.6", note = "use SendDgramTo instead")]
 #[doc(hidden)]
 pub use send_dgram_to::SendDgramTo as SendDgram;
-pub use recv_dgram2::RecvDgram2;
-pub use send_dgram2::SendDgram2;
 pub use stream::{ConnectFuture, UnixStream};
 pub use ucred::UCred;

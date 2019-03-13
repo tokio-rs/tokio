@@ -26,7 +26,7 @@ enum State<T> {
 
 impl<T> SendDgram2<T>
 where
-    T: AsRef<[u8]>
+    T: AsRef<[u8]>,
 {
     pub(crate) fn new(sock: UnixDatagram, buf: T) -> SendDgram2<T> {
         SendDgram2 {
