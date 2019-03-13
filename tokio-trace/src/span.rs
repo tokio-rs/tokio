@@ -142,11 +142,11 @@ use {
 /// span will silently do nothing. Thus, the handle can be used in the same
 /// manner regardless of whether or not the trace is currently being collected.
 #[derive(Clone, PartialEq, Hash)]
-pub struct Span<'a> {
+pub struct Span {
     /// A handle used to enter the span when it is not executing.
     ///
     /// If this is `None`, then the span has either closed or was never enabled.
-    inner: Option<Inner<'a>>,
+    inner: Option<Inner<'static>>,
 }
 
 /// A handle representing the capacity to enter a span which is known to exist.
@@ -184,7 +184,7 @@ struct Entered<'a> {
 
 // ===== impl Span =====
 
-impl<'a> Span<'a> {
+impl Span {
     /// Constructs a new `Span` with the given [metadata] and set of [field
     /// values].
     ///
@@ -199,7 +199,7 @@ impl<'a> Span<'a> {
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+    pub fn new(meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span {
         let new_span = Attributes::new(meta, values);
         Self::make(meta, new_span)
     }
@@ -214,7 +214,7 @@ impl<'a> Span<'a> {
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new_root(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+    pub fn new_root(meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span {
         Self::make(meta, Attributes::new_root(meta, values))
     }
 
@@ -227,7 +227,7 @@ impl<'a> Span<'a> {
     /// [metadata]: ::metadata::Metadata
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
-    pub fn child_of<I>(parent: I, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a>
+    pub fn child_of<I>(parent: I, meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span
     where
         I: Into<Option<Id>>,
     {
@@ -240,15 +240,14 @@ impl<'a> Span<'a> {
 
     /// Constructs a new disabled span.
     #[inline(always)]
-    pub fn new_disabled() -> Span<'a> {
+    pub fn new_disabled() -> Span {
         Span {
             inner: None,
-            is_closed: false,
         }
     }
 
     #[inline(always)]
-    fn make(meta: &'a Metadata<'a>, new_span: Attributes) -> Span<'a> {
+    fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
         let inner = dispatcher::get_default(move |dispatch| {
             let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))
@@ -361,12 +360,12 @@ impl<'a> Span<'a> {
     }
 
     /// Returns this span's `Metadata`, if it is enabled.
-    pub fn metadata(&self) -> Option<&'a Metadata<'a>> {
+    pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
         self.inner.as_ref().map(Inner::metadata)
     }
 }
 
-impl<'a> fmt::Debug for Span<'a> {
+impl<'a> fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut span = f.debug_struct("Span");
         if let Some(ref inner) = self.inner {
