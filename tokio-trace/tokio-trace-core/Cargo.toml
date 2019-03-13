@@ -1,18 +1,23 @@
 [package]
 name = "tokio-trace-core"
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
+# - Update CHANGELOG.md.
+# - Create "v0.1.x" git tag.
 version = "0.1.0"
-authors = ["Eliza Weisman <eliza@buoyant.io>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-trace-core/0.1.0/tokio_trace_core"
 description = """
 Core primitives for tokio-trace.
 """
 categories = ["development-tools::debugging"]
 keywords = ["logging", "tracing"]
-
-# Not yet ready for production.
-publish = false
 
 [dependencies]
 lazy_static = "1.0.0"
