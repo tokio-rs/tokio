@@ -76,24 +76,35 @@ enum Round {
     Down,
 }
 
-/// Convert a `Duration` to milliseconds, rounding up and saturating at
-/// `u64::MAX`.
-///
-/// The saturating is fine because `u64::MAX` milliseconds are still many
-/// million years.
-#[inline]
-fn ms(duration: Duration, round: Round) -> u64 {
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
+/// Timer precision
+#[derive(Debug, Copy, Clone)]
+pub struct Resolution {
+    /// nanoseconds per unit of time
+    pub nanos_per_unit: u64,
+    /// units of time in a second
+    pub units_per_sec: u64,
+}
 
-    // Round up.
-    let millis = match round {
-        Round::Up => (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI,
-        Round::Down => duration.subsec_nanos() / NANOS_PER_MILLI,
-    };
+impl Resolution {
+    /// Convert a `Duration` to base units, rounding up and saturating at
+    /// `u64::MAX`.
+    fn to_base_units(&self, duration: Duration, round: Round) -> u64 {
+        // Round up.
+        let millis = match round {
+            Round::Up => {
+                (duration.subsec_nanos() as u64 + self.nanos_per_unit - 1) / self.nanos_per_unit
+            }
+            Round::Down => duration.subsec_nanos() as u64 / self.nanos_per_unit,
+        };
 
-    duration
-        .as_secs()
-        .saturating_mul(MILLIS_PER_SEC)
-        .saturating_add(millis as u64)
+        duration
+            .as_secs()
+            .saturating_mul(self.units_per_sec)
+            .saturating_add(millis as u64)
+    }
+
+    /// Convert from base units back to `Duration`
+    fn from_base_units(&self, units: u64) -> Duration {
+        Duration::from_nanos(units.saturating_mul(self.nanos_per_unit))
+    }
 }

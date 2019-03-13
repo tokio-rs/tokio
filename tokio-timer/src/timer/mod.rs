@@ -55,12 +55,24 @@ use Error;
 
 use tokio_executor::park::{Park, ParkThread, Unpark};
 
+use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::usize;
 use std::{cmp, fmt};
+
+use Resolution;
+
+/// Timer implementation
+pub trait TimerImpl<T>: Park
+where
+    T: Park,
+{
+    /// Timer resolution
+    fn resolution(&self) -> Resolution;
+}
 
 /// Timer implementation that drives [`Delay`], [`Interval`], and [`Timeout`].
 ///
@@ -126,15 +138,17 @@ use std::{cmp, fmt};
 /// [`turn`]: #method.turn
 /// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
-pub struct Timer<T, N = SystemNow> {
+pub struct Timer<T, N = SystemNow, I = DefaultTimerImpl<T>> {
     /// Shared state
     inner: Arc<Inner>,
 
     /// Timer wheel
     wheel: wheel::Wheel<Stack>,
 
-    /// Thread parker. The `Timer` park implementation delegates to this.
-    park: T,
+    /// Timer implementation
+    timer: I,
+
+    park: PhantomData<T>,
 
     /// Source of "now" instances
     now: N,
@@ -163,6 +177,8 @@ pub(crate) struct Inner {
 
     /// Unparks the timer thread.
     unpark: Box<Unpark>,
+
+    resolution: Resolution,
 }
 
 /// Maximum number of timeouts the system can handle concurrently.
@@ -192,12 +208,12 @@ where
 impl<T, N> Timer<T, N> {
     /// Returns a reference to the underlying `Park` instance.
     pub fn get_park(&self) -> &T {
-        &self.park
+        &self.timer.park
     }
 
     /// Returns a mutable reference to the underlying `Park` instance.
     pub fn get_park_mut(&mut self) -> &mut T {
-        &mut self.park
+        &mut self.timer.park
     }
 }
 
@@ -210,13 +226,29 @@ where
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
-    pub fn new_with_now(park: T, mut now: N) -> Self {
-        let unpark = Box::new(park.unpark());
+    pub fn new_with_now(park: T, now: N) -> Self {
+        Self::new_with_now_and_impl(now, DefaultTimerImpl { park })
+    }
+}
+
+impl<T, N, I> Timer<T, N, I>
+where
+    T: Park,
+    N: Now,
+    I: TimerImpl<T>,
+{
+    /// Create a new `Timer` instance that uses `timer` implementation
+    /// `now` to get the current `Instant`.
+    ///
+    /// Specifying the source of time is useful when testing.
+    pub fn new_with_now_and_impl(mut now: N, timer: I) -> Self {
+        let unpark = Box::new(timer.unpark());
 
         Timer {
-            inner: Arc::new(Inner::new(now.now(), unpark)),
+            inner: Arc::new(Inner::new(now.now(), unpark, timer.resolution())),
             wheel: wheel::Wheel::new(),
-            park,
+            timer,
+            park: PhantomData,
             now,
         }
     }
@@ -250,7 +282,7 @@ where
     /// error.
     ///
     /// [`new`]: #method.new
-    pub fn turn(&mut self, max_wait: Option<Duration>) -> Result<Turn, T::Error> {
+    pub fn turn(&mut self, max_wait: Option<Duration>) -> Result<Turn, I::Error> {
         match max_wait {
             Some(timeout) => self.park_timeout(timeout)?,
             None => self.park()?,
@@ -261,12 +293,13 @@ where
 
     /// Converts an `Expiration` to an `Instant`.
     fn expiration_instant(&self, when: u64) -> Instant {
-        self.inner.start + Duration::from_millis(when)
+        self.inner.start + self.timer.resolution().from_base_units(when)
     }
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = ::ms(self.now.now() - self.inner.start, ::Round::Down);
+        let resolution = self.timer.resolution();
+        let now = resolution.to_base_units(self.now.now() - self.inner.start, ::Round::Down);
         let mut poll = wheel::Poll::new(now);
 
         while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
@@ -345,16 +378,55 @@ impl Default for Timer<ParkThread, SystemNow> {
     }
 }
 
-impl<T, N> Park for Timer<T, N>
+/// Default timer implementation
+#[derive(Debug)]
+pub struct DefaultTimerImpl<T> {
+    park: T,
+}
+
+impl<T> Park for DefaultTimerImpl<T>
 where
     T: Park,
-    N: Now,
 {
     type Unpark = T::Unpark;
     type Error = T::Error;
 
     fn unpark(&self) -> Self::Unpark {
         self.park.unpark()
+    }
+
+    fn park(&mut self) -> Result<(), Self::Error> {
+        self.park.park()
+    }
+
+    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
+        self.park.park_timeout(duration)
+    }
+}
+
+impl<T> TimerImpl<T> for DefaultTimerImpl<T>
+where
+    T: Park,
+{
+    fn resolution(&self) -> Resolution {
+        Resolution {
+            nanos_per_unit: 1_000_000,
+            units_per_sec: 1_000,
+        }
+    }
+}
+
+impl<T, N, I> Park for Timer<T, N, I>
+where
+    T: Park,
+    N: Now,
+    I: TimerImpl<T>,
+{
+    type Unpark = I::Unpark;
+    type Error = I::Error;
+
+    fn unpark(&self) -> Self::Unpark {
+        self.timer.unpark()
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
@@ -366,13 +438,13 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    self.park.park_timeout(deadline - now)?;
+                    self.timer.park_timeout(deadline - now)?;
                 } else {
-                    self.park.park_timeout(Duration::from_secs(0))?;
+                    self.timer.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
-                self.park.park()?;
+                self.timer.park()?;
             }
         }
 
@@ -390,13 +462,14 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    self.park.park_timeout(cmp::min(deadline - now, duration))?;
+                    self.timer
+                        .park_timeout(cmp::min(deadline - now, duration))?;
                 } else {
-                    self.park.park_timeout(Duration::from_secs(0))?;
+                    self.timer.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
-                self.park.park_timeout(duration)?;
+                self.timer.park_timeout(duration)?;
             }
         }
 
@@ -406,7 +479,7 @@ where
     }
 }
 
-impl<T, N> Drop for Timer<T, N> {
+impl<T, N, I> Drop for Timer<T, N, I> {
     fn drop(&mut self) {
         use std::u64;
 
@@ -426,13 +499,14 @@ impl<T, N> Drop for Timer<T, N> {
 // ===== impl Inner =====
 
 impl Inner {
-    fn new(start: Instant, unpark: Box<Unpark>) -> Inner {
+    fn new(start: Instant, unpark: Box<Unpark>, resolution: Resolution) -> Inner {
         Inner {
             num: AtomicUsize::new(0),
             elapsed: AtomicU64::new(0),
             process: AtomicStack::new(),
             start,
             unpark,
+            resolution,
         }
     }
 
@@ -479,7 +553,12 @@ impl Inner {
             return 0;
         }
 
-        ::ms(deadline - self.start, ::Round::Up)
+        self.resolution
+            .to_base_units(deadline - self.start, ::Round::Up)
+    }
+
+    fn resolution(&self) -> Resolution {
+        self.resolution
     }
 }
 
