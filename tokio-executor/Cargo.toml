@@ -23,3 +23,4 @@ categories = ["concurrency", "asynchronous"]
 [dependencies]
 crossbeam-utils = "0.6.2"
 futures = "0.1.19"
+log = "0.4.6"

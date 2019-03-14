@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 
 use futures::{future, Future};
-use tokio_executor::{self, SpawnError};
+use tokio_executor::{self, SpawnError, LazyFn};
 
 /// Submit futures to the associated thread pool for execution.
 ///
@@ -99,6 +99,7 @@ impl Sender {
             }
 
             if next.lifecycle() == Lifecycle::ShutdownNow {
+                trace!("Shutting down");
                 // Cannot execute the future, executor is shutdown.
                 return Err(SpawnError::shutdown());
             }
@@ -136,6 +137,15 @@ impl tokio_executor::Executor for Sender {
         let mut s = &*self;
         tokio_executor::Executor::spawn(&mut s, future)
     }
+
+    fn spawn_lazy(
+        &mut self,
+        lazy: LazyFn
+    ) -> Result<(), SpawnError> {
+        let mut s = &*self;
+        tokio_executor::Executor::spawn_lazy(&mut s, lazy)
+    }
+
 }
 
 impl<'a> tokio_executor::Executor for &'a Sender {
@@ -166,6 +176,27 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 
         // Create a new task for the future
         let task = Arc::new(Task::new(future));
+
+        // Call `submit_external()` in order to place the task into the global
+        // queue. This way all workers have equal chance of running this task,
+        // which means IO handles will be assigned to reactors more evenly.
+        self.pool.submit_external(task, &self.pool);
+
+        Ok(())
+    }
+
+    fn spawn_lazy(
+        &mut self,
+        future: LazyFn,
+    ) -> Result<(), SpawnError> {
+        self.prepare_for_spawn()?;
+        // At this point, the pool has accepted the future, so schedule it for
+        // execution.
+
+        // Create a new task from the lazy future.
+        // The actual future will be created just before the task
+        // begins executing
+        let task = Arc::new(Task::new_lazy(future));
 
         // Call `submit_external()` in order to place the task into the global
         // queue. This way all workers have equal chance of running this task,

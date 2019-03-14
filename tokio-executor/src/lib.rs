@@ -37,18 +37,72 @@
 
 extern crate crossbeam_utils;
 extern crate futures;
+#[macro_use] extern crate log;
 
 mod enter;
 mod global;
 pub mod park;
 
 pub use enter::{enter, Enter, EnterError};
-pub use global::{spawn, with_default, DefaultExecutor};
+pub use global::{spawn, spawn_lazy, with_default, DefaultExecutor};
 
 use futures::Future;
 
 use std::error::Error;
 use std::fmt;
+
+/// A function that returns a [`Future`]
+///
+/// This is simply a workaround for the fact that Box<FnOnce>
+/// is not callable on stable Rust. In the future, this may
+/// be removed in favor of directly using Box<FnOnce>, if
+/// it becomes supported by Rust.
+///
+/// [`spawn_lazy`] takes a LazyFn as it argument
+pub struct LazyFn {
+    inner: Box<FnBox<Box<Future<Item = (), Error = ()>>> + Send>
+}
+
+impl fmt::Debug for LazyFn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "LazyFn")
+    }
+}
+
+impl LazyFn {
+
+    /// Invokes the boxed closure, returning its result
+    pub fn call(self) -> Box<Future<Item = (), Error = ()>> {
+        self.inner.call()
+    }
+}
+
+impl<F: Send + 'static + FnOnce() -> Box<Future<Item = (), Error = ()>>> From<F> for LazyFn {
+    fn from(f: F) -> LazyFn {
+        LazyFn {
+            inner: Box::new(f)
+        }
+    }
+}
+
+/// Based on https://github.com/stbuehler/rust-boxfnonce/blob/58405ab1607636d35a0409a9ee511a014210360b/src/traits.rs
+/// We only implement what's necessary for us to be able to use this
+/// in [`spawn_lazy`]. Consumers of tokio can only access the opaque
+/// [`LazyFn`] type, so we don't need to make this trait generally
+/// useful.
+trait FnBox<Result> {
+    fn call(self: Box<Self>) -> Result;
+}
+
+impl<Result, F: FnOnce() -> Result> FnBox<Result> for F {
+    fn call(self: Box<Self>) -> Result {
+        let this: Self = *self;
+        this()
+    }
+}
+
+// Blah
+//pub type LazyFn = SendBoxFnOnce<'static, (), Box<Future<Item = (), Error = ()>>>;
 
 /// A value that executes futures.
 ///
@@ -139,6 +193,50 @@ pub trait Executor {
         future: Box<Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError>;
 
+    /// Spawns a future object to run on this executor.
+    ///
+    /// This function is almost identical to [`spawn`], except that
+    /// it takes a closure that will be called to create a future.
+    ///
+    /// Unlike [`spawn`], this function requires that the *function*
+    /// be [`Send`]. not the future itself. This allows the future
+    /// returned by the function to use non-Send types like [`Rc`],
+    /// which would normally not be allowed.
+
+    ///
+    /// `future` is passed to the executor, which will begin running it. The
+    /// future may run on the current thread or another thread at the discretion
+    /// of the `Executor` implementation.
+    ///
+    /// # Panics
+    ///
+    /// Implementers are encouraged to avoid panics. However, a panic is
+    /// permitted and the caller should check the implementation specific
+    /// documentation for more details on possible panics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate futures;
+    /// # extern crate tokio_executor;
+    /// # use tokio_executor::Executor;
+    /// # fn docs(my_executor: &mut Executor) {
+    /// use futures::future::lazy;
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    /// my_executor.spawn_lazy((|| {
+    ///     let rc = Rc::new(RefCell::new(true));
+    ///     println!("running on the executor with non-Send type: {:?}", rc);
+    ///     Box::new(futures::future::ok(())) as Box<futures::Future<Item = (), Error = ()>>
+    /// }).into()).unwrap();
+    /// # }
+    /// # fn main() {}
+    /// ```
+    fn spawn_lazy(
+        &mut self,
+        lazy: LazyFn
+    ) -> Result<(), SpawnError>;
+
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///
     /// This function may return both false positives **and** false negatives.
@@ -186,6 +284,14 @@ impl<E: Executor + ?Sized> Executor for Box<E> {
     ) -> Result<(), SpawnError> {
         (**self).spawn(future)
     }
+
+    fn spawn_lazy(
+        &mut self,
+        lazy: LazyFn
+    ) -> Result<(), SpawnError> {
+        (**self).spawn_lazy(lazy)
+    }
+
 
     fn status(&self) -> Result<(), SpawnError> {
         (**self).status()

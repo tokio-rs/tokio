@@ -1,5 +1,6 @@
 
 use tokio_threadpool::Sender;
+use tokio_executor::LazyFn;
 
 use futures::future::{self, Future};
 
@@ -71,5 +72,11 @@ impl ::executor::Executor for TaskExecutor {
         -> Result<(), ::executor::SpawnError>
     {
         self.inner.spawn(future)
+    }
+
+    fn spawn_lazy(&mut self, lazy: LazyFn)
+        -> Result<(), ::executor::SpawnError>
+    {
+        self.inner.spawn_lazy(lazy)
     }
 }

@@ -134,6 +134,78 @@ where F: Future<Item = (), Error = ()> + 'static + Send
     Spawn(())
 }
 
+/// Spawns a future on the default executor, delaying creation
+/// of the future until it actually runs.
+///
+/// This method is almost identical to [`spawn`], except that
+/// it takes a closure that will be called to create a future.
+///
+/// Unlike [`spawn`], this method requires that the *function*
+/// be [`Send`]. not the future itself. This allows the future
+/// returned by the function to use non-Send types like [`Rc`],
+/// which would normally not be allowed.
+///
+/// The provided closure will be invoked just before the created
+/// task is run for the first time. The invocation will occur
+/// on the thread that will actually be running the future.
+/// If a threadpool is in use, this will be the worker thread
+/// that is responsible for driving the future to completion.
+/// If a single-threaded executor is use, then the closure
+/// will be invoked on the same that that calls spawn_lazy
+///
+/// # Examples
+///
+/// In this example, a server is started and `spawn_lazy` is used to start a new task
+/// that processes each received connection. The task uses an Rc,
+/// which would not be possible with `spawn`.
+///
+/// ```rust
+/// # extern crate tokio;
+/// # extern crate futures;
+/// # use futures::{Future, Stream};
+/// use tokio::net::TcpListener;
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
+///
+/// # fn process<T>(_: T, rc: Rc<RefCell<bool>>) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # unimplemented!();
+/// # }
+/// # fn dox() {
+/// # let addr = "127.0.0.1:8080".parse().unwrap();
+/// let listener = TcpListener::bind(&addr).unwrap();
+///
+/// let server = listener.incoming()
+///     .map_err(|e| println!("error = {:?}", e))
+///     .for_each(|socket| {
+///         tokio::spawn_lazy(|| {
+///             let rc = Rc::new(RefCell::new(true));;
+///             process(socket, rc);
+///             Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = ()>>
+///         })
+///     });
+///
+/// tokio::run(server);
+/// # }
+/// # pub fn main() {}
+/// ```
+///
+/// [default executor]: struct.DefaultExecutor.html
+///
+/// # Panics
+///
+/// This function will panic if the default executor is not set or if spawning
+/// onto the default executor returns an error. To avoid the panic, use
+/// [`DefaultExecutor`].
+///
+/// [`DefaultExecutor`]: struct.DefaultExecutor.html
+
+pub fn spawn_lazy<F>(f: F) -> Spawn
+where F: FnOnce() -> Box<Future<Item = (), Error = ()>> + Send + 'static
+{
+    ::tokio_executor::spawn_lazy(f);
+    Spawn(())
+}
+
 impl IntoFuture for Spawn {
     type Future = FutureResult<(), ()>;
     type Item = ();

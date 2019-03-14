@@ -4,6 +4,8 @@ use futures::{future, Future};
 
 use std::cell::Cell;
 
+use LazyFn;
+
 /// Executes futures on the default executor for the current execution context.
 ///
 /// `DefaultExecutor` implements `Executor` and can be used to spawn futures
@@ -39,20 +41,27 @@ impl DefaultExecutor {
     #[inline]
     fn with_current<F: FnOnce(&mut Executor) -> R, R>(f: F) -> Option<R> {
         EXECUTOR.with(
-            |current_executor| match current_executor.replace(State::Active) {
-                State::Ready(executor_ptr) => {
-                    let executor = unsafe { &mut *executor_ptr };
-                    let result = f(executor);
-                    current_executor.set(State::Ready(executor_ptr));
-                    Some(result)
+            |current_executor| {
+                let state = current_executor.replace(State::Active);
+                trace!("with_current state: {:?}", state);
+                match state {
+                    State::Ready(executor_ptr) => {
+                        let executor = unsafe { &mut *executor_ptr };
+                        let result = f(executor);
+                        current_executor.set(State::Ready(executor_ptr));
+                        Some(result)
+                    }
+                    State::Empty | State::Active => {
+                        trace!("state = {:?}, returning None", state);
+                        None
+                    }
                 }
-                State::Empty | State::Active => None,
             },
         )
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum State {
     // default executor not defined
     Empty,
@@ -77,6 +86,15 @@ impl super::Executor for DefaultExecutor {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
+
+    fn spawn_lazy(
+        &mut self,
+        lazy: LazyFn
+    ) -> Result<(), SpawnError> {
+        DefaultExecutor::with_current(|executor| executor.spawn_lazy(lazy))
+            .unwrap_or_else(|| Err(SpawnError::shutdown()))
+    }
+
 
     fn status(&self) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.status())
@@ -150,6 +168,61 @@ where
     T: Future<Item = (), Error = ()> + Send + 'static,
 {
     DefaultExecutor::current().spawn(Box::new(future)).unwrap()
+}
+
+/// Submits a future for execution on the default executor -- usually a
+/// threadpool.
+///
+/// This function is almost identical to [`spawn`], except that
+/// it takes a closure that will be called to create a future.
+///
+/// Unlike [`spawn`], this function requires that the *function*
+/// be [`Send`]. not the future itself. This allows the future
+/// returned by the function to use non-Send types like [`Rc`],
+/// which would normally not be allowed.
+///
+/// Futures are lazy constructs. When they are defined, no work happens. In
+/// order for the logic defined by the future to be run, the future must be
+/// spawned on an executor. This function is the easiest way to do so.
+///
+/// This function must be called from an execution context, i.e. from a future
+/// that has been already spawned onto an executor.
+///
+/// Once spawned, the future will execute. The details of how that happens is
+/// left up to the executor instance. If the executor is a thread pool, the
+/// future will be pushed onto a queue that a worker thread polls from. If the
+/// executor is a "current thread" executor, the future might be polled
+/// immediately from within the call to `spawn` or it might be pushed onto an
+/// internal queue.
+///
+/// # Panics
+///
+/// This function will panic if the default executor is not set or if spawning
+/// onto the default executor returns an error. To avoid the panic, use the
+/// `DefaultExecutor` handle directly.
+///
+/// # Examples
+///
+/// ```rust
+/// # extern crate futures;
+/// # extern crate tokio_executor;
+/// # use tokio_executor::spawn_lazy;
+/// # pub fn dox() {
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
+///
+/// spawn_lazy(|| {
+///     let rc = Rc::new(RefCell::new(false));
+///     println!("running on the default executor with non-Send type: {:?}", rc);
+///     Box::new(futures::future::ok(())) as Box<futures::Future<Item = (), Error = ()>>
+/// });
+/// # }
+/// # pub fn main() {}
+/// ```
+
+pub fn spawn_lazy<T: Into<LazyFn>>(lazy: T)
+{
+    DefaultExecutor::current().spawn_lazy(lazy.into()).unwrap()
 }
 
 /// Set the default executor for the duration of the closure

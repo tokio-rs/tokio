@@ -12,7 +12,10 @@ use pool::Pool;
 use futures::executor::{self, Spawn};
 use futures::{self, Async, Future};
 
-use std::cell::{Cell, UnsafeCell};
+use tokio_executor::LazyFn;
+
+use std::cell::Cell;
+use std::cell::RefCell;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
@@ -50,7 +53,27 @@ pub(crate) struct Task {
     /// Store the future at the head of the struct
     ///
     /// The future is dropped immediately when it transitions to Complete
-    future: UnsafeCell<Option<Spawn<BoxFuture>>>,
+    future: RefCell<MaybeFuture>,
+}
+
+/// Represents a future that may or may not have been created
+/// This is to support spawn_lazy, which requires that we call
+/// the user-provided closure on the proper thread
+enum MaybeFuture {
+    /// Represents an already created future
+    Future(Option<Spawn<Box<Future<Item = (), Error = ()>>>>),
+    /// Represents a lazily-created future, which will
+    /// be created on the thread it will be run on
+    Lazy(LazyFn)
+}
+
+impl MaybeFuture {
+    fn is_future(&self) -> bool {
+        match self {
+            MaybeFuture::Future(_) => true,
+            MaybeFuture::Lazy(_) => false
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -68,7 +91,7 @@ impl Task {
     /// Create a new `Task` as a harness for `future`.
     pub fn new(future: BoxFuture) -> Task {
         // Wrap the future with an execution context.
-        let task_fut = executor::spawn(future);
+        let task_fut = executor::spawn(future as Box<Future<Item = (), Error = ()>>);
 
         Task {
             state: AtomicUsize::new(State::new().into()),
@@ -76,14 +99,25 @@ impl Task {
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
-            future: UnsafeCell::new(Some(task_fut)),
+            future: RefCell::new(MaybeFuture::Future(Some(task_fut))),
+        }
+    }
+
+    pub fn new_lazy(lazy: LazyFn) -> Task {
+        Task {
+            state: AtomicUsize::new(State::new().into()),
+            blocking: AtomicUsize::new(BlockingState::new().into()),
+            next_blocking: AtomicPtr::new(ptr::null_mut()),
+            reg_worker: Cell::new(None),
+            reg_index: Cell::new(0),
+            future: RefCell::new(MaybeFuture::Lazy(lazy)),
         }
     }
 
     /// Create a fake `Task` to be used as part of the intrusive mpsc channel
     /// algorithm.
     fn stub() -> Task {
-        let future = Box::new(futures::empty()) as BoxFuture;
+        let future = Box::new(futures::empty()) as Box<Future<Item = (), Error = ()>>;
         let task_fut = executor::spawn(future);
 
         Task {
@@ -92,66 +126,91 @@ impl Task {
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
-            future: UnsafeCell::new(Some(task_fut)),
+            future: RefCell::new(MaybeFuture::Future(Some(task_fut))),
         }
     }
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
     pub fn run(&self, unpark: &Arc<Notifier>) -> Run {
+
         use self::State::*;
 
-        // Transition task to running state. At this point, the task must be
-        // scheduled.
-        let actual: State = self
-            .state
-            .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
-            .into();
+        // Necessary until we're using Rust 2018 -
+        // we can't call drop(ref_mut) from within the block
+        let res = {
 
-        match actual {
-            Scheduled => {}
-            _ => panic!("unexpected task state; {:?}", actual),
-        }
+            // Transition task to running state. At this point, the task must be
+            // scheduled.
+            let actual: State = self
+                .state
+                .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
+                .into();
 
-        trace!(
-            "Task::run; state={:?}",
-            State::from(self.state.load(Relaxed))
-        );
-
-        // The transition to `Running` done above ensures that a lock on the
-        // future has been obtained.
-        let fut = unsafe { &mut (*self.future.get()) };
-
-        // This block deals with the future panicking while being polled.
-        //
-        // If the future panics, then the drop handler must be called such that
-        // `thread::panicking() -> true`. To do this, the future is dropped from
-        // within the catch_unwind block.
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
-
-            impl<'a> Drop for Guard<'a> {
-                fn drop(&mut self) {
-                    // This drops the future
-                    if self.1 {
-                        let _ = self.0.take();
-                    }
-                }
+            match actual {
+                Scheduled => {}
+                _ => panic!("unexpected task state; {:?}", actual),
             }
 
-            let mut g = Guard(fut, true);
+            trace!(
+                "Task::run; state={:?}",
+                State::from(self.state.load(Relaxed))
+            );
 
-            let ret =
-                g.0.as_mut()
-                    .unwrap()
-                    .poll_future_notify(unpark, self as *const _ as usize);
+            let ref_mut = &mut *self.future.borrow_mut();
 
-            g.1 = false;
+            let fut = if ref_mut.is_future() {
+                match ref_mut {
+                    MaybeFuture::Future(ref mut f) => f,
+                    _ => unreachable!()
+                }
+            } else {
+                let inner = std::mem::replace(ref_mut, MaybeFuture::Future(None));
+                let lazy = match inner {
+                    MaybeFuture::Lazy(f) => f.call(),
+                    _ => unreachable!()
+                };
 
-            ret
-        }));
+                *ref_mut = MaybeFuture::Future(Some(executor::spawn(lazy)));
+                match ref_mut {
+                    MaybeFuture::Future(ref mut f) => f,
+                    _ => unreachable!()
+                }
+            };
 
-        match res {
+            // This block deals with the future panicking while being polled.
+            //
+            // If the future panics, then the drop handler must be called such that
+            // `thread::panicking() -> true`. To do this, the future is dropped from
+            // within the catch_unwind block.
+            let res = panic::catch_unwind(panic::AssertUnwindSafe(move || {
+                struct Guard<'a>(&'a mut Option<Spawn<Box<Future<Item = (), Error = ()>>>>, bool);
+
+                impl<'a> Drop for Guard<'a> {
+                    fn drop(&mut self) {
+                        // This drops the future
+                        if self.1 {
+                            let _ = self.0.take();
+                        }
+                    }
+                }
+
+                let mut g = Guard(fut, true);
+
+                let ret =
+                    g.0.as_mut()
+                        .unwrap()
+                        .poll_future_notify(unpark, self as *const _ as usize);
+
+                g.1 = false;
+
+                ret
+            }));
+            res
+        };
+
+
+        return match res {
             Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
                 trace!("    -> task complete");
 
@@ -288,7 +347,11 @@ impl Task {
     /// This must only be called by the thread that successfully transitioned
     /// the future state to `Running`.
     fn drop_future(&self) {
-        let _ = unsafe { (*self.future.get()).take() };
+        let inner = &mut *self.future.borrow_mut();
+        match inner {
+            MaybeFuture::Future(ref mut f) => { f.take(); }
+            MaybeFuture::Lazy(_) => {} // Nothing to do
+        };
     }
 }
 

@@ -140,6 +140,7 @@ if_runtime! {
     pub mod runtime;
 
     pub use executor::spawn;
+    pub use executor::spawn_lazy;
     pub use runtime::run;
 }
 
