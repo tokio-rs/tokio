@@ -27,7 +27,7 @@ macro_rules! assert_not_ready {
 
 #[test]
 fn straight_execution() {
-    let mut l = Lock::from(100);
+    let mut l = Lock::new(100);
 
     // We can immediately acquire the lock and take the value
     let mut g = assert_ready!(l.poll_lock());
@@ -53,7 +53,7 @@ fn straight_execution() {
 fn readiness() {
     let mut task = MockTask::new();
 
-    let mut l = Lock::from(100);
+    let mut l = Lock::new(100);
     let g = assert_ready!(l.poll_lock());
 
     // We can't now acquire the lease since it's already held in g

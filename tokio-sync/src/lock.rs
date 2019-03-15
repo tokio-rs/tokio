@@ -77,6 +77,17 @@ struct State<T> {
 }
 
 impl<T> Lock<T> {
+    /// Creates a new lock in an unlocked state ready for use.
+    pub fn new(t: T) -> Self {
+        Self {
+            inner: Arc::new(State {
+                c: UnsafeCell::new(t),
+                s: semaphore::Semaphore::new(1),
+            }),
+            permit: semaphore::Permit::new(),
+        }
+    }
+
     /// Try to acquire the lock.
     ///
     /// If the lock is already held, the current task is notified when it is released.
@@ -114,13 +125,7 @@ impl<T> Drop for LockGuard<T> {
 
 impl<T> From<T> for Lock<T> {
     fn from(s: T) -> Self {
-        Self {
-            inner: Arc::new(State {
-                c: UnsafeCell::new(s),
-                s: semaphore::Semaphore::new(1),
-            }),
-            permit: semaphore::Permit::new(),
-        }
+        Self::new(s)
     }
 }
 
@@ -138,7 +143,7 @@ where
     T: Default,
 {
     fn default() -> Self {
-        Self::from(T::default())
+        Self::new(T::default())
     }
 }
 
