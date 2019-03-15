@@ -33,13 +33,13 @@ fn straight_execution() {
     let mut g = assert_ready!(l.poll_lock());
     assert_eq!(&*g, &100);
     *g = 99;
-    g.unlock();
+    drop(g);
 
-    // Dropping the locks should be the same as calling .unlock
     let mut g = assert_ready!(l.poll_lock());
     assert_eq!(&*g, &99);
     *g = 98;
     drop(g);
+
     let mut g = assert_ready!(l.poll_lock());
     assert_eq!(&*g, &98);
 
@@ -62,7 +62,7 @@ fn readiness() {
     });
 
     // But once g unlocks, we can acquire it
-    g.unlock();
+    drop(g);
     assert!(task.is_notified());
     assert_ready!(l.poll_lock());
 }

@@ -112,13 +112,6 @@ impl<T> Drop for LockGuard<T> {
     }
 }
 
-impl<T> LockGuard<T> {
-    /// Release the lock.
-    pub fn unlock(self) {
-        drop(self);
-    }
-}
-
 impl<T> From<T> for Lock<T> {
     fn from(s: T) -> Self {
         Self {
