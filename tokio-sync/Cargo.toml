@@ -25,7 +25,7 @@ default = []
 [dependencies]
 fnv = "1.0.6"
 futures = "0.1.19"
-tokio-io = { version = "0.1", optional = true }
+tokio-io = { version = "0.1", path = "../tokio-io", optional = true }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }

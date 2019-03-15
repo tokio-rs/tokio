@@ -9,9 +9,9 @@
 //!
 //! ```rust,no_run
 //! # extern crate futures;
+//! # extern crate tokio;
 //! # use futures::{Poll, Async, Future, Sink};
-//! # mod tokio { pub fn spawn<F: ::futures::Future<Item = (), Error = ()>>(f: F) {} }
-//! use tokio_sync::lock::Lock;
+//! use tokio::sync::lock::Lock;
 //! struct MyType<S> {
 //!     lock: Lock<S>,
 //! }
