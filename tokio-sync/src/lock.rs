@@ -42,6 +42,8 @@ use std::cell::UnsafeCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::{fmt, io};
+#[cfg(feature = "io")]
+use tokio_io;
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
