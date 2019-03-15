@@ -3,7 +3,7 @@ extern crate tokio_trace;
 mod support;
 
 use self::support::*;
-use tokio_trace::{dispatcher, Dispatch};
+use tokio_trace::subscriber::with_default;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -33,7 +33,7 @@ fn filters_are_not_reevaluated_for_the_same_span() {
         })
         .run_with_handle();
 
-    dispatcher::with_default(Dispatch::new(subscriber), move || {
+    with_default(subscriber, move || {
         // Enter "alice" and then "bob". The dispatcher expects to see "bob" but
         // not "alice."
         let mut alice = span!("alice");
@@ -87,7 +87,7 @@ fn filters_are_reevaluated_for_different_call_sites() {
         })
         .run();
 
-    dispatcher::with_default(Dispatch::new(subscriber), move || {
+    with_default(subscriber, move || {
         // Enter "charlie" and then "dave". The dispatcher expects to see "dave" but
         // not "charlie."
         let mut charlie = span!("charlie");
@@ -146,7 +146,7 @@ fn filter_caching_is_lexically_scoped() {
         })
         .run();
 
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         // Call the function once. The filter should be re-evaluated.
         assert!(my_great_function());
         assert_eq!(count.load(Ordering::Relaxed), 1);

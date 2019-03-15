@@ -21,7 +21,7 @@ use self::sloggish_subscriber::SloggishSubscriber;
 fn main() {
     let subscriber = SloggishSubscriber::new(2);
 
-    tokio_trace::dispatcher::with_default(tokio_trace::Dispatch::new(subscriber), || {
+    tokio_trace::subscriber::with_default(subscriber, || {
         span!("", version = &field::display(5.0)).enter(|| {
             span!("server", host = "localhost", port = 8080).enter(|| {
                 info!("starting");

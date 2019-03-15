@@ -7,11 +7,11 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.16"
+version = "0.1.17"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.1.16/tokio/"
+documentation = "https://docs.rs/tokio/0.1.17/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -70,6 +70,7 @@ rt-full = [
   "tokio-current-thread",
   "tokio-executor",
   "tokio-threadpool",
+  "tokio-trace-core",
 ]
 sync = ["tokio-sync"]
 tcp = ["tokio-tcp"]
@@ -96,15 +97,16 @@ bytes = { version = "0.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 tokio-codec = { version = "0.1.0", path = "tokio-codec", optional = true }
 tokio-current-thread = { version = "0.1.3", path = "tokio-current-thread", optional = true }
-tokio-fs = { version = "0.1.3", path = "tokio-fs", optional = true }
+tokio-fs = { version = "0.1.6", path = "tokio-fs", optional = true }
 tokio-io = { version = "0.1.6", path = "tokio-io", optional = true }
 tokio-executor = { version = "0.1.5", path = "tokio-executor", optional = true }
 tokio-reactor = { version = "0.1.1", path = "tokio-reactor", optional = true }
-tokio-sync = { version = "0.1.0", path = "tokio-sync", features = ["io"], optional = true }
+tokio-sync = { version = "0.1.3", path = "tokio-sync", features = ["io"], optional = true }
 tokio-threadpool = { version = "0.1.8", path = "tokio-threadpool", optional = true }
 tokio-tcp = { version = "0.1.0", path = "tokio-tcp", optional = true }
 tokio-udp = { version = "0.1.0", path = "tokio-udp", optional = true }
 tokio-timer = { version = "0.2.8", path = "tokio-timer", optional = true }
+tokio-trace-core = { version = "0.1", path = "tokio-trace/tokio-trace-core", optional = true }
 
 # Needed until `reactor` is removed from `tokio`.
 mio = { version = "0.6.14", optional = true }

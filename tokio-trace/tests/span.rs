@@ -5,10 +5,9 @@ mod support;
 use self::support::*;
 use std::thread;
 use tokio_trace::{
-    dispatcher,
     field::{debug, display},
     subscriber::with_default,
-    Dispatch, Level, Span,
+    Level, Span,
 };
 
 #[test]
@@ -22,7 +21,7 @@ fn closed_handle_cannot_be_entered() {
         .exit(span::mock().named("foo"))
         .run();
 
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         span!("foo").enter(|| {
             let bar = span!("bar");
             let mut another_bar = bar.clone();
@@ -44,7 +43,7 @@ fn handles_to_the_same_span_are_equal() {
     // `Subscriber::enabled`, so that the spans will be constructed. We
     // won't enter any spans in this test, so the subscriber won't actually
     // expect to see any spans.
-    dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
+    with_default(subscriber::mock().run(), || {
         let foo1 = span!("foo");
         let foo2 = foo1.clone();
         // Two handles that point to the same span are equal.
@@ -54,7 +53,7 @@ fn handles_to_the_same_span_are_equal() {
 
 #[test]
 fn handles_to_different_spans_are_not_equal() {
-    dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
+    with_default(subscriber::mock().run(), || {
         // Even though these spans have the same name and fields, they will have
         // differing metadata, since they were created on different lines.
         let foo1 = span!("foo", bar = 1u64, baz = false);
@@ -72,7 +71,7 @@ fn handles_to_different_spans_with_the_same_metadata_are_not_equal() {
         span!("foo", bar = 1u64, baz = false)
     }
 
-    dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
+    with_default(subscriber::mock().run(), || {
         let foo1 = make_span();
         let foo2 = make_span();
 
@@ -89,18 +88,18 @@ fn spans_always_go_to_the_subscriber_that_tagged_them() {
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
-        .done();
-    let subscriber1 = Dispatch::new(subscriber1.run());
-    let subscriber2 = Dispatch::new(subscriber::mock().run());
+        .done()
+        .run();
+    let subscriber2 = subscriber::mock().run();
 
-    let mut foo = dispatcher::with_default(subscriber1, || {
+    let mut foo = with_default(subscriber1, || {
         let mut foo = span!("foo");
         foo.enter(|| {});
         foo
     });
     // Even though we enter subscriber 2's context, the subscriber that
     // tagged the span should see the enter/exit.
-    dispatcher::with_default(subscriber2, move || foo.enter(|| {}));
+    with_default(subscriber2, move || foo.enter(|| {}));
 }
 
 #[test]
@@ -111,9 +110,9 @@ fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
         .enter(span::mock().named("foo"))
         .exit(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
-        .done();
-    let subscriber1 = Dispatch::new(subscriber1.run());
-    let mut foo = dispatcher::with_default(subscriber1, || {
+        .done()
+        .run();
+    let mut foo = with_default(subscriber1, || {
         let mut foo = span!("foo");
         foo.enter(|| {});
         foo
@@ -122,7 +121,7 @@ fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
     // Even though we enter subscriber 2's context, the subscriber that
     // tagged the span should see the enter/exit.
     thread::spawn(move || {
-        dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
+        with_default(subscriber::mock().run(), || {
             foo.enter(|| {});
         })
     })
@@ -138,7 +137,7 @@ fn dropping_a_span_calls_drop_span() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let mut span = span!("foo");
         span.enter(|| {});
         drop(span);
@@ -156,7 +155,7 @@ fn span_closes_after_event() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         span!("foo").enter(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
@@ -177,7 +176,7 @@ fn new_span_after_event() {
         .drop_span(span::mock().named("bar"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         span!("foo").enter(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
@@ -196,7 +195,7 @@ fn event_outside_of_span() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         debug!("my event!");
         span!("foo").enter(|| {});
     });
@@ -209,7 +208,7 @@ fn cloning_a_span_calls_clone_span() {
     let (subscriber, handle) = subscriber::mock()
         .clone_span(span::mock().named("foo"))
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let span = span!("foo");
         let _span2 = span.clone();
     });
@@ -224,7 +223,7 @@ fn drop_span_when_exiting_dispatchers_context() {
         .drop_span(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let span = span!("foo");
         let _span2 = span.clone();
         drop(span);
@@ -244,17 +243,16 @@ fn clone_and_drop_span_always_go_to_the_subscriber_that_tagged_the_span() {
         .drop_span(span::mock().named("foo"))
         .drop_span(span::mock().named("foo"))
         .run_with_handle();
-    let subscriber1 = Dispatch::new(subscriber1);
-    let subscriber2 = Dispatch::new(subscriber::mock().done().run());
+    let subscriber2 = subscriber::mock().done().run();
 
-    let mut foo = dispatcher::with_default(subscriber1, || {
+    let mut foo = with_default(subscriber1, || {
         let mut foo = span!("foo");
         foo.enter(|| {});
         foo
     });
     // Even though we enter subscriber 2's context, the subscriber that
     // tagged the span should see the enter/exit.
-    dispatcher::with_default(subscriber2, move || {
+    with_default(subscriber2, move || {
         let foo2 = foo.clone();
         foo.enter(|| {});
         drop(foo);
@@ -272,7 +270,7 @@ fn span_closes_when_exited() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let mut foo = span!("foo");
         assert!(!foo.is_closed());
 
@@ -296,7 +294,7 @@ fn entering_a_closed_span_again_is_a_no_op() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let mut foo = span!("foo");
 
         foo.close();
@@ -324,7 +322,7 @@ fn moved_field() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run_with_handle();
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let from = "my span";
         let mut span = span!("foo", bar = display(format!("hello from {}", from)));
         span.enter(|| {});
@@ -349,7 +347,7 @@ fn borrowed_field() {
         .done()
         .run_with_handle();
 
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let from = "my span";
         let mut message = format!("hello from {}", from);
         let mut span = span!("foo", bar = display(&message));
@@ -389,7 +387,7 @@ fn move_field_out_of_struct() {
         )
         .run_with_handle();
 
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let pos = Position {
             x: 3.234,
             y: -1.223,
@@ -421,7 +419,7 @@ fn add_field_after_new_span() {
         .done()
         .run_with_handle();
 
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let mut span = span!("foo", bar = 5, baz);
         span.record("baz", &true);
         span.enter(|| {})
@@ -448,7 +446,7 @@ fn add_fields_only_after_new_span() {
         .done()
         .run_with_handle();
 
-    dispatcher::with_default(Dispatch::new(subscriber), || {
+    with_default(subscriber, || {
         let mut span = span!("foo", bar, baz);
         span.record("bar", &5);
         span.record("baz", &true);

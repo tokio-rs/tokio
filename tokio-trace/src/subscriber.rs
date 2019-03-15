@@ -15,5 +15,5 @@ pub fn with_default<T, S>(subscriber: S, f: impl FnOnce() -> T) -> T
 where
     S: Subscriber + Send + Sync + 'static,
 {
-    ::dispatcher::with_default(::Dispatch::new(subscriber), f)
+    ::dispatcher::with_default(&::Dispatch::new(subscriber), f)
 }

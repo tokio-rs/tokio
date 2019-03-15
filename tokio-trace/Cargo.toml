@@ -15,7 +15,7 @@ keywords = ["logging", "tracing"]
 publish = false
 
 [dependencies]
-tokio-trace-core = { path = "tokio-trace-core" }
+tokio-trace-core = "0.1"
 
 [dev-dependencies]
 ansi_term = "0.11"

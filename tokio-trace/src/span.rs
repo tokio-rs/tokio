@@ -292,12 +292,12 @@ impl<'a> Span<'a> {
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
-            Some(inner) => dispatcher::with_default(inner.subscriber.clone(), || {
+            Some(inner) => {
                 let guard = inner.enter();
                 let result = f();
                 self.inner = guard.exit();
                 result
-            }),
+            }
             None => f(),
         }
     }

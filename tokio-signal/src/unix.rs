@@ -351,7 +351,7 @@ impl Signal {
     /// * If the signal is one of
     ///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
     pub fn new(signal: c_int) -> IoFuture<Signal> {
-        Signal::with_handle(signal, &Handle::current())
+        Signal::with_handle(signal, &Handle::default())
     }
 
     /// Creates a new stream which will receive notifications when the current

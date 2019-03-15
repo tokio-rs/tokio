@@ -5,6 +5,9 @@ extern crate futures;
 extern crate test;
 extern crate tokio_sync;
 
+type Medium = [usize; 64];
+type Large = [Medium; 64];
+
 mod tokio {
     use futures::{future, Async, Future, Sink, Stream};
     use std::thread;
@@ -12,16 +15,29 @@ mod tokio {
     use tokio_sync::mpsc::*;
 
     #[bench]
-    fn bounded_new(b: &mut Bencher) {
+    fn bounded_new_medium(b: &mut Bencher) {
         b.iter(|| {
-            let _ = test::black_box(&channel::<i32>(1_000));
+            let _ = test::black_box(&channel::<super::Medium>(1_000));
         })
     }
 
     #[bench]
-    fn unbounded_new(b: &mut Bencher) {
+    fn unbounded_new_medium(b: &mut Bencher) {
         b.iter(|| {
-            let _ = test::black_box(&unbounded_channel::<i32>());
+            let _ = test::black_box(&unbounded_channel::<super::Medium>());
+        })
+    }
+    #[bench]
+    fn bounded_new_large(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&channel::<super::Large>(1_000));
+        })
+    }
+
+    #[bench]
+    fn unbounded_new_large(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&unbounded_channel::<super::Large>());
         })
     }
 
@@ -35,6 +51,19 @@ mod tokio {
 
             // Receive
             assert_eq!(Async::Ready(Some(1)), rx.poll().unwrap());
+        })
+    }
+
+    #[bench]
+    fn send_one_message_large(b: &mut Bencher) {
+        b.iter(|| {
+            let (mut tx, mut rx) = channel::<super::Large>(1_000);
+
+            // Send
+            let _ = tx.try_send([[0; 64]; 64]);
+
+            // Receive
+            let _ = test::black_box(&rx.poll());
         })
     }
 
@@ -122,6 +151,19 @@ mod tokio {
                 tx.try_send(i).unwrap();
                 // No need to create a task, because poll is not going to park.
                 assert_eq!(Async::Ready(Some(i)), rx.poll().unwrap());
+            }
+        })
+    }
+
+    #[bench]
+    fn bounded_uncontended_1_large(b: &mut Bencher) {
+        b.iter(|| {
+            let (mut tx, mut rx) = channel::<super::Large>(1_000);
+
+            for i in 0..1000 {
+                let _ = tx.try_send([[i; 64]; 64]);
+                // No need to create a task, because poll is not going to park.
+                let _ = test::black_box(&rx.poll());
             }
         })
     }
@@ -237,16 +279,30 @@ mod legacy {
     use test::{self, Bencher};
 
     #[bench]
-    fn bounded_new(b: &mut Bencher) {
+    fn bounded_new_medium(b: &mut Bencher) {
         b.iter(|| {
-            let _ = test::black_box(&channel::<i32>(1_000));
+            let _ = test::black_box(&channel::<super::Medium>(1_000));
         })
     }
 
     #[bench]
-    fn unbounded_new(b: &mut Bencher) {
+    fn unbounded_new_medium(b: &mut Bencher) {
         b.iter(|| {
-            let _ = test::black_box(&unbounded::<i32>());
+            let _ = test::black_box(&unbounded::<super::Medium>());
+        })
+    }
+
+    #[bench]
+    fn bounded_new_large(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&channel::<super::Large>(1_000));
+        })
+    }
+
+    #[bench]
+    fn unbounded_new_large(b: &mut Bencher) {
+        b.iter(|| {
+            let _ = test::black_box(&unbounded::<super::Large>());
         })
     }
 
@@ -260,6 +316,19 @@ mod legacy {
 
             // Receive
             assert_eq!(Ok(Async::Ready(Some(1))), rx.poll());
+        })
+    }
+
+    #[bench]
+    fn send_one_message_large(b: &mut Bencher) {
+        b.iter(|| {
+            let (mut tx, mut rx) = channel::<super::Large>(1_000);
+
+            // Send
+            let _ = tx.try_send([[0; 64]; 64]);
+
+            // Receive
+            let _ = test::black_box(&rx.poll());
         })
     }
 
@@ -347,6 +416,19 @@ mod legacy {
                 UnboundedSender::unbounded_send(&tx, i).expect("send");
                 // No need to create a task, because poll is not going to park.
                 assert_eq!(Ok(Async::Ready(Some(i))), rx.poll());
+            }
+        })
+    }
+
+    #[bench]
+    fn unbounded_uncontended_1_large(b: &mut Bencher) {
+        b.iter(|| {
+            let (tx, mut rx) = unbounded::<super::Large>();
+
+            for i in 0..1000 {
+                let _ = UnboundedSender::unbounded_send(&tx, [[i; 64]; 64]);
+                // No need to create a task, because poll is not going to park.
+                let _ = test::black_box(&rx.poll());
             }
         })
     }

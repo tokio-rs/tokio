@@ -356,7 +356,7 @@ fn dropping_rx_closes_channel_for_try() {
 }
 
 #[test]
-fn unconsumed_messagers_are_dropped() {
+fn unconsumed_messages_are_dropped() {
     let msg = Arc::new(());
 
     let (mut tx, rx) = mpsc::channel(100);

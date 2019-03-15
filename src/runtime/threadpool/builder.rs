@@ -11,6 +11,7 @@ use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
+use tokio_trace_core as trace;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -90,10 +91,10 @@ impl Builder {
 
     /// Set builder to set up the thread pool instance.
     #[deprecated(
-        since="0.1.9",
-        note="use the `core_threads`, `blocking_threads`, `name_prefix`, \
-              `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
-              instead")]
+        since = "0.1.9",
+        note = "use the `core_threads`, `blocking_threads`, `name_prefix`, \
+                `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
+                instead")]
     #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
@@ -330,14 +331,23 @@ impl Builder {
         // Get a handle to the clock for the runtime.
         let clock = self.clock.clone();
 
-        let pool = self.threadpool_builder
+        // Get the current trace dispatcher.
+        // TODO(eliza): when `tokio-trace-core` is stable enough to take a
+        // public API dependency, we should allow users to set a custom
+        // subscriber for the runtime.
+        let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
+
+        let pool = self
+            .threadpool_builder
             .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
 
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
                         timer::with_default(&timer_handles[index], enter, |_| {
-                            w.run();
+                            trace::dispatcher::with_default(&dispatch, || {
+                                w.run();
+                            })
                         });
                     })
                 });

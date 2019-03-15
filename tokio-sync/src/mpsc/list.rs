@@ -58,7 +58,7 @@ impl<T> Tx<T> {
     /// Push a value into the list.
     pub(crate) fn push(&self, value: T) {
         // First, claim a slot for the value. `Acquire` is used here to
-        // synchronize with the `fetch_add` in `free_blocks`.
+        // synchronize with the `fetch_add` in `reclaim_blocks`.
         let slot_index = self.tail_position.fetch_add(1, Acquire);
 
         // Load the current block and write the value
@@ -170,6 +170,7 @@ impl<T> Tx<T> {
     }
 
     pub(crate) unsafe fn reclaim_block(&self, mut block: NonNull<Block<T>>) {
+        debug!("+ reclaim_block({:p})", block);
         // The block has been removed from the linked list and ownership
         // is reclaimed.
         //
@@ -206,6 +207,7 @@ impl<T> Tx<T> {
         }
 
         if !reused {
+            debug!(" + block freed {:p}", block);
             let _ = Box::from_raw(block.as_ptr());
         }
     }
@@ -231,7 +233,7 @@ impl<T> Rx<T> {
             return None;
         }
 
-        self.free_blocks(tx);
+        self.reclaim_blocks(tx);
 
         unsafe {
             let block = self.head.as_ref();
@@ -276,8 +278,8 @@ impl<T> Rx<T> {
         }
     }
 
-    fn free_blocks(&mut self, tx: &Tx<T>) {
-        debug!("+ free_blocks()");
+    fn reclaim_blocks(&mut self, tx: &Tx<T>) {
+        debug!("+ reclaim_blocks()");
 
         while self.free_head != self.head {
             unsafe {
@@ -297,8 +299,8 @@ impl<T> Rx<T> {
                 }
 
                 // We may read the next pointer with `Relaxed` ordering as it is
-                // guaranteed that the `free_blocks` routine trails the `recv`
-                // routine. Any memory accessed by `free_blocks` has already
+                // guaranteed that the `reclaim_blocks` routine trails the `recv`
+                // routine. Any memory accessed by `reclaim_blocks` has already
                 // been acquired by `recv`.
                 let next_block = block.as_ref().load_next(Relaxed);
 
@@ -311,6 +313,29 @@ impl<T> Rx<T> {
             }
 
             loom::yield_now();
+        }
+    }
+
+    /// Effectively `Drop` all the blocks. Should only be called once, when
+    /// the list is dropping.
+    pub(super) unsafe fn free_blocks(&mut self) {
+        debug!("+ free_blocks()");
+        debug_assert_ne!(self.free_head, NonNull::dangling());
+
+        let mut cur = Some(self.free_head);
+
+        #[cfg(debug_assertions)]
+        {
+            // to trigger the debug assert above so as to catch that we
+            // don't call `free_blocks` more than once.
+            self.free_head = NonNull::dangling();
+            self.head = NonNull::dangling();
+        }
+
+        while let Some(block) = cur {
+            cur = block.as_ref().load_next(Relaxed);
+            debug!(" + free: block = {:p}", block);
+            drop(Box::from_raw(block.as_ptr()));
         }
     }
 }
