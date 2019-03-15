@@ -17,7 +17,7 @@
 //! }
 //!
 //! impl<S> Future for MyType<S>
-//!   where S: Sink<SinkItem = u32>
+//!   where S: Sink<SinkItem = u32> + Send + 'static
 //! {
 //! # type Item = ();
 //! # type Error = ();
@@ -76,6 +76,12 @@ unsafe impl<T> Sync for LockGuard<T> where T: Send + Sync {}
 struct State<T> {
     c: UnsafeCell<T>,
     s: semaphore::Semaphore,
+}
+
+#[test]
+fn bounds() {
+    fn check<T: Send>() {}
+    check::<LockGuard<u32>>();
 }
 
 impl<T> Lock<T> {
