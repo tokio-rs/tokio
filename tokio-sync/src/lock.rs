@@ -39,9 +39,9 @@
 use futures::{Async, Future, Poll, Sink, StartSend, Stream};
 use semaphore;
 use std::cell::UnsafeCell;
-use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::{fmt, io};
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
@@ -164,7 +164,30 @@ impl<T> DerefMut for LockGuard<T> {
     }
 }
 
-// NOTE: it'd be really nice to forward AsyncRead/AsyncWrite too
+impl<T: io::Read> io::Read for LockGuard<T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        io::Read::read(&mut **self, buf)
+    }
+}
+
+impl<T: io::Write> io::Write for LockGuard<T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        io::Write::write(&mut **self, buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        io::Write::flush(&mut **self)
+    }
+}
+
+#[cfg(feature = "io")]
+impl<T: tokio_io::AsyncRead> tokio_io::AsyncRead for LockGuard<T> {}
+
+#[cfg(feature = "io")]
+impl<T: tokio_io::AsyncWrite> tokio_io::AsyncWrite for LockGuard<T> {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        tokio_io::AsyncWrite::shutdown(&mut **self)
+    }
+}
 
 impl<T: fmt::Display> fmt::Display for LockGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
