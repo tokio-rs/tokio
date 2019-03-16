@@ -309,10 +309,12 @@
 //! [`tokio-trace-futures`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-futures
 //! [`tokio-trace-fmt`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-fmt
 //! [`tokio-trace-log`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-log
+extern crate cfg_if;
 extern crate tokio_trace_core;
 
 // Somehow this `use` statement is necessary for us to re-export the `core`
 // macros on Rust 1.26.0. I'm not sure how this makes it work, but it does.
+use cfg_if::cfg_if;
 #[allow(unused_imports)]
 #[doc(hidden)]
 use tokio_trace_core::*;
@@ -344,4 +346,59 @@ pub mod subscriber;
 
 mod sealed {
     pub trait Sealed {}
+}
+
+/// An enum representing the available verbosity level filters of the logger.
+#[repr(usize)]
+#[derive(Copy, Clone, Debug, Hash)]
+pub enum LevelFilter {
+    /// A level lower than all log levels.
+    Off,
+    /// Corresponds to the `Error` log level.
+    Error,
+    /// Corresponds to the `Warn` log level.
+    Warn,
+    /// Corresponds to the `Info` log level.
+    Info,
+    /// Corresponds to the `Debug` log level.
+    Debug,
+    /// Corresponds to the `Trace` log level.
+    Trace,
+}
+
+/// The statically resolved maximum trace level.
+///
+/// See the crate level documentation for information on how to configure this.
+///
+/// This value is checked by the `event` macro. Code that manually calls functions on that value
+/// should compare the level against this value.
+///
+pub const STATIC_MAX_LEVEL: LevelFilter = MAX_LEVEL_INNER;
+
+cfg_if! {
+    if #[cfg(all(not(debug_assertions), feature = "release_max_level_off"))] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Off;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_error"))] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Error;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_warn"))] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Warn;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_info"))] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Info;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_debug"))] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Debug;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_trace"))] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Trace;
+    } else if #[cfg(feature = "max_level_off")] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Off;
+    } else if #[cfg(feature = "max_level_error")] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Error;
+    } else if #[cfg(feature = "max_level_warn")] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Warn;
+    } else if #[cfg(feature = "max_level_info")] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Info;
+    } else if #[cfg(feature = "max_level_debug")] {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Debug;
+    } else {
+        const MAX_LEVEL_INNER: LevelFilter = LevelFilter::Trace;
+    }
 }
