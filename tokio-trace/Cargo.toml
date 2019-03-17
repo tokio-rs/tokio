@@ -16,7 +16,6 @@ publish = false
 
 [dependencies]
 tokio-trace-core = "0.1"
-cfg-if = "0.1.7"
 
 [dev-dependencies]
 ansi_term = "0.11"
