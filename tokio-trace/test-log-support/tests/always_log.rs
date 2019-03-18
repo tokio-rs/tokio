@@ -24,7 +24,8 @@ impl Log for Logger {
     fn flush(&self) {}
 }
 
-fn main() {
+#[test]
+fn test_always_log() {
     let me = Arc::new(State {
         last_log: Mutex::new(None),
     });
