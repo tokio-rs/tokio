@@ -254,7 +254,6 @@ fn span_closes_when_exited() {
     handle.assert_finished();
 }
 
-
 #[test]
 fn moved_field() {
     let (subscriber, handle) = subscriber::mock()

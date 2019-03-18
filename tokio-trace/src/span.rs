@@ -227,7 +227,11 @@ impl Span {
     /// [metadata]: ::metadata::Metadata
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
-    pub fn child_of<I>(parent: I, meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span
+    pub fn child_of<I>(
+        parent: I,
+        meta: &'static Metadata<'static>,
+        values: &field::ValueSet,
+    ) -> Span
     where
         I: Into<Option<Id>>,
     {
@@ -241,9 +245,7 @@ impl Span {
     /// Constructs a new disabled span.
     #[inline(always)]
     pub fn new_disabled() -> Span {
-        Span {
-            inner: None,
-        }
+        Span { inner: None }
     }
 
     #[inline(always)]
@@ -252,9 +254,7 @@ impl Span {
             let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))
         });
-        Self {
-            inner,
-        }
+        Self { inner }
     }
 
     /// Executes the given function in the context of this span.
