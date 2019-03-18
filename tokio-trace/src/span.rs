@@ -42,7 +42,7 @@
 //!    span: tokio_trace::Span,
 //! }
 //!
-//! impl<'a> Future for MyFuture<'a> {
+//! impl Future for MyFuture {
 //!     type Item = ();
 //!     type Error = ();
 //!
