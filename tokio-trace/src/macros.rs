@@ -106,8 +106,8 @@ macro_rules! span {
                 __tokio_trace_log!(
                     target: $target,
                     $lvl,
+                    span = __tokio_trace_format_args!("{}", $name),
                     $( $k $( = $val )* ),*
-
                 );
             }
 
@@ -146,6 +146,8 @@ macro_rules! span {
                 __tokio_trace_log!(
                     target: $target,
                     $lvl,
+                    span = __tokio_trace_format_args!("{}", $name),
+                    $( $k $( = $val )* ),*
                 );
             }
             use $crate::callsite;
