@@ -16,6 +16,7 @@ use tokio_executor::LazyFn;
 
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::mem;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
@@ -163,7 +164,7 @@ impl Task {
                     _ => unreachable!(),
                 }
             } else {
-                let inner = std::mem::replace(ref_mut, MaybeFuture::Future(None));
+                let inner = mem::replace(ref_mut, MaybeFuture::Future(None));
                 let lazy = match inner {
                     MaybeFuture::Lazy(f) => f.call(),
                     _ => unreachable!(),
