@@ -37,9 +37,9 @@
 //! # extern crate tokio_trace;
 //! # extern crate futures;
 //! # use futures::{Future, Poll, Async};
-//! struct MyFuture<'a> {
+//! struct MyFuture {
 //!    // data
-//!    span: tokio_trace::Span<'a>,
+//!    span: tokio_trace::Span,
 //! }
 //!
 //! impl<'a> Future for MyFuture<'a> {
