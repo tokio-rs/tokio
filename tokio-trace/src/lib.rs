@@ -311,6 +311,10 @@
 //! [`tokio-trace-log`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-log
 extern crate tokio_trace_core;
 
+#[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+#[doc(hidden)]
+pub extern crate log;
+
 // Somehow this `use` statement is necessary for us to re-export the `core`
 // macros on Rust 1.26.0. I'm not sure how this makes it work, but it does.
 #[allow(unused_imports)]
