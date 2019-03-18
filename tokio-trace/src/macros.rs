@@ -1126,15 +1126,17 @@ macro_rules! __tokio_trace_log {
                 .level(level)
                 .args(__tokio_trace_format_args!(
                     __tokio_trace_concat!(
-                        $( __tokio_trace_stringify!( $key ), "={:?} "),*
+                        $(__tokio_trace_log!(@key $key)),*
                     ),
                     $( __tokio_trace_log!(@val_or $key, $($val)*) ),*
                 ))
                 .build());
         }
     };
+    (@key message) => { "{}; " };
+    (@key $key:ident) => { __tokio_trace_concat!(__tokio_trace_stringify!( $key ), "={:?} ") };
     (@val_or $k:ident, $v:expr) => { $v };
-    (@val_or $k:ident ) => { "?" };
+    (@val_or $k:ident ) => { __tokio_trace_format_args!("?") };
 }
 
 #[cfg(not(any(feature = "emit_log_always", feature = "emit_log_optional")))]
@@ -1142,4 +1144,12 @@ macro_rules! __tokio_trace_log {
 #[macro_export]
 macro_rules! __tokio_trace_log {
     (target: $target:expr, $level:expr, $( $key:ident = $($val:expr)* ),* $(,)* ) => {};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! ag {
+    () => {
+        println!("ag")
+    };
 }
