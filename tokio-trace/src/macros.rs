@@ -106,7 +106,7 @@ macro_rules! span {
                 __tokio_trace_log!(
                     target: $target,
                     $lvl,
-                    span = __tokio_trace_format_args!("{}", $name),
+                    span = __tokio_trace_format_args!("{};", $name),
                     $( $k $( = $val )* ),*
                 );
             }
@@ -146,7 +146,7 @@ macro_rules! span {
                 __tokio_trace_log!(
                     target: $target,
                     $lvl,
-                    span = __tokio_trace_format_args!("{}", $name),
+                    span = __tokio_trace_format_args!("{};", $name),
                     $( $k $( = $val )* ),*
                 );
             }
@@ -1114,7 +1114,7 @@ macro_rules! level_to_log {
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! __tokio_trace_log {
-    (target: $target:expr, $level:expr, $( $key:ident = $($val:expr)* ),* ) => {
+    (target: $target:expr, $level:expr, $( $key:ident = $($val:expr)* ),* $(,)* ) => {
         use $crate::log;
         let level = level_to_log!($level);
         if level <= log::STATIC_MAX_LEVEL && level <= log::max_level() {
@@ -1141,5 +1141,5 @@ macro_rules! __tokio_trace_log {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __tokio_trace_log {
-    (target: $target:expr, $level:expr, $( $key:ident = $($val:expr)* ),* ) => {};
+    (target: $target:expr, $level:expr, $( $key:ident = $($val:expr)* ),* $(,)* ) => {};
 }
