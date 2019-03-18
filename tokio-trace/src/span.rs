@@ -37,12 +37,12 @@
 //! # extern crate tokio_trace;
 //! # extern crate futures;
 //! # use futures::{Future, Poll, Async};
-//! struct MyFuture<'a> {
+//! struct MyFuture {
 //!    // data
-//!    span: tokio_trace::Span<'a>,
+//!    span: tokio_trace::Span,
 //! }
 //!
-//! impl<'a> Future for MyFuture<'a> {
+//! impl Future for MyFuture {
 //!     type Item = ();
 //!     type Error = ();
 //!
@@ -91,29 +91,17 @@
 //! # }
 //! ```
 //!
-//! A span may be explicitly closed before when the span handle is dropped by
-//! calling the [`Span::close`] method. Doing so will drop that handle the next
+//! A span may be explicitly closed by dropping a handle to it, if it is the only
+//! handle to that span.
 //! time it is exited. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
 //! # fn main() {
 //! use tokio_trace::Span;
 //!
-//! let mut my_span = span!("my_span");
-//! // Signal to my_span that it should close when it exits
-//! my_span.close();
-//! my_span.enter(|| {
-//!    // ...
-//! }); // --> Subscriber::exit(my_span); Subscriber::drop_span(my_span)
-//!
-//! // The handle to `my_span` still exists, but it now knows that the span was
-//! // closed while it was executing.
-//! my_span.is_closed(); // ==> true
-//!
-//! // Attempting to enter the span using the handle again will do nothing.
-//! my_span.enter(|| {
-//!     // no-op
-//! });
+//! let my_span = span!("my_span");
+//! // Drop the handle to the span.
+//! drop(my_span); // --> Subscriber::drop_span(my_span)
 //! # }
 //! ```
 //! However, if multiple handles exist, the span can still be re-entered even if
@@ -154,18 +142,11 @@ use {
 /// span will silently do nothing. Thus, the handle can be used in the same
 /// manner regardless of whether or not the trace is currently being collected.
 #[derive(Clone, PartialEq, Hash)]
-pub struct Span<'a> {
+pub struct Span {
     /// A handle used to enter the span when it is not executing.
     ///
     /// If this is `None`, then the span has either closed or was never enabled.
-    inner: Option<Inner<'a>>,
-
-    /// Set to `true` when the span closes.
-    ///
-    /// This allows us to distinguish if `inner` is `None` because the span was
-    /// never enabled (and thus the inner state was never created), or if the
-    /// previously entered, but it is now closed.
-    is_closed: bool,
+    inner: Option<Inner<'static>>,
 }
 
 /// A handle representing the capacity to enter a span which is known to exist.
@@ -183,10 +164,6 @@ pub(crate) struct Inner<'a> {
     /// This should be the same subscriber that provided this span with its
     /// `id`.
     subscriber: Dispatch,
-
-    /// A flag indicating that the span has been instructed to close when
-    /// possible.
-    closed: bool,
 
     meta: &'a Metadata<'a>,
 }
@@ -207,7 +184,7 @@ struct Entered<'a> {
 
 // ===== impl Span =====
 
-impl<'a> Span<'a> {
+impl Span {
     /// Constructs a new `Span` with the given [metadata] and set of [field
     /// values].
     ///
@@ -222,7 +199,7 @@ impl<'a> Span<'a> {
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+    pub fn new(meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span {
         let new_span = Attributes::new(meta, values);
         Self::make(meta, new_span)
     }
@@ -237,7 +214,7 @@ impl<'a> Span<'a> {
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
     #[inline]
-    pub fn new_root(meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a> {
+    pub fn new_root(meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span {
         Self::make(meta, Attributes::new_root(meta, values))
     }
 
@@ -250,7 +227,11 @@ impl<'a> Span<'a> {
     /// [metadata]: ::metadata::Metadata
     /// [field values]: ::field::ValueSet
     /// [`follows_from`]: ::span::Span::follows_from
-    pub fn child_of<I>(parent: I, meta: &'a Metadata<'a>, values: &field::ValueSet) -> Span<'a>
+    pub fn child_of<I>(
+        parent: I,
+        meta: &'static Metadata<'static>,
+        values: &field::ValueSet,
+    ) -> Span
     where
         I: Into<Option<Id>>,
     {
@@ -263,23 +244,17 @@ impl<'a> Span<'a> {
 
     /// Constructs a new disabled span.
     #[inline(always)]
-    pub fn new_disabled() -> Span<'a> {
-        Span {
-            inner: None,
-            is_closed: false,
-        }
+    pub fn new_disabled() -> Span {
+        Span { inner: None }
     }
 
     #[inline(always)]
-    fn make(meta: &'a Metadata<'a>, new_span: Attributes) -> Span<'a> {
+    fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
         let inner = dispatcher::get_default(move |dispatch| {
             let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))
         });
-        Self {
-            inner,
-            is_closed: false,
-        }
+        Self { inner }
     }
 
     /// Executes the given function in the context of this span.
@@ -295,7 +270,7 @@ impl<'a> Span<'a> {
             Some(inner) => {
                 let guard = inner.enter();
                 let result = f();
-                self.inner = guard.exit();
+                self.inner = Some(guard.exit());
                 result
             }
             None => f(),
@@ -351,29 +326,11 @@ impl<'a> Span<'a> {
         self
     }
 
-    /// Closes this span handle, dropping its internal state.
-    ///
-    /// Once this function has been called, subsequent calls to `enter` on this
-    /// handle will no longer enter the span. If this is the final handle with
-    /// the potential to enter that span, the subscriber may consider the span to
-    /// have ended.
-    pub fn close(&mut self) {
-        if let Some(mut inner) = self.inner.take() {
-            inner.close();
-        }
-        self.is_closed = true;
-    }
-
-    /// Returns `true` if this span is closed.
-    pub fn is_closed(&self) -> bool {
-        self.is_closed
-    }
-
     /// Returns `true` if this span was disabled by the subscriber and does not
     /// exist.
     #[inline]
     pub fn is_disabled(&self) -> bool {
-        self.inner.is_none() && !self.is_closed
+        self.inner.is_none()
     }
 
     /// Indicates that the span with the given ID has an indirect causal
@@ -403,12 +360,12 @@ impl<'a> Span<'a> {
     }
 
     /// Returns this span's `Metadata`, if it is enabled.
-    pub fn metadata(&self) -> Option<&'a Metadata<'a>> {
+    pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
         self.inner.as_ref().map(Inner::metadata)
     }
 }
 
-impl<'a> fmt::Debug for Span<'a> {
+impl<'a> fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut span = f.debug_struct("Span");
         if let Some(ref inner) = self.inner {
@@ -420,7 +377,7 @@ impl<'a> fmt::Debug for Span<'a> {
     }
 }
 
-impl<'a> Into<Option<Id>> for &'a Span<'a> {
+impl<'a> Into<Option<Id>> for &'a Span {
     fn into(self) -> Option<Id> {
         self.id()
     }
@@ -429,14 +386,6 @@ impl<'a> Into<Option<Id>> for &'a Span<'a> {
 // ===== impl Inner =====
 
 impl<'a> Inner<'a> {
-    /// Indicates that this handle will not be reused to enter the span again.
-    ///
-    /// After calling `close`, the `Entered` guard returned by `self.enter()`
-    /// will _drop_ this handle when it is exited.
-    fn close(&mut self) {
-        self.closed = true;
-    }
-
     /// Enters the span, returning a guard that may be used to exit the span and
     /// re-enter the prior span.
     ///
@@ -487,7 +436,6 @@ impl<'a> Inner<'a> {
         Inner {
             id,
             subscriber: subscriber.clone(),
-            closed: false,
             meta,
         }
     }
@@ -516,7 +464,6 @@ impl<'a> Clone for Inner<'a> {
         Inner {
             id: self.subscriber.clone_span(&self.id),
             subscriber: self.subscriber.clone(),
-            closed: self.closed,
             meta: self.meta,
         }
     }
@@ -526,16 +473,9 @@ impl<'a> Clone for Inner<'a> {
 
 impl<'a> Entered<'a> {
     /// Exit the `Entered` guard, returning an `Inner` handle that may be used
-    /// to re-enter the span, or `None` if the span closed while performing the
-    /// exit.
-    fn exit(self) -> Option<Inner<'a>> {
+    /// to re-enter the span.
+    fn exit(self) -> Inner<'a> {
         self.inner.subscriber.exit(&self.inner.id);
-        if self.inner.closed {
-            // Dropping `inner` will allow it to perform the closure if
-            // able.
-            None
-        } else {
-            Some(self.inner)
-        }
+        self.inner
     }
 }
