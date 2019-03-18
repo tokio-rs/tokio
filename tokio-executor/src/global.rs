@@ -40,24 +40,22 @@ impl DefaultExecutor {
 
     #[inline]
     fn with_current<F: FnOnce(&mut Executor) -> R, R>(f: F) -> Option<R> {
-        EXECUTOR.with(
-            |current_executor| {
-                let state = current_executor.replace(State::Active);
-                trace!("with_current state: {:?}", state);
-                match state {
-                    State::Ready(executor_ptr) => {
-                        let executor = unsafe { &mut *executor_ptr };
-                        let result = f(executor);
-                        current_executor.set(State::Ready(executor_ptr));
-                        Some(result)
-                    }
-                    State::Empty | State::Active => {
-                        trace!("state = {:?}, returning None", state);
-                        None
-                    }
+        EXECUTOR.with(|current_executor| {
+            let state = current_executor.replace(State::Active);
+            trace!("with_current state: {:?}", state);
+            match state {
+                State::Ready(executor_ptr) => {
+                    let executor = unsafe { &mut *executor_ptr };
+                    let result = f(executor);
+                    current_executor.set(State::Ready(executor_ptr));
+                    Some(result)
                 }
-            },
-        )
+                State::Empty | State::Active => {
+                    trace!("state = {:?}, returning None", state);
+                    None
+                }
+            }
+        })
     }
 }
 
@@ -87,14 +85,10 @@ impl super::Executor for DefaultExecutor {
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
 
-    fn spawn_lazy(
-        &mut self,
-        lazy: LazyFn
-    ) -> Result<(), SpawnError> {
+    fn spawn_lazy(&mut self, lazy: LazyFn) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn_lazy(lazy))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
-
 
     fn status(&self) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.status())
@@ -220,8 +214,7 @@ where
 /// # pub fn main() {}
 /// ```
 
-pub fn spawn_lazy<T: Into<LazyFn>>(lazy: T)
-{
+pub fn spawn_lazy<T: Into<LazyFn>>(lazy: T) {
     DefaultExecutor::current().spawn_lazy(lazy.into()).unwrap()
 }
 

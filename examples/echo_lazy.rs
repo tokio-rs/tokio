@@ -21,17 +21,17 @@
 
 #![deny(warnings)]
 
-extern crate tokio;
 extern crate env_logger;
+extern crate tokio;
 
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
+use std::cell::Cell;
 use std::env;
 use std::net::SocketAddr;
 use std::rc::Rc;
-use std::cell::Cell;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     env_logger::init();
@@ -62,7 +62,6 @@ fn main() -> Result<(), Box<std::error::Error>> {
         .incoming()
         .map_err(|e| println!("failed to accept socket; error = {:?}", e))
         .for_each(move |socket| {
-
             tokio::spawn_lazy(|| {
                 // Once we're inside this closure this represents an accepted client
                 // from our server. The `socket` is the client connection (similar to
@@ -101,22 +100,24 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
                 // After our copy operation is complete we just print out some helpful
                 // information.
-                let msg = amt.then(move |result| {
-                    match result {
-                        Ok((amt, _, _)) => {
-                            println!("wrote {} bytes", amt);
+                let msg = amt
+                    .then(move |result| {
+                        match result {
+                            Ok((amt, _, _)) => {
+                                println!("wrote {} bytes", amt);
 
-                            amount_one.set(amt);
-                        },
-                        Err(e) => println!("error: {}", e),
-                    }
+                                amount_one.set(amt);
+                            }
+                            Err(e) => println!("error: {}", e),
+                        }
 
-                    Ok(())
-                }).map(move |_| {
-                    // In a larger program, we might make use of this Cell
-                    // in a different part of program.
-                    println!("Read amount from Cell: {:?}", amount_two.get());
-                });
+                        Ok(())
+                    })
+                    .map(move |_| {
+                        // In a larger program, we might make use of this Cell
+                        // in a different part of program.
+                        println!("Read amount from Cell: {:?}", amount_two.get());
+                    });
 
                 // We return our created future from
                 // the closure we provide to spawn_lazy

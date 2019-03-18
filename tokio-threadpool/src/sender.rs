@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 
 use futures::{future, Future};
-use tokio_executor::{self, SpawnError, LazyFn};
+use tokio_executor::{self, LazyFn, SpawnError};
 
 /// Submit futures to the associated thread pool for execution.
 ///
@@ -138,14 +138,10 @@ impl tokio_executor::Executor for Sender {
         tokio_executor::Executor::spawn(&mut s, future)
     }
 
-    fn spawn_lazy(
-        &mut self,
-        lazy: LazyFn
-    ) -> Result<(), SpawnError> {
+    fn spawn_lazy(&mut self, lazy: LazyFn) -> Result<(), SpawnError> {
         let mut s = &*self;
         tokio_executor::Executor::spawn_lazy(&mut s, lazy)
     }
-
 }
 
 impl<'a> tokio_executor::Executor for &'a Sender {
@@ -185,10 +181,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         Ok(())
     }
 
-    fn spawn_lazy(
-        &mut self,
-        future: LazyFn,
-    ) -> Result<(), SpawnError> {
+    fn spawn_lazy(&mut self, future: LazyFn) -> Result<(), SpawnError> {
         self.prepare_for_spawn()?;
         // At this point, the pool has accepted the future, so schedule it for
         // execution.

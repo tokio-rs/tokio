@@ -64,14 +64,14 @@ enum MaybeFuture {
     Future(Option<Spawn<Box<Future<Item = (), Error = ()>>>>),
     /// Represents a lazily-created future, which will
     /// be created on the thread it will be run on
-    Lazy(LazyFn)
+    Lazy(LazyFn),
 }
 
 impl MaybeFuture {
     fn is_future(&self) -> bool {
         match self {
             MaybeFuture::Future(_) => true,
-            MaybeFuture::Lazy(_) => false
+            MaybeFuture::Lazy(_) => false,
         }
     }
 }
@@ -133,13 +133,11 @@ impl Task {
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
     pub fn run(&self, unpark: &Arc<Notifier>) -> Run {
-
         use self::State::*;
 
         // Necessary until we're using Rust 2018 -
         // we can't call drop(ref_mut) from within the block
         let res = {
-
             // Transition task to running state. At this point, the task must be
             // scheduled.
             let actual: State = self
@@ -162,19 +160,19 @@ impl Task {
             let fut = if ref_mut.is_future() {
                 match ref_mut {
                     MaybeFuture::Future(ref mut f) => f,
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             } else {
                 let inner = std::mem::replace(ref_mut, MaybeFuture::Future(None));
                 let lazy = match inner {
                     MaybeFuture::Lazy(f) => f.call(),
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 };
 
                 *ref_mut = MaybeFuture::Future(Some(executor::spawn(lazy)));
                 match ref_mut {
                     MaybeFuture::Future(ref mut f) => f,
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             };
 
@@ -184,7 +182,10 @@ impl Task {
             // `thread::panicking() -> true`. To do this, the future is dropped from
             // within the catch_unwind block.
             let res = panic::catch_unwind(panic::AssertUnwindSafe(move || {
-                struct Guard<'a>(&'a mut Option<Spawn<Box<Future<Item = (), Error = ()>>>>, bool);
+                struct Guard<'a>(
+                    &'a mut Option<Spawn<Box<Future<Item = (), Error = ()>>>>,
+                    bool,
+                );
 
                 impl<'a> Drop for Guard<'a> {
                     fn drop(&mut self) {
@@ -208,7 +209,6 @@ impl Task {
             }));
             res
         };
-
 
         return match res {
             Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
@@ -248,7 +248,7 @@ impl Task {
                     _ => unreachable!(),
                 }
             }
-        }
+        };
     }
 
     /// Aborts this task.
@@ -349,7 +349,9 @@ impl Task {
     fn drop_future(&self) {
         let inner = &mut *self.future.borrow_mut();
         match inner {
-            MaybeFuture::Future(ref mut f) => { f.take(); }
+            MaybeFuture::Future(ref mut f) => {
+                f.take();
+            }
             MaybeFuture::Lazy(_) => {} // Nothing to do
         };
     }

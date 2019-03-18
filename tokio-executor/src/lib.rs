@@ -37,7 +37,8 @@
 
 extern crate crossbeam_utils;
 extern crate futures;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 mod enter;
 mod global;
@@ -60,7 +61,7 @@ use std::fmt;
 ///
 /// [`spawn_lazy`] takes a LazyFn as it argument
 pub struct LazyFn {
-    inner: Box<FnBox<Box<Future<Item = (), Error = ()>>> + Send>
+    inner: Box<FnBox<Box<Future<Item = (), Error = ()>>> + Send>,
 }
 
 impl fmt::Debug for LazyFn {
@@ -70,7 +71,6 @@ impl fmt::Debug for LazyFn {
 }
 
 impl LazyFn {
-
     /// Invokes the boxed closure, returning its result
     pub fn call(self) -> Box<Future<Item = (), Error = ()>> {
         self.inner.call()
@@ -79,9 +79,7 @@ impl LazyFn {
 
 impl<F: Send + 'static + FnOnce() -> Box<Future<Item = (), Error = ()>>> From<F> for LazyFn {
     fn from(f: F) -> LazyFn {
-        LazyFn {
-            inner: Box::new(f)
-        }
+        LazyFn { inner: Box::new(f) }
     }
 }
 
@@ -232,10 +230,7 @@ pub trait Executor {
     /// # }
     /// # fn main() {}
     /// ```
-    fn spawn_lazy(
-        &mut self,
-        lazy: LazyFn
-    ) -> Result<(), SpawnError>;
+    fn spawn_lazy(&mut self, lazy: LazyFn) -> Result<(), SpawnError>;
 
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///
@@ -285,13 +280,9 @@ impl<E: Executor + ?Sized> Executor for Box<E> {
         (**self).spawn(future)
     }
 
-    fn spawn_lazy(
-        &mut self,
-        lazy: LazyFn
-    ) -> Result<(), SpawnError> {
+    fn spawn_lazy(&mut self, lazy: LazyFn) -> Result<(), SpawnError> {
         (**self).spawn_lazy(lazy)
     }
-
 
     fn status(&self) -> Result<(), SpawnError> {
         (**self).status()

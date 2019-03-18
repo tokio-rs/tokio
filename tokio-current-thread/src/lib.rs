@@ -33,7 +33,7 @@ mod scheduler;
 use self::scheduler::Scheduler;
 
 use tokio_executor::park::{Park, ParkThread, Unpark};
-use tokio_executor::{Enter, SpawnError, LazyFn};
+use tokio_executor::{Enter, LazyFn, SpawnError};
 
 use futures::future::{ExecuteError, ExecuteErrorKind, Executor};
 use futures::{executor, Async, Future};
@@ -430,10 +430,7 @@ impl tokio_executor::Executor for CurrentThread {
         Ok(())
     }
 
-    fn spawn_lazy(
-        &mut self,
-        lazy: LazyFn,
-    ) -> Result<(), SpawnError> {
+    fn spawn_lazy(&mut self, lazy: LazyFn) -> Result<(), SpawnError> {
         // We're already on the proper thread by definition,
         // so go ahead and create the future.
         let future: Box<Future<Item = (), Error = ()>> = lazy.call();
@@ -752,10 +749,7 @@ impl tokio_executor::Executor for TaskExecutor {
         self.spawn_local(future)
     }
 
-    fn spawn_lazy(
-        &mut self,
-        lazy: LazyFn
-    ) -> Result<(), SpawnError> {
+    fn spawn_lazy(&mut self, lazy: LazyFn) -> Result<(), SpawnError> {
         // We're already on the proper thread by definition,
         // so go ahead and create the future.
 

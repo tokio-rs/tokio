@@ -1,8 +1,8 @@
 extern crate futures;
 extern crate tokio_executor;
 
-use futures::{future::lazy, Future};
 use futures::future::ok;
+use futures::{future::lazy, Future};
 use tokio_executor::*;
 
 mod out_of_executor_context {
@@ -23,7 +23,8 @@ mod out_of_executor_context {
 
     #[test]
     fn spawn_lazy() {
-        let res = DefaultExecutor::current().spawn_lazy((move || Box::new(ok(())) as Box<Future<Item = (), Error = ()>>).into());
+        let res = DefaultExecutor::current()
+            .spawn_lazy((move || Box::new(ok(())) as Box<Future<Item = (), Error = ()>>).into());
         assert!(res.is_err());
     }
 
