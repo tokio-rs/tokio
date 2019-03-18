@@ -1,0 +1,12 @@
+[package]
+name = "test_log_support"
+version = "0.1.0"
+publish = false
+
+[[bin]]
+name = "test_log_support"
+path = "main.rs"
+
+[dependencies]
+tokio-trace = { path = "..", features = ["emit_log_always"] }
+log = "0.4"
