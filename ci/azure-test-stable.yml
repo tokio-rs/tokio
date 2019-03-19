@@ -28,6 +28,9 @@ jobs:
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
     - script: |
         set -e
+        echo "~~~~ Cargo.toml ~~~~"
+        cat ../Cargo.toml
+        echo "~~~~~~~~~~~~~~~~~~~~"
         cat ../ci/patch.toml >> ../Cargo.toml
         echo "~~~~ Cargo.toml ~~~~"
         cat ../Cargo.toml
