@@ -26,16 +26,17 @@ jobs:
         CI: 'True'
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-    - script: |
-        set -e
-        echo "~~~~ Cargo.toml ~~~~"
-        cat ../Cargo.toml
-        echo "~~~~~~~~~~~~~~~~~~~~"
-        cat ../ci/patch.toml >> ../Cargo.toml
-        echo "~~~~ Cargo.toml ~~~~"
-        cat ../Cargo.toml
-        echo "~~~~~~~~~~~~~~~~~~~~"
-        cargo test
+
+  - script: |
+      set -e
+      cat ci/patch.toml >> Cargo.toml
+      echo "~~~~ Cargo.toml ~~~~"
+      cat Cargo.toml
+      echo "~~~~~~~~~~~~~~~~~~~~"
+    displayName: Patch Cargo.toml
+
+  - ${{ each crate in parameters.crates }}:
+    - script: cargo test
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
