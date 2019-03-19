@@ -24,6 +24,6 @@ futures = "0.1.19"
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
-tokio = { version = "0.1.15", path = ".." }
+tokio = "0.1.15"
 tokio-mock-task = "0.1.1"
 loom = { version = "0.1.1", features = ["futures"] }

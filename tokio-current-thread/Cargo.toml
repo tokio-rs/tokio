@@ -21,5 +21,5 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-tokio-executor = { version = "0.1.5", path = "../tokio-executor" }
+tokio-executor = "0.1.5"
 futures = "0.1.19"
