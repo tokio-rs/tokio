@@ -13,14 +13,9 @@ jobs:
 
   - ${{ each crate in parameters.crates }}:
     - ${{ each feature in crate.value }}:
-      - ${{ if eq(crate.key, 'tokio') }}:
-        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
-          displayName: Check features = ${{ feature }}
-
-      - ${{ if not(eq(crate.key, 'tokio')) }}:
-        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
-          displayName: Check `${{ crate.key }}`, features = ${{ feature }}
-          workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+      - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
+        displayName: Check `${{ crate.key }}`, features = ${{ feature }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
   - ${{ if parameters.benches }}:
     - script: cargo check --benches --all

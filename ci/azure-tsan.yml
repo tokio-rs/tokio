@@ -16,6 +16,12 @@ jobs:
 
   - script: |
         set -e
+
+        cat ci/patch.toml >> Cargo.toml
+        echo "~~~~ Cargo.toml ~~~~"
+        cat Cargo.toml
+        echo "~~~~~~~~~~~~~~~~~~~~"
+
         # Make sure the benchmarks compile
         export ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0"
         export TSAN_OPTIONS="suppressions=`pwd`/ci/tsan"
