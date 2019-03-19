@@ -552,7 +552,7 @@ macro_rules! trace {
 /// let pos = Position { x: 3.234, y: -1.223 };
 ///
 /// debug!(x = field::debug(pos.x), y = field::debug(pos.y));
-/// debug!(target: "app_events", { position = field::debug(pos) }, "New position");
+/// debug!(target: "app_events", { position = field::debug(&pos) }, "New position");
 /// # }
 /// ```
 #[macro_export(local_inner_macros)]
@@ -1146,12 +1146,4 @@ macro_rules! __tokio_trace_log {
 #[macro_export]
 macro_rules! __tokio_trace_log {
     (target: $target:expr, $level:expr, $( $key:ident $( = $val:expr )* ),* $(,)* ) => {};
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! ag {
-    () => {
-        println!("ag")
-    };
 }
