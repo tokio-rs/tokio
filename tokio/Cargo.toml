@@ -60,10 +60,6 @@ async-await-preview = [
   "tokio-async-await/async-await-preview",
 ]
 
-[badges]
-travis-ci = { repository = "tokio-rs/tokio" }
-appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
-
 [dependencies]
 # Only non-optional dependency...
 futures = "0.1.20"
