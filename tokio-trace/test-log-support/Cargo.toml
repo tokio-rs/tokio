@@ -5,4 +5,4 @@ publish = false
 
 [dependencies]
 tokio-trace = { path = "..", features = ["emit_log_always"] }
-log = "0.4"
+log = { version = "0.4", features = ["std"] }
