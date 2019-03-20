@@ -1135,7 +1135,7 @@ macro_rules! __tokio_trace_log {
                 .build());
         }
     };
-    (@key message) => { "{}; " };
+    (@key message) => { "{} " };
     (@key $key:ident) => { __tokio_trace_concat!(__tokio_trace_stringify!( $key ), "={:?} ") };
     (@val_or $k:ident = $v:expr) => { $v };
     (@val_or $k:ident ) => { __tokio_trace_format_args!("?") };
