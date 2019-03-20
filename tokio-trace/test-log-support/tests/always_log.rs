@@ -18,6 +18,7 @@ impl Log for Logger {
 
     fn log(&self, record: &Record) {
         let line = format!("{}", record.args());
+        println!("{:<5} {} {}", record.level(), record.target(), line);
         *self.0.last_log.lock().unwrap() = Some(line);
     }
 
@@ -39,10 +40,17 @@ fn test_always_log() {
     last(&a, "hello world;");
     info!(message = "hello world;", thingy = 42, other_thingy = 666);
     last(&a, "hello world; thingy=42 other_thingy=666");
-    trace!({foo = 3, bar = 4}, "hello {};", "san francisco");
-    last(&a, "hello san francisco; foo=3 bar=4");
-    span!("foo");
+
+    let mut foo = span!("foo");
     last(&a, "span=foo;");
+    foo.enter(|| {
+        last(&a, "-> foo");
+
+        trace!({foo = 3, bar = 4}, "hello {};", "san francisco");
+        last(&a, "hello san francisco; foo=3 bar=4");
+    });
+    last(&a, "<- foo");
+
     span!("foo", bar = 3, baz = false);
     last(&a, "span=foo; bar=3 baz=false");
 }

@@ -141,12 +141,13 @@ use {
 /// If the span was rejected by the current `Subscriber`'s filter, entering the
 /// span will silently do nothing. Thus, the handle can be used in the same
 /// manner regardless of whether or not the trace is currently being collected.
-#[derive(Clone, PartialEq, Hash)]
+#[derive(Clone)]
 pub struct Span {
     /// A handle used to enter the span when it is not executing.
     ///
     /// If this is `None`, then the span has either closed or was never enabled.
-    inner: Option<Inner<'static>>,
+    inner: Option<Inner>,
+    meta: &'static Metadata<'static>,
 }
 
 /// A handle representing the capacity to enter a span which is known to exist.
@@ -155,7 +156,7 @@ pub struct Span {
 /// enabled by the current filter. This type is primarily used for implementing
 /// span handles; users should typically not need to interact with it directly.
 #[derive(Debug)]
-pub(crate) struct Inner<'a> {
+pub(crate) struct Inner {
     /// The span's ID, as provided by `subscriber`.
     id: Id,
 
@@ -164,8 +165,6 @@ pub(crate) struct Inner<'a> {
     /// This should be the same subscriber that provided this span with its
     /// `id`.
     subscriber: Dispatch,
-
-    meta: &'a Metadata<'a>,
 }
 
 /// A guard representing a span which has been entered and is currently
@@ -178,8 +177,8 @@ pub(crate) struct Inner<'a> {
 /// typically not need to interact with it directly.
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
-struct Entered<'a> {
-    inner: Inner<'a>,
+struct Entered {
+    inner: Inner,
 }
 
 // ===== impl Span =====
@@ -244,17 +243,17 @@ impl Span {
 
     /// Constructs a new disabled span.
     #[inline(always)]
-    pub fn new_disabled() -> Span {
-        Span { inner: None }
+    pub fn new_disabled(meta: &'static Metadata<'static>) -> Span {
+        Span { inner: None, meta }
     }
 
     #[inline(always)]
     fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
         let inner = dispatcher::get_default(move |dispatch| {
             let id = dispatch.new_span(&new_span);
-            Some(Inner::new(id, dispatch, meta))
+            Some(Inner::new(id, dispatch))
         });
-        Self { inner }
+        Self { inner, meta }
     }
 
     /// Executes the given function in the context of this span.
@@ -266,7 +265,8 @@ impl Span {
     ///
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
-        match self.inner.take() {
+        self.log("->");
+        let result = match self.inner.take() {
             Some(inner) => {
                 let guard = inner.enter();
                 let result = f();
@@ -274,7 +274,9 @@ impl Span {
                 result
             }
             None => f(),
-        }
+        };
+        self.log("<-");
+        result
     }
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
@@ -283,9 +285,7 @@ impl Span {
     where
         Q: Borrow<str>,
     {
-        self.inner
-            .as_ref()
-            .and_then(|inner| inner.meta.fields().field(name))
+        self.metadata().and_then(|meta| meta.fields().field(name))
     }
 
     /// Returns true if this `Span` has a field for the given
@@ -306,10 +306,10 @@ impl Span {
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
-            let meta = inner.metadata();
-            if let Some(field) = field.as_field(meta) {
+            if let Some(field) = field.as_field(self.meta) {
                 inner.record(
-                    &meta
+                    &self
+                        .meta
                         .fields()
                         .value_set(&[(&field, Some(value as &field::Value))]),
                 )
@@ -361,13 +361,59 @@ impl Span {
 
     /// Returns this span's `Metadata`, if it is enabled.
     pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
-        self.inner.as_ref().map(Inner::metadata)
+        if self.inner.is_some() {
+            Some(self.meta)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+    #[inline]
+    fn log(&self, message: &'static str) {
+        use log;
+
+        if should_emit_log!() {
+            let logger = log::logger();
+            let log_meta = log::Metadata::builder()
+                .level(level_to_log!(self.meta.level))
+                .target(self.meta.target)
+                .build();
+            if logger.enabled(&log_meta) {
+                logger.log(
+                    &log::Record::builder()
+                        .metadata(log_meta)
+                        .module_path(self.meta.module_path)
+                        .file(self.meta.file)
+                        .line(self.meta.line)
+                        .args(format_args!("{} {}", message, self.meta.name))
+                        .build(),
+                );
+            }
+        }
+    }
+
+    #[cfg(not(any(feature = "emit_log_always", feature = "emit_log_optional")))]
+    #[inline]
+    fn log(&self, _: &'static str) {}
+}
+
+impl cmp::PartialEq for Span {
+    fn eq(&self, other: &Self) -> bool {
+        self.meta.callsite() == other.meta.callsite() && self.inner == other.inner
     }
 }
 
-impl<'a> fmt::Debug for Span {
+impl Hash for Span {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.inner.hash(hasher);
+    }
+}
+
+impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut span = f.debug_struct("Span");
+        span.field("name", &self.meta.name());
         if let Some(ref inner) = self.inner {
             span.field("id", &inner.id())
         } else {
@@ -385,14 +431,14 @@ impl<'a> Into<Option<Id>> for &'a Span {
 
 // ===== impl Inner =====
 
-impl<'a> Inner<'a> {
+impl Inner {
     /// Enters the span, returning a guard that may be used to exit the span and
     /// re-enter the prior span.
     ///
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
-    fn enter(self) -> Entered<'a> {
+    fn enter(self) -> Entered {
         self.subscriber.enter(&self.id);
         Entered { inner: self }
     }
@@ -421,60 +467,51 @@ impl<'a> Inner<'a> {
         self.id.clone()
     }
 
-    /// Returns the span's metadata.
-    fn metadata(&self) -> &'a Metadata<'a> {
-        self.meta
-    }
-
     fn record(&mut self, values: &field::ValueSet) {
-        if values.callsite() == self.meta.callsite() {
-            self.subscriber.record(&self.id, &Record::new(values))
-        }
+        self.subscriber.record(&self.id, &Record::new(values))
     }
 
-    fn new(id: Id, subscriber: &Dispatch, meta: &'a Metadata<'a>) -> Self {
+    fn new(id: Id, subscriber: &Dispatch) -> Self {
         Inner {
             id,
             subscriber: subscriber.clone(),
-            meta,
         }
     }
 }
 
-impl<'a> cmp::PartialEq for Inner<'a> {
+impl cmp::PartialEq for Inner {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<'a> Hash for Inner<'a> {
+impl Hash for Inner {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
-impl<'a> Drop for Inner<'a> {
+impl Drop for Inner {
     fn drop(&mut self) {
         self.subscriber.drop_span(self.id.clone());
     }
 }
 
-impl<'a> Clone for Inner<'a> {
+impl Clone for Inner {
     fn clone(&self) -> Self {
         Inner {
             id: self.subscriber.clone_span(&self.id),
             subscriber: self.subscriber.clone(),
-            meta: self.meta,
         }
     }
 }
 
 // ===== impl Entered =====
 
-impl<'a> Entered<'a> {
+impl Entered {
     /// Exit the `Entered` guard, returning an `Inner` handle that may be used
     /// to re-enter the span.
-    fn exit(self) -> Inner<'a> {
+    fn exit(self) -> Inner {
         self.inner.subscriber.exit(&self.inner.id);
         self.inner
     }
