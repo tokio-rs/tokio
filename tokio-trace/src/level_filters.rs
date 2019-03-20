@@ -56,40 +56,30 @@ impl PartialOrd<LevelFilter> for Level {
 ///
 /// This value is checked by the `event` macro. Code that manually calls functions on that value
 /// should compare the level against this value.
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
-
-#[cfg(feature = "max_level_off")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
-
-#[cfg(feature = "max_level_error")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
-
-#[cfg(feature = "max_level_warn")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::WARN;
-
-#[cfg(feature = "max_level_info")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::INFO;
-
-#[cfg(feature = "max_level_debug")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
-
-#[cfg(feature = "max_level_trace")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_off"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_error"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_warn"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::WARN;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_info"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::INFO;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_debug"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_trace"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
+cfg_if! {
+    if #[cfg(all(not(debug_assertions), feature = "release_max_level_off"))] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_error"))] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_warn"))] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::WARN;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_info"))] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::INFO;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_debug"))] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
+    } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_trace"))] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
+    } else if #[cfg(feature = "max_level_off")] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
+    } else if #[cfg(feature = "max_level_error")] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
+    } else if #[cfg(feature = "max_level_warn")] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::WARN;
+    } else if #[cfg(feature = "max_level_info")] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::INFO;
+    } else if #[cfg(feature = "max_level_debug")] {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
+    } else {
+        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
+    }
+}
