@@ -8,7 +8,7 @@ pub struct LevelFilter(Option<Level>);
 impl LevelFilter {
     /// The "off" level.
     ///
-    /// Designates to turn off logging.
+    /// Designates that logging should be to turned off.
     pub const OFF: LevelFilter = LevelFilter(None);
     /// The "error" level.
     ///
