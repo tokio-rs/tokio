@@ -339,44 +339,10 @@ pub use self::{
 mod macros;
 
 pub mod field;
+pub mod level_filters;
 pub mod span;
 pub mod subscriber;
 
 mod sealed {
     pub trait Sealed {}
 }
-
-/// The statically resolved maximum trace level.
-///
-/// See the crate level documentation for information on how to configure this.
-///
-/// This value is checked by the `event` macro. Code that manually calls functions on that value
-/// should compare the level against this value.
-pub const STATIC_MAX_LEVEL: Level = Level::TRACE;
-
-#[cfg(feature = "max_level_error")]
-pub const STATIC_MAX_LEVEL: Level = Level::ERROR;
-
-#[cfg(feature = "max_level_warn")]
-pub const STATIC_MAX_LEVEL: Level = Level::WARN;
-
-#[cfg(feature = "max_level_info")]
-pub const STATIC_MAX_LEVEL: Level = Level::INFO;
-
-#[cfg(feature = "max_level_debug")]
-pub const STATIC_MAX_LEVEL: Level = Level::DEBUG;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_error"))]
-pub const STATIC_MAX_LEVEL: Level = Level::ERROR;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_warn"))]
-pub const STATIC_MAX_LEVEL: Level = Level::WARN;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_info"))]
-pub const STATIC_MAX_LEVEL: Level = Level::INFO;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_debug"))]
-pub const STATIC_MAX_LEVEL: Level = Level::DEBUG;
-
-#[cfg(all(not(debug_assertions), feature = "release_max_level_trace"))]
-pub const STATIC_MAX_LEVEL: Level = Level::TRACE;
