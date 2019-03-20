@@ -89,7 +89,7 @@ extern crate rand;
 extern crate slab;
 
 #[macro_use]
-extern crate log;
+extern crate tokio_trace;
 
 // ## Crate layout
 //
