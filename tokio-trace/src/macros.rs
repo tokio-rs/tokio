@@ -102,6 +102,16 @@ macro_rules! span {
         $($k:ident $( = $val:expr )* ),*
     ) => {
         {
+            use $crate::callsite;
+            use $crate::callsite::Callsite;
+            let callsite = callsite! {
+                name: $name,
+                target: $target,
+                level: $lvl,
+                fields: $($k),*
+            };
+            let meta = callsite.metadata();
+
             if should_emit_log!() {
                 __tokio_trace_log!(
                     target: $target,
@@ -111,27 +121,14 @@ macro_rules! span {
                 );
             }
 
-            if should_emit_trace!() {
-                use $crate::callsite;
-                use $crate::callsite::Callsite;
-                let callsite = callsite! {
-                    name: $name,
-                    target: $target,
-                    level: $lvl,
-                    fields: $($k),*
-                };
-                if is_enabled!(callsite) {
-                    let meta = callsite.metadata();
-                    $crate::Span::child_of(
-                        $parent,
-                        meta,
-                        &valueset!(meta.fields(), $($k $( = $val)*),*),
-                    )
-                } else {
-                    $crate::Span::new_disabled()
-                }
+            if should_emit_trace!() && is_enabled!(callsite) {
+                $crate::Span::child_of(
+                    $parent,
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*),
+                )
             } else {
-                $crate::Span::new_disabled()
+                $crate::Span::new_disabled(meta)
             }
         }
     };
@@ -142,14 +139,6 @@ macro_rules! span {
         $($k:ident $( = $val:expr )* ),*
     ) => {
         {
-            if should_emit_log!() {
-                __tokio_trace_log!(
-                    target: $target,
-                    $lvl,
-                    span = __tokio_trace_format_args!("{};", $name),
-                    $( $k $( = $val )* ),*
-                );
-            }
             use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
@@ -158,14 +147,25 @@ macro_rules! span {
                 level: $lvl,
                 fields: $($k),*
             };
-            if is_enabled!(callsite) {
+            let meta = callsite.metadata();
+
+            if should_emit_log!() {
+                __tokio_trace_log!(
+                    target: $target,
+                    $lvl,
+                    span = __tokio_trace_format_args!("{};", $name),
+                    $( $k $( = $val )* ),*
+                );
+            }
+
+            if should_emit_trace!() && is_enabled!(callsite) {
                 let meta = callsite.metadata();
                 $crate::Span::new(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled()
+                $crate::Span::new_disabled(meta)
             }
         }
     };

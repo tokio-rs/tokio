@@ -313,6 +313,7 @@ extern crate tokio_trace_core;
 
 #[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
 #[doc(hidden)]
+#[macro_use]
 pub extern crate log;
 
 // Somehow this `use` statement is necessary for us to re-export the `core`

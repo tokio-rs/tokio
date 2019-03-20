@@ -141,12 +141,13 @@ use {
 /// If the span was rejected by the current `Subscriber`'s filter, entering the
 /// span will silently do nothing. Thus, the handle can be used in the same
 /// manner regardless of whether or not the trace is currently being collected.
-#[derive(Clone, PartialEq, Hash)]
+#[derive(Clone)]
 pub struct Span {
     /// A handle used to enter the span when it is not executing.
     ///
     /// If this is `None`, then the span has either closed or was never enabled.
     inner: Option<Inner<'static>>,
+    meta: &'static Metadata<'static>,
 }
 
 /// A handle representing the capacity to enter a span which is known to exist.
@@ -244,8 +245,8 @@ impl Span {
 
     /// Constructs a new disabled span.
     #[inline(always)]
-    pub fn new_disabled() -> Span {
-        Span { inner: None }
+    pub fn new_disabled(meta: &'static Metadata<'static>) -> Span {
+        Span { inner: None, meta }
     }
 
     #[inline(always)]
@@ -254,7 +255,7 @@ impl Span {
             let id = dispatch.new_span(&new_span);
             Some(Inner::new(id, dispatch, meta))
         });
-        Self { inner }
+        Self { inner, meta }
     }
 
     /// Executes the given function in the context of this span.
@@ -266,7 +267,8 @@ impl Span {
     ///
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
-        match self.inner.take() {
+        self.log("->");
+        let result = match self.inner.take() {
             Some(inner) => {
                 let guard = inner.enter();
                 let result = f();
@@ -274,7 +276,9 @@ impl Span {
                 result
             }
             None => f(),
-        }
+        };
+        self.log("<-");
+        result
     }
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
@@ -361,13 +365,59 @@ impl Span {
 
     /// Returns this span's `Metadata`, if it is enabled.
     pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
-        self.inner.as_ref().map(Inner::metadata)
+        if self.inner.is_some() {
+            Some(self.meta)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+    #[inline]
+    fn log(&self, message: &'static str) {
+        use log;
+
+        if should_emit_log!() {
+            let logger = log::logger();
+            let log_meta = log::Metadata::builder()
+                .level(level_to_log!(self.meta.level))
+                .target(self.meta.target)
+                .build();
+            if logger.enabled(&log_meta) {
+                logger.log(
+                    &log::Record::builder()
+                        .metadata(log_meta)
+                        .module_path(self.meta.module_path)
+                        .file(self.meta.file)
+                        .line(self.meta.line)
+                        .args(format_args!("{} {}", message, self.meta.name))
+                        .build(),
+                );
+            }
+        }
+    }
+
+    #[cfg(not(any(feature = "emit_log_always", feature = "emit_log_optional")))]
+    #[inline]
+    fn log(&self, _: &'static str) {}
+}
+
+impl cmp::PartialEq for Span {
+    fn eq(&self, other: &Self) -> bool {
+        self.meta.callsite() == other.meta.callsite() && self.inner == other.inner
     }
 }
 
-impl<'a> fmt::Debug for Span {
+impl Hash for Span {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.inner.hash(hasher);
+    }
+}
+
+impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut span = f.debug_struct("Span");
+        span.field("name", &self.meta.name());
         if let Some(ref inner) = self.inner {
             span.field("id", &inner.id())
         } else {
