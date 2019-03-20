@@ -11,6 +11,7 @@ use pool::Pool;
 
 use futures::executor::{self, Spawn};
 use futures::{self, Async, Future};
+use tokio_trace::field;
 
 use std::cell::{Cell, UnsafeCell};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
@@ -114,8 +115,8 @@ impl Task {
         }
 
         trace!(
-            "Task::run; state={:?}",
-            State::from(self.state.load(Relaxed))
+            message = "Task::run;",
+            state = field::debug(State::from(self.state.load(Relaxed)))
         );
 
         // The transition to `Running` done above ensures that a lock on the
@@ -153,7 +154,7 @@ impl Task {
 
         match res {
             Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
-                trace!("    -> task complete");
+                trace!(message = "    -> task complete");
 
                 // The future has completed. Drop it immediately to free
                 // resources and run drop handlers.
@@ -168,7 +169,7 @@ impl Task {
                 Run::Complete
             }
             Ok(Ok(Async::NotReady)) => {
-                trace!("    -> not ready");
+                trace!(message = "    -> not ready");
 
                 // Attempt to transition from Running -> Idle, if successful,
                 // then the task does not need to be scheduled again. If the CAS

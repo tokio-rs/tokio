@@ -13,6 +13,9 @@ use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 use tokio_trace_core as trace;
 
+#[cfg(feature = "trace")]
+use tokio_trace_core::dispatcher::{self, Dispatch};
+
 /// Builds Tokio Runtime with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -62,6 +65,10 @@ pub struct Builder {
 
     /// The clock to use
     clock: Clock,
+
+    /// The tokio-trace dispatcher to use.
+    #[cfg(feature = "trace")]
+    dispatch: Option<Dispatch>,
 }
 
 impl Builder {
@@ -80,6 +87,8 @@ impl Builder {
             threadpool_builder,
             core_threads,
             clock: Clock::new(),
+            #[cfg(feature = "trace")]
+            dispatch: None,
         }
     }
 
@@ -94,7 +103,8 @@ impl Builder {
         since = "0.1.9",
         note = "use the `core_threads`, `blocking_threads`, `name_prefix`, \
                 `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
-                instead")]
+                instead"
+    )]
     #[doc(hidden)]
     pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
         self.threadpool_builder = val;
@@ -262,7 +272,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.threadpool_builder.after_start(f);
         self
@@ -288,9 +299,21 @@ impl Builder {
     /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.threadpool_builder.before_stop(f);
+        self
+    }
+
+    /// Configures the runtime to set the provided `tokio-trace` subscriber as
+    /// the default for all worker threads.
+    #[cfg(feature = "trace")]
+    pub fn subscriber<I>(&mut self, subscriber: I) -> &mut Self
+    where
+        I: Into<Dispatch>,
+    {
+        self.dispatch = Some(subscriber.into());
         self
     }
 
@@ -341,6 +364,16 @@ impl Builder {
             .threadpool_builder
             .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
+                #[cfg(not(feature = "trace"))]
+                {
+                    tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
+                        clock::with_default(&clock, enter, |enter| {
+                            timer::with_default(&timer_handles[index], enter, |_| {
+                                w.run();
+                            });
+                        })
+                    });
+                }
 
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
@@ -355,11 +388,7 @@ impl Builder {
             .custom_park(move |worker_id| {
                 let index = worker_id.to_usize();
 
-                timers[index]
-                    .lock()
-                    .unwrap()
-                    .take()
-                    .unwrap()
+                timers[index].lock().unwrap().take().unwrap()
             })
             .build();
 

@@ -26,6 +26,7 @@ use std::thread;
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use rand;
+use tokio_trace::field;
 
 #[derive(Debug)]
 pub(crate) struct Pool {
@@ -78,6 +79,8 @@ pub(crate) struct Pool {
 
     // Configuration
     pub config: Config,
+
+    span: tokio_trace::Span,
 }
 
 impl Pool {
@@ -120,6 +123,7 @@ impl Pool {
             backup_stack,
             blocking,
             config,
+            span: span!("pool"),
         };
 
         // Now, we prime the sleeper stack
@@ -135,7 +139,7 @@ impl Pool {
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
 
-        trace!("shutdown; state={:?}", state);
+        trace!(message = "shutdown", state = field::debug(state));
 
         // For now, this must be true
         debug_assert!(!purge_queue || now);
@@ -183,7 +187,7 @@ impl Pool {
             state = actual;
         }
 
-        trace!("  -> transitioned to shutdown");
+        trace!(message = "  -> transitioned to shutdown");
 
         // Only transition to terminate if there are no futures currently on the
         // pool
@@ -204,7 +208,7 @@ impl Pool {
     pub fn terminate_sleeping_workers(&self) {
         use worker::Lifecycle::Signaled;
 
-        trace!("  -> shutting down workers");
+        trace!(message = "  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
         // transition, and terminate.
         while let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, true) {
@@ -245,7 +249,7 @@ impl Pool {
                 if !worker.is_blocking() && *self == *worker.pool {
                     let idx = worker.id.0;
 
-                    trace!("    -> submit internal; idx={}", idx);
+                    trace!(message = "    -> submit internal;", idx = idx);
 
                     worker.pool.workers[idx].submit_internal(task);
                     worker.pool.signal_work(pool);
@@ -264,7 +268,7 @@ impl Pool {
     pub fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
-        trace!("    -> submit external");
+        trace!(message = "    -> submit external");
 
         self.queue.push(task);
         self.signal_work(pool);
@@ -322,66 +326,68 @@ impl Pool {
         }
 
         let pool = pool.clone();
-
+        let mut span = pool.span.clone();
         let res = th.spawn(move || {
-            if let Some(ref f) = pool.config.after_start {
-                f();
-            }
-
-            let mut worker_id = id;
-
-            pool.backup[backup_id.0].start(&worker_id);
-
-            loop {
-                // The backup token should be in the running state.
-                debug_assert!(pool.backup[backup_id.0].is_running());
-
-                // TODO: Avoid always cloning
-                let worker = Worker::new(worker_id, backup_id, pool.clone(), trigger.clone());
-
-                // Run the worker. If the worker transitioned to a "blocking"
-                // state, then `is_blocking` will be true.
-                if !worker.do_run() {
-                    // The worker shutdown, so exit the thread.
-                    break;
+            span.enter(|| {
+                if let Some(ref f) = pool.config.after_start {
+                    f();
                 }
 
-                debug_assert!(!pool.backup[backup_id.0].is_pushed());
+                let mut worker_id = id;
 
-                // Push the thread back onto the backup stack. This makes it
-                // available for future handoffs.
-                //
-                // This **must** happen before notifying the task.
-                let res = pool.backup_stack.push(&pool.backup, backup_id);
+                pool.backup[backup_id.0].start(&worker_id);
 
-                if res.is_err() {
-                    // The pool is being shutdown.
-                    break;
-                }
+                loop {
+                    // The backup token should be in the running state.
+                    debug_assert!(pool.backup[backup_id.0].is_running());
 
-                // The task switched the current thread to blocking mode.
-                // Now that the blocking task completed, any tasks
-                pool.notify_blocking_task(&pool);
+                    // TODO: Avoid always cloning
+                    let worker = Worker::new(worker_id, backup_id, pool.clone(), trigger.clone());
 
-                debug_assert!(pool.backup[backup_id.0].is_running());
-
-                // Wait for a handoff
-                let handoff = pool.backup[backup_id.0].wait_for_handoff(pool.config.keep_alive);
-
-                match handoff {
-                    Handoff::Worker(id) => {
-                        debug_assert!(pool.backup[backup_id.0].is_running());
-                        worker_id = id;
-                    }
-                    Handoff::Idle | Handoff::Terminated => {
+                    // Run the worker. If the worker transitioned to a "blocking"
+                    // state, then `is_blocking` will be true.
+                    if !worker.do_run() {
+                        // The worker shutdown, so exit the thread.
                         break;
                     }
-                }
-            }
 
-            if let Some(ref f) = pool.config.before_stop {
-                f();
-            }
+                    debug_assert!(!pool.backup[backup_id.0].is_pushed());
+
+                    // Push the thread back onto the backup stack. This makes it
+                    // available for future handoffs.
+                    //
+                    // This **must** happen before notifying the task.
+                    let res = pool.backup_stack.push(&pool.backup, backup_id);
+
+                    if res.is_err() {
+                        // The pool is being shutdown.
+                        break;
+                    }
+
+                    // The task switched the current thread to blocking mode.
+                    // Now that the blocking task completed, any tasks
+                    pool.notify_blocking_task(&pool);
+
+                    debug_assert!(pool.backup[backup_id.0].is_running());
+
+                    // Wait for a handoff
+                    let handoff = pool.backup[backup_id.0].wait_for_handoff(pool.config.keep_alive);
+
+                    match handoff {
+                        Handoff::Worker(id) => {
+                            debug_assert!(pool.backup[backup_id.0].is_running());
+                            worker_id = id;
+                        }
+                        Handoff::Idle | Handoff::Terminated => {
+                            break;
+                        }
+                    }
+                }
+
+                if let Some(ref f) = pool.config.before_stop {
+                    f();
+                }
+            })
         });
 
         if let Err(e) = res {
@@ -406,10 +412,10 @@ impl Pool {
                 worker_state.lifecycle(),
             );
 
-            trace!("signal_work -- notify; idx={}", idx);
+            trace!(message = "signal_work -- notify;", idx = idx);
 
             if !entry.notify(worker_state) {
-                trace!("signal_work -- spawn; idx={}", idx);
+                trace!(message = "signal_work -- spawn;", idx = idx);
                 self.spawn_thread(WorkerId(idx), pool);
             }
         }

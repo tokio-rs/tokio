@@ -11,8 +11,8 @@ use pool::{self, BackupId, Pool};
 use sender::Sender;
 use shutdown::ShutdownTrigger;
 use task::{self, CanBlock, Task};
-
 use tokio_executor;
+use tokio_trace::{self, field};
 
 use futures::{Async, Poll};
 
@@ -59,6 +59,8 @@ pub struct Worker {
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     trigger: Arc<ShutdownTrigger>,
 
+    span: tokio_trace::Span,
+
     // Keep the value on the current thread.
     _p: PhantomData<Rc<()>>,
 }
@@ -91,6 +93,7 @@ impl Worker {
         pool: Arc<Pool>,
         trigger: Arc<ShutdownTrigger>,
     ) -> Worker {
+        let span = span!("worker", id = &id.0, is_blocking);
         Worker {
             pool,
             id,
@@ -99,6 +102,7 @@ impl Worker {
             is_blocking: Cell::new(false),
             should_finalize: Cell::new(false),
             trigger,
+            span,
             _p: PhantomData,
         }
     }
@@ -113,6 +117,7 @@ impl Worker {
     pub(crate) fn do_run(&self) -> bool {
         // Create another worker... It's ok, this is just a new type around
         // `Pool` that is expected to stay on the current thread.
+        let mut span = self.span.clone();
         CURRENT_WORKER.with(|c| {
             c.set(self as *const _);
 
@@ -122,13 +127,16 @@ impl Worker {
             // Enter an execution context
             let mut enter = tokio_executor::enter().unwrap();
 
-            tokio_executor::with_default(&mut sender, &mut enter, |enter| {
-                if let Some(ref callback) = self.pool.config.around_worker {
-                    callback.call(self, enter);
-                } else {
-                    self.run();
-                }
-            });
+            // Enter a trace span for this worker
+            span.enter(|| {
+                tokio_executor::with_default(&mut sender, &mut enter, |enter| {
+                    if let Some(ref callback) = self.pool.config.around_worker {
+                        callback.call(self, enter);
+                    } else {
+                        self.run();
+                    }
+                });
+            })
         });
 
         // Can't be in blocking mode and finalization mode
@@ -192,8 +200,8 @@ impl Worker {
             return Ok(().into());
         }
 
-        trace!("transition to blocking state");
-
+        trace!(message = "transition to blocking state");
+        self.span.clone().record("is_blocking", &true);
         // Transitioning to blocking requires handing over the worker state to
         // another thread so that the work queue can continue to be processed.
 
@@ -371,7 +379,7 @@ impl Worker {
         // started, which results in the thread pool permanently being at 2
         // workers even though it should reach 4.
         if !first && state.is_signaled() {
-            trace!("Worker::check_run_state; delegate signal");
+            trace!(message = "Worker::check_run_state; delegate signal");
             // This worker is not ready to be signaled, so delegate the signal
             // to another worker.
             self.pool.signal_work(&self.pool);
@@ -411,14 +419,14 @@ impl Worker {
             if idx < len {
                 match self.pool.workers[idx].steal_tasks(self.entry()) {
                     Steal::Success(task) => {
-                        trace!("stole task from another worker");
+                        trace!(message = "stole task from another worker");
 
                         self.run_task(task, notify);
 
                         trace!(
-                            "try_steal_task -- signal_work; self={}; from={}",
-                            self.id.0,
-                            idx
+                            message = "try_steal_task -- signal_work;",
+                            self = self.id.0,
+                            from = idx
                         );
 
                         // Signal other workers that work is available
@@ -493,7 +501,7 @@ impl Worker {
                         .into();
 
                     if actual == state {
-                        trace!("task complete; state={:?}", next);
+                        trace!(message = "task complete;", state = field::debug(next));
 
                         if state.num_futures() == 1 {
                             // If the thread pool has been flagged as shutdown,
@@ -577,7 +585,7 @@ impl Worker {
         // due to the fact that a worker can be notified without it being popped
         // from the sleep stack. Extra care is needed to deal with this.
 
-        trace!("Worker::sleep; worker={:?}", self.id);
+        trace!(message = "Worker::sleep;", worker = self.id.0);
 
         let mut state: State = self.entry().state.load(Acquire).into();
 
@@ -623,12 +631,15 @@ impl Worker {
                 if !state.is_pushed() {
                     debug_assert!(next.is_pushed());
 
-                    trace!("  sleeping -- push to stack; idx={}", self.id.0);
+                    trace!(message = "  sleeping -- push to stack;", idx = self.id.0);
 
                     // We obtained permission to push the worker into the
                     // sleeper queue.
                     if let Err(_) = self.pool.push_sleeper(self.id.0) {
-                        trace!("  sleeping -- push to stack failed; idx={}", self.id.0);
+                        trace!(
+                            message = "  sleeping -- push to stack failed;",
+                            idx = self.id.0
+                        );
                         // The push failed due to the pool being terminated.
                         //
                         // This is true because the "work" being woken up for is
@@ -643,7 +654,7 @@ impl Worker {
             state = actual;
         }
 
-        trace!("    -> starting to sleep; idx={}", self.id.0);
+        trace!(message = "    -> starting to sleep;", idx = self.id.0);
 
         // Do a quick check to see if there are any notifications in the
         // reactor or new tasks in the global queue. Since this call will
@@ -692,7 +703,7 @@ impl Worker {
 
             self.entry().park();
 
-            trace!("    -> wakeup; idx={}", self.id.0);
+            trace!(message = "    -> wakeup;", idx = self.id.0);
         }
     }
 
@@ -725,7 +736,7 @@ impl Worker {
 
 impl Drop for Worker {
     fn drop(&mut self) {
-        trace!("shutting down thread; idx={}", self.id.0);
+        trace!(message = "shutting down thread;", idx = self.id.0);
 
         if self.should_finalize.get() {
             // Drain the work queue
