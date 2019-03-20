@@ -43,8 +43,10 @@ mod error;
 mod executor;
 mod global;
 pub mod park;
+mod typed;
 
 pub use enter::{enter, Enter, EnterError};
 pub use error::SpawnError;
 pub use executor::Executor;
 pub use global::{spawn, with_default, DefaultExecutor};
+pub use typed::TypedExecutor;
