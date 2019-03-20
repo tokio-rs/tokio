@@ -3,64 +3,38 @@ use tokio_trace_core::Level;
 
 /// Describes the level of verbosity of a span or event.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct LevelFilter(LevelFilterInner, Option<Level>);
+pub struct LevelFilter(Option<Level>);
 
 impl LevelFilter {
-    /// The "zero" level.
+    /// The "off" level.
     ///
-    /// Designates no logging.
-    pub const ZERO: LevelFilter = LevelFilter(LevelFilterInner::Zero, None);
+    /// Designates to turn off logging.
+    pub const OFF: LevelFilter = LevelFilter(None);
     /// The "error" level.
     ///
     /// Designates very serious errors.
-    pub const ERROR: LevelFilter = LevelFilter(LevelFilterInner::Error, Some(Level::ERROR));
+    pub const ERROR: LevelFilter = LevelFilter(Some(Level::ERROR));
     /// The "warn" level.
     ///
     /// Designates hazardous situations.
-    pub const WARN: LevelFilter = LevelFilter(LevelFilterInner::Warn, Some(Level::WARN));
+    pub const WARN: LevelFilter = LevelFilter(Some(Level::WARN));
     /// The "info" level.
     ///
     /// Designates useful information.
-    pub const INFO: LevelFilter = LevelFilter(LevelFilterInner::Info, Some(Level::INFO));
+    pub const INFO: LevelFilter = LevelFilter(Some(Level::INFO));
     /// The "debug" level.
     ///
     /// Designates lower priority information.
-    pub const DEBUG: LevelFilter = LevelFilter(LevelFilterInner::Debug, Some(Level::DEBUG));
+    pub const DEBUG: LevelFilter = LevelFilter(Some(Level::DEBUG));
     /// The "trace" level.
     ///
     /// Designates very low priority, often extremely verbose, information.
-    pub const TRACE: LevelFilter = LevelFilter(LevelFilterInner::Trace, Some(Level::TRACE));
-}
-
-#[repr(usize)]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-enum LevelFilterInner {
-    Zero = 0,
-    /// The "error" level.
-    ///
-    /// Designates very serious errors.
-    Error,
-    /// The "warn" level.
-    ///
-    /// Designates hazardous situations.
-    Warn,
-    /// The "info" level.
-    ///
-    /// Designates useful information.
-    Info,
-    /// The "debug" level.
-    ///
-    /// Designates lower priority information.
-    Debug,
-    /// The "trace" level.
-    ///
-    /// Designates very low priority, often extremely verbose, information.
-    Trace,
+    pub const TRACE: LevelFilter = LevelFilter(Some(Level::TRACE));
 }
 
 impl PartialEq<LevelFilter> for Level {
     fn eq(&self, other: &LevelFilter) -> bool {
-        match other.1 {
+        match other.0 {
             None => false,
             Some(ref level) => self.eq(level),
         }
@@ -69,7 +43,7 @@ impl PartialEq<LevelFilter> for Level {
 
 impl PartialOrd<LevelFilter> for Level {
     fn partial_cmp(&self, other: &LevelFilter) -> Option<Ordering> {
-        match other.1 {
+        match other.0 {
             None => Some(Ordering::Less),
             Some(ref level) => self.partial_cmp(level),
         }
@@ -82,10 +56,10 @@ impl PartialOrd<LevelFilter> for Level {
 ///
 /// This value is checked by the `event` macro. Code that manually calls functions on that value
 /// should compare the level against this value.
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ZERO;
+pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
 
-#[cfg(feature = "max_level_zero")]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ZERO;
+#[cfg(feature = "max_level_off")]
+pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
 
 #[cfg(feature = "max_level_error")]
 pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
@@ -102,8 +76,8 @@ pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
 #[cfg(feature = "max_level_trace")]
 pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
 
-#[cfg(all(not(debug_assertions), feature = "release_max_level_zero"))]
-pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ZERO;
+#[cfg(all(not(debug_assertions), feature = "release_max_level_off"))]
+pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
 
 #[cfg(all(not(debug_assertions), feature = "release_max_level_error"))]
 pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
