@@ -35,11 +35,11 @@ fn test_always_log() {
 
     error!(foo = 5);
     last(&a, "foo=5");
-    warn!("hello {}", "world");
+    warn!("hello {};", "world");
     last(&a, "hello world;");
-    info!(message = "hello world", thingy = 42, other_thingy = 666);
+    info!(message = "hello world;", thingy = 42, other_thingy = 666);
     last(&a, "hello world; thingy=42 other_thingy=666");
-    trace!({foo = 3, bar = 4}, "hello {}", "san francisco");
+    trace!({foo = 3, bar = 4}, "hello {};", "san francisco");
     last(&a, "hello san francisco; foo=3 bar=4");
     span!("foo");
     last(&a, "span=foo;");
