@@ -928,6 +928,7 @@ macro_rules! callsite {
             }
         }
         REGISTRATION.call_once(|| {
+            $crate::init();
             callsite::register(&MyCallsite);
         });
         &MyCallsite
@@ -1026,14 +1027,6 @@ macro_rules! __tokio_trace_concat {
 macro_rules! __tokio_trace_stringify {
     ($s:expr) => {
         stringify!($s)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __tokio_trace_cfg {
-    ($i:ident) => {
-        cfg!($i)
     };
 }
 
