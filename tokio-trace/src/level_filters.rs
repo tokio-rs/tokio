@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 use tokio_trace_core::Level;
 
-/// Describes the level of verbosity of a span or event.
+/// `LevelFilter` is used to statistically filter the logging messages based on its `Level`.
+/// Logging messages will be discarded if its `Level` is greater than `LevelFilter`.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LevelFilter(Option<Level>);
 
