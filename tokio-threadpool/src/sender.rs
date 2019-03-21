@@ -184,7 +184,7 @@ where
         tokio_executor::Executor::status(self)
     }
 
-    fn typed_spawn(&mut self, future: T) -> Result<(), SpawnError> {
+    fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
         tokio_executor::Executor::spawn(self, Box::new(future))
     }
 }

@@ -435,7 +435,7 @@ impl<T> tokio_executor::TypedExecutor<T> for CurrentThread
 where
     T: Future<Item = (), Error = ()> + 'static,
 {
-    fn typed_spawn(&mut self, future: T) -> Result<(), SpawnError> {
+    fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
         self.borrow().spawn_local(Box::new(future), false);
         Ok(())
     }
@@ -756,7 +756,7 @@ impl<F> tokio_executor::TypedExecutor<F> for TaskExecutor
 where
     F: Future<Item = (), Error = ()> + 'static,
 {
-    fn typed_spawn(&mut self, future: F) -> Result<(), SpawnError> {
+    fn spawn(&mut self, future: F) -> Result<(), SpawnError> {
         self.spawn_local(Box::new(future))
     }
 }

@@ -80,7 +80,7 @@ impl<T> ::executor::TypedExecutor<T> for Handle
 where
     T: Future<Item = (), Error = ()> + Send + 'static,
 {
-    fn typed_spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
+    fn spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
         self.spawn(future)
     }
 }
