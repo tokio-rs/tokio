@@ -81,7 +81,7 @@ where
     T: Future<Item = (), Error = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
-        self.spawn(future)
+        Handle::spawn(self, future)
     }
 }
 
