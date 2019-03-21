@@ -431,6 +431,16 @@ impl tokio_executor::Executor for CurrentThread {
     }
 }
 
+impl<T> tokio_executor::TypedExecutor<T> for CurrentThread
+where
+    T: Future<Item = (), Error = ()> + 'static,
+{
+    fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
+        self.borrow().spawn_local(Box::new(future), false);
+        Ok(())
+    }
+}
+
 impl<P: Park> fmt::Debug for CurrentThread<P> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("CurrentThread")
@@ -739,6 +749,15 @@ impl tokio_executor::Executor for TaskExecutor {
         future: Box<Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.spawn_local(future)
+    }
+}
+
+impl<F> tokio_executor::TypedExecutor<F> for TaskExecutor
+where
+    F: Future<Item = (), Error = ()> + 'static,
+{
+    fn spawn(&mut self, future: F) -> Result<(), SpawnError> {
+        self.spawn_local(Box::new(future))
     }
 }
 

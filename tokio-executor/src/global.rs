@@ -84,6 +84,19 @@ impl super::Executor for DefaultExecutor {
     }
 }
 
+impl<T> super::TypedExecutor<T> for DefaultExecutor
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
+        super::Executor::spawn(self, Box::new(future))
+    }
+
+    fn status(&self) -> Result<(), SpawnError> {
+        super::Executor::status(self)
+    }
+}
+
 impl<T> future::Executor<T> for DefaultExecutor
 where
     T: Future<Item = (), Error = ()> + Send + 'static,
