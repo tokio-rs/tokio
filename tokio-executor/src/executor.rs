@@ -1,5 +1,5 @@
-use SpawnError;
 use futures::Future;
+use SpawnError;
 
 /// A value that executes futures.
 ///
