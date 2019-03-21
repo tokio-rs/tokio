@@ -31,7 +31,7 @@ slab = "0.4.0"
 tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 tokio-sync = { version = "0.1.1", path = "../tokio-sync" }
-tokio-trace = { path = "../tokio-trace", default-features = false, features = ["emit_trace_optional", "emit_log_always"]}
+tokio-trace = { path = "../tokio-trace", features = ["log"]}
 
 [dev-dependencies]
 num_cpus = "1.8.0"

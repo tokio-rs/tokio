@@ -21,7 +21,7 @@ categories = ["concurrency", "asynchronous"]
 
 [dependencies]
 tokio-executor = { version = "0.1.2", path = "../tokio-executor" }
-tokio-trace = { path = "../tokio-trace", default-features = false, features = ["emit_trace_optional", "emit_log_always"]}
+tokio-trace = { path = "../tokio-trace", features = ["log"]}
 futures = "0.1.19"
 crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"
