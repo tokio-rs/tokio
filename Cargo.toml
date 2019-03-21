@@ -21,6 +21,3 @@ members = [
   "tokio-udp",
   "tokio-uds",
 ]
-
-[patch.crates-io]
-tokio-executor = { path = "tokio-executor" }
