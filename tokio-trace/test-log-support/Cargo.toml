@@ -4,5 +4,5 @@ version = "0.1.0"
 publish = false
 
 [dependencies]
-tokio-trace = { path = "..", features = ["emit_log_always"] }
+tokio-trace = { path = "..", features = ["log"] }
 log = { version = "0.4", features = ["std"] }

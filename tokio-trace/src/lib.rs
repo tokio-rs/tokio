@@ -311,7 +311,7 @@
 //! [`tokio-trace-log`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-log
 extern crate tokio_trace_core;
 
-#[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+#[cfg(feature = "log")]
 #[doc(hidden)]
 pub extern crate log;
 
@@ -349,3 +349,10 @@ pub mod subscriber;
 mod sealed {
     pub trait Sealed {}
 }
+
+#[cfg(not(all(feature = "log", not(feature = "trace"))))]
+#[doc(hidden)]
+pub const EMIT_TRACE: bool = true;
+
+#[cfg(all(feature = "log", not(feature = "trace")))]
+pub const EMIT_TRACE: bool = false;

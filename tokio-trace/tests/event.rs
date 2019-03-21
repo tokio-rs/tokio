@@ -130,7 +130,7 @@ fn borrowed_field() {
 
 #[test]
 // If emitting log instrumentation, this gets moved anyway, breaking the test.
-#[cfg(not(any(feature = "emit_log_always", feature = "emit_log_optional")))]
+#[cfg(not(feature = "log"))]
 fn move_field_out_of_struct() {
     use tokio_trace::field::debug;
 
