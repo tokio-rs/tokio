@@ -20,17 +20,19 @@ jobs:
       rust_version: stable
 
   - ${{ each crate in parameters.crates }}:
-    - ${{ if eq(crate, 'tokio') }}:
-      - script: cargo test
-        env:
-          LOOM_MAX_DURATION: 10
-          CI: 'True'
-        displayName: cargo test
+    - script: cargo test
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+      displayName: cargo test -p ${{ crate }}
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-    - ${{ if not(eq(crate, 'tokio')) }}:
-      - script: cargo test
-        env:
-          LOOM_MAX_DURATION: 10
-          CI: 'True'
-        displayName: cargo test -p ${{ crate }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+  - template: azure-patch-crates.yml
+
+  - ${{ each crate in parameters.crates }}:
+    - script: cargo test
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+      displayName: cargo test -p ${{ crate }} (PATCHED)
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}

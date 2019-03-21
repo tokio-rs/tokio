@@ -11,33 +11,6 @@ use tokio_trace::{
 };
 
 #[test]
-fn closed_handle_cannot_be_entered() {
-    let subscriber = subscriber::mock()
-        .enter(span::mock().named("foo"))
-        .drop_span(span::mock().named("bar"))
-        .enter(span::mock().named("bar"))
-        .exit(span::mock().named("bar"))
-        .drop_span(span::mock().named("bar"))
-        .exit(span::mock().named("foo"))
-        .run();
-
-    with_default(subscriber, || {
-        span!("foo").enter(|| {
-            let bar = span!("bar");
-            let mut another_bar = bar.clone();
-            drop(bar);
-
-            another_bar.enter(|| {});
-
-            another_bar.close();
-            // After we close `another_bar`, it should close and not be
-            // re-entered.
-            another_bar.enter(|| {});
-        });
-    });
-}
-
-#[test]
 fn handles_to_the_same_span_are_equal() {
     // Create a mock subscriber that will return `true` on calls to
     // `Subscriber::enabled`, so that the spans will be constructed. We
@@ -67,7 +40,7 @@ fn handles_to_different_spans_are_not_equal() {
 fn handles_to_different_spans_with_the_same_metadata_are_not_equal() {
     // Every time time this function is called, it will return a _new
     // instance_ of a span with the same metadata, name, and fields.
-    fn make_span() -> Span<'static> {
+    fn make_span() -> Span {
         span!("foo", bar = 1u64, baz = false)
     }
 
@@ -272,36 +245,10 @@ fn span_closes_when_exited() {
         .run_with_handle();
     with_default(subscriber, || {
         let mut foo = span!("foo");
-        assert!(!foo.is_closed());
 
         foo.enter(|| {});
-        assert!(!foo.is_closed());
 
-        foo.close();
-        assert!(foo.is_closed());
-
-        // Now that `foo` has closed, entering it should do nothing.
-        foo.enter(|| {});
-        assert!(foo.is_closed());
-    });
-
-    handle.assert_finished();
-}
-
-#[test]
-fn entering_a_closed_span_again_is_a_no_op() {
-    let (subscriber, handle) = subscriber::mock()
-        .drop_span(span::mock().named("foo"))
-        .done()
-        .run_with_handle();
-    with_default(subscriber, || {
-        let mut foo = span!("foo");
-
-        foo.close();
-        foo.enter(|| {
-            // This should do nothing.
-        });
-        assert!(foo.is_closed());
+        drop(foo);
     });
 
     handle.assert_finished();

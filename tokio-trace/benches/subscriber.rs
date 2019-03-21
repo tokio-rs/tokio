@@ -110,7 +110,7 @@ fn enter_span(b: &mut Bencher) {
 #[bench]
 fn span_repeatedly(b: &mut Bencher) {
     #[inline]
-    fn mk_span(i: u64) -> tokio_trace::Span<'static> {
+    fn mk_span(i: u64) -> tokio_trace::Span {
         span!("span", i = i)
     }
 
