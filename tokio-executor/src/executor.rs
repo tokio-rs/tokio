@@ -73,7 +73,7 @@ pub trait Executor {
     ///
     /// # Panics
     ///
-    /// Implementers are encouraged to avoid panics. However, a panic is
+    /// Implementations are encouraged to avoid panics. However, panics are
     /// permitted and the caller should check the implementation specific
     /// documentation for more details on possible panics.
     ///
