@@ -39,9 +39,9 @@
 use futures::Async;
 use semaphore;
 use std::cell::UnsafeCell;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::fmt;
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
