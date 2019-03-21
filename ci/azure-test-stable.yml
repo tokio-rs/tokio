@@ -29,7 +29,14 @@ jobs:
 
   - script: |
       set -e
+
+      # Remove any existing patch statements
+      sed -n '/\[patch.crates-io\]/q;p' Cargo.toml > Cargo.toml
+
+      # Patch all crates
       cat ci/patch.toml >> Cargo.toml
+
+      # Print `Cargo.toml` for debugging
       echo "~~~~ Cargo.toml ~~~~"
       cat Cargo.toml
       echo "~~~~~~~~~~~~~~~~~~~~"
