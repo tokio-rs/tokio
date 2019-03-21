@@ -356,20 +356,3 @@ pub const EMIT_TRACE: bool = true;
 
 #[cfg(not(feature = "trace"))]
 pub const EMIT_TRACE: bool = false;
-
-#[cfg(feature = "trace")]
-#[doc(hidden)]
-pub fn init() {}
-
-#[cfg(not(feature = "trace"))]
-pub fn init() {
-    use std::sync::Once;
-    static PRINTED_WARNING: Once = Once::new();
-    PRINTED_WARNING.call_once(|| {
-        eprintln!(
-            "warning: `tokio-trace` instrumentation is experimental.\n\
-             note: to enable `tokio-trace`, compile with the environment \
-             variable `TOKIO_TRACE_ENABLED` set."
-        )
-    });
-}

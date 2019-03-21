@@ -119,7 +119,7 @@ macro_rules! span {
                 $( $k $( = $val )* ),*
             );
 
-            if $crate::EMIT_TRACE && is_enabled!(callsite) {
+            if is_enabled!(callsite) {
                 $crate::Span::child_of(
                     $parent,
                     meta,
@@ -154,7 +154,7 @@ macro_rules! span {
                 $( $k $( = $val )* ),*
             );
 
-            if $crate::EMIT_TRACE && is_enabled!(callsite) {
+            if is_enabled!(callsite) {
                 let meta = callsite.metadata();
                 $crate::Span::new(
                     meta,
@@ -928,7 +928,6 @@ macro_rules! callsite {
             }
         }
         REGISTRATION.call_once(|| {
-            $crate::init();
             callsite::register(&MyCallsite);
         });
         &MyCallsite
