@@ -74,9 +74,46 @@ use SpawnError;
 ///
 /// By doing this, the `drain` fn can accept a stream that is `!Send` as long as
 /// the supplied executor is able to spawn `!Send` types.
-///
 pub trait TypedExecutor<T> {
-    /// TODO: DOX
+    /// Spawns a future to run on this executor.
+    ///
+    /// `future` is passed to the executor, which will begin running it. The
+    /// executor takes ownership of the future and becomes responsible for
+    /// driving the future to completion.
+    ///
+    /// # Panics
+    ///
+    /// Implementations are encouraged to avoid panics. However, panics are
+    /// permitted and the caller should check the implementation specific
+    /// documentation for more details on possible panics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # extern crate futures;
+    /// # extern crate tokio_executor;
+    /// # use tokio_executor::TypedExecutor;
+    /// # use futures::{Future, Poll};
+    /// fn example<T>(my_executor: &mut T)
+    /// where
+    ///     T: TypedExecutor<MyFuture>,
+    /// {
+    ///     my_executor.spawn(MyFuture).unwrap();
+    /// }
+    ///
+    /// struct MyFuture;
+    ///
+    /// impl Future for MyFuture {
+    ///     type Item = ();
+    ///     type Error = ();
+    ///
+    ///     fn poll(&mut self) -> Poll<(), ()> {
+    ///         println!("running on the executor");
+    ///         Ok(().into())
+    ///     }
+    /// }
+    /// # fn main() {}
+    /// ```
     fn spawn(&mut self, future: T) -> Result<(), SpawnError>;
 
     /// TODO: DOX
