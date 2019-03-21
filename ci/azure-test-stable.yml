@@ -31,7 +31,8 @@ jobs:
       set -e
 
       # Remove any existing patch statements
-      sed -i -n '/\[patch.crates-io\]/q;p' Cargo.toml
+      mv Cargo.toml Cargo.toml.bck
+      sed -n '/\[patch.crates-io\]/q;p' Cargo.toml.bck > Cargo.toml
 
       # Patch all crates
       cat ci/patch.toml >> Cargo.toml
