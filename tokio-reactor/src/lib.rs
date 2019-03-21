@@ -35,14 +35,14 @@ extern crate crossbeam_utils;
 extern crate futures;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate log;
 extern crate mio;
 extern crate num_cpus;
 extern crate parking_lot;
 extern crate slab;
 extern crate tokio_executor;
 extern crate tokio_io;
+#[macro_use]
+extern crate tokio_trace;
 extern crate tokio_sync;
 
 pub(crate) mod background;
@@ -64,6 +64,7 @@ use futures::task::Task;
 use tokio_executor::park::{Park, Unpark};
 use tokio_executor::Enter;
 use tokio_sync::task::AtomicTask;
+use tokio_trace::field;
 
 use std::cell::RefCell;
 use std::error::Error;
@@ -74,10 +75,9 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{fmt, usize};
 
-use log::Level;
 use mio::event::Evented;
 use slab::Slab;
 
@@ -362,38 +362,32 @@ impl Reactor {
             Err(e) => return Err(e),
         }
 
-        let start = if log_enabled!(Level::Debug) {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
-        // Process all the events that came in, dispatching appropriately
         let mut events = 0;
-        for event in self.events.iter() {
-            events += 1;
-            let token = event.token();
-            trace!("event {:?} {:?}", event.readiness(), event.token());
+        let mut span = span!("loop process");
 
-            if token == TOKEN_WAKEUP {
-                self.inner
-                    .wakeup
-                    .set_readiness(mio::Ready::empty())
-                    .unwrap();
-            } else {
-                self.dispatch(token, event.readiness());
+        span.enter(|| {
+            // Process all the events that came in, dispatching appropriately
+            for event in self.events.iter() {
+                events += 1;
+                let token = event.token();
+                trace!(
+                    message = "event;",
+                    readiness = field::debug(event.readiness()),
+                    token = field::debug(event.token())
+                );
+
+                if token == TOKEN_WAKEUP {
+                    self.inner
+                        .wakeup
+                        .set_readiness(mio::Ready::empty())
+                        .unwrap();
+                } else {
+                    self.dispatch(token, event.readiness());
+                }
             }
-        }
+        });
 
-        if let Some(start) = start {
-            let dur = start.elapsed();
-            trace!(
-                "loop process - {} events, {}.{:03}s",
-                events,
-                dur.as_secs(),
-                dur.subsec_nanos() / 1_000_000
-            );
-        }
+        span.record("events", &events);
 
         Ok(())
     }

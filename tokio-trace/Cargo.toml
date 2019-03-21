@@ -14,12 +14,6 @@ keywords = ["logging", "tracing"]
 # Not yet ready for production.
 publish = false
 
-[features]
-default = []
-emit_log_always = ["log"]
-emit_trace_optional = []
-emit_log_optional = ["log"]
-
 [dependencies]
 tokio-trace-core = "0.1"
 log = { version = "0.4", optional = true }

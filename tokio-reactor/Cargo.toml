@@ -24,7 +24,6 @@ categories = ["asynchronous", "network-programming"]
 crossbeam-utils = "0.6.0"
 futures = "0.1.19"
 lazy_static = "1.0.2"
-log = "0.4.1"
 mio = "0.6.14"
 num_cpus = "1.8.0"
 parking_lot = "0.7.0"
@@ -32,6 +31,7 @@ slab = "0.4.0"
 tokio-executor = { version = "0.1.1", path = "../tokio-executor" }
 tokio-io = { version = "0.1.6", path = "../tokio-io" }
 tokio-sync = { version = "0.1.1", path = "../tokio-sync" }
+tokio-trace = { path = "../tokio-trace", default-features = false, features = ["emit_trace_optional", "emit_log_always"]}
 
 [dev-dependencies]
 num_cpus = "1.8.0"
