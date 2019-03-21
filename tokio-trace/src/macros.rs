@@ -112,14 +112,12 @@ macro_rules! span {
             };
             let meta = callsite.metadata();
 
-            if should_emit_log!() {
-                __tokio_trace_log!(
-                    target: $target,
-                    $lvl,
-                    span = __tokio_trace_format_args!("{};", $name),
-                    $( $k $( = $val )* ),*
-                );
-            }
+            __tokio_trace_log!(
+                target: $target,
+                $lvl,
+                span = __tokio_trace_format_args!("{};", $name),
+                $( $k $( = $val )* ),*
+            );
 
             if should_emit_trace!() && is_enabled!(callsite) {
                 $crate::Span::child_of(
@@ -149,14 +147,12 @@ macro_rules! span {
             };
             let meta = callsite.metadata();
 
-            if should_emit_log!() {
-                __tokio_trace_log!(
-                    target: $target,
-                    $lvl,
-                    span = __tokio_trace_format_args!("{};", $name),
-                    $( $k $( = $val )* ),*
-                );
-            }
+            __tokio_trace_log!(
+                target: $target,
+                $lvl,
+                span = __tokio_trace_format_args!("{};", $name),
+                $( $k $( = $val )* ),*
+            );
 
             if should_emit_trace!() && is_enabled!(callsite) {
                 let meta = callsite.metadata();
@@ -356,13 +352,12 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* $(,)*} )=> ({
         {
-            if should_emit_log!() {
-                __tokio_trace_log!(
-                    target: $target,
-                    $lvl,
-                    $( $k = $val ),*
-                );
-            }
+            __tokio_trace_log!(
+                target: $target,
+                $lvl,
+                $( $k = $val ),*
+            );
+
             if should_emit_trace!() {
                 #[allow(unused_imports)]
                 use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
@@ -978,25 +973,6 @@ macro_rules! valueset {
 
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
-#[cfg(all(feature = "emit_log_always", not(feature = "emit_log_optional")))]
-macro_rules! should_emit_log {
-    () => {
-        true
-    };
-}
-
-#[doc(hidden)]
-#[macro_export(local_inner_macros)]
-#[cfg(not(feature = "emit_log_always"))]
-macro_rules! should_emit_log {
-    () => {
-        __tokio_trace_cfg!(emit_log_optional)
-            && __tokio_trace_option_env!("TOKIO_TRACE_EMIT_LOG").is_some()
-    };
-}
-
-#[doc(hidden)]
-#[macro_export(local_inner_macros)]
 #[cfg(not(feature = "emit_trace_optional"))]
 macro_rules! should_emit_trace {
     () => {
@@ -1095,7 +1071,7 @@ macro_rules! __tokio_trace_env {
     };
 }
 
-#[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+#[cfg(feature = "log")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! level_to_log {
@@ -1110,7 +1086,7 @@ macro_rules! level_to_log {
     };
 }
 
-#[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+#[cfg(feature = "log")]
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! __tokio_trace_log {
@@ -1141,7 +1117,7 @@ macro_rules! __tokio_trace_log {
     (@val_or $k:ident ) => { __tokio_trace_format_args!("?") };
 }
 
-#[cfg(not(any(feature = "emit_log_always", feature = "emit_log_optional")))]
+#[cfg(not(feature = "log"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __tokio_trace_log {

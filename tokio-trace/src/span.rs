@@ -368,32 +368,29 @@ impl Span {
         }
     }
 
-    #[cfg(any(feature = "emit_log_always", feature = "emit_log_optional"))]
+    #[cfg(feature = "log")]
     #[inline]
     fn log(&self, message: &'static str) {
         use log;
-
-        if should_emit_log!() {
-            let logger = log::logger();
-            let log_meta = log::Metadata::builder()
-                .level(level_to_log!(self.meta.level))
-                .target(self.meta.target)
-                .build();
-            if logger.enabled(&log_meta) {
-                logger.log(
-                    &log::Record::builder()
-                        .metadata(log_meta)
-                        .module_path(self.meta.module_path)
-                        .file(self.meta.file)
-                        .line(self.meta.line)
-                        .args(format_args!("{} {}", message, self.meta.name))
-                        .build(),
-                );
-            }
+        let logger = log::logger();
+        let log_meta = log::Metadata::builder()
+            .level(level_to_log!(self.meta.level))
+            .target(self.meta.target)
+            .build();
+        if logger.enabled(&log_meta) {
+            logger.log(
+                &log::Record::builder()
+                    .metadata(log_meta)
+                    .module_path(self.meta.module_path)
+                    .file(self.meta.file)
+                    .line(self.meta.line)
+                    .args(format_args!("{} {}", message, self.meta.name))
+                    .build(),
+            );
         }
     }
 
-    #[cfg(not(any(feature = "emit_log_always", feature = "emit_log_optional")))]
+    #[cfg(not(feature = "log"))]
     #[inline]
     fn log(&self, _: &'static str) {}
 }
