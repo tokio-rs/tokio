@@ -36,14 +36,12 @@
 //!   [`Lock`]: struct.Lock.html
 //!   [`LockGuard`]: struct.LockGuard.html
 
-use futures::{Async, Future, Poll, Sink, StartSend, Stream};
+use futures::Async;
 use semaphore;
 use std::cell::UnsafeCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::{fmt, io};
-#[cfg(feature = "io")]
-use tokio_io;
+use std::fmt;
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
@@ -155,8 +153,6 @@ where
     }
 }
 
-// === forwarding traits for LockGuard<T> ===
-
 impl<T> Deref for LockGuard<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -172,60 +168,8 @@ impl<T> DerefMut for LockGuard<T> {
     }
 }
 
-impl<T: io::Read> io::Read for LockGuard<T> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        io::Read::read(&mut **self, buf)
-    }
-}
-
-impl<T: io::Write> io::Write for LockGuard<T> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        io::Write::write(&mut **self, buf)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        io::Write::flush(&mut **self)
-    }
-}
-
-#[cfg(feature = "io")]
-impl<T: tokio_io::AsyncRead> tokio_io::AsyncRead for LockGuard<T> {}
-
-#[cfg(feature = "io")]
-impl<T: tokio_io::AsyncWrite> tokio_io::AsyncWrite for LockGuard<T> {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        tokio_io::AsyncWrite::shutdown(&mut **self)
-    }
-}
-
 impl<T: fmt::Display> fmt::Display for LockGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
-    }
-}
-
-impl<T: Stream> Stream for LockGuard<T> {
-    type Item = T::Item;
-    type Error = T::Error;
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        T::poll(&mut **self)
-    }
-}
-
-impl<T: Sink> Sink for LockGuard<T> {
-    type SinkItem = T::SinkItem;
-    type SinkError = T::SinkError;
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        T::start_send(&mut **self, item)
-    }
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        T::poll_complete(&mut **self)
-    }
-}
-
-impl<T: Future> Future for LockGuard<T> {
-    type Item = T::Item;
-    type Error = T::Error;
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        T::poll(&mut **self)
     }
 }

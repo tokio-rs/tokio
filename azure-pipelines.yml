@@ -67,8 +67,6 @@ jobs:
         - sync
       tokio-buf:
         - util
-      tokio-sync:
-        - io
 
 # Check async / await
 - template: ci/azure-cargo-check.yml

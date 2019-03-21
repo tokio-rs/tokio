@@ -9,8 +9,6 @@
 extern crate fnv;
 #[macro_use]
 extern crate futures;
-#[cfg(feature = "io")]
-extern crate tokio_io;
 
 macro_rules! debug {
     ($($t:tt)*) => {
