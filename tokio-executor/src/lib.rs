@@ -33,15 +33,23 @@
 //!
 //! * [`Park`] abstracts over blocking and unblocking the current thread.
 //!
+//! # Implementing an executor
+//!
+//! Executors should always implement `TypedExecutor`. This usually is the bound
+//! that applications and libraries will use when generic over an executor. See
+//! the [trait documentation][`TypedExecutor`] for more details.
+//!
+//! If the executor is able to spawn all futures that are `Send`, then the
+//! executor should also implement the `Executor` trait. This trait is rarely
+//! used directly by applications and libraries. Instead, `tokio::spawn` is
+//! configured to dispatch to type that implements `Executor`.
+//!
 //! [`Executor`]: trait.Executor.html
+//! [`TypedExecutor`]: trait.TypedExecutor.html
 //! [`enter`]: fn.enter.html
 //! [`DefaultExecutor`]: struct.DefaultExecutor.html
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
-//!
-//! # Implementing an executor
-//!
-//! TODO: Dox
 
 extern crate crossbeam_utils;
 extern crate futures;
