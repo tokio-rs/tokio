@@ -27,13 +27,7 @@ jobs:
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-  - script: |
-      set -e
-      cat ci/patch.toml >> Cargo.toml
-      echo "~~~~ Cargo.toml ~~~~"
-      cat Cargo.toml
-      echo "~~~~~~~~~~~~~~~~~~~~"
-    displayName: Patch Cargo.toml
+  - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
     - script: cargo test
