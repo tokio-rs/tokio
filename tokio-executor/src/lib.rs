@@ -17,8 +17,12 @@
 //! This crate provides traits and utilities that are necessary for building an
 //! executor, including:
 //!
-//! * The [`Executor`] trait describes the API for spawning a future onto an
-//!   executor.
+//! * The [`Executor`] trait spawns future object onto an executor.
+//!
+//! * The [`TypedExecutor`] trait spawns futures of a specific type onto an
+//!   executor. This is used to be generic over executors that spawn futures
+//!   that are either `Send` or `!Send` or implement executors that apply to
+//!   specific futures.
 //!
 //! * [`enter`] marks that the current thread is entering an execution
 //!   context. This prevents a second executor from accidentally starting from
@@ -34,6 +38,10 @@
 //! [`DefaultExecutor`]: struct.DefaultExecutor.html
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
+//!
+//! # Implementing an executor
+//!
+//! TODO: Dox
 
 extern crate crossbeam_utils;
 extern crate futures;

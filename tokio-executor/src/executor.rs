@@ -22,6 +22,12 @@ use SpawnError;
 /// `Send`). Note that single threaded executors can still implement `Executor`,
 /// but only futures that are `Send` can be spawned via the trait.
 ///
+/// This trait is primarily intended to implemented by executors and used to
+/// back `tokio::spawn`. Libraries and applications **may** use this trait to
+/// bound generics, but doing so will limit usage to futures that implement
+/// `Send`. Instead, libraries and applications are recommended to use
+/// [`TypedExecutor`] as a bound.
+///
 /// # Errors
 ///
 /// The [`spawn`] function returns `Result` with an error type of `SpawnError`.
@@ -57,6 +63,7 @@ use SpawnError;
 ///
 /// [`spawn`]: #tymethod.spawn
 /// [`poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
+/// [`TypedExecutor`]: ../trait.TypedExecutor.html
 pub trait Executor {
     /// Spawns a future object to run on this executor.
     ///
