@@ -57,30 +57,32 @@ impl PartialOrd<LevelFilter> for Level {
 ///
 /// This value is checked by the `event` macro. Code that manually calls functions on that value
 /// should compare the level against this value.
+pub const STATIC_MAX_LEVEL: LevelFilter = MAX_LEVEL;
+
 cfg_if! {
     if #[cfg(all(not(debug_assertions), feature = "release_max_level_off"))] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
+        const MAX_LEVEL: LevelFilter = LevelFilter::OFF;
     } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_error"))] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
+        const MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
     } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_warn"))] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::WARN;
+        const MAX_LEVEL: LevelFilter = LevelFilter::WARN;
     } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_info"))] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::INFO;
+        const MAX_LEVEL: LevelFilter = LevelFilter::INFO;
     } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_debug"))] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
+        const MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
     } else if #[cfg(all(not(debug_assertions), feature = "release_max_level_trace"))] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
+        const MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
     } else if #[cfg(feature = "max_level_off")] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::OFF;
+        const MAX_LEVEL: LevelFilter = LevelFilter::OFF;
     } else if #[cfg(feature = "max_level_error")] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
+        const MAX_LEVEL: LevelFilter = LevelFilter::ERROR;
     } else if #[cfg(feature = "max_level_warn")] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::WARN;
+        const MAX_LEVEL: LevelFilter = LevelFilter::WARN;
     } else if #[cfg(feature = "max_level_info")] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::INFO;
+        const MAX_LEVEL: LevelFilter = LevelFilter::INFO;
     } else if #[cfg(feature = "max_level_debug")] {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
+        const MAX_LEVEL: LevelFilter = LevelFilter::DEBUG;
     } else {
-        pub const STATIC_MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
+        const MAX_LEVEL: LevelFilter = LevelFilter::TRACE;
     }
 }
