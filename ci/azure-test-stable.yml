@@ -26,7 +26,7 @@ jobs:
         CI: 'True'
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-      condition: and(succeeded(), contains(variables['Build.SourceVersionMessage'], "\n[release]"))
+      condition: and(succeeded(), contains(variables['Build.SourceVersionMessage'], '[release]'))
 
   - script: |
       set -e
