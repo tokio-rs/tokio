@@ -283,7 +283,7 @@ pub trait Subscriber: 'static {
     /// implementations which consist of multiple composed types. Such
     /// subscribers might allow `downcast_raw` by returning references to those
     /// component if they contain components with the given `TypeId`.
-    fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
+    unsafe fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
         if id == TypeId::of::<Self>() {
             Some(self as *const Self as *const ())
         } else {
@@ -295,14 +295,16 @@ pub trait Subscriber: 'static {
 impl Subscriber {
     /// Returns `true` if this `Subscriber` is the same type as `T`.
     pub fn is<T: Any>(&self) -> bool {
-        self.downcast_raw(TypeId::of::<T>()).is_some()
+        unsafe { self.downcast_raw(TypeId::of::<T>()).is_some() }
     }
 
     /// Returns some reference to this `Subscriber` value if it is of type `T`,
     /// or `None` if it isn't.
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        self.downcast_raw(TypeId::of::<T>())
-            .map(|raw| unsafe { &*(raw as *const _) })
+        unsafe {
+            self.downcast_raw(TypeId::of::<T>())
+                .map(|raw| &*(raw as *const _))
+        }
     }
 }
 
