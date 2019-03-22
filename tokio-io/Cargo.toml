@@ -25,4 +25,4 @@ futures = "0.1.18"
 log = "0.4"
 
 [dev-dependencies]
-tokio-current-thread = { version = "0.1.1", path = "../tokio-current-thread" }
+tokio-current-thread = "0.1.1"

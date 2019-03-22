@@ -176,6 +176,19 @@ impl<'a> tokio_executor::Executor for &'a Sender {
     }
 }
 
+impl<T> tokio_executor::TypedExecutor<T> for Sender
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
+        tokio_executor::Executor::status(self)
+    }
+
+    fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
+        tokio_executor::Executor::spawn(self, Box::new(future))
+    }
+}
+
 impl<T> future::Executor<T> for Sender
 where
     T: Future<Item = (), Error = ()> + Send + 'static,
