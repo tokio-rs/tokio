@@ -20,9 +20,9 @@ jobs:
       rust_version: stable
 
   - script: |
-    set -e
+      set -e
 
-    git --no-pager log
+      git --no-pager log
 
       # - script: echo WUT = $(Build.SourceVersionMessage)
       #   displayName: source version message
