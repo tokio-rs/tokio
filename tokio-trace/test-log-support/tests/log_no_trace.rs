@@ -53,6 +53,13 @@ fn test_always_log() {
 
     span!("foo", bar = 3, baz = false);
     last(&a, "span=foo; bar=3 baz=false");
+
+    let mut span = span!("foo", bar, baz);
+    span.record("bar", &3);
+    last(&a, "foo: bar=3");
+    span.record("baz", &"a string");
+    last(&a, "foo: baz=\"a string\"");
+
 }
 
 fn last(state: &State, expected: &str) {

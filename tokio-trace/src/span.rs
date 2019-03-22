@@ -277,7 +277,7 @@ impl Span {
     ///
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
-        self.log("->");
+        self.log(format_args!("-> {}", self.meta.name));
         let result = match self.inner.take() {
             Some(inner) => {
                 let guard = inner.enter();
@@ -287,7 +287,7 @@ impl Span {
             }
             None => f(),
         };
-        self.log("<-");
+        self.log(format_args!("<- {}", self.meta.name));
         result
     }
 
@@ -317,24 +317,25 @@ impl Span {
         Q: field::AsField,
         V: field::Value,
     {
-        if let Some(ref mut inner) = self.inner {
-            if let Some(field) = field.as_field(self.meta) {
-                inner.record(
-                    &self
-                        .meta
-                        .fields()
-                        .value_set(&[(&field, Some(value as &field::Value))]),
-                )
-            }
+        if let Some(field) = field.as_field(self.meta) {
+            self.record_all(
+                &self
+                    .meta
+                    .fields()
+                    .value_set(&[(&field, Some(value as &field::Value))]),
+            );
         }
+
         self
     }
 
     /// Visit all the fields in the span
     pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
+        let record = Record::new(values);
         if let Some(ref mut inner) = self.inner {
-            inner.record(&values);
+            inner.record(&record);
         }
+        self.log(format_args!("{}: {}", self.meta.name(), FmtValues(&record)));
         self
     }
 
@@ -382,7 +383,7 @@ impl Span {
 
     #[cfg(feature = "log")]
     #[inline]
-    fn log(&self, message: &'static str) {
+    fn log(&self, message: fmt::Arguments) {
         use log;
         let logger = log::logger();
         let log_meta = log::Metadata::builder()
@@ -396,7 +397,7 @@ impl Span {
                     .module_path(self.meta.module_path)
                     .file(self.meta.file)
                     .line(self.meta.line)
-                    .args(format_args!("{} {}", message, self.meta.name))
+                    .args(message)
                     .build(),
             );
         }
@@ -404,7 +405,7 @@ impl Span {
 
     #[cfg(not(feature = "log"))]
     #[inline]
-    fn log(&self, _: &'static str) {}
+    fn log(&self, _: fmt::Arguments) {}
 }
 
 impl cmp::PartialEq for Span {
@@ -476,8 +477,8 @@ impl Inner {
         self.id.clone()
     }
 
-    fn record(&mut self, values: &field::ValueSet) {
-        self.subscriber.record(&self.id, &Record::new(values))
+    fn record(&mut self, values: &Record) {
+        self.subscriber.record(&self.id, values)
     }
 
     #[cfg(feature = "trace")]
@@ -524,5 +525,17 @@ impl Entered {
     fn exit(self) -> Inner {
         self.inner.subscriber.exit(&self.inner.id);
         self.inner
+    }
+}
+
+struct FmtValues<'a>(&'a Record<'a>);
+
+impl<'a> fmt::Display for FmtValues<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut res = Ok(());
+        self.0.record(&mut |k: &field::Field, v: &fmt::Debug| {
+            res = write!(f, "{}={:?} ", k, v);
+        });
+        res
     }
 }
