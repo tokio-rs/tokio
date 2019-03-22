@@ -286,6 +286,15 @@ pub trait Subscriber: 'static {
     /// implementations which consist of multiple composed types. Such
     /// subscribers might allow `downcast_raw` by returning references to those
     /// component if they contain components with the given `TypeId`.
+    ///
+    /// # Safety
+    ///
+    /// The [`downcast_ref`] method expects that the pointer returned by
+    /// `downcast_raw` is non-null and points to a valid instance of the type
+    /// with the provided `TypeId`. Failure to ensure this will result in
+    /// undefined behaviour, so implementing `downcast_raw` is unsafe.
+    ///
+    /// [`downcast_ref`]: #method.downcast_ref
     unsafe fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
         if id == TypeId::of::<Self>() {
             Some(self as *const Self as *const ())
