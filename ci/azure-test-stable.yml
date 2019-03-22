@@ -22,10 +22,10 @@ jobs:
   - script: |
       set -e
 
-      git --no-pager log
-
-      # - script: echo WUT = $(Build.SourceVersionMessage)
-      #   displayName: source version message
+      if git --no-pager log --no-merges -1 --format='%s' | grep -q '[ci-release]'; then
+        echo "IS RELEASE YO"
+      fi
+    displayName: Check if release commit
 
   - ${{ each crate in parameters.crates }}:
     - script: cargo test
