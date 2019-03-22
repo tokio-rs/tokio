@@ -1,3 +1,8 @@
+# 0.1.7 (March 22, 2019)
+
+### Added
+- `TypedExecutor` for spawning futures of a specific type (#993).
+
 # 0.1.6 (January 6, 2019)
 
 * Implement `Unpark` for `Arc<Unpark>` (#802).
