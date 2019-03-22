@@ -19,14 +19,7 @@ jobs:
     parameters:
       rust_version: stable
 
-  - bash: |
-      set -e
-
-      if git log --no-merges -1 --format='%s' | grep -q '[ci-release]'; then
-        echo "##vso[task.setvariable variable=isRelease]true"
-      fi
-    failOnStderr: true
-    displayName: Check if release commit
+  - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
     - script: cargo test
