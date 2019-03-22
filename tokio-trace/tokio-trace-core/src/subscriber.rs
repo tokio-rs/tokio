@@ -1,7 +1,10 @@
 //! Subscribers collect and record trace data.
 use {span, Event, Metadata};
 
-use std::any::{Any, TypeId};
+use std::{
+    any::{Any, TypeId},
+    ptr,
+};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -295,15 +298,19 @@ pub trait Subscriber: 'static {
 impl Subscriber {
     /// Returns `true` if this `Subscriber` is the same type as `T`.
     pub fn is<T: Any>(&self) -> bool {
-        unsafe { self.downcast_raw(TypeId::of::<T>()).is_some() }
+       self.downcast_ref::<T>().is_some()
     }
 
     /// Returns some reference to this `Subscriber` value if it is of type `T`,
     /// or `None` if it isn't.
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         unsafe {
-            self.downcast_raw(TypeId::of::<T>())
-                .map(|raw| &*(raw as *const _))
+            let raw = self.downcast_raw(TypeId::of::<T>())?;
+            if raw == ptr::null() {
+                None
+            } else {
+                Some(&*(raw as *const _))
+            }
         }
     }
 }
