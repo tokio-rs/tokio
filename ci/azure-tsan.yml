@@ -14,8 +14,10 @@ jobs:
     parameters:
       rust_version: nightly-2018-11-18
 
+  - template: azure-patch-crates.yml
   - script: |
         set -e
+
         # Make sure the benchmarks compile
         export ASAN_OPTIONS="detect_odr_violation=0 detect_leaks=0"
         export TSAN_OPTIONS="suppressions=`pwd`/ci/tsan"

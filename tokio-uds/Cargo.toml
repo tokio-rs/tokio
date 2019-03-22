@@ -26,10 +26,10 @@ libc = "0.2.42"
 log = "0.4.2"
 mio = "0.6.14"
 mio-uds = "0.6.5"
-tokio-codec = { version = "0.1.0", path = "../tokio-codec" }
-tokio-reactor = { version = "0.1.1", path = "../tokio-reactor" }
-tokio-io = { version = "0.1.6", path = "../tokio-io" }
+tokio-codec = "0.1.0"
+tokio-reactor = "0.1.1"
+tokio-io = "0.1.6"
 
 [dev-dependencies]
-tokio = { version = "0.1.6", path = "../" }
+tokio = "0.1.6"
 tempfile = "3"

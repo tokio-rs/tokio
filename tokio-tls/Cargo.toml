@@ -22,10 +22,10 @@ travis-ci = { repository = "tokio-rs/tokio-tls" }
 [dependencies]
 futures = "0.1.23"
 native-tls = "0.2"
-tokio-io = { version = "0.1.7", path = "../tokio-io" }
+tokio-io = "0.1.7"
 
 [dev-dependencies]
-tokio = { version = "0.1", path = "../" }
+tokio = "0.1"
 cfg-if = "0.1"
 env_logger = { version = "0.5", default-features = false }
 

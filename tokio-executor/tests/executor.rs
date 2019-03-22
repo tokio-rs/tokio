@@ -2,10 +2,11 @@ extern crate futures;
 extern crate tokio_executor;
 
 use futures::{future::lazy, Future};
-use tokio_executor::*;
+use tokio_executor::DefaultExecutor;
 
 mod out_of_executor_context {
     use super::*;
+    use tokio_executor::Executor;
 
     fn test<F, E>(spawn: F)
     where

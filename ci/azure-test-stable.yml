@@ -19,20 +19,27 @@ jobs:
     parameters:
       rust_version: stable
 
-  - ${{ each crate in parameters.crates }}:
-    - ${{ if eq(crate, 'tokio') }}:
-      - script: cargo test
-        env:
-          LOOM_MAX_DURATION: 10
-          CI: 'True'
-        displayName: cargo test
+  - template: azure-is-release.yml
 
-    - ${{ if not(eq(crate, 'tokio')) }}:
-      - script: cargo test
-        env:
-          LOOM_MAX_DURATION: 10
-          CI: 'True'
-          ${{ if eq(crate, 'tokio-trace') }}:
-            TOKIO_TRACE_ENABLED: true
-        displayName: cargo test -p ${{ crate }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+  - ${{ each crate in parameters.crates }}:
+    - script: cargo test
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+        ${{ if eq(crate, 'tokio-trace') }}:
+          TOKIO_TRACE_ENABLED: true
+      displayName: cargo test -p ${{ crate }}
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+      condition: and(succeeded(), not(variables['isRelease']))
+
+  - template: azure-patch-crates.yml
+
+  - ${{ each crate in parameters.crates }}:
+    - script: cargo test
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+        ${{ if eq(crate, 'tokio-trace') }}:
+          TOKIO_TRACE_ENABLED: true
+      displayName: cargo test -p ${{ crate }} (PATCHED)
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}

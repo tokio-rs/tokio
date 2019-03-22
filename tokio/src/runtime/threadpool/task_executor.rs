@@ -73,3 +73,12 @@ impl ::executor::Executor for TaskExecutor {
         self.inner.spawn(future)
     }
 }
+
+impl<T> ::executor::TypedExecutor<T> for TaskExecutor
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
+        ::executor::Executor::spawn(self, Box::new(future))
+    }
+}
