@@ -350,9 +350,9 @@ mod sealed {
     pub trait Sealed {}
 }
 
-#[cfg(not(all(feature = "log", not(feature = "trace"))))]
+#[cfg(feature = "trace")]
 #[doc(hidden)]
 pub const EMIT_TRACE: bool = true;
 
-#[cfg(all(feature = "log", not(feature = "trace")))]
+#[cfg(not(feature = "trace"))]
 pub const EMIT_TRACE: bool = false;

@@ -60,7 +60,7 @@ pub mod thread_pool {
     };
 }
 
-pub use tokio_executor::{Executor, DefaultExecutor, SpawnError};
+pub use tokio_executor::{Executor, TypedExecutor, DefaultExecutor, SpawnError};
 
 use futures::{Future, IntoFuture};
 use futures::future::{self, FutureResult};

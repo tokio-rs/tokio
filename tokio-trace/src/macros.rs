@@ -112,21 +112,17 @@ macro_rules! span {
             };
             let meta = callsite.metadata();
 
-            __tokio_trace_log!(
-                target: $target,
-                $lvl,
-                span = __tokio_trace_format_args!("{};", $name),
-                $( $k $( = $val )* ),*
-            );
-
-            if $crate::EMIT_TRACE && is_enabled!(callsite) {
+            if is_enabled!(callsite) {
                 $crate::Span::child_of(
                     $parent,
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled(meta)
+                 __tokio_trace_disabled_span!(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*)
+                )
             }
         }
     };
@@ -147,21 +143,16 @@ macro_rules! span {
             };
             let meta = callsite.metadata();
 
-            __tokio_trace_log!(
-                target: $target,
-                $lvl,
-                span = __tokio_trace_format_args!("{};", $name),
-                $( $k $( = $val )* ),*
-            );
-
-            if $crate::EMIT_TRACE && is_enabled!(callsite) {
-                let meta = callsite.metadata();
+            if is_enabled!(callsite) {
                 $crate::Span::new(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled(meta)
+                __tokio_trace_disabled_span!(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*)
+                )
             }
         }
     };
@@ -1031,14 +1022,6 @@ macro_rules! __tokio_trace_stringify {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __tokio_trace_cfg {
-    ($i:ident) => {
-        cfg!($i)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
 macro_rules! __tokio_trace_option_env {
     ($e:expr) => {
         option_env!($e)
@@ -1110,4 +1093,24 @@ macro_rules! __tokio_trace_log {
 #[macro_export]
 macro_rules! __tokio_trace_log {
     (target: $target:expr, $level:expr, $( $key:ident $( = $val:expr )* ),* $(,)* ) => {};
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_disabled_span {
+    ($meta:expr, $valueset:expr) => {{
+        let mut span = $crate::Span::new_disabled($meta);
+        span.record_all(&$valueset);
+        span
+    }};
+}
+
+#[cfg(not(feature = "log"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_disabled_span {
+    ($meta:expr, $valueset:expr) => {
+        $crate::Span::new_disabled($meta)
+    };
 }

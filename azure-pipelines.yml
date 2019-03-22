@@ -35,7 +35,7 @@ jobs:
 - template: ci/azure-test-stable.yml
   parameters:
     name: test_linux
-    displayName: Test sub crates - Any
+    displayName: Test sub crates -
     crates:
       - tokio-buf
       - tokio-codec

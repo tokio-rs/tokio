@@ -11,16 +11,22 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust }}
 
+  - template: azure-is-release.yml
+
   - ${{ each crate in parameters.crates }}:
     - ${{ each feature in crate.value }}:
-      - ${{ if eq(crate.key, 'tokio') }}:
-        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
-          displayName: Check features = ${{ feature }}
+      - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
+        displayName: Check `${{ crate.key }}`, features = ${{ feature }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+        condition: and(succeeded(), not(variables['isRelease']))
 
-      - ${{ if not(eq(crate.key, 'tokio')) }}:
-        - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
-          displayName: Check `${{ crate.key }}`, features = ${{ feature }}
-          workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+  - template: azure-patch-crates.yml
+
+  - ${{ each crate in parameters.crates }}:
+    - ${{ each feature in crate.value }}:
+      - script: cargo check ${{ parameters.noDefaultFeatures }} --features ${{ feature }}
+        displayName: Check `${{ crate.key }}`, features = ${{ feature }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
   - ${{ if parameters.benches }}:
     - script: cargo check --benches --all

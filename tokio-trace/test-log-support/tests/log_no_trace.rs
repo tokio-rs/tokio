@@ -42,7 +42,7 @@ fn test_always_log() {
     last(&a, "hello world; thingy=42 other_thingy=666");
 
     let mut foo = span!("foo");
-    last(&a, "span=foo;");
+    last(&a, "foo;");
     foo.enter(|| {
         last(&a, "-> foo");
 
@@ -52,7 +52,13 @@ fn test_always_log() {
     last(&a, "<- foo");
 
     span!("foo", bar = 3, baz = false);
-    last(&a, "span=foo; bar=3 baz=false");
+    last(&a, "foo; bar=3 baz=false");
+
+    let mut span = span!("foo", bar, baz);
+    span.record("bar", &3);
+    last(&a, "foo; bar=3");
+    span.record("baz", &"a string");
+    last(&a, "foo; baz=\"a string\"");
 }
 
 fn last(state: &State, expected: &str) {

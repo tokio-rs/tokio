@@ -76,6 +76,15 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
     }
 }
 
+impl<T> ::executor::TypedExecutor<T> for Handle
+where
+    T: Future<Item = (), Error = ()> + Send + 'static,
+{
+    fn spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
+        Handle::spawn(self, future)
+    }
+}
+
 /// Error returned by the `run` function.
 #[derive(Debug)]
 pub struct RunError {
