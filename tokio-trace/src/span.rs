@@ -247,8 +247,9 @@ impl Span {
     fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
         #[cfg(feature = "trace")]
         let span = {
+            let attrs = &new_span;
             let inner = ::dispatcher::get_default(move |dispatch| {
-                let id = dispatch.new_span(&new_span);
+                let id = dispatch.new_span(attrs);
                 Some(Inner::new(id, dispatch))
             });
             Self { inner, meta }
@@ -269,7 +270,6 @@ impl Span {
         };
 
         span.log(format_args!("{}; {}", meta.name(), FmtAttrs(&new_span)));
-
         span
     }
 
