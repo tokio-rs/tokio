@@ -267,14 +267,6 @@ pub trait Subscriber: 'static {
 
     // === Downcasting methods ================================================
 
-    /// Gets the `TypeId` of `Self`.
-    ///
-    /// Implementations of `Subscriber` are **not** expected to override this!
-    #[doc(hidden)]
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-
     /// If `self` is the same type as the provided `TypeId`, returns an untyped
     /// `*const` pointer to that type. Otherwise, returns `None`.
     ///
@@ -292,7 +284,7 @@ pub trait Subscriber: 'static {
     /// subscribers might allow `downcast_raw` by returning references to those
     /// component if they contain components with the given `TypeId`.
     fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
-        if id == self.type_id() {
+        if id == TypeId::of::<Self>() {
             Some(self as *const Self as *const ())
         } else {
             None
