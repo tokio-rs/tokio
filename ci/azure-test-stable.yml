@@ -22,8 +22,8 @@ jobs:
   - script: |
       set -e
 
-      if git --no-pager log --no-merges -1 --format='%s' | grep -q '[ci-release]'; then
-        echo "IS RELEASE YO"
+      if git log --no-merges -1 --format='%s' | grep -q '[ci-release]'; then
+        echo "##vso[task.setvariable variable=isRelease]true"
       fi
     displayName: Check if release commit
 
@@ -34,7 +34,7 @@ jobs:
         CI: 'True'
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-      condition: and(succeeded(), not(contains(variables['Build.SourceVersionMessage'], '[ci-release]')))
+      condition: and(succeeded(), not(variables['isRelease']))
 
   - template: azure-patch-crates.yml
 
