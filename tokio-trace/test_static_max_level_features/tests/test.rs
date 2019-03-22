@@ -33,7 +33,8 @@ impl Subscriber for TestSubscriber {
     fn exit(&self, _span: &Id) {}
 }
 
-fn main() {
+#[cfg(test)]
+fn test_static_max_level_features() {
     let me = Arc::new(State {
         last_level: Mutex::new(None),
     });
