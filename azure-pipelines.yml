@@ -2,7 +2,7 @@ trigger: ["master"]
 pr: ["master"]
 
 variables:
-  release_mode: ci: release
+  release_mode: 'ci: release'
 
 jobs:
 # Check formatting
