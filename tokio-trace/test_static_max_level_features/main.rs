@@ -1,75 +1,70 @@
 #[macro_use]
-extern crate log;
+extern crate tokio_trace;
 
 use std::sync::{Arc, Mutex};
-use log::{Level, LevelFilter, Log, Record, Metadata};
-
-#[cfg(feature = "std")]
-use log::set_boxed_logger;
-#[cfg(not(feature = "std"))]
-fn set_boxed_logger(logger: Box<Log>) -> Result<(), log::SetLoggerError> {
-    unsafe {
-        log::set_logger(&*Box::into_raw(logger))
-    }
-}
+use tokio_trace::span::{Attributes, Record};
+use tokio_trace::{span, Event, Id, Level, Metadata, Subscriber};
 
 struct State {
-    last_log: Mutex<Option<Level>>,
+    last_level: Mutex<Option<Level>>,
 }
 
-struct Logger(Arc<State>);
+struct TestSubscriber(Arc<State>);
 
-impl Log for Logger {
+impl Subscriber for TestSubscriber {
     fn enabled(&self, _: &Metadata) -> bool {
         true
     }
 
-    fn log(&self, record: &Record) {
-        *self.0.last_log.lock().unwrap() = Some(record.level());
+    fn new_span(&self, _span: &Attributes) -> Id {
+        span::Id::from_u64(42)
     }
 
-    fn flush(&self) {}
+    fn record(&self, _span: &Id, _values: &Record) {}
+
+    fn record_follows_from(&self, _span: &Id, _follows: &Id) {}
+
+    fn event(&self, event: &Event) {
+        *self.0.last_level.lock().unwrap() = Some(event.metadata().level().clone());
+    }
+
+    fn enter(&self, _span: &Id) {}
+
+    fn exit(&self, _span: &Id) {}
 }
 
 fn main() {
-    let me = Arc::new(State { last_log: Mutex::new(None) });
+    let me = Arc::new(State {
+        last_level: Mutex::new(None),
+    });
     let a = me.clone();
-    set_boxed_logger(Box::new(Logger(me))).unwrap();
-
-    test(&a, LevelFilter::Off);
-    test(&a, LevelFilter::Error);
-    test(&a, LevelFilter::Warn);
-    test(&a, LevelFilter::Info);
-    test(&a, LevelFilter::Debug);
-    test(&a, LevelFilter::Trace);
-}
-
-fn test(a: &State, filter: LevelFilter) {
-    log::set_max_level(filter);
-    error!("");
-    last(&a, t(Level::Error, filter));
-    warn!("");
-    last(&a, t(Level::Warn, filter));
-    info!("");
-    last(&a, t(Level::Info, filter));
-
-    debug!("");
-    if cfg!(debug_assertions) {
-        last(&a, t(Level::Debug, filter));
-    } else {
+    tokio_trace::subscriber::with_default(TestSubscriber(me), || {
+        error!("");
+        last(&a, Some(Level::ERROR));
+        warn!("");
+        last(&a, Some(Level::WARN));
+        info!("");
+        last(&a, Some(Level::INFO));
+        debug!("");
+        last(&a, Some(Level::DEBUG));
+        trace!("");
         last(&a, None);
-    }
 
-    trace!("");
-    last(&a, None);
-
-    fn t(lvl: Level, filter: LevelFilter) -> Option<Level> {
-        if lvl <= filter {Some(lvl)} else {None}
-    }
+        span!(level: Level::ERROR, "");
+        last(&a, None);
+        span!(level: Level::WARN, "");
+        last(&a, None);
+        span!(level: Level::INFO, "");
+        last(&a, None);
+        span!(level: Level::DEBUG, "");
+        last(&a, None);
+        span!(level: Level::TRACE, "");
+        last(&a, None);
+    });
 }
 
 fn last(state: &State, expected: Option<Level>) {
-    let mut lvl = state.last_log.lock().unwrap();
+    let mut lvl = state.last_level.lock().unwrap();
     assert_eq!(*lvl, expected);
     *lvl = None;
 }

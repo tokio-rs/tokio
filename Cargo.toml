@@ -40,6 +40,7 @@ members = [
   "tokio-tcp",
   "tokio-tls",
   "tokio-trace",
+  "tokio-trace/test_static_max_level_features",
   "tokio-trace/tokio-trace-core",
   "tokio-udp",
   "tokio-uds",
