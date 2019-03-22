@@ -6,6 +6,7 @@ use {
 };
 
 use std::{
+    any::Any,
     cell::RefCell,
     fmt,
     sync::{Arc, Weak},
@@ -226,6 +227,20 @@ impl Dispatch {
     pub fn drop_span(&self, id: span::Id) {
         self.subscriber.drop_span(id)
     }
+
+    /// Returns `true` if this `Dispatch` forwards to a `Subscriber` of type
+    /// `T`.
+    #[inline]
+    pub fn is<T: Any>(&self) -> bool {
+        Subscriber::is::<T>(&*self.subscriber)
+    }
+
+    /// Returns some reference to the `Subscriber` this `Dispatch` forwards to
+    /// if it is of type `T`, or `None` if it isn't.
+    #[inline]
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        Subscriber::downcast_ref(&*self.subscriber)
+    }
 }
 
 impl fmt::Debug for Dispatch {
@@ -273,5 +288,22 @@ impl Subscriber for NoSubscriber {
 impl Registrar {
     pub(crate) fn try_register(&self, metadata: &Metadata) -> Option<subscriber::Interest> {
         self.0.upgrade().map(|s| s.register_callsite(metadata))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn dispatch_is() {
+        let dispatcher = Dispatch::new(NoSubscriber);
+        assert!(dispatcher.is::<NoSubscriber>());
+    }
+
+    #[test]
+    fn dispatch_downcasts() {
+        let dispatcher = Dispatch::new(NoSubscriber);
+        assert!(dispatcher.downcast_ref::<NoSubscriber>().is_some());
     }
 }
