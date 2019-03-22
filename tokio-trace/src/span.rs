@@ -244,28 +244,33 @@ impl Span {
         Span { inner: None, meta }
     }
 
-    #[cfg(feature = "trace")]
-    #[inline(always)]
     fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
-        let inner = ::dispatcher::get_default(move |dispatch| {
-            let id = dispatch.new_span(&new_span);
-            Some(Inner::new(id, dispatch))
-        });
-        Self { inner, meta }
-    }
+        #[cfg(feature = "trace")]
+        let span = {
+            let inner = ::dispatcher::get_default(move |dispatch| {
+                let id = dispatch.new_span(&new_span);
+                Some(Inner::new(id, dispatch))
+            });
+            Self { inner, meta }
+        };
 
-    #[cfg(not(feature = "trace"))]
-    fn make(meta: &'static Metadata<'static>, _: Attributes) -> Span {
-        use std::sync::Once;
-        static PRINTED_WARNING: Once = Once::new();
-        PRINTED_WARNING.call_once(|| {
-            eprintln!(
-                "warning: `tokio-trace` instrumentation is experimental.\n\
-                 note: to enable `tokio-trace`, compile with the environment \
-                 variable `TOKIO_TRACE_ENABLED` set."
-            )
-        });
-        Self::new_disabled(meta)
+        #[cfg(not(feature = "trace"))]
+        let span = {
+            use std::sync::Once;
+            static PRINTED_WARNING: Once = Once::new();
+            PRINTED_WARNING.call_once(|| {
+                eprintln!(
+                    "warning: `tokio-trace` instrumentation is experimental.\n\
+                     note: to enable `tokio-trace`, compile with the environment \
+                     variable `TOKIO_TRACE_ENABLED` set."
+                )
+            });
+            Self { inner: None, meta }
+        };
+
+        span.log(format_args!("{}; {}", meta.name(), FmtAttrs(&new_span)));
+
+        span
     }
 
     /// Executes the given function in the context of this span.
@@ -335,7 +340,7 @@ impl Span {
         if let Some(ref mut inner) = self.inner {
             inner.record(&record);
         }
-        self.log(format_args!("{}: {}", self.meta.name(), FmtValues(&record)));
+        self.log(format_args!("{}; {}", self.meta.name(), FmtValues(&record)));
         self
     }
 
@@ -531,6 +536,18 @@ impl Entered {
 struct FmtValues<'a>(&'a Record<'a>);
 
 impl<'a> fmt::Display for FmtValues<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut res = Ok(());
+        self.0.record(&mut |k: &field::Field, v: &fmt::Debug| {
+            res = write!(f, "{}={:?} ", k, v);
+        });
+        res
+    }
+}
+
+struct FmtAttrs<'a>(&'a Attributes<'a>);
+
+impl<'a> fmt::Display for FmtAttrs<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut res = Ok(());
         self.0.record(&mut |k: &field::Field, v: &fmt::Debug| {
