@@ -19,6 +19,9 @@ jobs:
     parameters:
       rust_version: stable
 
+  - script: echo WUT = $(Build.SourceVersionMessage)
+    displayName: source version message
+
   - ${{ each crate in parameters.crates }}:
     - script: cargo test
       env:
