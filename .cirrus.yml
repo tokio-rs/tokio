@@ -15,14 +15,6 @@ task:
     - sh rustup.sh -y
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
-  cargo_cache:
-    folder: $HOME/.cargo/registry
-  test_script:
-    - . $HOME/.cargo/env
-    - cargo test --all --no-fail-fast
-    - cargo doc --all
-  i686_test_script:
-    - . $HOME/.cargo/env
     - |
       # Remove any existing patch statements
       mv Cargo.toml Cargo.toml.bck
@@ -35,7 +27,15 @@ task:
       echo "~~~~ Cargo.toml ~~~~"
       cat Cargo.toml
       echo "~~~~~~~~~~~~~~~~~~~~"
-
+  cargo_cache:
+    folder: $HOME/.cargo/registry
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test --all --no-fail-fast
+    - cargo doc --all
+  i686_test_script:
+    - . $HOME/.cargo/env
+    - |
       cargo test --all --exclude tokio-tls --no-fail-fast --target i686-unknown-freebsd
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index
