@@ -14,6 +14,9 @@ jobs:
   - script: rustup target add ${{ parameters.target }}
     displayName: "Add target"
 
+  # Always patch
+  - template: azure-patch-crates.yml
+
   - script: cargo check --all --exclude tokio-tls --target ${{ parameters.target }}
     displayName: Check source
 

@@ -8,5 +8,7 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust_version }}
 
+  - template: azure-patch-crates.yml
+
   - script: cargo check --all
     displayName: cargo check --all

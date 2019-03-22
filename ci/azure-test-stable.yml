@@ -19,6 +19,8 @@ jobs:
     parameters:
       rust_version: stable
 
+  - template: azure-is-release.yml
+
   - ${{ each crate in parameters.crates }}:
     - script: cargo test
       env:
@@ -26,6 +28,7 @@ jobs:
         CI: 'True'
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+      condition: and(succeeded(), not(variables['isRelease']))
 
   - template: azure-patch-crates.yml
 
