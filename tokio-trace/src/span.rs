@@ -428,13 +428,29 @@ impl Hash for Span {
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut span = f.debug_struct("Span");
-        span.field("name", &self.meta.name());
+        span.field("name", &self.meta.name())
+            .field("level", &self.meta.level())
+            .field("target", &self.meta.target());
+
         if let Some(ref inner) = self.inner {
-            span.field("id", &inner.id())
+            span.field("id", &inner.id());
         } else {
-            span.field("disabled", &true)
+            span.field("disabled", &true);
         }
-        .finish()
+
+        if let Some(ref path) = self.meta.module_path() {
+            span.field("module_path", &path);
+        }
+
+        if let Some(ref line) = self.meta.line() {
+            span.field("line", &line);
+        }
+
+        if let Some(ref file) = self.meta.file() {
+            span.field("file", &file);
+        }
+
+        span.finish()
     }
 }
 
