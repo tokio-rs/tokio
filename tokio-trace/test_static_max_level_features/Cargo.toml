@@ -3,10 +3,6 @@ name = "test_cargo_max_level_features"
 version = "0.1.0"
 publish = false
 
-[[bin]]
-name = "main"
-path = "main.rs"
-
 [dependencies.tokio-trace]
 path = ".."
 features = ["max_level_debug", "release_max_level_info"]
