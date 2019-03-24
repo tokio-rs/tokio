@@ -344,3 +344,49 @@ impl mio::Evented for MyRegistration {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate tokio;
+
+    use self::tokio::timer::Timeout;
+    use self::tokio::runtime::current_thread;
+    use std::time::Duration;
+    use super::*;
+
+    fn test_with_event(ty: DWORD, future: IoFuture<Event>) {
+        let future = Timeout::new(future, Duration::from_secs(1))
+            .map_err(|e| {
+                if e.is_timer() {
+                    panic!("failed to register timer");
+                } else if e.is_elapsed() {
+                    panic!("timed out")
+                } else {
+                    e.into_inner().expect("missing inner error")
+                }
+            });
+
+        let mut rt = current_thread::Runtime::new().unwrap();
+        let event = rt.block_on(future)
+            .expect("failed to run future");
+
+        // Windows doesn't have a good programmatic way of sending events
+        // like sending signals on Unix, so we'll stub out the actual OS
+        // integration and test that our handling works.
+        unsafe { super::handler(ty); }
+
+        rt.block_on(event.into_future()).ok()
+            .expect("failed to run event");
+    }
+
+    #[test]
+    fn ctrl_c() {
+        test_with_event(CTRL_C_EVENT, Box::new(future::lazy(|| Event::ctrl_c())));
+    }
+
+    #[test]
+    #[ignore]
+    fn ctrl_break() {
+        test_with_event(CTRL_BREAK_EVENT, Box::new(future::lazy(|| Event::ctrl_break())));
+    }
+}
