@@ -29,7 +29,7 @@ A high level description of each example is:
 
 * [`connect`](connect.rs) - this is a `nc`-like clone which can be used to
   interact with most other examples. The program creates a TCP connection or UDP
-  socket to sends all information read on stdin to the remote peer, displaying
+  socket and sends all information read on stdin to the remote peer, displaying
   any data received on stdout. Often quite useful when interacting with the
   various other servers here!
 
