@@ -355,8 +355,8 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    fn test_with_event(ty: DWORD, future: IoFuture<Event>) {
-        let future = Timeout::new(future, Duration::from_secs(1)).map_err(|e| {
+    fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
+        Timeout::new(future, Duration::from_secs(1)).map_err(|e| {
             if e.is_timer() {
                 panic!("failed to register timer");
             } else if e.is_elapsed() {
@@ -364,30 +364,38 @@ mod tests {
             } else {
                 e.into_inner().expect("missing inner error")
             }
-        });
+        })
+    }
 
+    #[test]
+    fn ctrl_c_and_ctrl_break() {
+        // FIXME(1000): combining into one test due to a restriction where the
+        // first event loop cannot go away
         let mut rt = current_thread::Runtime::new().unwrap();
-        let event = rt.block_on(future).expect("failed to run future");
+        let event_ctrl_c = rt
+            .block_on(with_timeout(Event::ctrl_c()))
+            .expect("failed to run future");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            super::handler(ty);
+            super::handler(CTRL_C_EVENT);
         }
 
-        rt.block_on(event.into_future())
+        rt.block_on(with_timeout(event_ctrl_c.into_future()))
             .ok()
             .expect("failed to run event");
-    }
 
-    #[test]
-    fn ctrl_c() {
-        test_with_event(CTRL_C_EVENT, Event::ctrl_c());
-    }
+        let event_ctrl_break = rt
+            .block_on(with_timeout(Event::ctrl_break()))
+            .expect("failed to run future");
+        unsafe {
+            super::handler(CTRL_BREAK_EVENT);
+        }
 
-    #[test]
-    fn ctrl_break() {
-        test_with_event(CTRL_BREAK_EVENT, Event::ctrl_break());
+        rt.block_on(with_timeout(event_ctrl_break.into_future()))
+            .ok()
+            .expect("failed to run event");
     }
 }
