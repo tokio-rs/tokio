@@ -144,7 +144,8 @@ impl Stream for Event {
             return Ok(Async::NotReady);
         }
         self.reg.clear_read_ready(Ready::readable())?;
-        self.reg.get_ref()
+        self.reg
+            .get_ref()
             .readiness
             .set_readiness(mio::Ready::empty())
             .expect("failed to set readiness");
@@ -261,7 +262,8 @@ impl DriverTask {
             return Ok(());
         }
         self.reg.clear_read_ready(Ready::readable())?;
-        self.reg.get_ref()
+        self.reg
+            .get_ref()
             .readiness
             .set_readiness(mio::Ready::empty())
             .expect("failed to set readiness");
@@ -348,33 +350,34 @@ impl mio::Evented for MyRegistration {
 mod tests {
     extern crate tokio;
 
-    use self::tokio::timer::Timeout;
     use self::tokio::runtime::current_thread;
-    use std::time::Duration;
+    use self::tokio::timer::Timeout;
     use super::*;
+    use std::time::Duration;
 
     fn test_with_event(ty: DWORD, future: IoFuture<Event>) {
-        let future = Timeout::new(future, Duration::from_secs(1))
-            .map_err(|e| {
-                if e.is_timer() {
-                    panic!("failed to register timer");
-                } else if e.is_elapsed() {
-                    panic!("timed out")
-                } else {
-                    e.into_inner().expect("missing inner error")
-                }
-            });
+        let future = Timeout::new(future, Duration::from_secs(1)).map_err(|e| {
+            if e.is_timer() {
+                panic!("failed to register timer");
+            } else if e.is_elapsed() {
+                panic!("timed out")
+            } else {
+                e.into_inner().expect("missing inner error")
+            }
+        });
 
         let mut rt = current_thread::Runtime::new().unwrap();
-        let event = rt.block_on(future)
-            .expect("failed to run future");
+        let event = rt.block_on(future).expect("failed to run future");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
-        unsafe { super::handler(ty); }
+        unsafe {
+            super::handler(ty);
+        }
 
-        rt.block_on(event.into_future()).ok()
+        rt.block_on(event.into_future())
+            .ok()
             .expect("failed to run event");
     }
 
