@@ -387,7 +387,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn ctrl_break() {
         test_with_event(CTRL_BREAK_EVENT, Event::ctrl_break());
     }
