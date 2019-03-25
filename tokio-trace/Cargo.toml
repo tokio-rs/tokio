@@ -16,12 +16,28 @@ publish = false
 
 [dependencies]
 tokio-trace-core = "0.1"
+cfg-if = "0.1.7"
 
 [dev-dependencies]
 ansi_term = "0.11"
 humantime = "1.1.1"
 futures = "0.1"
 log = "0.4"
+
+[features]
+max_level_off   = []
+max_level_error = []
+max_level_warn  = []
+max_level_info  = []
+max_level_debug = []
+max_level_trace = []
+
+release_max_level_off   = []
+release_max_level_error = []
+release_max_level_warn  = []
+release_max_level_info  = []
+release_max_level_debug = []
+release_max_level_trace = []
 
 # These are used for the "basic" example from the tokio-trace-prototype repo,
 # which is currently not included as it used the `tokio-trace-log` crate, and

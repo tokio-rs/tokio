@@ -47,6 +47,7 @@ jobs:
       - tokio-timer
       - tokio-trace
       - tokio-trace/tokio-trace-core
+      - tokio-trace/test_static_max_level_features
 
 - template: ci/azure-cargo-check.yml
   parameters:

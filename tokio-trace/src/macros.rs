@@ -101,7 +101,7 @@ macro_rules! span {
         $name:expr,
         $($k:ident $( = $val:expr )* ),*
     ) => {
-        {
+        if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
             use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
@@ -120,6 +120,8 @@ macro_rules! span {
             } else {
                 $crate::Span::new_disabled()
             }
+        } else {
+            $crate::Span::new_disabled()
         }
     };
     (
@@ -128,7 +130,7 @@ macro_rules! span {
         $name:expr,
         $($k:ident $( = $val:expr )* ),*
     ) => {
-        {
+        if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
             use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
@@ -146,6 +148,8 @@ macro_rules! span {
             } else {
                 $crate::Span::new_disabled()
             }
+        } else {
+            $crate::Span::new_disabled()
         }
     };
     (target: $target:expr, level: $lvl:expr, parent: $parent:expr, $name:expr) => {
@@ -334,7 +338,7 @@ macro_rules! span {
 #[macro_export(local_inner_macros)]
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* $(,)*} )=> ({
-        {
+        if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
             #[allow(unused_imports)]
             use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
             use $crate::callsite::Callsite;
