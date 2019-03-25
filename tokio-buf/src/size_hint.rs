@@ -29,7 +29,7 @@ impl SizeHint {
     ///
     /// # Panics
     ///
-    /// The function panics if `value` is less than `upper`.
+    /// The function panics if `value` is greater than `upper`.
     pub fn set_lower(&mut self, value: u64) {
         assert!(value <= self.upper.unwrap_or(u64::MAX));
         self.lower = value;
