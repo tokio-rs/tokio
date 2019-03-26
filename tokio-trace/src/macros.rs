@@ -1021,22 +1021,6 @@ macro_rules! __tokio_trace_stringify {
     };
 }
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __tokio_trace_option_env {
-    ($e:expr) => {
-        option_env!($e)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __tokio_trace_env {
-    ($e:expr) => {
-        env!($e)
-    };
-}
-
 #[cfg(feature = "log")]
 #[doc(hidden)]
 #[macro_export]
