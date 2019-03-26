@@ -16,6 +16,7 @@ publish = false
 
 [dependencies]
 tokio-trace-core = "0.1"
+log = { version = "0.4", optional = true }
 cfg-if = "0.1.7"
 
 [dev-dependencies]
@@ -23,6 +24,11 @@ ansi_term = "0.11"
 humantime = "1.1.1"
 futures = "0.1"
 log = "0.4"
+# These are used for the "basic" example from the tokio-trace-prototype repo,
+# which is currently not included as it used the `tokio-trace-log` crate, and
+# that crate is currently unstable.
+# env_logger = "0.5"
+# tokio-trace-log = { path = "../tokio-trace-log" }
 
 [features]
 max_level_off   = []
@@ -39,8 +45,3 @@ release_max_level_info  = []
 release_max_level_debug = []
 release_max_level_trace = []
 
-# These are used for the "basic" example from the tokio-trace-prototype repo,
-# which is currently not included as it used the `tokio-trace-log` crate, and
-# that crate is currently unstable.
-# env_logger = "0.5"
-# tokio-trace-log = { path = "../tokio-trace-log" }

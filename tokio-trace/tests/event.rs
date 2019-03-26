@@ -4,11 +4,7 @@ mod support;
 
 use self::support::*;
 
-use tokio_trace::{
-    field::{debug, display},
-    subscriber::with_default,
-    Level,
-};
+use tokio_trace::{field::display, subscriber::with_default, Level};
 
 #[test]
 fn event_without_message() {
@@ -133,7 +129,11 @@ fn borrowed_field() {
 }
 
 #[test]
+// If emitting log instrumentation, this gets moved anyway, breaking the test.
+#[cfg(not(feature = "log"))]
 fn move_field_out_of_struct() {
+    use tokio_trace::field::debug;
+
     #[derive(Debug)]
     struct Position {
         x: f32,

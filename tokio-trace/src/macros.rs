@@ -101,7 +101,7 @@ macro_rules! span {
         $name:expr,
         $($k:ident $( = $val:expr )* ),*
     ) => {
-        if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
+        {
             use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
@@ -110,18 +110,20 @@ macro_rules! span {
                 level: $lvl,
                 fields: $($k),*
             };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
+            let meta = callsite.metadata();
+
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::child_of(
                     $parent,
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled()
+                 __tokio_trace_disabled_span!(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*)
+                )
             }
-        } else {
-            $crate::Span::new_disabled()
         }
     };
     (
@@ -130,7 +132,7 @@ macro_rules! span {
         $name:expr,
         $($k:ident $( = $val:expr )* ),*
     ) => {
-        if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
+        {
             use $crate::callsite;
             use $crate::callsite::Callsite;
             let callsite = callsite! {
@@ -139,18 +141,21 @@ macro_rules! span {
                 level: $lvl,
                 fields: $($k),*
             };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
+            let meta = callsite.metadata();
+
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::new(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled()
+                __tokio_trace_disabled_span!(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*)
+                )
             }
-        } else {
-            $crate::Span::new_disabled()
         }
+
     };
     (target: $target:expr, level: $lvl:expr, parent: $parent:expr, $name:expr) => {
         span!(target: $target, level: $lvl, parent: $parent, $name,)
@@ -338,24 +343,32 @@ macro_rules! span {
 #[macro_export(local_inner_macros)]
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* $(,)*} )=> ({
-        if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
-            #[allow(unused_imports)]
-            use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! {
-                name: __tokio_trace_concat!(
-                    "event ",
-                    __tokio_trace_file!(),
-                    ":",
-                    __tokio_trace_line!()
-                ),
+        {
+            __tokio_trace_log!(
                 target: $target,
-                level: $lvl,
-                fields: $( $k ),*
-            };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
-                Event::dispatch(meta, &valueset!(meta.fields(), $( $k = $val),* ));
+                $lvl,
+                $( $k = $val ),*
+            );
+
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
+                #[allow(unused_imports)]
+                use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
+                use $crate::callsite::Callsite;
+                let callsite = callsite! {
+                    name: __tokio_trace_concat!(
+                        "event ",
+                        __tokio_trace_file!(),
+                        ":",
+                        __tokio_trace_line!()
+                    ),
+                    target: $target,
+                    level: $lvl,
+                    fields: $( $k ),*
+                };
+                if is_enabled!(callsite) {
+                    let meta = callsite.metadata();
+                    Event::dispatch(meta, &valueset!(meta.fields(), $( $k = $val),* ));
+                }
             }
         }
     });
@@ -526,7 +539,7 @@ macro_rules! trace {
 /// let pos = Position { x: 3.234, y: -1.223 };
 ///
 /// debug!(x = field::debug(pos.x), y = field::debug(pos.y));
-/// debug!(target: "app_events", { position = field::debug(pos) }, "New position");
+/// debug!(target: "app_events", { position = field::debug(&pos) }, "New position");
 /// # }
 /// ```
 #[macro_export(local_inner_macros)]
@@ -1005,5 +1018,84 @@ macro_rules! __tokio_trace_concat {
 macro_rules! __tokio_trace_stringify {
     ($s:expr) => {
         stringify!($s)
+    };
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! level_to_log {
+    ($level:expr) => {
+        match $level {
+            $crate::Level::ERROR => $crate::log::Level::Error,
+            $crate::Level::WARN => $crate::log::Level::Warn,
+            $crate::Level::INFO => $crate::log::Level::Info,
+            $crate::Level::DEBUG => $crate::log::Level::Debug,
+            _ => $crate::log::Level::Trace,
+        }
+    };
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export(local_inner_macros)]
+macro_rules! __tokio_trace_log {
+    (target: $target:expr, $level:expr, $( $key:ident $( = $val:expr )* ),* $(,)* ) => {
+        use $crate::log;
+        let level = level_to_log!($level);
+        if level <= log::STATIC_MAX_LEVEL {
+            let log_meta = log::Metadata::builder()
+                .level(level)
+                .target($target)
+                .build();
+            let logger = log::logger();
+            if logger.enabled(&log_meta) {
+                logger.log(&log::Record::builder()
+                    .file(Some(__tokio_trace_file!()))
+                    .module_path(Some(__tokio_trace_module_path!()))
+                    .line(Some(__tokio_trace_line!()))
+                    .metadata(log_meta)
+                    .args(__tokio_trace_format_args!(
+                        __tokio_trace_concat!(
+                            $(__tokio_trace_log!(@key $key)),*
+                        ),
+                        $(
+                            __tokio_trace_log!(@val_or $key $( = $val)* )
+                        ),*
+                    ))
+                    .build());
+            }
+        }
+    };
+    (@key message) => { "{} " };
+    (@key $key:ident) => { __tokio_trace_concat!(__tokio_trace_stringify!( $key ), "={:?} ") };
+    (@val_or $k:ident = $v:expr) => { $v };
+    (@val_or $k:ident ) => { __tokio_trace_format_args!("?") };
+}
+
+#[cfg(not(feature = "log"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_log {
+    (target: $target:expr, $level:expr, $( $key:ident $( = $val:expr )* ),* $(,)* ) => {};
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_disabled_span {
+    ($meta:expr, $valueset:expr) => {{
+        let mut span = $crate::Span::new_disabled($meta);
+        span.record_all(&$valueset);
+        span
+    }};
+}
+
+#[cfg(not(feature = "log"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_disabled_span {
+    ($meta:expr, $valueset:expr) => {
+        $crate::Span::new_disabled($meta)
     };
 }

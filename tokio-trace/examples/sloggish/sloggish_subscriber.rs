@@ -158,7 +158,7 @@ impl SloggishSubscriber {
             stderr: io::stderr(),
             stack: Mutex::new(vec![]),
             spans: Mutex::new(HashMap::new()),
-            ids: AtomicUsize::new(0),
+            ids: AtomicUsize::new(1),
         }
     }
 

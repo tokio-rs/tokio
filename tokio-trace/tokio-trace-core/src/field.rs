@@ -222,11 +222,11 @@ pub trait Value: ::sealed::Sealed {
 }
 
 /// A `Value` which serializes as a string using `fmt::Display`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DisplayValue<T: fmt::Display>(T);
 
 /// A `Value` which serializes as a string using `fmt::Debug`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DebugValue<T: fmt::Debug>(T);
 
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
@@ -360,6 +360,12 @@ where
     }
 }
 
+impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // ===== impl DebugValue =====
 
 impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
@@ -370,6 +376,12 @@ where
 {
     fn record(&self, key: &Field, visitor: &mut Visit) {
         visitor.record_debug(key, &self.0)
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for DebugValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 

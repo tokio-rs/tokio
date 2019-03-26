@@ -313,6 +313,10 @@
 extern crate cfg_if;
 extern crate tokio_trace_core;
 
+#[cfg(feature = "log")]
+#[doc(hidden)]
+pub extern crate log;
+
 // Somehow this `use` statement is necessary for us to re-export the `core`
 // macros on Rust 1.26.0. I'm not sure how this makes it work, but it does.
 #[allow(unused_imports)]
