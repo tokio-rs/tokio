@@ -245,30 +245,12 @@ impl Span {
     }
 
     fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
-        #[cfg(feature = "trace")]
-        let span = {
-            let attrs = &new_span;
-            let inner = ::dispatcher::get_default(move |dispatch| {
-                let id = dispatch.new_span(attrs);
-                Some(Inner::new(id, dispatch))
-            });
-            Self { inner, meta }
-        };
-
-        #[cfg(not(feature = "trace"))]
-        let span = {
-            use std::sync::Once;
-            static PRINTED_WARNING: Once = Once::new();
-            PRINTED_WARNING.call_once(|| {
-                eprintln!(
-                    "warning: `tokio-trace` instrumentation is experimental.\n\
-                     note: to enable `tokio-trace`, compile with the environment \
-                     variable `TOKIO_TRACE_ENABLED` set."
-                )
-            });
-            Self { inner: None, meta }
-        };
-
+        let attrs = &new_span;
+        let inner = ::dispatcher::get_default(move |dispatch| {
+            let id = dispatch.new_span(attrs);
+            Some(Inner::new(id, dispatch))
+        });
+        let span = Self { inner, meta };
         span.log(format_args!("{}; {}", meta.name(), FmtAttrs(&new_span)));
         span
     }
@@ -502,7 +484,6 @@ impl Inner {
         self.subscriber.record(&self.id, values)
     }
 
-    #[cfg(feature = "trace")]
     fn new(id: Id, subscriber: &Dispatch) -> Self {
         Inner {
             id,

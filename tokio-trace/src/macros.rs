@@ -350,7 +350,7 @@ macro_rules! event {
                 $( $k = $val ),*
             );
 
-            if $crate::EMIT_TRACE && $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
                 #[allow(unused_imports)]
                 use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
                 use $crate::callsite::Callsite;

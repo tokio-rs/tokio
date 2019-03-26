@@ -352,10 +352,3 @@ pub mod subscriber;
 mod sealed {
     pub trait Sealed {}
 }
-
-#[cfg(feature = "trace")]
-#[doc(hidden)]
-pub const EMIT_TRACE: bool = true;
-
-#[cfg(not(feature = "trace"))]
-pub const EMIT_TRACE: bool = false;
