@@ -2,7 +2,7 @@
 
 Single threaded executor for Tokio.
 
-[Documentation](https://docs.rs/tokio-current-thread/0.1.5/tokio_current_thread/)
+[Documentation](https://docs.rs/tokio-current-thread/0.1.6/tokio_current_thread/)
 
 ## Overview
 

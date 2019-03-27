@@ -1,6 +1,11 @@
 //! Subscribers collect and record trace data.
 use {span, Event, Metadata};
 
+use std::{
+    any::{Any, TypeId},
+    ptr,
+};
+
 /// Trait representing the functions required to collect trace data.
 ///
 /// Crates that provide implementations of methods for collecting or recording
@@ -261,6 +266,61 @@ pub trait Subscriber: 'static {
     /// [`clone_span`]: trait.Subscriber.html#method.clone_span
     fn drop_span(&self, id: span::Id) {
         let _ = id;
+    }
+
+    // === Downcasting methods ================================================
+
+    /// If `self` is the same type as the provided `TypeId`, returns an untyped
+    /// `*const` pointer to that type. Otherwise, returns `None`.
+    ///
+    /// If you wish to downcast a `Subscriber`, it is strongly advised to use
+    /// the safe API provided by [`downcast_ref`] instead.
+    ///
+    /// This API is required for `downcast_raw` to be a trait method; a method
+    /// signature like [`downcast_ref`] (with a generic type parameter) is not
+    /// object-safe, and thus cannot be a trait method for `Subscriber`. This
+    /// means that if we only exposed `downcast_ref`, `Subscriber`
+    /// implementations could not override the downcasting behavior
+    ///
+    /// This method may be overridden by "fan out" or "chained" subscriber
+    /// implementations which consist of multiple composed types. Such
+    /// subscribers might allow `downcast_raw` by returning references to those
+    /// component if they contain components with the given `TypeId`.
+    ///
+    /// # Safety
+    ///
+    /// The [`downcast_ref`] method expects that the pointer returned by
+    /// `downcast_raw` is non-null and points to a valid instance of the type
+    /// with the provided `TypeId`. Failure to ensure this will result in
+    /// undefined behaviour, so implementing `downcast_raw` is unsafe.
+    ///
+    /// [`downcast_ref`]: #method.downcast_ref
+    unsafe fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
+        if id == TypeId::of::<Self>() {
+            Some(self as *const Self as *const ())
+        } else {
+            None
+        }
+    }
+}
+
+impl Subscriber {
+    /// Returns `true` if this `Subscriber` is the same type as `T`.
+    pub fn is<T: Any>(&self) -> bool {
+        self.downcast_ref::<T>().is_some()
+    }
+
+    /// Returns some reference to this `Subscriber` value if it is of type `T`,
+    /// or `None` if it isn't.
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        unsafe {
+            let raw = self.downcast_raw(TypeId::of::<T>())?;
+            if raw == ptr::null() {
+                None
+            } else {
+                Some(&*(raw as *const _))
+            }
+        }
     }
 }
 

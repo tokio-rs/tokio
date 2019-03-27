@@ -379,7 +379,7 @@ where
     }
 }
 
-impl<T: fmt::Display> fmt::Debug for DebugValue<T> {
+impl<T: fmt::Debug> fmt::Debug for DebugValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
     }

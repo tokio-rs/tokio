@@ -2,7 +2,7 @@
 
 Task execution related traits and utilities.
 
-[Documentation](https://docs.rs/tokio-executor/0.1.6/tokio_executor)
+[Documentation](https://docs.rs/tokio-executor/0.1.7/tokio_executor)
 
 ## Overview
 
@@ -31,10 +31,10 @@ executor, including:
 
 * [`Park`] abstracts over blocking and unblocking the current thread.
 
-[`Executor`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/trait.Executor.html
-[`enter`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/fn.enter.html
-[`DefaultExecutor`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/struct.DefaultExecutor.html
-[`Park`]: https://docs.rs/tokio-executor/0.1.6/tokio_executor/park/trait.Park.html
+[`Executor`]: https://docs.rs/tokio-executor/0.1.7/tokio_executor/trait.Executor.html
+[`enter`]: https://docs.rs/tokio-executor/0.1.7/tokio_executor/fn.enter.html
+[`DefaultExecutor`]: https://docs.rs/tokio-executor/0.1.7/tokio_executor/struct.DefaultExecutor.html
+[`Park`]: https://docs.rs/tokio-executor/0.1.7/tokio_executor/park/trait.Park.html
 
 ## License
 

@@ -245,30 +245,12 @@ impl Span {
     }
 
     fn make(meta: &'static Metadata<'static>, new_span: Attributes) -> Span {
-        #[cfg(feature = "trace")]
-        let span = {
-            let attrs = &new_span;
-            let inner = ::dispatcher::get_default(move |dispatch| {
-                let id = dispatch.new_span(attrs);
-                Some(Inner::new(id, dispatch))
-            });
-            Self { inner, meta }
-        };
-
-        #[cfg(not(feature = "trace"))]
-        let span = {
-            use std::sync::Once;
-            static PRINTED_WARNING: Once = Once::new();
-            PRINTED_WARNING.call_once(|| {
-                eprintln!(
-                    "warning: `tokio-trace` instrumentation is experimental.\n\
-                     note: to enable `tokio-trace`, compile with the environment \
-                     variable `TOKIO_TRACE_ENABLED` set."
-                )
-            });
-            Self { inner: None, meta }
-        };
-
+        let attrs = &new_span;
+        let inner = ::dispatcher::get_default(move |dispatch| {
+            let id = dispatch.new_span(attrs);
+            Some(Inner::new(id, dispatch))
+        });
+        let span = Self { inner, meta };
         span.log(format_args!("{}; {}", meta.name(), FmtAttrs(&new_span)));
         span
     }
@@ -428,13 +410,29 @@ impl Hash for Span {
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut span = f.debug_struct("Span");
-        span.field("name", &self.meta.name());
+        span.field("name", &self.meta.name())
+            .field("level", &self.meta.level())
+            .field("target", &self.meta.target());
+
         if let Some(ref inner) = self.inner {
-            span.field("id", &inner.id())
+            span.field("id", &inner.id());
         } else {
-            span.field("disabled", &true)
+            span.field("disabled", &true);
         }
-        .finish()
+
+        if let Some(ref path) = self.meta.module_path() {
+            span.field("module_path", &path);
+        }
+
+        if let Some(ref line) = self.meta.line() {
+            span.field("line", &line);
+        }
+
+        if let Some(ref file) = self.meta.file() {
+            span.field("file", &file);
+        }
+
+        span.finish()
     }
 }
 
@@ -486,7 +484,6 @@ impl Inner {
         self.subscriber.record(&self.id, values)
     }
 
-    #[cfg(feature = "trace")]
     fn new(id: Id, subscriber: &Dispatch) -> Self {
         Inner {
             id,

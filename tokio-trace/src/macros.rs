@@ -112,7 +112,7 @@ macro_rules! span {
             };
             let meta = callsite.metadata();
 
-            if is_enabled!(callsite) {
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::child_of(
                     $parent,
                     meta,
@@ -143,7 +143,7 @@ macro_rules! span {
             };
             let meta = callsite.metadata();
 
-            if is_enabled!(callsite) {
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::new(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
@@ -155,6 +155,7 @@ macro_rules! span {
                 )
             }
         }
+
     };
     (target: $target:expr, level: $lvl:expr, parent: $parent:expr, $name:expr) => {
         span!(target: $target, level: $lvl, parent: $parent, $name,)
@@ -349,7 +350,7 @@ macro_rules! event {
                 $( $k = $val ),*
             );
 
-            if $crate::EMIT_TRACE {
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
                 #[allow(unused_imports)]
                 use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
                 use $crate::callsite::Callsite;
@@ -1017,22 +1018,6 @@ macro_rules! __tokio_trace_concat {
 macro_rules! __tokio_trace_stringify {
     ($s:expr) => {
         stringify!($s)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __tokio_trace_option_env {
-    ($e:expr) => {
-        option_env!($e)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __tokio_trace_env {
-    ($e:expr) => {
-        env!($e)
     };
 }
 
