@@ -122,6 +122,25 @@ pub struct Metadata<'a> {
     /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub fields: field::FieldSet,
+
+    /// The kind of the callsite.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must
+    /// be able to be constructed statically by macros. However, when `const
+    /// fn`s are available on stable Rust, this will no longer be necessary.
+    /// Thus, these fields are *not* considered stable public API, and they may
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
+    #[doc(hidden)]
+    pub callsite_kind: CallsiteKind,
+}
+
+/// Indicate whether the callsite is a span or event.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum CallsiteKind {
+    Event,
+    Span,
 }
 
 /// Describes the level of verbosity of a span or event.
@@ -142,6 +161,7 @@ impl<'a> Metadata<'a> {
         line: Option<u32>,
         field_names: &'static [&'static str],
         callsite: &'static Callsite,
+        callsite_kind: &'static CallsiteKind,
     ) -> Self {
         Metadata {
             name,
@@ -154,6 +174,8 @@ impl<'a> Metadata<'a> {
                 names: field_names,
                 callsite: callsite::Identifier(callsite),
             },
+            // FIXME(csmoe): what the default callsite kind should be?
+            callsite_kind: CallsiteKind::Span,
         }
     }
 
@@ -204,6 +226,11 @@ impl<'a> Metadata<'a> {
     #[inline]
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
+    }
+
+    /// Returns the kind of callsite.
+    pub fn callsite_kind(&self) -> &CallsiteKind {
+        &self.callsite_kind
     }
 }
 
