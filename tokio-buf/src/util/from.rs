@@ -119,4 +119,8 @@ impl fmt::Display for CollectVecError {
     }
 }
 
-impl Error for CollectVecError {}
+impl Error for CollectVecError {
+    fn description(&self) -> &str {
+        "BufStream too big"
+    }
+}
