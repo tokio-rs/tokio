@@ -118,6 +118,7 @@ macro_rules! identify_callsite {
 ///     level: Level::DEBUG,
 ///     fields: &["bar", "baz"],
 ///     callsite: &FOO_CALLSITE,
+///     callsite_kind: CallsiteKind::Span,
 /// };
 /// # }
 /// ```
@@ -131,7 +132,8 @@ macro_rules! metadata {
         target: $target:expr,
         level: $level:expr,
         fields: $fields:expr,
-        callsite: $callsite:expr
+        callsite: $callsite:expr,
+        callsite_kind: $callsite_kind:expr,
     ) => {
         metadata! {
             name: $name,
@@ -139,6 +141,7 @@ macro_rules! metadata {
             level: $level,
             fields: $fields,
             callsite: $callsite,
+            callsite_kind: $callsite_kind,
         }
     };
     (
@@ -147,6 +150,7 @@ macro_rules! metadata {
         level: $level:expr,
         fields: $fields:expr,
         callsite: $callsite:expr,
+        callsite_kind: $callsite_kind:expr,
     ) => {
         $crate::metadata::Metadata {
             name: $name,
@@ -159,6 +163,7 @@ macro_rules! metadata {
                 names: $fields,
                 callsite: identify_callsite!($callsite),
             },
+            callsite_kind: $callsite_kind,
         }
     };
 }
@@ -200,7 +205,7 @@ pub use self::{
     dispatcher::Dispatch,
     event::Event,
     field::Field,
-    metadata::{Level, Metadata},
+    metadata::{Level, Metadata, CallsiteKind},
     subscriber::{Interest, Subscriber},
 };
 
