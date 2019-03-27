@@ -2,6 +2,8 @@ use SizeHint;
 
 use bytes::{Buf, BufMut};
 
+use std::error::Error;
+use std::fmt;
 use std::usize;
 
 /// Conversion from a `BufStream`.
@@ -110,3 +112,11 @@ impl<T: Buf> FromBufStream<T> for Vec<u8> {
         Ok(builder)
     }
 }
+
+impl fmt::Display for CollectVecError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "BufStream too big")
+    }
+}
+
+impl Error for CollectVecError {}
