@@ -14,7 +14,7 @@ pub mod error {
     //! Error types
 
     pub use super::collect::CollectError;
-    pub use super::from::CollectVecError;
+    pub use super::from::{CollectBytesError, CollectVecError};
     pub use super::limit::LimitError;
 }
 
