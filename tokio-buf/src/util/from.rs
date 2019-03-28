@@ -1,6 +1,6 @@
 use SizeHint;
 
-use bytes::{Buf, BufMut};
+use bytes::{Buf, BufMut, Bytes};
 
 use std::error::Error;
 use std::fmt;
@@ -49,12 +49,18 @@ pub struct CollectVecError {
     _p: (),
 }
 
+/// Error returned from collecting into a `Bytes`
+#[derive(Debug)]
+pub struct CollectBytesError {
+    _p: (),
+}
+
 impl<T: Buf> FromBufStream<T> for Vec<u8> {
     type Builder = Vec<u8>;
     type Error = CollectVecError;
 
-    fn builder(_hint: &SizeHint) -> Vec<u8> {
-        Vec::new()
+    fn builder(hint: &SizeHint) -> Vec<u8> {
+        Vec::with_capacity(hint.lower() as usize)
     }
 
     fn extend(builder: &mut Self, buf: &mut T, hint: &SizeHint) -> Result<(), Self::Error> {
@@ -113,6 +119,24 @@ impl<T: Buf> FromBufStream<T> for Vec<u8> {
     }
 }
 
+impl<T: Buf> FromBufStream<T> for Bytes {
+    type Builder = Vec<u8>;
+    type Error = CollectBytesError;
+
+    fn builder(hint: &SizeHint) -> Vec<u8> {
+        <Vec<u8> as FromBufStream<T>>::builder(hint)
+    }
+
+    fn extend(builder: &mut Vec<u8>, buf: &mut T, hint: &SizeHint) -> Result<(), Self::Error> {
+        <Vec<u8> as FromBufStream<T>>::extend(builder, buf, hint)
+            .map_err(|_| CollectBytesError { _p: () })
+    }
+
+    fn build(builder: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(builder.into())
+    }
+}
+
 impl fmt::Display for CollectVecError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "BufStream too big")
@@ -120,6 +144,18 @@ impl fmt::Display for CollectVecError {
 }
 
 impl Error for CollectVecError {
+    fn description(&self) -> &str {
+        "BufStream too big"
+    }
+}
+
+impl fmt::Display for CollectBytesError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "BufStream too big")
+    }
+}
+
+impl Error for CollectBytesError {
     fn description(&self) -> &str {
         "BufStream too big"
     }
