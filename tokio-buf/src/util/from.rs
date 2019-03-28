@@ -139,7 +139,7 @@ impl<T: Buf> FromBufStream<T> for Bytes {
 
 impl fmt::Display for CollectVecError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "BufStream too big")
+        write!(fmt, "BufStream is too big")
     }
 }
 
