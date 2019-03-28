@@ -209,14 +209,32 @@ impl<'a> Metadata<'a> {
 
 impl<'a> fmt::Debug for Metadata<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Metadata")
-            .field("name", &self.name)
+        let mut meta = f.debug_struct("Metadata");
+        meta.field("name", &self.name)
             .field("target", &self.target)
-            .field("level", &self.level)
-            .field("module_path", &self.module_path)
-            .field("file", &self.file)
-            .field("line", &self.line)
-            .field("field_names", &self.fields)
+            .field("level", &self.level);
+
+        if let Some(path) = self.module_path() {
+            meta.field("module_path", &path);
+        }
+
+        match (self.file(), self.line()) {
+            (Some(file), Some(line)) => {
+                meta.field("location", &format_args!("{}:{}", file, line));
+            }
+            (Some(file), None) => {
+                meta.field("file", &format_args!("{}", file));
+            }
+
+            // Note: a line num with no file is a kind of weird case that _probably_ never occurs...
+            (None, Some(line)) => {
+                meta.field("line", &line);
+            }
+            (None, None) => {}
+        };
+
+        meta.field("fields", &format_args!("{}", self.fields))
+            .field("callsite", &self.callsite())
             .finish()
     }
 }
