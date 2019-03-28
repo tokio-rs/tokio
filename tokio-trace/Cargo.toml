@@ -10,7 +10,6 @@ A scoped, structured logging and diagnostics system.
 """
 categories = ["development-tools::debugging", "asynchronous"]
 keywords = ["logging", "tracing"]
-build = "build.rs"
 
 # Not yet ready for production.
 publish = false

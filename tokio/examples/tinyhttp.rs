@@ -22,8 +22,6 @@ extern crate serde_json;
 extern crate time;
 extern crate tokio;
 extern crate tokio_io;
-extern crate tokio_trace;
-extern crate tokio_trace_fmt;
 
 use std::net::SocketAddr;
 use std::{env, fmt, io};
@@ -41,23 +39,19 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>()?;
-    let subscriber = tokio_trace_fmt::FmtSubscriber::builder().full().finish();
 
     let listener = TcpListener::bind(&addr)?;
-    tokio_trace::subscriber::with_default(subscriber, || {
-        println!("Listening on: {}", addr);
+    println!("Listening on: {}", addr);
 
-        tokio::run({
-            listener
-                .incoming()
-                .map_err(|e| println!("failed to accept socket; error = {:?}", e))
-                .for_each(|socket| {
-                    process(socket);
-                    Ok(())
-                })
-        });
+    tokio::run({
+        listener
+            .incoming()
+            .map_err(|e| println!("failed to accept socket; error = {:?}", e))
+            .for_each(|socket| {
+                process(socket);
+                Ok(())
+            })
     });
-
     Ok(())
 }
 

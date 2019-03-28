@@ -26,8 +26,6 @@ jobs:
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
-        ${{ if eq(crate, 'tokio-trace') }}:
-          TOKIO_TRACE_ENABLED: true
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
       condition: and(succeeded(), not(variables['isRelease']))
@@ -39,7 +37,5 @@ jobs:
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
-        ${{ if eq(crate, 'tokio-trace') }}:
-          TOKIO_TRACE_ENABLED: true
       displayName: cargo test -p ${{ crate }} (PATCHED)
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}

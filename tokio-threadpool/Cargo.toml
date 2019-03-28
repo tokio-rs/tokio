@@ -21,7 +21,6 @@ categories = ["concurrency", "asynchronous"]
 
 [dependencies]
 tokio-executor = "0.1.7"
-
 tokio-trace = { path = "../tokio-trace", features = ["log"]}
 futures = "0.1.19"
 crossbeam-deque = "0.7.0"

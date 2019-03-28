@@ -18,7 +18,6 @@ members = [
   "tokio-tls",
   "tokio-trace",
   "tokio-trace/tokio-trace-core",
-  "tokio-trace/test-log-support",
   "tokio-udp",
   "tokio-uds",
 ]
