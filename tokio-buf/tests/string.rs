@@ -4,8 +4,8 @@ extern crate tokio_buf;
 
 use bytes::Buf;
 use futures::Async::*;
-use tokio_buf::BufStream;
 use std::fmt;
+use tokio_buf::BufStream;
 
 #[macro_use]
 mod support;
