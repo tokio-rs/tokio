@@ -1,5 +1,6 @@
 use never::Never;
 use BufStream;
+use SizeHint;
 
 use futures::Poll;
 
@@ -20,6 +21,10 @@ impl BufStream for String {
 
         Ok(Some(buf).into())
     }
+
+    fn size_hint(&self) -> SizeHint {
+        size_hint(&self[..])
+    }
 }
 
 impl BufStream for &'static str {
@@ -36,4 +41,15 @@ impl BufStream for &'static str {
 
         Ok(Some(buf).into())
     }
+
+    fn size_hint(&self) -> SizeHint {
+        size_hint(&self[..])
+    }
+}
+
+fn size_hint(s: &str) -> SizeHint {
+    let mut hint = SizeHint::new();
+    hint.set_lower(s.len() as u64);
+    hint.set_upper(s.len() as u64);
+    hint
 }
