@@ -12,7 +12,7 @@ pub use self::collect::Collect;
 pub use self::from::FromBufStream;
 pub use self::iter::iter;
 pub use self::limit::Limit;
-pub use self::stream::from_stream;
+pub use self::stream::stream;
 
 pub mod error {
     //! Error types

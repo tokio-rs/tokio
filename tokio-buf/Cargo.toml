@@ -27,3 +27,6 @@ futures = "0.1.23"
 [features]
 default = ["util"]
 util = ["bytes/either", "either"]
+
+[dev-dependencies]
+tokio-mock-task = "0.1.1"

@@ -3,7 +3,7 @@ use bytes::Buf;
 use futures::{Stream, Poll};
 
 /// TODO: Dox
-pub fn from_stream<T>(stream: T) -> FromStream<T>
+pub fn stream<T>(stream: T) -> FromStream<T>
 where
     T: Stream,
     T::Item: Buf,
