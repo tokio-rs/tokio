@@ -4,7 +4,6 @@ extern crate bytes;
 extern crate futures;
 extern crate tokio_buf;
 
-use bytes::Buf;
 use futures::Async::*;
 use futures::Future;
 use tokio_buf::{BufStream, BufStreamExt};
