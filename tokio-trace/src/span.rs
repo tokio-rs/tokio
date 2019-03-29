@@ -444,20 +444,6 @@ impl fmt::Debug for Span {
     }
 }
 
-impl ::sealed::Sealed for Span {}
-impl<'a> ::sealed::Sealed for &'a Span {}
-
-impl AsId for Span {
-    fn as_id(&self) -> Option<&Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
-    }
-}
-
-impl<'a> AsId for &'a Span {
-    fn as_id(&self) -> Option<&Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
-    }
-}
 // ===== impl Inner =====
 
 impl Inner {
@@ -572,9 +558,33 @@ impl<'a> fmt::Display for FmtAttrs<'a> {
 
 // ===== impl AsId =====
 
+impl ::sealed::Sealed for Span {}
+
+impl AsId for Span {
+    fn as_id(&self) -> Option<&Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Span {}
+
+impl<'a> AsId for &'a Span {
+    fn as_id(&self) -> Option<&Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
 impl ::sealed::Sealed for Id {}
 
 impl AsId for Id {
+    fn as_id(&self) -> Option<&Id> {
+        Some(self)
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Id {}
+
+impl<'a> AsId for &'a Id {
     fn as_id(&self) -> Option<&Id> {
         Some(self)
     }
@@ -585,14 +595,6 @@ impl ::sealed::Sealed for Option<Id> {}
 impl AsId for Option<Id> {
     fn as_id(&self) -> Option<&Id> {
         self.as_ref()
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Id {}
-
-impl<'a> AsId for &'a Id {
-    fn as_id(&self) -> Option<&Id> {
-        Some(self)
     }
 }
 
