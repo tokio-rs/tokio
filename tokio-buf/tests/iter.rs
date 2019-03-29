@@ -13,7 +13,7 @@ type Buf = Cursor<&'static [u8]>;
 
 #[test]
 fn empty_iter() {
-    let mut bs = util::iter::<_, ()>(Vec::<Buf>::new());
+    let mut bs = util::iter(Vec::<Buf>::new());
     assert_none!(bs.poll_buf());
 }
 
@@ -21,7 +21,7 @@ fn empty_iter() {
 fn full_iter() {
     let bufs = vec![buf(b"one"), buf(b"two"), buf(b"three")];
 
-    let mut bs = util::iter::<_, ()>(bufs);
+    let mut bs = util::iter(bufs);
     assert_buf_eq!(bs.poll_buf(), "one");
     assert_buf_eq!(bs.poll_buf(), "two");
     assert_buf_eq!(bs.poll_buf(), "three");
