@@ -4,7 +4,11 @@ use std::error::Error;
 use std::fmt;
 use BufStream;
 
-/// TODO: Dox
+/// Converts an `Iterator` into a `BufStream` which is always ready to yield the
+/// next value.
+///
+/// Iterators in Rust don't express the ability to block, so this adapter
+/// simply always calls `iter.next()` and returns that.
 pub fn iter<I>(i: I) -> Iter<I::IntoIter>
 where
     I: IntoIterator,
@@ -15,7 +19,7 @@ where
     }
 }
 
-/// TODO: Dox
+/// `BufStream` returned by the [`iter`] function.
 #[derive(Debug)]
 pub struct Iter<I> {
     iter: I,
