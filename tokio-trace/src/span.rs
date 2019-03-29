@@ -126,7 +126,6 @@
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
-    borrow::Borrow,
     cmp, fmt,
     hash::{Hash, Hasher},
 };
@@ -285,22 +284,21 @@ impl Span {
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn field<Q>(&self, name: &Q) -> Option<field::Field>
+    pub fn field<Q: ?Sized>(&self, field: &Q) -> Option<field::Field>
     where
-        Q: Borrow<str>,
+        Q: field::AsField,
     {
-        self.metadata().and_then(|meta| meta.fields().field(name))
+        self.metadata().and_then(|meta| field.as_field(meta))
     }
 
     /// Returns true if this `Span` has a field for the given
     /// [`Field`](::field::Field) or field name.
+    #[inline]
     pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
         Q: field::AsField,
     {
-        self.metadata()
-            .and_then(|meta| field.as_field(meta))
-            .is_some()
+        self.field(field).is_some()
     }
 
     /// Visits that the field described by `field` has the value `value`.
