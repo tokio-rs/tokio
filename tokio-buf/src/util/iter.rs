@@ -1,7 +1,7 @@
-use BufStream;
 use bytes::Buf;
 use futures::Poll;
 use std::marker::PhantomData;
+use BufStream;
 
 /// TODO: Dox
 pub fn iter<I, E>(i: I) -> Iter<I::IntoIter, E>

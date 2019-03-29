@@ -1,6 +1,6 @@
-use BufStream;
 use bytes::Buf;
-use futures::{Stream, Poll};
+use futures::{Poll, Stream};
+use BufStream;
 
 /// TODO: Dox
 pub fn stream<T>(stream: T) -> FromStream<T>

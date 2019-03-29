@@ -3,11 +3,11 @@ extern crate futures;
 extern crate tokio_buf;
 extern crate tokio_mock_task;
 
-use futures::Async::*;
 use futures::sync::mpsc;
+use futures::Async::*;
+use std::io::Cursor;
 use tokio_buf::{util, BufStream};
 use tokio_mock_task::MockTask;
-use std::io::Cursor;
 
 #[macro_use]
 mod support;

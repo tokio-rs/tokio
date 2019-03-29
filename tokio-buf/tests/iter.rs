@@ -3,8 +3,8 @@ extern crate futures;
 extern crate tokio_buf;
 
 use futures::Async::*;
-use tokio_buf::{util, BufStream};
 use std::io::Cursor;
+use tokio_buf::{util, BufStream};
 
 #[macro_use]
 mod support;
@@ -19,11 +19,7 @@ fn empty_iter() {
 
 #[test]
 fn full_iter() {
-    let bufs = vec![
-        buf(b"one"),
-        buf(b"two"),
-        buf(b"three"),
-    ];
+    let bufs = vec![buf(b"one"), buf(b"two"), buf(b"three")];
 
     let mut bs = util::iter::<_, ()>(bufs);
     assert_buf_eq!(bs.poll_buf(), "one");
