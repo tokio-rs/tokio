@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 
-use tokio_trace::{field::display, subscriber::with_default, Level};
+use tokio_trace::{
+    field::{debug, display},
+    subscriber::with_default,
+    Level,
+};
 
 #[test]
 fn event_without_message() {
@@ -132,8 +136,6 @@ fn borrowed_field() {
 // If emitting log instrumentation, this gets moved anyway, breaking the test.
 #[cfg(not(feature = "log"))]
 fn move_field_out_of_struct() {
-    use tokio_trace::field::debug;
-
     #[derive(Debug)]
     struct Position {
         x: f32,
@@ -165,5 +167,26 @@ fn move_field_out_of_struct() {
         debug!(x = debug(pos.x), y = debug(pos.y));
         debug!(target: "app_events", { position = debug(pos) }, "New position");
     });
+    handle.assert_finished();
+}
+
+#[test]
+fn field_separators() {
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("pos::x")
+                    .with_value(&debug(3.234))
+                    .and(field::mock("pos::y").with_value(&debug(-1.223)))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        debug!(pos::x = debug(3.234), pos::y = debug(-1.223));
+    });
+
     handle.assert_finished();
 }

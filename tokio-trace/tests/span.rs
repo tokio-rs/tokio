@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{field::display, subscriber::with_default, Level, Span};
+use tokio_trace::{
+    field::{debug, display},
+    subscriber::with_default,
+    Level, Span,
+};
 
 #[test]
 fn handles_to_the_same_span_are_equal() {
@@ -306,8 +310,6 @@ fn borrowed_field() {
 // If emitting log instrumentation, this gets moved anyway, breaking the test.
 #[cfg(not(feature = "log"))]
 fn move_field_out_of_struct() {
-    use tokio_trace::field::debug;
-
     #[derive(Debug)]
     struct Position {
         x: f32,
@@ -343,6 +345,27 @@ fn move_field_out_of_struct() {
         let mut bar = span!("bar", position = debug(pos));
         foo.enter(|| {});
         bar.enter(|| {});
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn field_separators() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("pos::x")
+                    .with_value(&debug(3.234))
+                    .and(field::mock("pos::y").with_value(&debug(-1.223)))
+                    .only(),
+            ),
+        )
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let mut foo = span!("foo", pos::x = debug(3.234), pos::y = debug(-1.223));
+        foo.enter(|| {});
     });
 
     handle.assert_finished();
