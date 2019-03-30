@@ -79,7 +79,7 @@ pub trait Decoder {
     /// frames to yield. This behavior enables returning finalization frames
     /// that may not be based on inbound data.
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        match try!(self.decode(buf)) {
+        match self.decode(buf)? {
             Some(frame) => Ok(Some(frame)),
             None => {
                 if buf.is_empty() {

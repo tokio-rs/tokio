@@ -161,7 +161,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
     let reg = MyRegistration {
         inner: RefCell::new(None),
     };
-    let reg = try!(PollEvented::new_with_handle(reg, handle));
+    let reg = PollEvented::new_with_handle(reg, handle)?;
     let ready = reg.get_ref().inner.borrow().as_ref().unwrap().1.clone();
     unsafe {
         let state = Box::new(GlobalState {

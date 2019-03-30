@@ -368,7 +368,7 @@ impl codec::Decoder for Decoder {
 
     fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
         let n = match self.state {
-            DecodeState::Head => match try!(self.decode_head(src)) {
+            DecodeState::Head => match self.decode_head(src)? {
                 Some(n) => {
                     self.state = DecodeState::Data(n);
                     n
@@ -378,7 +378,7 @@ impl codec::Decoder for Decoder {
             DecodeState::Data(n) => n,
         };
 
-        match try!(self.decode_data(n, src)) {
+        match self.decode_data(n, src)? {
             Some(data) => {
                 // Update the decode state
                 self.state = DecodeState::Head;
@@ -525,11 +525,11 @@ impl<T: AsyncWrite, B: IntoBuf> Sink for FramedWrite<T, B> {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: B) -> StartSend<B, io::Error> {
-        if !try!(self.do_write()).is_ready() {
+        if !self.do_write()?.is_ready() {
             return Ok(AsyncSink::NotReady(item));
         }
 
-        try!(self.set_frame(item.into_buf()));
+        self.set_frame(item.into_buf())?;
 
         Ok(AsyncSink::Ready)
     }
