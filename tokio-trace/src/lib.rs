@@ -56,9 +56,10 @@
 //! construct one span and perform the entire loop inside of that span, like:
 //! ```rust
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! # let n = 1;
-//! span!("my loop").enter(|| {
+//! span!(Level::TRACE, "my loop").enter(|| {
 //!     for i in 0..n {
 //!         # let _ = i;
 //!         // ...
@@ -69,11 +70,12 @@
 //! Or, should we create a new span for each iteration of the loop, as in:
 //! ```rust
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! # let n = 1u64;
 //! for i in 0..n {
 //!     # let _ = i;
-//!     span!("my loop", iteration = i).enter(|| {
+//!     span!(Level::TRACE, "my loop", iteration = i).enter(|| {
 //!         // ...
 //!     })
 //! }
@@ -154,9 +156,10 @@
 //! ```rust
 //! # #[macro_use]
 //! # extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
-//! // Construct a new span named "my span".
-//! let mut span = span!("my span");
+//! // Construct a new span named "my span" with trace log level.
+//! let mut span = span!(Level::TRACE, "my span");
 //! span.enter(|| {
 //!     // Any trace events in this closure or code called by it will occur within
 //!     // the span.
@@ -188,7 +191,7 @@
 //! ```rust
 //! #[macro_use]
 //! extern crate tokio_trace;
-//! use tokio_trace::field;
+//! use tokio_trace::{field, Level};
 //! # #[derive(Debug)] pub struct Yak(String);
 //! # impl Yak { fn shave(&mut self, _: u32) {} }
 //! # fn find_a_razor() -> Result<u32, u32> { Ok(1) }
@@ -196,7 +199,7 @@
 //! pub fn shave_the_yak(yak: &mut Yak) {
 //!     // Create a new span for this invocation of `shave_the_yak`, annotated
 //!     // with  the yak being shaved as a *field* on the span.
-//!     span!("shave_the_yak", yak = field::debug(&yak)).enter(|| {
+//!     span!(Level::TRACE, "shave_the_yak", yak = field::debug(&yak)).enter(|| {
 //!         // Since the span is annotated with the yak, it is part of the context
 //!         // for everything happening inside the span. Therefore, we don't need
 //!         // to add it to the message for this event, as the `log` crate does.

@@ -68,7 +68,7 @@ fn one_with_everything() {
                         .and(field::mock("bar").with_value(&false))
                         .only(),
                 )
-                .at_level(tokio_trace::Level::ERROR)
+                .at_level(Level::ERROR)
                 .with_target("whatever"),
         )
         .done()
@@ -77,7 +77,7 @@ fn one_with_everything() {
     with_default(subscriber, || {
         event!(
             target: "whatever",
-            tokio_trace::Level::ERROR,
+            Level::ERROR,
             { foo = 666, bar = false },
              "{:#x} make me one with{what:.>20}", 4277009102u64, what = "everything"
         );

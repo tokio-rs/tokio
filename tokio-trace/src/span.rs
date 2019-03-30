@@ -12,9 +12,10 @@
 //! if the span exists:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! let my_var: u64 = 5;
-//! let mut my_span = span!("my_span", my_var = &my_var);
+//! let mut my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
 //!
 //! my_span.enter(|| {
 //!     // perform some work in the context of `my_span`...
@@ -78,9 +79,10 @@
 //! exists. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! {
-//!     span!("my_span").enter(|| {
+//!     span!(Level::TRACE, "my_span").enter(|| {
 //!         // perform some work in the context of `my_span`...
 //!     }); // --> Subscriber::exit(my_span)
 //!
@@ -96,10 +98,11 @@
 //! time it is exited. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! use tokio_trace::Span;
 //!
-//! let my_span = span!("my_span");
+//! let my_span = span!(Level::TRACE, "my_span");
 //! // Drop the handle to the span.
 //! drop(my_span); // --> Subscriber::drop_span(my_span)
 //! # }

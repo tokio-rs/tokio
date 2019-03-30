@@ -13,7 +13,7 @@ fn handles_to_the_same_span_are_equal() {
     // won't enter any spans in this test, so the subscriber won't actually
     // expect to see any spans.
     with_default(subscriber::mock().run(), || {
-        let foo1 = span!("foo");
+        let foo1 = span!(Level::TRACE, "foo");
         let foo2 = foo1.clone();
         // Two handles that point to the same span are equal.
         assert_eq!(foo1, foo2);
@@ -25,8 +25,8 @@ fn handles_to_different_spans_are_not_equal() {
     with_default(subscriber::mock().run(), || {
         // Even though these spans have the same name and fields, they will have
         // differing metadata, since they were created on different lines.
-        let foo1 = span!("foo", bar = 1u64, baz = false);
-        let foo2 = span!("foo", bar = 1u64, baz = false);
+        let foo1 = span!(Level::TRACE, "foo", bar = 1u64, baz = false);
+        let foo2 = span!(Level::TRACE, "foo", bar = 1u64, baz = false);
 
         assert_ne!(foo1, foo2);
     });
@@ -37,7 +37,7 @@ fn handles_to_different_spans_with_the_same_metadata_are_not_equal() {
     // Every time time this function is called, it will return a _new
     // instance_ of a span with the same metadata, name, and fields.
     fn make_span() -> Span {
-        span!("foo", bar = 1u64, baz = false)
+        span!(Level::TRACE, "foo", bar = 1u64, baz = false)
     }
 
     with_default(subscriber::mock().run(), || {
@@ -62,7 +62,7 @@ fn spans_always_go_to_the_subscriber_that_tagged_them() {
     let subscriber2 = subscriber::mock().run();
 
     let mut foo = with_default(subscriber1, || {
-        let mut foo = span!("foo");
+        let mut foo = span!(Level::TRACE, "foo");
         foo.enter(|| {});
         foo
     });
@@ -82,7 +82,7 @@ fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
         .done()
         .run();
     let mut foo = with_default(subscriber1, || {
-        let mut foo = span!("foo");
+        let mut foo = span!(Level::TRACE, "foo");
         foo.enter(|| {});
         foo
     });
@@ -107,7 +107,7 @@ fn dropping_a_span_calls_drop_span() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        let mut span = span!("foo");
+        let mut span = span!(Level::TRACE, "foo");
         span.enter(|| {});
         drop(span);
     });
@@ -125,7 +125,7 @@ fn span_closes_after_event() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        span!("foo").enter(|| {
+        span!(Level::TRACE, "foo").enter(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
     });
@@ -146,10 +146,10 @@ fn new_span_after_event() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        span!("foo").enter(|| {
+        span!(Level::TRACE, "foo").enter(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
-        span!("bar").enter(|| {});
+        span!(Level::TRACE, "bar").enter(|| {});
     });
 
     handle.assert_finished();
@@ -166,7 +166,7 @@ fn event_outside_of_span() {
         .run_with_handle();
     with_default(subscriber, || {
         debug!("my event!");
-        span!("foo").enter(|| {});
+        span!(Level::TRACE, "foo").enter(|| {});
     });
 
     handle.assert_finished();
@@ -178,7 +178,7 @@ fn cloning_a_span_calls_clone_span() {
         .clone_span(span::mock().named("foo"))
         .run_with_handle();
     with_default(subscriber, || {
-        let span = span!("foo");
+        let span = span!(Level::TRACE, "foo");
         let _span2 = span.clone();
     });
 
@@ -193,7 +193,7 @@ fn drop_span_when_exiting_dispatchers_context() {
         .drop_span(span::mock().named("foo"))
         .run_with_handle();
     with_default(subscriber, || {
-        let span = span!("foo");
+        let span = span!(Level::TRACE, "foo");
         let _span2 = span.clone();
         drop(span);
     });
@@ -215,7 +215,7 @@ fn clone_and_drop_span_always_go_to_the_subscriber_that_tagged_the_span() {
     let subscriber2 = subscriber::mock().done().run();
 
     let mut foo = with_default(subscriber1, || {
-        let mut foo = span!("foo");
+        let mut foo = span!(Level::TRACE, "foo");
         foo.enter(|| {});
         foo
     });
@@ -240,7 +240,7 @@ fn span_closes_when_exited() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        let mut foo = span!("foo");
+        let mut foo = span!(Level::TRACE, "foo");
 
         foo.enter(|| {});
 
@@ -267,7 +267,11 @@ fn moved_field() {
         .run_with_handle();
     with_default(subscriber, || {
         let from = "my span";
-        let mut span = span!("foo", bar = display(format!("hello from {}", from)));
+        let mut span = span!(
+            Level::TRACE,
+            "foo",
+            bar = display(format!("hello from {}", from))
+        );
         span.enter(|| {});
     });
 
@@ -293,7 +297,7 @@ fn borrowed_field() {
     with_default(subscriber, || {
         let from = "my span";
         let mut message = format!("hello from {}", from);
-        let mut span = span!("foo", bar = display(&message));
+        let mut span = span!(Level::TRACE, "foo", bar = display(&message));
         span.enter(|| {
             message.insert_str(10, " inside");
         });
@@ -339,8 +343,8 @@ fn move_field_out_of_struct() {
             x: 3.234,
             y: -1.223,
         };
-        let mut foo = span!("foo", x = debug(pos.x), y = debug(pos.y));
-        let mut bar = span!("bar", position = debug(pos));
+        let mut foo = span!(Level::TRACE, "foo", x = debug(pos.x), y = debug(pos.y));
+        let mut bar = span!(Level::TRACE, "bar", position = debug(pos));
         foo.enter(|| {});
         bar.enter(|| {});
     });
@@ -367,7 +371,7 @@ fn add_field_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let mut span = span!("foo", bar = 5, baz);
+        let mut span = span!(Level::TRACE, "foo", bar = 5, baz);
         span.record("baz", &true);
         span.enter(|| {})
     });
@@ -394,7 +398,7 @@ fn add_fields_only_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let mut span = span!("foo", bar, baz);
+        let mut span = span!(Level::TRACE, "foo", bar, baz);
         span.record("bar", &5);
         span.record("baz", &true);
         span.enter(|| {})
@@ -410,13 +414,13 @@ fn new_span_with_target_and_log_level() {
             span::mock()
                 .named("foo")
                 .with_target("app_span")
-                .at_level(tokio_trace::Level::DEBUG),
+                .at_level(Level::DEBUG),
         )
         .done()
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!(target: "app_span", level: tokio_trace::Level::DEBUG, "foo");
+        span!(Level::DEBUG, target: "app_span", "foo");
     });
 
     handle.assert_finished();
@@ -430,7 +434,7 @@ fn explicit_root_span_is_root() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!(parent: None, "foo");
+        span!(Level::TRACE, parent: None, "foo");
     });
 
     handle.assert_finished();
@@ -447,8 +451,8 @@ fn explicit_root_span_is_root_regardless_of_ctx() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!("foo").enter(|| {
-            span!(parent: None, "bar");
+        span!(Level::TRACE, "foo").enter(|| {
+            span!(Level::TRACE, parent: None, "bar");
         })
     });
 
@@ -464,8 +468,8 @@ fn explicit_child() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let foo = span!("foo");
-        span!(parent: foo.id(), "bar");
+        let foo = span!(Level::TRACE, "foo");
+        span!(Level::TRACE, parent: foo.id(), "bar");
     });
 
     handle.assert_finished();
@@ -483,8 +487,8 @@ fn explicit_child_regardless_of_ctx() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let foo = span!("foo");
-        span!("bar").enter(|| span!(parent: foo.id(), "baz"))
+        let foo = span!(Level::TRACE, "foo");
+        span!(Level::TRACE, "bar").enter(|| span!(Level::TRACE, parent: foo.id(), "baz"))
     });
 
     handle.assert_finished();
@@ -498,7 +502,7 @@ fn contextual_root() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!("foo");
+        span!(Level::TRACE, "foo");
     });
 
     handle.assert_finished();
@@ -519,8 +523,8 @@ fn contextual_child() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!("foo").enter(|| {
-            span!("bar");
+        span!(Level::TRACE, "foo").enter(|| {
+            span!(Level::TRACE, "bar");
         })
     });
 

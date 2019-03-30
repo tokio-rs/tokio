@@ -51,15 +51,15 @@ fn test_static_max_level_features() {
         trace!("");
         last(&a, None);
 
-        span!(level: Level::ERROR, "");
+        span!(Level::ERROR, "");
         last(&a, None);
-        span!(level: Level::WARN, "");
+        span!(Level::WARN, "");
         last(&a, None);
-        span!(level: Level::INFO, "");
+        span!(Level::INFO, "");
         last(&a, None);
-        span!(level: Level::DEBUG, "");
+        span!(Level::DEBUG, "");
         last(&a, None);
-        span!(level: Level::TRACE, "");
+        span!(Level::TRACE, "");
         last(&a, None);
     });
 }

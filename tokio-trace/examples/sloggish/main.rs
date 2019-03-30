@@ -13,7 +13,7 @@
 #[macro_use]
 extern crate tokio_trace;
 
-use tokio_trace::field;
+use tokio_trace::{field, Level};
 
 mod sloggish_subscriber;
 use self::sloggish_subscriber::SloggishSubscriber;
@@ -22,16 +22,16 @@ fn main() {
     let subscriber = SloggishSubscriber::new(2);
 
     tokio_trace::subscriber::with_default(subscriber, || {
-        span!("", version = &field::display(5.0)).enter(|| {
-            span!("server", host = "localhost", port = 8080).enter(|| {
+        span!(Level::TRACE, "", version = &field::display(5.0)).enter(|| {
+            span!(Level::TRACE, "server", host = "localhost", port = 8080).enter(|| {
                 info!("starting");
                 info!("listening");
-                let mut peer1 = span!("conn", peer_addr = "82.9.9.9", port = 42381);
+                let mut peer1 = span!(Level::TRACE, "conn", peer_addr = "82.9.9.9", port = 42381);
                 peer1.enter(|| {
                     debug!("connected");
                     debug!({ length = 2 }, "message received");
                 });
-                let mut peer2 = span!("conn", peer_addr = "8.8.8.8", port = 18230);
+                let mut peer2 = span!(Level::TRACE, "conn", peer_addr = "8.8.8.8", port = 18230);
                 peer2.enter(|| {
                     debug!("connected");
                 });
