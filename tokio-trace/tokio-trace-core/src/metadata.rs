@@ -137,11 +137,8 @@ pub struct Metadata<'a> {
 }
 
 /// Indicate whether the callsite is a span or event.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum CallsiteKind {
-    Event,
-    Span,
-}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CallsiteKind(CallsiteKindInner);
 
 /// Describes the level of verbosity of a span or event.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -161,7 +158,7 @@ impl<'a> Metadata<'a> {
         line: Option<u32>,
         field_names: &'static [&'static str],
         callsite: &'static Callsite,
-        callsite_kind: &'static CallsiteKind,
+        callsite_kind: CallsiteKind,
     ) -> Self {
         Metadata {
             name,
@@ -174,8 +171,7 @@ impl<'a> Metadata<'a> {
                 names: field_names,
                 callsite: callsite::Identifier(callsite),
             },
-            // FIXME(csmoe): what the default callsite kind should be?
-            callsite_kind: CallsiteKind::Span,
+            callsite_kind,
         }
     }
 
@@ -228,9 +224,14 @@ impl<'a> Metadata<'a> {
         self.fields.callsite()
     }
 
-    /// Returns the kind of callsite.
-    pub fn callsite_kind(&self) -> &CallsiteKind {
-        &self.callsite_kind
+    /// Returns true if the callsite kind is `Event`.
+    pub fn is_event(&self) -> bool {
+        self.callsite_kind.is_event()
+    }
+
+    /// Return true if the callsite kind is `Span`.
+    pub fn is_span(&self) -> bool {
+        self.callsite_kind.is_span()
     }
 }
 
@@ -262,7 +263,38 @@ impl<'a> fmt::Debug for Metadata<'a> {
 
         meta.field("fields", &format_args!("{}", self.fields))
             .field("callsite", &self.callsite())
+            .field("callsite_kind", &self.callsite_kind)
             .finish()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CallsiteKindInner {
+    Event,
+    Span,
+}
+
+impl CallsiteKind {
+    /// `Event` callsite
+    pub const EVENT: CallsiteKind = CallsiteKind(CallsiteKindInner::Event);
+
+    /// `Span` callsite
+    pub const SPAN: CallsiteKind = CallsiteKind(CallsiteKindInner::Span);
+
+    /// Return true if the callsite kind is `Span`
+    pub fn is_span(&self) -> bool {
+        match self {
+            CallsiteKind(CallsiteKindInner::Span) => true,
+            _ => false,
+        }
+    }
+
+    /// Return true if the callsite kind is `Event`
+    pub fn is_event(&self) -> bool {
+        match self {
+            CallsiteKind(CallsiteKindInner::Event) => true,
+            _ => false,
+        }
     }
 }
 

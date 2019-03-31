@@ -205,7 +205,7 @@ pub use self::{
     dispatcher::Dispatch,
     event::Event,
     field::Field,
-    metadata::{Level, Metadata, CallsiteKind},
+    metadata::{CallsiteKind, Level, Metadata},
     subscriber::{Interest, Subscriber},
 };
 
