@@ -139,64 +139,65 @@ impl Pool {
     /// accepted.
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
+        self.span.clone().enter(move || {
+            trace!(message = "shutdown", state = field::debug(state));
 
-        trace!(message = "shutdown", state = field::debug(state));
+            // For now, this must be true
+            debug_assert!(!purge_queue || now);
 
-        // For now, this must be true
-        debug_assert!(!purge_queue || now);
+            // Start by setting the shutdown flag
+            loop {
+                let mut next = state;
 
-        // Start by setting the shutdown flag
-        loop {
-            let mut next = state;
+                let num_futures = next.num_futures();
 
-            let num_futures = next.num_futures();
+                if next.lifecycle() == Lifecycle::ShutdownNow {
+                    // Already transitioned to shutting down state
 
-            if next.lifecycle() == Lifecycle::ShutdownNow {
-                // Already transitioned to shutting down state
+                    if !purge_queue || num_futures == 0 {
+                        // Nothing more to do
+                        return;
+                    }
 
-                if !purge_queue || num_futures == 0 {
-                    // Nothing more to do
-                    return;
-                }
-
-                // The queue must be purged
-                debug_assert!(purge_queue);
-                next.clear_num_futures();
-            } else {
-                next.set_lifecycle(if now || num_futures == 0 {
-                    // If already idle, always transition to shutdown now.
-                    Lifecycle::ShutdownNow
-                } else {
-                    Lifecycle::ShutdownOnIdle
-                });
-
-                if purge_queue {
+                    // The queue must be purged
+                    debug_assert!(purge_queue);
                     next.clear_num_futures();
+                } else {
+                    next.set_lifecycle(if now || num_futures == 0 {
+                        // If already idle, always transition to shutdown now.
+                        Lifecycle::ShutdownNow
+                    } else {
+                        Lifecycle::ShutdownOnIdle
+                    });
+
+                    if purge_queue {
+                        next.clear_num_futures();
+                    }
                 }
+
+                let actual = self
+                    .state
+                    .compare_and_swap(state.into(), next.into(), AcqRel)
+                    .into();
+
+                if state == actual {
+                    state = next;
+                    break;
+                }
+
+                state = actual;
             }
 
-            let actual = self
-                .state
-                .compare_and_swap(state.into(), next.into(), AcqRel)
-                .into();
+            trace!(message = "  -> transitioned to shutdown");
 
-            if state == actual {
-                state = next;
-                break;
+            // Only transition to terminate if there are no futures currently on the
+            // pool
+            if state.num_futures() != 0 {
+                return;
             }
 
-            state = actual;
-        }
-
-        trace!(message = "  -> transitioned to shutdown");
-
-        // Only transition to terminate if there are no futures currently on the
-        // pool
-        if state.num_futures() != 0 {
-            return;
-        }
-
-        self.terminate_sleeping_workers();
+            self.terminate_sleeping_workers();
+        })
     }
 
     /// Called by `Worker` as it tries to enter a sleeping state. Before it
@@ -208,26 +209,31 @@ impl Pool {
 
     pub fn terminate_sleeping_workers(&self) {
         use worker::Lifecycle::Signaled;
+        self.span.clone().enter(|| {
+            trace!(message = "  -> shutting down workers");
+            // Wakeup all sleeping workers. They will wake up, see the state
+            // transition, and terminate.
+            while let Some((idx, worker_state)) =
+                self.sleep_stack.pop(&self.workers, Signaled, true)
+            {
+                self.workers[idx].signal_stop(worker_state);
+            }
 
-        trace!(message = "  -> shutting down workers");
-        // Wakeup all sleeping workers. They will wake up, see the state
-        // transition, and terminate.
-        while let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, true) {
-            self.workers[idx].signal_stop(worker_state);
-        }
-
-        // Now terminate any backup threads
-        //
-        // The call to `pop` must be successful because shutting down the pool
-        // is coordinated and at this point, this is the only thread that will
-        // attempt to transition the backup stack to "terminated".
-        while let Ok(Some(backup_id)) = self.backup_stack.pop(&self.backup, true) {
-            self.backup[backup_id.0].signal_stop();
-        }
+            // Now terminate any backup threads
+            //
+            // The call to `pop` must be successful because shutting down the pool
+            // is coordinated and at this point, this is the only thread that will
+            // attempt to transition the backup stack to "terminated".
+            while let Ok(Some(backup_id)) = self.backup_stack.pop(&self.backup, true) {
+                self.backup[backup_id.0].signal_stop();
+            }
+        })
     }
 
     pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), ::BlockingError> {
-        self.blocking.poll_blocking_capacity(task)
+        self.span
+            .clone()
+            .enter(|| self.blocking.poll_blocking_capacity(task))
     }
 
     /// Submit a task to the scheduler.
@@ -235,31 +241,33 @@ impl Pool {
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
     pub fn submit(&self, task: Arc<Task>, pool: &Arc<Pool>) {
-        debug_assert_eq!(*self, **pool);
+        self.span.clone().enter(|| {
+            debug_assert_eq!(*self, **pool);
 
-        Worker::with_current(|worker| {
-            if let Some(worker) = worker {
-                // If the worker is in blocking mode, then even though the
-                // thread-local variable is set, the current thread does not
-                // have ownership of that worker entry. This is because the
-                // worker entry has already been handed off to another thread.
-                //
-                // The second check handles the case where the current thread is
-                // part of a different threadpool than the one being submitted
-                // to.
-                if !worker.is_blocking() && *self == *worker.pool {
-                    let idx = worker.id.0;
+            Worker::with_current(|worker| {
+                if let Some(worker) = worker {
+                    // If the worker is in blocking mode, then even though the
+                    // thread-local variable is set, the current thread does not
+                    // have ownership of that worker entry. This is because the
+                    // worker entry has already been handed off to another thread.
+                    //
+                    // The second check handles the case where the current thread is
+                    // part of a different threadpool than the one being submitted
+                    // to.
+                    if !worker.is_blocking() && *self == *worker.pool {
+                        let idx = worker.id.0;
 
-                    trace!(message = "    -> submit internal;", idx = idx);
+                        trace!(message = "    -> submit internal;", idx = idx);
 
-                    worker.pool.workers[idx].submit_internal(task);
-                    worker.pool.signal_work(pool);
-                    return;
+                        worker.pool.workers[idx].submit_internal(task);
+                        worker.pool.signal_work(pool);
+                        return;
+                    }
                 }
-            }
 
-            self.submit_external(task, pool);
-        });
+                self.submit_external(task, pool);
+            });
+        })
     }
 
     /// Submit a task to the scheduler from off worker
@@ -267,12 +275,14 @@ impl Pool {
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
     pub fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
-        debug_assert_eq!(*self, **pool);
+        self.span.clone().enter(|| {
+            debug_assert_eq!(*self, **pool);
 
-        trace!(message = "    -> submit external");
+            trace!(message = "    -> submit external");
 
-        self.queue.push(task);
-        self.signal_work(pool);
+            self.queue.push(task);
+            self.signal_work(pool);
+        })
     }
 
     pub fn release_backup(&self, backup_id: BackupId) -> Result<(), ()> {
@@ -400,26 +410,29 @@ impl Pool {
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
     pub fn signal_work(&self, pool: &Arc<Pool>) {
-        debug_assert_eq!(*self, **pool);
+        self.span.clone().enter(|| {
+            debug_assert_eq!(*self, **pool);
 
-        use worker::Lifecycle::Signaled;
+            use worker::Lifecycle::Signaled;
 
-        if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
-            let entry = &self.workers[idx];
+            if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false)
+            {
+                let entry = &self.workers[idx];
 
-            debug_assert!(
-                worker_state.lifecycle() != Signaled,
-                "actual={:?}",
-                worker_state.lifecycle(),
-            );
+                debug_assert!(
+                    worker_state.lifecycle() != Signaled,
+                    "actual={:?}",
+                    worker_state.lifecycle(),
+                );
 
-            trace!(message = "signal_work -- notify;", idx = idx);
+                trace!(message = "signal_work -- notify;", idx = idx);
 
-            if !entry.notify(worker_state) {
-                trace!(message = "signal_work -- spawn;", idx = idx);
-                self.spawn_thread(WorkerId(idx), pool);
+                if !entry.notify(worker_state) {
+                    trace!(message = "signal_work -- spawn;", idx = idx);
+                    self.spawn_thread(WorkerId(idx), pool);
+                }
             }
-        }
+        })
     }
 
     /// Generates a random number
