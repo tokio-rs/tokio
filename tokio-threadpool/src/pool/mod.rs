@@ -114,6 +114,11 @@ impl Pool {
         // Initialize the blocking state
         let blocking = Blocking::new(max_blocking);
 
+        let mut span = span!("pool", name);
+        if let Some(name) = config.name_prefix.as_ref() {
+            span.record("name", &name.as_str());
+        }
+
         let ret = Pool {
             state: CachePadded::new(AtomicUsize::new(State::new().into())),
             sleep_stack: CachePadded::new(worker::Stack::new()),
@@ -124,7 +129,7 @@ impl Pool {
             backup_stack,
             blocking,
             config,
-            span: span!("pool"),
+            span,
         };
 
         // Now, we prime the sleeper stack
