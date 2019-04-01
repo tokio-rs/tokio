@@ -1438,10 +1438,10 @@ macro_rules! __tokio_trace_log {
                     .metadata(log_meta)
                     .args(__tokio_trace_format_args!(
                         __tokio_trace_concat!(
-                            $(__tokio_trace_log!(@key $key)),*
+                            $(__tokio_trace_log!(@key $($k).+)),*
                         ),
                         $(
-                            __tokio_trace_log!(@val_or $key $( = $val)* )
+                            __tokio_trace_log!(@val_or $($k).+ $( = $val)* )
                         ),*
                     ))
                     .build());
@@ -1449,7 +1449,7 @@ macro_rules! __tokio_trace_log {
         }
     };
     (@key message) => { "{} " };
-    (@key $($k:ident).+) => { __tokio_trace_concat!(__tokio_trace_stringify!( $key ), "={:?} ") };
+    (@key $($k:ident).+) => { __tokio_trace_concat!(__tokio_trace_stringify!( $($k).+ ), "={:?} ") };
     (@val_or $($k:ident).+ = $v:expr) => { $v };
     (@val_or $($k:ident).+ ) => { __tokio_trace_format_args!("?") };
 }
