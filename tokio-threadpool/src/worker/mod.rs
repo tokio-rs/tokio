@@ -59,6 +59,7 @@ pub struct Worker {
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     trigger: Arc<ShutdownTrigger>,
 
+    // A `tokio-trace` span identifying this worker thread.
     span: tokio_trace::Span,
 
     // Keep the value on the current thread.
