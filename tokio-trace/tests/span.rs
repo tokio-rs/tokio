@@ -279,6 +279,23 @@ fn moved_field() {
 }
 
 #[test]
+fn dotted_field_name() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock()
+                .named("foo")
+                .with_field(field::mock("fields.bar").with_value(&true).only()),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "foo", fields.bar = true);
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
 fn borrowed_field() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(
