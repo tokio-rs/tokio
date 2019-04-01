@@ -38,4 +38,4 @@ tokio = "0.1.8"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
-features = ["minwindef", "wincon"]
+features = ["consoleapi", "minwindef", "wincon"]
