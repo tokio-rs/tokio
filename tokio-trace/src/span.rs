@@ -126,11 +126,15 @@
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
-    borrow::Borrow,
     cmp, fmt,
     hash::{Hash, Hasher},
 };
 use {dispatcher::Dispatch, field, Metadata};
+
+/// Trait implemented by types which have a span `Id`.
+pub trait AsId: ::sealed::Sealed {
+    fn as_id(&self) -> Option<&Id>;
+}
 
 /// A handle representing a span, with the capability to enter the span if it
 /// exists.
@@ -229,10 +233,10 @@ impl Span {
         values: &field::ValueSet,
     ) -> Span
     where
-        I: Into<Option<Id>>,
+        I: AsId,
     {
-        let new_span = match parent.into() {
-            Some(parent) => Attributes::child_of(parent, meta, values),
+        let new_span = match parent.as_id() {
+            Some(parent) => Attributes::child_of(parent.clone(), meta, values),
             None => Attributes::new_root(meta, values),
         };
         Self::make(meta, new_span)
@@ -280,22 +284,21 @@ impl Span {
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn field<Q>(&self, name: &Q) -> Option<field::Field>
+    pub fn field<Q: ?Sized>(&self, field: &Q) -> Option<field::Field>
     where
-        Q: Borrow<str>,
+        Q: field::AsField,
     {
-        self.metadata().and_then(|meta| meta.fields().field(name))
+        self.metadata().and_then(|meta| field.as_field(meta))
     }
 
     /// Returns true if this `Span` has a field for the given
     /// [`Field`](::field::Field) or field name.
+    #[inline]
     pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
         Q: field::AsField,
     {
-        self.metadata()
-            .and_then(|meta| field.as_field(meta))
-            .is_some()
+        self.field(field).is_some()
     }
 
     /// Visits that the field described by `field` has the value `value`.
@@ -347,9 +350,14 @@ impl Span {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
-    pub fn follows_from(&self, from: &Id) -> &Self {
+    pub fn follows_from<I>(&self, from: I) -> &Self
+    where
+        I: AsId,
+    {
         if let Some(ref inner) = self.inner {
-            inner.follows_from(from);
+            if let Some(from) = from.as_id() {
+                inner.follows_from(from);
+            }
         }
         self
     }
@@ -433,12 +441,6 @@ impl fmt::Debug for Span {
         }
 
         span.finish()
-    }
-}
-
-impl<'a> Into<Option<Id>> for &'a Span {
-    fn into(self) -> Option<Id> {
-        self.id()
     }
 }
 
@@ -551,5 +553,55 @@ impl<'a> fmt::Display for FmtAttrs<'a> {
             res = write!(f, "{}={:?} ", k, v);
         });
         res
+    }
+}
+
+// ===== impl AsId =====
+
+impl ::sealed::Sealed for Span {}
+
+impl AsId for Span {
+    fn as_id(&self) -> Option<&Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Span {}
+
+impl<'a> AsId for &'a Span {
+    fn as_id(&self) -> Option<&Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
+impl ::sealed::Sealed for Id {}
+
+impl AsId for Id {
+    fn as_id(&self) -> Option<&Id> {
+        Some(self)
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Id {}
+
+impl<'a> AsId for &'a Id {
+    fn as_id(&self) -> Option<&Id> {
+        Some(self)
+    }
+}
+
+impl ::sealed::Sealed for Option<Id> {}
+
+impl AsId for Option<Id> {
+    fn as_id(&self) -> Option<&Id> {
+        self.as_ref()
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Option<Id> {}
+
+impl<'a> AsId for &'a Option<Id> {
+    fn as_id(&self) -> Option<&Id> {
+        self.as_ref()
     }
 }
