@@ -190,13 +190,13 @@ where
             // readable again, at which point the stream is terminated.
             if self.is_readable {
                 if self.eof {
-                    let frame = try!(self.inner.decode_eof(&mut self.buffer));
+                    let frame = self.inner.decode_eof(&mut self.buffer)?;
                     return Ok(Async::Ready(frame));
                 }
 
                 trace!("attempting to decode a frame");
 
-                if let Some(frame) = try!(self.inner.decode(&mut self.buffer)) {
+                if let Some(frame) = self.inner.decode(&mut self.buffer)? {
                     trace!("frame decoded from buffer");
                     return Ok(Async::Ready(Some(frame)));
                 }

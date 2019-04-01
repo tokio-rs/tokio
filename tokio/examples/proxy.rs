@@ -124,7 +124,7 @@ impl AsyncRead for MyTcpStream {}
 
 impl AsyncWrite for MyTcpStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        try!(self.0.lock().unwrap().shutdown(Shutdown::Write));
+        self.0.lock().unwrap().shutdown(Shutdown::Write)?;
         Ok(().into())
     }
 }

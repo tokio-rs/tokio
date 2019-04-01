@@ -530,7 +530,7 @@ impl Decoder for LengthDelimitedCodec {
 
     fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
         let n = match self.state {
-            DecodeState::Head => match try!(self.decode_head(src)) {
+            DecodeState::Head => match self.decode_head(src)? {
                 Some(n) => {
                     self.state = DecodeState::Data(n);
                     n
@@ -540,7 +540,7 @@ impl Decoder for LengthDelimitedCodec {
             DecodeState::Data(n) => n,
         };
 
-        match try!(self.decode_data(n, src)) {
+        match self.decode_data(n, src)? {
             Some(data) => {
                 // Update the decode state
                 self.state = DecodeState::Head;

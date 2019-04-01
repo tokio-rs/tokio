@@ -78,7 +78,7 @@ impl UnixStream {
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        let (a, b) = try!(mio_uds::UnixStream::pair());
+        let (a, b) = mio_uds::UnixStream::pair()?;
         let a = UnixStream::new(a);
         let b = UnixStream::new(b);
 
@@ -262,7 +262,7 @@ impl Future for ConnectFuture {
                     return Ok(Async::NotReady);
                 }
 
-                if let Some(e) = try!(stream.io.get_ref().take_error()) {
+                if let Some(e) = stream.io.get_ref().take_error()? {
                     return Err(e);
                 }
             }
