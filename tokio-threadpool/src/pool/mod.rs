@@ -80,6 +80,7 @@ pub(crate) struct Pool {
     // Configuration
     pub config: Config,
 
+    // A trace span entered when running the thread pool.
     span: tokio_trace::Span,
 }
 
