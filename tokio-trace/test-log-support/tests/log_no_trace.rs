@@ -4,6 +4,7 @@ extern crate tokio_trace;
 
 use log::{LevelFilter, Log, Metadata, Record};
 use std::sync::{Arc, Mutex};
+use tokio_trace::Level;
 
 struct State {
     last_log: Mutex<Option<String>>,
@@ -41,7 +42,7 @@ fn test_always_log() {
     info!(message = "hello world;", thingy = 42, other_thingy = 666);
     last(&a, "hello world; thingy=42 other_thingy=666");
 
-    let mut foo = span!("foo");
+    let mut foo = span!(Level::TRACE, "foo");
     last(&a, "foo;");
     foo.enter(|| {
         last(&a, "-> foo");
@@ -51,10 +52,10 @@ fn test_always_log() {
     });
     last(&a, "<- foo");
 
-    span!("foo", bar = 3, baz = false);
+    span!(Level::TRACE, "foo", bar = 3, baz = false);
     last(&a, "foo; bar=3 baz=false");
 
-    let mut span = span!("foo", bar, baz);
+    let mut span = span!(Level::TRACE, "foo", bar, baz);
     span.record("bar", &3);
     last(&a, "foo; bar=3");
     span.record("baz", &"a string");

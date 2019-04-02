@@ -4,6 +4,7 @@
 extern crate tokio_trace;
 extern crate test;
 use test::Bencher;
+use tokio_trace::Level;
 
 use std::{
     fmt,
@@ -97,13 +98,15 @@ const N_SPANS: usize = 100;
 
 #[bench]
 fn span_no_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || b.iter(|| span!("span")));
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+        b.iter(|| span!(Level::TRACE, "span"))
+    });
 }
 
 #[bench]
 fn enter_span(b: &mut Bencher) {
     tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        b.iter(|| test::black_box(span!("span").enter(|| {})))
+        b.iter(|| test::black_box(span!(Level::TRACE, "span").enter(|| {})))
     });
 }
 
@@ -111,7 +114,7 @@ fn enter_span(b: &mut Bencher) {
 fn span_repeatedly(b: &mut Bencher) {
     #[inline]
     fn mk_span(i: u64) -> tokio_trace::Span {
-        span!("span", i = i)
+        span!(Level::TRACE, "span", i = i)
     }
 
     let n = test::black_box(N_SPANS);
@@ -125,6 +128,7 @@ fn span_with_fields(b: &mut Bencher) {
     tokio_trace::subscriber::with_default(EnabledSubscriber, || {
         b.iter(|| {
             span!(
+                Level::TRACE,
                 "span",
                 foo = "foo",
                 bar = "bar",
@@ -141,6 +145,7 @@ fn span_with_fields_record(b: &mut Bencher) {
     tokio_trace::subscriber::with_default(subscriber, || {
         b.iter(|| {
             span!(
+                Level::TRACE,
                 "span",
                 foo = "foo",
                 bar = "bar",

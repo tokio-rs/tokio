@@ -1,3 +1,5 @@
+use tokio_trace::Level;
+
 #[macro_use]
 extern crate tokio_trace;
 // Tests that macros work across various invocation syntax.
@@ -8,95 +10,258 @@ extern crate tokio_trace;
 
 #[test]
 fn span() {
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 3);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 4,);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "foo");
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, "bar",);
-    span!(level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 3);
-    span!(level: tokio_trace::Level::DEBUG, "foo", bar = 2, baz = 4,);
-    span!(level: tokio_trace::Level::DEBUG, "foo");
-    span!(level: tokio_trace::Level::DEBUG, "bar",);
-    span!("foo", bar = 2, baz = 3);
-    span!("foo", bar = 2, baz = 4,);
-    span!("foo");
-    span!("bar",);
+    span!(Level::DEBUG, target: "foo_events", "foo", bar = 2, baz = 3);
+    span!(Level::DEBUG, target: "foo_events", "foo", bar = 2, baz = 4,);
+    span!(Level::DEBUG, target: "foo_events", "foo");
+    span!(Level::DEBUG, target: "foo_events", "bar",);
+    span!(Level::DEBUG, "foo", bar = 2, baz = 3);
+    span!(Level::DEBUG, "foo", bar = 2, baz = 4,);
+    span!(Level::TRACE, "foo", bar = 2, baz = 3);
+    span!(Level::TRACE, "foo", bar = 2, baz = 4,);
+    span!(Level::TRACE, "foo");
+    span!(Level::TRACE, "bar",);
+}
+
+#[test]
+fn trace_span() {
+    trace_span!(target: "foo_events", "foo", bar = 2, baz = 3);
+    trace_span!(target: "foo_events", "foo", bar = 2, baz = 4,);
+    trace_span!(target: "foo_events", "foo");
+    trace_span!(target: "foo_events", "bar",);
+    trace_span!("foo", bar = 2, baz = 3);
+    trace_span!("foo", bar = 2, baz = 4,);
+    trace_span!("bar");
+    trace_span!("bar",);
+}
+
+#[test]
+fn debug_span() {
+    debug_span!(target: "foo_events", "foo", bar = 2, baz = 3);
+    debug_span!(target: "foo_events", "foo", bar = 2, baz = 4,);
+    debug_span!(target: "foo_events", "foo");
+    debug_span!(target: "foo_events", "bar",);
+    debug_span!("foo", bar = 2, baz = 3);
+    debug_span!("foo", bar = 2, baz = 4,);
+    debug_span!("bar");
+    debug_span!("bar",);
+}
+
+#[test]
+fn info_span() {
+    info_span!(target: "foo_events", "foo", bar = 2, baz = 3);
+    info_span!(target: "foo_events", "foo", bar = 2, baz = 4,);
+    info_span!(target: "foo_events", "foo");
+    info_span!(target: "foo_events", "bar",);
+    info_span!("foo", bar = 2, baz = 3);
+    info_span!("foo", bar = 2, baz = 4,);
+    info_span!("bar");
+    info_span!("bar",);
+}
+
+#[test]
+fn warn_span() {
+    warn_span!(target: "foo_events", "foo", bar = 2, baz = 3);
+    warn_span!(target: "foo_events", "foo", bar = 2, baz = 4,);
+    warn_span!(target: "foo_events", "foo");
+    warn_span!(target: "foo_events", "bar",);
+    warn_span!("foo", bar = 2, baz = 3);
+    warn_span!("foo", bar = 2, baz = 4,);
+    warn_span!("bar");
+    warn_span!("bar",);
+}
+
+#[test]
+fn error_span() {
+    error_span!(target: "foo_events", "foo", bar = 2, baz = 3);
+    error_span!(target: "foo_events", "foo", bar = 2, baz = 4,);
+    error_span!(target: "foo_events", "foo");
+    error_span!(target: "foo_events", "bar",);
+    error_span!("foo", bar = 2, baz = 3);
+    error_span!("foo", bar = 2, baz = 4,);
+    error_span!("bar");
+    error_span!("bar",);
 }
 
 #[test]
 fn span_root() {
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 3);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo", bar = 2, baz = 4,);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "foo");
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: None, "bar",);
-    span!(
-        level: tokio_trace::Level::DEBUG,
-        parent: None,
-        "foo",
-        bar = 2,
-        baz = 3
-    );
-    span!(
-        level: tokio_trace::Level::DEBUG,
-        parent: None,
-        "foo",
-        bar = 2,
-        baz = 4,
-    );
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "foo");
-    span!(level: tokio_trace::Level::DEBUG, parent: None, "bar",);
-    span!(parent: None, "foo", bar = 2, baz = 3);
-    span!(parent: None, "foo", bar = 2, baz = 4,);
-    span!(parent: None, "foo");
-    span!(parent: None, "bar",);
+    span!(Level::DEBUG, target: "foo_events", parent: None, "foo", bar = 2, baz = 3);
+    span!(Level::DEBUG, target: "foo_events", parent: None, "foo", bar = 2, baz = 4,);
+    span!(Level::DEBUG, target: "foo_events", parent: None, "foo");
+    span!(Level::DEBUG, target: "foo_events", parent: None, "bar",);
+    span!(Level::TRACE, parent: None, "foo", bar = 2, baz = 3);
+    span!(Level::TRACE, parent: None, "foo", bar = 2, baz = 4,);
+    span!(Level::TRACE, parent: None, "foo");
+    span!(Level::TRACE, parent: None, "bar",);
+}
+
+#[test]
+fn trace_span_root() {
+    trace_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 3);
+    trace_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 4,);
+    trace_span!(target: "foo_events", parent: None, "foo");
+    trace_span!(target: "foo_events", parent: None, "bar",);
+    trace_span!(parent: None, "foo", bar = 2, baz = 3);
+    trace_span!(parent: None, "foo", bar = 2, baz = 4,);
+    trace_span!(parent: None, "foo");
+    trace_span!(parent: None, "bar",);
+}
+
+#[test]
+fn debug_span_root() {
+    debug_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 3);
+    debug_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 4,);
+    debug_span!(target: "foo_events", parent: None, "foo");
+    debug_span!(target: "foo_events", parent: None, "bar",);
+    debug_span!(parent: None, "foo", bar = 2, baz = 3);
+    debug_span!(parent: None, "foo", bar = 2, baz = 4,);
+    debug_span!(parent: None, "foo");
+    debug_span!(parent: None, "bar",);
+}
+
+#[test]
+fn info_span_root() {
+    info_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 3);
+    info_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 4,);
+    info_span!(target: "foo_events", parent: None, "foo");
+    info_span!(target: "foo_events", parent: None, "bar",);
+    info_span!(parent: None, "foo", bar = 2, baz = 3);
+    info_span!(parent: None, "foo", bar = 2, baz = 4,);
+    info_span!(parent: None, "foo");
+    info_span!(parent: None, "bar",);
+}
+
+#[test]
+fn warn_span_root() {
+    warn_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 3);
+    warn_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 4,);
+    warn_span!(target: "foo_events", parent: None, "foo");
+    warn_span!(target: "foo_events", parent: None, "bar",);
+    warn_span!(parent: None, "foo", bar = 2, baz = 3);
+    warn_span!(parent: None, "foo", bar = 2, baz = 4,);
+    warn_span!(parent: None, "foo");
+    warn_span!(parent: None, "bar",);
+}
+
+#[test]
+fn error_span_root() {
+    error_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 3);
+    error_span!(target: "foo_events", parent: None, "foo", bar = 2, baz = 4,);
+    error_span!(target: "foo_events", parent: None, "foo");
+    error_span!(target: "foo_events", parent: None, "bar",);
+    error_span!(parent: None, "foo", bar = 2, baz = 3);
+    error_span!(parent: None, "foo", bar = 2, baz = 4,);
+    error_span!(parent: None, "foo");
+    error_span!(parent: None, "bar",);
 }
 
 #[test]
 fn span_with_parent() {
-    let p = span!("im_a_parent!");
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 3);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo", bar = 2, baz = 4,);
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "foo");
-    span!(target: "foo_events", level: tokio_trace::Level::DEBUG, parent: &p, "bar",);
-    span!(
-        level: tokio_trace::Level::DEBUG,
-        parent: &p,
-        "foo",
-        bar = 2,
-        baz = 3
-    );
-    span!(
-        level: tokio_trace::Level::DEBUG,
-        parent: &p,
-        "foo",
-        bar = 2,
-        baz = 4,
-    );
-    span!(level: tokio_trace::Level::DEBUG, parent: &p, "foo");
-    span!(level: tokio_trace::Level::DEBUG, parent: &p, "bar",);
-    span!(parent: &p, "foo", bar = 2, baz = 3);
-    span!(parent: &p, "foo", bar = 2, baz = 4,);
-    span!(parent: &p, "foo");
-    span!(parent: &p, "bar",);
+    let p = span!(Level::TRACE, "im_a_parent!");
+    span!(Level::DEBUG, target: "foo_events", parent: &p, "foo", bar = 2, baz = 3);
+    span!(Level::DEBUG, target: "foo_events", parent: &p, "foo", bar = 2, baz = 4,);
+    span!(Level::DEBUG, target: "foo_events", parent: &p, "foo");
+    span!(Level::DEBUG, target: "foo_events", parent: &p, "bar",);
+
+    span!(Level::DEBUG, parent: &p, "foo", bar = 2, baz = 3);
+    span!(Level::DEBUG, parent: &p, "foo", bar = 2, baz = 4,);
+
+    span!(Level::DEBUG, parent: &p, "foo");
+    span!(Level::DEBUG, parent: &p, "bar",);
+}
+
+#[test]
+fn trace_span_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    trace_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 3);
+    trace_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 4,);
+    trace_span!(target: "foo_events", parent: &p, "foo");
+    trace_span!(target: "foo_events", parent: &p, "bar",);
+
+    trace_span!(parent: &p, "foo", bar = 2, baz = 3);
+    trace_span!(parent: &p, "foo", bar = 2, baz = 4,);
+
+    trace_span!(parent: &p, "foo");
+    trace_span!(parent: &p, "bar",);
+}
+
+#[test]
+fn debug_span_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    debug_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 3);
+    debug_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 4,);
+    debug_span!(target: "foo_events", parent: &p, "foo");
+    debug_span!(target: "foo_events", parent: &p, "bar",);
+
+    debug_span!(parent: &p, "foo", bar = 2, baz = 3);
+    debug_span!(parent: &p, "foo", bar = 2, baz = 4,);
+
+    debug_span!(parent: &p, "foo");
+    debug_span!(parent: &p, "bar",);
+}
+
+#[test]
+fn info_span_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    info_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 3);
+    info_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 4,);
+    info_span!(target: "foo_events", parent: &p, "foo");
+    info_span!(target: "foo_events", parent: &p, "bar",);
+
+    info_span!(parent: &p, "foo", bar = 2, baz = 3);
+    info_span!(parent: &p, "foo", bar = 2, baz = 4,);
+
+    info_span!(parent: &p, "foo");
+    info_span!(parent: &p, "bar",);
+}
+
+#[test]
+fn warn_span_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    warn_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 3);
+    warn_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 4,);
+    warn_span!(target: "foo_events", parent: &p, "foo");
+    warn_span!(target: "foo_events", parent: &p, "bar",);
+
+    warn_span!(parent: &p, "foo", bar = 2, baz = 3);
+    warn_span!(parent: &p, "foo", bar = 2, baz = 4,);
+
+    warn_span!(parent: &p, "foo");
+    warn_span!(parent: &p, "bar",);
+}
+
+#[test]
+fn error_span_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    error_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 3);
+    error_span!(target: "foo_events", parent: &p, "foo", bar = 2, baz = 4,);
+    error_span!(target: "foo_events", parent: &p, "foo");
+    error_span!(target: "foo_events", parent: &p, "bar",);
+
+    error_span!(parent: &p, "foo", bar = 2, baz = 3);
+    error_span!(parent: &p, "foo", bar = 2, baz = 4,);
+
+    error_span!(parent: &p, "foo");
+    error_span!(parent: &p, "bar",);
 }
 
 #[test]
 fn event() {
-    event!(tokio_trace::Level::DEBUG, foo = 3, bar = 2, baz = false);
-    event!(tokio_trace::Level::DEBUG, foo = 3, bar = 3,);
-    event!(tokio_trace::Level::DEBUG, "foo");
-    event!(tokio_trace::Level::DEBUG, "foo: {}", 3);
-    event!(tokio_trace::Level::DEBUG, { foo = 3, bar = 80 }, "baz");
-    event!(tokio_trace::Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}", true);
-    event!(tokio_trace::Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}, {quux}", true, quux = false);
-    event!(tokio_trace::Level::DEBUG, { foo = 2, bar = 78, }, "baz");
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, foo = 3, bar = 2, baz = false);
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, foo = 3, bar = 3,);
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, "foo");
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, "foo: {}", 3);
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, { foo = 3, bar = 80 }, "baz");
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}", true);
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}, {quux}", true, quux = false);
-    event!(target: "foo_events", tokio_trace::Level::DEBUG, { foo = 2, bar = 78, }, "baz");
+    event!(Level::DEBUG, foo = 3, bar = 2, baz = false);
+    event!(Level::DEBUG, foo = 3, bar = 3,);
+    event!(Level::DEBUG, "foo");
+    event!(Level::DEBUG, "foo: {}", 3);
+    event!(Level::DEBUG, { foo = 3, bar = 80 }, "baz");
+    event!(Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}", true);
+    event!(Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}, {quux}", true, quux = false);
+    event!(Level::DEBUG, { foo = 2, bar = 78, }, "baz");
+    event!(target: "foo_events", Level::DEBUG, foo = 3, bar = 2, baz = false);
+    event!(target: "foo_events", Level::DEBUG, foo = 3, bar = 3,);
+    event!(target: "foo_events", Level::DEBUG, "foo");
+    event!(target: "foo_events", Level::DEBUG, "foo: {}", 3);
+    event!(target: "foo_events", Level::DEBUG, { foo = 3, bar = 80 }, "baz");
+    event!(target: "foo_events", Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}", true);
+    event!(target: "foo_events", Level::DEBUG, { foo = 2, bar = 79 }, "baz {:?}, {quux}", true, quux = false);
+    event!(target: "foo_events", Level::DEBUG, { foo = 2, bar = 78, }, "baz");
 }
 
 #[test]
