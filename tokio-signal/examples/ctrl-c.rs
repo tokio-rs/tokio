@@ -53,7 +53,12 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // Up until now, we haven't really DONE anything, just prepared
     // now it's time to actually schedule, and thus execute, the stream
     // on our event loop
-    tokio::runtime::current_thread::block_on_all(future)?;
+    // FIXME(1000): windows uses a global driver task which doesn't terminate
+    // on its own, so if we use block_on_all our application will never exit
+    //tokio::runtime::current_thread::block_on_all(future)?;
+    tokio::runtime::current_thread::Runtime::new()
+        .expect("failed to start runtime on current thread")
+        .block_on(future)?;
 
     println!("Stream ended, quiting the program.");
     Ok(())

@@ -3,18 +3,22 @@
 mod chain;
 mod collect;
 mod from;
+mod iter;
 mod limit;
+mod stream;
 
 pub use self::chain::Chain;
 pub use self::collect::Collect;
 pub use self::from::FromBufStream;
+pub use self::iter::iter;
 pub use self::limit::Limit;
+pub use self::stream::stream;
 
 pub mod error {
     //! Error types
 
     pub use super::collect::CollectError;
-    pub use super::from::CollectVecError;
+    pub use super::from::{CollectBytesError, CollectVecError};
     pub use super::limit::LimitError;
 }
 

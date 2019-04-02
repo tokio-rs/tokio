@@ -1,3 +1,8 @@
+# 0.1.6 (March 22, 2019)
+
+### Added
+- implement `TypedExecutor` (#993).
+
 # 0.1.5 (March 1, 2019)
 
 ### Fixed

@@ -4,11 +4,7 @@ mod support;
 
 use self::support::*;
 
-use tokio_trace::{
-    field::{debug, display},
-    subscriber::with_default,
-    Level,
-};
+use tokio_trace::{field::display, subscriber::with_default, Level};
 
 #[test]
 fn event_without_message() {
@@ -72,7 +68,7 @@ fn one_with_everything() {
                         .and(field::mock("bar").with_value(&false))
                         .only(),
                 )
-                .at_level(tokio_trace::Level::ERROR)
+                .at_level(Level::ERROR)
                 .with_target("whatever"),
         )
         .done()
@@ -81,7 +77,7 @@ fn one_with_everything() {
     with_default(subscriber, || {
         event!(
             target: "whatever",
-            tokio_trace::Level::ERROR,
+            Level::ERROR,
             { foo = 666, bar = false },
              "{:#x} make me one with{what:.>20}", 4277009102u64, what = "everything"
         );
@@ -133,7 +129,11 @@ fn borrowed_field() {
 }
 
 #[test]
+// If emitting log instrumentation, this gets moved anyway, breaking the test.
+#[cfg(not(feature = "log"))]
 fn move_field_out_of_struct() {
+    use tokio_trace::field::debug;
+
     #[derive(Debug)]
     struct Position {
         x: f32,

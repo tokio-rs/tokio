@@ -1,3 +1,16 @@
+# 0.2.9
+
+### Fixed
+- `windows::Event` performs internal registrations lazily, so now it can be
+constructed outside of a running task
+- remove usage of deprecated `Handle::current` in default `windows::Event`
+constructors
+
+# 0.2.8 (March 22, 2019)
+
+### Fixed
+- remove usage of deprecated `Handle::current` (#981).
+
 ## 0.2.7 - (November 21, 2018)
 ### Changed
 * `unix::Signal` now implements `Sync`

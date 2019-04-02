@@ -6,8 +6,9 @@
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
-/// let mut span = span!("my span");
+/// let mut span = span!(Level::TRACE, "my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -18,8 +19,9 @@
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
-/// span!("my span", foo = 2, bar = "a string").enter(|| {
+/// span!(Level::TRACE, "my span", foo = 2, bar = "a string").enter(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -29,8 +31,10 @@
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
 /// span!(
+///     Level::TRACE,
 ///     "my span",
 ///     foo = 2,
 ///     bar = "a string",
@@ -42,10 +46,11 @@
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
 /// span!(
+///     Level::TRACE,
 ///     target: "app_span",
-///     level: tokio_trace::Level::TRACE,
 ///     "my span",
 ///     foo = 3,
 ///     bar = "another string"
@@ -57,8 +62,9 @@
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
-/// let mut my_span = span!("my span", foo = 2, bar);
+/// let mut my_span = span!(Level::TRACE, "my span", foo = 2, bar);
 /// my_span.record("bar", &7);
 /// # }
 /// ```
@@ -67,8 +73,10 @@
 /// ```rust,compile_fail
 ///  # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
 /// span!(
+///     Level::TRACE,
 ///     "too many fields!",
 ///     a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8, i = 9,
 ///     j = 10, k = 11, l = 12, m = 13, n = 14, o = 15, p = 16, q = 17,
@@ -79,28 +87,16 @@
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! span {
-    (
-        target: $target:expr,
-        level: $lvl:expr,
-        parent: $parent:expr,
-        $name:expr,
-        $($k:ident $( = $val:expr )* ),*,
-    ) => {
+    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
         span!(
+            $lvl,
             target: $target,
-            level: $lvl,
             parent: $parent,
             $name,
             $($k $( = $val)*),*
         )
     };
-    (
-        target: $target:expr,
-        level: $lvl:expr,
-        parent: $parent:expr,
-        $name:expr,
-        $($k:ident $( = $val:expr )* ),*
-    ) => {
+    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
         {
             use $crate::callsite;
             use $crate::callsite::Callsite;
@@ -110,24 +106,23 @@ macro_rules! span {
                 level: $lvl,
                 fields: $($k),*
             };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
+            let meta = callsite.metadata();
+
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::child_of(
                     $parent,
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled()
+                 __tokio_trace_disabled_span!(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*)
+                )
             }
         }
     };
-    (
-        target: $target:expr,
-        level: $lvl:expr,
-        $name:expr,
-        $($k:ident $( = $val:expr )* ),*
-    ) => {
+    ($lvl:expr, target: $target:expr, $name:expr,$($k:ident $( = $val:expr )* ),*) => {
         {
             use $crate::callsite;
             use $crate::callsite::Callsite;
@@ -137,45 +132,134 @@ macro_rules! span {
                 level: $lvl,
                 fields: $($k),*
             };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
+            let meta = callsite.metadata();
+
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::new(
                     meta,
                     &valueset!(meta.fields(), $($k $( = $val)*),*),
                 )
             } else {
-                $crate::Span::new_disabled()
+                __tokio_trace_disabled_span!(
+                    meta,
+                    &valueset!(meta.fields(), $($k $( = $val)*),*)
+                )
             }
         }
+
     };
-    (target: $target:expr, level: $lvl:expr, parent: $parent:expr, $name:expr) => {
-        span!(target: $target, level: $lvl, parent: $parent, $name,)
+    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr) => {
+        span!($lvl, target: $target, parent: $parent, $name,)
     };
-    (level: $lvl:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
+    ($lvl:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
         span!(
+            $lvl,
             target: __tokio_trace_module_path!(),
-            level: $lvl,
             parent: $parent,
             $name,
             $($k $( = $val)*),*
         )
     };
-    (level: $lvl:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
+    ($lvl:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
         span!(
+            $lvl,
             target: __tokio_trace_module_path!(),
-            level: $lvl,
             parent: $parent,
             $name,
             $($k $( = $val)*),*
         )
     };
-    (level: $lvl:expr, parent: $parent:expr, $name:expr) => {
-        span!(target: __tokio_trace_module_path!(), level: $lvl, parent: $parent, $name,)
+    ($lvl:expr, parent: $parent:expr, $name:expr) => {
+        span!(
+            $lvl,
+            target: __tokio_trace_module_path!(),
+            parent: $parent,
+            $name,
+        )
+    };
+    ($lvl:expr, target: $target:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,
+    ) => {
+        span!(
+            $lvl,
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($lvl:expr, target: $target:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
+        span!(
+            $lvl,
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($lvl:expr, target: $target:expr, $name:expr) => {
+        span!($lvl, target: $target, $name,)
+    };
+    ($lvl:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        span!(
+            $lvl,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($lvl:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $lvl,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($lvl:expr, $name:expr) => {
+        span!(
+            $lvl,
+            target: __tokio_trace_module_path!(),
+            $name,
+        )
+    };
+}
+
+/// Constructs a span at the trace level.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// let mut span = trace_span!("my span");
+/// span.enter(|| {
+///     // do work inside the span...
+/// });
+/// # }
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! trace_span {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        trace_span!(
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::TRACE,
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr) => {
+        trace_span!(target: $target, parent: $parent, $name,)
     };
     (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
-        span!(
-            target: __tokio_trace_module_path!(),
-            level: $crate::Level::TRACE,
+        trace_span!(
             parent: $parent,
             $name,
             $($k $( = $val)*),*
@@ -183,98 +267,403 @@ macro_rules! span {
     };
     (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
         span!(
+            $crate::Level::TRACE,
             target: __tokio_trace_module_path!(),
-            level: $crate::Level::TRACE,
-            parent: $parent,
             $name,
             $($k $( = $val)*),*
         )
     };
     (parent: $parent:expr, $name:expr) => {
-        span!(
-            target: __tokio_trace_module_path!(),
-            level: $crate::Level::TRACE,
-            parent: $parent,
-            $name,
-        )
+        trace_span!(parent: $parent, $name,)
     };
-    (
-        target: $target:expr,
-        level: $lvl:expr,
-        $name:expr,
-        $($k:ident $( = $val:expr )* ),*,
-    ) => {
-        span!(
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        trace_span!(
             target: $target,
-            level: $lvl,
             $name,
             $($k $( = $val)*),*
         )
     };
-    (
-        target: $target:expr,
-        level: $lvl:expr,
-        $name:expr,
-        $($k:ident $( = $val:expr )* ),*
-    ) => {
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
         span!(
+            $crate::Level::TRACE,
             target: $target,
-            level: $lvl,
             $name,
             $($k $( = $val)*),*
         )
     };
-    (target: $target:expr, level: $lvl:expr, $name:expr) => {
-        span!(target: $target, level: $lvl, $name,)
-    };
-    (target: $target:expr, level: $lvl:expr, $name:expr,) => {
-        span!(
-            target: $target,
-            level: $lvl,
-            $name,
-        )
-    };
-    (level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*,) => {
-        span!(
-            target: __tokio_trace_module_path!(),
-            level: $lvl,
-            $name,
-            $($k $( = $val)*),*
-        )
-    };
-    (level: $lvl:expr, $name:expr, $($k:ident $( = $val:expr )* ),*) => {
-        span!(
-            target: __tokio_trace_module_path!(),
-            level: $lvl,
-            $name, $($k $( = $val)*),*
-        )
-    };
-    (level: $lvl:expr, $name:expr) => {
-        span!(target: __tokio_trace_module_path!(), level: $lvl, $name,)
+    (target: $target:expr, $name:expr) => {
+        trace_span!(target: $target, $name,)
     };
     ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
-        span!(
-            target: __tokio_trace_module_path!(),
-            level: $crate::Level::TRACE,
+        trace_span!(
             $name,
             $($k $( = $val)*),*
         )
     };
     ($name:expr, $($k:ident $( = $val:expr)*),*) => {
         span!(
+            $crate::Level::TRACE,
             target: __tokio_trace_module_path!(),
-            level: $crate::Level::TRACE,
             $name,
             $($k $( = $val)*),*
         )
     };
-    ($name:expr) => {
-        span!(
-            target: __tokio_trace_module_path!(),
-            level: $crate::Level::TRACE,
+    ($name:expr) => {trace_span!($name,)};
+}
+
+/// Constructs a span at the debug level.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// let mut span = debug_span!("my span");
+/// span.enter(|| {
+///     // do work inside the span...
+/// });
+/// # }
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! debug_span {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        debug_span!(
+            target: $target,
+            parent: $parent,
             $name,
+            $($k $( = $val)*),*
         )
     };
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::DEBUG,
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr) => {
+        debug_span!(target: $target, parent: $parent, $name,)
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        debug_span!(
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::DEBUG,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr) => {
+        debug_span!(parent: $parent, $name,)
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        debug_span!(
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::DEBUG,
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr) => {
+        debug_span!(target: $target, $name,)
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        debug_span!(
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::DEBUG,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr) => {debug_span!($name,)};
+}
+
+/// Constructs a span at the info level.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// let mut span = info_span!("my span");
+/// span.enter(|| {
+///     // do work inside the span...
+/// });
+/// # }
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! info_span {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        info_span!(
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::INFO,
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr) => {
+        info_span!(target: $target, parent: $parent, $name,)
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        info_span!(
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::INFO,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr) => {
+        info_span!(parent: $parent, $name,)
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        info_span!(
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::INFO,
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr) => {
+        info_span!(target: $target, $name,)
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        info_span!(
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::INFO,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr) => {info_span!($name,)};
+}
+
+/// Constructs a span at the warn level.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// let mut span = warn_span!("my span");
+/// span.enter(|| {
+///     // do work inside the span...
+/// });
+/// # }
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! warn_span {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        warn_span!(
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::WARN,
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr) => {
+        warn_span!(target: $target, parent: $parent, $name,)
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        warn_span!(
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::WARN,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr) => {
+        warn_span!(parent: $parent, $name,)
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        warn_span!(
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::WARN,
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr) => {
+        warn_span!(target: $target, $name,)
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        warn_span!(
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::WARN,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr) => {warn_span!($name,)};
+}
+/// Constructs a span at the error level.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # fn main() {
+/// let mut span = error_span!("my span");
+/// span.enter(|| {
+///     // do work inside the span...
+/// });
+/// # }
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! error_span {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        error_span!(
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::ERROR,
+            target: $target,
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, parent: $parent:expr, $name:expr) => {
+        error_span!(target: $target, parent: $parent, $name,)
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        error_span!(
+            parent: $parent,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::ERROR,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (parent: $parent:expr, $name:expr) => {
+        error_span!(parent: $parent, $name,)
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        error_span!(
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::ERROR,
+            target: $target,
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    (target: $target:expr, $name:expr) => {
+        error_span!(target: $target, $name,)
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*,) => {
+        error_span!(
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr, $($k:ident $( = $val:expr)*),*) => {
+        span!(
+            $crate::Level::ERROR,
+            target: __tokio_trace_module_path!(),
+            $name,
+            $($k $( = $val)*),*
+        )
+    };
+    ($name:expr) => {error_span!($name,)};
 }
 
 /// Constructs a new `Event`.
@@ -322,8 +711,9 @@ macro_rules! span {
 /// ```rust,compile_fail
 ///  # #[macro_use]
 /// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
 /// # fn main() {
-/// event!(tokio_trace::Level::INFO,
+/// event!(Level::INFO,
 ///     a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8, i = 9,
 ///     j = 10, k = 11, l = 12, m = 13, n = 14, o = 15, p = 16, q = 17,
 ///     r = 18, s = 19, t = 20, u = 21, v = 22, w = 23, x = 24, y = 25,
@@ -335,23 +725,31 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $( $k:ident = $val:expr ),* $(,)*} )=> ({
         {
-            #[allow(unused_imports)]
-            use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! {
-                name: __tokio_trace_concat!(
-                    "event ",
-                    __tokio_trace_file!(),
-                    ":",
-                    __tokio_trace_line!()
-                ),
+            __tokio_trace_log!(
                 target: $target,
-                level: $lvl,
-                fields: $( $k ),*
-            };
-            if is_enabled!(callsite) {
-                let meta = callsite.metadata();
-                Event::dispatch(meta, &valueset!(meta.fields(), $( $k = $val),* ));
+                $lvl,
+                $( $k = $val ),*
+            );
+
+            if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
+                #[allow(unused_imports)]
+                use $crate::{callsite, dispatcher, Event, field::{Value, ValueSet}};
+                use $crate::callsite::Callsite;
+                let callsite = callsite! {
+                    name: __tokio_trace_concat!(
+                        "event ",
+                        __tokio_trace_file!(),
+                        ":",
+                        __tokio_trace_line!()
+                    ),
+                    target: $target,
+                    level: $lvl,
+                    fields: $( $k ),*
+                };
+                if is_enabled!(callsite) {
+                    let meta = callsite.metadata();
+                    Event::dispatch(meta, &valueset!(meta.fields(), $( $k = $val),* ));
+                }
             }
         }
     });
@@ -522,7 +920,7 @@ macro_rules! trace {
 /// let pos = Position { x: 3.234, y: -1.223 };
 ///
 /// debug!(x = field::debug(pos.x), y = field::debug(pos.y));
-/// debug!(target: "app_events", { position = field::debug(pos) }, "New position");
+/// debug!(target: "app_events", { position = field::debug(&pos) }, "New position");
 /// # }
 /// ```
 #[macro_export(local_inner_macros)]
@@ -1001,5 +1399,84 @@ macro_rules! __tokio_trace_concat {
 macro_rules! __tokio_trace_stringify {
     ($s:expr) => {
         stringify!($s)
+    };
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! level_to_log {
+    ($level:expr) => {
+        match $level {
+            $crate::Level::ERROR => $crate::log::Level::Error,
+            $crate::Level::WARN => $crate::log::Level::Warn,
+            $crate::Level::INFO => $crate::log::Level::Info,
+            $crate::Level::DEBUG => $crate::log::Level::Debug,
+            _ => $crate::log::Level::Trace,
+        }
+    };
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export(local_inner_macros)]
+macro_rules! __tokio_trace_log {
+    (target: $target:expr, $level:expr, $( $key:ident $( = $val:expr )* ),* $(,)* ) => {
+        use $crate::log;
+        let level = level_to_log!($level);
+        if level <= log::STATIC_MAX_LEVEL {
+            let log_meta = log::Metadata::builder()
+                .level(level)
+                .target($target)
+                .build();
+            let logger = log::logger();
+            if logger.enabled(&log_meta) {
+                logger.log(&log::Record::builder()
+                    .file(Some(__tokio_trace_file!()))
+                    .module_path(Some(__tokio_trace_module_path!()))
+                    .line(Some(__tokio_trace_line!()))
+                    .metadata(log_meta)
+                    .args(__tokio_trace_format_args!(
+                        __tokio_trace_concat!(
+                            $(__tokio_trace_log!(@key $key)),*
+                        ),
+                        $(
+                            __tokio_trace_log!(@val_or $key $( = $val)* )
+                        ),*
+                    ))
+                    .build());
+            }
+        }
+    };
+    (@key message) => { "{} " };
+    (@key $key:ident) => { __tokio_trace_concat!(__tokio_trace_stringify!( $key ), "={:?} ") };
+    (@val_or $k:ident = $v:expr) => { $v };
+    (@val_or $k:ident ) => { __tokio_trace_format_args!("?") };
+}
+
+#[cfg(not(feature = "log"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_log {
+    (target: $target:expr, $level:expr, $( $key:ident $( = $val:expr )* ),* $(,)* ) => {};
+}
+
+#[cfg(feature = "log")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_disabled_span {
+    ($meta:expr, $valueset:expr) => {{
+        let mut span = $crate::Span::new_disabled($meta);
+        span.record_all(&$valueset);
+        span
+    }};
+}
+
+#[cfg(not(feature = "log"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tokio_trace_disabled_span {
+    ($meta:expr, $valueset:expr) => {
+        $crate::Span::new_disabled($meta)
     };
 }

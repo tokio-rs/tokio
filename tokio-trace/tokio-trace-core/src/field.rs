@@ -222,11 +222,11 @@ pub trait Value: ::sealed::Sealed {
 }
 
 /// A `Value` which serializes as a string using `fmt::Display`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DisplayValue<T: fmt::Display>(T);
 
 /// A `Value` which serializes as a string using `fmt::Debug`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DebugValue<T: fmt::Debug>(T);
 
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
@@ -360,6 +360,12 @@ where
     }
 }
 
+impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // ===== impl DebugValue =====
 
 impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
@@ -370,6 +376,12 @@ where
 {
     fn record(&self, key: &Field, visitor: &mut Visit) {
         visitor.record_debug(key, &self.0)
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for DebugValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 
@@ -526,6 +538,14 @@ impl fmt::Debug for FieldSet {
     }
 }
 
+impl fmt::Display for FieldSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_set()
+            .entries(self.names.iter().map(|n| display(n)))
+            .finish()
+    }
+}
+
 // ===== impl Iter =====
 
 impl Iterator for Iter {
@@ -597,6 +617,21 @@ impl<'a> fmt::Debug for ValueSet<'a> {
         self.values
             .iter()
             .fold(&mut f.debug_struct("ValueSet"), |dbg, (key, v)| {
+                if let Some(val) = v {
+                    val.record(key, dbg);
+                }
+                dbg
+            })
+            .field("callsite", &self.callsite())
+            .finish()
+    }
+}
+
+impl<'a> fmt::Display for ValueSet<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.values
+            .iter()
+            .fold(&mut f.debug_map(), |dbg, (key, v)| {
                 if let Some(val) = v {
                     val.record(key, dbg);
                 }

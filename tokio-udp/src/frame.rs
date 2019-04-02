@@ -66,7 +66,7 @@ impl<C: Encoder> Sink for UdpFramed<C> {
         trace!("sending frame");
 
         if !self.flushed {
-            match try!(self.poll_complete()) {
+            match self.poll_complete()? {
                 Async::Ready(()) => {}
                 Async::NotReady => return Ok(AsyncSink::NotReady(item)),
             }

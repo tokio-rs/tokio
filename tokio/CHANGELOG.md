@@ -1,6 +1,11 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.18 (March 22, 2019)
+
+### Added
+- `TypedExecutor` re-export and implementations (#993).
+
 # 0.1.17 (March 13, 2019)
 
 ### Added

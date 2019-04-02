@@ -4,6 +4,7 @@ mod support;
 
 use self::support::*;
 use tokio_trace::subscriber::with_default;
+use tokio_trace::Level;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -36,9 +37,9 @@ fn filters_are_not_reevaluated_for_the_same_span() {
     with_default(subscriber, move || {
         // Enter "alice" and then "bob". The dispatcher expects to see "bob" but
         // not "alice."
-        let mut alice = span!("alice");
+        let mut alice = span!(Level::TRACE, "alice");
         let mut bob = alice.enter(|| {
-            let mut bob = span!("bob");
+            let mut bob = span!(Level::TRACE, "bob");
             bob.enter(|| ());
             bob
         });
@@ -90,9 +91,9 @@ fn filters_are_reevaluated_for_different_call_sites() {
     with_default(subscriber, move || {
         // Enter "charlie" and then "dave". The dispatcher expects to see "dave" but
         // not "charlie."
-        let mut charlie = span!("charlie");
+        let mut charlie = span!(Level::TRACE, "charlie");
         let mut dave = charlie.enter(|| {
-            let mut dave = span!("dave");
+            let mut dave = span!(Level::TRACE, "dave");
             dave.enter(|| {});
             dave
         });
@@ -110,14 +111,14 @@ fn filters_are_reevaluated_for_different_call_sites() {
 
         // A different span with the same name has a different call site, so it
         // should cause the filter to be reapplied.
-        let mut charlie2 = span!("charlie");
+        let mut charlie2 = span!(Level::TRACE, "charlie");
         charlie.enter(|| {});
         assert_eq!(charlie_count.load(Ordering::Relaxed), 2);
         assert_eq!(dave_count.load(Ordering::Relaxed), 1);
 
         // But, the filter should not be re-evaluated for the new "charlie" span
         // when it is re-entered.
-        charlie2.enter(|| span!("dave").enter(|| {}));
+        charlie2.enter(|| span!(Level::TRACE, "dave").enter(|| {}));
         assert_eq!(charlie_count.load(Ordering::Relaxed), 2);
         assert_eq!(dave_count.load(Ordering::Relaxed), 2);
     });
@@ -126,11 +127,11 @@ fn filters_are_reevaluated_for_different_call_sites() {
 #[test]
 fn filter_caching_is_lexically_scoped() {
     pub fn my_great_function() -> bool {
-        span!("emily").enter(|| true)
+        span!(Level::TRACE, "emily").enter(|| true)
     }
 
     pub fn my_other_function() -> bool {
-        span!("frank").enter(|| true)
+        span!(Level::TRACE, "frank").enter(|| true)
     }
 
     let count = Arc::new(AtomicUsize::new(0));

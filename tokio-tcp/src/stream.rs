@@ -990,7 +990,7 @@ impl ConnectFutureState {
                 return Ok(Async::NotReady);
             }
 
-            if let Some(e) = try!(stream.io.get_ref().take_error()) {
+            if let Some(e) = stream.io.get_ref().take_error()? {
                 return Err(e);
             }
         }
