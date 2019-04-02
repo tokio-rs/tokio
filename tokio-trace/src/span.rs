@@ -181,8 +181,8 @@ pub(crate) struct Inner {
 /// typically not need to interact with it directly.
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
-struct Entered {
-    inner: Inner,
+struct Entered<'a> {
+    inner: &'a Inner,
 }
 
 // ===== impl Span =====
@@ -270,17 +270,10 @@ impl Span {
     /// one).
     ///
     /// Returns the result of evaluating `f`.
-    pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+    pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
         self.log(format_args!("-> {}", self.meta.name));
-        let result = match self.inner.take() {
-            Some(inner) => {
-                let guard = inner.enter();
-                let result = f();
-                self.inner = Some(guard.exit());
-                result
-            }
-            None => f(),
-        };
+        let _enter = self.inner.as_ref().map(Inner::enter);
+        let result = f();
         self.log(format_args!("<- {}", self.meta.name));
         result
     }
@@ -456,7 +449,7 @@ impl Inner {
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
-    fn enter(self) -> Entered {
+    fn enter<'a>(&'a self) -> Entered<'a> {
         self.subscriber.enter(&self.id);
         Entered { inner: self }
     }
@@ -526,12 +519,13 @@ impl Clone for Inner {
 
 // ===== impl Entered =====
 
-impl Entered {
-    /// Exit the `Entered` guard, returning an `Inner` handle that may be used
-    /// to re-enter the span.
-    fn exit(self) -> Inner {
+impl<'a> Drop for Entered<'a> {
+    fn drop(&mut self) {
+        // Dropping the guard exits the span.AsId
+        //
+        // Running this behaviour on drop rather than with an explicit function
+        // call means that spans may still be exited when unwinding.
         self.inner.subscriber.exit(&self.inner.id);
-        self.inner
     }
 }
 
