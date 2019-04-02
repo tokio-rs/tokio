@@ -449,6 +449,7 @@ impl Inner {
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
+    #[inline]
     fn enter<'a>(&'a self) -> Entered<'a> {
         self.subscriber.enter(&self.id);
         Entered { inner: self }
@@ -520,8 +521,9 @@ impl Clone for Inner {
 // ===== impl Entered =====
 
 impl<'a> Drop for Entered<'a> {
+    #[inline]
     fn drop(&mut self) {
-        // Dropping the guard exits the span.AsId
+        // Dropping the guard exits the span.
         //
         // Running this behaviour on drop rather than with an explicit function
         // call means that spans may still be exited when unwinding.
