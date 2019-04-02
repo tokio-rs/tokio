@@ -15,7 +15,7 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! let my_var: u64 = 5;
-//! let mut my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
+//! let my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
 //!
 //! my_span.enter(|| {
 //!     // perform some work in the context of `my_span`...

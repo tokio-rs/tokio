@@ -8,7 +8,7 @@
 /// # extern crate tokio_trace;
 /// # use tokio_trace::Level;
 /// # fn main() {
-/// let mut span = span!(Level::TRACE, "my span");
+/// let span = span!(Level::TRACE, "my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -64,7 +64,7 @@
 /// # extern crate tokio_trace;
 /// # use tokio_trace::Level;
 /// # fn main() {
-/// let mut my_span = span!(Level::TRACE, "my span", foo = 2, bar);
+/// let my_span = span!(Level::TRACE, "my span", foo = 2, bar);
 /// my_span.record("bar", &7);
 /// # }
 /// ```
@@ -230,7 +230,7 @@ macro_rules! span {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// let mut span = trace_span!("my span");
+/// let span = trace_span!("my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -319,7 +319,7 @@ macro_rules! trace_span {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// let mut span = debug_span!("my span");
+/// let span = debug_span!("my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -408,7 +408,7 @@ macro_rules! debug_span {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// let mut span = info_span!("my span");
+/// let span = info_span!("my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -497,7 +497,7 @@ macro_rules! info_span {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// let mut span = warn_span!("my span");
+/// let span = warn_span!("my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -585,7 +585,7 @@ macro_rules! warn_span {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// let mut span = error_span!("my span");
+/// let span = error_span!("my span");
 /// span.enter(|| {
 ///     // do work inside the span...
 /// });
@@ -1466,7 +1466,7 @@ macro_rules! __tokio_trace_log {
 #[macro_export]
 macro_rules! __tokio_trace_disabled_span {
     ($meta:expr, $valueset:expr) => {{
-        let mut span = $crate::Span::new_disabled($meta);
+        let span = $crate::Span::new_disabled($meta);
         span.record_all(&$valueset);
         span
     }};

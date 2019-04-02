@@ -37,9 +37,9 @@ fn filters_are_not_reevaluated_for_the_same_span() {
     with_default(subscriber, move || {
         // Enter "alice" and then "bob". The dispatcher expects to see "bob" but
         // not "alice."
-        let mut alice = span!(Level::TRACE, "alice");
-        let mut bob = alice.enter(|| {
-            let mut bob = span!(Level::TRACE, "bob");
+        let alice = span!(Level::TRACE, "alice");
+        let bob = alice.enter(|| {
+            let bob = span!(Level::TRACE, "bob");
             bob.enter(|| ());
             bob
         });
@@ -91,9 +91,9 @@ fn filters_are_reevaluated_for_different_call_sites() {
     with_default(subscriber, move || {
         // Enter "charlie" and then "dave". The dispatcher expects to see "dave" but
         // not "charlie."
-        let mut charlie = span!(Level::TRACE, "charlie");
-        let mut dave = charlie.enter(|| {
-            let mut dave = span!(Level::TRACE, "dave");
+        let charlie = span!(Level::TRACE, "charlie");
+        let dave = charlie.enter(|| {
+            let dave = span!(Level::TRACE, "dave");
             dave.enter(|| {});
             dave
         });
@@ -111,7 +111,7 @@ fn filters_are_reevaluated_for_different_call_sites() {
 
         // A different span with the same name has a different call site, so it
         // should cause the filter to be reapplied.
-        let mut charlie2 = span!(Level::TRACE, "charlie");
+        let charlie2 = span!(Level::TRACE, "charlie");
         charlie.enter(|| {});
         assert_eq!(charlie_count.load(Ordering::Relaxed), 2);
         assert_eq!(dave_count.load(Ordering::Relaxed), 1);

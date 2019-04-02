@@ -159,7 +159,7 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! // Construct a new span named "my span" with trace log level.
-//! let mut span = span!(Level::TRACE, "my span");
+//! let span = span!(Level::TRACE, "my span");
 //! span.enter(|| {
 //!     // Any trace events in this closure or code called by it will occur within
 //!     // the span.

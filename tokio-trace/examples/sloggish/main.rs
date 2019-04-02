@@ -26,12 +26,12 @@ fn main() {
             span!(Level::TRACE, "server", host = "localhost", port = 8080).enter(|| {
                 info!("starting");
                 info!("listening");
-                let mut peer1 = span!(Level::TRACE, "conn", peer_addr = "82.9.9.9", port = 42381);
+                let peer1 = span!(Level::TRACE, "conn", peer_addr = "82.9.9.9", port = 42381);
                 peer1.enter(|| {
                     debug!("connected");
                     debug!({ length = 2 }, "message received");
                 });
-                let mut peer2 = span!(Level::TRACE, "conn", peer_addr = "8.8.8.8", port = 18230);
+                let peer2 = span!(Level::TRACE, "conn", peer_addr = "8.8.8.8", port = 18230);
                 peer2.enter(|| {
                     debug!("connected");
                 });
