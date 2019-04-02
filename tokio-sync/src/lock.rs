@@ -8,29 +8,36 @@
 //! This allows you to do something along the lines of:
 //!
 //! ```rust,no_run
+//! # #[macro_use]
 //! # extern crate futures;
 //! # extern crate tokio;
-//! # use futures::{Poll, Async, Future, Sink};
-//! use tokio::sync::lock::Lock;
+//! # use futures::{future, Poll, Async, Future, Stream};
+//! use tokio::sync::lock::{Lock, LockGuard};
 //! struct MyType<S> {
 //!     lock: Lock<S>,
 //! }
 //!
 //! impl<S> Future for MyType<S>
-//!   where S: Sink<SinkItem = u32> + Send + 'static
+//!   where S: Stream<Item = u32> + Send + 'static
 //! {
-//! # type Item = ();
-//! # type Error = ();
+//!     type Item = ();
+//!     type Error = ();
+//!
 //!     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
 //!         match self.lock.poll_lock() {
-//!             Async::Ready(guard) => {
-//!                 tokio::spawn(guard.send(42).then(|_| Ok(())));
-//!                 Ok(Async::Ready(()))
+//!             Async::Ready(mut guard) => {
+//!                 tokio::spawn(future::poll_fn(move || {
+//!                     let item = try_ready!(guard.poll().map_err(|_| ()));
+//!                     println!("item = {:?}", item);
+//!                     Ok(().into())
+//!                 }));
+//!                 Ok(().into())
 //!             },
 //!             Async::NotReady => Ok(Async::NotReady)
 //!         }
 //!     }
 //! }
+//! # fn main() {}
 //! ```
 //!
 //!   [`Lock`]: struct.Lock.html
