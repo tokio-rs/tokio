@@ -158,10 +158,40 @@ pub trait Subscriber: 'static {
 
     /// Record a set of values on a span.
     ///
+    /// This method will be invoked when value is recorded on a span.
+    /// Recording multiple values for the same field is possible,
+    /// but the actual behaviour is defined by the subscriber implementation.
+    ///
+    /// Keep in mind that a span might not provide a value
+    /// for each field it declares.
+    ///
     /// The subscriber is expected to provide a [visitor] to the `Record`'s
     /// [`record` method] in order to record the added values.
     ///
+    /// # Example
+    ///  "foo = 3" will be recorded when [`record`] is called on the
+    /// `Attributes` passed to `new_span`.
+    /// Since values are not provided for the `bar` and `baz` fields,
+    /// the span's `Metadata` will indicate that it _has_ those fields,
+    /// but values for them won't be recorded at this time.
+    ///
+    /// ```rust,ignore
+    /// #[macro_use]
+    /// extern crate tokio_trace;
+    ///
+    /// let mut span = span!("my_span", foo = 3, bar, baz);
+    ///
+    /// // `Subscriber::record` will be called with a `Record`
+    /// // containing "bar = false"
+    /// span.record("bar", &false);
+    ///
+    /// // `Subscriber::record` will be called with a `Record`
+    /// // containing "baz = "a string""
+    /// span.record("baz", &"a string");
+    /// ```
+    ///
     /// [visitor]: ../field/trait.Visit.html
+    /// [`record`]: ../span/struct.Attributes.html#method.record
     /// [`record` method]: ../span/struct.Record.html#method.record
     fn record(&self, span: &span::Id, values: &span::Record);
 
@@ -187,6 +217,14 @@ pub trait Subscriber: 'static {
 
     /// Records that an [`Event`] has occurred.
     ///
+    /// This method will be invoked when an Event is constructed by
+    /// the `Event`'s [`dispatch` method]. For example, this happens internally
+    /// when an event macro from `tokio-trace` is called.
+    ///
+    /// The key difference between this method and `record` is that `record` is
+    /// called when a value is recorded for a field defined by a span,
+    /// while `event` is called when a new event occurs.
+    ///
     /// The provided `Event` struct contains any field values attached to the
     /// event. The subscriber may pass a [visitor] to the `Event`'s
     /// [`record` method] to record these values.
@@ -194,6 +232,7 @@ pub trait Subscriber: 'static {
     /// [`Event`]: ../event/struct.Event.html
     /// [visitor]: ../field/trait.Visit.html
     /// [`record` method]: ../event/struct.Event.html#method.record
+    /// [`dispatch` method]: ../event/struct.Event.html#method.dispatch
     fn event(&self, event: &Event);
 
     /// Records that a span has been entered.
