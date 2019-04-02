@@ -18,7 +18,7 @@ struct EnabledSubscriber;
 impl tokio_trace::Subscriber for EnabledSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
         let _ = span;
-        Id::from_u64(0)
+        Id::from_u64(0xDEADFACE)
     }
 
     fn event(&self, event: &Event) {
@@ -63,7 +63,7 @@ impl tokio_trace::Subscriber for VisitingSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
         let mut visitor = Visitor(self.0.lock().unwrap());
         span.record(&mut visitor);
-        Id::from_u64(0)
+        Id::from_u64(0xDEADFACE)
     }
 
     fn record(&self, _span: &Id, values: &span::Record) {
