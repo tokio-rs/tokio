@@ -298,7 +298,7 @@ impl Span {
     }
 
     /// Visits that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
+    pub fn record<Q: ?Sized, V>(&self, field: &Q, value: &V) -> &Self
     where
         Q: field::AsField,
         V: field::Value,
@@ -316,9 +316,9 @@ impl Span {
     }
 
     /// Visit all the fields in the span
-    pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
+    pub fn record_all(&self, values: &field::ValueSet) -> &Self {
         let record = Record::new(values);
-        if let Some(ref mut inner) = self.inner {
+        if let Some(ref inner) = self.inner {
             inner.record(&record);
         }
         self.log(format_args!("{}; {}", self.meta.name(), FmtValues(&record)));
@@ -479,7 +479,7 @@ impl Inner {
         self.id.clone()
     }
 
-    fn record(&mut self, values: &Record) {
+    fn record(&self, values: &Record) {
         self.subscriber.record(&self.id, values)
     }
 
