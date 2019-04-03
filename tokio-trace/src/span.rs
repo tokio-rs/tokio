@@ -604,3 +604,14 @@ impl<'a> AsId for &'a Option<Id> {
         self.as_ref()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    trait AssertSend: Send {}
+    impl AssertSend for Span {}
+
+    trait AssertSync: Sync {}
+    impl AssertSync for Span {}
+}
