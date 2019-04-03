@@ -9,7 +9,7 @@ name = "tokio-test"
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.0"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
