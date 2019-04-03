@@ -21,8 +21,13 @@ pub struct Dispatch {
 }
 
 thread_local! {
-    static CURRENT_DISPATCH: RefCell<Dispatch> = RefCell::new(Dispatch::none());
+    static CURRENT_DISPATCH: RefCell<Option<Dispatch>> = RefCell::new(None);
 }
+
+// A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
+// Using this (rather than simply resetting after calling `f`) ensures
+// that we always reset to the prior dispatcher even if `f` panics.
+struct ResetGuard(Option<Dispatch>);
 
 /// Sets this dispatch as the default for the duration of a closure.
 ///
@@ -35,41 +40,34 @@ thread_local! {
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
 pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
-    // A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
-    // Using this (rather than simply resetting after calling `f`) ensures
-    // that we always reset to the prior dispatcher even if `f` panics.
-    struct ResetGuard(Option<Dispatch>);
-    impl Drop for ResetGuard {
-        fn drop(&mut self) {
-            if let Some(dispatch) = self.0.take() {
-                let _ = CURRENT_DISPATCH.try_with(|current| {
-                    *current.borrow_mut() = dispatch;
-                });
-            }
-        }
-    }
-
     let dispatcher = dispatcher.clone();
-    let prior = CURRENT_DISPATCH.try_with(|current| current.replace(dispatcher));
-    let _guard = ResetGuard(prior.ok());
+    let _guard = ResetGuard::swap(Some(dispatcher));
     f()
 }
 /// Executes a closure with a reference to this thread's current [dispatcher].
+///
+/// Note that calls to `get_default` should not be nested; if this function is
+/// called while inside of another `get_default`, that closure will be provided
+/// with `Dispatch::none` rather than the previously set dispatcher.
 ///
 /// [dispatcher]: ../dispatcher/struct.Dispatch.html
 pub fn get_default<T, F>(mut f: F) -> T
 where
     F: FnMut(&Dispatch) -> T,
 {
-    CURRENT_DISPATCH
-        .try_with(|current| f(&*current.borrow()))
-        .unwrap_or_else(|_| f(&Dispatch::none()))
+    let guard = ResetGuard::swap(None);
+    if let Some(current) = guard.0.as_ref() {
+        f(current)
+    } else {
+        f(&Dispatch::none())
+    }
 }
 
 pub(crate) struct Registrar(Weak<Subscriber + Send + Sync>);
 
 impl Dispatch {
     /// Returns a new `Dispatch` that discards events and spans.
+    #[inline]
     pub fn none() -> Self {
         Dispatch {
             subscriber: Arc::new(NoSubscriber),
@@ -292,6 +290,30 @@ impl Registrar {
 
     pub(crate) fn is_alive(&self) -> bool {
         self.0.upgrade().is_some()
+    }
+}
+
+// ===== impl ResetGuard =====
+
+impl ResetGuard {
+    #[inline(always)]
+    fn swap(dispatcher: Option<Dispatch>) -> Self {
+        let prior = CURRENT_DISPATCH
+            .try_with(|current| current.replace(dispatcher))
+            .ok()
+            .and_then(|x| x);
+        ResetGuard(prior)
+    }
+}
+
+impl Drop for ResetGuard {
+    #[inline]
+    fn drop(&mut self) {
+        if let Some(dispatch) = self.0.take() {
+            let _ = CURRENT_DISPATCH.try_with(|current| {
+                *current.borrow_mut() = Some(dispatch);
+            });
+        }
     }
 }
 
