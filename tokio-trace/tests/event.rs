@@ -107,6 +107,26 @@ fn moved_field() {
 }
 
 #[test]
+fn dotted_field_name() {
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("foo.bar")
+                    .with_value(&true)
+                    .and(field::mock("foo.baz").with_value(&false))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        event!(Level::INFO, foo.bar = true, foo.baz = false);
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
 fn borrowed_field() {
     let (subscriber, handle) = subscriber::mock()
         .event(
