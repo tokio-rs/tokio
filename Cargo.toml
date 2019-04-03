@@ -12,6 +12,7 @@ members = [
   "tokio-reactor",
   "tokio-signal",
   "tokio-sync",
+  "tokio-test",
   "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
