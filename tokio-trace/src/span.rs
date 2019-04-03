@@ -15,7 +15,7 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! let my_var: u64 = 5;
-//! let mut my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
+//! let my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
 //!
 //! my_span.enter(|| {
 //!     // perform some work in the context of `my_span`...
@@ -181,8 +181,8 @@ pub(crate) struct Inner {
 /// typically not need to interact with it directly.
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
-struct Entered {
-    inner: Inner,
+struct Entered<'a> {
+    inner: &'a Inner,
 }
 
 // ===== impl Span =====
@@ -270,17 +270,10 @@ impl Span {
     /// one).
     ///
     /// Returns the result of evaluating `f`.
-    pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+    pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
         self.log(format_args!("-> {}", self.meta.name));
-        let result = match self.inner.take() {
-            Some(inner) => {
-                let guard = inner.enter();
-                let result = f();
-                self.inner = Some(guard.exit());
-                result
-            }
-            None => f(),
-        };
+        let _enter = self.inner.as_ref().map(Inner::enter);
+        let result = f();
         self.log(format_args!("<- {}", self.meta.name));
         result
     }
@@ -305,7 +298,7 @@ impl Span {
     }
 
     /// Visits that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
+    pub fn record<Q: ?Sized, V>(&self, field: &Q, value: &V) -> &Self
     where
         Q: field::AsField,
         V: field::Value,
@@ -323,9 +316,9 @@ impl Span {
     }
 
     /// Visit all the fields in the span
-    pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
+    pub fn record_all(&self, values: &field::ValueSet) -> &Self {
         let record = Record::new(values);
-        if let Some(ref mut inner) = self.inner {
+        if let Some(ref inner) = self.inner {
             inner.record(&record);
         }
         self.log(format_args!("{}; {}", self.meta.name(), FmtValues(&record)));
@@ -456,7 +449,8 @@ impl Inner {
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
-    fn enter(self) -> Entered {
+    #[inline]
+    fn enter<'a>(&'a self) -> Entered<'a> {
         self.subscriber.enter(&self.id);
         Entered { inner: self }
     }
@@ -485,7 +479,7 @@ impl Inner {
         self.id.clone()
     }
 
-    fn record(&mut self, values: &Record) {
+    fn record(&self, values: &Record) {
         self.subscriber.record(&self.id, values)
     }
 
@@ -526,12 +520,14 @@ impl Clone for Inner {
 
 // ===== impl Entered =====
 
-impl Entered {
-    /// Exit the `Entered` guard, returning an `Inner` handle that may be used
-    /// to re-enter the span.
-    fn exit(self) -> Inner {
+impl<'a> Drop for Entered<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        // Dropping the guard exits the span.
+        //
+        // Running this behaviour on drop rather than with an explicit function
+        // call means that spans may still be exited when unwinding.
         self.inner.subscriber.exit(&self.inner.id);
-        self.inner
     }
 }
 
@@ -607,4 +603,15 @@ impl<'a> AsId for &'a Option<Id> {
     fn as_id(&self) -> Option<&Id> {
         self.as_ref()
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    trait AssertSend: Send {}
+    impl AssertSend for Span {}
+
+    trait AssertSync: Sync {}
+    impl AssertSync for Span {}
 }

@@ -61,8 +61,8 @@ fn spans_always_go_to_the_subscriber_that_tagged_them() {
         .run();
     let subscriber2 = subscriber::mock().run();
 
-    let mut foo = with_default(subscriber1, || {
-        let mut foo = span!(Level::TRACE, "foo");
+    let foo = with_default(subscriber1, || {
+        let foo = span!(Level::TRACE, "foo");
         foo.enter(|| {});
         foo
     });
@@ -81,8 +81,8 @@ fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
         .drop_span(span::mock().named("foo"))
         .done()
         .run();
-    let mut foo = with_default(subscriber1, || {
-        let mut foo = span!(Level::TRACE, "foo");
+    let foo = with_default(subscriber1, || {
+        let foo = span!(Level::TRACE, "foo");
         foo.enter(|| {});
         foo
     });
@@ -107,7 +107,7 @@ fn dropping_a_span_calls_drop_span() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        let mut span = span!(Level::TRACE, "foo");
+        let span = span!(Level::TRACE, "foo");
         span.enter(|| {});
         drop(span);
     });
@@ -214,8 +214,8 @@ fn clone_and_drop_span_always_go_to_the_subscriber_that_tagged_the_span() {
         .run_with_handle();
     let subscriber2 = subscriber::mock().done().run();
 
-    let mut foo = with_default(subscriber1, || {
-        let mut foo = span!(Level::TRACE, "foo");
+    let foo = with_default(subscriber1, || {
+        let foo = span!(Level::TRACE, "foo");
         foo.enter(|| {});
         foo
     });
@@ -240,7 +240,7 @@ fn span_closes_when_exited() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        let mut foo = span!(Level::TRACE, "foo");
+        let foo = span!(Level::TRACE, "foo");
 
         foo.enter(|| {});
 
@@ -267,7 +267,7 @@ fn moved_field() {
         .run_with_handle();
     with_default(subscriber, || {
         let from = "my span";
-        let mut span = span!(
+        let span = span!(
             Level::TRACE,
             "foo",
             bar = display(format!("hello from {}", from))
@@ -314,7 +314,7 @@ fn borrowed_field() {
     with_default(subscriber, || {
         let from = "my span";
         let mut message = format!("hello from {}", from);
-        let mut span = span!(Level::TRACE, "foo", bar = display(&message));
+        let span = span!(Level::TRACE, "foo", bar = display(&message));
         span.enter(|| {
             message.insert_str(10, " inside");
         });
@@ -360,8 +360,8 @@ fn move_field_out_of_struct() {
             x: 3.234,
             y: -1.223,
         };
-        let mut foo = span!(Level::TRACE, "foo", x = debug(pos.x), y = debug(pos.y));
-        let mut bar = span!(Level::TRACE, "bar", position = debug(pos));
+        let foo = span!(Level::TRACE, "foo", x = debug(pos.x), y = debug(pos.y));
+        let bar = span!(Level::TRACE, "bar", position = debug(pos));
         foo.enter(|| {});
         bar.enter(|| {});
     });
@@ -388,7 +388,7 @@ fn add_field_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let mut span = span!(Level::TRACE, "foo", bar = 5, baz);
+        let span = span!(Level::TRACE, "foo", bar = 5, baz);
         span.record("baz", &true);
         span.enter(|| {})
     });
@@ -415,7 +415,7 @@ fn add_fields_only_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let mut span = span!(Level::TRACE, "foo", bar, baz);
+        let span = span!(Level::TRACE, "foo", bar, baz);
         span.record("bar", &5);
         span.record("baz", &true);
         span.enter(|| {})
