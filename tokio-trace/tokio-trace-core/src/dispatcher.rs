@@ -182,8 +182,7 @@ impl Dispatch {
     /// [`enabled`]: ../subscriber/trait.Subscriber.html#method.enabled
     #[inline]
     pub fn enabled(&self, metadata: &Metadata) -> bool {
-        Self::if_enabled(|| self.subscriber.enabled(metadata))
-            .unwrap_or(false)
+        Self::if_enabled(|| self.subscriber.enabled(metadata)).unwrap_or(false)
     }
 
     /// Records that an [`Event`] has occurred.
@@ -283,7 +282,6 @@ impl Dispatch {
                     return Some(f());
                 }
                 None
-
             })
             .unwrap_or(None)
     }
