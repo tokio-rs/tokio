@@ -18,6 +18,7 @@ description = """
 Tokio and futures based testing utilites
 """
 categories = ["asynchronous", "testing"]
+publish = false
 
 [dependencies]
 futures = "0.1"
