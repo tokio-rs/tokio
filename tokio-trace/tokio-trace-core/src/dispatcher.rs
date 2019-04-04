@@ -7,7 +7,7 @@ use {
 
 use std::{
     any::Any,
-    cell::RefCell,
+    cell::Cell,
     fmt,
     sync::{Arc, Weak},
 };
@@ -21,7 +21,7 @@ pub struct Dispatch {
 }
 
 thread_local! {
-    static CURRENT_DISPATCH: RefCell<Option<Dispatch>> = RefCell::new(None);
+    static CURRENT_DISPATCH: Cell<Option<Dispatch>> = Cell::new(None);
 }
 
 // A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
@@ -311,7 +311,7 @@ impl Drop for ResetGuard {
     fn drop(&mut self) {
         if let Some(dispatch) = self.0.take() {
             let _ = CURRENT_DISPATCH.try_with(|current| {
-                *current.borrow_mut() = Some(dispatch);
+                current.set(Some(dispatch));
             });
         }
     }
