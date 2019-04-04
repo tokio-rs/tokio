@@ -337,10 +337,7 @@ mod test {
     fn stops_infinite_loops() {
         // This test ensures that an event triggered within a subscriber
         // won't cause an infinite loop of events.
-        //
-        // TODO(eliza): Unfortunately, the failure mode of this test is to hang
-        // forever, rather than to panic. This should be fixed so that the
-        // failures are more easily detected.
+        use std::sync::atomic::{AtomicUsize, Ordering};
         use {
             callsite::Callsite,
             metadata::{Level, Metadata},
@@ -382,6 +379,12 @@ mod test {
             fn record_follows_from(&self, _: &span::Id, _: &span::Id) {}
 
             fn event(&self, _: &Event) {
+                static EVENTS: AtomicUsize = AtomicUsize::new(0);
+                assert_eq!(
+                    EVENTS.fetch_add(1, Ordering::Relaxed),
+                    0,
+                    "event method called twice!"
+                );
                 Event::dispatch(&TEST_META, &TEST_META.fields().value_set(&[]))
             }
 
