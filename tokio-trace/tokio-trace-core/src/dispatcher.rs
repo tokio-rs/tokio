@@ -332,4 +332,66 @@ mod test {
         let dispatcher = Dispatch::new(NoSubscriber);
         assert!(dispatcher.downcast_ref::<NoSubscriber>().is_some());
     }
+
+    #[test]
+    fn stops_infinite_loops() {
+        // This test ensures that an event triggered within a subscriber
+        // won't cause an infinite loop of events.
+        //
+        // TODO(eliza): Unfortunately, the failure mode of this test is to hang
+        // forever, rather than to panic. This should be fixed so that the
+        // failures are more easily detected.
+        use {
+            callsite::Callsite,
+            metadata::{Level, Metadata},
+            span,
+            subscriber::{Interest, Subscriber},
+            Event,
+        };
+
+        struct TestCallsite;
+        static TEST_CALLSITE: TestCallsite = TestCallsite;
+        static TEST_META: Metadata<'static> = metadata! {
+            name: "test",
+            target: module_path!(),
+            level: Level::DEBUG,
+            fields: &[],
+            callsite: &TEST_CALLSITE,
+        };
+
+        impl Callsite for TestCallsite {
+            fn add_interest(&self, _: Interest) {}
+            fn clear_interest(&self) {}
+            fn metadata(&self) -> &Metadata {
+                &TEST_META
+            }
+        }
+
+        struct TestSubscriber;
+        impl Subscriber for TestSubscriber {
+            fn enabled(&self, _: &Metadata) -> bool {
+                true
+            }
+
+            fn new_span(&self, _: &span::Attributes) -> span::Id {
+                span::Id::from_u64(0xAAAA)
+            }
+
+            fn record(&self, _: &span::Id, _: &span::Record) {}
+
+            fn record_follows_from(&self, _: &span::Id, _: &span::Id) {}
+
+            fn event(&self, _: &Event) {
+                Event::dispatch(&TEST_META, &TEST_META.fields().value_set(&[]))
+            }
+
+            fn enter(&self, _: &span::Id) {}
+
+            fn exit(&self, _: &span::Id) {}
+        }
+
+        with_default(&Dispatch::new(TestSubscriber), || {
+            Event::dispatch(&TEST_META, &TEST_META.fields().value_set(&[]))
+        })
+    }
 }
