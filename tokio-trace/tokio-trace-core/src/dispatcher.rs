@@ -7,7 +7,7 @@ use {
 
 use std::{
     any::Any,
-    cell::Cell,
+    cell::{Cell, Ref, RefCell},
     fmt,
     sync::{Arc, Weak},
 };
@@ -21,7 +21,15 @@ pub struct Dispatch {
 }
 
 thread_local! {
-    static CURRENT_DISPATCH: Cell<Option<Dispatch>> = Cell::new(None);
+    static CURRENT_STATE: State = State {
+        dispatch: RefCell::new(Dispatch::none()),
+        entered: Cell::new(true),
+    };
+}
+
+struct State {
+    dispatch: RefCell<Dispatch>,
+    entered: Cell<bool>,
 }
 
 // A drop guard that resets CURRENT_DISPATCH to the prior dispatcher.
@@ -40,8 +48,7 @@ struct ResetGuard(Option<Dispatch>);
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
 pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
-    let dispatcher = dispatcher.clone();
-    let _guard = ResetGuard::swap(Some(dispatcher));
+    let _guard = ResetGuard::swap(dispatcher.clone());
     f()
 }
 /// Executes a closure with a reference to this thread's current [dispatcher].
@@ -55,12 +62,9 @@ pub fn get_default<T, F>(mut f: F) -> T
 where
     F: FnMut(&Dispatch) -> T,
 {
-    let guard = ResetGuard::swap(None);
-    if let Some(current) = guard.0.as_ref() {
-        f(current)
-    } else {
-        f(&Dispatch::none())
-    }
+    CURRENT_STATE
+        .try_with(|state| f(&state.dispatch.borrow()))
+        .unwrap_or_else(|_| f(&Dispatch::none()))
 }
 
 pub(crate) struct Registrar(Weak<Subscriber + Send + Sync>);
@@ -116,7 +120,8 @@ impl Dispatch {
     /// [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
     #[inline]
     pub fn new_span(&self, span: &span::Attributes) -> span::Id {
-        self.subscriber.new_span(span)
+        self.if_enabled(|subscriber| subscriber.new_span(span))
+            .unwrap_or_else(|| span::Id::from_u64(0xDEADFACE))
     }
 
     /// Record a set of values on a span.
@@ -155,7 +160,8 @@ impl Dispatch {
     /// [`enabled`]: ../subscriber/trait.Subscriber.html#method.enabled
     #[inline]
     pub fn enabled(&self, metadata: &Metadata) -> bool {
-        self.subscriber.enabled(metadata)
+        self.if_enabled(|subscriber| subscriber.enabled(metadata))
+            .unwrap_or(false)
     }
 
     /// Records that an [`Event`] has occurred.
@@ -168,7 +174,7 @@ impl Dispatch {
     /// [`event`]: ../subscriber/trait.Subscriber.html#method.event
     #[inline]
     pub fn event(&self, event: &Event) {
-        self.subscriber.event(event)
+        self.if_enabled(|subscriber| subscriber.event(event));
     }
 
     /// Records that a span has been entered.
@@ -180,7 +186,7 @@ impl Dispatch {
     /// [`event`]: ../subscriber/trait.Subscriber.html#method.event
     #[inline]
     pub fn enter(&self, span: &span::Id) {
-        self.subscriber.enter(span)
+        self.if_enabled(|subscriber| subscriber.enter(span));
     }
 
     /// Records that a span has been exited.
@@ -189,7 +195,7 @@ impl Dispatch {
     /// that this `Dispatch` forwards to.
     #[inline]
     pub fn exit(&self, span: &span::Id) {
-        self.subscriber.exit(span)
+        self.if_enabled(|subscriber| subscriber.exit(span));
     }
 
     /// Notifies the subscriber that a [span ID] has been cloned.
@@ -238,6 +244,22 @@ impl Dispatch {
     #[inline]
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         Subscriber::downcast_ref(&*self.subscriber)
+    }
+
+    #[inline]
+    fn if_enabled<F, T>(&self, f: F) -> Option<T>
+    where
+        F: FnOnce(&(Subscriber + Send + Sync)) -> T,
+    {
+        CURRENT_STATE
+            .try_with(|state| {
+                if state.is_current(&self.subscriber) {
+                    state.enter().map(|enter| f(enter.subscriber()))
+                } else {
+                    Some(f(&*self.subscriber))
+                }
+            })
+            .unwrap_or(None)
     }
 }
 
@@ -293,15 +315,39 @@ impl Registrar {
     }
 }
 
+struct Entered<'a> {
+    dispatch: Ref<'a, Dispatch>,
+    entered: &'a Cell<bool>,
+}
+
+impl State {
+    #[inline]
+    fn is_current(&self, s: &Arc<Subscriber + Send + Sync>) -> bool {
+        Arc::ptr_eq(&self.dispatch.borrow().subscriber, s)
+    }
+
+    #[inline]
+    fn enter(&self) -> Option<Entered> {
+        if self.entered.replace(true) == false {
+            let dispatch = self.dispatch.borrow();
+            Some(Entered {
+                dispatch,
+                entered: &self.entered,
+            })
+        } else {
+            None
+        }
+    }
+}
+
 // ===== impl ResetGuard =====
 
 impl ResetGuard {
     #[inline(always)]
-    fn swap(dispatcher: Option<Dispatch>) -> Self {
-        let prior = CURRENT_DISPATCH
-            .try_with(|current| current.replace(dispatcher))
-            .ok()
-            .and_then(|x| x);
+    fn swap(dispatch: Dispatch) -> Self {
+        let prior = CURRENT_STATE
+            .try_with(|state| state.dispatch.replace(dispatch))
+            .ok();
         ResetGuard(prior)
     }
 }
@@ -310,10 +356,26 @@ impl Drop for ResetGuard {
     #[inline]
     fn drop(&mut self) {
         if let Some(dispatch) = self.0.take() {
-            let _ = CURRENT_DISPATCH.try_with(|current| {
-                current.set(Some(dispatch));
+            let _ = CURRENT_STATE.try_with(|state| {
+                *state.dispatch.borrow_mut() = dispatch;
             });
         }
+    }
+}
+
+// ===== impl Entered =====
+
+impl<'a> Entered<'a> {
+    #[inline]
+    fn subscriber(&self) -> &(Subscriber + Send + Sync) {
+        &*self.dispatch.subscriber
+    }
+}
+
+impl<'a> Drop for Entered<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        self.entered.replace(false);
     }
 }
 
