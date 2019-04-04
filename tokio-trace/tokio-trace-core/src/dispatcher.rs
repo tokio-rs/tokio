@@ -320,6 +320,14 @@ impl Drop for ResetGuard {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use {
+        callsite::Callsite,
+        metadata::{Level, Metadata},
+        span,
+        subscriber::{Interest, Subscriber},
+        Event,
+    };
 
     #[test]
     fn dispatch_is() {
@@ -333,37 +341,28 @@ mod test {
         assert!(dispatcher.downcast_ref::<NoSubscriber>().is_some());
     }
 
+    struct TestCallsite;
+    static TEST_CALLSITE: TestCallsite = TestCallsite;
+    static TEST_META: Metadata<'static> = metadata! {
+        name: "test",
+        target: module_path!(),
+        level: Level::DEBUG,
+        fields: &[],
+        callsite: &TEST_CALLSITE,
+    };
+
+    impl Callsite for TestCallsite {
+        fn add_interest(&self, _: Interest) {}
+        fn clear_interest(&self) {}
+        fn metadata(&self) -> &Metadata {
+            &TEST_META
+        }
+    }
+
     #[test]
-    fn stops_infinite_loops() {
+    fn events_dont_infinite_loop() {
         // This test ensures that an event triggered within a subscriber
         // won't cause an infinite loop of events.
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        use {
-            callsite::Callsite,
-            metadata::{Level, Metadata},
-            span,
-            subscriber::{Interest, Subscriber},
-            Event,
-        };
-
-        struct TestCallsite;
-        static TEST_CALLSITE: TestCallsite = TestCallsite;
-        static TEST_META: Metadata<'static> = metadata! {
-            name: "test",
-            target: module_path!(),
-            level: Level::DEBUG,
-            fields: &[],
-            callsite: &TEST_CALLSITE,
-        };
-
-        impl Callsite for TestCallsite {
-            fn add_interest(&self, _: Interest) {}
-            fn clear_interest(&self) {}
-            fn metadata(&self) -> &Metadata {
-                &TEST_META
-            }
-        }
-
         struct TestSubscriber;
         impl Subscriber for TestSubscriber {
             fn enabled(&self, _: &Metadata) -> bool {
@@ -396,5 +395,50 @@ mod test {
         with_default(&Dispatch::new(TestSubscriber), || {
             Event::dispatch(&TEST_META, &TEST_META.fields().value_set(&[]))
         })
+    }
+
+    #[test]
+    fn spans_dont_infinite_loop() {
+        // This test ensures that a span created within a subscriber
+        // won't cause an infinite loop of new spans.
+
+        fn mk_span() {
+            get_default(|current| {
+                current.new_span(&span::Attributes::new(
+                    &TEST_META,
+                    &TEST_META.fields().value_set(&[]),
+                ))
+            });
+        }
+
+        struct TestSubscriber;
+        impl Subscriber for TestSubscriber {
+            fn enabled(&self, _: &Metadata) -> bool {
+                true
+            }
+
+            fn new_span(&self, _: &span::Attributes) -> span::Id {
+                static NEW_SPANS: AtomicUsize = AtomicUsize::new(0);
+                assert_eq!(
+                    NEW_SPANS.fetch_add(1, Ordering::Relaxed),
+                    0,
+                    "new_span method called twice!"
+                );
+                mk_span();
+                span::Id::from_u64(0xAAAA)
+            }
+
+            fn record(&self, _: &span::Id, _: &span::Record) {}
+
+            fn record_follows_from(&self, _: &span::Id, _: &span::Id) {}
+
+            fn event(&self, _: &Event) {}
+
+            fn enter(&self, _: &span::Id) {}
+
+            fn exit(&self, _: &span::Id) {}
+        }
+
+        with_default(&Dispatch::new(TestSubscriber), || mk_span())
     }
 }
