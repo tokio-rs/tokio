@@ -12,9 +12,10 @@
 //! if the span exists:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! let my_var: u64 = 5;
-//! let mut my_span = span!("my_span", my_var = &my_var);
+//! let my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
 //!
 //! my_span.enter(|| {
 //!     // perform some work in the context of `my_span`...
@@ -78,9 +79,10 @@
 //! exists. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! {
-//!     span!("my_span").enter(|| {
+//!     span!(Level::TRACE, "my_span").enter(|| {
 //!         // perform some work in the context of `my_span`...
 //!     }); // --> Subscriber::exit(my_span)
 //!
@@ -96,10 +98,11 @@
 //! time it is exited. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
 //! # fn main() {
 //! use tokio_trace::Span;
 //!
-//! let my_span = span!("my_span");
+//! let my_span = span!(Level::TRACE, "my_span");
 //! // Drop the handle to the span.
 //! drop(my_span); // --> Subscriber::drop_span(my_span)
 //! # }
@@ -126,11 +129,15 @@
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
-    borrow::Borrow,
     cmp, fmt,
     hash::{Hash, Hasher},
 };
 use {dispatcher::Dispatch, field, Metadata};
+
+/// Trait implemented by types which have a span `Id`.
+pub trait AsId: ::sealed::Sealed {
+    fn as_id(&self) -> Option<&Id>;
+}
 
 /// A handle representing a span, with the capability to enter the span if it
 /// exists.
@@ -174,8 +181,8 @@ pub(crate) struct Inner {
 /// typically not need to interact with it directly.
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
-struct Entered {
-    inner: Inner,
+struct Entered<'a> {
+    inner: &'a Inner,
 }
 
 // ===== impl Span =====
@@ -229,10 +236,10 @@ impl Span {
         values: &field::ValueSet,
     ) -> Span
     where
-        I: Into<Option<Id>>,
+        I: AsId,
     {
-        let new_span = match parent.into() {
-            Some(parent) => Attributes::child_of(parent, meta, values),
+        let new_span = match parent.as_id() {
+            Some(parent) => Attributes::child_of(parent.clone(), meta, values),
             None => Attributes::new_root(meta, values),
         };
         Self::make(meta, new_span)
@@ -263,43 +270,35 @@ impl Span {
     /// one).
     ///
     /// Returns the result of evaluating `f`.
-    pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+    pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
         self.log(format_args!("-> {}", self.meta.name));
-        let result = match self.inner.take() {
-            Some(inner) => {
-                let guard = inner.enter();
-                let result = f();
-                self.inner = Some(guard.exit());
-                result
-            }
-            None => f(),
-        };
+        let _enter = self.inner.as_ref().map(Inner::enter);
+        let result = f();
         self.log(format_args!("<- {}", self.meta.name));
         result
     }
 
     /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn field<Q>(&self, name: &Q) -> Option<field::Field>
+    pub fn field<Q: ?Sized>(&self, field: &Q) -> Option<field::Field>
     where
-        Q: Borrow<str>,
+        Q: field::AsField,
     {
-        self.metadata().and_then(|meta| meta.fields().field(name))
+        self.metadata().and_then(|meta| field.as_field(meta))
     }
 
     /// Returns true if this `Span` has a field for the given
     /// [`Field`](::field::Field) or field name.
+    #[inline]
     pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
         Q: field::AsField,
     {
-        self.metadata()
-            .and_then(|meta| field.as_field(meta))
-            .is_some()
+        self.field(field).is_some()
     }
 
     /// Visits that the field described by `field` has the value `value`.
-    pub fn record<Q: ?Sized, V>(&mut self, field: &Q, value: &V) -> &mut Self
+    pub fn record<Q: ?Sized, V>(&self, field: &Q, value: &V) -> &Self
     where
         Q: field::AsField,
         V: field::Value,
@@ -317,9 +316,9 @@ impl Span {
     }
 
     /// Visit all the fields in the span
-    pub fn record_all(&mut self, values: &field::ValueSet) -> &mut Self {
+    pub fn record_all(&self, values: &field::ValueSet) -> &Self {
         let record = Record::new(values);
-        if let Some(ref mut inner) = self.inner {
+        if let Some(ref inner) = self.inner {
             inner.record(&record);
         }
         self.log(format_args!("{}; {}", self.meta.name(), FmtValues(&record)));
@@ -347,9 +346,14 @@ impl Span {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
-    pub fn follows_from(&self, from: &Id) -> &Self {
+    pub fn follows_from<I>(&self, from: I) -> &Self
+    where
+        I: AsId,
+    {
         if let Some(ref inner) = self.inner {
-            inner.follows_from(from);
+            if let Some(from) = from.as_id() {
+                inner.follows_from(from);
+            }
         }
         self
     }
@@ -436,12 +440,6 @@ impl fmt::Debug for Span {
     }
 }
 
-impl<'a> Into<Option<Id>> for &'a Span {
-    fn into(self) -> Option<Id> {
-        self.id()
-    }
-}
-
 // ===== impl Inner =====
 
 impl Inner {
@@ -451,7 +449,8 @@ impl Inner {
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
-    fn enter(self) -> Entered {
+    #[inline]
+    fn enter<'a>(&'a self) -> Entered<'a> {
         self.subscriber.enter(&self.id);
         Entered { inner: self }
     }
@@ -480,7 +479,7 @@ impl Inner {
         self.id.clone()
     }
 
-    fn record(&mut self, values: &Record) {
+    fn record(&self, values: &Record) {
         self.subscriber.record(&self.id, values)
     }
 
@@ -521,12 +520,14 @@ impl Clone for Inner {
 
 // ===== impl Entered =====
 
-impl Entered {
-    /// Exit the `Entered` guard, returning an `Inner` handle that may be used
-    /// to re-enter the span.
-    fn exit(self) -> Inner {
+impl<'a> Drop for Entered<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        // Dropping the guard exits the span.
+        //
+        // Running this behaviour on drop rather than with an explicit function
+        // call means that spans may still be exited when unwinding.
         self.inner.subscriber.exit(&self.inner.id);
-        self.inner
     }
 }
 
@@ -552,4 +553,65 @@ impl<'a> fmt::Display for FmtAttrs<'a> {
         });
         res
     }
+}
+
+// ===== impl AsId =====
+
+impl ::sealed::Sealed for Span {}
+
+impl AsId for Span {
+    fn as_id(&self) -> Option<&Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Span {}
+
+impl<'a> AsId for &'a Span {
+    fn as_id(&self) -> Option<&Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
+impl ::sealed::Sealed for Id {}
+
+impl AsId for Id {
+    fn as_id(&self) -> Option<&Id> {
+        Some(self)
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Id {}
+
+impl<'a> AsId for &'a Id {
+    fn as_id(&self) -> Option<&Id> {
+        Some(self)
+    }
+}
+
+impl ::sealed::Sealed for Option<Id> {}
+
+impl AsId for Option<Id> {
+    fn as_id(&self) -> Option<&Id> {
+        self.as_ref()
+    }
+}
+
+impl<'a> ::sealed::Sealed for &'a Option<Id> {}
+
+impl<'a> AsId for &'a Option<Id> {
+    fn as_id(&self) -> Option<&Id> {
+        self.as_ref()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    trait AssertSend: Send {}
+    impl AssertSend for Span {}
+
+    trait AssertSync: Sync {}
+    impl AssertSync for Span {}
 }

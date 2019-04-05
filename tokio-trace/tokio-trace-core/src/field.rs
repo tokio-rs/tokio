@@ -538,6 +538,14 @@ impl fmt::Debug for FieldSet {
     }
 }
 
+impl fmt::Display for FieldSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_set()
+            .entries(self.names.iter().map(|n| display(n)))
+            .finish()
+    }
+}
+
 // ===== impl Iter =====
 
 impl Iterator for Iter {
@@ -609,6 +617,21 @@ impl<'a> fmt::Debug for ValueSet<'a> {
         self.values
             .iter()
             .fold(&mut f.debug_struct("ValueSet"), |dbg, (key, v)| {
+                if let Some(val) = v {
+                    val.record(key, dbg);
+                }
+                dbg
+            })
+            .field("callsite", &self.callsite())
+            .finish()
+    }
+}
+
+impl<'a> fmt::Display for ValueSet<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.values
+            .iter()
+            .fold(&mut f.debug_map(), |dbg, (key, v)| {
                 if let Some(val) = v {
                     val.record(key, dbg);
                 }

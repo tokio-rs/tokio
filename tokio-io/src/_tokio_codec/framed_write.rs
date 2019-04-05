@@ -94,7 +94,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(try!(self.inner.close()))
+        Ok(self.inner.close()?)
     }
 }
 
@@ -173,14 +173,14 @@ where
         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
         // *still* over 8KiB, then apply backpressure (reject the send).
         if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
-            try!(self.poll_complete());
+            self.poll_complete()?;
 
             if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
                 return Ok(AsyncSink::NotReady(item));
             }
         }
 
-        try!(self.inner.encode(item, &mut self.buffer));
+        self.inner.encode(item, &mut self.buffer)?;
 
         Ok(AsyncSink::Ready)
     }
@@ -216,7 +216,7 @@ where
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
         try_ready!(self.poll_complete());
-        Ok(try!(self.inner.shutdown()))
+        Ok(self.inner.shutdown()?)
     }
 }
 

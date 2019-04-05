@@ -5,7 +5,7 @@ use tokio_trace::{
     field::{Field, Visit},
     span,
     subscriber::{self, Subscriber},
-    Event, Id, Metadata,
+    Event, Id, Level, Metadata,
 };
 
 use std::{
@@ -125,10 +125,16 @@ fn main() {
 
     tokio_trace::subscriber::with_default(subscriber, || {
         let mut foo: u64 = 2;
-        span!("my_great_span", foo_count = &foo).enter(|| {
+        span!(Level::TRACE, "my_great_span", foo_count = &foo).enter(|| {
             foo += 1;
             info!({ yak_shaved = true, yak_count = 1 }, "hi from inside my span");
-            span!("my other span", foo_count = &foo, baz_count = 5).enter(|| {
+            span!(
+                Level::TRACE,
+                "my other span",
+                foo_count = &foo,
+                baz_count = 5
+            )
+            .enter(|| {
                 warn!({ yak_shaved = false, yak_count = -1 }, "failed to shave yak");
             });
         });

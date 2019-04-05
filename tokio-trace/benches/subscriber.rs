@@ -4,6 +4,7 @@
 extern crate tokio_trace;
 extern crate test;
 use test::Bencher;
+use tokio_trace::Level;
 
 use std::{
     fmt,
@@ -17,7 +18,7 @@ struct EnabledSubscriber;
 impl tokio_trace::Subscriber for EnabledSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
         let _ = span;
-        Id::from_u64(0)
+        Id::from_u64(0xDEADFACE)
     }
 
     fn event(&self, event: &Event) {
@@ -62,7 +63,7 @@ impl tokio_trace::Subscriber for VisitingSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
         let mut visitor = Visitor(self.0.lock().unwrap());
         span.record(&mut visitor);
-        Id::from_u64(0)
+        Id::from_u64(0xDEADFACE)
     }
 
     fn record(&self, _span: &Id, values: &span::Record) {
@@ -97,13 +98,16 @@ const N_SPANS: usize = 100;
 
 #[bench]
 fn span_no_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || b.iter(|| span!("span")));
+    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+        b.iter(|| span!(Level::TRACE, "span"))
+    });
 }
 
 #[bench]
 fn enter_span(b: &mut Bencher) {
     tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        b.iter(|| test::black_box(span!("span").enter(|| {})))
+        let span = span!(Level::TRACE, "span");
+        b.iter(|| test::black_box(span.enter(|| {})))
     });
 }
 
@@ -111,7 +115,7 @@ fn enter_span(b: &mut Bencher) {
 fn span_repeatedly(b: &mut Bencher) {
     #[inline]
     fn mk_span(i: u64) -> tokio_trace::Span {
-        span!("span", i = i)
+        span!(Level::TRACE, "span", i = i)
     }
 
     let n = test::black_box(N_SPANS);
@@ -125,6 +129,7 @@ fn span_with_fields(b: &mut Bencher) {
     tokio_trace::subscriber::with_default(EnabledSubscriber, || {
         b.iter(|| {
             span!(
+                Level::TRACE,
                 "span",
                 foo = "foo",
                 bar = "bar",
@@ -141,6 +146,7 @@ fn span_with_fields_record(b: &mut Bencher) {
     tokio_trace::subscriber::with_default(subscriber, || {
         b.iter(|| {
             span!(
+                Level::TRACE,
                 "span",
                 foo = "foo",
                 bar = "bar",

@@ -5,11 +5,12 @@ extern crate tokio_trace;
 extern crate log;
 extern crate test;
 use test::Bencher;
+use tokio_trace::Level;
 
 #[bench]
 fn bench_span_no_subscriber(b: &mut Bencher) {
     b.iter(|| {
-        span!("span");
+        span!(Level::TRACE, "span");
     });
 }
 
@@ -24,6 +25,7 @@ fn bench_log_no_logger(b: &mut Bencher) {
 fn bench_costly_field_no_subscriber(b: &mut Bencher) {
     b.iter(|| {
         span!(
+            Level::TRACE,
             "span",
             foo = tokio_trace::field::display(format!("bar {:?}", 2))
         );

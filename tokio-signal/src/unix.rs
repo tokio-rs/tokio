@@ -377,11 +377,11 @@ impl Signal {
         Box::new(future::lazy(move || {
             let result = (|| {
                 // Turn the signal delivery on once we are ready for it
-                try!(signal_enable(signal));
+                signal_enable(signal)?;
 
                 // Ensure there's a driver for our associated event loop processing
                 // signals.
-                let driver = try!(Driver::new(&handle));
+                let driver = Driver::new(&handle)?;
 
                 // One wakeup in a queue is enough, no need for us to buffer up any
                 // more. NB: channels always guarantee at least one slot per sender,

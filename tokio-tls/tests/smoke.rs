@@ -488,7 +488,7 @@ description should mention "tokio-tls".
                 let cert_context = MyCertContext(cert_context);
                 let cert_context: CertContext = mem::transmute(cert_context);
 
-                try!(cert_context.set_friendly_name(FRIENDLY_NAME));
+                cert_context.set_friendly_name(FRIENDLY_NAME)?;
 
                 // install the certificate to the machine's local store
                 io::stdout().write_all(br#"
@@ -500,8 +500,8 @@ for one day and will be automatically deleted if you re-run the tokio-tls
 test suite later.
 
         "#).unwrap();
-                try!(local_root_store().add_cert(&cert_context,
-                                                 CertAdd::ReplaceExisting));
+                local_root_store().add_cert(&cert_context,
+                                                 CertAdd::ReplaceExisting)?;
                 Ok(cert_context)
             }
         }

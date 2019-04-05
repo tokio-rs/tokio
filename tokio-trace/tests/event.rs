@@ -68,7 +68,7 @@ fn one_with_everything() {
                         .and(field::mock("bar").with_value(&false))
                         .only(),
                 )
-                .at_level(tokio_trace::Level::ERROR)
+                .at_level(Level::ERROR)
                 .with_target("whatever"),
         )
         .done()
@@ -77,7 +77,7 @@ fn one_with_everything() {
     with_default(subscriber, || {
         event!(
             target: "whatever",
-            tokio_trace::Level::ERROR,
+            Level::ERROR,
             { foo = 666, bar = false },
              "{:#x} make me one with{what:.>20}", 4277009102u64, what = "everything"
         );
@@ -101,6 +101,26 @@ fn moved_field() {
     with_default(subscriber, || {
         let from = "my event";
         event!(Level::INFO, foo = display(format!("hello from {}", from)))
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn dotted_field_name() {
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("foo.bar")
+                    .with_value(&true)
+                    .and(field::mock("foo.baz").with_value(&false))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        event!(Level::INFO, foo.bar = true, foo.baz = false);
     });
 
     handle.assert_finished();

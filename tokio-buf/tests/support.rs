@@ -14,6 +14,7 @@ use std::io::Cursor;
 
 macro_rules! assert_buf_eq {
     ($actual:expr, $expect:expr) => {{
+        use bytes::Buf;
         match $actual {
             Ok(Ready(Some(val))) => {
                 assert_eq!(val.remaining(), val.bytes().len());
