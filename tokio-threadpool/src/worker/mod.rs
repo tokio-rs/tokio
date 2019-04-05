@@ -93,8 +93,15 @@ impl Worker {
         backup_id: BackupId,
         pool: Arc<Pool>,
         trigger: Arc<ShutdownTrigger>,
+        name: Option<&str>,
     ) -> Worker {
-        let span = trace_span!("worker", id = &id.0, is_blocking);
+        let span = trace_span!("worker", name, id = &id.0, is_blocking);
+
+        if let Some(name) = name {
+            span.record("name", &name);
+        }
+        span.follows_from(&pool.span);
+
         Worker {
             pool,
             id,
