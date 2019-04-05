@@ -113,7 +113,7 @@ impl Counters {
     fn new() -> (Self, CounterSubscriber) {
         let counters = Counters(Arc::new(RwLock::new(HashMap::new())));
         let subscriber = CounterSubscriber {
-            ids: AtomicUsize::new(0),
+            ids: AtomicUsize::new(1),
             counters: counters.clone(),
         };
         (counters, subscriber)
