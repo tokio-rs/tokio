@@ -94,7 +94,7 @@ impl Worker {
         pool: Arc<Pool>,
         trigger: Arc<ShutdownTrigger>,
     ) -> Worker {
-        let span = span!("worker", id = &id.0, is_blocking);
+        let span = trace_span!("worker", id = &id.0, is_blocking);
         Worker {
             pool,
             id,
@@ -118,7 +118,6 @@ impl Worker {
     pub(crate) fn do_run(&self) -> bool {
         // Create another worker... It's ok, this is just a new type around
         // `Pool` that is expected to stay on the current thread.
-        let mut span = self.span.clone();
         CURRENT_WORKER.with(|c| {
             c.set(self as *const _);
 
@@ -129,7 +128,7 @@ impl Worker {
             let mut enter = tokio_executor::enter().unwrap();
 
             // Enter a trace span for this worker
-            span.enter(|| {
+            self.span.enter(|| {
                 tokio_executor::with_default(&mut sender, &mut enter, |enter| {
                     if let Some(ref callback) = self.pool.config.around_worker {
                         callback.call(self, enter);
@@ -202,7 +201,7 @@ impl Worker {
         }
 
         trace!(message = "transition to blocking state");
-        self.span.clone().record("is_blocking", &true);
+        self.span.record("is_blocking", &true);
         // Transitioning to blocking requires handing over the worker state to
         // another thread so that the work queue can continue to be processed.
 
@@ -242,60 +241,61 @@ impl Worker {
         let mut first = true;
         let mut spin_cnt = 0;
         let mut tick = 0;
+        self.span.enter(|| {
+            while self.check_run_state(first) {
+                first = false;
 
-        while self.check_run_state(first) {
-            first = false;
+                // Run the next available task
+                if self.try_run_task(&notify) {
+                    if self.is_blocking.get() {
+                        // Exit out of the run state
+                        return;
+                    }
 
-            // Run the next available task
-            if self.try_run_task(&notify) {
-                if self.is_blocking.get() {
-                    // Exit out of the run state
+                    // Poll the reactor and the global queue every now and then to
+                    // ensure no task gets left behind.
+                    if tick % LIGHT_SLEEP_INTERVAL == 0 {
+                        self.sleep_light();
+                    }
+
+                    tick = tick.wrapping_add(1);
+                    spin_cnt = 0;
+
+                    // As long as there is work, keep looping.
+                    continue;
+                }
+
+                spin_cnt += 1;
+
+                // Yield the thread several times before it actually goes to sleep.
+                if spin_cnt <= MAX_SPINS {
+                    thread::yield_now();
+                    continue;
+                }
+
+                tick = 0;
+                spin_cnt = 0;
+
+                // Starting to get sleeeeepy
+                if !self.sleep() {
                     return;
                 }
 
-                // Poll the reactor and the global queue every now and then to
-                // ensure no task gets left behind.
-                if tick % LIGHT_SLEEP_INTERVAL == 0 {
-                    self.sleep_light();
-                }
-
-                tick = tick.wrapping_add(1);
-                spin_cnt = 0;
-
-                // As long as there is work, keep looping.
-                continue;
+                // If there still isn't any work to do, shutdown the worker?
             }
 
-            spin_cnt += 1;
+            // The pool is terminating. However, transitioning the pool state to
+            // terminated is the very first step of the finalization process. Other
+            // threads may not see this state and try to spawn a new thread. To
+            // ensure consistency, before the current thread shuts down, it must
+            // return the backup token to the stack.
+            //
+            // The returned result is ignored because `Err` represents the pool
+            // shutting down. We are currently aware of this fact.
+            let _ = self.pool.release_backup(self.backup_id);
 
-            // Yield the thread several times before it actually goes to sleep.
-            if spin_cnt <= MAX_SPINS {
-                thread::yield_now();
-                continue;
-            }
-
-            tick = 0;
-            spin_cnt = 0;
-
-            // Starting to get sleeeeepy
-            if !self.sleep() {
-                return;
-            }
-
-            // If there still isn't any work to do, shutdown the worker?
-        }
-
-        // The pool is terminating. However, transitioning the pool state to
-        // terminated is the very first step of the finalization process. Other
-        // threads may not see this state and try to spawn a new thread. To
-        // ensure consistency, before the current thread shuts down, it must
-        // return the backup token to the stack.
-        //
-        // The returned result is ignored because `Err` represents the pool
-        // shutting down. We are currently aware of this fact.
-        let _ = self.pool.release_backup(self.backup_id);
-
-        self.should_finalize.set(true);
+            self.should_finalize.set(true);
+        })
     }
 
     /// Try to run a task

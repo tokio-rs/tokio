@@ -114,7 +114,7 @@ impl Pool {
         // Initialize the blocking state
         let blocking = Blocking::new(max_blocking);
 
-        let mut span = span!("pool", name);
+        let span = trace_span!("pool", name);
         if let Some(name) = config.name_prefix.as_ref() {
             span.record("name", &name.as_str());
         }
@@ -144,7 +144,7 @@ impl Pool {
     /// accepted.
     pub fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
-        self.span.clone().enter(move || {
+        self.span.enter(move || {
             trace!(message = "shutdown", state = field::debug(state));
 
             // For now, this must be true
@@ -214,7 +214,7 @@ impl Pool {
 
     pub fn terminate_sleeping_workers(&self) {
         use worker::Lifecycle::Signaled;
-        self.span.clone().enter(|| {
+        self.span.enter(|| {
             trace!(message = "  -> shutting down workers");
             // Wakeup all sleeping workers. They will wake up, see the state
             // transition, and terminate.
@@ -246,7 +246,7 @@ impl Pool {
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
     pub fn submit(&self, task: Arc<Task>, pool: &Arc<Pool>) {
-        self.span.clone().enter(|| {
+        self.span.enter(|| {
             debug_assert_eq!(*self, **pool);
 
             Worker::with_current(|worker| {
@@ -280,7 +280,7 @@ impl Pool {
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
     pub fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
-        self.span.clone().enter(|| {
+        self.span.enter(|| {
             debug_assert_eq!(*self, **pool);
 
             trace!(message = "    -> submit external");
@@ -342,7 +342,7 @@ impl Pool {
         }
 
         let pool = pool.clone();
-        let mut span = pool.span.clone();
+        let span = pool.span.clone();
         let res = th.spawn(move || {
             span.enter(|| {
                 if let Some(ref f) = pool.config.after_start {
@@ -415,7 +415,7 @@ impl Pool {
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
     pub fn signal_work(&self, pool: &Arc<Pool>) {
-        self.span.clone().enter(|| {
+        self.span.enter(|| {
             debug_assert_eq!(*self, **pool);
 
             use worker::Lifecycle::Signaled;
