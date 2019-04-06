@@ -24,21 +24,15 @@ struct Registry {
     dispatchers: Vec<dispatcher::Registrar>,
 }
 
-type DispatchersChanged = bool;
-
 impl Registry {
-    fn establish_interest(&self, callsite: &'static Callsite) -> DispatchersChanged {
-        let mut any_dropped = false;
+    fn establish_interest(&self, callsite: &'static Callsite) {
         let meta = callsite.metadata();
 
-        self.dispatchers
-            .iter()
-            .for_each(|registrar| match registrar.try_register(meta) {
-                Some(interest) => callsite.add_interest(interest),
-                None => any_dropped = true,
-            });
-
-        any_dropped
+        self.dispatchers.iter().for_each(|registrar| {
+            if let Some(interest) = registrar.try_register(meta) {
+                callsite.add_interest(interest)
+            }
+        });
     }
 
     fn reestablish(&mut self) {
@@ -106,14 +100,8 @@ pub fn invalidate_cache() {
 /// constructed.
 pub fn register(callsite: &'static Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
-    let dispatchers_changed = registry.establish_interest(callsite);
-
+    registry.establish_interest(callsite);
     registry.callsites.push(callsite);
-
-    if dispatchers_changed {
-        println!("got here during a test"); // pushing to test something in CI, do not merge
-        registry.reestablish();
-    }
 }
 
 pub(crate) fn register_dispatch(dispatch: &Dispatch) {
