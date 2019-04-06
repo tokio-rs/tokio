@@ -107,11 +107,12 @@ pub fn invalidate_cache() {
 pub fn register(callsite: &'static Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
     let dispatchers_changed = registry.establish_interest(callsite);
-    registry.callsites.push(callsite);
 
     if dispatchers_changed {
         registry.reestablish();
     }
+
+    registry.callsites.push(callsite);
 }
 
 pub(crate) fn register_dispatch(dispatch: &Dispatch) {
