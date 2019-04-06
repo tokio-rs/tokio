@@ -24,6 +24,33 @@ struct Registry {
     dispatchers: Vec<dispatcher::Registrar>,
 }
 
+type DispatchersChanged = bool;
+
+impl Registry {
+    fn establish_interest(&self, callsite: &'static Callsite) -> DispatchersChanged {
+        let mut any_dropped = false;
+        let meta = callsite.metadata();
+
+        self.dispatchers
+            .iter()
+            .for_each(|registrar| match registrar.try_register(meta) {
+                Some(interest) => callsite.add_interest(interest),
+                None => any_dropped = true,
+            });
+
+        any_dropped
+    }
+
+    fn reestablish(&mut self) {
+        self.dispatchers.retain(|registrar| registrar.is_alive());
+
+        self.callsites.iter().for_each(|&callsite| {
+            callsite.clear_interest();
+            self.establish_interest(callsite);
+        });
+    }
+}
+
 /// Trait implemented by callsites.
 pub trait Callsite: Sync {
     /// Adds the [`Interest`] returned by [registering] the callsite with a
@@ -67,25 +94,24 @@ pub struct Identifier(
     pub &'static Callsite,
 );
 
+/// Clear and reregister interest on all callsites
+pub fn recache_interest() {
+    let mut registry = REGISTRY.lock().unwrap();
+    registry.reestablish();
+}
+
 /// Register a new `Callsite` with the global registry.
 ///
 /// This should be called once per callsite after the callsite has been
 /// constructed.
 pub fn register(callsite: &'static Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
-    let meta = callsite.metadata();
-    registry.dispatchers.retain(|registrar| {
-        match registrar.try_register(meta) {
-            Some(interest) => {
-                callsite.add_interest(interest);
-                true
-            }
-            // TODO: if the dispatcher has been dropped, should we invalidate
-            // any callsites that it previously enabled?
-            None => false,
-        }
-    });
+    let dispatchers_changed = registry.establish_interest(callsite);
     registry.callsites.push(callsite);
+
+    if dispatchers_changed {
+        registry.reestablish();
+    }
 }
 
 pub(crate) fn register_dispatch(dispatch: &Dispatch) {

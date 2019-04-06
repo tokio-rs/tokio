@@ -52,7 +52,7 @@ pub trait Subscriber: 'static {
     ///
     /// This function is guaranteed to be called exactly once per callsite on
     /// every active subscriber. The subscriber may store the keys to fields it
-    /// cares in order to reduce the cost of accessing fields by name,
+    /// cares about in order to reduce the cost of accessing fields by name,
     /// preallocate storage for that callsite, or perform any other actions it
     /// wishes to perform once for each callsite.
     ///
