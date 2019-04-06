@@ -3,11 +3,21 @@
 #![cfg_attr(test, deny(warnings))]
 
 //! Tokio and Futures based testing utilites
+//!
+//! # Example
+//!
+//! ```
+//! # extern crate futures;
+//! # #[macro_use] extern crate tokio_test;
+//! # use futures::{Future, future};
+//! let mut fut = future::ok::<(), ()>(());
+//! assert_ready!(fut.poll());
+//! ```
 
 extern crate futures;
 extern crate tokio_executor;
 extern crate tokio_timer;
 
-pub mod macros;
+mod macros;
 pub mod task;
 pub mod timer;

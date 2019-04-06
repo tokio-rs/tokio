@@ -1,4 +1,24 @@
 //! Mock timer utilities
+//!
+//! # Example
+//!
+//! ```
+//! # #[macro_use] extern crate tokio_test;
+//! # extern crate futures;
+//! # extern crate tokio_timer;
+//! # use tokio_test::timer::{mocked, turn};
+//! # use tokio_timer::Delay;
+//! # use std::time::Duration;
+//! # use futures::Future;
+//! mocked(|timer, time| {
+//!     let mut delay = Delay::new(time.now() + Duration::from_secs(1));
+//!
+//!     assert_not_ready!(delay.poll());
+//!     turn(timer, Duration::from_secs(2));
+//!     turn(timer, None);
+//!     assert_ready!(delay.poll());
+//! });
+//! ```
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_timer::clock::Now;
@@ -68,7 +88,9 @@ impl IntoTimeout for Duration {
     }
 }
 
-/// Turn the timer state once
+/// Turn the timer state once Internally calls [`Timer::turn`][timer]
+///
+/// [timer]: ../../tokio_timer/timer/struct.Timer.html#method.turn
 pub fn turn<T: IntoTimeout>(timer: &mut Timer<MockPark>, duration: T) {
     timer.turn(duration.into_timeout()).unwrap();
 }
