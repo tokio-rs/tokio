@@ -1,6 +1,6 @@
 //! A collection of useful macros for testing futures and tokio based code
 
-/// Assert if a future is ready
+/// Assert if a poll is ready
 #[macro_export]
 macro_rules! assert_ready {
     ($e:expr) => {{
@@ -25,7 +25,7 @@ macro_rules! assert_ready {
     }};
 }
 
-/// Asset if the Future is not ready
+/// Asset if the poll is not ready
 #[macro_export]
 macro_rules! assert_not_ready {
     ($e:expr) => {{
@@ -50,7 +50,7 @@ macro_rules! assert_not_ready {
     }};
 }
 
-/// Assert if a Future is ready and check for equality on the value
+/// Assert if a poll is ready and check for equality on the value
 #[macro_export]
 macro_rules! assert_ready_eq {
     ($e:expr, $expect:expr) => {
