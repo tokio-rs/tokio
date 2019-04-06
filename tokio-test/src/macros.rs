@@ -10,6 +10,19 @@ macro_rules! assert_ready {
             Err(e) => panic!("error = {:?}", e),
         }
     }};
+    ($e:expr, $($msg:expr),+) => {{
+        match $e {
+            Ok(::futures::Async::Ready(v)) => v,
+            Ok(_) => {
+                let msg = format!($($msg),+);
+                panic!("not ready; {}", msg)
+            }
+            Err(e) => {
+                let msg = format!($($msg),+);
+                panic!("error = {:?}; {}", e, msg)
+            }
+        }
+    }};
 }
 
 /// Asset if the Future is not ready
@@ -22,6 +35,19 @@ macro_rules! assert_not_ready {
             Err(e) => panic!("error = {:?}", e),
         }
     }};
+    ($e:expr, $($msg:expr),+) => {{
+        match $e {
+            Ok(::futures::Async::NotReady) => {}
+            Ok(::futures::Async::Ready(v)) => {
+                let msg = format!($($msg),+);
+                panic!("ready; value = {:?}; {}", v, msg)
+            }
+            Err(e) => {
+                let msg = format!($($msg),+);
+                panic!("error = {:?}; {}", e, msg)
+            }
+        }
+    }};
 }
 
 /// Assert if a Future is ready and check for equality on the value
@@ -29,6 +55,10 @@ macro_rules! assert_not_ready {
 macro_rules! assert_ready_eq {
     ($e:expr, $expect:expr) => {
         assert_eq!($e, ::futures::Async::Ready($expect));
+    };
+
+    ($e:expr, $expect:expr, $($msg:expr),+) => {
+        assert_eq!($e, ::futures::Async::Ready($expect), $msg);
     };
 }
 
@@ -38,4 +68,42 @@ macro_rules! assert_elapsed {
     ($e:expr) => {
         assert!($e.unwrap_err().is_elapsed());
     };
+
+    ($e:expr, $($msg:expr),+) => {
+        assert!($e.unwrap_err().is_elapsed(), $msg);
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::{future, Async, Future, Poll};
+
+    #[test]
+    fn assert_ready() {
+        let mut fut = future::ok::<(), ()>(());
+        assert_ready!(fut.poll());
+        let mut fut = future::ok::<(), ()>(());
+        assert_ready!(fut.poll(), "some message");
+    }
+
+    #[test]
+    #[should_panic]
+    fn assert_ready_err() {
+        let mut fut = future::err::<(), ()>(());
+        assert_ready!(fut.poll());
+    }
+
+    #[test]
+    fn assert_not_ready() {
+        let poll: Poll<(), ()> = Ok(Async::NotReady);
+        assert_not_ready!(poll);
+        assert_not_ready!(poll, "some message");
+    }
+
+    #[test]
+    #[should_panic]
+    fn assert_not_ready_err() {
+        let mut fut = future::err::<(), ()>(());
+        assert_not_ready!(fut.poll());
+    }
 }
