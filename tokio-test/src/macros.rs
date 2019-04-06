@@ -54,11 +54,20 @@ macro_rules! assert_not_ready {
 #[macro_export]
 macro_rules! assert_ready_eq {
     ($e:expr, $expect:expr) => {
-        assert_eq!($e, ::futures::Async::Ready($expect));
+        match $e {
+            Ok(e) => assert_eq!(e, ::futures::Async::Ready($expect)),
+            Err(e) => panic!("error = {:?}", e),
+        }
     };
 
     ($e:expr, $expect:expr, $($msg:expr),+) => {
-        assert_eq!($e, ::futures::Async::Ready($expect), $msg);
+        match $e {
+            Ok(e) => assert_eq!(e, ::futures::Async::Ready($expect), $msg),
+            Err(e) => {
+                let msg = format!($($msg),+);
+                panic!("error = {:?}; {}", e, msg)
+            }
+        }
     };
 }
 
@@ -106,4 +115,11 @@ mod tests {
         let mut fut = future::err::<(), ()>(());
         assert_not_ready!(fut.poll());
     }
+
+    #[test]
+    fn assert_ready_eq() {
+        let mut fut = future::ok::<(), ()>(());
+        assert_ready_eq!(fut.poll(), ());
+    }
+
 }
