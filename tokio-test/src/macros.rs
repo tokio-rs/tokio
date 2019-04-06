@@ -10,11 +10,11 @@ macro_rules! assert_ready {
             Err(e) => panic!("error = {:?}", e),
         }
     }};
-    ($e:expr, $($msg:expr),+) => {{
+    ($e:expr, $($msg:tt),+) => {{
         match $e {
             Ok(::futures::Async::Ready(v)) => v,
             Ok(_) => {
-                let msg = format!($($msg),+);
+                let msg = format_args!($($msg),+);
                 panic!("not ready; {}", msg)
             }
             Err(e) => {
@@ -35,15 +35,15 @@ macro_rules! assert_not_ready {
             Err(e) => panic!("error = {:?}", e),
         }
     }};
-    ($e:expr, $($msg:expr),+) => {{
+    ($e:expr, $($msg:tt),+) => {{
         match $e {
             Ok(::futures::Async::NotReady) => {}
             Ok(::futures::Async::Ready(v)) => {
-                let msg = format!($($msg),+);
+                let msg = format_args!($($msg),+);
                 panic!("ready; value = {:?}; {}", v, msg)
             }
             Err(e) => {
-                let msg = format!($($msg),+);
+                let msg = format_args!($($msg),+);
                 panic!("error = {:?}; {}", e, msg)
             }
         }
@@ -60,11 +60,11 @@ macro_rules! assert_ready_eq {
         }
     };
 
-    ($e:expr, $expect:expr, $($msg:expr),+) => {
+    ($e:expr, $expect:expr, $($msg:tt),+) => {
         match $e {
-            Ok(e) => assert_eq!(e, ::futures::Async::Ready($expect), $msg),
+            Ok(e) => assert_eq!(e, ::futures::Async::Ready($expect), $($msg)+),
             Err(e) => {
-                let msg = format!($($msg),+);
+                let msg = format_args!($($msg),+);
                 panic!("error = {:?}; {}", e, msg)
             }
         }
