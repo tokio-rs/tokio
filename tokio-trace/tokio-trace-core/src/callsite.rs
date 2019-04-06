@@ -95,7 +95,7 @@ pub struct Identifier(
 );
 
 /// Clear and reregister interest on all callsites
-pub fn recache_interest() {
+pub fn invalidate_cache() {
     let mut registry = REGISTRY.lock().unwrap();
     registry.reestablish();
 }
