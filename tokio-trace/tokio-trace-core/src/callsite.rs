@@ -91,7 +91,7 @@ pub struct Identifier(
 /// Clear and reregister interest on every [`Callsite`]
 ///
 /// [`Callsite`]: ../callsite/trait.Callsite.html
-pub fn invalidate_cache() {
+pub fn invalidate_interest() {
     let mut registry = REGISTRY.lock().unwrap();
     registry.reestablish();
 }
