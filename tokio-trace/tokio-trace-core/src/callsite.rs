@@ -7,7 +7,7 @@ use std::{
     sync::Mutex,
 };
 use {
-    dispatcher::{self, Dispatch},
+    dispatcher::{self, Dispatch, Registrar},
     subscriber::Interest,
     Metadata,
 };
@@ -36,7 +36,7 @@ impl Registry {
     }
 
     fn reestablish(&mut self) {
-        self.dispatchers.retain(|registrar| registrar.is_alive());
+        self.dispatchers.retain(Registrar::is_alive);
 
         self.callsites.iter().for_each(|&callsite| {
             callsite.clear_interest();
