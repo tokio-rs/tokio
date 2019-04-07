@@ -90,6 +90,12 @@ pub struct Identifier(
 
 /// Clear and reregister interest on every [`Callsite`]
 ///
+/// This function is intended for runtime reconfiguration of filters on traces
+/// when the filter recalculation is much less frequent than trace events are.
+/// The alternative is to have the Subscriber that supports runtime reconfiguration
+/// always return Interest::sometimes() and manually reimplement the filtering
+/// of the events it receives.
+///
 /// [`Callsite`]: ../callsite/trait.Callsite.html
 pub fn invalidate_interest() {
     let mut registry = REGISTRY.lock().unwrap();
