@@ -55,6 +55,8 @@ pub(crate) struct Task {
 
     /// A `tokio-trace` span entered when running this task.
     span: Span,
+
+    state_field: field::Field,
 }
 
 #[derive(Debug)]
@@ -74,6 +76,9 @@ impl Task {
         // Wrap the future with an execution context.
         let task_fut = executor::spawn(future);
 
+        let span = trace_span!(parent: None, "task", state, blocking);
+        let state_field = span.field("state").expect("span must have state field");
+
         Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
@@ -81,7 +86,8 @@ impl Task {
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
-            span: trace_span!(parent: None, "task", state, blocking),
+            span,
+            state_field,
         }
     }
 
@@ -91,6 +97,9 @@ impl Task {
         let future = Box::new(futures::empty()) as BoxFuture;
         let task_fut = executor::spawn(future);
 
+        let span = trace_span!(parent: None, "stub_task", state, blocking);
+        let state_field = span.field("state").expect("span must have state field");
+
         Task {
             state: AtomicUsize::new(State::stub().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
@@ -98,7 +107,8 @@ impl Task {
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
-            span: trace_span!("stub_task", state, blocking),
+            span,
+            state_field,
         }
     }
 
@@ -113,15 +123,12 @@ impl Task {
                 .state
                 .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
                 .into();
+            self.record_state();
 
             match actual {
                 Scheduled => {}
                 _ => panic!("unexpected task state; {:?}", actual),
             }
-            self.span.record(
-                "state",
-                &field::debug(State::from(self.state.load(Relaxed))),
-            );
             trace!(message = "Task::run;");
 
             // The transition to `Running` done above ensures that a lock on the
@@ -157,7 +164,7 @@ impl Task {
                 ret
             }));
 
-            match res {
+            let res = match res {
                 Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
                     trace!(message = "    -> task complete");
 
@@ -170,6 +177,7 @@ impl Task {
 
                     // Transition to the completed state
                     self.state.store(State::Complete.into(), Release);
+
                     Run::Complete
                 }
                 Ok(Ok(Async::NotReady)) => {
@@ -189,12 +197,16 @@ impl Task {
                         Running => Run::Idle,
                         Notified => {
                             self.state.store(Scheduled.into(), Release);
+
                             Run::Schedule
                         }
                         _ => unreachable!(),
                     }
                 }
-            }
+            };
+
+            self.record_state();
+            res
         })
     }
 
@@ -221,6 +233,7 @@ impl Task {
                 .state
                 .compare_and_swap(state.into(), Aborted.into(), AcqRel)
                 .into();
+            self.record_state();
 
             if actual == state {
                 // The future has been aborted. Drop it immediately to free resources and run drop
@@ -269,6 +282,7 @@ impl Task {
                         .state
                         .compare_and_swap(Running.into(), Notified.into(), AcqRel)
                         .into();
+                    self.record_state();
 
                     match actual {
                         Idle => continue,
@@ -295,6 +309,13 @@ impl Task {
     /// the future state to `Running`.
     fn drop_future(&self) {
         let _ = unsafe { (*self.future.get()).take() };
+    }
+
+    fn record_state(&self) {
+        self.span.record(
+            &self.state_field,
+            &field::debug(State::from(self.state.load(Relaxed))),
+        );
     }
 }
 
