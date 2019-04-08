@@ -30,7 +30,7 @@ fn eof() -> io::Error {
 impl<'a, T: AsyncRead + ?Sized> Future for ReadExact<'a, T> {
     type Output = io::Result<()>;
 
-    fn poll(mut self: Pin<&mut Self>, _waker: &task::Waker) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

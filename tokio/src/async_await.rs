@@ -1,6 +1,6 @@
 use std::future::Future as StdFuture;
 use std::pin::Pin;
-use std::task::{Poll, Waker};
+use std::task::{Context, Poll};
 
 fn map_ok<T: StdFuture>(future: T) -> impl StdFuture<Output = Result<(), ()>> {
     MapOk(future)
@@ -17,8 +17,8 @@ impl<T> MapOk<T> {
 impl<T: StdFuture> StdFuture for MapOk<T> {
     type Output = Result<(), ()>;
 
-    fn poll(self: Pin<&mut Self>, waker: &Waker) -> Poll<Self::Output> {
-        match self.future().poll(waker) {
+    fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
+        match self.future().poll(context) {
             Poll::Ready(_) => Poll::Ready(Ok(())),
             Poll::Pending => Poll::Pending,
         }
