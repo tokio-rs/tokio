@@ -11,7 +11,7 @@ use pool::Pool;
 
 use futures::executor::{self, Spawn};
 use futures::{self, Async, Future};
-use tokio_trace::field;
+use tokio_trace::{field, Span};
 
 use std::cell::{Cell, UnsafeCell};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
@@ -52,6 +52,9 @@ pub(crate) struct Task {
     ///
     /// The future is dropped immediately when it transitions to Complete
     future: UnsafeCell<Option<Spawn<BoxFuture>>>,
+
+    /// A `tokio-trace` span entered when running this task.
+    span: Span,
 }
 
 #[derive(Debug)]
@@ -78,6 +81,7 @@ impl Task {
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
+            span: trace_span!(parent: None, "task", state, blocking),
         }
     }
 
@@ -94,6 +98,7 @@ impl Task {
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
             future: UnsafeCell::new(Some(task_fut)),
+            span: trace_span!("stub_task", state, blocking),
         }
     }
 
@@ -101,96 +106,96 @@ impl Task {
     /// scheduled again.
     pub fn run(&self, unpark: &Arc<Notifier>) -> Run {
         use self::State::*;
+        self.span.enter(|| {
+            // Transition task to running state. At this point, the task must be
+            // scheduled.
+            let actual: State = self
+                .state
+                .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
+                .into();
 
-        // Transition task to running state. At this point, the task must be
-        // scheduled.
-        let actual: State = self
-            .state
-            .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
-            .into();
+            match actual {
+                Scheduled => {}
+                _ => panic!("unexpected task state; {:?}", actual),
+            }
+            self.span.record(
+                "state",
+                &field::debug(State::from(self.state.load(Relaxed))),
+            );
+            trace!(message = "Task::run;");
 
-        match actual {
-            Scheduled => {}
-            _ => panic!("unexpected task state; {:?}", actual),
-        }
+            // The transition to `Running` done above ensures that a lock on the
+            // future has been obtained.
+            let fut = unsafe { &mut (*self.future.get()) };
 
-        trace!(
-            message = "Task::run;",
-            state = field::debug(State::from(self.state.load(Relaxed)))
-        );
+            // This block deals with the future panicking while being polled.
+            //
+            // If the future panics, then the drop handler must be called such that
+            // `thread::panicking() -> true`. To do this, the future is dropped from
+            // within the catch_unwind block.
+            let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
 
-        // The transition to `Running` done above ensures that a lock on the
-        // future has been obtained.
-        let fut = unsafe { &mut (*self.future.get()) };
+                impl<'a> Drop for Guard<'a> {
+                    fn drop(&mut self) {
+                        // This drops the future
+                        if self.1 {
+                            let _ = self.0.take();
+                        }
+                    }
+                }
 
-        // This block deals with the future panicking while being polled.
-        //
-        // If the future panics, then the drop handler must be called such that
-        // `thread::panicking() -> true`. To do this, the future is dropped from
-        // within the catch_unwind block.
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
+                let mut g = Guard(fut, true);
 
-            impl<'a> Drop for Guard<'a> {
-                fn drop(&mut self) {
-                    // This drops the future
-                    if self.1 {
-                        let _ = self.0.take();
+                let ret =
+                    g.0.as_mut()
+                        .unwrap()
+                        .poll_future_notify(unpark, self as *const _ as usize);
+
+                g.1 = false;
+
+                ret
+            }));
+
+            match res {
+                Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
+                    trace!(message = "    -> task complete");
+
+                    // The future has completed. Drop it immediately to free
+                    // resources and run drop handlers.
+                    //
+                    // The `Task` harness will stay around longer if it is contained
+                    // by any of the various queues.
+                    self.drop_future();
+
+                    // Transition to the completed state
+                    self.state.store(State::Complete.into(), Release);
+                    Run::Complete
+                }
+                Ok(Ok(Async::NotReady)) => {
+                    trace!(message = "    -> not ready");
+
+                    // Attempt to transition from Running -> Idle, if successful,
+                    // then the task does not need to be scheduled again. If the CAS
+                    // fails, then the task has been unparked concurrent to running,
+                    // in which case it transitions immediately back to scheduled
+                    // and we return `true`.
+                    let prev: State = self
+                        .state
+                        .compare_and_swap(Running.into(), Idle.into(), AcqRel)
+                        .into();
+
+                    match prev {
+                        Running => Run::Idle,
+                        Notified => {
+                            self.state.store(Scheduled.into(), Release);
+                            Run::Schedule
+                        }
+                        _ => unreachable!(),
                     }
                 }
             }
-
-            let mut g = Guard(fut, true);
-
-            let ret =
-                g.0.as_mut()
-                    .unwrap()
-                    .poll_future_notify(unpark, self as *const _ as usize);
-
-            g.1 = false;
-
-            ret
-        }));
-
-        match res {
-            Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
-                trace!(message = "    -> task complete");
-
-                // The future has completed. Drop it immediately to free
-                // resources and run drop handlers.
-                //
-                // The `Task` harness will stay around longer if it is contained
-                // by any of the various queues.
-                self.drop_future();
-
-                // Transition to the completed state
-                self.state.store(State::Complete.into(), Release);
-
-                Run::Complete
-            }
-            Ok(Ok(Async::NotReady)) => {
-                trace!(message = "    -> not ready");
-
-                // Attempt to transition from Running -> Idle, if successful,
-                // then the task does not need to be scheduled again. If the CAS
-                // fails, then the task has been unparked concurrent to running,
-                // in which case it transitions immediately back to scheduled
-                // and we return `true`.
-                let prev: State = self
-                    .state
-                    .compare_and_swap(Running.into(), Idle.into(), AcqRel)
-                    .into();
-
-                match prev {
-                    Running => Run::Idle,
-                    Notified => {
-                        self.state.store(Scheduled.into(), Release);
-                        Run::Schedule
-                    }
-                    _ => unreachable!(),
-                }
-            }
-        }
+        })
     }
 
     /// Aborts this task.
