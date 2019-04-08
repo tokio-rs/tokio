@@ -35,12 +35,26 @@ impl Registry {
         });
     }
 
+    fn reestablish_interest(&self, callsite: &'static Callsite) {
+        let meta = callsite.metadata();
+
+        let mut interest = Interest::never();
+
+        for registrar in &self.dispatchers {
+            if let Some(sub_interest) = registrar.try_register(meta) {
+                interest = interest.and(sub_interest);
+            }
+        }
+
+        callsite.set_interest(interest)
+    }
+
     fn reestablish(&mut self) {
         self.dispatchers.retain(Registrar::is_alive);
 
         self.callsites.iter().for_each(|&callsite| {
             callsite.clear_interest();
-            self.establish_interest(callsite);
+            self.reestablish_interest(callsite);
         });
     }
 }
@@ -57,6 +71,9 @@ pub trait Callsite: Sync {
     /// [registering]: ../subscriber/trait.Subscriber.html#method.register_callsite
     /// [dispatcher]: ../dispatcher/struct.Dispatch.html
     fn add_interest(&self, interest: Interest);
+
+    /// Relevant documentation
+    fn set_interest(&self, interest: Interest);
 
     /// Remove _all_ [`Interest`] from the callsite, disabling it.
     ///

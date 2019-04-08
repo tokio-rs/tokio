@@ -442,4 +442,23 @@ impl Interest {
             _ => false,
         }
     }
+
+    /// More relevant documentation
+    pub fn and(self, rhs: Interest) -> Self {
+        match rhs.0 {
+            // If the added interest is `never()`, don't change anything —
+            // either a different subscriber added a higher interest, which we
+            // want to preserve, or the interest is 0 anyway (as it's
+            // initialized to 0).
+            InterestKind::Never => self,
+            // If the interest is `sometimes()`, that overwrites a `never()`
+            // interest, but doesn't downgrade an `always()` interest.
+            InterestKind::Sometimes if self.0 == InterestKind::Never => rhs,
+            // If the interest is `always()`, we overwrite the current interest,
+            // as always() is the highest interest level and should take
+            // precedent.
+            InterestKind::Always => rhs,
+            _ => self,
+        }
+    }
 }

@@ -1293,6 +1293,11 @@ macro_rules! callsite {
                 };
                 INTEREST.store(interest, Ordering::Relaxed);
             }
+
+            fn set_interest(&self, interest: Interest) {
+                INTEREST.store(interest, Ordering::Relaxed);
+            }
+
             fn clear_interest(&self) {
                 INTEREST.store(0, Ordering::Relaxed);
             }
