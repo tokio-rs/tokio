@@ -1272,6 +1272,7 @@ macro_rules! callsite {
                     _ => Interest::sometimes(),
                 }
             }
+
         }
         impl callsite::Callsite for MyCallsite {
             fn get_interest(&self) -> Interest {
@@ -1279,6 +1280,11 @@ macro_rules! callsite {
             }
 
             fn set_interest(&self, interest: Interest) {
+                let interest = match () {
+                    _ if interest.is_never()  => 0,
+                    _ if interest.is_always() => 2,
+                    _ => 1,
+                };
                 INTEREST.store(interest, Ordering::Relaxed);
             }
 
