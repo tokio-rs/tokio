@@ -444,7 +444,7 @@ impl Interest {
     }
 
     /// More relevant documentation
-    pub fn and(self, rhs: Interest) -> Self {
+    pub(crate) fn and(self, rhs: Interest) -> Self {
         match rhs.0 {
             // If the added interest is `never()`, don't change anything —
             // either a different subscriber added a higher interest, which we

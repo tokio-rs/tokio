@@ -25,17 +25,7 @@ struct Registry {
 }
 
 impl Registry {
-    fn establish_interest(&self, callsite: &'static Callsite) {
-        let meta = callsite.metadata();
-
-        self.dispatchers.iter().for_each(|registrar| {
-            if let Some(interest) = registrar.try_register(meta) {
-                callsite.add_interest(interest)
-            }
-        });
-    }
-
-    fn reestablish_interest(&self, callsite: &'static Callsite) {
+    fn rebuild_callsite_interest(&self, callsite: &'static Callsite) {
         let meta = callsite.metadata();
 
         let mut interest = Interest::never();
@@ -49,36 +39,29 @@ impl Registry {
         callsite.set_interest(interest)
     }
 
-    fn reestablish(&mut self) {
+    fn rebuild_interest(&mut self) {
         self.dispatchers.retain(Registrar::is_alive);
 
         self.callsites.iter().for_each(|&callsite| {
-            callsite.clear_interest();
-            self.reestablish_interest(callsite);
+            self.rebuild_callsite_interest(callsite);
         });
     }
 }
 
 /// Trait implemented by callsites.
+///
+/// These functions are only intended to be called by the [`Registry`] which
+/// correctly handles determining the common interest between all subscribers.
 pub trait Callsite: Sync {
-    /// Adds the [`Interest`] returned by [registering] the callsite with a
-    /// [dispatcher].
-    ///
-    /// If the interest is greater than or equal to the callsite's current
-    /// interest, this should change whether or not the callsite is enabled.
+    /// Sets the [`Interest`] for this callsite.
     ///
     /// [`Interest`]: ../subscriber/struct.Interest.html
-    /// [registering]: ../subscriber/trait.Subscriber.html#method.register_callsite
-    /// [dispatcher]: ../dispatcher/struct.Dispatch.html
-    fn add_interest(&self, interest: Interest);
-
-    /// Relevant documentation
     fn set_interest(&self, interest: Interest);
 
-    /// Remove _all_ [`Interest`] from the callsite, disabling it.
+    /// Gets the [`Interest`] for this callsite.
     ///
     /// [`Interest`]: ../subscriber/struct.Interest.html
-    fn clear_interest(&self);
+    fn get_interest(&self) -> Interest;
 
     /// Returns the [metadata] associated with the callsite.
     ///
@@ -114,9 +97,9 @@ pub struct Identifier(
 /// of the events it receives.
 ///
 /// [`Callsite`]: ../callsite/trait.Callsite.html
-pub fn invalidate_interest() {
+pub fn rebuild_interest_cache() {
     let mut registry = REGISTRY.lock().unwrap();
-    registry.reestablish();
+    registry.rebuild_interest();
 }
 
 /// Register a new `Callsite` with the global registry.
@@ -125,7 +108,7 @@ pub fn invalidate_interest() {
 /// constructed.
 pub fn register(callsite: &'static Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
-    registry.establish_interest(callsite);
+    registry.rebuild_callsite_interest(callsite);
     registry.callsites.push(callsite);
 }
 
@@ -133,8 +116,10 @@ pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     let mut registry = REGISTRY.lock().unwrap();
     registry.dispatchers.push(dispatch.registrar());
     for callsite in &registry.callsites {
-        let interest = dispatch.register_callsite(callsite.metadata());
-        callsite.add_interest(interest);
+        let old_interest = callsite.get_interest();
+        let new_interest = dispatch.register_callsite(callsite.metadata());
+        let interest = old_interest.and(new_interest);
+        callsite.set_interest(interest);
     }
 }
 
