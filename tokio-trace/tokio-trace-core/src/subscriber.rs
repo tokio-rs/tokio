@@ -50,7 +50,7 @@ pub trait Subscriber: 'static {
     /// indicate different interests, or to implement behaviour that should run
     /// once for every callsite.
     ///
-    /// This function is guaranteed to be called exactly once per callsite on
+    /// This function is guaranteed to be called at least once per callsite on
     /// every active subscriber. The subscriber may store the keys to fields it
     /// cares about in order to reduce the cost of accessing fields by name,
     /// preallocate storage for that callsite, or perform any other actions it
@@ -79,6 +79,10 @@ pub trait Subscriber: 'static {
     /// set of metadata. Thus, the counter will not be incremented, and the span
     /// or event that correspands to the metadata will never be `enabled`.
     ///
+    /// `Subscriber`s that need to change their filters occasionally should call
+    /// [`rebuild_interest_cache`] to re-evaluate register_callsite for all
+    /// callsites.
+    ///
     /// Similarly, if a `Subscriber` has a filtering strategy that can be
     /// changed dynamically at runtime, it would need to re-evaluate that filter
     /// if the cached results have changed.
@@ -91,14 +95,19 @@ pub trait Subscriber: 'static {
     /// return `Interest::Never`, as a new subscriber may be added that _is_
     /// interested.
     ///
-    /// **Note**: If a subscriber returns `Interest::never` for a particular
-    /// callsite, it _may_ still see spans and events originating from that
-    /// callsite, if another subscriber expressed interest in it.
+    /// # Note
+    /// This function may be called again when a new subscriber is created or
+    /// when the registry is invalidated.
+    ///
+    /// If a subscriber returns `Interest::never` for a particular callsite, it
+    /// _may_ still see spans and events originating from that callsite, if
+    /// another subscriber expressed interest in it.
     ///
     /// [filter]: #method.enabled
     /// [metadata]: ../metadata/struct.Metadata.html
     /// [`Interest`]: struct.Interest.html
     /// [`enabled`]: #method.enabled
+    /// [`rebuild_interest_cache`]: ../callsite/fn.rebuild_interest_cache.html
     fn register_callsite(&self, metadata: &Metadata) -> Interest {
         match self.enabled(metadata) {
             true => Interest::always(),
@@ -396,7 +405,7 @@ impl Interest {
     ///
     /// If all active subscribers are `sometimes` or `never` interested in a
     /// callsite, the currently active subscriber will be asked to filter that
-    /// callsite every time it creates a span. This will be the case until a
+    /// callsite every time it creates a span. This will be the case until a new
     /// subscriber expresses that it is `always` interested in the callsite.
     #[inline]
     pub fn sometimes() -> Self {

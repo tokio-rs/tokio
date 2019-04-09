@@ -87,11 +87,14 @@ pub struct Identifier(
 ///
 /// This function is intended for runtime reconfiguration of filters on traces
 /// when the filter recalculation is much less frequent than trace events are.
-/// The alternative is to have the Subscriber that supports runtime reconfiguration
-/// always return Interest::sometimes() and manually reimplement the filtering
-/// of the events it receives.
+/// The alternative is to have the [`Subscriber`] that supports runtime
+/// reconfiguration of filters always return [`Interest::sometimes()`] so that
+/// [`enabled`] is evaluated for every event.
 ///
 /// [`Callsite`]: ../callsite/trait.Callsite.html
+/// [`enabled`]: ../subscriber/trait.Subscriber.html#tymethod.enabled
+/// [`Interest::sometimes()`]: ../subscriber/struct.Interest.html#method.sometimes
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 pub fn rebuild_interest_cache() {
     let mut registry = REGISTRY.lock().unwrap();
     registry.rebuild_interest();
