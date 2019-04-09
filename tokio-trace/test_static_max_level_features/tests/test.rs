@@ -39,7 +39,7 @@ fn test_static_max_level_features() {
         last_level: Mutex::new(None),
     });
     let a = me.clone();
-    tokio_trace::subscriber::with_default(TestSubscriber(me), || {
+    tokio_trace::dispatcher::with_default(TestSubscriber(me), || {
         error!("");
         last(&a, Some(Level::ERROR));
         warn!("");

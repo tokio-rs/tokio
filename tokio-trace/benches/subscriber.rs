@@ -98,14 +98,14 @@ const N_SPANS: usize = 100;
 
 #[bench]
 fn span_no_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+    tokio_trace::dispatcher::with_default(EnabledSubscriber, || {
         b.iter(|| span!(Level::TRACE, "span"))
     });
 }
 
 #[bench]
 fn enter_span(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+    tokio_trace::dispatcher::with_default(EnabledSubscriber, || {
         let span = span!(Level::TRACE, "span");
         b.iter(|| test::black_box(span.enter(|| {})))
     });
@@ -119,14 +119,14 @@ fn span_repeatedly(b: &mut Bencher) {
     }
 
     let n = test::black_box(N_SPANS);
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+    tokio_trace::dispatcher::with_default(EnabledSubscriber, || {
         b.iter(|| (0..n).fold(mk_span(0), |_, i| mk_span(i as u64)))
     });
 }
 
 #[bench]
 fn span_with_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+    tokio_trace::dispatcher::with_default(EnabledSubscriber, || {
         b.iter(|| {
             span!(
                 Level::TRACE,
@@ -143,7 +143,7 @@ fn span_with_fields(b: &mut Bencher) {
 #[bench]
 fn span_with_fields_record(b: &mut Bencher) {
     let subscriber = VisitingSubscriber(Mutex::new(String::from("")));
-    tokio_trace::subscriber::with_default(subscriber, || {
+    tokio_trace::dispatcher::with_default(subscriber, || {
         b.iter(|| {
             span!(
                 Level::TRACE,
