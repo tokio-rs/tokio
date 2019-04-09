@@ -55,6 +55,8 @@ A high level description of each example is:
 
 * [`manual-runtime`](manual-runtime.rs) - manually composing a runtime.
 
+* [`blocking`](blocking.rs) - perform heavy computation in blocking environment.
+
 If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
 to make a PR!
