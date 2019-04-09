@@ -689,9 +689,6 @@ mod test {
         fn set_interest(&self, _: ::subscriber::Interest) {
             unimplemented!()
         }
-        fn interest(&self) -> ::subscriber::Interest {
-            unimplemented!()
-        }
 
         fn metadata(&self) -> &Metadata {
             &TEST_META_1
@@ -710,10 +707,6 @@ mod test {
 
     impl ::callsite::Callsite for TestCallsite2 {
         fn set_interest(&self, _: ::subscriber::Interest) {
-            unimplemented!()
-        }
-
-        fn interest(&self) -> ::subscriber::Interest {
             unimplemented!()
         }
 

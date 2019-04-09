@@ -1274,10 +1274,6 @@ macro_rules! callsite {
             }
         }
         impl callsite::Callsite for MyCallsite {
-            fn interest(&self) -> Interest {
-                self.interest()
-            }
-
             fn set_interest(&self, interest: Interest) {
                 let interest = match () {
                     _ if interest.is_never()  => 0,
