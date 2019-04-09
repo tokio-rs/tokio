@@ -215,8 +215,6 @@ impl<T> Tx<T> {
 
 impl<T> fmt::Debug for Tx<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        use std::sync::atomic::Ordering::Relaxed;
-
         fmt.debug_struct("Tx")
             .field("block_tail", &self.block_tail.load(Relaxed))
             .field("tail_position", &self.tail_position.load(Relaxed))
