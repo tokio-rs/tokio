@@ -1272,7 +1272,6 @@ macro_rules! callsite {
                     _ => Interest::sometimes(),
                 }
             }
-
         }
         impl callsite::Callsite for MyCallsite {
             fn interest(&self) -> Interest {
