@@ -116,7 +116,7 @@ pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     let mut registry = REGISTRY.lock().unwrap();
     registry.dispatchers.push(dispatch.registrar());
     for callsite in &registry.callsites {
-        let old_interest = callsite.get_interest();
+        let old_interest = callsite.interest();
         let new_interest = dispatch.register_callsite(callsite.metadata());
         let interest = old_interest.and(new_interest);
         callsite.set_interest(interest);

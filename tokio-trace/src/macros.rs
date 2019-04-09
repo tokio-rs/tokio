@@ -1275,7 +1275,7 @@ macro_rules! callsite {
 
         }
         impl callsite::Callsite for MyCallsite {
-            fn get_interest(&self) -> Interest {
+            fn interest(&self) -> Interest {
                 self.interest()
             }
 

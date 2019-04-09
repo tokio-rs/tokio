@@ -689,7 +689,7 @@ mod test {
         fn set_interest(&self, _: ::subscriber::Interest) {
             unimplemented!()
         }
-        fn get_interest(&self) -> ::subscriber::Interest {
+        fn interest(&self) -> ::subscriber::Interest {
             unimplemented!()
         }
 
@@ -713,7 +713,7 @@ mod test {
             unimplemented!()
         }
 
-        fn get_interest(&self) -> ::subscriber::Interest {
+        fn interest(&self) -> ::subscriber::Interest {
             unimplemented!()
         }
 
