@@ -1285,7 +1285,7 @@ macro_rules! callsite {
                     _ if interest.is_always() => 2,
                     _ => 1,
                 };
-                INTEREST.store(interest, Ordering::Relaxed);
+                INTEREST.store(interest, Ordering::SeqCst);
             }
 
             fn metadata(&self) -> &Metadata {
