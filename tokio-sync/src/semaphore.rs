@@ -532,8 +532,6 @@ impl Semaphore {
 
 impl fmt::Debug for Semaphore {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        use std::sync::atomic::Ordering::Relaxed;
-
         fmt.debug_struct("Semaphore")
             .field("state", &SemState::load(&self.state, Relaxed))
             .field("head", &self.head.with(|ptr| ptr))
