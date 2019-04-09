@@ -61,7 +61,7 @@ pub trait Callsite: Sync {
     /// Gets the [`Interest`] for this callsite.
     ///
     /// [`Interest`]: ../subscriber/struct.Interest.html
-    fn get_interest(&self) -> Interest;
+    fn interest(&self) -> Interest;
 
     /// Returns the [metadata] associated with the callsite.
     ///
