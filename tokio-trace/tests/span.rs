@@ -4,7 +4,7 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{field::display, subscriber::with_default, Level, Span};
+use tokio_trace::{dispatcher::with_default, field::display, Level, Span};
 
 #[test]
 fn handles_to_the_same_span_are_equal() {

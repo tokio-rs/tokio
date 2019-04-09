@@ -9,7 +9,7 @@ extern crate tokio_trace;
 mod support;
 
 use self::support::*;
-use tokio_trace::subscriber::with_default;
+use tokio_trace::dispatcher::with_default;
 use tokio_trace::Level;
 
 use std::sync::{

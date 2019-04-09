@@ -4,7 +4,7 @@ mod support;
 
 use self::support::*;
 
-use tokio_trace::{field::display, subscriber::with_default, Level};
+use tokio_trace::{dispatcher::with_default, field::display, Level};
 
 #[test]
 fn event_without_message() {

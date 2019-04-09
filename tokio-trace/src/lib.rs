@@ -266,7 +266,7 @@
 //! # fn main() {
 //! let my_subscriber = FooSubscriber::new();
 //!
-//! tokio_trace::subscriber::with_default(my_subscriber, || {
+//! tokio_trace::dispatcher::with_default(my_subscriber, || {
 //!     // Any trace events generated in this closure or by functions it calls
 //!     // will be collected by `my_subscriber`.
 //! })
@@ -332,7 +332,7 @@ pub use self::{
     field::Value,
     span::Span,
     subscriber::Subscriber,
-    tokio_trace_core::{dispatcher, event, Level, Metadata},
+    tokio_trace_core::{dispatcher, event, subscriber, Level, Metadata},
 };
 
 #[doc(hidden)]
@@ -350,7 +350,6 @@ mod macros;
 pub mod field;
 pub mod level_filters;
 pub mod span;
-pub mod subscriber;
 
 mod sealed {
     pub trait Sealed {}
