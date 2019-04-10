@@ -12,7 +12,7 @@ pub struct CreateFuture<P>(Mode<P>);
 #[derive(Debug)]
 enum Mode<P> {
     Native { path: P },
-    Fallback(Blocking<std::fs::File, io::Error>),
+    Fallback(Blocking<StdFile, io::Error>),
 }
 
 impl<P> CreateFuture<P>

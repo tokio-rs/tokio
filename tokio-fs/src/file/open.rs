@@ -12,7 +12,7 @@ pub struct OpenFuture<P>(Mode<P>);
 #[derive(Debug)]
 enum Mode<P> {
     Native { options: StdOpenOptions, path: P },
-    Fallback(Blocking<std::fs::File, io::Error>),
+    Fallback(Blocking<StdFile, io::Error>),
 }
 
 impl<P> OpenFuture<P>
