@@ -19,7 +19,7 @@ use std::{
 /// - Registering new spans as they are created, and providing them with span
 ///   IDs. Implicitly, this means the subscriber may determine the strategy for
 ///   determining span equality.
-/// - Visiting the attachment of field values and follows-from annotations to
+/// - Recording the attachment of field values and follows-from annotations to
 ///   spans.
 /// - Filtering spans and events, and determining when those filters must be
 ///   invalidated.
@@ -452,7 +452,11 @@ impl Interest {
         }
     }
 
-    /// More relevant documentation
+    /// Returns the common interest between these two Interests.
+    ///
+    /// The common interest is defined as the least restrictive, so if one
+    /// interest is `never` and the other is `always` the common interest is
+    /// `always`.
     pub(crate) fn and(self, rhs: Interest) -> Self {
         match rhs.0 {
             // If the added interest is `never()`, don't change anything —
