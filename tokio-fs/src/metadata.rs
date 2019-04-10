@@ -4,6 +4,7 @@ use futures::{future, Future, Poll};
 use std::fs::{self, Metadata};
 use std::io;
 use std::path::Path;
+use tokio_threadpool;
 
 /// Queries the file system metadata for a path.
 pub fn metadata<P>(path: P) -> MetadataFuture<P>

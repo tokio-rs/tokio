@@ -1,10 +1,9 @@
 //! A simple thread pool for executing blocking functions.
 
-use tokio_threadpool;
-
 use futures::future;
 use futures::prelude::*;
 use futures::sync::oneshot;
+use tokio_threadpool;
 
 // TODO(stjepang): The current implementation is based on tokio-threadpool and is just a simple
 // hack that works, but doesn't deliver great performance. We'll need a custom thread pool

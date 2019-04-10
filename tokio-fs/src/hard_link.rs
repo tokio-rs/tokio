@@ -3,7 +3,6 @@ use futures::{future, Future, Poll};
 use std::fs;
 use std::io;
 use std::path::Path;
-use tokio_threadpool;
 
 /// Creates a new hard link on the filesystem.
 ///
