@@ -683,6 +683,7 @@ mod test {
         level: Level::INFO,
         fields: &["foo", "bar", "baz"],
         callsite: &TEST_CALLSITE_1,
+        callsite_kind: CallsiteKind::Span,
     };
 
     impl ::callsite::Callsite for TestCallsite1 {
@@ -703,6 +704,7 @@ mod test {
         level: Level::INFO,
         fields: &["foo", "bar", "baz"],
         callsite: &TEST_CALLSITE_2,
+        callsite_kind: CallsiteKind::Span,
     };
 
     impl ::callsite::Callsite for TestCallsite2 {
