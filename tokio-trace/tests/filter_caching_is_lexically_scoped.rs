@@ -1,5 +1,5 @@
 // Tests that depend on a count of the number of times their filter is evaluated
-// cant exist in the same file with other tests that add subscribers to the
+// can't exist in the same file with other tests that add subscribers to the
 // registry. The registry was changed so that each time a new dispatcher is
 // added all filters are re-evaluated. The tests being run only in separate
 // threads with shared global state lets them interfere with eachother
