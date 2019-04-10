@@ -77,4 +77,4 @@ unsafe fn wake(_data: *const ()) {
     unimplemented!("async-await-preview currently only supports futures 0.1. Use the compatibility layer of futures 0.3 instead, if you want to use futures 0.3.");
 }
 
-const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone_raw, drop_raw, wake);
+const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone_raw, wake, drop_raw);
