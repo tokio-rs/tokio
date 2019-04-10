@@ -744,7 +744,7 @@ macro_rules! event {
                         ":",
                         __tokio_trace_line!()
                     ),
-                    kind: $crate::metadata::Kind::SPAN,
+                    kind: $crate::metadata::Kind::EVENT,
                     target: $target,
                     level: $lvl,
                     fields: $( $($k).+ ),*
