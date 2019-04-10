@@ -332,7 +332,7 @@ pub use self::{
     field::Value,
     span::Span,
     subscriber::Subscriber,
-    tokio_trace_core::{dispatcher, event, subscriber, Level, Metadata},
+    tokio_trace_core::{event, subscriber, Level, Metadata},
 };
 
 #[doc(hidden)]
@@ -347,6 +347,7 @@ pub use self::{
 #[macro_use]
 mod macros;
 
+pub mod dispatcher;
 pub mod field;
 pub mod level_filters;
 pub mod span;
