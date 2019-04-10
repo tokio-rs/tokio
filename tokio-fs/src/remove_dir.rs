@@ -1,5 +1,5 @@
 use super::blocking_pool::{blocking, Blocking};
-use futures::{Future, Poll, future};
+use futures::{future, Future, Poll, future};
 use std::fs;
 use std::io;
 use std::path::Path;

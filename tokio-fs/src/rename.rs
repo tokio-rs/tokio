@@ -46,9 +46,7 @@ where
         RenameFuture(if tokio_threadpool::entered() {
             Mode::Native { from, to }
         } else {
-            Mode::Fallback(blocking(future::lazy(move || {
-                fs::rename(&from, &to)
-            })))
+            Mode::Fallback(blocking(future::lazy(move || fs::rename(&from, &to))))
         })
     }
 }

@@ -210,11 +210,9 @@ impl File {
     /// ```
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
         match &mut self.0 {
-            Mode::Native(std) => crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .seek(pos)
-            }),
+            Mode::Native(std) => {
+                crate::blocking_io(|| std.as_mut().expect("`File` instance closed").seek(pos))
+            }
             Mode::Fallback(fallback) => fallback.poll_seek(pos),
         }
     }
@@ -269,11 +267,9 @@ impl File {
     /// ```
     pub fn poll_sync_all(&mut self) -> Poll<(), io::Error> {
         match &mut self.0 {
-            Mode::Native(std) => crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .sync_all()
-            }),
+            Mode::Native(std) => {
+                crate::blocking_io(|| std.as_mut().expect("`File` instance closed").sync_all())
+            }
             Mode::Fallback(fallback) => fallback.poll_sync_all(),
         }
     }
@@ -306,11 +302,9 @@ impl File {
     /// ```
     pub fn poll_sync_data(&mut self) -> Poll<(), io::Error> {
         match &mut self.0 {
-            Mode::Native(std) => crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .sync_data()
-            }),
+            Mode::Native(std) => {
+                crate::blocking_io(|| std.as_mut().expect("`File` instance closed").sync_data())
+            }
             Mode::Fallback(fallback) => fallback.poll_sync_data(),
         }
     }
@@ -345,11 +339,9 @@ impl File {
     /// ```
     pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
         match &mut self.0 {
-            Mode::Native(std) => crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .set_len(size)
-            }),
+            Mode::Native(std) => {
+                crate::blocking_io(|| std.as_mut().expect("`File` instance closed").set_len(size))
+            }
             Mode::Fallback(fallback) => fallback.poll_set_len(size),
         }
     }
@@ -391,11 +383,9 @@ impl File {
     /// ```
     pub fn poll_metadata(&mut self) -> Poll<Metadata, io::Error> {
         match &mut self.0 {
-            Mode::Native(std) => crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .metadata()
-            }),
+            Mode::Native(std) => {
+                crate::blocking_io(|| std.as_mut().expect("`File` instance closed").metadata())
+            }
             Mode::Fallback(fallback) => fallback.poll_metadata(),
         }
     }
@@ -421,10 +411,7 @@ impl File {
     pub fn poll_try_clone(&mut self) -> Poll<File, io::Error> {
         match &mut self.0 {
             Mode::Native(std) => crate::blocking_io(|| {
-                let std = std
-                    .as_mut()
-                    .expect("`File` instance closed")
-                    .try_clone()?;
+                let std = std.as_mut().expect("`File` instance closed").try_clone()?;
                 Ok(File::from_std(std))
             }),
             Mode::Fallback(fallback) => fallback.poll_try_clone(),
@@ -540,9 +527,7 @@ impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match &mut self.0 {
             Mode::Native(std) => crate::would_block(crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .read(buf)
+                std.as_mut().expect("`File` instance closed").read(buf)
             })),
             Mode::Fallback(fallback) => crate::would_block(fallback.poll_read(buf)),
         }
@@ -559,9 +544,7 @@ impl Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match &mut self.0 {
             Mode::Native(std) => crate::would_block(crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .write(buf)
+                std.as_mut().expect("`File` instance closed").write(buf)
             })),
             Mode::Fallback(fallback) => crate::would_block(fallback.poll_write(buf)),
         }
@@ -570,9 +553,7 @@ impl Write for File {
     fn flush(&mut self) -> io::Result<()> {
         match &mut self.0 {
             Mode::Native(std) => crate::would_block(crate::blocking_io(|| {
-                std.as_mut()
-                    .expect("`File` instance closed")
-                    .flush()
+                std.as_mut().expect("`File` instance closed").flush()
             })),
             Mode::Fallback(fallback) => crate::would_block(fallback.poll_flush()),
         }
