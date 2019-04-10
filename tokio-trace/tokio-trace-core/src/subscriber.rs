@@ -95,7 +95,7 @@ pub trait Subscriber: 'static {
     /// return `Interest::Never`, as a new subscriber may be added that _is_
     /// interested.
     ///
-    /// # Note
+    /// # Notes
     /// This function may be called again when a new subscriber is created or
     /// when the registry is invalidated.
     ///
