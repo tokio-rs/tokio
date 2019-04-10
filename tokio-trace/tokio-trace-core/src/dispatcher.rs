@@ -289,6 +289,10 @@ impl Registrar {
     pub(crate) fn try_register(&self, metadata: &Metadata) -> Option<subscriber::Interest> {
         self.0.upgrade().map(|s| s.register_callsite(metadata))
     }
+
+    pub(crate) fn is_alive(&self) -> bool {
+        self.0.upgrade().is_some()
+    }
 }
 
 #[cfg(test)]

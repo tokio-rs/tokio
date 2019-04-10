@@ -15,7 +15,7 @@ keywords = ["logging", "tracing"]
 publish = false
 
 [dependencies]
-tokio-trace-core = "0.1"
+tokio-trace-core = { path = "./tokio-trace-core" }
 log = { version = "0.4", optional = true }
 cfg-if = "0.1.7"
 

@@ -686,8 +686,9 @@ mod test {
     };
 
     impl ::callsite::Callsite for TestCallsite1 {
-        fn add_interest(&self, _: ::subscriber::Interest) {}
-        fn clear_interest(&self) {}
+        fn set_interest(&self, _: ::subscriber::Interest) {
+            unimplemented!()
+        }
 
         fn metadata(&self) -> &Metadata {
             &TEST_META_1
@@ -705,8 +706,9 @@ mod test {
     };
 
     impl ::callsite::Callsite for TestCallsite2 {
-        fn add_interest(&self, _: ::subscriber::Interest) {}
-        fn clear_interest(&self) {}
+        fn set_interest(&self, _: ::subscriber::Interest) {
+            unimplemented!()
+        }
 
         fn metadata(&self) -> &Metadata {
             &TEST_META_2

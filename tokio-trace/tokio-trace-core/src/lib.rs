@@ -65,8 +65,7 @@ extern crate lazy_static;
 ///    // ...
 /// }
 /// impl callsite::Callsite for MyCallsite {
-/// # fn add_interest(&self, _: Interest) { unimplemented!() }
-/// # fn clear_interest(&self) {}
+/// # fn set_interest(&self, _: Interest) { unimplemented!() }
 /// # fn metadata(&self) -> &Metadata { unimplemented!() }
 ///     // ...
 /// }
@@ -103,8 +102,7 @@ macro_rules! identify_callsite {
 /// # fn main() {
 /// # pub struct MyCallsite { }
 /// # impl Callsite for MyCallsite {
-/// # fn add_interest(&self, _: Interest) { unimplemented!() }
-/// # fn clear_interest(&self) {}
+/// # fn set_interest(&self, _: Interest) { unimplemented!() }
 /// # fn metadata(&self) -> &Metadata { unimplemented!() }
 /// # }
 /// #
