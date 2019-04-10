@@ -1,6 +1,7 @@
 use tokio_trace::{
     callsite::Callsite,
     field::{self, Field, Value, Visit},
+    metadata::CallsiteKind,
 };
 
 use std::{collections::HashMap, fmt};
@@ -199,7 +200,7 @@ impl<'a> From<&'a Value> for MockValue {
             }
         }
 
-        let fake_field = callsite!(name: "fake", fields: fake_field)
+        let fake_field = callsite!(name: "fake", kind: CallsiteKind::EVENT, fields: fake_field)
             .metadata()
             .fields()
             .field("fake_field")
