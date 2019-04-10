@@ -102,7 +102,7 @@ macro_rules! span {
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
-                kind: $crate::metadata::CallsiteKind::SPAN,
+                kind: $crate::metadata::Kind::SPAN,
                 target: $target,
                 level: $lvl,
                 fields: $($($k).+),*
@@ -129,7 +129,7 @@ macro_rules! span {
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
-                kind: $crate::metadata::CallsiteKind::SPAN,
+                kind: $crate::metadata::Kind::SPAN,
                 target: $target,
                 level: $lvl,
                 fields: $( $($k).+ ),*
@@ -744,7 +744,7 @@ macro_rules! event {
                         ":",
                         __tokio_trace_line!()
                     ),
-                    kind: $crate::metadata::CallsiteKind::SPAN,
+                    kind: $crate::metadata::Kind::SPAN,
                     target: $target,
                     level: $lvl,
                     fields: $( $($k).+ ),*
@@ -1267,7 +1267,7 @@ macro_rules! callsite {
                 level: $lvl,
                 fields: &[ $( __tokio_trace_stringify!($field_name) ),* ],
                 callsite: &MyCallsite,
-                callsite_kind: $kind,
+                kind: $kind,
             }
         };
         // FIXME: Rust 1.34 deprecated ATOMIC_USIZE_INIT. When Tokio's minimum
