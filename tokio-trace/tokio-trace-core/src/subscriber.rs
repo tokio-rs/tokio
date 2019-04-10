@@ -80,7 +80,7 @@ pub trait Subscriber: 'static {
     /// or event that correspands to the metadata will never be `enabled`.
     ///
     /// `Subscriber`s that need to change their filters occasionally should call
-    /// [`rebuild_interest_cache`] to re-evaluate register_callsite for all
+    /// [`rebuild_interest_cache`] to re-evaluate `register_callsite` for all
     /// callsites.
     ///
     /// Similarly, if a `Subscriber` has a filtering strategy that can be
