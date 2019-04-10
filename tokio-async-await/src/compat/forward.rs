@@ -2,7 +2,7 @@ use futures::{Async, Future};
 
 use std::future::Future as StdFuture;
 use std::pin::Pin;
-use std::task::{Poll as StdPoll, Waker};
+use std::task::{Context, Poll as StdPoll};
 
 /// Converts an 0.1 `Future` into an 0.3 `Future`.
 #[derive(Debug)]
@@ -53,7 +53,7 @@ where
 {
     type Output = Result<T::Item, T::Error>;
 
-    fn poll(mut self: Pin<&mut Self>, _waker: &Waker) -> StdPoll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut Context) -> StdPoll<Self::Output> {
         use futures::Async::{NotReady, Ready};
 
         // TODO: wire in cx

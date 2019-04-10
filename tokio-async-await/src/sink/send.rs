@@ -27,7 +27,7 @@ impl<'a, T: Sink + Unpin + ?Sized> Send<'a, T> {
 impl<T: Sink + Unpin + ?Sized> Future for Send<'_, T> {
     type Output = Result<(), T::SinkError>;
 
-    fn poll(mut self: Pin<&mut Self>, _waker: &task::Waker) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
         use futures::AsyncSink::{NotReady, Ready};
 
