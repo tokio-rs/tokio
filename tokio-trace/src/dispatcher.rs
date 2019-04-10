@@ -1,4 +1,5 @@
 //! Dispatches trace events to `Subscriber`s.
+use tokio_trace_core;
 pub use tokio_trace_core::dispatcher::{get_default, Dispatch};
 
 /// Sets this dispatch as the default for the duration of a closure.
