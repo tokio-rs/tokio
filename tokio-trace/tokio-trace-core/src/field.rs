@@ -673,7 +673,7 @@ impl_valid_len! {
 #[cfg(test)]
 mod test {
     use super::*;
-    use {Level, Metadata};
+    use metadata::{CallsiteKind, Level, Metadata};
 
     struct TestCallsite1;
     static TEST_CALLSITE_1: TestCallsite1 = TestCallsite1;
@@ -683,7 +683,7 @@ mod test {
         level: Level::INFO,
         fields: &["foo", "bar", "baz"],
         callsite: &TEST_CALLSITE_1,
-        callsite_kind: CallsiteKind::Span,
+        callsite_kind: CallsiteKind::SPAN,
     };
 
     impl ::callsite::Callsite for TestCallsite1 {
@@ -704,7 +704,7 @@ mod test {
         level: Level::INFO,
         fields: &["foo", "bar", "baz"],
         callsite: &TEST_CALLSITE_2,
-        callsite_kind: CallsiteKind::Span,
+        callsite_kind: CallsiteKind::SPAN,
     };
 
     impl ::callsite::Callsite for TestCallsite2 {
