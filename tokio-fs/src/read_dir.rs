@@ -115,7 +115,7 @@ impl Stream for ReadDir {
                         Some(Err(err)) => Err(err),
                         Some(Ok(item)) => Ok(Some(DirEntry::from_std(item))),
                         None => Ok(None),
-                    })
+                    });
                 }
                 ReadDirMode::Fallback(fallback) => match fallback.take().unwrap() {
                     ReadDirStatus::Idle(mut std) => {
