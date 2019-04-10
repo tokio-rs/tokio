@@ -131,7 +131,7 @@ macro_rules! metadata {
         level: $level:expr,
         fields: $fields:expr,
         callsite: $callsite:expr,
-        callsite_kind: $callsite_kind:expr,
+        callsite_kind: $callsite_kind:expr
     ) => {
         metadata! {
             name: $name,
