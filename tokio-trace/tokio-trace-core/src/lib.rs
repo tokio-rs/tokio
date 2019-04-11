@@ -98,7 +98,7 @@ macro_rules! identify_callsite {
 /// # #[macro_use]
 /// # extern crate tokio_trace_core;
 /// # use tokio_trace_core::{callsite::Callsite, subscriber::Interest};
-/// use tokio_trace_core::metadata::{Metadata, Level, Kind};
+/// use tokio_trace_core::metadata::{Kind, Level, Metadata};
 /// # fn main() {
 /// # pub struct MyCallsite { }
 /// # impl Callsite for MyCallsite {
