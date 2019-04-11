@@ -1,12 +1,14 @@
 # Next Release
 
-### Breaking Change
-- Removed `Callsite::clear_interest` and `Callsite::add_interest` (#1039)
+### Breaking Changes
+- Remove `Callsite::clear_interest` and `Callsite::add_interest` (#1039)
+- `metadata!` macro now requires a `Kind` field (#1046)
 
 ### Added
 - Add a function to rebuild cached interest (#1039)
 - Add overrideable downcasting to `Subscriber`s (#974)
 - Add slightly more useful debug impls (#1014)
+- Introduce callsite classification in metadata (#1046)
 
 ### Fixed
 - `fmt::Debug` impls for `field::Display` and `field::Debug` not passing through
