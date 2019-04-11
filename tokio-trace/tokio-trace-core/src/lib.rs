@@ -98,7 +98,7 @@ macro_rules! identify_callsite {
 /// # #[macro_use]
 /// # extern crate tokio_trace_core;
 /// # use tokio_trace_core::{callsite::Callsite, subscriber::Interest};
-/// use tokio_trace_core::{Metadata, Level};
+/// use tokio_trace_core::metadata::{Kind, Level, Metadata};
 /// # fn main() {
 /// # pub struct MyCallsite { }
 /// # impl Callsite for MyCallsite {
@@ -116,6 +116,7 @@ macro_rules! identify_callsite {
 ///     level: Level::DEBUG,
 ///     fields: &["bar", "baz"],
 ///     callsite: &FOO_CALLSITE,
+///     kind: Kind::SPAN,
 /// };
 /// # }
 /// ```
@@ -129,7 +130,8 @@ macro_rules! metadata {
         target: $target:expr,
         level: $level:expr,
         fields: $fields:expr,
-        callsite: $callsite:expr
+        callsite: $callsite:expr,
+        kind: $kind:expr
     ) => {
         metadata! {
             name: $name,
@@ -137,6 +139,7 @@ macro_rules! metadata {
             level: $level,
             fields: $fields,
             callsite: $callsite,
+            kind: $kind,
         }
     };
     (
@@ -145,6 +148,7 @@ macro_rules! metadata {
         level: $level:expr,
         fields: $fields:expr,
         callsite: $callsite:expr,
+        kind: $kind:expr,
     ) => {
         $crate::metadata::Metadata {
             name: $name,
@@ -157,6 +161,7 @@ macro_rules! metadata {
                 names: $fields,
                 callsite: identify_callsite!($callsite),
             },
+            kind: $kind,
         }
     };
 }
@@ -198,7 +203,7 @@ pub use self::{
     dispatcher::Dispatch,
     event::Event,
     field::Field,
-    metadata::{Level, Metadata},
+    metadata::{Kind, Level, Metadata},
     subscriber::{Interest, Subscriber},
 };
 

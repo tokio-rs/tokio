@@ -109,7 +109,8 @@ impl MockSpan {
     }
 
     pub(in support) fn check_metadata(&self, actual: &tokio_trace::Metadata) {
-        self.metadata.check(actual, format_args!("span {}", self))
+        self.metadata.check(actual, format_args!("span {}", self));
+        assert!(actual.is_span(), "expected a span but got {:?}", actual);
     }
 }
 

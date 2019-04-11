@@ -365,3 +365,27 @@ fn error() {
     error!(target: "foo_events", { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
     error!(target: "foo_events", { foo = 2, bar.baz = 78, }, "quux");
 }
+
+#[test]
+fn callsite_macro_api() {
+    // This test should catch any inadvertant breaking changes
+    // caused bu changes to the macro.
+    let _callsite = callsite! {
+        name: "test callsite",
+        kind: tokio_trace::metadata::Kind::EVENT,
+        target: "test target",
+        level: tokio_trace::Level::TRACE,
+        fields: foo, bar,
+    };
+    let _callsite = callsite! {
+        name: "test callsite",
+        kind: tokio_trace::metadata::Kind::SPAN,
+        level: tokio_trace::Level::TRACE,
+        fields: foo,
+    };
+    let _callsite = callsite! {
+        name: "test callsite",
+        kind: tokio_trace::metadata::Kind::SPAN,
+        fields: foo,
+    };
+}

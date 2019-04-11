@@ -102,6 +102,7 @@ macro_rules! span {
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
+                kind: $crate::metadata::Kind::SPAN,
                 target: $target,
                 level: $lvl,
                 fields: $($($k).+),*
@@ -128,6 +129,7 @@ macro_rules! span {
             use $crate::callsite::Callsite;
             let callsite = callsite! {
                 name: $name,
+                kind: $crate::metadata::Kind::SPAN,
                 target: $target,
                 level: $lvl,
                 fields: $( $($k).+ ),*
@@ -742,6 +744,7 @@ macro_rules! event {
                         ":",
                         __tokio_trace_line!()
                     ),
+                    kind: $crate::metadata::Kind::EVENT,
                     target: $target,
                     level: $lvl,
                     fields: $( $($k).+ ),*
@@ -1223,17 +1226,24 @@ macro_rules! error {
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! callsite {
-    (name: $name:expr, fields: $( $field_name:expr ),* $(,)*) => ({
+    (name: $name:expr, kind: $kind:expr, fields: $( $field_name:expr ),* $(,)*) => ({
         callsite! {
             name: $name,
+            kind: $kind,
             target: __tokio_trace_module_path!(),
             level: $crate::Level::TRACE,
             fields: $( $field_name ),*
         }
     });
-    (name: $name:expr, level: $lvl:expr, fields: $( $field_name:expr ),* $(,)*) => ({
+    (
+        name: $name:expr,
+        kind: $kind:expr,
+        level: $lvl:expr,
+        fields: $( $field_name:expr ),*  $(,)*
+    ) => ({
         callsite! {
             name: $name,
+            kind: $kind,
             target: __tokio_trace_module_path!(),
             level: $lvl,
             fields: $( $field_name ),*
@@ -1241,6 +1251,7 @@ macro_rules! callsite {
     });
     (
         name: $name:expr,
+        kind: $kind:expr,
         target: $target:expr,
         level: $lvl:expr,
         fields: $( $field_name:expr ),*
@@ -1256,6 +1267,7 @@ macro_rules! callsite {
                 level: $lvl,
                 fields: &[ $( __tokio_trace_stringify!($field_name) ),* ],
                 callsite: &MyCallsite,
+                kind: $kind,
             }
         };
         // FIXME: Rust 1.34 deprecated ATOMIC_USIZE_INIT. When Tokio's minimum

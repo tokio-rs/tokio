@@ -122,7 +122,23 @@ pub struct Metadata<'a> {
     /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub fields: field::FieldSet,
+
+    /// The kind of the callsite.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must
+    /// be able to be constructed statically by macros. However, when `const
+    /// fn`s are available on stable Rust, this will no longer be necessary.
+    /// Thus, these fields are *not* considered stable public API, and they may
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
+    #[doc(hidden)]
+    pub kind: Kind,
 }
+
+/// Indicate whether the callsite is a span or event.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Kind(KindInner);
 
 /// Describes the level of verbosity of a span or event.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -142,6 +158,7 @@ impl<'a> Metadata<'a> {
         line: Option<u32>,
         field_names: &'static [&'static str],
         callsite: &'static Callsite,
+        kind: Kind,
     ) -> Self {
         Metadata {
             name,
@@ -154,6 +171,7 @@ impl<'a> Metadata<'a> {
                 names: field_names,
                 callsite: callsite::Identifier(callsite),
             },
+            kind,
         }
     }
 
@@ -205,6 +223,16 @@ impl<'a> Metadata<'a> {
     pub fn callsite(&self) -> callsite::Identifier {
         self.fields.callsite()
     }
+
+    /// Returns true if the callsite kind is `Event`.
+    pub fn is_event(&self) -> bool {
+        self.kind.is_event()
+    }
+
+    /// Return true if the callsite kind is `Span`.
+    pub fn is_span(&self) -> bool {
+        self.kind.is_span()
+    }
 }
 
 impl<'a> fmt::Debug for Metadata<'a> {
@@ -235,7 +263,38 @@ impl<'a> fmt::Debug for Metadata<'a> {
 
         meta.field("fields", &format_args!("{}", self.fields))
             .field("callsite", &self.callsite())
+            .field("kind", &self.kind)
             .finish()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum KindInner {
+    Event,
+    Span,
+}
+
+impl Kind {
+    /// `Event` callsite
+    pub const EVENT: Kind = Kind(KindInner::Event);
+
+    /// `Span` callsite
+    pub const SPAN: Kind = Kind(KindInner::Span);
+
+    /// Return true if the callsite kind is `Span`
+    pub fn is_span(&self) -> bool {
+        match self {
+            Kind(KindInner::Span) => true,
+            _ => false,
+        }
+    }
+
+    /// Return true if the callsite kind is `Event`
+    pub fn is_event(&self) -> bool {
+        match self {
+            Kind(KindInner::Event) => true,
+            _ => false,
+        }
     }
 }
 

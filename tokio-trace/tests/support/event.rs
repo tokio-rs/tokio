@@ -70,6 +70,7 @@ impl MockEvent {
         let meta = event.metadata();
         let name = meta.name();
         self.metadata.check(meta, format_args!("event {}", name));
+        assert!(meta.is_event(), "expected an event but got {:?}", event);
         if let Some(mut expected_fields) = self.fields {
             let mut checker = expected_fields.checker(format!("{}", name));
             event.record(&mut checker);
