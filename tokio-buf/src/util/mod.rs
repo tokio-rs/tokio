@@ -12,7 +12,7 @@ pub use self::collect::Collect;
 pub use self::from::FromBufStream;
 pub use self::iter::iter;
 pub use self::limit::Limit;
-pub use self::stream::stream;
+pub use self::stream::{stream, IntoStream};
 
 pub mod error {
     //! Error types
@@ -73,5 +73,15 @@ pub trait BufStreamExt: BufStream {
         Self: Sized,
     {
         Limit::new(self, amount)
+    }
+
+    /// Creates a `Stream` from a `BufStream`.
+    ///
+    /// This produces a `Stream` of `BufStream::Items`.
+    fn into_stream(self) -> IntoStream<Self>
+    where
+        Self: Sized,
+    {
+        IntoStream::new(self)
     }
 }
