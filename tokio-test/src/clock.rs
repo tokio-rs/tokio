@@ -1,4 +1,25 @@
-//! TODO
+//! A mocked clock for use with `tokio_timer` based futures.
+//!
+//! # Example
+//!
+//! ```
+//! # #[macro_use] extern crate tokio_test;
+//! # extern crate futures;
+//! # extern crate tokio_timer;
+//! # use tokio_test::clock;
+//! # use tokio_timer::Delay;
+//! # use std::time::Duration;
+//! # use futures::Future;
+//! clock::mock(|handle| {
+//!     let mut delay = Delay::new(handle.now() + Duration::from_secs(1));
+//!
+//!     assert_not_ready!(delay.poll());
+//!
+//!     handle.advance(Duration::from_secs(1));
+//!
+//!     assert_ready!(delay.poll());
+//! });
+//! ```
 
 use futures::{future::lazy, Future};
 use std::marker::PhantomData;
@@ -6,19 +27,38 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio_executor::park::{Park, Unpark};
-use tokio_timer::{clock, Timer};
+use tokio_timer::clock::{Clock, Now};
+use tokio_timer::Timer;
 
-/// Mock timber
+/// Run the provided closure with a `MockClock` that starts at the current time.
+pub fn mock<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut Handle) -> R,
+{
+    let mut mock = MockClock::new();
+    mock.enter(f)
+}
+
+/// run the provided closure witha `MockClock` that starts at the provided `Instant`.
+pub fn mock_with<F, R>(instant: Instant, f: F) -> R
+where
+    F: FnOnce(&mut Handle) -> R,
+{
+    let mut mock = MockClock::with_instant(instant);
+    mock.enter(f)
+}
+
+/// Mock clock for use with `tokio-timer` futures.
 ///
 /// A mock timer that is able to advance and wake after a
 /// certain duration.
 #[derive(Debug)]
-pub struct Clock {
+pub struct MockClock {
     time: MockTime,
-    clock: clock::Clock,
+    clock: Clock,
 }
 
-/// REMIND ME TO ADD THIS
+/// A handle to the `MockClock`.
 #[derive(Debug)]
 pub struct Handle {
     timer: Timer<MockPark>,
@@ -57,16 +97,29 @@ struct State {
     park_for: Option<Duration>,
 }
 
-impl Clock {
-    /// Create a new `MockTimer` with the current time.
+impl MockClock {
+    /// Create a new `MockClock` with the current time.
     pub fn new() -> Self {
-        let time = MockTime::new(Instant::now());
-        let clock = clock::Clock::new_with_now(time.mock_now());
-
-        Clock { time, clock }
+        MockClock::with_instant(Instant::now())
     }
 
-    /// REMIND ME TO FIX THIS
+    /// Create a `MockClock` that sets its current time from a duration.
+    ///
+    /// This will create a clock with `Instant::now() + duration` as the current time.
+    pub fn with_duration(duration: Duration) -> Self {
+        let instant = Instant::now() + duration;
+        MockClock::with_instant(instant)
+    }
+
+    /// Create a `MockClock` that sets its current time as the `Instant` provided.
+    pub fn with_instant(instant: Instant) -> Self {
+        let time = MockTime::new(instant);
+        let clock = Clock::new_with_now(time.mock_now());
+
+        MockClock { time, clock }
+    }
+
+    /// Enter the `MockClock` context.
     pub fn enter<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut Handle) -> R,
@@ -92,12 +145,12 @@ impl Handle {
         Handle { timer, time }
     }
 
-    /// REMIND ME
+    /// Turn the internal timer and mock park for the provided duration.
     pub fn turn(&mut self, duration: Option<Duration>) {
         self.timer.turn(duration).unwrap();
     }
 
-    /// REMIND ME
+    /// Advance the `MockClock` by the provided duration.
     pub fn advance(&mut self, duration: Duration) {
         let inner = self.timer.get_park().inner.clone();
         let deadline = inner.lock().unwrap().now() + duration;
@@ -145,19 +198,6 @@ impl MockTime {
     pub(crate) fn now(&self) -> Instant {
         self.inner.lock().unwrap().now()
     }
-
-    // pub(crate) fn advanced(&self) -> Duration {
-    //     self.inner.lock().unwrap().advance
-    // }
-
-    // pub(crate) fn advance(&self, duration: Duration) {
-    //     let mut inner = self.inner.lock().unwrap();
-    //     inner.advance(duration);
-    // }
-
-    // pub(crate) fn park_for(&self, duration: Duration) {
-    //     self.inner.lock().unwrap().park_for = Some(duration);
-    // }
 }
 
 impl State {
@@ -209,7 +249,7 @@ impl Unpark for MockUnpark {
     }
 }
 
-impl clock::Now for MockNow {
+impl Now for MockNow {
     fn now(&self) -> Instant {
         self.inner.lock().unwrap().now()
     }
