@@ -18,6 +18,6 @@ extern crate futures;
 extern crate tokio_executor;
 extern crate tokio_timer;
 
+pub mod clock;
 mod macros;
 pub mod task;
-pub mod timer;
