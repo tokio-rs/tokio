@@ -35,6 +35,7 @@ where
 }
 
 /// Converts a `BufStream` into a `Stream`.
+#[derive(Debug)]
 pub struct IntoStream<T> {
     buf: T,
 }
