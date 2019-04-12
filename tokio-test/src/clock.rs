@@ -124,15 +124,15 @@ impl MockClock {
     where
         F: FnOnce(&mut Handle) -> R,
     {
-        let mut enter = tokio_executor::enter().unwrap();
+        let mut enter = ::tokio_executor::enter().unwrap();
 
-        tokio_timer::clock::with_default(&self.clock, &mut enter, |enter| {
+        ::tokio_timer::clock::with_default(&self.clock, &mut enter, |enter| {
             let park = self.time.mock_park();
             let timer = Timer::new(park);
             let handle = timer.handle();
             let time = self.time.clone();
 
-            tokio_timer::with_default(&handle, enter, |_| {
+            ::tokio_timer::with_default(&handle, enter, |_| {
                 let mut handle = Handle::new(timer, time);
                 lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()
             })
