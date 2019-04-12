@@ -103,7 +103,7 @@ impl MockClock {
         MockClock::with_instant(Instant::now())
     }
 
-    /// Create a `MockClock` that sets its current time from a duration.
+    /// Create a `MockClock` with its current time at a duration from now
     ///
     /// This will create a clock with `Instant::now() + duration` as the current time.
     pub fn with_duration(duration: Duration) -> Self {
