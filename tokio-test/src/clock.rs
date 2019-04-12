@@ -40,7 +40,7 @@ where
 }
 
 /// Run the provided closure with a `MockClock` that starts at the provided `Instant`.
-pub fn mock_with<F, R>(instant: Instant, f: F) -> R
+pub fn mock_at<F, R>(instant: Instant, f: F) -> R
 where
     F: FnOnce(&mut Handle) -> R,
 {
