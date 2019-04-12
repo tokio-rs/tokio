@@ -15,7 +15,7 @@ repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 documentation = "https://docs.rs/tokio-test/0.1.0/tokio_test"
 description = """
-Tokio and futures based testing utilites
+Testing utilities for Tokio- and futures-based code
 """
 categories = ["asynchronous", "testing"]
 publish = false
