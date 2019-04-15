@@ -405,7 +405,7 @@ mod test {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use {
         callsite::Callsite,
-        metadata::{Level, Metadata},
+        metadata::{Kind, Level, Metadata},
         span,
         subscriber::{Interest, Subscriber},
         Event,
@@ -431,11 +431,11 @@ mod test {
         level: Level::DEBUG,
         fields: &[],
         callsite: &TEST_CALLSITE,
+        kind: Kind::EVENT
     };
 
     impl Callsite for TestCallsite {
-        fn add_interest(&self, _: Interest) {}
-        fn clear_interest(&self) {}
+        fn set_interest(&self, _: Interest) {}
         fn metadata(&self) -> &Metadata {
             &TEST_META
         }
