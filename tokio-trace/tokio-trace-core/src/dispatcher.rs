@@ -41,16 +41,6 @@ struct State {
     can_enter: Cell<bool>,
 }
 
-/// A guard returned by `State::enter`, borrowing the thread's current default
-/// dispatcher.
-///
-/// While this guard is active, additional calls to subscriber functions on the
-/// default dispatcher will not be able to access the dispatch context. Dropping
-/// the guard will allow the dispatch context to be re-entered.
-struct Entered<'a> {
-    can_enter: &'a Cell<bool>,
-}
-
 /// A guard that resets the current default dispatcher to the prior
 /// default dispatcher when dropped.
 struct ResetGuard(Option<Dispatch>);
@@ -84,8 +74,26 @@ pub fn get_default<T, F>(mut f: F) -> T
 where
     F: FnMut(&Dispatch) -> T,
 {
+    // While this guard is active, additional calls to subscriber functions on
+    // the default dispatcher will not be able to access the dispatch context.
+    // Dropping the guard will allow the dispatch context to be re-entered.
+    struct Entered<'a>(&'a Cell<bool>);
+    impl<'a> Drop for Entered<'a> {
+        #[inline]
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
+
     CURRENT_STATE
-        .try_with(|state| f(&state.default.borrow()))
+        .try_with(|state| {
+            if state.can_enter.replace(false) {
+                let _guard = Entered(&state.can_enter);
+                f(&state.default.borrow())
+            } else {
+                f(&Dispatch::none())
+            }
+        })
         .unwrap_or_else(|_| f(&Dispatch::none()))
 }
 
@@ -142,8 +150,7 @@ impl Dispatch {
     /// [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
     #[inline]
     pub fn new_span(&self, span: &span::Attributes) -> span::Id {
-        Self::if_enabled(|| self.subscriber.new_span(span))
-            .unwrap_or_else(|| span::Id::from_u64(0xDEADFACE))
+        self.subscriber.new_span(span)
     }
 
     /// Record a set of values on a span.
@@ -182,7 +189,7 @@ impl Dispatch {
     /// [`enabled`]: ../subscriber/trait.Subscriber.html#method.enabled
     #[inline]
     pub fn enabled(&self, metadata: &Metadata) -> bool {
-        Self::if_enabled(|| self.subscriber.enabled(metadata)).unwrap_or(false)
+        self.subscriber.enabled(metadata)
     }
 
     /// Records that an [`Event`] has occurred.
@@ -195,7 +202,7 @@ impl Dispatch {
     /// [`event`]: ../subscriber/trait.Subscriber.html#method.event
     #[inline]
     pub fn event(&self, event: &Event) {
-        Self::if_enabled(|| self.subscriber.event(event));
+        self.subscriber.event(event)
     }
 
     /// Records that a span has been can_enter.
@@ -265,25 +272,6 @@ impl Dispatch {
     #[inline]
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         Subscriber::downcast_ref(&*self.subscriber)
-    }
-
-    /// If this dispatcher is not currently dispatching a trace event on this
-    /// thread, invokes the provided function with a reference to the subscriber
-    /// this dispatcher forwards to. If the subscriber is currently busy on this
-    /// thread, returns `None`.
-    #[inline(always)]
-    fn if_enabled<F, T>(f: F) -> Option<T>
-    where
-        F: FnOnce() -> T,
-    {
-        CURRENT_STATE
-            .try_with(|state| {
-                if let Some(_enter) = state.enter() {
-                    return Some(f());
-                }
-                None
-            })
-            .unwrap_or(None)
     }
 }
 
@@ -357,24 +345,6 @@ impl State {
             .ok();
         ResetGuard(prior)
     }
-
-    /// Begins recording a trace event with this thread's current
-    /// default dispatcher.
-    ///
-    /// If this thread's dispatcher is currently recording, this returns
-    /// `None`. Otherwise, a guard is returned allowing access to the
-    /// thread's current `Subscriber`. Dropping the guard will reset the
-    /// flag indicating that we are currently recording a trace event.
-    #[inline]
-    fn enter(&self) -> Option<Entered> {
-        if self.can_enter.replace(false) {
-            Some(Entered {
-                can_enter: &self.can_enter,
-            })
-        } else {
-            None
-        }
-    }
 }
 
 // ===== impl ResetGuard =====
@@ -387,15 +357,6 @@ impl Drop for ResetGuard {
                 *state.default.borrow_mut() = dispatch;
             });
         }
-    }
-}
-
-// ===== impl Entered =====
-
-impl<'a> Drop for Entered<'a> {
-    #[inline]
-    fn drop(&mut self) {
-        self.can_enter.set(true);
     }
 }
 
