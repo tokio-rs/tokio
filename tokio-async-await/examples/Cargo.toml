@@ -25,14 +25,14 @@ name = "hyper"
 path = "src/hyper.rs"
 
 [dependencies]
-tokio = { version = "0.1.0", path = "../..", features = ["async-await-preview"] }
+tokio = { version = "0.1.18", features = ["async-await-preview"] }
 futures = "0.1.23"
 bytes = "0.4.9"
 hyper = "0.12.8"
 
 # Avoid using crates.io for Tokio dependencies
 [patch.crates-io]
-tokio = { path = "../.." }
+tokio = { path = "../../tokio" }
 tokio-async-await  = { path = "../" }
 tokio-codec = { path = "../../tokio-codec" }
 tokio-current-thread = { path = "../../tokio-current-thread" }

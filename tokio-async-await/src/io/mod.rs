@@ -24,7 +24,7 @@ pub trait AsyncReadExt: AsyncRead {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```edition2018
     /// #![feature(async_await, await_macro, futures_api)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
@@ -58,7 +58,7 @@ pub trait AsyncReadExt: AsyncRead {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```edition2018
     /// #![feature(async_await, await_macro, futures_api)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
@@ -77,7 +77,7 @@ pub trait AsyncReadExt: AsyncRead {
     ///
     /// ## EOF is hit before `buf` is filled
     ///
-    /// ```
+    /// ```edition2018
     /// #![feature(async_await, await_macro, futures_api)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
@@ -109,7 +109,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```edition2018
     /// #![feature(async_await, await_macro, futures_api)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
@@ -138,7 +138,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```edition2018
     /// #![feature(async_await, await_macro, futures_api)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
@@ -162,7 +162,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```edition2018
     /// #![feature(async_await, await_macro, futures_api)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
