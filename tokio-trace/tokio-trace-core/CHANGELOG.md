@@ -13,6 +13,9 @@
 ### Fixed
 - `fmt::Debug` impls for `field::Display` and `field::Debug` not passing through
   to the inner value (#992)
+- Entering a `Dispatch` function unsets the default dispatcher for the duration
+  of the function (so that events inside the subscriber cannot cause infinite
+  loops) (#1033)
 
 # 0.1.0 (March 13, 2019)
 
