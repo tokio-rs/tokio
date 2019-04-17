@@ -372,6 +372,7 @@ fn busy_threadpool_is_not_idle() {
     idle.wait().unwrap();
 }
 
+#[cfg(not(feature = "no_catch_panic"))]
 #[test]
 fn panic_in_task() {
     let pool = ThreadPool::new();

@@ -151,6 +151,13 @@ impl Task {
             ret
         }));
 
+        #[cfg(feature = "no_catch_panic")]
+        {
+            if let Err(err) = res {
+                panic::resume_unwind(err);
+            }
+        }
+
         match res {
             Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
                 trace!("    -> task complete");
