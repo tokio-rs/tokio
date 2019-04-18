@@ -151,8 +151,7 @@ impl Task {
             ret
         }));
 
-        #[cfg(feature = "no_catch_panic")]
-        {
+        if !unpark.pool.config.catch_panics {
             if let Err(err) = res {
                 panic::resume_unwind(err);
             }

@@ -372,7 +372,6 @@ fn busy_threadpool_is_not_idle() {
     idle.wait().unwrap();
 }
 
-#[cfg(not(feature = "no_catch_panic"))]
 #[test]
 fn panic_in_task() {
     let pool = ThreadPool::new();
@@ -399,6 +398,37 @@ fn panic_in_task() {
 
     pool.shutdown_on_idle().wait().unwrap();
 }
+
+/* WIP...
+
+#[test]
+fn no_catch_panics() {
+    use std::panic;
+
+    struct Boom;
+
+    impl Future for Boom {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<(), ()> {
+            panic!();
+        }
+    }
+
+    let pool = tokio_threadpool::Builder::new()
+        .catch_panics(false)
+        .around_worker(move |w, _| {
+            let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                w.run();
+            }));
+            assert!(res.is_err());
+        })
+        .build();
+
+    pool.spawn_handle(Boom).wait();
+}
+*/
 
 #[test]
 fn multi_threadpool() {

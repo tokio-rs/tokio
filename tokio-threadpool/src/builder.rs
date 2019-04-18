@@ -106,6 +106,7 @@ impl Builder {
                 around_worker: None,
                 after_start: None,
                 before_stop: None,
+                catch_panics: true,
             },
             new_park,
         }
@@ -196,6 +197,13 @@ impl Builder {
     /// ```
     pub fn keep_alive(&mut self, val: Option<Duration>) -> &mut Self {
         self.config.keep_alive = val;
+        self
+    }
+
+    /// Sets whether Tokio should catch panics (and print them to stderr) from
+    /// tasks. The default value is `false`.
+    pub fn catch_panics(&mut self, val: bool) -> &mut Self {
+        self.config.catch_panics = val;
         self
     }
 

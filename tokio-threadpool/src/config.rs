@@ -14,6 +14,7 @@ pub(crate) struct Config {
     pub around_worker: Option<Callback>,
     pub after_start: Option<Arc<Fn() + Send + Sync>>,
     pub before_stop: Option<Arc<Fn() + Send + Sync>>,
+    pub catch_panics: bool,
 }
 
 /// Max number of workers that can be part of a pool. This is the most that can
@@ -27,6 +28,7 @@ impl fmt::Debug for Config {
             .field("keep_alive", &self.keep_alive)
             .field("name_prefix", &self.name_prefix)
             .field("stack_size", &self.stack_size)
+            .field("catch_panics", &self.catch_panics)
             .finish()
     }
 }
