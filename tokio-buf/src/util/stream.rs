@@ -45,6 +45,21 @@ impl<T> IntoStream<T> {
     pub fn new(buf: T) -> Self {
         IntoStream { buf }
     }
+
+    /// Get a reference to the inner `BufStream`.
+    pub fn get_ref(&self) -> &T {
+        &self.buf
+    }
+
+    /// Get a mutable reference to the inner `BufStream`
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.buf
+    }
+
+    /// Get the inner `BufStream`.
+    pub fn into_inner(self) -> T {
+        self.buf
+    }
 }
 
 impl<T: BufStream> Stream for IntoStream<T> {
