@@ -24,6 +24,7 @@ macro_rules! if_fuzz {
     }}
 }
 
+pub mod lock;
 mod loom;
 pub mod mpsc;
 pub mod oneshot;

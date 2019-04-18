@@ -66,6 +66,7 @@ jobs:
         - timer
         - udp
         - uds
+        - sync
       tokio-buf:
         - util
 
