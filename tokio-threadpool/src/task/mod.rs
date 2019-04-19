@@ -151,12 +151,6 @@ impl Task {
             ret
         }));
 
-        if !unpark.pool.config.catch_panics {
-            if let Err(err) = res {
-                panic::resume_unwind(err);
-            }
-        }
-
         match res {
             Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
                 trace!("    -> task complete");
@@ -170,6 +164,12 @@ impl Task {
 
                 // Transition to the completed state
                 self.state.store(State::Complete.into(), Release);
+
+                if let Err(panic_err) = res {
+                    if let Some(ref f) = unpark.pool.config.catch_panics {
+                        f(panic_err);
+                    }
+                }
 
                 Run::Complete
             }

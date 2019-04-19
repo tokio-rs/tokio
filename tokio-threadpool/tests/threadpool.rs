@@ -399,36 +399,22 @@ fn panic_in_task() {
     pool.shutdown_on_idle().wait().unwrap();
 }
 
-/* WIP...
-
 #[test]
-fn no_catch_panics() {
-    use std::panic;
-
-    struct Boom;
-
-    impl Future for Boom {
-        type Item = ();
-        type Error = ();
-
-        fn poll(&mut self) -> Poll<(), ()> {
-            panic!();
-        }
-    }
-
+fn count_catch_panics() {
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_ = counter.clone();
     let pool = tokio_threadpool::Builder::new()
-        .catch_panics(false)
-        .around_worker(move |w, _| {
-            let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                w.run();
-            }));
-            assert!(res.is_err());
+        .catch_panics(move |_err| {
+            // We caught a panic.
+            counter_.fetch_add(1, Relaxed);
         })
         .build();
-
-    pool.spawn_handle(Boom).wait();
+    // Spawn a future that will panic.
+    pool.spawn(lazy(|| -> Result<(), ()> { panic!() }));
+    pool.shutdown_on_idle().wait().unwrap();
+    let counter = counter.load(Relaxed);
+    assert_eq!(counter, 1);
 }
-*/
 
 #[test]
 fn multi_threadpool() {

@@ -106,7 +106,7 @@ impl Builder {
                 around_worker: None,
                 after_start: None,
                 before_stop: None,
-                catch_panics: true,
+                catch_panics: None,
             },
             new_park,
         }
@@ -200,10 +200,32 @@ impl Builder {
         self
     }
 
-    /// Sets whether Tokio should catch panics (and print them to stderr) from
-    /// tasks. The default value is `false`.
-    pub fn catch_panics(&mut self, val: bool) -> &mut Self {
-        self.config.catch_panics = val;
+    /// Sets a callback to be triggered when a panic during a future bubbles up
+    /// to Tokio. By default Tokio catches these panics, and they will be
+    /// ignored. The parameter passed to this callback is the same error value
+    /// returned from std::panic::catch_unwind(). To crash on panics, use
+    /// std::panic::resume_unwind() in this callback.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio_threadpool;
+    /// # extern crate futures;
+    /// # use tokio_threadpool::Builder;
+    ///
+    /// # pub fn main() {
+    /// let thread_pool = Builder::new()
+    ///     .catch_panics(|err| {
+    ///         std::panic::resume_unwind(err)
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn catch_panics<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(Box<dyn std::any::Any + Send>) + Send + Sync + 'static,
+    {
+        self.config.catch_panics = Some(Arc::new(f));
         self
     }
 
