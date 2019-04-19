@@ -6,6 +6,7 @@ use shutdown::ShutdownTrigger;
 use thread_pool::ThreadPool;
 use worker::{self, Worker, WorkerId};
 
+use std::any::Any;
 use std::cmp::max;
 use std::error::Error;
 use std::fmt;
@@ -222,7 +223,7 @@ impl Builder {
     /// ```
     pub fn catch_panics<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(Box<dyn std::any::Any + Send>) + Send + Sync + 'static,
+        F: Fn(Box<Any + Send>) + Send + Sync + 'static,
     {
         self.config.catch_panics = Some(Arc::new(f));
         self
