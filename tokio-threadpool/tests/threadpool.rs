@@ -400,11 +400,11 @@ fn panic_in_task() {
 }
 
 #[test]
-fn count_catch_panics() {
+fn count_panics() {
     let counter = Arc::new(AtomicUsize::new(0));
     let counter_ = counter.clone();
     let pool = tokio_threadpool::Builder::new()
-        .catch_panics(move |_err| {
+        .panic_handler(move |_err| {
             // We caught a panic.
             counter_.fetch_add(1, Relaxed);
         })

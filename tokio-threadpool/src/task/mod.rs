@@ -166,7 +166,7 @@ impl Task {
                 self.state.store(State::Complete.into(), Release);
 
                 if let Err(panic_err) = res {
-                    if let Some(ref f) = unpark.pool.config.catch_panics {
+                    if let Some(ref f) = unpark.pool.config.panic_handler {
                         f(panic_err);
                     }
                 }

@@ -107,7 +107,7 @@ impl Builder {
                 around_worker: None,
                 after_start: None,
                 before_stop: None,
-                catch_panics: None,
+                panic_handler: None,
             },
             new_park,
         }
@@ -217,15 +217,15 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let thread_pool = Builder::new()
-    ///     .catch_panics(|err| std::panic::resume_unwind(err))
+    ///     .panic_handler(|err| std::panic::resume_unwind(err))
     ///     .build();
     /// # }
     /// ```
-    pub fn catch_panics<F>(&mut self, f: F) -> &mut Self
+    pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(Box<Any + Send>) + Send + Sync + 'static,
     {
-        self.config.catch_panics = Some(Arc::new(f));
+        self.config.panic_handler = Some(Arc::new(f));
         self
     }
 
