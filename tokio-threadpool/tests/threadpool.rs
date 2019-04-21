@@ -400,6 +400,23 @@ fn panic_in_task() {
 }
 
 #[test]
+fn count_panics() {
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_ = counter.clone();
+    let pool = tokio_threadpool::Builder::new()
+        .panic_handler(move |_err| {
+            // We caught a panic.
+            counter_.fetch_add(1, Relaxed);
+        })
+        .build();
+    // Spawn a future that will panic.
+    pool.spawn(lazy(|| -> Result<(), ()> { panic!() }));
+    pool.shutdown_on_idle().wait().unwrap();
+    let counter = counter.load(Relaxed);
+    assert_eq!(counter, 1);
+}
+
+#[test]
 fn multi_threadpool() {
     use futures::sync::oneshot;
 
