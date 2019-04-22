@@ -4,7 +4,7 @@
 //!
 //! A thread of execution is said to _enter_ a span when it begins executing,
 //! and _exit_ the span when it switches to another context. Spans may be
-//! entered through the [`enter`](`Span::enter`) method, which enters the target span,
+//! entered through the [`enter`] method, which enters the target span,
 //! performs a given function (either a closure or a function pointer), exits
 //! the span, and then returns the result.
 //!
@@ -68,11 +68,10 @@
 //! Because spans may be entered and exited multiple times before they close,
 //! [`Subscriber`]s have separate trait methods which are called to notify them
 //! of span exits and when span handles are dropped. When execution exits a
-//! span, [`exit`](::Subscriber::exit) will always be called with that span's ID
-//! to notify the subscriber that the span has been exited. When span handles
-//! are dropped, the [`drop_span`](::Subscriber::drop_span) method is called
-//! with that span's ID. The subscriber may use this to determine whether or not
-//! the span will be entered again.
+//! span, [`exit`] will always be called with that span's ID to notify the
+//! subscriber that the span has been exited. When span handles are dropped, the
+//! [`drop_span`] method is called with that span's ID. The subscriber may use
+//! this to determine whether or not the span will be entered again.
 //!
 //! If there is only a single handle with the capacity to exit a span, dropping
 //! that handle "close" the span, since the capacity to enter it no longer
@@ -87,34 +86,20 @@
 //!     }); // --> Subscriber::exit(my_span)
 //!
 //!     // The handle to `my_span` only lives inside of this block; when it is
-//!     // dropped, the subscriber will be informed that `my_span` has closed.
+//!     // dropped, the subscriber will be informed via `drop_span`.
 //!
-//! } // --> Subscriber::close(my_span)
+//! } // --> Subscriber::drop_span(my_span)
 //! # }
 //! ```
 //!
-//! A span may be explicitly closed by dropping a handle to it, if it is the only
-//! handle to that span.
-//! time it is exited. For example:
-//! ```
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! use tokio_trace::Span;
-//!
-//! let my_span = span!(Level::TRACE, "my_span");
-//! // Drop the handle to the span.
-//! drop(my_span); // --> Subscriber::drop_span(my_span)
-//! # }
-//! ```
 //! However, if multiple handles exist, the span can still be re-entered even if
 //! one or more is dropped. For determining when _all_ handles to a span have
-//! been dropped, `Subscriber`s have a [`clone_span`](::Subscriber::clone_span)
-//! method, which is called every time a span handle is cloned. Combined with
-//! `drop_span`, this may be used to track the number of handles to a given span
-//! — if `drop_span` has been called one more time than the number of calls to
-//! `clone_span` for a given ID, then no more handles to the span with that ID
-//! exist. The subscriber may then treat it as closed.
+//! been dropped, `Subscriber`s have a [`clone_span`]  method, which is called
+//! every time a span handle is cloned. Combined with `drop_span`, this may be
+//! used to track the number of handles to a given span — if `drop_span` has
+//! been called one more time than the number of calls to `clone_span` for a
+//! given ID, then no more handles to the span with that ID exist. The
+//! subscriber may then treat it as closed.
 //!
 //! # Accessing a Span's Attributes
 //!
@@ -125,7 +110,12 @@
 //! to the [`Subscriber`] when the span is created; it may then choose to cache
 //! the data for future use, record it in some manner, or discard it completely.
 //!
-//! [`Subscriber`]: ::Subscriber
+//! [`clone_span`]: ../subscriber/trait.Subscriber.html#method.clone_span
+//! [`drop_span`]: ../subscriber/trait.Subscriber.html#method.drop_span
+//! [`exit`]: ../subscriber/trait.Subscriber.html#tymethod.exit
+//! [`Subscriber`]: ../subscriber/trait.Subscriber.html
+//! [`Attributes`]: struct.Attributes.html
+//! [`enter`]: struct.Span.html#method.enter
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
@@ -136,6 +126,8 @@ use {dispatcher::Dispatch, field, Metadata};
 
 /// Trait implemented by types which have a span `Id`.
 pub trait AsId: ::sealed::Sealed {
+    /// Returns the `Id` of the span that `self` corresponds to, or `None` if
+    /// this corresponds to a disabled span.
     fn as_id(&self) -> Option<&Id>;
 }
 
@@ -188,8 +180,8 @@ struct Entered<'a> {
 // ===== impl Span =====
 
 impl Span {
-    /// Constructs a new `Span` with the given [metadata] and set of [field
-    /// values].
+    /// Constructs a new `Span` with the given [metadata] and set of
+    /// [field values].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
     /// with the current span as its parent (if one exists).
@@ -197,10 +189,10 @@ impl Span {
     /// After the span is constructed, [field values] and/or [`follows_from`]
     /// annotations may be added to it.
     ///
-    /// [metadata]: ::metadata::Metadata
-    /// [`Subscriber`]: ::subscriber::Subscriber
-    /// [field values]: ::field::ValueSet
-    /// [`follows_from`]: ::span::Span::follows_from
+    /// [metadata]: ../metadata
+    /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+    /// [field values]: ../field/struct.ValueSet.html
+    /// [`follows_from`]: ../struct.Span.html#method.follows_from
     #[inline]
     pub fn new(meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span {
         let new_span = Attributes::new(meta, values);
@@ -213,9 +205,9 @@ impl Span {
     /// After the span is constructed, [field values] and/or [`follows_from`]
     /// annotations may be added to it.
     ///
-    /// [metadata]: ::metadata::Metadata
-    /// [field values]: ::field::ValueSet
-    /// [`follows_from`]: ::span::Span::follows_from
+    /// [metadata]: ../metadata
+    /// [field values]: ../field/struct.ValueSet.html
+    /// [`follows_from`]: ../struct.Span.html#method.follows_from
     #[inline]
     pub fn new_root(meta: &'static Metadata<'static>, values: &field::ValueSet) -> Span {
         Self::make(meta, Attributes::new_root(meta, values))
@@ -227,9 +219,9 @@ impl Span {
     /// After the span is constructed, [field values] and/or [`follows_from`]
     /// annotations may be added to it.
     ///
-    /// [metadata]: ::metadata::Metadata
-    /// [field values]: ::field::ValueSet
-    /// [`follows_from`]: ::span::Span::follows_from
+    /// [metadata]: ../metadata
+    /// [field values]: ../field/struct.ValueSet.html
+    /// [`follows_from`]: ../struct.Span.html#method.follows_from
     pub fn child_of<I>(
         parent: I,
         meta: &'static Metadata<'static>,
@@ -278,8 +270,8 @@ impl Span {
         result
     }
 
-    /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
-    /// one exists,
+    /// Returns a [`Field`](../field/struct.Field.html) for the field with the
+    /// given `name`, if one exists,
     pub fn field<Q: ?Sized>(&self, field: &Q) -> Option<field::Field>
     where
         Q: field::AsField,
@@ -288,7 +280,7 @@ impl Span {
     }
 
     /// Returns true if this `Span` has a field for the given
-    /// [`Field`](::field::Field) or field name.
+    /// [`Field`](../field/struct.Field.html) or field name.
     #[inline]
     pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
@@ -450,7 +442,7 @@ impl Inner {
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
     #[inline]
-    fn enter<'a>(&'a self) -> Entered<'a> {
+    fn enter(&self) -> Entered {
         self.subscriber.enter(&self.id);
         Entered { inner: self }
     }

@@ -8,9 +8,9 @@ pub use tokio_trace_core::subscriber::*;
 /// executing, new spans or events are dispatched to the subscriber that
 /// tagged that span, instead.
 ///
-/// [`Span`]: ::span::Span
-/// [`Subscriber`]: ::Subscriber
-/// [`Event`]: ::Event
+/// [`Span`]: ../span/struct.Span.html
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+/// [`Event`]: :../event/struct.Event.html
 pub fn with_default<T, S>(subscriber: S, f: impl FnOnce() -> T) -> T
 where
     S: Subscriber + Send + Sync + 'static,

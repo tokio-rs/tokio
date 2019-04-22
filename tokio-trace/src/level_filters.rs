@@ -1,15 +1,59 @@
+//! Trace verbosity level filtering.
+//!
+//! # Compile time filters
+//!
+//! Trace verbosity levels can be statically disabled at compile time via Cargo
+//! features, similar to the [`log` crate]. Trace instrumentation at disabled
+//! levels will be skipped and will not even be present in the resulting binary
+//! unless the verbosity level is specified dynamically. This level is
+//! configured separately for release and debug builds. The features are:
+//!
+//! * `max_level_off`
+//! * `max_level_error`
+//! * `max_level_warn`
+//! * `max_level_info`
+//! * `max_level_debug`
+//! * `max_level_trace`
+//! * `release_max_level_off`
+//! * `release_max_level_error`
+//! * `release_max_level_warn`
+//! * `release_max_level_info`
+//! * `release_max_level_debug`
+//! * `release_max_level_trace`
+//!
+//! These features control the value of the `STATIC_MAX_LEVEL` constant. The
+//! instrumentation macros macros check this value before recording an event or
+//! constructing a span. By default, no levels are disabled.
+//!
+//! For example, a crate can disable trace level instrumentation in debug builds
+//! and trace, debug, and info level instrumentation in release builds with the
+//! following configuration:
+//!
+//! ```toml
+//! [dependencies]
+//! tokio-trace = { version = "0.1", features = ["max_level_debug", "release_max_level_warn"] }
+//! ```
+//!
+//! [`log` crate]: https://docs.rs/log/0.4.6/log/#compile-time-filters
 use std::cmp::Ordering;
 use tokio_trace_core::Level;
 
-/// `LevelFilter` is used to statistically filter the logging messages based on its `Level`.
-/// Logging messages will be discarded if its `Level` is greater than `LevelFilter`.
+/// A filter comparable to trace verbosity `Level`.
+///
+/// If a `Level` is considered less than a `LevelFilter`, it should be
+/// considered disabled; if greater than or equal to the `LevelFilter`, that
+/// level is enabled.
+///
+/// Note that this is essentially identical to the `Level` type, but with the
+/// addition of an `OFF` level that completely disables all trace
+/// instrumentation.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LevelFilter(Option<Level>);
 
 impl LevelFilter {
     /// The "off" level.
     ///
-    /// Designates that logging should be to turned off.
+    /// Designates that trace instrumentation should be completely disabled.
     pub const OFF: LevelFilter = LevelFilter(None);
     /// The "error" level.
     ///
@@ -51,12 +95,17 @@ impl PartialOrd<LevelFilter> for Level {
     }
 }
 
-/// The statically resolved maximum trace level.
+/// The statically configured maximum trace level.
 ///
-/// See the crate level documentation for information on how to configure this.
+/// See the [module-level documentation] for information on how to configure
+/// this.
 ///
-/// This value is checked by the `event` macro. Code that manually calls functions on that value
-/// should compare the level against this value.
+/// This value is checked by the `event!` and `span!` macros. Code that
+/// manually constructs events or spans via the `Event::record` function or
+/// `Span` constructors should compare the level against this value to
+/// determine if those spans or events are enabled.
+///
+/// [module-level documentation]: ../index.html#compile-time-filters
 pub const STATIC_MAX_LEVEL: LevelFilter = MAX_LEVEL;
 
 cfg_if! {
