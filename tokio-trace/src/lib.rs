@@ -1,3 +1,4 @@
+#![doc(html_root_url = "https://docs.rs/tokio-trace/0.1.0")]
 //! A scoped, structured logging and diagnostics system.
 //!
 //! # Overview
@@ -139,7 +140,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+//! tokio-trace = "0.1"
 //! ```
 //!
 //! Next, add this to your crate:
