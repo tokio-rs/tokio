@@ -8,12 +8,12 @@ name = "tokio-buf"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-buf/0.1.0/tokio_buf"
+documentation = "https://docs.rs/tokio-buf/0.1.1/tokio_buf"
 description = """
 Asynchronous stream of byte buffers
 """

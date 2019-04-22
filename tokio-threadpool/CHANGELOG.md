@@ -1,3 +1,8 @@
+# 0.1.14 (April 22, 2019)
+
+### Added
+- Add `panic_handler` for customizing action taken on panic (#1052).
+
 # 0.1.13 (March 22, 2019)
 
 ### Added

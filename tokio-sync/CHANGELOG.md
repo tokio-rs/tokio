@@ -1,3 +1,8 @@
+# 0.1.5 (April 22, 2019)
+
+### Added
+- Add asynchronous mutual exclusion primitive (#964).
+
 # 0.1.4 (March 13, 2019)
 
 ### Fixed

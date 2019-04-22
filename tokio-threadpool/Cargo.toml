@@ -7,8 +7,8 @@ name = "tokio-threadpool"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.13"
-documentation = "https://docs.rs/tokio-threadpool/0.1.13/tokio_threadpool"
+version = "0.1.14"
+documentation = "https://docs.rs/tokio-threadpool/0.1.14/tokio_threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
