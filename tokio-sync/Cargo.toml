@@ -7,12 +7,12 @@ name = "tokio-sync"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-sync/0.1.4/tokio_sync"
+documentation = "https://docs.rs/tokio-sync/0.1.5/tokio_sync"
 description = """
 Synchronization utilities.
 """
