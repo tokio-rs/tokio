@@ -1,3 +1,6 @@
+#![doc(html_root_url = "https://docs.rs/tokio-trace/0.1.0")]
+#![deny(missing_debug_implementations, missing_docs, unreachable_pub)]
+#![cfg_attr(test, deny(warnings))]
 //! A scoped, structured logging and diagnostics system.
 //!
 //! # Overview
@@ -32,6 +35,20 @@
 //! another context. The span in which a thread is currently executing is
 //! referred to as the _current_ span.
 //!
+//! For example:
+//! ```
+//! #[macro_use]
+//! extern crate tokio_trace;
+//!
+//! use tokio_trace::Level;
+//!
+//! # fn main() {
+//! span!(Level::TRACE, "my_span").enter(|| {
+//!     // perform some work in the context of `my_span`...
+//! });
+//! # }
+//!```
+//!
 //! Spans form a tree structure — unless it is a root span, all spans have a
 //! _parent_, and may have one or more _children_. When a new span is created,
 //! the current span becomes the new span's parent. The total execution time of
@@ -39,10 +56,43 @@
 //! represented by its children. Thus, a parent span always lasts for at least
 //! as long as the longest-executing span in its subtree.
 //!
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! // this span is considered the "root" of a new trace tree:
+//! span!(Level::INFO, "root").enter(|| {
+//!     // since we are now inside "root", this span is considered a child
+//!     // of "root":
+//!     span!(Level::DEBUG, "outer_child").enter(|| {
+//!         // this span is a child of "outer_child", which is in turn a
+//!         // child of "root":
+//!         span!(Level::TRACE, "inner_child").enter(|| {
+//!             // and so on...
+//!         });
+//!     });
+//! });
+//! # }
+//!```
+//!
 //! In addition, data may be associated with spans. A span may have _fields_ —
 //! a set of key-value pairs describing the state of the program during that
 //! span; an optional name, and metadata describing the source code location
 //! where the span was originally entered.
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! // construct a new span with three fields:
+//! //  - "foo", with a value of 42,
+//! //  - "bar", with the value "false"
+//! //  - "baz", with no initial value
+//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false, baz);
+//!
+//! // record a value for the field "baz" declared above:
+//! my_span.record("baz", &"hello world");
+//! # }
+//!```
 //!
 //! ### When to use spans
 //!
@@ -95,9 +145,22 @@
 //! records emitted by unstructured logging code, but unlike a typical log line,
 //! an `Event` may occur within the context of a `Span`. Like a `Span`, it
 //! may have fields, and implicitly inherits any of the fields present on its
-//! parent span, and it may be linked with one or more additional
-//! spans that are not its parent; in this case, the event is said to _follow
-//! from_ those spans.
+//! parent span.
+//!
+//! For example:
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! // records an event outside of any span context:
+//! event!(Level::INFO, "something happened");
+//!
+//! span!(Level::INFO, "my_span").enter(|| {
+//!     // records an event within "my_span".
+//!     event!(Level::DEBUG, "something happened inside my_span");
+//! });
+//! # }
+//!```
 //!
 //! Essentially, `Event`s exist to bridge the gap between traditional
 //! unstructured logging and span-based tracing. Similar to log records, they
@@ -139,7 +202,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+//! tokio-trace = "0.1"
 //! ```
 //!
 //! Next, add this to your crate:
@@ -230,13 +293,13 @@
 //! You can find examples showing how to use this crate in the examples
 //! directory.
 //!
-//! ### In libraries
+//! ## In libraries
 //!
 //! Libraries should link only to the `tokio-trace` crate, and use the provided
 //! macros to record whatever information will be useful to downstream
 //! consumers.
 //!
-//! ### In executables
+//! ## In executables
 //!
 //! In order to record trace events, executables have to use a `Subscriber`
 //! implementation compatible with `tokio-trace`. A `Subscriber` implements a
@@ -264,6 +327,7 @@
 //! #   fn new() -> Self { FooSubscriber }
 //! # }
 //! # fn main() {
+//!
 //! let my_subscriber = FooSubscriber::new();
 //!
 //! tokio_trace::subscriber::with_default(my_subscriber, || {
@@ -299,6 +363,21 @@
 //!   trace tree. This is useful when a project using `tokio-trace` have
 //!   dependencies which use `log`.
 //!
+//!
+//! ##  Crate Feature Flags
+//!
+//! The following crate feature flags are available:
+//!
+//! * A set of features controlling the [static verbosity level].
+//! * `log` causes trace instrumentation points to emit [`log`] records as well
+//!   as trace events. This is inteded for use in libraries whose users may be
+//!   using either `tokio-trace` or `log`.
+//!
+//! ```toml
+//! [dependencies]
+//! tokio-trace = { version = "0.1", features = ["log"] }
+//! ```
+//!
 //! [`log`]: https://docs.rs/log/0.4.6/log/
 //! [`Span`]: span/struct.Span
 //! [`Event`]: struct.Event.html
@@ -312,6 +391,7 @@
 //! [`tokio-trace-futures`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-futures
 //! [`tokio-trace-fmt`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-fmt
 //! [`tokio-trace-log`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-log
+//! [static verbosity level]: level_filters/index.html#compile-time-filters
 #[macro_use]
 extern crate cfg_if;
 extern crate tokio_trace_core;

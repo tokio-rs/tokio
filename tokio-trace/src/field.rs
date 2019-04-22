@@ -10,6 +10,8 @@ use Metadata;
 /// Indexing a field with a string results in an iterative search that performs
 /// string comparisons. Thus, if possible, once the key for a field is known, it
 /// should be used whenever possible.
+///
+/// [`Field`]: ../struct.Field.html
 pub trait AsField: ::sealed::Sealed {
     /// Attempts to convert `&self` into a `Field` with the specified `metadata`.
     ///
