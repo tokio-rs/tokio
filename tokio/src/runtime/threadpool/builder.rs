@@ -5,6 +5,7 @@ use reactor::Reactor;
 use std::io;
 use std::sync::Mutex;
 use std::time::Duration;
+use std::any::Any;
 
 use num_cpus;
 use tokio_reactor;
@@ -126,7 +127,7 @@ impl Builder {
     where
         F: Fn(Box<Any + Send>) + Send + Sync + 'static,
     {
-        self.threadpool_builder.panic_handler(f)
+        self.threadpool_builder.panic_handler(f);
         self
     }
 
