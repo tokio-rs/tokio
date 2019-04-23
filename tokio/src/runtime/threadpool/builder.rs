@@ -105,7 +105,7 @@ impl Builder {
     /// Sets a callback to be triggered when a panic during a future bubbles up
     /// to Tokio. By default Tokio catches these panics, and they will be
     /// ignored. The parameter passed to this callback is the same error value
-    /// returned from std::panic::catch_unwind(). To abort the process on
+    /// returned from `std::panic::catch_unwind()`. To abort the process on
     /// panics, use std::panic::resume_unwind() in this callback as shown
     /// below.
     ///
