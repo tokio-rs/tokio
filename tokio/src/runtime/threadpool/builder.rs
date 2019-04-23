@@ -101,6 +101,36 @@ impl Builder {
         self
     }
 
+    /// Sets a callback to be triggered when a panic during a future bubbles up
+    /// to Tokio. By default Tokio catches these panics, and they will be
+    /// ignored. The parameter passed to this callback is the same error value
+    /// returned from std::panic::catch_unwind(). To abort the process on
+    /// panics, use std::panic::resume_unwind() in this callback as shown
+    /// below.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate tokio;
+    /// # extern crate futures;
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let mut rt = runtime::Builder::new()
+    ///     .panic_handler(|err| std::panic::resume_unwind(err))
+    ///     .build()
+    ///     .unwrap();
+    /// # }
+    /// ```
+    pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(Box<Any + Send>) + Send + Sync + 'static,
+    {
+        self.threadpool_builder.panic_handler(f)
+        self
+    }
+
+
     /// Set the maximum number of worker threads for the `Runtime`'s thread pool.
     ///
     /// This must be a number between 1 and 32,768 though it is advised to keep
