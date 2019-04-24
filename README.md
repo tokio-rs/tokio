@@ -139,6 +139,8 @@ The crates included as part of Tokio are:
 
 * [`tokio-io`]: Asynchronous I/O related traits and utilities.
 
+* [`tokio-macros`]: Macros for usage with Tokio.
+
 * [`tokio-reactor`]: Event loop that drives I/O resources (like TCP and UDP
   sockets).
 
@@ -160,6 +162,7 @@ The crates included as part of Tokio are:
 [`tokio-fs`]: tokio-fs
 [`tokio-futures`]: tokio-futures
 [`tokio-io`]: tokio-io
+[`tokio-macros`]: tokio-macros
 [`tokio-reactor`]: tokio-reactor
 [`tokio-tcp`]: tokio-tcp
 [`tokio-threadpool`]: tokio-threadpool
