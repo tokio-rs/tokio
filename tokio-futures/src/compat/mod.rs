@@ -6,14 +6,13 @@ pub mod forward;
 /// Convert a `std::future::Future` yielding `Result` into an 0.1 `Future`.
 pub fn into_01<T, Item, Error>(future: T) -> backward::Compat<T>
 where
-    T: std::future::Future<Output = Result<Item, Error>>
+    T: std::future::Future<Output = Result<Item, Error>>,
 {
     backward::Compat::new(future)
 }
 
 /// Convert a `std::future::Future` into an 0.1 `Future` with unit error.
-pub fn infallible_into_01<T>(future: T)
-    -> impl futures::Future<Item = T::Output, Error = ()>
+pub fn infallible_into_01<T>(future: T) -> impl futures::Future<Item = T::Output, Error = ()>
 where
     T: std::future::Future,
 {

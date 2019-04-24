@@ -76,9 +76,11 @@ unsafe fn clone_raw(_data: *const ()) -> RawWaker {
 unsafe fn drop_raw(_data: *const ()) {}
 
 unsafe fn wake(_data: *const ()) {
-    unimplemented!("async-await-preview currently only supports futures 0.1. Use \
-                   the compatibility layer of futures 0.3 instead, if you want \
-                   to use futures 0.3.");
+    unimplemented!(
+        "async-await-preview currently only supports futures 0.1. Use \
+         the compatibility layer of futures 0.3 instead, if you want \
+         to use futures 0.3."
+    );
 }
 
 const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone_raw, wake, wake, drop_raw);
