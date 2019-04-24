@@ -8,6 +8,11 @@ publish = false
 [lib]
 proc-macro = true
 
+[features]
+# This feature comes with no promise of stability. Things will
+# break with each patch release. Use at your own risk.
+async-await-preview = []
+
 [dependencies]
 proc-macro2 = "0.4.27"
 quote = "0.6.11"

@@ -146,6 +146,9 @@ if_runtime! {
 extern crate tokio_futures;
 
 #[cfg(feature = "async-await-preview")]
+extern crate tokio_macros;
+
+#[cfg(feature = "async-await-preview")]
 mod async_await;
 
 #[cfg(feature = "async-await-preview")]
@@ -153,3 +156,6 @@ pub use async_await::{run_async, spawn_async};
 
 #[cfg(feature = "async-await-preview")]
 pub use tokio_futures::await;
+
+#[cfg(feature = "async-await-preview")]
+pub use tokio_macros::{test, main};
