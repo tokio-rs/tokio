@@ -1,12 +1,12 @@
 [package]
 name = "tokio-fs"
-
 # When releasing to crates.io:
+# - Remove path dependencies
 # - Update html_root_url.
-# - Update CHANGELOG.md.
-# - Update doc URL.
+# - Update doc url
 #   - Cargo.toml
 #   - README.md
+# - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.6"
 authors = ["Carl Lerche <me@carllerche.com>"]

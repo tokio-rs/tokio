@@ -1,9 +1,13 @@
 [package]
 name = "tokio-tls"
 # When releasing to crates.io:
+# - Remove path dependencies
 # - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
 # - Update CHANGELOG.md.
-# - Create "tokio-tls-0.2.x" git tag.
+# - Create "v0.2.x" git tag.
 version = "0.2.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
