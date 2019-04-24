@@ -1,10 +1,12 @@
 [package]
 name = "tokio-signal"
-
 # When releasing to crates.io:
+# - Remove path dependencies
 # - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
 # - Update CHANGELOG.md.
-# - Update doc URL.
 # - Create "v0.2.x" git tag.
 version = "0.2.8"
 authors = ["Tokio Contributors <team@tokio.rs>"]
