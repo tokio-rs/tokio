@@ -1,0 +1,26 @@
+[package]
+name = "tokio-test"
+
+# When releasing to crates.io:
+# - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
+# - Update CHANGELOG.md.
+# - Create "v0.1.x" git tag.
+version = "0.1.0"
+authors = ["Tokio Contributors <team@tokio.rs>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-test/0.1.0/tokio_test"
+description = """
+Testing utilities for Tokio- and futures-based code
+"""
+categories = ["asynchronous", "testing"]
+publish = false
+
+[dependencies]
+futures = "0.1"
+tokio-timer = "0.2"
+tokio-executor = "0.1"

@@ -45,6 +45,7 @@ jobs:
       - tokio-sync
       - tokio-threadpool
       - tokio-timer
+      - tokio-test
       - tokio-trace
       - tokio-trace/tokio-trace-core
       - tokio-trace/test-log-support
