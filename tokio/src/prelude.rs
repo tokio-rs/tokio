@@ -21,7 +21,7 @@ pub use futures::{future, stream, task, Async, AsyncSink, Future, IntoFuture, Po
 
 #[cfg(feature = "async-await-preview")]
 #[doc(inline)]
-pub use tokio_async_await::{
+pub use tokio_futures::{
     io::{AsyncReadExt, AsyncWriteExt},
     sink::SinkExt,
     stream::StreamExt as StreamAsyncExt,

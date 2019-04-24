@@ -108,9 +108,6 @@ extern crate tokio_timer;
 #[cfg(feature = "udp")]
 extern crate tokio_udp;
 
-#[cfg(feature = "async-await-preview")]
-extern crate tokio_async_await;
-
 #[cfg(all(unix, feature = "uds"))]
 extern crate tokio_uds;
 
@@ -146,10 +143,13 @@ if_runtime! {
 // ===== Experimental async/await support =====
 
 #[cfg(feature = "async-await-preview")]
+extern crate tokio_futures;
+
+#[cfg(feature = "async-await-preview")]
 mod async_await;
 
 #[cfg(feature = "async-await-preview")]
 pub use async_await::{run_async, spawn_async};
 
 #[cfg(feature = "async-await-preview")]
-pub use tokio_async_await::await;
+pub use tokio_futures::await;
