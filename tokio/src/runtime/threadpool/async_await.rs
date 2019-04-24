@@ -8,11 +8,9 @@ impl Runtime {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        use crate::async_await::map_result;
-        use tokio_futures::compat::backward;
+        use tokio_futures::compat;
 
-        let future = backward::Compat::new(map_result(future));
-        match self.block_on(future) {
+        match self.block_on(compat::infallible_into_01(future)) {
             Ok(v) => v,
             Err(_) => unreachable!(),
         }
