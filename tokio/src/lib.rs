@@ -158,4 +158,4 @@ pub use async_await::{run_async, spawn_async};
 pub use tokio_futures::await;
 
 #[cfg(feature = "async-await-preview")]
-pub use tokio_macros::{test, main};
+pub use tokio_macros::{main, test};
