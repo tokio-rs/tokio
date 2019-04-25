@@ -13,7 +13,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(await_macro, async_await, futures_api)]
+    /// #![feature(await_macro, async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.

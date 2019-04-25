@@ -2,7 +2,7 @@
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 #![cfg_attr(
     feature = "async-await-preview",
-    feature(async_await, await_macro, futures_api,)
+    feature(async_await, await_macro)
 )]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.

@@ -25,7 +25,7 @@ Then, get started. In your application, add:
 
 ```rust
 // The nightly features that are commonly needed with async / await
-#![feature(await_macro, async_await, futures_api)]
+#![feature(await_macro, async_await)]
 
 // This pulls in the `tokio-futures` crate. While Rust 2018 doesn't require
 // `extern crate`, we need to pull in the macros.

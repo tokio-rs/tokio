@@ -25,7 +25,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro, futures_api)]
+    /// #![feature(async_await, await_macro)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -59,7 +59,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro, futures_api)]
+    /// #![feature(async_await, await_macro)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -78,7 +78,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// ## EOF is hit before `buf` is filled
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro, futures_api)]
+    /// #![feature(async_await, await_macro)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -110,7 +110,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro, futures_api)]
+    /// #![feature(async_await, await_macro)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -139,7 +139,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro, futures_api)]
+    /// #![feature(async_await, await_macro)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -163,7 +163,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro, futures_api)]
+    /// #![feature(async_await, await_macro)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.

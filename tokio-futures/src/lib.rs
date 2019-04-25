@@ -1,5 +1,5 @@
 #![cfg(feature = "async-await-preview")]
-#![feature(await_macro, futures_api)]
+#![feature(await_macro)]
 #![doc(html_root_url = "https://docs.rs/tokio-futures/0.1.0")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
