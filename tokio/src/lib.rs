@@ -1,9 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.19")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
-#![cfg_attr(
-    feature = "async-await-preview",
-    feature(async_await, await_macro)
-)]
+#![cfg_attr(feature = "async-await-preview", feature(async_await, await_macro))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
