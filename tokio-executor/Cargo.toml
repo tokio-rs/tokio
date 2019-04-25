@@ -1,12 +1,12 @@
 [package]
 name = "tokio-executor"
-
 # When releasing to crates.io:
+# - Remove path dependencies
 # - Update html_root_url.
-# - Update CHANGELOG.md.
-# - Update doc URL.
+# - Update doc url
 #   - Cargo.toml
 #   - README.md
+# - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.7"
 documentation = "https://docs.rs/tokio-executor/0.1.7/tokio_executor"

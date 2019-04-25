@@ -61,7 +61,7 @@ impl TcpListener {
     /// use tokio::net::TcpListener;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
     /// let listener = TcpListener::bind(&addr)?;
     /// # Ok(())
     /// # }
@@ -109,7 +109,7 @@ impl TcpListener {
     /// use futures::Async;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
     /// let mut listener = TcpListener::bind(&addr)?;
     /// match listener.poll_accept() {
     ///     Ok(Async::Ready((_socket, addr))) => println!("listener ready to accept: {:?}", addr),
@@ -167,7 +167,7 @@ impl TcpListener {
     /// use futures::Async;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
     /// let mut listener = TcpListener::bind(&addr)?;
     /// match listener.poll_accept_std() {
     ///     Ok(Async::Ready((_socket, addr))) => println!("listener ready to accept: {:?}", addr),
@@ -230,7 +230,7 @@ impl TcpListener {
     /// use tokio::reactor::Handle;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let std_listener = StdTcpListener::bind("127.0.0.1:8080")?;
+    /// let std_listener = StdTcpListener::bind("127.0.0.1:0")?;
     /// let listener = TcpListener::from_std(std_listener, &Handle::default())?;
     /// # Ok(())
     /// # }
@@ -296,7 +296,7 @@ impl TcpListener {
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
     /// let listener = TcpListener::bind(&addr)?;
     ///
     /// listener.incoming()
@@ -326,7 +326,7 @@ impl TcpListener {
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
     /// let listener = TcpListener::bind(&addr)?;
     /// listener.set_ttl(100).expect("could not set TTL");
     /// assert_eq!(listener.ttl()?, 100);
@@ -350,7 +350,7 @@ impl TcpListener {
     /// use std::net::SocketAddr;
     ///
     /// # fn main() -> Result<(), Box<std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
     /// let listener = TcpListener::bind(&addr)?;
     /// listener.set_ttl(100).expect("could not set TTL");
     /// # Ok(())
