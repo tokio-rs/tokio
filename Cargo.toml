@@ -2,13 +2,14 @@
 
 members = [
   "tokio",
-  "tokio-async-await",
   "tokio-buf",
   "tokio-codec",
   "tokio-current-thread",
   "tokio-executor",
   "tokio-fs",
+  "tokio-futures",
   "tokio-io",
+  "tokio-macros",
   "tokio-reactor",
   "tokio-signal",
   "tokio-sync",

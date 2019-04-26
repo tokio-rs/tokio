@@ -31,13 +31,13 @@ task:
     folder: $HOME/.cargo/registry
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --no-fail-fast
+    - cargo test --all
     - (cd tokio-trace/test-log-support && cargo test)
     - (cd tokio-trace/test_static_max_level_features && cargo test)
     - cargo doc --all
   i686_test_script:
     - . $HOME/.cargo/env
     - |
-      cargo test --all --exclude tokio-tls --no-fail-fast --target i686-unknown-freebsd
+      cargo test --all --exclude tokio-tls --exclude tokio-macros --target i686-unknown-freebsd
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index

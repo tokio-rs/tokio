@@ -1,9 +1,6 @@
-#![feature(await_macro, async_await, futures_api)]
+#![feature(await_macro, async_await)]
 
-#[macro_use]
-extern crate tokio;
-extern crate futures; // v0.1
-
+use tokio::await;
 use tokio::codec::{LinesCodec, Decoder};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
@@ -95,7 +92,8 @@ async fn process(stream: TcpStream, state: Arc<Mutex<Shared>>) -> io::Result<()>
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Create the shared state. This is how all the peers communicate.
     //
     // The server task will hold a handle to this. For every new client, the
@@ -113,23 +111,21 @@ fn main() {
     println!("server running on localhost:6142");
 
     // Start the Tokio runtime.
-    tokio::run_async(async move {
-        let mut incoming = listener.incoming();
+    let mut incoming = listener.incoming();
 
-        while let Some(stream) = await!(incoming.next()) {
-            let stream = match stream {
-                Ok(stream) => stream,
-                Err(_) => continue,
-            };
+    while let Some(stream) = await!(incoming.next()) {
+        let stream = match stream {
+            Ok(stream) => stream,
+            Err(_) => continue,
+        };
 
-            let state = state.clone();
+        let state = state.clone();
 
-            tokio::spawn_async(async move {
-                if let Err(_) = await!(process(stream, state)) {
-                    eprintln!("failed to process connection");
-                }
-            });
-        }
-    });
+        tokio::spawn_async(async move {
+            if let Err(_) = await!(process(stream, state)) {
+                eprintln!("failed to process connection");
+            }
+        });
+    }
 }
 

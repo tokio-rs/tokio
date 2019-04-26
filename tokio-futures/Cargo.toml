@@ -1,16 +1,16 @@
 [package]
-name = "tokio-async-await"
+name = "tokio-futures"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-version = "0.1.7"
+version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-async-await/0.1.7"
+documentation = "https://docs.rs/tokio-futures/0.1.0"
 description = """
-Experimental async/await support for Tokio
+Experimental std::future::Future and async/await support for Tokio
 """
 categories = ["asynchronous"]
 
@@ -25,5 +25,5 @@ tokio-io = "0.1.7"
 
 [dev-dependencies]
 bytes = "0.4.9"
-tokio = "0.1.8"
 hyper = "0.12.8"
+tokio = { version = "0.1.8", path = "../tokio" }

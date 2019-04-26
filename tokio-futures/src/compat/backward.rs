@@ -1,3 +1,5 @@
+//! Converts a `std::future::Future` into an 0.1 `Future.
+
 use futures::{Future, Poll};
 
 use std::future::Future as StdFuture;
@@ -5,18 +7,18 @@ use std::pin::Pin;
 use std::ptr;
 use std::task::{Context, Poll as StdPoll, RawWaker, RawWakerVTable, Waker};
 
-/// Convert an 0.3 `Future` to an 0.1 `Future`.
+/// Converts a `std::future::Future` into an 0.1 `Future.
 #[derive(Debug)]
 pub struct Compat<T>(Pin<Box<T>>);
 
 impl<T> Compat<T> {
     /// Create a new `Compat` backed by `future`.
-    pub fn new(future: T) -> Compat<T> {
+    pub(crate) fn new(future: T) -> Compat<T> {
         Compat(Box::pin(future))
     }
 }
 
-/// Convert a value into one that can be used with `await!`.
+#[doc(hidden)]
 pub trait IntoAwaitable {
     type Awaitable;
 
@@ -74,7 +76,11 @@ unsafe fn clone_raw(_data: *const ()) -> RawWaker {
 unsafe fn drop_raw(_data: *const ()) {}
 
 unsafe fn wake(_data: *const ()) {
-    unimplemented!("async-await-preview currently only supports futures 0.1. Use the compatibility layer of futures 0.3 instead, if you want to use futures 0.3.");
+    unimplemented!(
+        "async-await-preview currently only supports futures 0.1. Use \
+         the compatibility layer of futures 0.3 instead, if you want \
+         to use futures 0.3."
+    );
 }
 
 const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone_raw, wake, wake, drop_raw);

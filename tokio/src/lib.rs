@@ -1,9 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.19")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
-#![cfg_attr(
-    feature = "async-await-preview",
-    feature(async_await, await_macro, futures_api,)
-)]
+#![cfg_attr(feature = "async-await-preview", feature(async_await, await_macro))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -108,9 +105,6 @@ extern crate tokio_timer;
 #[cfg(feature = "udp")]
 extern crate tokio_udp;
 
-#[cfg(feature = "async-await-preview")]
-extern crate tokio_async_await;
-
 #[cfg(all(unix, feature = "uds"))]
 extern crate tokio_uds;
 
@@ -146,10 +140,19 @@ if_runtime! {
 // ===== Experimental async/await support =====
 
 #[cfg(feature = "async-await-preview")]
+extern crate tokio_futures;
+
+#[cfg(feature = "async-await-preview")]
+extern crate tokio_macros;
+
+#[cfg(feature = "async-await-preview")]
 mod async_await;
 
 #[cfg(feature = "async-await-preview")]
 pub use async_await::{run_async, spawn_async};
 
 #[cfg(feature = "async-await-preview")]
-pub use tokio_async_await::await;
+pub use tokio_futures::await;
+
+#[cfg(feature = "async-await-preview")]
+pub use tokio_macros::{main, test};

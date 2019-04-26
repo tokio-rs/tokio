@@ -1,6 +1,6 @@
 #![cfg(feature = "async-await-preview")]
-#![feature(rust_2018_preview, async_await, await_macro, futures_api)]
-#![doc(html_root_url = "https://docs.rs/tokio-async-await/0.1.7")]
+#![feature(await_macro)]
+#![doc(html_root_url = "https://docs.rs/tokio-futures/0.1.0")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
 

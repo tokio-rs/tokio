@@ -76,7 +76,7 @@ jobs:
   parameters:
     name: async_await
     displayName: Async / Await
-    rust: nightly-2019-04-22
+    rust: nightly-2019-04-25
     noDefaultFeatures: ''
     benches: true
     crates:

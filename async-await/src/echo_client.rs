@@ -1,8 +1,6 @@
-#![feature(await_macro, async_await, futures_api)]
+#![feature(await_macro, async_await)]
 
-#[macro_use]
-extern crate tokio;
-
+use tokio::await;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 
@@ -36,7 +34,8 @@ async fn run_client(addr: &SocketAddr) -> io::Result<()> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     use std::env;
 
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
@@ -44,10 +43,8 @@ fn main() {
 
     // Connect to the echo serveer
 
-    tokio::run_async(async move {
-        match await!(run_client(&addr)) {
-            Ok(_) => println!("done."),
-            Err(e) => eprintln!("echo client failed; error = {:?}", e),
-        }
-    });
+    match await!(run_client(&addr)) {
+        Ok(_) => println!("done."),
+        Err(e) => eprintln!("echo client failed; error = {:?}", e),
+    }
 }

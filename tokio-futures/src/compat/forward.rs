@@ -1,10 +1,12 @@
+//! Converts an 0.1 `Future` into a `std::future::Future`.
+//!
 use futures::{Async, Future};
 
 use std::future::Future as StdFuture;
 use std::pin::Pin;
 use std::task::{Context, Poll as StdPoll};
 
-/// Converts an 0.1 `Future` into an 0.3 `Future`.
+/// Converts an 0.1 `Future` into a `std::future::Future`.
 #[derive(Debug)]
 pub struct Compat<T>(T);
 
@@ -31,7 +33,7 @@ pub(crate) fn convert_poll_stream<T, E>(
     }
 }
 
-/// Convert a value into one that can be used with `await!`.
+#[doc(hidden)]
 pub trait IntoAwaitable {
     type Awaitable;
 

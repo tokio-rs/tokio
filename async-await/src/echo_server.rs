@@ -1,8 +1,6 @@
-#![feature(await_macro, async_await, futures_api)]
+#![feature(await_macro, async_await)]
 
-#[macro_use]
-extern crate tokio;
-
+use tokio::await;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
@@ -24,7 +22,8 @@ fn handle(mut stream: TcpStream) {
     });
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     use std::env;
 
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
@@ -34,12 +33,10 @@ fn main() {
     let listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
-    tokio::run_async(async {
-        let mut incoming = listener.incoming();
+    let mut incoming = listener.incoming();
 
-        while let Some(stream) = await!(incoming.next()) {
-            let stream = stream.unwrap();
-            handle(stream);
-        }
-    });
+    while let Some(stream) = await!(incoming.next()) {
+        let stream = stream.unwrap();
+        handle(stream);
+    }
 }
