@@ -2,7 +2,7 @@ steps:
   - bash: |
       set -e
 
-      if git log --no-merges -1 --format='%s' | grep -q '[ci-release]'; then
+      if git log --no-merges -1 --format='%B' | grep -qF '[ci-release]'; then
         echo "##vso[task.setvariable variable=isRelease]true"
       fi
     failOnStderr: true
