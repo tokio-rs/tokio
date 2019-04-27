@@ -70,7 +70,7 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let result = quote! {
         #[test]
         fn #name() #ret {
-            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on_async(async { #body })
         }
     };
