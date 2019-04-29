@@ -72,7 +72,7 @@ jobs:
         - util
 
 # Check async / await
-- template: ci/azure-cargo-check.yml
+- template: ci/azure-test-check.yml
   parameters:
     name: async_await
     displayName: Async / Await
@@ -82,6 +82,15 @@ jobs:
     crates:
       tokio:
         - async-await-preview
+
+# Run async-await tests
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_async_await
+    displayName: Test Async / Await
+    cross: false
+    crates:
+      - async-await
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
