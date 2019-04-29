@@ -74,7 +74,7 @@ jobs:
 # Run async-await tests
 - template: ci/azure-test-nightly.yml
   parameters:
-    name: test_async_await
+    name: test_nightly
     displayName: Test Async / Await
     rust: nightly-2019-04-25
 
@@ -108,7 +108,7 @@ jobs:
       - test_sub_cross
       - test_linux
       - features
-      - async_await
+      - test_nightly
       - cross_32bit_linux
       - minrust
       - tsan
