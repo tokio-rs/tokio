@@ -28,7 +28,7 @@ jobs:
         CI: 'True'
       displayName: cargo test -p ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-      condition: and(succeeded(), not(variables['isRelease']))
+      condition: and(succeeded(), ne(variables['isRelease'], 'true'))
 
   - template: azure-patch-crates.yml
 
