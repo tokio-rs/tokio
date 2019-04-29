@@ -8,7 +8,7 @@
 pub extern crate libc;
 extern crate mio;
 extern crate mio_uds;
-extern crate signal_hook;
+extern crate signal_hook_registry;
 
 use std::io::prelude::*;
 use std::io::{self, Error, ErrorKind};
@@ -153,7 +153,7 @@ fn action(slot: &SignalInfo, mut sender: &UnixStream) {
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
 fn signal_enable(signal: c_int) -> io::Result<()> {
-    if signal_hook::FORBIDDEN.contains(&signal) {
+    if signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
             format!("Refusing to register signal {}", signal),
@@ -168,7 +168,8 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     let mut registered = Ok(());
     siginfo.init.call_once(|| {
         registered = unsafe {
-            signal_hook::register(signal, move || action(siginfo, &globals.sender)).map(|_| ())
+            signal_hook_registry::register(signal, move || action(siginfo, &globals.sender))
+                .map(|_| ())
         };
         if registered.is_ok() {
             siginfo.initialized.store(true, Ordering::Relaxed);
