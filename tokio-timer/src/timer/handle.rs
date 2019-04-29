@@ -1,5 +1,5 @@
 use timer::Inner;
-use {Deadline, Delay, Error, Interval};
+use {Deadline, Delay, Error, Interval, Timeout};
 
 use tokio_executor::Enter;
 
@@ -139,9 +139,15 @@ impl Handle {
         }
     }
 
-    /// Create a `Deadline` driven by this handle's associated `Timer`.
+    #[doc(hidden)]
+    #[deprecated(since = "0.2.11", note = "use timeout instead")]
     pub fn deadline<T>(&self, future: T, deadline: Instant) -> Deadline<T> {
         Deadline::new_with_delay(future, self.delay(deadline))
+    }
+
+    /// Create a `Timeout` driven by this handle's associated `Timer`.
+    pub fn timeout<T>(&self, value: T, deadline: Instant) -> Timeout<T> {
+        Timeout::new_with_delay(value, self.delay(deadline))
     }
 
     /// Create a new `Interval` that starts at `at` and yields every `duration`
