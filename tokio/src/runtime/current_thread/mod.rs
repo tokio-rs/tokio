@@ -69,6 +69,9 @@
 mod builder;
 mod runtime;
 
+#[cfg(feature = "async-await-preview")]
+mod async_await;
+
 pub use self::builder::Builder;
 pub use self::runtime::{Runtime, Handle};
 pub use tokio_current_thread::spawn;
