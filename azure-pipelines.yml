@@ -72,7 +72,7 @@ jobs:
         - util
 
 # Check async / await
-- template: ci/azure-test-check.yml
+- template: ci/azure-cargo-check.yml
   parameters:
     name: async_await
     displayName: Async / Await
