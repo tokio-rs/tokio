@@ -118,7 +118,7 @@ fn hammer_cancel() {
                     let deadline = cmp::min(deadline1, deadline2);
 
                     let delay = handle.delay(deadline1);
-                    let join = handle.deadline(delay, deadline2);
+                    let join = handle.timeout(delay, deadline2);
 
                     exec.push({
                         join.and_then(move |_| {

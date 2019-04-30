@@ -126,7 +126,10 @@ impl<T> Timeout<T> {
     /// ```
     pub fn new(value: T, timeout: Duration) -> Timeout<T> {
         let delay = Delay::new_timeout(now() + timeout, timeout);
+        Timeout::new_with_delay(value, delay)
+    }
 
+    pub(crate) fn new_with_delay(value: T, delay: Delay) -> Timeout<T> {
         Timeout { value, delay }
     }
 
