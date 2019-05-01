@@ -4,9 +4,11 @@
 //!
 //! A thread of execution is said to _enter_ a span when it begins executing,
 //! and _exit_ the span when it switches to another context. Spans may be
-//! entered through the [`enter`] method, which enters the target span,
-//! performs a given function (either a closure or a function pointer), exits
-//! the span, and then returns the result.
+//! entered through the [`enter`] and [`enter_scoped`] methods.
+//!
+//! The `enter` method performs a given function (either a closure or a
+//! function pointer), exits the span, and then returns the result; while
+//! `enter_scoped` enters the span and returns a [guard] that will enxit
 //!
 //! Calling `enter` on a span handle enters the span that handle corresponds to,
 //! if the span exists:
@@ -28,6 +30,22 @@
 //! });
 //! # }
 //! ```
+//!
+//! Calling `enter_scoped` returns a guard that exits the span when dropped:
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! let my_var: u64 = 5;
+//! let my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
+//!
+//! // `my_span` exists but has not been entered.
+//!
+//! let _guard = my_span.enter_scoped();
+//!
+//! // Perform some work outside of the context of `my_span`...
+//! # }
+//!```
 //!
 //! # The Span Lifecycle
 //!
@@ -116,6 +134,8 @@
 //! [`Subscriber`]: ../subscriber/trait.Subscriber.html
 //! [`Attributes`]: struct.Attributes.html
 //! [`enter`]: struct.Span.html#method.enter
+//! [`enter_scoped`]: struct.Span.html#method.enter_scoped
+//! [`guard`]: struct.Entered.html
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
@@ -166,15 +186,15 @@ pub(crate) struct Inner {
 /// A guard representing a span which has been entered and is currently
 /// executing.
 ///
-/// This guard may be used to exit the span, returning an `Enter` to
-/// re-enter it.
+/// When the guard is dropped, the span will be exited.
 ///
-/// This type is primarily used for implementing span handles; users should
-/// typically not need to interact with it directly.
+/// This is returned by the [`Span::enter_scoped`] function.
+///
+/// [`Span::enter_scoped`]: ../struct.Span.html#method.enter_scoped
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
-struct Entered<'a> {
-    inner: &'a Inner,
+pub struct Entered<'a> {
+    span: &'a Span,
 }
 
 // ===== impl Span =====
@@ -263,11 +283,36 @@ impl Span {
     ///
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
+        let _enter = self.enter_scoped();
+        f()
+    }
+
+    /// Enters this span, returning a guard that will exit the span when dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[macro_use] extern crate tokio_trace;
+    /// # use tokio_trace::Level;
+    /// #
+    /// # fn main() {
+    /// let span = span!(Level::INFO, "my_span");
+    /// let guard = span.enter_scoped();
+    ///
+    /// // code here is within the span
+    ///
+    /// drop(guard);
+    ///
+    /// // code here is no longer within the span
+    ///
+    /// # }
+    /// ```
+    pub fn enter_scoped<'a>(&'a self) -> Entered<'a> {
+        if let Some(ref inner) = self.inner.as_ref() {
+            inner.subscriber.enter(&inner.id);
+        }
         self.log(format_args!("-> {}", self.meta.name));
-        let _enter = self.inner.as_ref().map(Inner::enter);
-        let result = f();
-        self.log(format_args!("<- {}", self.meta.name));
-        result
+        Entered { span: self }
     }
 
     /// Returns a [`Field`](../field/struct.Field.html) for the field with the
@@ -435,18 +480,6 @@ impl fmt::Debug for Span {
 // ===== impl Inner =====
 
 impl Inner {
-    /// Enters the span, returning a guard that may be used to exit the span and
-    /// re-enter the prior span.
-    ///
-    /// This is used internally to implement `Span::enter`. It may be used for
-    /// writing custom span handles, but should generally not be called directly
-    /// when entering a span.
-    #[inline]
-    fn enter(&self) -> Entered {
-        self.subscriber.enter(&self.id);
-        Entered { inner: self }
-    }
-
     /// Indicates that the span with the given ID has an indirect causal
     /// relationship with this span.
     ///
@@ -519,7 +552,10 @@ impl<'a> Drop for Entered<'a> {
         //
         // Running this behaviour on drop rather than with an explicit function
         // call means that spans may still be exited when unwinding.
-        self.inner.subscriber.exit(&self.inner.id);
+        if let Some(inner) = self.span.inner.as_ref() {
+            inner.subscriber.exit(&inner.id);
+        }
+        self.span.log(format_args!("<- {}", self.span.meta.name));
     }
 }
 

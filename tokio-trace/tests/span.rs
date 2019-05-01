@@ -255,6 +255,24 @@ fn span_closes_when_exited() {
 }
 
 #[test]
+fn enter_scoped() {
+    let (subscriber, handle) = subscriber::mock()
+        .enter(span::mock().named("foo"))
+        .event(event::mock())
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        let foo = span!(Level::TRACE, "foo");
+        let _guard = foo.enter_scoped();
+        debug!("dropping guard...");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
 fn moved_field() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(
