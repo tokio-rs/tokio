@@ -8,7 +8,8 @@
 //!
 //! The `enter` method performs a given function (either a closure or a
 //! function pointer), exits the span, and then returns the result; while
-//! `enter_scoped` enters the span and returns a [guard] that will enxit
+//! `enter_scoped` enters the span and returns a [guard] that will exit the
+//! span when dropped.
 //!
 //! Calling `enter` on a span handle enters the span that handle corresponds to,
 //! if the span exists:
