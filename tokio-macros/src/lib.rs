@@ -58,6 +58,7 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let ret = &input.decl.output;
     let name = &input.ident;
     let body = &input.block;
+    let attrs = &input.attrs;
 
     if input.asyncness.is_none() {
         let tokens = quote_spanned! { input.span() =>
@@ -69,6 +70,7 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let result = quote! {
         #[test]
+        #(#attrs)*
         fn #name() #ret {
             let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
             rt.block_on_async(async { #body })

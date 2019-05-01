@@ -37,7 +37,7 @@ tokio-codec = { path = "../tokio-codec" }
 tokio-current-thread = { path = "../tokio-current-thread" }
 tokio-executor = { path = "../tokio-executor" }
 tokio-fs = { path = "../tokio-fs" }
-# tokio-futures  = { path = "../" }
+tokio-futures  = { path = "../tokio-futures" }
 tokio-io = { path = "../tokio-io" }
 tokio-reactor = { path = "../tokio-reactor" }
 tokio-signal = { path = "../tokio-signal" }

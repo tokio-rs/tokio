@@ -71,17 +71,12 @@ jobs:
       tokio-buf:
         - util
 
-# Check async / await
-- template: ci/azure-cargo-check.yml
+# Run async-await tests
+- template: ci/azure-test-nightly.yml
   parameters:
-    name: async_await
-    displayName: Async / Await
+    name: test_nightly
+    displayName: Test Async / Await
     rust: nightly-2019-04-25
-    noDefaultFeatures: ''
-    benches: true
-    crates:
-      tokio:
-        - async-await-preview
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
@@ -113,7 +108,7 @@ jobs:
       - test_sub_cross
       - test_linux
       - features
-      - async_await
+      - test_nightly
       - cross_32bit_linux
       - minrust
       - tsan
