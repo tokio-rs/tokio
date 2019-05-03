@@ -4,15 +4,17 @@
 #[macro_export]
 macro_rules! assert_ready {
     ($e:expr) => {{
+        use $crate::codegen::futures::Async::Ready;
         match $e {
-            Ok(::futures::Async::Ready(v)) => v,
+            Ok(Ready(v)) => v,
             Ok(_) => panic!("not ready"),
             Err(e) => panic!("error = {:?}", e),
         }
     }};
     ($e:expr, $($msg:tt),+) => {{
+        use $crate::codegen::futures::Async::Ready;
         match $e {
-            Ok(::futures::Async::Ready(v)) => v,
+            Ok(Ready(v)) => v,
             Ok(_) => {
                 let msg = format_args!($($msg),+);
                 panic!("not ready; {}", msg)
@@ -29,16 +31,18 @@ macro_rules! assert_ready {
 #[macro_export]
 macro_rules! assert_not_ready {
     ($e:expr) => {{
+        use $crate::codegen::futures::Async::{Ready, NotReady};
         match $e {
-            Ok(::futures::Async::NotReady) => {}
-            Ok(::futures::Async::Ready(v)) => panic!("ready; value = {:?}", v),
+            Ok(NotReady) => {}
+            Ok(Ready(v)) => panic!("ready; value = {:?}", v),
             Err(e) => panic!("error = {:?}", e),
         }
     }};
     ($e:expr, $($msg:tt),+) => {{
+        use $crate::codegen::futures::Async::{Ready, NotReady};
         match $e {
-            Ok(::futures::Async::NotReady) => {}
-            Ok(::futures::Async::Ready(v)) => {
+            Ok(NotReady) => {}
+            Ok(Ready(v)) => {
                 let msg = format_args!($($msg),+);
                 panic!("ready; value = {:?}; {}", v, msg)
             }
@@ -54,15 +58,17 @@ macro_rules! assert_not_ready {
 #[macro_export]
 macro_rules! assert_ready_eq {
     ($e:expr, $expect:expr) => {
+        use $crate::codegen::futures::Async::Ready;
         match $e {
-            Ok(e) => assert_eq!(e, ::futures::Async::Ready($expect)),
+            Ok(e) => assert_eq!(e, Ready($expect)),
             Err(e) => panic!("error = {:?}", e),
         }
     };
 
     ($e:expr, $expect:expr, $($msg:tt),+) => {
+        use $crate::codegen::futures::Async::Ready;
         match $e {
-            Ok(e) => assert_eq!(e, ::futures::Async::Ready($expect), $($msg)+),
+            Ok(e) => assert_eq!(e, Ready($expect), $($msg)+),
             Err(e) => {
                 let msg = format_args!($($msg),+);
                 panic!("error = {:?}; {}", e, msg)
