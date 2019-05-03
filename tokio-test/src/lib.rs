@@ -25,6 +25,6 @@ pub mod task;
 #[doc(hidden)]
 pub mod codegen {
     pub mod futures {
-        pub use ::futures::*;
+        pub use futures::*;
     }
 }
