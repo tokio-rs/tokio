@@ -21,3 +21,10 @@ extern crate tokio_timer;
 pub mod clock;
 mod macros;
 pub mod task;
+
+#[doc(hidden)]
+pub mod codegen {
+    pub mod futures {
+        pub use futures::*;
+    }
+}
