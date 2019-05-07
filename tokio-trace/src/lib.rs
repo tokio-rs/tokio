@@ -43,8 +43,22 @@
 //! use tokio_trace::Level;
 //!
 //! # fn main() {
-//! span!(Level::TRACE, "my_span").in_scope(|| {
-//!     // perform some work in the context of `my_span`...
+//! let span = span!(Level::TRACE, "my_span");
+//! let _enter = span.enter();
+//! // perform some work in the context of `my_span`...
+//! # }
+//!```
+//!
+//! The [`in_scope`] method may be used to execute a closure inside a
+//! span:
+//!
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! # let span = span!(Level::TRACE, "my_span");
+//! span.in_scope(|| {
+//!     // perform some more work in the context of `my_span`...
 //! });
 //! # }
 //!```
@@ -143,12 +157,12 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! # let n = 1;
-//! span!(Level::TRACE, "my loop").in_scope(|| {
-//!     for i in 0..n {
-//!         # let _ = i;
-//!         // ...
-//!     }
-//! })
+//! let span = span!(Level::TRACE, "my_loop");
+//! let _enter = span.enter();
+//! for i in 0..n {
+//!     # let _ = i;
+//!     // ...
+//! }
 //! # }
 //! ```
 //! Or, should we create a new span for each iteration of the loop, as in:
@@ -158,10 +172,9 @@
 //! # fn main() {
 //! # let n = 1u64;
 //! for i in 0..n {
-//!     # let _ = i;
-//!     span!(Level::TRACE, "my loop", iteration = i).in_scope(|| {
-//!         // ...
-//!     })
+//!     let span = span!(Level::TRACE, "my_loop", iteration = i);
+//!     let _enter = span.enter();
+//!     // ...
 //! }
 //! # }
 //! ```
@@ -257,11 +270,14 @@
 //! # fn main() {
 //! // Construct a new span named "my span" with trace log level.
 //! let span = span!(Level::TRACE, "my span");
-//! span.in_scope(|| {
-//!     // Any trace events in this closure or code called by it will occur within
-//!     // the span.
-//! });
-//! // Dropping the span will close it, indicating that it has ended.
+//!
+//! // Enter the span, returning a guard object.
+//! let _enter = span.enter();
+//!
+//! // Any trace events that occur before the guard is dropped will occur
+//! // within the span.
+//!
+//! // Dropping the guard will exit the span.
 //! # }
 //! ```
 //!
@@ -295,32 +311,30 @@
 //! # fn find_a_razor() -> Result<u32, u32> { Ok(1) }
 //! # fn main() {
 //! pub fn shave_the_yak(yak: &mut Yak) {
-//!     // Create a new span for this invocation of `shave_the_yak`, annotated
-//!     // with  the yak being shaved as a *field* on the span.
-//!     span!(Level::TRACE, "shave_the_yak", yak = ?yak).in_scope(|| {
-//!         // Since the span is annotated with the yak, it is part of the context
-//!         // for everything happening inside the span. Therefore, we don't need
-//!         // to add it to the message for this event, as the `log` crate does.
-//!         info!(target: "yak_events", "Commencing yak shaving");
+//!     let span = span!(Level::TRACE, "shave_the_yak", yak = ?yak);
+//!     let _enter = span.enter();
 //!
-//!         loop {
-//!             match find_a_razor() {
-//!                 Ok(razor) => {
-//!                     // We can add the razor as a field rather than formatting it
-//!                     // as part of the message, allowing subscribers to consume it
-//!                     // in a more structured manner:
-//!                     info!({ razor = %razor }, "Razor located");
-//!                     yak.shave(razor);
-//!                     break;
-//!                 }
-//!                 Err(err) => {
-//!                     // However, we can also create events with formatted messages,
-//!                     // just as we would for log records.
-//!                     warn!("Unable to locate a razor: {}, retrying", err);
-//!                 }
+//!     // Since the span is annotated with the yak, it is part of the context
+//!     // for everything happening inside the span. Therefore, we don't need
+//!     // to add it to the message for this event, as the `log` crate does.
+//!     info!(target: "yak_events", "Commencing yak shaving");
+//!     loop {
+//!         match find_a_razor() {
+//!             Ok(razor) => {
+//!                 // We can add the razor as a field rather than formatting it
+//!                 // as part of the message, allowing subscribers to consume it
+//!                 // in a more structured manner:
+//!                 info!({ razor = %razor }, "Razor located");
+//!                 yak.shave(razor);
+//!                 break;
+//!             }
+//!             Err(err) => {
+//!                 // However, we can also create events with formatted messages,
+//!                 // just as we would for log records.
+//!                 warn!("Unable to locate a razor: {}, retrying", err);
 //!             }
 //!         }
-//!     })
+//!     }
 //! }
 //! # }
 //! ```
@@ -414,7 +428,8 @@
 //! ```
 //!
 //! [`log`]: https://docs.rs/log/0.4.6/log/
-//! [`Span`]: span/struct.Span
+//! [`Span`]: span/struct.Span.html
+//! [`in_scope`]: span/struct.Span.html#method.in_scope
 //! [`Event`]: struct.Event.html
 //! [`Subscriber`]: subscriber/trait.Subscriber.html
 //! [`observe_event`]: subscriber/trait.Subscriber.html#tymethod.observe_event
