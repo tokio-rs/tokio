@@ -43,7 +43,7 @@
 //! use tokio_trace::Level;
 //!
 //! # fn main() {
-//! span!(Level::TRACE, "my_span").enter(|| {
+//! span!(Level::TRACE, "my_span").in_scope(|| {
 //!     // perform some work in the context of `my_span`...
 //! });
 //! # }
@@ -61,13 +61,13 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! // this span is considered the "root" of a new trace tree:
-//! span!(Level::INFO, "root").enter(|| {
+//! span!(Level::INFO, "root").in_scope(|| {
 //!     // since we are now inside "root", this span is considered a child
 //!     // of "root":
-//!     span!(Level::DEBUG, "outer_child").enter(|| {
+//!     span!(Level::DEBUG, "outer_child").in_scope(|| {
 //!         // this span is a child of "outer_child", which is in turn a
 //!         // child of "root":
-//!         span!(Level::TRACE, "inner_child").enter(|| {
+//!         span!(Level::TRACE, "inner_child").in_scope(|| {
 //!             // and so on...
 //!         });
 //!     });
@@ -143,7 +143,7 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! # let n = 1;
-//! span!(Level::TRACE, "my loop").enter(|| {
+//! span!(Level::TRACE, "my loop").in_scope(|| {
 //!     for i in 0..n {
 //!         # let _ = i;
 //!         // ...
@@ -159,7 +159,7 @@
 //! # let n = 1u64;
 //! for i in 0..n {
 //!     # let _ = i;
-//!     span!(Level::TRACE, "my loop", iteration = i).enter(|| {
+//!     span!(Level::TRACE, "my loop", iteration = i).in_scope(|| {
 //!         // ...
 //!     })
 //! }
@@ -189,7 +189,7 @@
 //! // records an event outside of any span context:
 //! event!(Level::INFO, "something happened");
 //!
-//! span!(Level::INFO, "my_span").enter(|| {
+//! span!(Level::INFO, "my_span").in_scope(|| {
 //!     // records an event within "my_span".
 //!     event!(Level::DEBUG, "something happened inside my_span");
 //! });
@@ -257,7 +257,7 @@
 //! # fn main() {
 //! // Construct a new span named "my span" with trace log level.
 //! let span = span!(Level::TRACE, "my span");
-//! span.enter(|| {
+//! span.in_scope(|| {
 //!     // Any trace events in this closure or code called by it will occur within
 //!     // the span.
 //! });
@@ -297,7 +297,7 @@
 //! pub fn shave_the_yak(yak: &mut Yak) {
 //!     // Create a new span for this invocation of `shave_the_yak`, annotated
 //!     // with  the yak being shaved as a *field* on the span.
-//!     span!(Level::TRACE, "shave_the_yak", yak = ?yak).enter(|| {
+//!     span!(Level::TRACE, "shave_the_yak", yak = ?yak).in_scope(|| {
 //!         // Since the span is annotated with the yak, it is part of the context
 //!         // for everything happening inside the span. Therefore, we don't need
 //!         // to add it to the message for this event, as the `log` crate does.

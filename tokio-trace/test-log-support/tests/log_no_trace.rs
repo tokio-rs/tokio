@@ -44,7 +44,7 @@ fn test_always_log() {
 
     let mut foo = span!(Level::TRACE, "foo");
     last(&a, "foo;");
-    foo.enter(|| {
+    foo.in_scope(|| {
         last(&a, "-> foo");
 
         trace!({foo = 3, bar = 4}, "hello {};", "san francisco");

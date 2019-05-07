@@ -4,14 +4,14 @@
 //!
 //! A thread of execution is said to _enter_ a span when it begins executing,
 //! and _exit_ the span when it switches to another context. Spans may be
-//! entered through the [`enter`] and [`enter_scoped`] methods.
+//! entered through the [`enter`] and [`in_scope`] methods.
 //!
 //! The `enter` method performs a given function (either a closure or a
 //! function pointer), exits the span, and then returns the result; while
-//! `enter_scoped` enters the span and returns a [guard] that will exit the
+//! `enter` enters the span and returns a [guard] that will exit the
 //! span when dropped.
 //!
-//! Calling `enter` on a span handle enters the span that handle corresponds to,
+//! Calling `in_scope` on a span handle enters the span that handle corresponds to,
 //! if the span exists:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
@@ -20,19 +20,19 @@
 //! let my_var: u64 = 5;
 //! let my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
 //!
-//! my_span.enter(|| {
+//! my_span.in_scope(|| {
 //!     // perform some work in the context of `my_span`...
 //! });
 //!
 //! // Perform some work outside of the context of `my_span`...
 //!
-//! my_span.enter(|| {
+//! my_span.in_scope(|| {
 //!     // Perform some more work in the context of `my_span`.
 //! });
 //! # }
 //! ```
 //!
-//! Calling `enter_scoped` returns a guard that exits the span when dropped:
+//! Calling `enter` returns a guard that exits the span when dropped:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
 //! # use tokio_trace::Level;
@@ -42,7 +42,7 @@
 //!
 //! // `my_span` exists but has not been entered.
 //!
-//! let _guard = my_span.enter_scoped();
+//! let _guard = my_span.enter();
 //!
 //! // Perform some work outside of the context of `my_span`...
 //! # }
@@ -67,7 +67,7 @@
 //!     type Error = ();
 //!
 //!     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//!         self.span.enter(|| {
+//!         self.span.in_scope(|| {
 //!             // Do actual future work
 //! # Ok(Async::Ready(()))
 //!         })
@@ -100,7 +100,7 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! {
-//!     span!(Level::TRACE, "my_span").enter(|| {
+//!     span!(Level::TRACE, "my_span").in_scope(|| {
 //!         // perform some work in the context of `my_span`...
 //!     }); // --> Subscriber::exit(my_span)
 //!
@@ -135,7 +135,7 @@
 //! [`Subscriber`]: ../subscriber/trait.Subscriber.html
 //! [`Attributes`]: struct.Attributes.html
 //! [`enter`]: struct.Span.html#method.enter
-//! [`enter_scoped`]: struct.Span.html#method.enter_scoped
+//! [`in_scope`]: struct.Span.html#method.in_scope
 //! [`guard`]: struct.Entered.html
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
@@ -189,9 +189,9 @@ pub(crate) struct Inner {
 ///
 /// When the guard is dropped, the span will be exited.
 ///
-/// This is returned by the [`Span::enter_scoped`] function.
+/// This is returned by the [`Span::enter`] function.
 ///
-/// [`Span::enter_scoped`]: ../struct.Span.html#method.enter_scoped
+/// [`Span::enter`]: ../struct.Span.html#method.enter
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
 pub struct Entered<'a> {
@@ -277,14 +277,14 @@ impl Span {
 
     /// Executes the given function in the context of this span.
     ///
-    /// If this span is enabled, then this function enters the span, invokes
+    /// If this span is enabled, then this function enters the span, invokes `f`
     /// and then exits the span. If the span is disabled, `f` will still be
     /// invoked, but in the context of the currently-executing span (if there is
     /// one).
     ///
     /// Returns the result of evaluating `f`.
-    pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
-        let _enter = self.enter_scoped();
+    pub fn in_scope<F: FnOnce() -> T, T>(&self, f: F) -> T {
+        let _enter = self.enter();
         f()
     }
 
@@ -298,7 +298,7 @@ impl Span {
     /// #
     /// # fn main() {
     /// let span = span!(Level::INFO, "my_span");
-    /// let guard = span.enter_scoped();
+    /// let guard = span.enter();
     ///
     /// // code here is within the span
     ///
@@ -309,6 +309,7 @@ impl Span {
     /// # }
     /// ```
     pub fn enter_scoped<'a>(&'a self) -> Entered<'a> {
+    pub fn enter<'a>(&'a self) -> Entered<'a> {
         if let Some(ref inner) = self.inner.as_ref() {
             inner.subscriber.enter(&inner.id);
         }
