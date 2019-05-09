@@ -1,22 +1,21 @@
-use callback::Callback;
-use config::{Config, MAX_WORKERS};
-use park::{BoxPark, BoxedPark, DefaultPark};
-use pool::{Pool, MAX_BACKUP};
-use shutdown::ShutdownTrigger;
-use thread_pool::ThreadPool;
-use worker::{self, Worker, WorkerId};
-
+use crate::callback::Callback;
+use crate::config::{Config, MAX_WORKERS};
+use crate::park::{BoxPark, BoxedPark, DefaultPark};
+use crate::pool::{Pool, MAX_BACKUP};
+use crate::shutdown::ShutdownTrigger;
+use crate::thread_pool::ThreadPool;
+use crate::worker::{self, Worker, WorkerId};
+use crossbeam_deque::Injector;
+use log::trace;
+use num_cpus;
+use tokio_executor::park::Park;
+use tokio_executor::Enter;
 use std::any::Any;
 use std::cmp::max;
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-
-use crossbeam_deque::Injector;
-use num_cpus;
-use tokio_executor::park::Park;
-use tokio_executor::Enter;
 
 /// Builds a thread pool with custom configuration values.
 ///
@@ -67,7 +66,7 @@ pub struct Builder {
     max_blocking: usize,
 
     /// Generates the `Park` instances
-    new_park: Box<Fn(&WorkerId) -> BoxPark>,
+    new_park: Box<dyn Fn(&WorkerId) -> BoxPark>,
 }
 
 impl Builder {
@@ -223,7 +222,7 @@ impl Builder {
     /// ```
     pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(Box<Any + Send>) + Send + Sync + 'static,
+        F: Fn(Box<dyn Any + Send>) + Send + Sync + 'static,
     {
         self.config.panic_handler = Some(Arc::new(f));
         self
@@ -466,7 +465,7 @@ impl Builder {
 }
 
 impl fmt::Debug for Builder {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("config", &self.config)
             .field("pool_size", &self.pool_size)

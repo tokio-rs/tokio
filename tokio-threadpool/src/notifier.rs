@@ -1,11 +1,10 @@
-use pool::Pool;
-use task::Task;
-
+use crate::pool::Pool;
+use crate::task::Task;
+use futures::executor::Notify;
+use log::trace;
 use std::mem;
 use std::ops;
 use std::sync::Arc;
-
-use futures::executor::Notify;
 
 /// Implements the future `Notify` API.
 ///

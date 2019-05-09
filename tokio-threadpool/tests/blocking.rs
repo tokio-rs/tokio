@@ -1,15 +1,9 @@
-extern crate tokio_threadpool;
-
-extern crate env_logger;
-extern crate futures;
-extern crate rand;
-
-use tokio_threadpool::*;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::future::{lazy, poll_fn};
 use futures::*;
 use rand::*;
-
+use tokio_threadpool::*;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::*;
 use std::sync::*;

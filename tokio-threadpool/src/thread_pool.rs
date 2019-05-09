@@ -1,11 +1,9 @@
-use builder::Builder;
-use pool::Pool;
-use sender::Sender;
-use shutdown::{Shutdown, ShutdownTrigger};
-
+use crate::builder::Builder;
+use crate::pool::Pool;
+use crate::sender::Sender;
+use crate::shutdown::{Shutdown, ShutdownTrigger};
 use futures::sync::oneshot;
 use futures::{Future, Poll};
-
 use std::sync::Arc;
 
 /// Work-stealing based thread pool for executing futures.

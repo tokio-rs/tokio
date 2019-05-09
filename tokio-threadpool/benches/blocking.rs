@@ -1,17 +1,12 @@
 #![feature(test)]
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate rand;
 extern crate test;
-extern crate threadpool;
-extern crate tokio_threadpool;
 
 const ITER: usize = 1_000;
 
 mod blocking {
     use super::*;
-
     use futures::future::*;
     use tokio_threadpool::{blocking, Builder};
 
@@ -20,9 +15,9 @@ mod blocking {
         let pool = Builder::new().pool_size(2).max_blocking(20).build();
 
         b.iter(|| {
-            let count_down = Arc::new(CountDown::new(::ITER));
+            let count_down = Arc::new(CountDown::new(ITER));
 
-            for _ in 0..::ITER {
+            for _ in 0..ITER {
                 let count_down = count_down.clone();
 
                 pool.spawn(lazy(move || {
@@ -42,7 +37,6 @@ mod blocking {
 
 mod message_passing {
     use super::*;
-
     use futures::future::*;
     use futures::sync::oneshot;
     use tokio_threadpool::Builder;
@@ -54,9 +48,9 @@ mod message_passing {
         let blocking = threadpool::ThreadPool::new(20);
 
         b.iter(|| {
-            let count_down = Arc::new(CountDown::new(::ITER));
+            let count_down = Arc::new(CountDown::new(ITER));
 
-            for _ in 0..::ITER {
+            for _ in 0..ITER {
                 let count_down = count_down.clone();
                 let blocking = blocking.clone();
 

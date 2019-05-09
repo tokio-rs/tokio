@@ -1,5 +1,5 @@
-use park::DefaultPark;
-use worker::WorkerId;
+use crate::park::DefaultPark;
+use crate::worker::WorkerId;
 
 use std::cell::UnsafeCell;
 use std::fmt;
@@ -298,7 +298,7 @@ impl From<State> for usize {
 }
 
 impl fmt::Debug for State {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("backup::State")
             .field("is_pushed", &self.is_pushed())
             .field("is_running", &self.is_running())

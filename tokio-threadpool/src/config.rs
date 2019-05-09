@@ -1,5 +1,4 @@
-use callback::Callback;
-
+use crate::callback::Callback;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
@@ -13,9 +12,9 @@ pub(crate) struct Config {
     pub name_prefix: Option<String>,
     pub stack_size: Option<usize>,
     pub around_worker: Option<Callback>,
-    pub after_start: Option<Arc<Fn() + Send + Sync>>,
-    pub before_stop: Option<Arc<Fn() + Send + Sync>>,
-    pub panic_handler: Option<Arc<Fn(Box<Any + Send>) + Send + Sync>>,
+    pub after_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    pub before_stop: Option<Arc<dyn Fn() + Send + Sync>>,
+    pub panic_handler: Option<Arc<dyn Fn(Box<dyn Any + Send>) + Send + Sync>>,
 }
 
 /// Max number of workers that can be part of a pool. This is the most that can
@@ -24,7 +23,7 @@ pub(crate) struct Config {
 pub(crate) const MAX_WORKERS: usize = 1 << 15;
 
 impl fmt::Debug for Config {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Config")
             .field("keep_alive", &self.keep_alive)
             .field("name_prefix", &self.name_prefix)
