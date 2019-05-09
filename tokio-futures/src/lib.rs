@@ -28,8 +28,3 @@ pub mod compat;
 pub mod io;
 pub mod sink;
 pub mod stream;
-
-// Rename the `await` macro in `std`. This is used by the redefined
-// `await` macro in this crate.
-#[doc(hidden)]
-pub use std::await as std_await;
