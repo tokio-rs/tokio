@@ -1,4 +1,4 @@
-use SpawnError;
+use crate::SpawnError;
 
 /// A value that spawns futures of a specific type.
 ///

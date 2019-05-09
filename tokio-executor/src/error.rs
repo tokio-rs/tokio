@@ -38,7 +38,7 @@ impl SpawnError {
 }
 
 impl fmt::Display for SpawnError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }

@@ -1,8 +1,6 @@
-use super::{Enter, Executor, SpawnError};
-
 use futures::{future, Future};
-
 use std::cell::Cell;
+use super::{Enter, Executor, SpawnError};
 
 /// Executes futures on the default executor for the current execution context.
 ///
@@ -37,7 +35,7 @@ impl DefaultExecutor {
     }
 
     #[inline]
-    fn with_current<F: FnOnce(&mut Executor) -> R, R>(f: F) -> Option<R> {
+    fn with_current<F: FnOnce(&mut dyn Executor) -> R, R>(f: F) -> Option<R> {
         EXECUTOR.with(
             |current_executor| match current_executor.replace(State::Active) {
                 State::Ready(executor_ptr) => {
@@ -57,7 +55,7 @@ enum State {
     // default executor not defined
     Empty,
     // default executor is defined and ready to be used
-    Ready(*mut Executor),
+    Ready(*mut dyn Executor),
     // default executor is currently active (used to detect recursive calls)
     Active,
 }
@@ -72,7 +70,7 @@ thread_local! {
 impl super::Executor for DefaultExecutor {
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
@@ -210,7 +208,7 @@ where
     })
 }
 
-unsafe fn hide_lt<'a>(p: *mut (Executor + 'a)) -> *mut (Executor + 'static) {
+unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
     use std::mem;
     mem::transmute(p)
 }
