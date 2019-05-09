@@ -1,6 +1,6 @@
 #![feature(await_macro, async_await)]
 
-use tokio::await;
+use tokio::r#await;
 use tokio::timer::Delay;
 use std::time::{Duration, Instant};
 
@@ -18,5 +18,5 @@ async fn fail_no_async() {
 #[tokio::test]
 async fn use_timer() {
     let when = Instant::now() + Duration::from_millis(10);
-    await!(Delay::new(when));
+    r#await!(Delay::new(when));
 }

@@ -1,6 +1,6 @@
 #![feature(await_macro, async_await)]
 
-use tokio::await;
+use tokio::r#await;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
@@ -11,11 +11,11 @@ fn handle(mut stream: TcpStream) {
         let mut buf = [0; 1024];
 
         loop {
-            match await!(stream.read_async(&mut buf)).unwrap() {
+            match r#await!(stream.read_async(&mut buf)).unwrap() {
                 0 => break, // Socket closed
                 n => {
                     // Send the data back
-                    await!(stream.write_all_async(&buf[0..n])).unwrap();
+                    r#await!(stream.write_all_async(&buf[0..n])).unwrap();
                 }
             }
         }
@@ -35,7 +35,7 @@ async fn main() {
 
     let mut incoming = listener.incoming();
 
-    while let Some(stream) = await!(incoming.next()) {
+    while let Some(stream) = r#await!(incoming.next()) {
         let stream = stream.unwrap();
         handle(stream);
     }

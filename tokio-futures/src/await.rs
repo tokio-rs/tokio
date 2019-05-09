@@ -11,6 +11,8 @@ macro_rules! await {
         #[allow(unused_mut)]
         let mut e = $e;
         let e = e.into_awaitable();
+        // TODO: The code that the macro expands inherits the edition of the crate in which the macro is defined.
+        // When this crate transitioned to 2018 edition, replace it with the `await` syntax.
         std_await!(e)
     }};
 }

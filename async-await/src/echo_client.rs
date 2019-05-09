@@ -1,6 +1,6 @@
 #![feature(await_macro, async_await)]
 
-use tokio::await;
+use tokio::r#await;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 
@@ -14,7 +14,7 @@ const MESSAGES: &[&str] = &[
 ];
 
 async fn run_client(addr: &SocketAddr) -> io::Result<()> {
-    let mut stream = await!(TcpStream::connect(addr))?;
+    let mut stream = r#await!(TcpStream::connect(addr))?;
 
     // Buffer to read into
     let mut buf = [0; 128];
@@ -23,10 +23,10 @@ async fn run_client(addr: &SocketAddr) -> io::Result<()> {
         println!(" > write = {:?}", msg);
 
         // Write the message to the server
-        await!(stream.write_all_async(msg.as_bytes()))?;
+        r#await!(stream.write_all_async(msg.as_bytes()))?;
 
         // Read the message back from the server
-        await!(stream.read_exact_async(&mut buf[..msg.len()]))?;
+        r#await!(stream.read_exact_async(&mut buf[..msg.len()]))?;
 
         assert_eq!(&buf[..msg.len()], msg.as_bytes());
     }
@@ -43,7 +43,7 @@ async fn main() {
 
     // Connect to the echo serveer
 
-    match await!(run_client(&addr)) {
+    match r#await!(run_client(&addr)) {
         Ok(_) => println!("done."),
         Err(e) => eprintln!("echo client failed; error = {:?}", e),
     }
