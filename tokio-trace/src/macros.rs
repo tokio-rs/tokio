@@ -69,6 +69,47 @@
 /// # }
 /// ```
 ///
+/// Shorthand for `field::debug`:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// #[derive(Debug)]
+/// struct MyStruct {
+///     field: &'static str,
+/// }
+///
+/// let my_struct = MyStruct {
+///     field: "Hello world!"
+/// };
+///
+/// // `my_struct` will be recorded using its `fmt::Debug` implementation.
+/// let my_span = span!(Level::TRACE, "my span", my_struct = ?my_struct);
+/// # }
+/// ```
+/// Shorthand for `field::display`:
+/// /// Shorthand for `field::debug`:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// # #[derive(Debug)]
+/// # struct MyStruct {
+/// #     field: &'static str,
+/// # }
+/// #
+/// # let my_struct = MyStruct {
+/// #     field: "Hello world!"
+/// # };
+/// // `my_struct.field` will be recorded using its `fmt::Display` implementation.
+/// let my_span = span!(Level::TRACE, "my span", my_struct.field = %my_struct.field);
+/// # }
+/// ```
+///
+///
+///
 /// Note that a span may have up to 32 fields. The following will not compile:
 /// ```rust,compile_fail
 ///  # #[macro_use]
@@ -87,16 +128,10 @@
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! span {
-    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr )* ),*,) => {
-        span!(
-            $lvl,
-            target: $target,
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
+    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr) => {
+        span!($lvl, target: $target, parent: $parent, $name,)
     };
-    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr )* ),*) => {
+    ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr, $($fields:tt)*) => {
         {
             use $crate::callsite;
             use $crate::callsite::Callsite;
@@ -105,7 +140,7 @@ macro_rules! span {
                 kind: $crate::metadata::Kind::SPAN,
                 target: $target,
                 level: $lvl,
-                fields: $($($k).+),*
+                fields: $($fields)*
             };
             let meta = callsite.metadata();
 
@@ -113,17 +148,17 @@ macro_rules! span {
                 $crate::Span::child_of(
                     $parent,
                     meta,
-                    &valueset!(meta.fields(), $($($k).+ $( = $val)*),*),
+                    &valueset!(meta.fields(), $($fields)*),
                 )
             } else {
                  __tokio_trace_disabled_span!(
                     meta,
-                    &valueset!(meta.fields(), $($($k).+ $( = $val)*),*)
+                    &valueset!(meta.fields(), $($fields)*)
                 )
             }
         }
     };
-    ($lvl:expr, target: $target:expr, $name:expr,$($($k:ident).+ $( = $val:expr )* ),*) => {
+    ($lvl:expr, target: $target:expr, $name:expr, $($fields:tt)*) => {
         {
             use $crate::callsite;
             use $crate::callsite::Callsite;
@@ -132,19 +167,19 @@ macro_rules! span {
                 kind: $crate::metadata::Kind::SPAN,
                 target: $target,
                 level: $lvl,
-                fields: $( $($k).+ ),*
+                fields: $($fields)*
             };
             let meta = callsite.metadata();
 
             if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL && is_enabled!(callsite) {
                 $crate::Span::new(
                     meta,
-                    &valueset!(meta.fields(), $($($k).+ $( = $val)*),*),
+                    &valueset!(meta.fields(), $($fields)*)
                 )
             } else {
                 __tokio_trace_disabled_span!(
                     meta,
-                    &valueset!(meta.fields(), $($($k).+ $( = $val)*),*)
+                    &valueset!(meta.fields(), $($fields)*)
                 )
             }
         }
@@ -153,22 +188,13 @@ macro_rules! span {
     ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr) => {
         span!($lvl, target: $target, parent: $parent, $name,)
     };
-    ($lvl:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
+    ($lvl:expr, parent: $parent:expr, $name:expr, $($fields:tt)*) => {
         span!(
             $lvl,
             target: __tokio_trace_module_path!(),
             parent: $parent,
             $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($lvl:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
-        span!(
-            $lvl,
-            target: __tokio_trace_module_path!(),
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
+            $($fields)*
         )
     };
     ($lvl:expr, parent: $parent:expr, $name:expr) => {
@@ -179,40 +205,23 @@ macro_rules! span {
             $name,
         )
     };
-    ($lvl:expr, target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr )* ),*,
-    ) => {
+    ($lvl:expr, target: $target:expr, $name:expr, $($fields:tt)*) => {
         span!(
             $lvl,
             target: $target,
             $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($lvl:expr, target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr )* ),*) => {
-        span!(
-            $lvl,
-            target: $target,
-            $name,
-            $($($k).+ $( = $val)*),*
+            $($fields)*
         )
     };
     ($lvl:expr, target: $target:expr, $name:expr) => {
         span!($lvl, target: $target, $name,)
     };
-    ($lvl:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
+    ($lvl:expr, $name:expr, $($fields:tt)*) => {
         span!(
             $lvl,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($lvl:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
-        span!(
-            $lvl,
-            target: __tokio_trace_module_path!(),
-            $name,
-            $($($k).+ $( = $val)*),*
+            $($fields)*
         )
     };
     ($lvl:expr, $name:expr) => {
@@ -725,12 +734,12 @@ macro_rules! error_span {
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! event {
-    (target: $target:expr, $lvl:expr, { $( $($k:ident).+ = $val:expr ),* $(,)*} )=> ({
+    (target: $target:expr, $lvl:expr, { $($fields:tt)* } )=> ({
         {
             __tokio_trace_log!(
                 target: $target,
                 $lvl,
-                $( $($k).+ = $val ),*
+                $($fields)*
             );
 
             if $lvl <= $crate::level_filters::STATIC_MAX_LEVEL {
@@ -747,11 +756,11 @@ macro_rules! event {
                     kind: $crate::metadata::Kind::EVENT,
                     target: $target,
                     level: $lvl,
-                    fields: $( $($k).+ ),*
+                    fields: $($fields)*
                 };
                 if is_enabled!(callsite) {
                     let meta = callsite.metadata();
-                    Event::dispatch(meta, &valueset!(meta.fields(), $( $($k).+ = $val),* ));
+                    Event::dispatch(meta, &valueset!(meta.fields(), $($fields)*) );
                 }
             }
         }
@@ -759,13 +768,13 @@ macro_rules! event {
     (
         target: $target:expr,
         $lvl:expr,
-        { $( $($k:ident).+ = $val:expr ),*, },
+        { $($fields:tt)* },
         $($arg:tt)+
     ) => ({
         event!(
             target: $target,
             $lvl,
-            { message = __tokio_trace_format_args!($($arg)+), $( $($k).+ = $val ),* }
+            { message = __tokio_trace_format_args!($($arg)+), $($fields)* }
         )
     });
     (
@@ -1226,46 +1235,48 @@ macro_rules! error {
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! callsite {
-    (name: $name:expr, kind: $kind:expr, fields: $( $field_name:expr ),* $(,)*) => ({
+    (name: $name:expr, kind: $kind:expr, fields: $($fields:tt)*) => {{
         callsite! {
             name: $name,
             kind: $kind,
             target: __tokio_trace_module_path!(),
             level: $crate::Level::TRACE,
-            fields: $( $field_name ),*
+            fields: $($fields)*
         }
-    });
+    }};
     (
         name: $name:expr,
         kind: $kind:expr,
         level: $lvl:expr,
-        fields: $( $field_name:expr ),*  $(,)*
-    ) => ({
+        fields: $($fields:tt)*
+    ) => {{
         callsite! {
             name: $name,
             kind: $kind,
             target: __tokio_trace_module_path!(),
             level: $lvl,
-            fields: $( $field_name ),*
+            fields: $($fields)*
         }
-    });
+    }};
     (
         name: $name:expr,
         kind: $kind:expr,
         target: $target:expr,
         level: $lvl:expr,
-        fields: $( $field_name:expr ),*
-        $(,)*
-    ) => ({
-        use std::sync::{Once, atomic::{self, AtomicUsize, Ordering}};
-        use $crate::{callsite, Metadata, subscriber::Interest};
+        fields: $($fields:tt)*
+    ) => {{
+        use std::sync::{
+            atomic::{self, AtomicUsize, Ordering},
+            Once,
+        };
+        use $crate::{callsite, subscriber::Interest, Metadata};
         struct MyCallsite;
         static META: Metadata<'static> = {
             metadata! {
                 name: $name,
                 target: $target,
                 level: $lvl,
-                fields: &[ $( __tokio_trace_stringify!($field_name) ),* ],
+                fields: fieldset!( $($fields)* ),
                 callsite: &MyCallsite,
                 kind: $kind,
             }
@@ -1288,7 +1299,7 @@ macro_rules! callsite {
         impl callsite::Callsite for MyCallsite {
             fn set_interest(&self, interest: Interest) {
                 let interest = match () {
-                    _ if interest.is_never()  => 0,
+                    _ if interest.is_never() => 0,
                     _ if interest.is_always() => 2,
                     _ => 1,
                 };
@@ -1303,7 +1314,7 @@ macro_rules! callsite {
             callsite::register(&MyCallsite);
         });
         &MyCallsite
-    })
+    }};
 }
 
 #[macro_export]
@@ -1326,21 +1337,167 @@ macro_rules! is_enabled {
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! valueset {
-    ($fields:expr, $($($k:ident).+ $( = $val:expr )* ) ,*) => {
+    (@value $iter:expr, { } => $($k:ident).+, $(,)*) => {
+        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None),]
+    };
+    (@value $iter:expr, {  }  => $($k:ident).+ = ?$val:expr $(,)* ) => {
+        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value))]
+    };
+    (@value $iter:expr, {  }  => $($k:ident).+ = %$val:expr $(,)*) => {
+        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value))]
+    };
+    (@value $iter:expr, { } => $($k:ident).+ = $val:expr $(,)*) => {
+        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value))]
+    };
+    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ $(,)*) => {
+        &[ $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None),]
+    };
+    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+ = ?$val:expr $(,)*) => {
+        &[ $($out),* , (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value))]
+    };
+    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+ = %$val:expr $(,)*) => {
+        &[ $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value))]
+    };
+    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ = $val:expr $(,)*) => {
+        &[ $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value))]
+    };
+    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+, $($rest:tt)+) => {
+        valueset!(@value $iter,
+         { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
+             => $($rest)+)
+    };
+    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ = ?$_val:expr, $($rest:tt)+) => {
+        valueset!(@value $iter,
+         { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value)) } => $($rest)+)
+    };
+    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        valueset!(@value $iter,
+        { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value)) } => $($rest)+)
+    };
+    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        valueset!(
+            @value $iter,
+            { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value)) }
+             => $($rest)+)
+    };
+    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+, $($rest:tt)+) => {
+        valueset!(
+            @value $iter,
+            { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
+            => $($rest)+
+        )
+    };
+    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+, ) => {
+        valueset!(@value $iter,
+         { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
+             => $($rest)+)
+    };
+    (@value $iter:expr, { } => { $($k:ident).+ = ?$_val:expr, $($rest:tt)+ }) => {
+        valueset!(@value $iter,
+         { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value)) } => $($rest)+)
+    };
+    (@value $iter:expr, { } => $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        valueset!(@value $iter,
+        { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value)) } => $($rest)+)
+    };
+    (@value $iter:expr, { }  => $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        valueset!(
+            @value $iter,
+            { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value)) }
+             => $($rest)+)
+    };
+    (@value $iter:expr, { }  => $($k:ident).+, $($rest:tt)+) => {
+
+        valueset!(
+            @value $iter,
+            { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
+            => $($rest)+
+        )
+    };
+    ($fields:expr, $($kvs:tt)+) => {
         {
             let mut iter = $fields.iter();
-            $fields.value_set(&[
-                $((
-                    &iter.next().expect("FieldSet corrupted (this is a bug)"),
-                    valueset!(@val $($k).+ $(= $val)*)
-                )),*
-            ])
+            $fields.value_set(valueset!(@value iter, {} => $($kvs)+ ))
         }
     };
-    (@val $($k:ident).+ = $val:expr) => {
-        Some(&$val as &$crate::field::Value)
+    ($fields:expr,) => {
+        {
+            $fields.value_set(&[])
+        }
     };
-    (@val $($k:ident).+) => { None };
+}
+
+#[doc(hidden)]
+#[macro_export(local_inner_macros)]
+macro_rules! fieldset {
+    () => {
+        &[]
+    };
+
+    // == empty out set, no remaining tts ===
+
+    (@inner { } $($k:ident).+ = ?$_val:expr $(,)*) => {
+        &[ __tokio_trace_stringify!($($k).+) ]
+    };
+    (@inner { } $($k:ident).+ = %$val:expr $(,)*) => {
+        &[ __tokio_trace_stringify!($($k).+) ]
+    };
+    (@inner { } $($k:ident).+ = $val:expr $(,)*) => {
+        &[ __tokio_trace_stringify!($($k).+) ]
+    };
+    (@inner { } $($k:ident).+ $(,)*) => {
+        &[ __tokio_trace_stringify!($($k).+) ]
+    };
+
+
+    // == empty out set, remaining tts ==
+    (@inner { } $($k:ident).+ = ?$_val:expr, $($rest:tt)+) => {
+        fieldset!(@inner { __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+    (@inner { } $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        fieldset!(@inner { __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+    (@inner { } $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        fieldset!(@inner { __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+    (@inner { } $($k:ident).+, $($rest:tt)+) => {
+        fieldset!(@inner { __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+
+    // == non-empty out set, no remaining tts ==
+    // this needs its own set of cases (rather than using `$($rest:tt)*`) in
+    // order to gobble a potential trailing comma.
+    (@inner { $($out:expr),+ } $($k:ident).+ = ?$_val:expr $(,)*) => {
+        &[ $($out),+, __tokio_trace_stringify!($($k).+) ]
+    };
+    (@inner { $($out:expr),+} $($k:ident).+ = %$val:expr $(,)*) => {
+        &[ $($out),+, __tokio_trace_stringify!($($k).+) ]
+    };
+    (@inner {$($out:expr),+} $($k:ident).+ = $val:expr $(,)*) => {
+        &[ $($out),+, __tokio_trace_stringify!($($k).+) ]
+    };
+    (@inner { $($out:expr),+} $($k:ident).+ $(,)*) => {
+        &[ $($out),+, __tokio_trace_stringify!($($k).+) ]
+    };
+
+    // == non-empty out set, remaining tts ==
+    (@inner { $($out:expr),+ } $($k:ident).+ = ?$val:expr, $($rest:tt)+) => {
+        fieldset!(@inner { $($out),+,__tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+    (@inner { $($out:expr),+ } $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        fieldset!(@inner { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+    (@inner { $($out:expr),+ } $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        fieldset!(@inner { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+    (@inner { $($out:expr),+ } $($k:ident).+, $($rest:tt)+) => {
+        fieldset!(@inner { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)+)
+    };
+
+    // == initial ==
+    ($($args:tt)+) => {
+        fieldset!(@inner { } $($args)+ )
+    };
 }
 
 // The macros above cannot invoke format_args directly because they use
@@ -1440,7 +1597,7 @@ macro_rules! __tokio_trace_log {
                             $(__tokio_trace_log!(@key $($k).+)),*
                         ),
                         $(
-                            __tokio_trace_log!(@val_or $($k).+ $( = $val)* )
+                            __tokio_trace_log!(val:_or $($k).+ $( = $val)* )
                         ),*
                     ))
                     .build());
@@ -1449,8 +1606,8 @@ macro_rules! __tokio_trace_log {
     };
     (@key message) => { "{} " };
     (@key $($k:ident).+) => { __tokio_trace_concat!(__tokio_trace_stringify!( $($k).+ ), "={:?} ") };
-    (@val_or $($k:ident).+ = $v:expr) => { $v };
-    (@val_or $($k:ident).+ ) => { __tokio_trace_format_args!("?") };
+    (val:_or $($k:ident).+ = $v:expr) => { $v };
+    (val:_or $($k:ident).+ ) => { __tokio_trace_format_args!("?") };
 }
 
 #[cfg(not(feature = "log"))]
