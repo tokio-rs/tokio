@@ -7,7 +7,7 @@ name = "tokio-tls"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.2.x" git tag.
+# - Create "v0.3.x" git tag.
 version = "0.3.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
@@ -27,10 +27,10 @@ travis-ci = { repository = "tokio-rs/tokio-tls" }
 [dependencies]
 futures = "0.1.23"
 native-tls = "0.2"
-tokio-io = "0.1.7"
+tokio-io = { version = "0.2.0", path = "../tokio-io" }
 
 [dev-dependencies]
-tokio = "0.1"
+tokio = { version = "0.2.0", path = "../tokio" }
 cfg-if = "0.1"
 env_logger = { version = "0.5", default-features = false }
 

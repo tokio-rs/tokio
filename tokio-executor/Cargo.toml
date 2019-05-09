@@ -7,7 +7,7 @@ name = "tokio-executor"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.1.x" git tag.
+# - Create "v0.2.x" git tag.
 version = "0.2.0"
 edition = "2018"
 documentation = "https://docs.rs/tokio-executor/0.1.7/tokio_executor"
@@ -27,4 +27,4 @@ crossbeam-utils = "0.6.2"
 futures = "0.1.19"
 
 [dev-dependencies]
-tokio = "0.1.18"
+tokio = { version = "0.2.0", path = "../tokio" }

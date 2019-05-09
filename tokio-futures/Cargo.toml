@@ -22,9 +22,9 @@ async-await-preview = ["futures/nightly"]
 
 [dependencies]
 futures = "0.1.23"
-tokio-io = "0.1.7"
+tokio-io = { version = "0.2.0", path = "../tokio-io" }
 
 [dev-dependencies]
 bytes = "0.4.9"
 hyper = "0.12.8"
-tokio = { version = "0.1.8", path = "../tokio" }
+tokio = { version = "0.2.0", path = "../tokio" }
