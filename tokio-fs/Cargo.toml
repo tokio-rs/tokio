@@ -8,7 +8,7 @@ name = "tokio-fs"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.6"
+version = "0.2.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
@@ -20,6 +20,7 @@ Filesystem API for Tokio.
 """
 keywords = ["tokio", "futures", "fs", "file", "async"]
 categories = ["asynchronous", "network-programming", "filesystem"]
+publish = false
 
 [dependencies]
 futures = "0.1.21"

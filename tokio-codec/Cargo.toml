@@ -8,7 +8,7 @@ name = "tokio-codec"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.1"
+version = "0.2.0"
 edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>", "Bryan Burgers <bryan@burgers.io>"]
 license = "MIT"
@@ -19,6 +19,7 @@ description = """
 Utilities for encoding and decoding frames.
 """
 categories = ["asynchronous"]
+publish = false
 
 [dependencies]
 tokio-io = "0.1.7"

@@ -8,7 +8,7 @@ name = "tokio-tls"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -19,6 +19,7 @@ An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
 for nonblocking I/O streams.
 """
 categories = ["asynchronous", "network-programming"]
+publish = false
 
 [badges]
 travis-ci = { repository = "tokio-rs/tokio-tls" }
