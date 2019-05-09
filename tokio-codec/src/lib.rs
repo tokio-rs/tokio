@@ -1,5 +1,6 @@
-#![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-codec/0.1.1")]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
 
 //! Utilities for encoding and decoding frames.
 //!
@@ -13,13 +14,9 @@
 //! [`Stream`]: #
 //! [transports]: #
 
-extern crate bytes;
-extern crate tokio_io;
-
 mod bytes_codec;
 mod lines_codec;
 
+pub use crate::bytes_codec::BytesCodec;
+pub use crate::lines_codec::LinesCodec;
 pub use tokio_io::_tokio_codec::{Decoder, Encoder, Framed, FramedParts, FramedRead, FramedWrite};
-
-pub use bytes_codec::BytesCodec;
-pub use lines_codec::LinesCodec;

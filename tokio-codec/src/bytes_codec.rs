@@ -1,6 +1,6 @@
 use bytes::{BufMut, Bytes, BytesMut};
-use std::io;
 use tokio_io::_tokio_codec::{Decoder, Encoder};
+use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

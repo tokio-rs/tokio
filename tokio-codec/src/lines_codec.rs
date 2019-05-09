@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
-use std::{cmp, io, str, usize};
 use tokio_io::_tokio_codec::{Decoder, Encoder};
+use std::{cmp, io, str, usize};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

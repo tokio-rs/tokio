@@ -1,15 +1,10 @@
-extern crate bytes;
-extern crate futures;
-extern crate tokio_codec;
-extern crate tokio_io;
-
-use tokio_codec::{Decoder, FramedRead};
-use tokio_io::AsyncRead;
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::{Buf, BytesMut, IntoBuf};
 use futures::Async::{NotReady, Ready};
 use futures::Stream;
-
+use tokio_codec::{Decoder, FramedRead};
+use tokio_io::AsyncRead;
 use std::collections::VecDeque;
 use std::io::{self, Read};
 

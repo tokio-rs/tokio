@@ -9,6 +9,7 @@ name = "tokio-codec"
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.1"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>", "Bryan Burgers <bryan@burgers.io>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
