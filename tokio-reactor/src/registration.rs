@@ -1,8 +1,7 @@
-use {Direction, Handle, HandlePriv, Task};
-
+use crate::{Direction, Handle, HandlePriv, Task};
 use futures::{task, Async, Poll};
+use log::debug;
 use mio::{self, Evented};
-
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -498,7 +497,7 @@ impl Inner {
         };
 
         let mask = direction.mask();
-        let mask_no_hup = (mask - ::platform::hup()).as_usize();
+        let mask_no_hup = (mask - crate::platform::hup()).as_usize();
 
         let io_dispatch = inner.io_dispatch.read();
         let sched = &io_dispatch[self.token];
