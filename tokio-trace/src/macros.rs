@@ -1337,87 +1337,92 @@ macro_rules! is_enabled {
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! valueset {
-    (@value $iter:expr, { } => $($k:ident).+, $(,)*) => {
-        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None),]
-    };
-    (@value $iter:expr, {  }  => $($k:ident).+ = ?$val:expr $(,)* ) => {
-        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value))]
-    };
-    (@value $iter:expr, {  }  => $($k:ident).+ = %$val:expr $(,)*) => {
-        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value))]
-    };
-    (@value $iter:expr, { } => $($k:ident).+ = $val:expr $(,)*) => {
-        &[ (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value))]
-    };
-    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ $(,)*) => {
-        &[ $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None),]
-    };
-    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+ = ?$val:expr $(,)*) => {
-        &[ $($out),* , (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value))]
-    };
-    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+ = %$val:expr $(,)*) => {
-        &[ $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value))]
-    };
-    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ = $val:expr $(,)*) => {
-        &[ $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value))]
-    };
-    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+, $($rest:tt)+) => {
-        valueset!(@value $iter,
-         { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
-             => $($rest)+)
-    };
-    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ = ?$_val:expr, $($rest:tt)+) => {
-        valueset!(@value $iter,
-         { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value)) } => $($rest)+)
-    };
-    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
-        valueset!(@value $iter,
-        { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value)) } => $($rest)+)
-    };
-    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+ = $val:expr, $($rest:tt)+) => {
-        valueset!(
-            @value $iter,
-            { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value)) }
-             => $($rest)+)
-    };
-    (@value $iter:expr, { $($out:expr),+ }  => $($k:ident).+, $($rest:tt)+) => {
-        valueset!(
-            @value $iter,
-            { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
-            => $($rest)+
-        )
-    };
-    (@value $iter:expr, { $($out:expr),+ } => $($k:ident).+, ) => {
-        valueset!(@value $iter,
-         { $($out),+, (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
-             => $($rest)+)
-    };
-    (@value $iter:expr, { } => { $($k:ident).+ = ?$_val:expr, $($rest:tt)+ }) => {
-        valueset!(@value $iter,
-         { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::debug(&$val) as &$crate::field::Value)) } => $($rest)+)
-    };
-    (@value $iter:expr, { } => $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
-        valueset!(@value $iter,
-        { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$crate::field::display(&$val) as &$crate::field::Value)) } => $($rest)+)
-    };
-    (@value $iter:expr, { }  => $($k:ident).+ = $val:expr, $($rest:tt)+) => {
-        valueset!(
-            @value $iter,
-            { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), Some(&$val as &$crate::field::Value)) }
-             => $($rest)+)
-    };
-    (@value $iter:expr, { }  => $($k:ident).+, $($rest:tt)+) => {
 
+    // === base case (no more tts), empty out set ===
+    (@ { }, $next:expr, $($k:ident).+, $(,)*) => {
+        &[ (&$next, None),]
+    };
+    (@ { }, $next:expr, $($k:ident).+ = ?$val:expr $(,)* ) => {
+        &[ (&$next, Some(&debug(&$val) as &Value))]
+    };
+    (@ { }, $next:expr, $($k:ident).+ = %$val:expr $(,)*) => {
+        &[ (&$next, Some(&display(&$val) as &Value))]
+    };
+    (@ { }, $next:expr, $($k:ident).+ = $val:expr $(,)*) => {
+        &[ (&$next, Some(&$val as &Value))]
+    };
+
+    // === base case (no more tts), non-empty out set ===
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ $(,)*) => {
+        &[ $($out),+, (&$next, None),]
+    };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = ?$val:expr $(,)*) => {
+        &[ $($out),*, (&$next, Some(&debug(&$val) as &Value))]
+    };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = %$val:expr $(,)*) => {
+        &[ $($out),+, (&$next, Some(&display(&$val) as &$Value))]
+    };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = $val:expr $(,)*) => {
+        &[ $($out),+, (&$next, Some(&$val as &Value))]
+    };
+
+    // === recursive case (more tts), non-empty out set ===
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+, $($rest:tt)+) => {
+        valueset!(@ { $($out),+, (&$next, None) }, $next, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = ?$val:expr, $($rest:tt)+) => {
         valueset!(
-            @value $iter,
-            { (&$iter.next().expect("FieldSet corrupted (this is a bug)"), None) }
-            => $($rest)+
+            @ { $($out),+, (&$next, Some(&debug(&$val) as &Value)) },
+            $next,
+            $($rest)+
         )
     };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        valueset!(
+            @ { $($out),+, (&$next, Some(&display(&$val) as &Value)) },
+            $next,
+            $($rest)+
+        )
+    };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        valueset!(
+            @ { $($out),+, (&$next, Some(&$val as &Value)) },
+            $next,
+            $($rest)+
+        )
+    };
+    (@{ $($out:expr),+ }, $next:expr, $($k:ident).+, $($rest:tt)+) => {
+        valueset!(@ { $($out),+, (&$next, None) }, $next, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $next:expr, $($k:ident).+, ) => {
+        valueset!(@ { $($out),+, (&$next, None) }, $next, $($rest)+)
+    };
+
+    // == recursive case (more tts), empty out set ===
+    (@ { }, $next:expr, ($k:ident).+ = ?$_val:expr, $($rest:tt)+ ) => {
+        valueset!(@ { (&$next, Some(&debug(&$val) as &Value)) }, $next, $($rest)+ )
+    };
+    (@ { }, $next:expr,  $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        valueset!(@ { (&$next, Some(&display(&$val) as &Value)) }, $next, $($rest)+)
+    };
+    (@ { }, $next:expr, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        valueset!(@ { (&$next, Some(&$val as &Value)) }, $next, $($rest)+)
+    };
+    (@ { }, $next:expr, $($k:ident).+, $($rest:tt)+) => {
+        valueset!(@ { (&$next, None) }, $next, $($rest)+ )
+    };
+
+    // === entry ===
     ($fields:expr, $($kvs:tt)+) => {
         {
+            #[allow(unused_imports)]
+            use $crate::field::{debug, display, Value};
             let mut iter = $fields.iter();
-            $fields.value_set(valueset!(@value iter, {} => $($kvs)+ ))
+            $fields.value_set(valueset!(
+                @ {},
+                iter.next().expect("FieldSet corrupted (this is a bug)"),
+                $($kvs)+
+            ))
         }
     };
     ($fields:expr,) => {
@@ -1435,7 +1440,6 @@ macro_rules! fieldset {
     };
 
     // == empty out set, no remaining tts ===
-
     (@inner { } $($k:ident).+ = ?$_val:expr $(,)*) => {
         &[ __tokio_trace_stringify!($($k).+) ]
     };
@@ -1494,7 +1498,7 @@ macro_rules! fieldset {
         fieldset!(@inner { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)+)
     };
 
-    // == initial ==
+    // == entry ==
     ($($args:tt)+) => {
         fieldset!(@inner { } $($args)+ )
     };
