@@ -171,7 +171,7 @@ where
     T: fmt::Debug,
     B::Buf: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Framed")
             .field("inner", &self.inner)
             .finish()
@@ -577,7 +577,7 @@ where
     T: fmt::Debug,
     B::Buf: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedWrite")
             .field("inner", &self.inner)
             .field("builder", &self.builder)
@@ -922,13 +922,13 @@ impl Builder {
 // ===== impl FrameTooBig =====
 
 impl fmt::Debug for FrameTooBig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FrameTooBig").finish()
     }
 }
 
 impl fmt::Display for FrameTooBig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.description())
     }
 }

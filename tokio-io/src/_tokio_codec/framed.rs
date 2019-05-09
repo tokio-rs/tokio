@@ -185,7 +185,7 @@ where
     T: fmt::Debug,
     U: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Framed")
             .field("io", &self.inner.get_ref().get_ref().0)
             .field("codec", &self.inner.get_ref().get_ref().1)

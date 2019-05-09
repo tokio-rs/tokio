@@ -114,7 +114,7 @@ where
     T: fmt::Debug,
     U: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedWrite")
             .field("inner", &self.inner.get_ref().0)
             .field("encoder", &self.inner.get_ref().1)

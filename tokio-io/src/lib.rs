@@ -1,5 +1,6 @@
-#![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-io/0.1.12")]
+#![deny(missing_debug_implementations, missing_docs, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
 
 //! Core I/O traits and combinators when working with Tokio.
 //!
@@ -13,10 +14,10 @@ use futures::{Future, Stream};
 use std::io as std_io;
 
 /// A convenience typedef around a `Future` whose error component is `io::Error`
-pub type IoFuture<T> = Box<Future<Item = T, Error = std_io::Error> + Send>;
+pub type IoFuture<T> = Box<dyn Future<Item = T, Error = std_io::Error> + Send>;
 
 /// A convenience typedef around a `Stream` whose error component is `io::Error`
-pub type IoStream<T> = Box<Stream<Item = T, Error = std_io::Error> + Send>;
+pub type IoStream<T> = Box<dyn Stream<Item = T, Error = std_io::Error> + Send>;
 
 /// A convenience macro for working with `io::Result<T>` from the `Read` and
 /// `Write` traits.
@@ -57,6 +58,6 @@ pub use self::async_write::AsyncWrite;
 
 fn _assert_objects() {
     fn _assert<T>() {}
-    _assert::<Box<AsyncRead>>();
-    _assert::<Box<AsyncWrite>>();
+    _assert::<Box<dyn AsyncRead>>();
+    _assert::<Box<dyn AsyncWrite>>();
 }

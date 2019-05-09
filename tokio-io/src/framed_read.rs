@@ -120,7 +120,7 @@ where
     T: fmt::Debug,
     D: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedRead")
             .field("inner", &self.inner.inner.0)
             .field("decoder", &self.inner.inner.1)
