@@ -23,7 +23,7 @@ macro_rules! try_ready {
 }
 
 #[macro_use]
-mod await;
+mod async_wait;
 pub mod compat;
 pub mod io;
 pub mod sink;

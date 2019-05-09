@@ -1,6 +1,6 @@
 /// Wait for a future to complete.
 #[macro_export]
-macro_rules! await {
+macro_rules! async_wait {
     ($e:expr) => {{
         #[allow(unused_imports)]
         use $crate::compat::backward::IntoAwaitable as IntoAwaitableBackward;
