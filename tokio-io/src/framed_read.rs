@@ -1,13 +1,12 @@
 #![allow(deprecated)]
 
-use std::fmt;
-
-use codec::Decoder;
-use framed::Fuse;
-use AsyncRead;
-
+use crate::codec::Decoder;
+use crate::framed::Fuse;
+use crate::AsyncRead;
 use bytes::BytesMut;
-use futures::{Async, Poll, Sink, StartSend, Stream};
+use futures::{try_ready, Async, Poll, Sink, StartSend, Stream};
+use log::trace;
+use std::fmt;
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 #[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]

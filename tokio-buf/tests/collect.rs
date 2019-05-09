@@ -1,16 +1,10 @@
 #![cfg(feature = "util")]
 
-extern crate bytes;
-extern crate futures;
-extern crate tokio_buf;
-
 use bytes::Bytes;
 use futures::Future;
 use tokio_buf::BufStreamExt;
 
-#[macro_use]
 mod support;
-
 use support::*;
 
 macro_rules! test_collect_impl {

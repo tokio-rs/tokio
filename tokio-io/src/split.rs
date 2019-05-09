@@ -1,10 +1,8 @@
-use std::io::{self, Read, Write};
-
+use crate::{AsyncRead, AsyncWrite};
 use bytes::{Buf, BufMut};
 use futures::sync::BiLock;
-use futures::{Async, Poll};
-
-use {AsyncRead, AsyncWrite};
+use futures::{try_ready, Async, Poll};
+use std::io::{self, Read, Write};
 
 /// The readable half of an object returned from `AsyncRead::split`.
 #[derive(Debug)]

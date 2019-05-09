@@ -1,11 +1,10 @@
-use bytes::BufMut;
-use futures::{Async, Poll};
-use std::io as std_io;
-
 #[allow(deprecated)]
-use codec::{Decoder, Encoder, Framed};
-use split::{ReadHalf, WriteHalf};
-use {framed, split, AsyncWrite};
+use crate::codec::{Decoder, Encoder, Framed};
+use crate::split::{ReadHalf, WriteHalf};
+use crate::{framed, split, AsyncWrite};
+use bytes::BufMut;
+use futures::{try_ready, Async, Poll};
+use std::io as std_io;
 
 /// Read bytes asynchronously.
 ///

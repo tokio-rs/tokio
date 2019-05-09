@@ -1,4 +1,4 @@
-use SizeHint;
+use crate::SizeHint;
 
 use bytes::{Buf, BufMut, Bytes};
 
@@ -138,7 +138,7 @@ impl<T: Buf> FromBufStream<T> for Bytes {
 }
 
 impl fmt::Display for CollectVecError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "BufStream is too big")
     }
 }
@@ -150,7 +150,7 @@ impl Error for CollectVecError {
 }
 
 impl fmt::Display for CollectBytesError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "BufStream too big")
     }
 }

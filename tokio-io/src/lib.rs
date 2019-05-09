@@ -9,16 +9,8 @@
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
-#[macro_use]
-extern crate log;
-
-#[macro_use]
-extern crate futures;
-extern crate bytes;
-
-use std::io as std_io;
-
 use futures::{Future, Stream};
+use std::io as std_io;
 
 /// A convenience typedef around a `Future` whose error component is `io::Error`
 pub type IoFuture<T> = Box<Future<Item = T, Error = std_io::Error> + Send>;

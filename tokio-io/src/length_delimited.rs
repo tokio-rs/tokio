@@ -1,12 +1,9 @@
 #![allow(deprecated)]
 
-use {codec, AsyncRead, AsyncWrite};
-
+use crate::{codec, AsyncRead, AsyncWrite};
 use bytes::buf::Chain;
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
-
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
-
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};

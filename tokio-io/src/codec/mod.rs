@@ -27,10 +27,9 @@ pub use self::bytes_codec::BytesCodec;
 pub use self::decoder::Decoder;
 pub use self::encoder::Encoder;
 pub use self::lines_codec::LinesCodec;
-
-pub use framed::{Framed, FramedParts};
-pub use framed_read::FramedRead;
-pub use framed_write::FramedWrite;
+pub use crate::framed::{Framed, FramedParts};
+pub use crate::framed_read::FramedRead;
+pub use crate::framed_write::FramedWrite;
 
 #[deprecated(since = "0.1.8", note = "Moved to tokio-codec")]
 #[doc(hidden)]
@@ -374,5 +373,5 @@ pub mod length_delimited {
     //! [`Encoder`]: ../trait.Encoder.html
     //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
-    pub use length_delimited::*;
+    pub use crate::length_delimited::*;
 }

@@ -1,6 +1,6 @@
+use crate::{AsyncRead, AsyncWrite};
 use futures::{Async, Poll};
 use std::{fmt, io};
-use {AsyncRead, AsyncWrite};
 
 /// A simple wrapper type which allows types that only implement
 /// `std::io::Read` or `std::io::Write` to be used in contexts which expect

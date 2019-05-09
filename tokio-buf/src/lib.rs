@@ -1,5 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-buf/0.1.1")]
-#![deny(missing_docs, missing_debug_implementations, unreachable_pub)]
+#![deny(missing_docs, missing_debug_implementations, unreachable_pub, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 
 //! Asynchronous stream of bytes.
@@ -8,13 +8,6 @@
 //! this trait. The trait is similar to `Stream` in the `futures` library, but
 //! instead of yielding arbitrary values, it only yields types that implement
 //! `Buf` (i.e, byte collections).
-
-extern crate bytes;
-#[cfg(feature = "util")]
-extern crate either;
-#[allow(unused)]
-#[macro_use]
-extern crate futures;
 
 mod never;
 mod size_hint;
@@ -26,7 +19,7 @@ pub mod util;
 pub use self::size_hint::SizeHint;
 #[doc(inline)]
 #[cfg(feature = "util")]
-pub use util::BufStreamExt;
+pub use crate::util::BufStreamExt;
 
 use bytes::Buf;
 use futures::Poll;

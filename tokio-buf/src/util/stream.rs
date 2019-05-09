@@ -1,6 +1,6 @@
 use bytes::Buf;
 use futures::{Async, Poll, Stream};
-use BufStream;
+use crate::BufStream;
 
 /// Converts a `Stream` of `Buf` types into a `BufStream`.
 ///

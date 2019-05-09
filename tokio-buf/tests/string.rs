@@ -1,12 +1,7 @@
-extern crate bytes;
-extern crate futures;
-extern crate tokio_buf;
-
 use futures::Async::*;
 use std::fmt;
 use tokio_buf::BufStream;
 
-#[macro_use]
 mod support;
 
 fn test_hello_world<B>(mut bs: B)

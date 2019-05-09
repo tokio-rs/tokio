@@ -1,14 +1,13 @@
 #![allow(deprecated)]
 
+use super::framed::Fuse;
+use crate::codec::{Decoder, Encoder};
+use crate::{AsyncRead, AsyncWrite};
+use bytes::BytesMut;
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use log::trace;
 use std::fmt;
 use std::io::{self, Read};
-
-use super::framed::Fuse;
-use codec::{Decoder, Encoder};
-use {AsyncRead, AsyncWrite};
-
-use bytes::BytesMut;
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
 pub struct FramedWrite<T, E> {
