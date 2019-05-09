@@ -9,6 +9,7 @@ name = "tokio-current-thread"
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
 version = "0.1.6"
+edition = "2018"
 documentation = "https://docs.rs/tokio-current-thread/0.1.6/tokio_current_thread"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
@@ -19,6 +20,7 @@ Single threaded executor which manage many tasks concurrently on the current thr
 """
 keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
+publish = false
 
 [dependencies]
 tokio-executor = "0.1.7"
