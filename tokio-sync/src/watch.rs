@@ -58,8 +58,7 @@
 
 use fnv::FnvHashMap;
 use futures::task::AtomicTask;
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
-
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -97,7 +96,7 @@ pub struct Sender<T> {
 /// long lived borrows could cause the produce half to block. It is recommended
 /// to keep the borrow as short lived as possible.
 #[derive(Debug)]
-pub struct Ref<'a, T: 'a> {
+pub struct Ref<'a, T> {
     inner: RwLockReadGuard<'a, T>,
 }
 
@@ -121,7 +120,7 @@ pub mod error {
     // ===== impl RecvError =====
 
     impl fmt::Display for RecvError {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             use std::error::Error;
             write!(fmt, "{}", self.description())
         }
@@ -136,7 +135,7 @@ pub mod error {
     // ===== impl SendError =====
 
     impl<T: fmt::Debug> fmt::Display for SendError<T> {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             use std::error::Error;
             write!(fmt, "{}", self.description())
         }
@@ -255,7 +254,7 @@ impl<T> Receiver<T> {
     /// let (_, rx) = watch::channel("hello");
     /// assert_eq!(*rx.get_ref(), "hello");
     /// ```
-    pub fn get_ref(&self) -> Ref<T> {
+    pub fn get_ref(&self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
         Ref { inner }
     }
@@ -268,7 +267,7 @@ impl<T> Receiver<T> {
     ///
     /// Only the **most recent** value is returned. If the receiver is falling
     /// behind the sender, intermediate values are dropped.
-    pub fn poll_ref(&mut self) -> Poll<Option<Ref<T>>, error::RecvError> {
+    pub fn poll_ref(&mut self) -> Poll<Option<Ref<'_, T>>, error::RecvError> {
         // Make sure the task is up to date
         self.inner.task.register();
 

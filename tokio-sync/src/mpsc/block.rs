@@ -1,9 +1,8 @@
-use loom::{
+use crate::loom::{
     self,
     sync::atomic::{AtomicPtr, AtomicUsize},
     sync::CausalCell,
 };
-
 use std::mem::{self, ManuallyDrop};
 use std::ops;
 use std::ptr::{self, NonNull};

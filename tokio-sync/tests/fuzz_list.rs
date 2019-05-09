@@ -1,6 +1,5 @@
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
 #[macro_use]
 extern crate loom;
 
@@ -21,12 +20,11 @@ mod block;
 const BLOCK_CAP: usize = 2;
 
 use loom::thread;
-
 use std::sync::Arc;
 
 #[test]
 fn smoke() {
-    use block::Read::*;
+    use crate::block::Read::*;
 
     const NUM_TX: usize = 2;
     const NUM_MSG: usize = 2;

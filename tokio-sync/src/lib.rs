@@ -1,14 +1,10 @@
 #![doc(html_root_url = "https://docs.rs/tokio-sync/0.1.5")]
-#![deny(missing_debug_implementations, missing_docs, unreachable_pub)]
+#![deny(missing_debug_implementations, missing_docs, unreachable_pub, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 
 //! Asynchronous synchronization primitives.
 //!
 //! This crate provides primitives for synchronizing asynchronous tasks.
-
-extern crate fnv;
-#[macro_use]
-extern crate futures;
 
 macro_rules! debug {
     ($($t:tt)*) => {

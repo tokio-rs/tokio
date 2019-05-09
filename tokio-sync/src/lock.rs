@@ -43,8 +43,8 @@
 //!   [`Lock`]: struct.Lock.html
 //!   [`LockGuard`]: struct.LockGuard.html
 
+use crate::semaphore;
 use futures::Async;
-use semaphore;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -176,7 +176,7 @@ impl<T> DerefMut for LockGuard<T> {
 }
 
 impl<T: fmt::Display> fmt::Display for LockGuard<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
 }

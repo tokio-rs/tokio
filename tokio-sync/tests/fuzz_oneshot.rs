@@ -1,13 +1,11 @@
-#![deny(warnings)]
-
-extern crate futures;
-extern crate loom;
+#![deny(warnings, rust_2018_idioms)]
 
 #[path = "../src/oneshot.rs"]
 #[allow(warnings)]
 mod oneshot;
 
-use futures::{Async, Future};
+use futures::{self, Async, Future};
+use loom;
 use loom::futures::block_on;
 use loom::thread;
 

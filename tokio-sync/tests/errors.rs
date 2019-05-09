@@ -1,6 +1,4 @@
-#![deny(warnings)]
-
-extern crate tokio_sync;
+#![deny(warnings, rust_2018_idioms)]
 
 fn is_error<T: ::std::error::Error + Send + Sync>() {}
 

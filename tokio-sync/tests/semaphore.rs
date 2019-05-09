@@ -1,9 +1,6 @@
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate tokio_mock_task;
-extern crate tokio_sync;
-
+use futures;
 use tokio_mock_task::*;
 use tokio_sync::semaphore::{Permit, Semaphore};
 
