@@ -1,13 +1,10 @@
 #![cfg(feature = "async-await-preview")]
 #![feature(async_await, await_macro)]
 #![doc(html_root_url = "https://docs.rs/tokio-futures/0.1.0")]
-#![deny(missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 
 //! A preview of Tokio w/ `async` / `await` support.
-
-extern crate futures;
-extern crate tokio_io;
 
 /// Extracts the successful type of a `Poll<Result<T, E>>`.
 ///

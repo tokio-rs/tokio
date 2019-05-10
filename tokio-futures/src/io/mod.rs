@@ -183,7 +183,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// assert_eq!(output, [1, 2, 3, 4, 0]);
     /// });
     /// ```
-    fn flush_async<'a>(&mut self) -> Flush<Self> {
+    fn flush_async<'a>(&mut self) -> Flush<'_, Self> {
         Flush::new(self)
     }
 }

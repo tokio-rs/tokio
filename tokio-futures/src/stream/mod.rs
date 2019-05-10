@@ -27,7 +27,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(stream.next().await, None);
     /// });
     /// ```
-    fn next(&mut self) -> Next<Self>
+    fn next(&mut self) -> Next<'_, Self>
     where
         Self: Sized + Unpin,
     {

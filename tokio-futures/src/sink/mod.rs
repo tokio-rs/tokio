@@ -13,7 +13,7 @@ pub trait SinkExt: Sink {
     /// Note that, **because of the flushing requirement, it is usually better
     /// to batch together items to send via `send_all`, rather than flushing
     /// between each item.**
-    fn send_async(&mut self, item: Self::SinkItem) -> Send<Self>
+    fn send_async(&mut self, item: Self::SinkItem) -> Send<'_, Self>
     where
         Self: Sized + Unpin,
     {

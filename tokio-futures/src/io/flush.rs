@@ -1,5 +1,4 @@
 use tokio_io::AsyncWrite;
-
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -7,7 +6,7 @@ use std::task::{Context, Poll};
 
 /// A future used to fully flush an I/O object.
 #[derive(Debug)]
-pub struct Flush<'a, T: ?Sized + 'a> {
+pub struct Flush<'a, T: ?Sized> {
     writer: &'a mut T,
 }
 
@@ -23,7 +22,7 @@ impl<'a, T: AsyncWrite + ?Sized> Flush<'a, T> {
 impl<'a, T: AsyncWrite + ?Sized> Future for Flush<'a, T> {
     type Output = io::Result<()>;
 
-    fn poll(mut self: Pin<&mut Self>, _context: &mut Context) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
         convert_poll(self.writer.poll_flush())
     }
