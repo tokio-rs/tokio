@@ -45,6 +45,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::symlink_file(&self.src, &self.dst))
+        crate::blocking_io(|| fs::symlink_file(&self.src, &self.dst))
     }
 }

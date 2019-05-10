@@ -23,7 +23,7 @@ use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
 
-use IoFuture;
+use crate::IoFuture;
 
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;

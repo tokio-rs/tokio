@@ -129,7 +129,7 @@ pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<IoStream<()>> {
         // Use lazy to ensure that `ctrl_c` gets called while on an event loop
         Box::new(future::lazy(move || {
             windows::Event::ctrl_c_handle(&handle)
-                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>)
+                .map(|x| Box::new(x) as Box<dyn Stream<Item = _, Error = _> + Send>)
         }))
     }
 }
