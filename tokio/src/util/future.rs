@@ -39,8 +39,6 @@ pub trait FutureExt: Future {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::prelude::*;
     /// use std::time::Duration;
     /// # use futures::future::{self, FutureResult};

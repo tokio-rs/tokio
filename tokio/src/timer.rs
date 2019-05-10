@@ -52,13 +52,11 @@
 //! included in the prelude.
 //!
 //! ```
-//! # extern crate futures;
-//! # extern crate tokio;
 //! use tokio::prelude::*;
 //!
-//! use std::time::{Duration, Instant};
+//! use std::time::Duration;
 //!
-//! fn long_op() -> Box<Future<Item = (), Error = ()> + Send> {
+//! fn long_op() -> Box<dyn Future<Item = (), Error = ()> + Send> {
 //!     // ...
 //! # Box::new(futures::future::ok(()))
 //! }

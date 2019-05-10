@@ -21,7 +21,6 @@
 //! Let's start with a basic example, establishing a TCP connection.
 //!
 //! ```rust
-//! # extern crate tokio;
 //! # fn dox() {
 //! use tokio::prelude::*;
 //! use tokio::net::TcpStream;

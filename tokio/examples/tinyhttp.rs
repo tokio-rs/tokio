@@ -15,8 +15,6 @@
 
 use http;
 use httparse;
-#[macro_use]
-extern crate serde_derive;
 use bytes::BytesMut;
 use http::header::HeaderValue;
 use http::{Request, Response, StatusCode};

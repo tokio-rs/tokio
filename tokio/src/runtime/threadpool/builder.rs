@@ -27,9 +27,6 @@ use super::{Inner, Runtime};
 /// # Examples
 ///
 /// ```
-/// extern crate tokio;
-/// extern crate tokio_timer;
-///
 /// use std::time::Duration;
 ///
 /// use tokio::runtime::Builder;
@@ -110,8 +107,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -140,8 +135,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -172,8 +165,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -202,8 +193,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     /// use std::time::Duration;
     ///
@@ -229,8 +218,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -255,8 +242,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -278,8 +263,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -304,8 +287,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -330,7 +311,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::runtime::Builder;
     /// # pub fn main() {
     /// let runtime = Builder::new().build().unwrap();

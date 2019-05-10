@@ -8,17 +8,11 @@ Core I/O abstractions for the Tokio stack.
 
 ## Usage
 
-First, add this to your `Cargo.toml`:
+Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 tokio-io = "0.1"
-```
-
-Next, add this to your crate:
-
-```rust
-extern crate tokio_io;
 ```
 
 You can find extensive documentation and examples about how to use this crate

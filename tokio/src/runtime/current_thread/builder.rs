@@ -21,9 +21,6 @@ use std::io;
 /// # Examples
 ///
 /// ```
-/// extern crate tokio;
-/// extern crate tokio_timer;
-///
 /// use tokio::runtime::current_thread::Builder;
 /// use tokio_timer::clock::Clock;
 ///

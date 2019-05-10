@@ -26,8 +26,6 @@ impl TaskExecutor {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::Runtime;
     ///

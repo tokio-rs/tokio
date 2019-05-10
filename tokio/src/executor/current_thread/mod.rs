@@ -19,8 +19,6 @@
 //! For example:
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate futures;
 //! # use tokio::executor::current_thread;
 //! use futures::future::lazy;
 //!
@@ -47,8 +45,6 @@
 //! More fine-grain control can be achieved by using [`CurrentThread`] directly.
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate futures;
 //! # use tokio::executor::current_thread::CurrentThread;
 //! use futures::future::{lazy, empty};
 //! use std::time::Duration;

@@ -95,12 +95,10 @@ pub struct Spawn(());
 /// that processes each received connection.
 ///
 /// ```rust
-/// # extern crate tokio;
-/// # extern crate futures;
 /// # use futures::{Future, Stream};
 /// use tokio::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
 /// # unimplemented!();
 /// # }
 /// # fn dox() {

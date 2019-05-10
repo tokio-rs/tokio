@@ -16,10 +16,6 @@ tokio-signal = "0.2.8"
 Next you can use this in conjunction with the `tokio` and `futures` crates:
 
 ```rust,no_run
-extern crate futures;
-extern crate tokio;
-extern crate tokio_signal;
-
 use futures::{Future, Stream};
 
 fn main() {

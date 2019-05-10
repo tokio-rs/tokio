@@ -24,8 +24,6 @@
 //! For example:
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate futures;
 //! use tokio::runtime::current_thread::Runtime;
 //! use tokio::prelude::*;
 //! use std::thread;

@@ -2,6 +2,7 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(feature = "async-await-preview", feature(async_await, await_macro))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -29,8 +30,6 @@
 //! A simple TCP echo server:
 //!
 //! ```no_run
-//! extern crate tokio;
-//!
 //! use tokio::prelude::*;
 //! use tokio::io::copy;
 //! use tokio::net::TcpListener;

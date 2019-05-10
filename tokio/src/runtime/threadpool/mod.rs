@@ -67,12 +67,10 @@ struct Inner {
 /// # Examples
 ///
 /// ```rust
-/// # extern crate tokio;
-/// # extern crate futures;
 /// # use futures::{Future, Stream};
 /// use tokio::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
 /// # unimplemented!();
 /// # }
 /// # fn dox() {
@@ -213,8 +211,6 @@ impl Runtime {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::Runtime;
     ///

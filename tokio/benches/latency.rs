@@ -1,15 +1,13 @@
 #![feature(test)]
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
 extern crate test;
-#[macro_use]
-extern crate futures;
-extern crate tokio;
 
 use std::io;
 use std::net::SocketAddr;
 use std::thread;
 
+use futures::try_ready;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{Future, Poll, Sink, Stream};

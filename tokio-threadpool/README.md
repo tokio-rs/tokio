@@ -24,9 +24,6 @@ It's 10x slower.
 ## Examples
 
 ```rust
-extern crate tokio_threadpool;
-extern crate futures;
-
 use tokio_threadpool::ThreadPool;
 use futures::{Future, lazy};
 use futures::sync::oneshot;

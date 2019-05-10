@@ -6,17 +6,11 @@ Asynchronous stream of byte buffers
 
 ## Usage
 
-First, add this to your `Cargo.toml`:
+Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 tokio-buf = "0.1.1"
-```
-
-Next, add this to your crate:
-
-```rust
-extern crate tokio_buf;
 ```
 
 You can find extensive documentation and examples about how to use this crate

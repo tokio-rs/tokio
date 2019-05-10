@@ -144,8 +144,6 @@ impl Runtime {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::current_thread::Runtime;
     ///
