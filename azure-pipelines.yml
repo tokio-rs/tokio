@@ -76,7 +76,7 @@ jobs:
   parameters:
     name: test_nightly
     displayName: Test Async / Await
-    rust: nightly-2019-04-25
+    rust: nightly-2019-05-09
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml

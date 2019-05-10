@@ -1,5 +1,5 @@
 #![cfg(feature = "async-await-preview")]
-#![feature(await_macro)]
+#![feature(async_await, await_macro)]
 #![doc(html_root_url = "https://docs.rs/tokio-futures/0.1.0")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
@@ -23,13 +23,8 @@ macro_rules! try_ready {
 }
 
 #[macro_use]
-mod await;
+mod async_wait;
 pub mod compat;
 pub mod io;
 pub mod sink;
 pub mod stream;
-
-// Rename the `await` macro in `std`. This is used by the redefined
-// `await` macro in this crate.
-#[doc(hidden)]
-pub use std::await as std_await;

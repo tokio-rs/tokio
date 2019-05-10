@@ -1,6 +1,6 @@
 #![feature(await_macro, async_await)]
 
-use tokio::await;
+use tokio::async_wait;
 use tokio::codec::{LinesCodec, Decoder};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
@@ -33,7 +33,7 @@ async fn process(stream: TcpStream, state: Arc<Mutex<Shared>>) -> io::Result<()>
     let mut lines = LinesCodec::new().framed(stream);
 
     // Extract the peer's name
-    let name = match await!(lines.next()) {
+    let name = match async_wait!(lines.next()) {
         Some(name) => name?,
         None => {
             // Disconnected early
@@ -56,15 +56,15 @@ async fn process(stream: TcpStream, state: Arc<Mutex<Shared>>) -> io::Result<()>
     // Spawn a task that receives all lines broadcasted to us from other peers
     // and writes it to the client.
     tokio::spawn_async(async move {
-        while let Some(line) = await!(rx.next()) {
+        while let Some(line) = async_wait!(rx.next()) {
             let line = line.unwrap();
-            await!(lines_tx.send_async(line)).unwrap();
+            async_wait!(lines_tx.send_async(line)).unwrap();
         }
     });
 
     // Use the current task to read lines from the socket and broadcast them to
     // other peers.
-    while let Some(message) = await!(lines_rx.next()) {
+    while let Some(message) = async_wait!(lines_rx.next()) {
         // TODO: Error handling
         let message = message.unwrap();
 
@@ -113,7 +113,7 @@ async fn main() {
     // Start the Tokio runtime.
     let mut incoming = listener.incoming();
 
-    while let Some(stream) = await!(incoming.next()) {
+    while let Some(stream) = async_wait!(incoming.next()) {
         let stream = match stream {
             Ok(stream) => stream,
             Err(_) => continue,
@@ -122,7 +122,7 @@ async fn main() {
         let state = state.clone();
 
         tokio::spawn_async(async move {
-            if let Err(_) = await!(process(stream, state)) {
+            if let Err(_) = async_wait!(process(stream, state)) {
                 eprintln!("failed to process connection");
             }
         });

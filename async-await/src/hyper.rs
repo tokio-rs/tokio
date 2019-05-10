@@ -1,6 +1,6 @@
 #![feature(await_macro, async_await)]
 
-use tokio::await;
+use tokio::async_wait;
 use tokio::prelude::*;
 use hyper::Client;
 
@@ -13,7 +13,7 @@ async fn main() {
 
     let uri = "http://httpbin.org/ip".parse().unwrap();
 
-    let response = await!({
+    let response = async_wait!({
         client.get(uri)
             .timeout(Duration::from_secs(10))
     }).unwrap();
@@ -22,7 +22,7 @@ async fn main() {
 
     let mut body = response.into_body();
 
-    while let Some(chunk) = await!(body.next()) {
+    while let Some(chunk) = async_wait!(body.next()) {
         let chunk = chunk.unwrap();
         println!("chunk = {}", str::from_utf8(&chunk[..]).unwrap());
     }
