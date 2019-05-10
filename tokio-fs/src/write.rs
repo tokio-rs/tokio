@@ -1,7 +1,7 @@
-use futures::{Async, Future, Poll};
-use std::{fmt, io, mem, path::Path};
+use crate::{file, File};
+use futures::{try_ready, Async, Future, Poll};
 use tokio_io;
-use {file, File};
+use std::{fmt, io, mem, path::Path};
 
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.

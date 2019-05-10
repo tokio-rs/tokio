@@ -1,11 +1,10 @@
+use futures::{Future, Poll, Stream};
 use std::ffi::OsString;
 use std::fs::{self, DirEntry as StdDirEntry, FileType, Metadata, ReadDir as StdReadDir};
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::DirEntryExt;
 use std::path::{Path, PathBuf};
-
-use futures::{Future, Poll, Stream};
 
 /// Returns a stream over the entries within a directory.
 ///
@@ -45,7 +44,7 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, io::Error> {
-        ::blocking_io(|| Ok(ReadDir(fs::read_dir(&self.path)?)))
+        crate::blocking_io(|| Ok(ReadDir(fs::read_dir(&self.path)?)))
     }
 }
 
@@ -73,7 +72,7 @@ impl Stream for ReadDir {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        ::blocking_io(|| match self.0.next() {
+        crate::blocking_io(|| match self.0.next() {
             Some(Err(err)) => Err(err),
             Some(Ok(item)) => Ok(Some(DirEntry(item))),
             None => Ok(None),
@@ -195,7 +194,7 @@ impl DirEntry {
     /// }
     /// ```
     pub fn poll_metadata(&self) -> Poll<Metadata, io::Error> {
-        ::blocking_io(|| self.0.metadata())
+        crate::blocking_io(|| self.0.metadata())
     }
 
     /// Return the file type for the file that this entry points at.
@@ -231,7 +230,7 @@ impl DirEntry {
     /// }
     /// ```
     pub fn poll_file_type(&self) -> Poll<FileType, io::Error> {
-        ::blocking_io(|| self.0.file_type())
+        crate::blocking_io(|| self.0.file_type())
     }
 }
 

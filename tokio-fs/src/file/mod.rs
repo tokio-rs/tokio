@@ -16,10 +16,8 @@ pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
 pub use self::seek::SeekFuture;
 
-use tokio_io::{AsyncRead, AsyncWrite};
-
 use futures::Poll;
-
+use tokio_io::{AsyncRead, AsyncWrite};
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
@@ -209,7 +207,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
-        ::blocking_io(|| self.std().seek(pos))
+        crate::blocking_io(|| self.std().seek(pos))
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -267,7 +265,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_sync_all(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().sync_all())
+        crate::blocking_io(|| self.std().sync_all())
     }
 
     /// This function is similar to `poll_sync_all`, except that it may not
@@ -300,7 +298,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_sync_data(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().sync_data())
+        crate::blocking_io(|| self.std().sync_data())
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -335,7 +333,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().set_len(size))
+        crate::blocking_io(|| self.std().set_len(size))
     }
 
     /// Queries metadata about the underlying file.
@@ -380,7 +378,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_metadata(&mut self) -> Poll<Metadata, io::Error> {
-        ::blocking_io(|| self.std().metadata())
+        crate::blocking_io(|| self.std().metadata())
     }
 
     /// Create a new `File` instance that shares the same underlying file handle
@@ -405,7 +403,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_try_clone(&mut self) -> Poll<File, io::Error> {
-        ::blocking_io(|| {
+        crate::blocking_io(|| {
             let std = self.std().try_clone()?;
             Ok(File::from_std(std))
         })
@@ -481,7 +479,7 @@ impl File {
     /// }
     /// ```
     pub fn poll_set_permissions(&mut self, perm: Permissions) -> Poll<(), io::Error> {
-        ::blocking_io(|| self.std().set_permissions(perm))
+        crate::blocking_io(|| self.std().set_permissions(perm))
     }
 
     /// Destructures the `tokio_fs::File` into a [`std::fs::File`][std].
@@ -520,7 +518,7 @@ impl File {
 
 impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().read(buf))
+        crate::would_block(|| self.std().read(buf))
     }
 }
 
@@ -532,17 +530,17 @@ impl AsyncRead for File {
 
 impl Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        ::would_block(|| self.std().write(buf))
+        crate::would_block(|| self.std().write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        ::would_block(|| self.std().flush())
+        crate::would_block(|| self.std().flush())
     }
 }
 
 impl AsyncWrite for File {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        ::blocking_io(|| {
+        crate::blocking_io(|| {
             self.std = None;
             Ok(())
         })

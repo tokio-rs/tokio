@@ -1,5 +1,4 @@
 use tokio_io::AsyncRead;
-
 use std::io::{self, Read, Stdin as StdStdin};
 
 /// A handle to the standard input stream of a process.
@@ -33,7 +32,7 @@ pub fn stdin() -> Stdin {
 
 impl Read for Stdin {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        ::would_block(|| self.std.read(buf))
+        crate::would_block(|| self.std.read(buf))
     }
 }
 

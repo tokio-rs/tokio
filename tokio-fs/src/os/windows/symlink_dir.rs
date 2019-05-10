@@ -1,8 +1,7 @@
+use futures::{Future, Poll};
 use std::io;
 use std::os::windows::fs;
 use std::path::Path;
-
-use futures::{Future, Poll};
 
 /// Creates a new directory symlink on the filesystem.
 ///

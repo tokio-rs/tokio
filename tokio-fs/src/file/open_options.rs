@@ -1,8 +1,7 @@
-use super::OpenFuture;
-
 use std::convert::From;
 use std::fs::OpenOptions as StdOpenOptions;
 use std::path::Path;
+use super::OpenFuture;
 
 /// Options and flags which can be used to configure how a file is opened.
 ///

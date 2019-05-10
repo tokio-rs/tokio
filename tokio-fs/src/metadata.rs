@@ -1,10 +1,8 @@
-use super::blocking_io;
-
 use futures::{Future, Poll};
-
 use std::fs::{self, Metadata};
 use std::io;
 use std::path::Path;
+use super::blocking_io;
 
 /// Queries the file system metadata for a path.
 pub fn metadata<P>(path: P) -> MetadataFuture<P>

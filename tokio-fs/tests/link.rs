@@ -1,6 +1,8 @@
-extern crate futures;
-extern crate tempdir;
-extern crate tokio_fs;
+#![deny(warnings, rust_2018_idioms)]
+
+use futures;
+
+
 
 use futures::Future;
 use std::fs;

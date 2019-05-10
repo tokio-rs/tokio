@@ -1,7 +1,7 @@
-use futures::{Async, Future, Poll};
-use std::{io, mem, path::Path};
+use crate::{file, File};
+use futures::{try_ready, Async, Future, Poll};
 use tokio_io;
-use {file, File};
+use std::{io, mem, path::Path};
 
 /// Creates a future which will open a file for reading and read the entire
 /// contents into a buffer and return said buffer.

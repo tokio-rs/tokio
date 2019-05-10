@@ -1,7 +1,5 @@
-use tokio_io::AsyncWrite;
-
 use futures::Poll;
-
+use tokio_io::AsyncWrite;
 use std::io::{self, Stderr as StdStderr, Write};
 
 /// A handle to the standard error stream of a process.
@@ -29,11 +27,11 @@ pub fn stderr() -> Stderr {
 
 impl Write for Stderr {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        ::would_block(|| self.std.write(buf))
+        crate::would_block(|| self.std.write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        ::would_block(|| self.std.flush())
+        crate::would_block(|| self.std.flush())
     }
 }
 

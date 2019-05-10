@@ -1,10 +1,8 @@
-use super::File;
-
-use futures::{Future, Poll};
-
+use futures::{try_ready, Future, Poll};
 use std::fs::OpenOptions as StdOpenOptions;
 use std::io;
 use std::path::Path;
+use super::File;
 
 /// Future returned by `File::open` and resolves to a `File` instance.
 #[derive(Debug)]
@@ -30,7 +28,7 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let std = try_ready!(::blocking_io(|| self.options.open(&self.path)));
+        let std = try_ready!(crate::blocking_io(|| self.options.open(&self.path)));
 
         let file = File::from_std(std);
         Ok(file.into())
