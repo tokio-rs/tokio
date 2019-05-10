@@ -1,15 +1,12 @@
-extern crate futures;
-extern crate tokio_io;
-extern crate tokio_tcp;
-
-use std::io::{Read, Write};
-use std::net::TcpStream;
-use std::thread;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::stream::Stream;
 use futures::Future;
 use tokio_io::io::read_to_end;
 use tokio_tcp::TcpListener;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::thread;
 
 macro_rules! t {
     ($e:expr) => {

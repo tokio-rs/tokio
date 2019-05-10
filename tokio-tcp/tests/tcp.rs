@@ -1,14 +1,10 @@
-extern crate env_logger;
-extern crate futures;
-extern crate mio;
-extern crate tokio_io;
-extern crate tokio_tcp;
+#![deny(warnings, rust_2018_idioms)]
 
-use std::sync::mpsc::channel;
-use std::{net, thread};
-
+use env_logger;
 use futures::{Future, Stream};
 use tokio_tcp::{TcpListener, TcpStream};
+use std::sync::mpsc::channel;
+use std::{net, thread};
 
 macro_rules! t {
     ($e:expr) => {

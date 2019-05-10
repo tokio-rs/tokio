@@ -1,13 +1,12 @@
-use super::Incoming;
-use super::TcpStream;
-
+use futures::{try_ready, Async, Poll};
+use mio;
+use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
+use super::Incoming;
+use super::TcpStream;
 
-use futures::{Async, Poll};
-use mio;
-use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
@@ -362,7 +361,7 @@ impl TcpListener {
 }
 
 impl fmt::Debug for TcpListener {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

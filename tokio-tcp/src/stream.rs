@@ -1,15 +1,14 @@
+use bytes::{Buf, BufMut};
+use futures::{try_ready, Async, Future, Poll};
+use iovec::IoVec;
+use mio;
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
 use std::net::{self, Shutdown, SocketAddr};
 use std::time::Duration;
-
-use bytes::{Buf, BufMut};
-use futures::{Async, Future, Poll};
-use iovec::IoVec;
-use mio;
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP stream connected to a remote endpoint.
 ///
@@ -948,7 +947,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
 }
 
 impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

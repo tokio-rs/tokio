@@ -1,5 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.3")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
 
 //! TCP bindings for `tokio`.
 //!
@@ -21,14 +22,6 @@
 //! [`TcpListener`]: struct.TcpListener.html
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
-
-extern crate bytes;
-#[macro_use]
-extern crate futures;
-extern crate iovec;
-extern crate mio;
-extern crate tokio_io;
-extern crate tokio_reactor;
 
 mod incoming;
 mod listener;
