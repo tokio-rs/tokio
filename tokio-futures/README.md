@@ -42,7 +42,7 @@ fn main() {
 
 Because nightly is required, run the app with `cargo +nightly run`
 
-Check the [examples](examples) directory for more.
+Check the [examples](/async-await) directory for more.
 
 ## License
 
