@@ -29,8 +29,6 @@ use std::time::{Duration, Instant};
 /// example:
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate tokio;
 /// // import the `timeout` function, usually this is done
 /// // with `use tokio::prelude::*`
 /// use tokio::prelude::FutureExt;
@@ -38,7 +36,6 @@ use std::time::{Duration, Instant};
 /// use futures::sync::mpsc;
 /// use std::time::Duration;
 ///
-/// # fn main() {
 /// let (tx, rx) = mpsc::unbounded();
 /// # tx.unbounded_send(()).unwrap();
 /// # drop(tx);
@@ -53,7 +50,6 @@ use std::time::{Duration, Instant};
 /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
 /// process.timeout(Duration::from_millis(10))
 /// # ).unwrap();
-/// # }
 /// ```
 ///
 /// # Cancelation
@@ -105,14 +101,11 @@ impl<T> Timeout<T> {
     /// Create a new `Timeout` set to expire in 10 milliseconds.
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio;
     /// use tokio::timer::Timeout;
     /// use futures::Future;
     /// use futures::sync::oneshot;
     /// use std::time::Duration;
     ///
-    /// # fn main() {
     /// let (tx, rx) = oneshot::channel();
     /// # tx.send(()).unwrap();
     ///
@@ -120,7 +113,6 @@ impl<T> Timeout<T> {
     /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
     /// Timeout::new(rx, Duration::from_millis(10))
     /// # ).unwrap();
-    /// # }
     /// ```
     pub fn new(value: T, timeout: Duration) -> Timeout<T> {
         let delay = Delay::new_timeout(now() + timeout, timeout);
