@@ -20,7 +20,6 @@
 
 use futures::executor::{spawn, Notify};
 use futures::{future, Async};
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
