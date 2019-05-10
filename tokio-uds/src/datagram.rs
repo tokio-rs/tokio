@@ -2,13 +2,13 @@ use crate::{RecvDgram, SendDgram};
 use futures::{try_ready, Async, Poll};
 use mio::Ready;
 use mio_uds;
-use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a Unix datagram socket.
 pub struct UnixDatagram {

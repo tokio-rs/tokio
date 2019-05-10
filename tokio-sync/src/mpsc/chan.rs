@@ -1,3 +1,4 @@
+use super::list;
 use crate::loom::{
     futures::AtomicTask,
     sync::atomic::AtomicUsize,
@@ -7,7 +8,6 @@ use futures::Poll;
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
-use super::list;
 
 /// Channel sender
 pub(crate) struct Tx<T, S: Semaphore> {

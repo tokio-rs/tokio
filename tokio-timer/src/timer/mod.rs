@@ -52,13 +52,13 @@ pub(crate) use self::registration::Registration;
 use crate::atomic::AtomicU64;
 use crate::wheel;
 use crate::Error;
-use tokio_executor::park::{Park, ParkThread, Unpark};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::usize;
 use std::{cmp, fmt};
+use tokio_executor::park::{Park, ParkThread, Unpark};
 
 /// Timer implementation that drives [`Delay`], [`Interval`], and [`Timeout`].
 ///

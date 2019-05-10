@@ -1,8 +1,8 @@
+use super::File;
 use futures::{try_ready, Future, Poll};
 use std::fs::File as StdFile;
 use std::fs::Metadata;
 use std::io;
-use super::File;
 
 const POLL_AFTER_RESOLVE: &str = "Cannot poll MetadataFuture after it resolves";
 

@@ -2,11 +2,11 @@
 
 use futures::stream::Stream;
 use futures::Future;
-use tokio_io::io::read_to_end;
-use tokio_tcp::TcpListener;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::thread;
+use tokio_io::io::read_to_end;
+use tokio_tcp::TcpListener;
 
 macro_rules! t {
     ($e:expr) => {

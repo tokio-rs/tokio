@@ -2,9 +2,9 @@
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
 use futures::{Future, Stream};
+use std::io::{self, Read};
 use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
 use tokio_io::AsyncRead;
-use std::io::{self, Read};
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
 

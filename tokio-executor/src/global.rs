@@ -1,6 +1,6 @@
+use super::{Enter, Executor, SpawnError};
 use futures::{future, Future};
 use std::cell::Cell;
-use super::{Enter, Executor, SpawnError};
 
 /// Executes futures on the default executor for the current execution context.
 ///

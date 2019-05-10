@@ -17,10 +17,10 @@ pub use self::open_options::OpenOptions;
 pub use self::seek::SeekFuture;
 
 use futures::Poll;
-use tokio_io::{AsyncRead, AsyncWrite};
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
+use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A reference to an open file on the filesystem.
 ///

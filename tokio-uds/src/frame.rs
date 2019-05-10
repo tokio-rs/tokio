@@ -1,11 +1,11 @@
+use super::UnixDatagram;
 use bytes::{BufMut, BytesMut};
 use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
-use tokio_codec::{Decoder, Encoder};
 use log::trace;
 use std::io;
 use std::os::unix::net::SocketAddr;
 use std::path::Path;
-use super::UnixDatagram;
+use tokio_codec::{Decoder, Encoder};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UnixDatagram`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.

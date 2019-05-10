@@ -1,6 +1,6 @@
+use super::chan;
 use futures::{Poll, Sink, StartSend, Stream};
 use std::fmt;
-use super::chan;
 
 /// Send values to the associated `Receiver`.
 ///

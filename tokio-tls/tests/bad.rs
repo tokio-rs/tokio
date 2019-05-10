@@ -4,11 +4,11 @@ use cfg_if::cfg_if;
 use env_logger;
 use futures::Future;
 use native_tls::TlsConnector;
+use std::io::{self, Error};
+use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio_tls;
-use std::io::{self, Error};
-use std::net::ToSocketAddrs;
 
 macro_rules! t {
     ($e:expr) => {

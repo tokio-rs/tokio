@@ -4,8 +4,8 @@
 mod support;
 use crate::support::*;
 
-use futures::{future, Future};
 use futures::sync::oneshot;
+use futures::{future, Future};
 use tokio_timer::*;
 
 #[test]

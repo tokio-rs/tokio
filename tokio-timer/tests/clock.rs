@@ -1,9 +1,9 @@
 #![deny(warnings, rust_2018_idioms)]
 
+use std::time::Instant;
 use tokio_executor;
 use tokio_timer::clock;
 use tokio_timer::clock::*;
-use std::time::Instant;
 
 struct ConstNow(Instant);
 

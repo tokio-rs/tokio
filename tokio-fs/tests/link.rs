@@ -2,8 +2,6 @@
 
 use futures;
 
-
-
 use futures::Future;
 use std::fs;
 use std::io::prelude::*;

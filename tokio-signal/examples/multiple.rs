@@ -2,10 +2,6 @@
 
 //! A small example of how to listen for two signals at the same time
 
-
-
-
-
 // A trick to not fail build on non-unix platforms when using unix-specific features.
 #[cfg(unix)]
 mod platform {

@@ -5,12 +5,12 @@ use env_logger;
 use futures::Future;
 use native_tls;
 use native_tls::TlsConnector;
-use tokio_tls;
+use std::io;
+use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio_io::io::{flush, read_to_end, write_all};
-use std::io;
-use std::net::ToSocketAddrs;
+use tokio_tls;
 
 macro_rules! t {
     ($e:expr) => {

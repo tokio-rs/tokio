@@ -4,10 +4,10 @@
 use native_tls;
 use native_tls::Identity;
 use tokio;
-use tokio_tls;
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
+use tokio_tls;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Bind the server's socket

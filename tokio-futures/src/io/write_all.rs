@@ -1,9 +1,9 @@
-use tokio_io::AsyncWrite;
 use std::future::Future;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{self, Poll};
+use tokio_io::AsyncWrite;
 
 /// A future used to write the entire contents of a buffer.
 #[derive(Debug)]

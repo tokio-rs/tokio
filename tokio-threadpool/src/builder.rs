@@ -8,14 +8,14 @@ use crate::worker::{self, Worker, WorkerId};
 use crossbeam_deque::Injector;
 use log::trace;
 use num_cpus;
-use tokio_executor::park::Park;
-use tokio_executor::Enter;
 use std::any::Any;
 use std::cmp::max;
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio_executor::park::Park;
+use tokio_executor::Enter;
 
 /// Builds a thread pool with custom configuration values.
 ///

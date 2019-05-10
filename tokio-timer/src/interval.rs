@@ -1,5 +1,5 @@
-use crate::Delay;
 use crate::clock;
+use crate::Delay;
 use futures::{try_ready, Future, Poll, Stream};
 use std::time::{Duration, Instant};
 

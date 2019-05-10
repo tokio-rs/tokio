@@ -1,8 +1,8 @@
+use crate::BufStream;
 use bytes::Buf;
 use futures::Poll;
 use std::error::Error;
 use std::fmt;
-use crate::BufStream;
 
 /// Converts an `Iterator` into a `BufStream` which is always ready to yield the
 /// next value.

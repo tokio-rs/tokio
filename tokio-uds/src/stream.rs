@@ -5,14 +5,14 @@ use iovec::{self, IoVec};
 use libc;
 use mio::Ready;
 use mio_uds;
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_reactor::{Handle, PollEvented};
 
 /// A structure representing a connected Unix socket.
 ///

@@ -80,10 +80,10 @@ pub mod impl_linux {
     target_os = "openbsd"
 ))]
 pub mod impl_macos {
+    use crate::UnixStream;
     use libc::getpeereid;
     use std::os::unix::io::AsRawFd;
     use std::{io, mem};
-    use crate::UnixStream;
 
     pub fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
@@ -149,9 +149,9 @@ pub mod impl_solaris {
 #[cfg(not(target_os = "dragonfly"))]
 #[cfg(test)]
 mod test {
+    use crate::UnixStream;
     use libc::getegid;
     use libc::geteuid;
-    use crate::UnixStream;
 
     #[test]
     #[cfg_attr(

@@ -1,8 +1,8 @@
-use tokio_io::AsyncWrite;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{self, Poll};
+use tokio_io::AsyncWrite;
 
 /// A future used to write data.
 #[derive(Debug)]

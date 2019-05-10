@@ -1,5 +1,10 @@
 #![doc(html_root_url = "https://docs.rs/tokio-buf/0.1.1")]
-#![deny(missing_docs, missing_debug_implementations, unreachable_pub, rust_2018_idioms)]
+#![deny(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    rust_2018_idioms
+)]
 #![cfg_attr(test, deny(warnings))]
 
 //! Asynchronous stream of bytes.

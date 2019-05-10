@@ -2,12 +2,12 @@ use crate::{Incoming, UnixStream};
 use futures::{try_ready, Async, Poll};
 use mio::Ready;
 use mio_uds;
-use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use tokio_reactor::{Handle, PollEvented};
 
 /// A Unix socket which can accept connections from other Unix sockets.
 pub struct UnixListener {

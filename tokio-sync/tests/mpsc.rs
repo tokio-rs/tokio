@@ -2,10 +2,10 @@
 
 use futures;
 use futures::prelude::*;
-use tokio_mock_task::*;
-use tokio_sync::mpsc;
 use std::sync::Arc;
 use std::thread;
+use tokio_mock_task::*;
+use tokio_sync::mpsc;
 
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}

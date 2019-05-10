@@ -3,11 +3,11 @@
 use bytes::{BufMut, BytesMut};
 use env_logger;
 use futures::{Future, Poll, Sink, Stream};
+use std::io;
+use std::net::SocketAddr;
 use tokio_codec::{Decoder, Encoder};
 use tokio_io::try_nb;
 use tokio_udp::{UdpFramed, UdpSocket};
-use std::io;
-use std::net::SocketAddr;
 
 macro_rules! t {
     ($e:expr) => {

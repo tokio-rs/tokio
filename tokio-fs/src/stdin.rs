@@ -1,5 +1,5 @@
-use tokio_io::AsyncRead;
 use std::io::{self, Read, Stdin as StdStdin};
+use tokio_io::AsyncRead;
 
 /// A handle to the standard input stream of a process.
 ///

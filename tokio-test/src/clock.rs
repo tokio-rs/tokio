@@ -22,13 +22,13 @@
 //! ```
 
 use futures::{future::lazy, Future};
-use tokio_executor::park::{Park, Unpark};
-use tokio_timer::clock::{Clock, Now};
-use tokio_timer::Timer;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tokio_executor::park::{Park, Unpark};
+use tokio_timer::clock::{Clock, Now};
+use tokio_timer::Timer;
 
 /// Run the provided closure with a `MockClock` that starts at the current time.
 pub fn mock<F, R>(f: F) -> R

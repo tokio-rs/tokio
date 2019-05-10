@@ -2,10 +2,10 @@
 
 use bytes::{BufMut, BytesMut};
 use futures::{Poll, Sink};
-use tokio_codec::{Encoder, FramedWrite};
-use tokio_io::AsyncWrite;
 use std::collections::VecDeque;
 use std::io::{self, Write};
+use tokio_codec::{Encoder, FramedWrite};
+use tokio_io::AsyncWrite;
 
 macro_rules! mock {
     ($($x:expr,)*) => {{

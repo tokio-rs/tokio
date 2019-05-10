@@ -48,9 +48,6 @@ use crate::sharded_rwlock::RwLock;
 use futures::task::Task;
 use log::{debug, log_enabled, trace, Level};
 use mio::event::Evented;
-use tokio_executor::park::{Park, Unpark};
-use tokio_executor::Enter;
-use tokio_sync::task::AtomicTask;
 use slab::Slab;
 use std::cell::RefCell;
 use std::error::Error;
@@ -63,6 +60,9 @@ use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 use std::{fmt, usize};
+use tokio_executor::park::{Park, Unpark};
+use tokio_executor::Enter;
+use tokio_sync::task::AtomicTask;
 
 /// The core reactor, or event loop.
 ///

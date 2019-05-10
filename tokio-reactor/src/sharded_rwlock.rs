@@ -16,7 +16,6 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Mutex;
 use std::thread::{self, ThreadId};
 
-
 /// A scalable read-writer lock.
 ///
 /// This type of lock allows a number of readers or at most one writer at any point in time. The

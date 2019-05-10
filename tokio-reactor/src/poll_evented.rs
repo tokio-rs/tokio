@@ -1,12 +1,12 @@
 use crate::{Handle, Registration};
-use futures::{try_ready, task, Async, Poll};
+use futures::{task, try_ready, Async, Poll};
 use mio;
 use mio::event::Evented;
-use tokio_io::{AsyncRead, AsyncWrite};
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
+use tokio_io::{AsyncRead, AsyncWrite};
 
 /// Associates an I/O resource that implements the [`std::io::Read`] and/or
 /// [`std::io::Write`] traits with the reactor that drives it.
@@ -246,7 +246,10 @@ where
     pub fn clear_read_ready(&self, ready: mio::Ready) -> io::Result<()> {
         // Cannot clear write readiness
         assert!(!ready.is_writable(), "cannot clear write readiness");
-        assert!(!crate::platform::is_hup(&ready), "cannot clear HUP readiness");
+        assert!(
+            !crate::platform::is_hup(&ready),
+            "cannot clear HUP readiness"
+        );
 
         self.inner
             .read_readiness

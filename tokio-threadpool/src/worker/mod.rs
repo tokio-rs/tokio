@@ -13,7 +13,6 @@ use crate::shutdown::ShutdownTrigger;
 use crate::task::{self, CanBlock, Task};
 use futures::{Async, Poll};
 use log::trace;
-use tokio_executor;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -21,6 +20,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tokio_executor;
 
 /// Thread worker
 ///

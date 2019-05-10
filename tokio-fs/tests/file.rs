@@ -3,11 +3,11 @@
 use futures::future::poll_fn;
 use futures::Future;
 use rand::{distributions, thread_rng, Rng};
+use std::fs;
+use std::io::SeekFrom;
 use tempfile::Builder as TmpBuilder;
 use tokio_fs::*;
 use tokio_io::io;
-use std::fs;
-use std::io::SeekFrom;
 
 mod pool;
 

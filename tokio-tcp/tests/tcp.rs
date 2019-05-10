@@ -2,9 +2,9 @@
 
 use env_logger;
 use futures::{Future, Stream};
-use tokio_tcp::{TcpListener, TcpStream};
 use std::sync::mpsc::channel;
 use std::{net, thread};
+use tokio_tcp::{TcpListener, TcpStream};
 
 macro_rules! t {
     ($e:expr) => {

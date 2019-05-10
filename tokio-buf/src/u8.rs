@@ -1,8 +1,8 @@
+use crate::never::Never;
+use crate::BufStream;
 use bytes::{Bytes, BytesMut};
 use futures::Poll;
-use crate::never::Never;
 use std::io;
-use crate::BufStream;
 
 impl BufStream for Vec<u8> {
     type Item = io::Cursor<Vec<u8>>;

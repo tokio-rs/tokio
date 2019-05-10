@@ -1,12 +1,11 @@
+use super::Incoming;
+use super::TcpStream;
 use futures::{try_ready, Async, Poll};
 use mio;
-use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
-use super::Incoming;
-use super::TcpStream;
-
+use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///

@@ -8,7 +8,6 @@ use libc;
 use std::sync::mpsc::channel;
 use std::thread;
 
-
 #[test]
 fn multi_loop() {
     // An "ordinary" (non-future) channel

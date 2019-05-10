@@ -2,10 +2,9 @@ use crate::pool::{self, Lifecycle, Pool, MAX_FUTURES};
 use crate::task::Task;
 use futures::{future, Future};
 use log::trace;
-use tokio_executor::{self, SpawnError};
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-
+use tokio_executor::{self, SpawnError};
 
 /// Submit futures to the associated thread pool for execution.
 ///

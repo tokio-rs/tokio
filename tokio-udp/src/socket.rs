@@ -1,10 +1,10 @@
+use super::{RecvDgram, SendDgram};
 use futures::{try_ready, Async, Poll};
 use mio;
-use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use super::{RecvDgram, SendDgram};
+use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {

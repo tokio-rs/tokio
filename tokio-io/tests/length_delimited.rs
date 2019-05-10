@@ -3,10 +3,10 @@
 
 use futures::Async::*;
 use futures::{Poll, Sink, Stream};
-use tokio_io::codec::length_delimited::*;
-use tokio_io::{AsyncRead, AsyncWrite};
 use std::collections::VecDeque;
 use std::io;
+use tokio_io::codec::length_delimited::*;
+use tokio_io::{AsyncRead, AsyncWrite};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{

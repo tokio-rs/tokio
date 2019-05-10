@@ -21,8 +21,8 @@
 
 use futures::{Async, Future, Poll};
 use native_tls::{Error, HandshakeError};
-use tokio_io::{try_nb, AsyncRead, AsyncWrite};
 use std::io::{self, Read, Write};
+use tokio_io::{try_nb, AsyncRead, AsyncWrite};
 
 /// A wrapper around an underlying raw stream which implements the TLS or SSL
 /// protocol.

@@ -4,9 +4,9 @@ mod support;
 use crate::support::*;
 
 use futures::Future;
+use std::time::{Duration, Instant};
 use tokio_timer::timer::Handle;
 use tokio_timer::*;
-use std::time::{Duration, Instant};
 
 #[test]
 fn immediate_delay() {

@@ -3,12 +3,12 @@
 use env_logger;
 use futures::stream::Stream;
 use futures::Future;
-use tokio_io::io::copy;
-use tokio_io::AsyncRead;
-use tokio_tcp::TcpListener;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::thread;
+use tokio_io::io::copy;
+use tokio_io::AsyncRead;
+use tokio_tcp::TcpListener;
 
 macro_rules! t {
     ($e:expr) => {

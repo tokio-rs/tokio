@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use futures::Async;
-use tokio_io::AsyncRead;
 use std::io::{self, Read};
+use tokio_io::AsyncRead;
 
 #[test]
 fn read_buf_success() {

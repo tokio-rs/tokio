@@ -2,18 +2,20 @@
 
 use futures::future::lazy;
 use futures::{Async, Future, Poll, Sink, Stream};
-use tokio_executor::park::{Park, Unpark};
-use tokio_threadpool::park::{DefaultPark, DefaultUnpark};
-use tokio_threadpool::*;
 use std::cell::Cell;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::*;
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
+use tokio_executor::park::{Park, Unpark};
+use tokio_threadpool::park::{DefaultPark, DefaultUnpark};
+use tokio_threadpool::*;
 
 thread_local!(static FOO: Cell<u32> = Cell::new(0));
 
-fn ignore_results<F: Future + Send + 'static>(f: F) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+fn ignore_results<F: Future + Send + 'static>(
+    f: F,
+) -> Box<dyn Future<Item = (), Error = ()> + Send> {
     Box::new(f.map(|_| ()).map_err(|_| ()))
 }
 

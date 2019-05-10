@@ -8,7 +8,7 @@ extern crate loom;
 mod semaphore;
 
 use crate::semaphore::*;
-use futures::{try_ready, future, Async, Future, Poll};
+use futures::{future, try_ready, Async, Future, Poll};
 use loom::futures::block_on;
 use loom::thread;
 use std::sync::atomic::AtomicUsize;

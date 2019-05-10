@@ -1,8 +1,8 @@
+use super::File;
 use futures::{try_ready, Future, Poll};
 use std::fs::OpenOptions as StdOpenOptions;
 use std::io;
 use std::path::Path;
-use super::File;
 
 /// Future returned by `File::open` and resolves to a `File` instance.
 #[derive(Debug)]

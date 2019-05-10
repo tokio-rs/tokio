@@ -1,8 +1,6 @@
 use crate::Borrow;
 use futures::executor::{self, NotifyHandle, Spawn, UnsafeNotify};
 use futures::{Async, Future};
-use tokio_executor::park::Unpark;
-use tokio_executor::Enter;
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
@@ -13,6 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
 use std::sync::{Arc, Weak};
 use std::thread;
 use std::usize;
+use tokio_executor::park::Unpark;
+use tokio_executor::Enter;
 
 /// A generic task-aware scheduler.
 ///

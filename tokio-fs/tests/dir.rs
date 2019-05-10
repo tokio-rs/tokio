@@ -1,10 +1,10 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use futures::{Future, Stream};
-use tempdir::TempDir;
-use tokio_fs::*;
 use std::fs;
 use std::sync::{Arc, Mutex};
+use tempdir::TempDir;
+use tokio_fs::*;
 
 mod pool;
 

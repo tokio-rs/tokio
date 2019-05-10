@@ -12,12 +12,12 @@ use std::io::{self, Error, ErrorKind};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
-use libc::c_int;
-use mio_uds::UnixStream;
 use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async, Future};
 use futures::{Poll, Stream};
+use libc::c_int;
+use mio_uds::UnixStream;
 use tokio_io::IoFuture;
 use tokio_reactor::{Handle, PollEvented};
 

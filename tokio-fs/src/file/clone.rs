@@ -1,6 +1,6 @@
+use super::File;
 use futures::{Future, Poll};
 use std::io;
-use super::File;
 
 /// Future returned by `File::try_clone`.
 ///

@@ -1,9 +1,9 @@
-use tokio_io::AsyncRead;
 use std::future::Future;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{self, Poll};
+use tokio_io::AsyncRead;
 
 /// A future which can be used to read exactly enough bytes to fill a buffer.
 #[derive(Debug)]

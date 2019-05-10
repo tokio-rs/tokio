@@ -3,12 +3,12 @@
 use futures::future::{lazy, poll_fn};
 use futures::*;
 use rand::*;
-use tokio_threadpool::*;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::*;
 use std::sync::*;
 use std::thread;
 use std::time::Duration;
+use tokio_threadpool::*;
 
 #[test]
 fn basic() {

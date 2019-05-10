@@ -10,10 +10,10 @@ const TASKS_PER_CPU: usize = 50;
 mod threadpool {
     use futures::{future, task, Async};
     use num_cpus;
-    use tokio_threadpool::*;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
     use std::sync::{mpsc, Arc};
+    use tokio_threadpool::*;
 
     #[bench]
     fn spawn_many(b: &mut test::Bencher) {

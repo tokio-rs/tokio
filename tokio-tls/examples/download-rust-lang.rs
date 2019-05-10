@@ -2,12 +2,12 @@
 
 use futures::Future;
 use native_tls::TlsConnector;
+use std::io;
+use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio_io;
 use tokio_tls;
-use std::io;
-use std::net::ToSocketAddrs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = Runtime::new()?;

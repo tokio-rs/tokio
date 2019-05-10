@@ -73,8 +73,8 @@
 
 use futures::stream::Stream;
 use futures::{future, Future};
-use tokio_reactor::Handle;
 use std::io;
+use tokio_reactor::Handle;
 
 pub mod unix;
 pub mod windows;

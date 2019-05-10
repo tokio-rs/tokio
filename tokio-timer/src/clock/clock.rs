@@ -1,10 +1,10 @@
 use crate::clock::Now;
 use crate::timer;
-use tokio_executor::Enter;
 use std::cell::Cell;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio_executor::Enter;
 
 /// A handle to a source of time.
 ///

@@ -1,8 +1,8 @@
-use tokio_io::AsyncWrite;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use tokio_io::AsyncWrite;
 
 /// A future used to fully flush an I/O object.
 #[derive(Debug)]

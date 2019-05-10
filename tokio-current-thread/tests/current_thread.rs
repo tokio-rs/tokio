@@ -9,12 +9,12 @@ use futures::future::Executor;
 use futures::prelude::*;
 use futures::sync::oneshot;
 use futures::task;
-use tokio_current_thread::{block_on_all, CurrentThread};
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
+use tokio_current_thread::{block_on_all, CurrentThread};
 
 mod from_block_on_all {
     use super::*;

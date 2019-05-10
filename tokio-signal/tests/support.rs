@@ -2,8 +2,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use libc::{c_int, getpid, kill};
-use tokio::timer::Timeout;
 use std::time::Duration;
+use tokio::timer::Timeout;
 
 pub use futures::{Future, Stream};
 pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};

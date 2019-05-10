@@ -1,6 +1,6 @@
+use super::File;
 use futures::{try_ready, Future, Poll};
 use std::io;
-use super::File;
 
 /// Future returned by `File::seek`.
 #[derive(Debug)]

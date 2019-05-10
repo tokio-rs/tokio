@@ -1,7 +1,7 @@
+use super::socket::UdpSocket;
 use futures::{try_ready, Async, Future, Poll};
 use std::io;
 use std::net::SocketAddr;
-use super::socket::UdpSocket;
 
 /// A future used to receive a datagram from a UDP socket.
 ///

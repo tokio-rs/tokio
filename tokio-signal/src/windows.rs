@@ -12,9 +12,6 @@ use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
-use winapi::shared::minwindef::*;
-use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon::*;
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
@@ -22,6 +19,9 @@ use futures::sync::oneshot;
 use futures::{Async, Future, Poll, Stream};
 use mio::Ready;
 use tokio_reactor::{Handle, PollEvented};
+use winapi::shared::minwindef::*;
+use winapi::um::consoleapi::SetConsoleCtrlHandler;
+use winapi::um::wincon::*;
 
 use IoFuture;
 

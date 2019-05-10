@@ -1,8 +1,8 @@
 //! Slow down a stream by enforcing a delay between items.
 
 use crate::{clock, Delay, Error};
-use futures::{try_ready, Async, Future, Poll, Stream};
 use futures::future::Either;
+use futures::{try_ready, Async, Future, Poll, Stream};
 use std::{
     error::Error as StdError,
     fmt::{Display, Formatter, Result as FmtResult},

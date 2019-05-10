@@ -1,6 +1,6 @@
-use crate::Error;
 use crate::atomic::AtomicU64;
 use crate::timer::{HandlePriv, Inner};
+use crate::Error;
 use crossbeam_utils::CachePadded;
 use futures::task::AtomicTask;
 use futures::Poll;

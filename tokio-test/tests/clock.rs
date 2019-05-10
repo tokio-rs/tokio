@@ -1,11 +1,11 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use futures::Future;
-use tokio_test::{assert_ready, assert_not_ready};
+use std::time::{Duration, Instant};
 use tokio_test::clock::MockClock;
 use tokio_test::task::MockTask;
+use tokio_test::{assert_not_ready, assert_ready};
 use tokio_timer::Delay;
-use std::time::{Duration, Instant};
 
 #[test]
 fn clock() {

@@ -1,5 +1,6 @@
 //! A concurrent, lock-free, FIFO list.
 
+use super::block::{self, Block};
 use crate::loom::{
     self,
     sync::atomic::{AtomicPtr, AtomicUsize},
@@ -7,7 +8,6 @@ use crate::loom::{
 use std::fmt;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
-use super::block::{self, Block};
 
 /// List queue transmit handle
 pub(crate) struct Tx<T> {

@@ -3,12 +3,12 @@
 
 use bytes::BytesMut;
 use futures::{Future, Sink, Stream};
+use std::str;
 use tempfile;
 use tokio::io;
 use tokio::runtime::current_thread::Runtime;
 use tokio_codec::{Decoder, Encoder};
 use tokio_uds::*;
-use std::str;
 
 struct StringDatagramCodec;
 

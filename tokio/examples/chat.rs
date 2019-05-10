@@ -27,9 +27,9 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::try_ready;
 use futures::future::{self, Either};
 use futures::sync::mpsc;
+use futures::try_ready;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};

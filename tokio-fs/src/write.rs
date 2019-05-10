@@ -1,7 +1,7 @@
 use crate::{file, File};
 use futures::{try_ready, Async, Future, Poll};
-use tokio_io;
 use std::{fmt, io, mem, path::Path};
+use tokio_io;
 
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.

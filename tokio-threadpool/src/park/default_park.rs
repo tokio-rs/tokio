@@ -1,8 +1,8 @@
-use tokio_executor::park::{Park, Unpark};
 use crossbeam_utils::sync::{Parker, Unparker};
 use std::error::Error;
 use std::fmt;
 use std::time::Duration;
+use tokio_executor::park::{Park, Unpark};
 
 /// Parks the thread.
 #[derive(Debug)]

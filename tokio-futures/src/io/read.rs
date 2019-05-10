@@ -1,8 +1,8 @@
-use tokio_io::AsyncRead;
 use std::future::Future;
-use std::task::{self, Poll};
 use std::io;
 use std::pin::Pin;
+use std::task::{self, Poll};
+use tokio_io::AsyncRead;
 
 /// A future which can be used to read bytes.
 #[derive(Debug)]

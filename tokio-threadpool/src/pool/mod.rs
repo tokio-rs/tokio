@@ -16,7 +16,7 @@ use crate::worker::{self, Worker, WorkerId};
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use futures::Poll;
-use log::{debug, trace, error};
+use log::{debug, error, trace};
 use rand;
 use std::cell::Cell;
 use std::num::Wrapping;

@@ -1,11 +1,6 @@
 //! Echo everything received on STDIN to STDOUT.
 #![deny(deprecated, warnings)]
 
-
-
-
-
-
 use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio_fs::{stderr, stdin, stdout};
 use tokio_threadpool::Builder;
