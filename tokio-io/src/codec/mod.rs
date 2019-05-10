@@ -73,10 +73,6 @@ pub mod length_delimited {
     //! Specifically, given the following:
     //!
     //! ```
-    //! # extern crate tokio_io;
-    //! # extern crate bytes;
-    //! # extern crate futures;
-    //! #
     //! use tokio_io::{AsyncRead, AsyncWrite};
     //! use tokio_io::codec::length_delimited;
     //! use bytes::BytesMut;
@@ -88,8 +84,6 @@ pub mod length_delimited {
     //!
     //!     transport.send(frame).wait().unwrap();
     //! }
-    //! #
-    //! # pub fn main() {}
     //! ```
     //!
     //! The encoded frame will look like this:
@@ -114,8 +108,9 @@ pub mod length_delimited {
     //! frame head in the yielded `BytesMut`.
     //!
     //! ```
-    //! # use tokio_io::AsyncRead;
-    //! # use tokio_io::codec::length_delimited;
+    //! use tokio_io::AsyncRead;
+    //! use tokio_io::codec::length_delimited;
+    //!
     //! # fn bind_read<T: AsyncRead>(io: T) {
     //! length_delimited::Builder::new()
     //!     .length_field_offset(0) // default value
@@ -147,8 +142,9 @@ pub mod length_delimited {
     //! frame head in the yielded `BytesMut`.
     //!
     //! ```
-    //! # use tokio_io::AsyncRead;
-    //! # use tokio_io::codec::length_delimited;
+    //! use tokio_io::AsyncRead;
+    //! use tokio_io::codec::length_delimited;
+    //!
     //! # fn bind_read<T: AsyncRead>(io: T) {
     //! length_delimited::Builder::new()
     //!     .length_field_offset(0) // default value
@@ -178,8 +174,9 @@ pub mod length_delimited {
     //! **includes** the frame head length.
     //!
     //! ```
-    //! # use tokio_io::AsyncRead;
-    //! # use tokio_io::codec::length_delimited;
+    //! use tokio_io::AsyncRead;
+    //! use tokio_io::codec::length_delimited;
+    //!
     //! # fn bind_read<T: AsyncRead>(io: T) {
     //! length_delimited::Builder::new()
     //!     .length_field_offset(0) // default value
@@ -211,8 +208,9 @@ pub mod length_delimited {
     //! frame head, including the frame head in the yielded `BytesMut`.
     //!
     //! ```
-    //! # use tokio_io::AsyncRead;
-    //! # use tokio_io::codec::length_delimited;
+    //! use tokio_io::AsyncRead;
+    //! use tokio_io::codec::length_delimited;
+    //!
     //! # fn bind_read<T: AsyncRead>(io: T) {
     //! length_delimited::Builder::new()
     //!     .length_field_offset(0) // default value
@@ -254,8 +252,9 @@ pub mod length_delimited {
     //! included.
     //!
     //! ```
-    //! # use tokio_io::AsyncRead;
-    //! # use tokio_io::codec::length_delimited;
+    //! use tokio_io::AsyncRead;
+    //! use tokio_io::codec::length_delimited;
+    //!
     //! # fn bind_read<T: AsyncRead>(io: T) {
     //! length_delimited::Builder::new()
     //!     .length_field_offset(1) // length of hdr1
@@ -299,8 +298,9 @@ pub mod length_delimited {
     //! length.
     //!
     //! ```
-    //! # use tokio_io::AsyncRead;
-    //! # use tokio_io::codec::length_delimited;
+    //! use tokio_io::AsyncRead;
+    //! use tokio_io::codec::length_delimited;
+    //!
     //! # fn bind_read<T: AsyncRead>(io: T) {
     //! length_delimited::Builder::new()
     //!     .length_field_offset(1) // length of hdr1
@@ -344,18 +344,16 @@ pub mod length_delimited {
     //! configuration:
     //!
     //! ```
-    //! # extern crate tokio_io;
-    //! # extern crate bytes;
-    //! # use tokio_io::AsyncWrite;
-    //! # use tokio_io::codec::length_delimited;
-    //! # use bytes::BytesMut;
+    //! use tokio_io::AsyncWrite;
+    //! use tokio_io::codec::length_delimited;
+    //! use bytes::BytesMut;
+    //!
     //! # fn write_frame<T: AsyncWrite>(io: T) {
     //! # let _: length_delimited::FramedWrite<T, BytesMut> =
     //! length_delimited::Builder::new()
     //!     .length_field_length(2)
     //!     .new_write(io);
     //! # }
-    //! # pub fn main() {}
     //! ```
     //!
     //! A payload of `hello world` will be encoded as:

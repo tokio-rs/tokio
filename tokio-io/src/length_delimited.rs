@@ -856,18 +856,16 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_io;
-    /// # extern crate bytes;
-    /// # use tokio_io::AsyncWrite;
-    /// # use tokio_io::codec::length_delimited;
-    /// # use bytes::BytesMut;
+    /// use tokio_io::AsyncWrite;
+    /// use tokio_io::codec::length_delimited;
+    /// use bytes::BytesMut;
+    ///
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// # let _: length_delimited::FramedWrite<T, BytesMut> =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_write(io);
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new_write<T, B>(&self, inner: T) -> FramedWrite<T, B>
     where
@@ -886,18 +884,16 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_io;
-    /// # extern crate bytes;
-    /// # use tokio_io::{AsyncRead, AsyncWrite};
-    /// # use tokio_io::codec::length_delimited;
-    /// # use bytes::BytesMut;
+    /// use tokio_io::{AsyncRead, AsyncWrite};
+    /// use tokio_io::codec::length_delimited;
+    /// use bytes::BytesMut;
+    ///
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
     /// # let _: length_delimited::Framed<T, BytesMut> =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_framed(io);
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new_framed<T, B>(&self, inner: T) -> Framed<T, B>
     where

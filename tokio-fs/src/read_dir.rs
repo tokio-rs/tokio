@@ -111,18 +111,14 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// # extern crate futures;
-    /// # extern crate tokio;
-    /// # extern crate tokio_fs;
     /// use futures::{Future, Stream};
     ///
-    /// fn main() {
-    ///     let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///         println!("{:?}", dir.path());
-    ///         Ok(())
-    ///     }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///     tokio::run(fut);
-    /// }
+    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
+    ///     println!("{:?}", dir.path());
+    ///     Ok(())
+    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    ///
+    /// tokio::run(fut);
     /// ```
     ///
     /// This prints output like:
@@ -144,19 +140,15 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// # extern crate futures;
-    /// # extern crate tokio;
-    /// # extern crate tokio_fs;
     /// use futures::{Future, Stream};
     ///
-    /// fn main() {
-    ///     let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///         // Here, `dir` is a `DirEntry`.
-    ///         println!("{:?}", dir.file_name());
-    ///         Ok(())
-    ///     }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///     tokio::run(fut);
-    /// }
+    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
+    ///     // Here, `dir` is a `DirEntry`.
+    ///     println!("{:?}", dir.file_name());
+    ///     Ok(())
+    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    ///
+    /// tokio::run(fut);
     /// ```
     pub fn file_name(&self) -> OsString {
         self.0.file_name()
@@ -176,22 +168,18 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// # extern crate futures;
-    /// # extern crate tokio;
-    /// # extern crate tokio_fs;
     /// use futures::{Future, Stream};
     /// use futures::future::poll_fn;
     ///
-    /// fn main() {
-    ///     let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///         // Here, `dir` is a `DirEntry`.
-    ///         let path = dir.path();
-    ///         poll_fn(move || dir.poll_metadata()).map(move |metadata| {
-    ///             println!("{:?}: {:?}", path, metadata.permissions());
-    ///         })
-    ///     }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///     tokio::run(fut);
-    /// }
+    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
+    ///     // Here, `dir` is a `DirEntry`.
+    ///     let path = dir.path();
+    ///     poll_fn(move || dir.poll_metadata()).map(move |metadata| {
+    ///         println!("{:?}: {:?}", path, metadata.permissions());
+    ///     })
+    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    ///
+    /// tokio::run(fut);
     /// ```
     pub fn poll_metadata(&self) -> Poll<Metadata, io::Error> {
         crate::blocking_io(|| self.0.metadata())
@@ -211,23 +199,19 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// # extern crate futures;
-    /// # extern crate tokio;
-    /// # extern crate tokio_fs;
     /// use futures::{Future, Stream};
     /// use futures::future::poll_fn;
     ///
-    /// fn main() {
-    ///     let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///         // Here, `dir` is a `DirEntry`.
-    ///         let path = dir.path();
-    ///         poll_fn(move || dir.poll_file_type()).map(move |file_type| {
-    ///             // Now let's show our entry's file type!
-    ///             println!("{:?}: {:?}", path, file_type);
-    ///         })
-    ///     }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///     tokio::run(fut);
-    /// }
+    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
+    ///     // Here, `dir` is a `DirEntry`.
+    ///     let path = dir.path();
+    ///     poll_fn(move || dir.poll_file_type()).map(move |file_type| {
+    ///         // Now let's show our entry's file type!
+    ///         println!("{:?}: {:?}", path, file_type);
+    ///     })
+    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    ///
+    /// tokio::run(fut);
     /// ```
     pub fn poll_file_type(&self) -> Poll<FileType, io::Error> {
         crate::blocking_io(|| self.0.file_type())
