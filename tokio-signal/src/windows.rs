@@ -345,12 +345,10 @@ impl mio::Evented for MyRegistration {
 
 #[cfg(test)]
 mod tests {
-    extern crate tokio;
-
-    use self::tokio::runtime::current_thread;
-    use self::tokio::timer::Timeout;
     use super::*;
     use std::time::Duration;
+    use tokio::runtime::current_thread;
+    use tokio::timer::Timeout;
 
     fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
         Timeout::new(future, Duration::from_secs(1)).map_err(|e| {
