@@ -155,7 +155,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
     let ready = reg.readiness.clone();
 
     let (tx, rx) = mpsc::unbounded();
-    let reg = r#try!(PollEvented::new_with_handle(reg, handle));
+    let reg = PollEvented::new_with_handle(reg, handle)?;
 
     unsafe {
         let state = Box::new(GlobalState {
