@@ -78,9 +78,6 @@ pub struct BlockingError {
 /// that needs to be performed.
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate tokio_threadpool;
-///
 /// use tokio_threadpool::{ThreadPool, blocking};
 ///
 /// use futures::Future;

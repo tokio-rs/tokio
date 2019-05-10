@@ -1,6 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-tls/0.2.1")]
 #![deny(rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Async TLS streams
 //!

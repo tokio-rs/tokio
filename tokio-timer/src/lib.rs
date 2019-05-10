@@ -1,6 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.10")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Utilities for tracking time.
 //!

@@ -57,8 +57,6 @@ impl Sender {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
     /// # use tokio_threadpool::ThreadPool;
     /// use futures::future::{Future, lazy};
     ///

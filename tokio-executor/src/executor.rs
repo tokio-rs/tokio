@@ -48,17 +48,15 @@ use futures::Future;
 /// # Examples
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate tokio_executor;
-/// # use tokio_executor::Executor;
-/// # fn docs(my_executor: &mut Executor) {
+/// use tokio_executor::Executor;
 /// use futures::future::lazy;
+///
+/// # fn docs(my_executor: &mut dyn Executor) {
 /// my_executor.spawn(Box::new(lazy(|| {
 ///     println!("running on the executor");
 ///     Ok(())
 /// }))).unwrap();
 /// # }
-/// # fn main() {}
 /// ```
 ///
 /// [`spawn`]: #tymethod.spawn
@@ -80,17 +78,15 @@ pub trait Executor {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio_executor;
-    /// # use tokio_executor::Executor;
-    /// # fn docs(my_executor: &mut Executor) {
+    /// use tokio_executor::Executor;
     /// use futures::future::lazy;
+    ///
+    /// # fn docs(my_executor: &mut dyn Executor) {
     /// my_executor.spawn(Box::new(lazy(|| {
     ///     println!("running on the executor");
     ///     Ok(())
     /// }))).unwrap();
     /// # }
-    /// # fn main() {}
     /// ```
     fn spawn(
         &mut self,
@@ -115,12 +111,10 @@ pub trait Executor {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio_executor;
-    /// # use tokio_executor::Executor;
-    /// # fn docs(my_executor: &mut Executor) {
+    /// use tokio_executor::Executor;
     /// use futures::future::lazy;
     ///
+    /// # fn docs(my_executor: &mut dyn Executor) {
     /// if my_executor.status().is_ok() {
     ///     my_executor.spawn(Box::new(lazy(|| {
     ///         println!("running on the executor");
@@ -130,7 +124,6 @@ pub trait Executor {
     ///     println!("the executor is not in a good state");
     /// }
     /// # }
-    /// # fn main() {}
     /// ```
     fn status(&self) -> Result<(), SpawnError> {
         Ok(())

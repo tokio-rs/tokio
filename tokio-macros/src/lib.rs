@@ -1,6 +1,7 @@
 #![cfg(feature = "async-await-preview")]
 #![deny(missing_debug_implementations, unreachable_pub, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Macros for use with Tokio
 

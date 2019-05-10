@@ -33,13 +33,10 @@ use tokio_executor::Enter;
 /// # Examples
 ///
 /// ```
-/// # extern crate tokio_threadpool;
-/// # extern crate futures;
-/// # use tokio_threadpool::Builder;
+/// use tokio_threadpool::Builder;
 /// use futures::future::{Future, lazy};
 /// use std::time::Duration;
 ///
-/// # pub fn main() {
 /// let thread_pool = Builder::new()
 ///     .pool_size(4)
 ///     .keep_alive(Some(Duration::from_secs(30)))
@@ -52,7 +49,6 @@ use tokio_executor::Enter;
 ///
 /// // Gracefully shutdown the threadpool
 /// thread_pool.shutdown().wait().unwrap();
-/// # }
 /// ```
 pub struct Builder {
     /// Thread pool specific configuration values
@@ -78,17 +74,13 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     /// use std::time::Duration;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .pool_size(4)
     ///     .keep_alive(Some(Duration::from_secs(30)))
     ///     .build();
-    /// # }
     /// ```
     pub fn new() -> Builder {
         let num_cpus = max(1, num_cpus::get());
@@ -122,15 +114,11 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .pool_size(4)
     ///     .build();
-    /// # }
     /// ```
     pub fn pool_size(&mut self, val: usize) -> &mut Self {
         assert!(val >= 1, "at least one thread required");
@@ -154,15 +142,11 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .max_blocking(200)
     ///     .build();
-    /// # }
     /// ```
     pub fn max_blocking(&mut self, val: usize) -> &mut Self {
         assert!(val <= MAX_BACKUP, "max value is {}", MAX_BACKUP);
@@ -184,16 +168,12 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     /// use std::time::Duration;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .keep_alive(Some(Duration::from_secs(30)))
     ///     .build();
-    /// # }
     /// ```
     pub fn keep_alive(&mut self, val: Option<Duration>) -> &mut Self {
         self.config.keep_alive = val;
@@ -210,15 +190,11 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .panic_handler(|err| std::panic::resume_unwind(err))
     ///     .build();
-    /// # }
     /// ```
     pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
     where
@@ -240,15 +216,11 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .name_prefix("my-pool-")
     ///     .build();
-    /// # }
     /// ```
     pub fn name_prefix<S: Into<String>>(&mut self, val: S) -> &mut Self {
         self.config.name_prefix = Some(val.into());
@@ -266,15 +238,11 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .stack_size(32 * 1024)
     ///     .build();
-    /// # }
     /// ```
     pub fn stack_size(&mut self, val: usize) -> &mut Self {
         self.config.stack_size = Some(val);
@@ -290,11 +258,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .around_worker(|worker, _| {
     ///         println!("worker is starting up");
@@ -302,7 +267,6 @@ impl Builder {
     ///         println!("worker is shutting down");
     ///     })
     ///     .build();
-    /// # }
     /// ```
     ///
     /// [`Worker::run`]: struct.Worker.html#method.run
@@ -322,17 +286,13 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .after_start(|| {
     ///         println!("thread started");
     ///     })
     ///     .build();
-    /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
     where
@@ -349,17 +309,13 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .before_stop(|| {
     ///         println!("thread stopping");
     ///     })
     ///     .build();
-    /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
     where
@@ -377,12 +333,9 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     /// # fn decorate<F>(f: F) -> F { f }
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .custom_park(|_| {
     ///         use tokio_threadpool::park::DefaultPark;
@@ -396,7 +349,6 @@ impl Builder {
     ///         decorate(park)
     ///     })
     ///     .build();
-    /// # }
     /// ```
     pub fn custom_park<F, P>(&mut self, f: F) -> &mut Self
     where
@@ -416,14 +368,10 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
-    /// # use tokio_threadpool::Builder;
+    /// use tokio_threadpool::Builder;
     ///
-    /// # pub fn main() {
     /// let thread_pool = Builder::new()
     ///     .build();
-    /// # }
     /// ```
     pub fn build(&self) -> ThreadPool {
         trace!("build; num-workers={}", self.pool_size);

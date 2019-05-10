@@ -6,15 +6,16 @@
     rust_2018_idioms
 )]
 #![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Tokio and Futures based testing utilites
 //!
 //! # Example
 //!
 //! ```
-//! # extern crate futures;
-//! # #[macro_use] extern crate tokio_test;
 //! # use futures::{Future, future};
+//! use tokio_test::assert_ready;
+//!
 //! let mut fut = future::ok::<(), ()>(());
 //! assert_ready!(fut.poll());
 //! ```

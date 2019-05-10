@@ -51,12 +51,9 @@ impl ThreadPool {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
     /// # use tokio_threadpool::ThreadPool;
     /// use futures::future::{Future, lazy};
     ///
-    /// # pub fn main() {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = ThreadPool::new();
     ///
@@ -67,7 +64,6 @@ impl ThreadPool {
     ///
     /// // Gracefully shutdown the threadpool
     /// thread_pool.shutdown().wait().unwrap();
-    /// # }
     /// ```
     ///
     /// # Panics
@@ -91,12 +87,9 @@ impl ThreadPool {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
     /// # use tokio_threadpool::ThreadPool;
     /// use futures::future::{Future, lazy};
     ///
-    /// # pub fn main() {
     /// // Create a thread pool with default configuration values
     /// let thread_pool = ThreadPool::new();
     ///
@@ -107,7 +100,6 @@ impl ThreadPool {
     ///
     /// // Gracefully shutdown the threadpool
     /// thread_pool.shutdown().wait().unwrap();
-    /// # }
     /// ```
     ///
     /// # Panics

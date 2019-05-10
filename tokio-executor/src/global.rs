@@ -142,19 +142,14 @@ where
 ///
 /// # Examples
 ///
-/// ```rust
-/// # extern crate futures;
-/// # extern crate tokio_executor;
-/// # use tokio_executor::spawn;
-/// # pub fn dox() {
+/// ```no_run
+/// use tokio_executor::spawn;
 /// use futures::future::lazy;
 ///
 /// spawn(lazy(|| {
 ///     println!("running on the default executor");
 ///     Ok(())
 /// }));
-/// # }
-/// # pub fn main() {}
 /// ```
 pub fn spawn<T>(future: T)
 where
