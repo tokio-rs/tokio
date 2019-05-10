@@ -27,13 +27,15 @@ pub use self::impl_solaris::get_peer_cred;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod impl_linux {
+    use crate::UnixStream;
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
     use std::{io, mem};
-    use crate::UnixStream;
 
     use libc::ucred;
 
     pub fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        use std::os::unix::io::AsRawFd;
+
         unsafe {
             let raw_fd = sock.as_raw_fd();
 
