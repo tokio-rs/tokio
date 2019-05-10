@@ -1,5 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-signal/0.2.8")]
-#![deny(missing_docs)]
+#![deny(missing_docs, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
 
 //! Asynchronous signal handling for Tokio
 //!
@@ -70,25 +71,18 @@
 //! # fn main() {}
 //! ```
 
-extern crate futures;
-extern crate mio;
-extern crate tokio_executor;
-extern crate tokio_io;
-extern crate tokio_reactor;
-
-use std::io;
-
 use futures::stream::Stream;
 use futures::{future, Future};
 use tokio_reactor::Handle;
+use std::io;
 
 pub mod unix;
 pub mod windows;
 
 /// A future whose error is `io::Error`
-pub type IoFuture<T> = Box<Future<Item = T, Error = io::Error> + Send>;
+pub type IoFuture<T> = Box<dyn Future<Item = T, Error = io::Error> + Send>;
 /// A stream whose error is `io::Error`
-pub type IoStream<T> = Box<Stream<Item = T, Error = io::Error> + Send>;
+pub type IoStream<T> = Box<dyn Stream<Item = T, Error = io::Error> + Send>;
 
 /// Creates a stream which receives "ctrl-c" notifications sent to a process.
 ///
@@ -125,7 +119,7 @@ pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<IoStream<()>> {
         let handle = handle.clone();
         Box::new(future::lazy(move || {
             unix::Signal::with_handle(unix::libc::SIGINT, &handle)
-                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>)
+                .map(|x| Box::new(x.map(|_| ())) as Box<dyn Stream<Item = _, Error = _> + Send>)
         }))
     }
 

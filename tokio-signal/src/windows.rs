@@ -7,17 +7,14 @@
 
 #![cfg(windows)]
 
-extern crate mio;
-extern crate winapi;
-
 use std::cell::RefCell;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
-use self::winapi::shared::minwindef::*;
-use self::winapi::um::consoleapi::SetConsoleCtrlHandler;
-use self::winapi::um::wincon::*;
+use winapi::shared::minwindef::*;
+use winapi::um::consoleapi::SetConsoleCtrlHandler;
+use winapi::um::wincon::*;
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
@@ -158,7 +155,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
     let ready = reg.readiness.clone();
 
     let (tx, rx) = mpsc::unbounded();
-    let reg = try!(PollEvented::new_with_handle(reg, handle));
+    let reg = r#try!(PollEvented::new_with_handle(reg, handle));
 
     unsafe {
         let state = Box::new(GlobalState {

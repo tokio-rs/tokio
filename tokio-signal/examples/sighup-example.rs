@@ -1,6 +1,4 @@
-extern crate futures;
-extern crate tokio;
-extern crate tokio_signal;
+#![deny(warnings, rust_2018_idioms)]
 
 // A trick to not fail build on non-unix platforms when using unix-specific features.
 #[cfg(unix)]
@@ -9,7 +7,7 @@ mod platform {
     use futures::{Future, Stream};
     use tokio_signal::unix::{Signal, SIGHUP};
 
-    pub fn main() -> Result<(), Box<::std::error::Error>> {
+    pub fn main() -> Result<(), Box<dyn (::std::error::Error)>> {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
         let stream = Signal::new(SIGHUP).flatten_stream();
 
@@ -48,6 +46,6 @@ mod platform {
     }
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     platform::main()
 }
