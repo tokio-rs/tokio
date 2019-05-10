@@ -13,11 +13,11 @@
 
 #![deny(warnings, rust_2018_idioms)]
 
-use http;
-use httparse;
 use bytes::BytesMut;
+use http;
 use http::header::HeaderValue;
 use http::{Request, Response, StatusCode};
+use httparse;
 use serde_json;
 use std::net::SocketAddr;
 use std::{env, fmt, io};

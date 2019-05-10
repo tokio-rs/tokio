@@ -7,9 +7,9 @@ use std::io;
 use std::net::SocketAddr;
 use std::thread;
 
-use futures::try_ready;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
+use futures::try_ready;
 use futures::{Future, Poll, Sink, Stream};
 use test::Bencher;
 use tokio::net::UdpSocket;
