@@ -10,15 +10,9 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-#[cfg(feature = "io")]
-pub use tokio_io::{AsyncRead, AsyncWrite};
-
-pub use util::{FutureExt, StreamExt};
-
-pub use std::io::{Read, Write};
-
+pub use crate::util::{FutureExt, StreamExt};
 pub use futures::{future, stream, task, Async, AsyncSink, Future, IntoFuture, Poll, Sink, Stream};
-
+pub use std::io::{Read, Write};
 #[cfg(feature = "async-await-preview")]
 #[doc(inline)]
 pub use tokio_futures::{
@@ -26,3 +20,5 @@ pub use tokio_futures::{
     sink::SinkExt,
     stream::StreamExt as StreamAsyncExt,
 };
+#[cfg(feature = "io")]
+pub use tokio_io::{AsyncRead, AsyncWrite};

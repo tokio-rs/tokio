@@ -1,7 +1,5 @@
-
-use tokio_threadpool::Sender;
-
 use futures::future::{self, Future};
+use tokio_threadpool::Sender;
 
 /// Executes futures on the runtime
 ///
@@ -66,19 +64,19 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
     }
 }
 
-impl ::executor::Executor for TaskExecutor {
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
-        -> Result<(), ::executor::SpawnError>
+impl crate::executor::Executor for TaskExecutor {
+    fn spawn(&mut self, future: Box<dyn Future<Item = (), Error = ()> + Send>)
+        -> Result<(), crate::executor::SpawnError>
     {
         self.inner.spawn(future)
     }
 }
 
-impl<T> ::executor::TypedExecutor<T> for TaskExecutor
+impl<T> crate::executor::TypedExecutor<T> for TaskExecutor
 where
     T: Future<Item = (), Error = ()> + Send + 'static,
 {
-    fn spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
-        ::executor::Executor::spawn(self, Box::new(future))
+    fn spawn(&mut self, future: T) -> Result<(), crate::executor::SpawnError> {
+        crate::executor::Executor::spawn(self, Box::new(future))
     }
 }

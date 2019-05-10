@@ -9,16 +9,13 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::{Handle, Reactor};
-
-use std::io;
-use std::sync::Mutex;
-
-use tokio_executor::enter;
-use tokio_threadpool as threadpool;
-
+use crate::reactor::{Handle, Reactor};
 use futures;
 use futures::future::Future;
+use tokio_executor::enter;
+use tokio_threadpool as threadpool;
+use std::io;
+use std::sync::Mutex;
 
 /// Handle to the Tokio runtime.
 ///

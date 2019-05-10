@@ -141,7 +141,7 @@ impl<'a> Context<'a> {
 #[deprecated(since = "0.1.2", note = "use block_on_all instead")]
 #[doc(hidden)]
 pub fn run<F, R>(f: F) -> R
-    where F: FnOnce(&mut Context) -> R
+    where F: FnOnce(&mut Context<'_>) -> R
 {
     let mut context = Context {
         cancel: Cell::new(false),

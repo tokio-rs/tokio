@@ -1,7 +1,4 @@
-extern crate futures;
-extern crate tokio;
-extern crate tokio_executor;
-extern crate tokio_timer;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::sync::mpsc;
 use tokio::util::StreamExt;

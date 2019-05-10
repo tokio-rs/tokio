@@ -1,22 +1,18 @@
 #![cfg(unix)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate env_logger;
-extern crate futures;
-extern crate libc;
-extern crate mio;
-extern crate tokio;
-extern crate tokio_io;
-
+use env_logger;
+use futures::Future;
+use libc;
+use mio;
+use mio::event::Evented;
+use mio::unix::{EventedFd, UnixReady};
+use mio::{PollOpt, Ready, Token};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
-
-use futures::Future;
-use mio::event::Evented;
-use mio::unix::{EventedFd, UnixReady};
-use mio::{PollOpt, Ready, Token};
 use tokio::reactor::{Handle, PollEvented2};
 use tokio_io::io::read_to_end;
 

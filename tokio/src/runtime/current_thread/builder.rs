@@ -1,10 +1,8 @@
-use executor::current_thread::CurrentThread;
-use runtime::current_thread::Runtime;
-
+use crate::executor::current_thread::CurrentThread;
+use crate::runtime::current_thread::Runtime;
 use tokio_reactor::Reactor;
 use tokio_timer::clock::Clock;
 use tokio_timer::timer::Timer;
-
 use std::io;
 
 /// Builds a Single-threaded runtime with custom configuration values.

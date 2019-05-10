@@ -24,24 +24,21 @@
 //! connected clients they'll all join the same room and see everyone else's
 //! messages.
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate tokio;
-
-use tokio::io;
-use tokio::net::TcpListener;
-use tokio::prelude::*;
-use tokio::runtime::current_thread::{Runtime, TaskExecutor};
-
+use futures;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
 use std::io::BufReader;
 use std::iter;
 use std::rc::Rc;
+use tokio::io;
+use tokio::net::TcpListener;
+use tokio::prelude::*;
+use tokio::runtime::current_thread::{Runtime, TaskExecutor};
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = Runtime::new().unwrap();
 
     // Create the TCP listener we'll accept connections on.

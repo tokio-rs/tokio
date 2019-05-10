@@ -8,18 +8,16 @@
 //! Note that the error handling is a bit left out. Also, the `run` could be modified to return the
 //! result of the provided future.
 
-extern crate futures;
-extern crate tokio;
-extern crate tokio_current_thread;
-extern crate tokio_executor;
-extern crate tokio_reactor;
-extern crate tokio_timer;
-
-use std::io::Error as IoError;
-use std::time::{Duration, Instant};
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::{future, Future};
+use std::io::Error as IoError;
+use std::time::{Duration, Instant};
+use tokio;
+use tokio_current_thread;
 use tokio_current_thread::CurrentThread;
+use tokio_executor;
+use tokio_reactor;
 use tokio_reactor::Reactor;
 use tokio_timer::timer::{self, Timer};
 
@@ -60,7 +58,7 @@ fn run<F: Future<Item = (), Error = ()>>(f: F) -> Result<(), IoError> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     run(future::lazy(|| {
         // Here comes the application logic. It can spawn further tasks by tokio_current_thread::spawn().
         // It also can use the default reactor and create timeouts.

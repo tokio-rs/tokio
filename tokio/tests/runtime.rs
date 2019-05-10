@@ -1,10 +1,11 @@
-extern crate env_logger;
-extern crate futures;
-extern crate tokio;
+#![deny(warnings, rust_2018_idioms)]
 
+use env_logger;
+use futures;
 use futures::sync::oneshot;
 use std::sync::{atomic, Arc, Mutex};
 use std::thread;
+use tokio;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::future::lazy;
@@ -25,7 +26,7 @@ macro_rules! t {
     };
 }
 
-fn create_client_server_future() -> Box<Future<Item = (), Error = ()> + Send> {
+fn create_client_server_future() -> Box<dyn Future<Item = (), Error = ()> + Send> {
     let server = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
     let addr = t!(server.local_addr());
     let client = TcpStream::connect(&addr);
@@ -84,7 +85,7 @@ mod runtime_single_threaded_block_on_all {
 
     fn test<F>(spawn: F)
     where
-        F: Fn(Box<Future<Item = (), Error = ()> + Send>),
+        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>),
     {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
@@ -133,7 +134,10 @@ mod runtime_single_threaded_racy {
     use super::*;
     fn test<F>(spawn: F)
     where
-        F: Fn(tokio::runtime::current_thread::Handle, Box<Future<Item = (), Error = ()> + Send>),
+        F: Fn(
+            tokio::runtime::current_thread::Handle,
+            Box<dyn Future<Item = (), Error = ()> + Send>,
+        ),
     {
         let (trigger, exit) = futures::sync::oneshot::channel();
         let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
@@ -218,7 +222,7 @@ fn block_on_timer() {
     use std::time::{Duration, Instant};
     use tokio::timer::{Delay, Error};
 
-    fn after_1s<T>(x: T) -> Box<Future<Item = T, Error = Error> + Send>
+    fn after_1s<T>(x: T) -> Box<dyn Future<Item = T, Error = Error> + Send>
     where
         T: Send + 'static,
     {
@@ -235,7 +239,7 @@ mod from_block_on {
 
     fn test<F>(spawn: F)
     where
-        F: Fn(Box<Future<Item = (), Error = ()> + Send>) + Send + 'static,
+        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + Send + 'static,
     {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
@@ -317,7 +321,7 @@ mod many {
     const ITER: usize = 200;
     fn test<F>(spawn: F)
     where
-        F: Fn(&mut Runtime, Box<Future<Item = (), Error = ()> + Send>),
+        F: Fn(&mut Runtime, Box<dyn Future<Item = (), Error = ()> + Send>),
     {
         let cnt = Arc::new(Mutex::new(0));
         let mut runtime = Runtime::new().unwrap();
@@ -360,7 +364,7 @@ mod from_block_on_all {
 
     fn test<F>(spawn: F)
     where
-        F: Fn(Box<Future<Item = (), Error = ()> + Send>) + Send + 'static,
+        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + Send + 'static,
     {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
@@ -414,8 +418,8 @@ mod nested_enter {
 
     fn test<F1, F2>(first: F1, nested: F2)
     where
-        F1: Fn(Box<Future<Item = (), Error = ()> + Send>) + Send + 'static,
-        F2: Fn(Box<Future<Item = (), Error = ()> + Send>) + panic::UnwindSafe + Send + 'static,
+        F1: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + Send + 'static,
+        F2: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + panic::UnwindSafe + Send + 'static,
     {
         let panicked = Arc::new(Mutex::new(false));
         let panicked2 = panicked.clone();

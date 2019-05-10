@@ -1,11 +1,10 @@
-#[cfg(feature = "timer")]
-use tokio_timer::{throttle::Throttle, Timeout};
+pub use crate::util::enumerate::Enumerate;
 
 use futures::Stream;
-
 #[cfg(feature = "timer")]
 use std::time::Duration;
-pub use util::enumerate::Enumerate;
+#[cfg(feature = "timer")]
+use tokio_timer::{throttle::Throttle, Timeout};
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.

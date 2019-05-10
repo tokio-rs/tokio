@@ -1,5 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.19")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
 #![cfg_attr(feature = "async-await-preview", feature(async_await, await_macro))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
@@ -75,39 +76,6 @@ macro_rules! if_runtime {
     )*)
 }
 
-#[macro_use]
-extern crate futures;
-
-#[cfg(feature = "io")]
-extern crate bytes;
-#[cfg(feature = "reactor")]
-extern crate mio;
-#[cfg(feature = "rt-full")]
-extern crate num_cpus;
-#[cfg(feature = "codec")]
-extern crate tokio_codec;
-#[cfg(feature = "rt-full")]
-extern crate tokio_current_thread;
-#[cfg(feature = "fs")]
-extern crate tokio_fs;
-#[cfg(feature = "io")]
-extern crate tokio_io;
-#[cfg(feature = "reactor")]
-extern crate tokio_reactor;
-#[cfg(feature = "sync")]
-extern crate tokio_sync;
-#[cfg(feature = "tcp")]
-extern crate tokio_tcp;
-#[cfg(feature = "rt-full")]
-extern crate tokio_threadpool;
-#[cfg(feature = "timer")]
-extern crate tokio_timer;
-#[cfg(feature = "udp")]
-extern crate tokio_udp;
-
-#[cfg(all(unix, feature = "uds"))]
-extern crate tokio_uds;
-
 #[cfg(feature = "timer")]
 pub mod clock;
 #[cfg(feature = "codec")]
@@ -128,22 +96,14 @@ pub mod timer;
 pub mod util;
 
 if_runtime! {
-    extern crate tokio_executor;
-    extern crate tokio_trace_core;
     pub mod executor;
     pub mod runtime;
 
-    pub use executor::spawn;
-    pub use runtime::run;
+    pub use crate::executor::spawn;
+    pub use crate::runtime::run;
 }
 
 // ===== Experimental async/await support =====
-
-#[cfg(feature = "async-await-preview")]
-extern crate tokio_futures;
-
-#[cfg(feature = "async-await-preview")]
-extern crate tokio_macros;
 
 #[cfg(feature = "async-await-preview")]
 mod async_await;
@@ -152,7 +112,7 @@ mod async_await;
 pub use async_await::{run_async, spawn_async};
 
 #[cfg(feature = "async-await-preview")]
-pub use tokio_futures::await;
+pub use tokio_futures::r#await;
 
 #[cfg(feature = "async-await-preview")]
 pub use tokio_macros::{main, test};

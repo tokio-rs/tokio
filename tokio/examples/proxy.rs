@@ -20,20 +20,18 @@
 //! This final terminal will connect to our proxy, which will in turn connect to
 //! the echo server, and you'll be able to see data flowing between them.
 
-#![deny(warnings)]
-
-extern crate tokio;
+#![deny(warnings, rust_2018_idioms)]
 
 use std::env;
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::sync::{Arc, Mutex};
-
+use tokio;
 use tokio::io::{copy, shutdown};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listen_addr = env::args().nth(1).unwrap_or("127.0.0.1:8081".to_string());
     let listen_addr = listen_addr.parse::<SocketAddr>()?;
 
