@@ -9,6 +9,7 @@ race:Weak*drop
 # rust runtime logic.
 race:std*mpsc_queue
 race:std*lang_start
+race:drop*std::thread*
 
 # Probably more fences in std.
 race:__call_tls_dtors
