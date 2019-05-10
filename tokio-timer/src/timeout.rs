@@ -4,11 +4,9 @@
 //!
 //! [`Timeout`]: struct.Timeout.html
 
-use clock::now;
-use Delay;
-
+use crate::clock::now;
+use crate::Delay;
 use futures::{Async, Future, Poll, Stream};
-
 use std::error;
 use std::fmt;
 use std::time::{Duration, Instant};
@@ -89,7 +87,7 @@ enum Kind<T> {
     Elapsed,
 
     /// Timer returned an error.
-    Timer(::Error),
+    Timer(crate::Error),
 }
 
 impl<T> Timeout<T> {
@@ -265,7 +263,7 @@ impl<T> Error<T> {
 
     /// Creates a new `Error` representing an error encountered by the timer
     /// implementation
-    pub fn timer(err: ::Error) -> Error<T> {
+    pub fn timer(err: crate::Error) -> Error<T> {
         Error(Kind::Timer(err))
     }
 
@@ -278,7 +276,7 @@ impl<T> Error<T> {
     }
 
     /// Consumes `self`, returning the error raised by the timer implementation.
-    pub fn into_timer(self) -> Option<::Error> {
+    pub fn into_timer(self) -> Option<crate::Error> {
         match self.0 {
             Kind::Timer(err) => Some(err),
             _ => None,
@@ -299,7 +297,7 @@ impl<T: error::Error> error::Error for Error<T> {
 }
 
 impl<T: fmt::Display> fmt::Display for Error<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
 
         match self.0 {

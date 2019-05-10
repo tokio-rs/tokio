@@ -1,16 +1,11 @@
-extern crate futures;
-extern crate tokio_executor;
-extern crate tokio_mock_task;
-extern crate tokio_timer;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
 mod support;
-use support::*;
-
-use tokio_mock_task::MockTask;
-use tokio_timer::*;
+use crate::support::*;
 
 use futures::Stream;
+use tokio_mock_task::MockTask;
+use tokio_timer::*;
 
 #[test]
 fn single_immediate_delay() {
@@ -390,7 +385,7 @@ fn reset_first_expiring_item_to_expire_later() {
         let epoch = time.now();
 
         let foo = queue.insert_at("foo", epoch + ms(200));
-        let bar = queue.insert_at("bar", epoch + ms(250));
+        let _bar = queue.insert_at("bar", epoch + ms(250));
 
         task.enter(|| {
             assert_not_ready!(queue);

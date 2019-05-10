@@ -1,16 +1,12 @@
+#![deny(warnings, rust_2018_idioms)]
 #![allow(deprecated)]
-extern crate futures;
-extern crate tokio_executor;
-extern crate tokio_timer;
 
-#[macro_use]
 mod support;
-use support::*;
+use crate::support::*;
 
-use tokio_timer::*;
-
-use futures::sync::oneshot;
 use futures::{future, Future};
+use futures::sync::oneshot;
+use tokio_timer::*;
 
 #[test]
 fn simultaneous_deadline_future_completion() {

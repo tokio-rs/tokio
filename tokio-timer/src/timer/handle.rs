@@ -1,8 +1,6 @@
-use timer::Inner;
-use {Deadline, Delay, Error, Interval, Timeout};
-
+use crate::{Deadline, Delay, Error, Interval, Timeout};
+use crate::timer::Inner;
 use tokio_executor::Enter;
-
 use std::cell::RefCell;
 use std::fmt;
 use std::sync::{Arc, Weak};
@@ -190,7 +188,7 @@ impl HandlePriv {
 }
 
 impl fmt::Debug for HandlePriv {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "HandlePriv")
     }
 }

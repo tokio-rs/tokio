@@ -1,10 +1,9 @@
-use super::Entry;
-use Error;
-
+use crate::Error;
 use std::ptr;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
+use super::Entry;
 
 /// A stack of `Entry` nodes
 #[derive(Debug)]

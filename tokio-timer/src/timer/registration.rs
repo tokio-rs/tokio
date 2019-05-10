@@ -1,9 +1,7 @@
-use clock::now;
-use timer::{Entry, HandlePriv};
-use Error;
-
+use crate::clock::now;
+use crate::timer::{Entry, HandlePriv};
+use crate::Error;
 use futures::Poll;
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

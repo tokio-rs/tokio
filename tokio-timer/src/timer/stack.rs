@@ -1,8 +1,7 @@
-use super::Entry;
-use wheel;
-
+use crate::wheel;
 use std::ptr;
 use std::sync::Arc;
+use super::Entry;
 
 /// A doubly linked stack
 #[derive(Debug)]
