@@ -31,8 +31,6 @@ cfg_if! {
                         all(not(target_os = "macos"),
                             not(target_os = "windows"),
                             not(target_os = "ios"))))] {
-        extern crate openssl;
-
         fn assert_bad_hostname_error(err: &io::Error) {
             let err = err.get_ref().unwrap();
             let err = err.downcast_ref::<native_tls::Error>().unwrap();
