@@ -2,10 +2,9 @@
 
 // A tiny async TLS echo server with Tokio
 use native_tls;
+use native_tls::Identity;
 use tokio;
 use tokio_tls;
-
-use native_tls::Identity;
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
