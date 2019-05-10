@@ -249,74 +249,46 @@ macro_rules! span {
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! trace_span {
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        trace_span!(
-            target: $target,
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::TRACE,
             target: $target,
             parent: $parent,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, parent: $parent:expr, $name:expr) => {
         trace_span!(target: $target, parent: $parent, $name,)
     };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        trace_span!(
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::TRACE,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (parent: $parent:expr, $name:expr) => {
         trace_span!(parent: $parent, $name,)
     };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        trace_span!(
-            target: $target,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::TRACE,
             target: $target,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, $name:expr) => {
         trace_span!(target: $target, $name,)
     };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        trace_span!(
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    ($name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::TRACE,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     ($name:expr) => {trace_span!($name,)};
@@ -338,74 +310,46 @@ macro_rules! trace_span {
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! debug_span {
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        debug_span!(
-            target: $target,
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::DEBUG,
             target: $target,
             parent: $parent,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, parent: $parent:expr, $name:expr) => {
         debug_span!(target: $target, parent: $parent, $name,)
     };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        debug_span!(
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::DEBUG,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (parent: $parent:expr, $name:expr) => {
         debug_span!(parent: $parent, $name,)
     };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        debug_span!(
-            target: $target,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::DEBUG,
             target: $target,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, $name:expr) => {
         debug_span!(target: $target, $name,)
     };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        debug_span!(
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    ($name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::DEBUG,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     ($name:expr) => {debug_span!($name,)};
@@ -427,74 +371,46 @@ macro_rules! debug_span {
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! info_span {
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        info_span!(
-            target: $target,
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::INFO,
             target: $target,
             parent: $parent,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, parent: $parent:expr, $name:expr) => {
         info_span!(target: $target, parent: $parent, $name,)
     };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        info_span!(
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::INFO,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (parent: $parent:expr, $name:expr) => {
         info_span!(parent: $parent, $name,)
     };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        info_span!(
-            target: $target,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::INFO,
             target: $target,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, $name:expr) => {
         info_span!(target: $target, $name,)
     };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        info_span!(
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    ($name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::INFO,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     ($name:expr) => {info_span!($name,)};
@@ -516,74 +432,46 @@ macro_rules! info_span {
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! warn_span {
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        warn_span!(
-            target: $target,
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::WARN,
             target: $target,
             parent: $parent,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, parent: $parent:expr, $name:expr) => {
         warn_span!(target: $target, parent: $parent, $name,)
     };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        warn_span!(
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::WARN,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (parent: $parent:expr, $name:expr) => {
         warn_span!(parent: $parent, $name,)
     };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        warn_span!(
-            target: $target,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::WARN,
             target: $target,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, $name:expr) => {
         warn_span!(target: $target, $name,)
     };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        warn_span!(
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    ($name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::WARN,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     ($name:expr) => {warn_span!($name,)};
@@ -604,74 +492,46 @@ macro_rules! warn_span {
 /// ```
 #[macro_export(local_inner_macros)]
 macro_rules! error_span {
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        error_span!(
-            target: $target,
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::ERROR,
             target: $target,
             parent: $parent,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, parent: $parent:expr, $name:expr) => {
         error_span!(target: $target, parent: $parent, $name,)
     };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        error_span!(
-            parent: $parent,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (parent: $parent:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (parent: $parent:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::ERROR,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (parent: $parent:expr, $name:expr) => {
         error_span!(parent: $parent, $name,)
     };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        error_span!(
-            target: $target,
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    (target: $target:expr, $name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    (target: $target:expr, $name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::ERROR,
             target: $target,
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     (target: $target:expr, $name:expr) => {
         error_span!(target: $target, $name,)
     };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*,) => {
-        error_span!(
-            $name,
-            $($($k).+ $( = $val)*),*
-        )
-    };
-    ($name:expr, $($($k:ident).+ $( = $val:expr)*),*) => {
+    ($name:expr, $($field:tt)*) => {
         span!(
             $crate::Level::ERROR,
             target: __tokio_trace_module_path!(),
             $name,
-            $($($k).+ $( = $val)*),*
+            $($field)*
         )
     };
     ($name:expr) => {error_span!($name,)};
