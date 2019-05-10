@@ -28,9 +28,8 @@ pub use self::impl_solaris::get_peer_cred;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod impl_linux {
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
-    use std::os::unix::io::AsRawFd;
     use std::{io, mem};
-    use UnixStream;
+    use crate::UnixStream;
 
     use libc::ucred;
 
