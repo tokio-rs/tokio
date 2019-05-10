@@ -1,11 +1,8 @@
-use {RecvDgram, SendDgram};
-
-use tokio_reactor::{Handle, PollEvented};
-
-use futures::{Async, Poll};
+use crate::{RecvDgram, SendDgram};
+use futures::{try_ready, Async, Poll};
 use mio::Ready;
 use mio_uds;
-
+use tokio_reactor::{Handle, PollEvented};
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
@@ -197,7 +194,7 @@ impl UnixDatagram {
 }
 
 impl fmt::Debug for UnixDatagram {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

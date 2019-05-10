@@ -1,19 +1,12 @@
 #![cfg(unix)]
-
-extern crate futures;
-extern crate tokio;
-extern crate tokio_uds;
-
-extern crate tempfile;
-
-use tokio_uds::*;
-
-use tokio::io;
-use tokio::runtime::current_thread::Runtime;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::sync::oneshot;
 use futures::{Future, Stream};
 use tempfile::Builder;
+use tokio::io;
+use tokio::runtime::current_thread::Runtime;
+use tokio_uds::*;
 
 macro_rules! t {
     ($e:expr) => {

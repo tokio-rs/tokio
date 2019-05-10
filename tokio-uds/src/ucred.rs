@@ -83,7 +83,7 @@ pub mod impl_macos {
     use libc::getpeereid;
     use std::os::unix::io::AsRawFd;
     use std::{io, mem};
-    use UnixStream;
+    use crate::UnixStream;
 
     pub fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
@@ -151,7 +151,7 @@ pub mod impl_solaris {
 mod test {
     use libc::getegid;
     use libc::geteuid;
-    use UnixStream;
+    use crate::UnixStream;
 
     #[test]
     #[cfg_attr(
