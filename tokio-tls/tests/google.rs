@@ -1,21 +1,16 @@
-extern crate env_logger;
-extern crate futures;
-extern crate native_tls;
-extern crate tokio;
-extern crate tokio_io;
-extern crate tokio_tls;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
-extern crate cfg_if;
-
-use std::io;
-use std::net::ToSocketAddrs;
-
+use cfg_if::cfg_if;
+use env_logger;
 use futures::Future;
+use native_tls;
 use native_tls::TlsConnector;
+use tokio_tls;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio_io::io::{flush, read_to_end, write_all};
+use std::io;
+use std::net::ToSocketAddrs;
 
 macro_rules! t {
     ($e:expr) => {
@@ -92,7 +87,7 @@ fn fetch_google() {
     assert!(data.starts_with(b"HTTP/1.0 "));
 
     let data = String::from_utf8_lossy(&data);
-    let data = data.trim_right();
+    let data = data.trim_end();
     assert!(data.ends_with("</html>") || data.ends_with("</HTML>"));
 }
 

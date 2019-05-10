@@ -1,5 +1,6 @@
-#![deny(missing_docs)]
 #![doc(html_root_url = "https://docs.rs/tokio-tls/0.2.1")]
+#![deny(rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
 
 //! Async TLS streams
 //!
@@ -18,16 +19,10 @@
 //! built. Configuration of TLS parameters is still primarily done through the
 //! `native-tls` crate.
 
-extern crate futures;
-extern crate native_tls;
-#[macro_use]
-extern crate tokio_io;
-
-use std::io::{self, Read, Write};
-
 use futures::{Async, Future, Poll};
 use native_tls::{Error, HandshakeError};
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::{try_nb, AsyncRead, AsyncWrite};
+use std::io::{self, Read, Write};
 
 /// A wrapper around an underlying raw stream which implements the TLS or SSL
 /// protocol.
