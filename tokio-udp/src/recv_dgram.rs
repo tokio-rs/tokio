@@ -45,12 +45,14 @@ impl<T> RecvDgram<T> {
 
     /// Consume the `RecvDgram`, returning the socket and buffer.
     ///
+    /// # Panics
+    ///
+    /// If called after the future has completed.
+    ///
+    /// # Examples
+    ///
     /// ```
-    /// # extern crate tokio_udp;
-    ///
     /// use tokio_udp::UdpSocket;
-    ///
-    /// # pub fn main() {
     ///
     /// let socket = UdpSocket::bind(&([127, 0, 0, 1], 0).into()).unwrap();
     /// let mut buffer = vec![0; 4096];
@@ -63,12 +65,7 @@ impl<T> RecvDgram<T> {
     ///
     /// let socket = parts.socket; // extract the socket
     /// let buffer = parts.buffer; // extract the buffer
-    ///
-    /// # }
     /// ```
-    /// # Panics
-    ///
-    /// If called after the future has completed.
     pub fn into_parts(mut self) -> Parts<T> {
         let state = self
             .state

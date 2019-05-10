@@ -23,53 +23,34 @@
 //! Print out all ctrl-C notifications received
 //!
 //! ```rust,no_run
-//! extern crate futures;
-//! extern crate tokio;
-//! extern crate tokio_signal;
-//!
 //! use futures::{Future, Stream};
 //!
-//! fn main() {
-//!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
-//!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
+//! // Create an infinite stream of "Ctrl+C" notifications. Each item received
+//! // on this stream may represent multiple ctrl-c signals.
+//! let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
 //!
-//!     // Process each ctrl-c as it comes in
-//!     let prog = ctrl_c.for_each(|()| {
-//!         println!("ctrl-c received!");
-//!         Ok(())
-//!     });
+//! // Process each ctrl-c as it comes in
+//! let prog = ctrl_c.for_each(|()| {
+//!     println!("ctrl-c received!");
+//!     Ok(())
+//! });
 //!
-//!     tokio::runtime::current_thread::block_on_all(prog).unwrap();
-//! }
+//! tokio::runtime::current_thread::block_on_all(prog).unwrap();
 //! ```
 //!
 //! Wait for SIGHUP on Unix
 //!
 //! ```rust,no_run
-//! # extern crate futures;
-//! # extern crate tokio;
-//! # extern crate tokio_signal;
-//! # #[cfg(unix)]
-//! # mod foo {
-//! #
-//! extern crate futures;
-//! extern crate tokio;
-//! extern crate tokio_signal;
-//!
+//! # #![cfg(unix)]
 //! use futures::{Future, Stream};
 //! use tokio_signal::unix::{Signal, SIGHUP};
 //!
-//! fn main() {
-//!     // Like the previous example, this is an infinite stream of signals
-//!     // being received, and signals may be coalesced while pending.
-//!     let stream = Signal::new(SIGHUP).flatten_stream();
+//! // Like the previous example, this is an infinite stream of signals
+//! // being received, and signals may be coalesced while pending.
+//! let stream = Signal::new(SIGHUP).flatten_stream();
 //!
-//!     // Convert out stream into a future and block the program
-//!     tokio::runtime::current_thread::block_on_all(stream.into_future()).ok().unwrap();
-//! }
-//! # }
-//! # fn main() {}
+//! // Convert out stream into a future and block the program
+//! tokio::runtime::current_thread::block_on_all(stream.into_future()).ok().unwrap();
 //! ```
 
 use futures::stream::Stream;
