@@ -8,11 +8,9 @@
 //! This allows you to do something along the lines of:
 //!
 //! ```rust,no_run
-//! # #[macro_use]
-//! # extern crate futures;
-//! # extern crate tokio;
-//! # use futures::{future, Poll, Async, Future, Stream};
+//! use futures::{try_ready, future, Poll, Async, Future, Stream};
 //! use tokio::sync::lock::{Lock, LockGuard};
+//!
 //! struct MyType<S> {
 //!     lock: Lock<S>,
 //! }
@@ -37,11 +35,10 @@
 //!         }
 //!     }
 //! }
-//! # fn main() {}
 //! ```
 //!
-//!   [`Lock`]: struct.Lock.html
-//!   [`LockGuard`]: struct.LockGuard.html
+//! [`Lock`]: struct.Lock.html
+//! [`LockGuard`]: struct.LockGuard.html
 
 use crate::semaphore;
 use futures::Async;

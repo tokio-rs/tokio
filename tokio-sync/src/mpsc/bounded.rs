@@ -78,9 +78,6 @@ pub struct RecvError(());
 /// # Examples
 ///
 /// ```rust
-/// extern crate futures;
-/// extern crate tokio;
-///
 /// use tokio::sync::mpsc::channel;
 /// use tokio::prelude::*;
 /// use futures::future::lazy;

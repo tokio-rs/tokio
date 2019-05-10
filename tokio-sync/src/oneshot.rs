@@ -103,9 +103,6 @@ struct State(usize);
 /// # Examples
 ///
 /// ```
-/// extern crate futures;
-/// extern crate tokio;
-///
 /// use tokio::sync::oneshot;
 /// use futures::Future;
 /// use std::thread;

@@ -18,9 +18,6 @@
 //! # Examples
 //!
 //! ```
-//! # extern crate futures;
-//! extern crate tokio;
-//!
 //! use tokio::prelude::*;
 //! use tokio::sync::watch;
 //!
@@ -188,9 +185,6 @@ const CLOSED: usize = 1;
 /// # Examples
 ///
 /// ```
-/// # extern crate futures;
-/// extern crate tokio;
-///
 /// use tokio::prelude::*;
 /// use tokio::sync::watch;
 ///
@@ -249,8 +243,8 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # use tokio::sync::watch;
+    /// use tokio::sync::watch;
+    ///
     /// let (_, rx) = watch::channel("hello");
     /// assert_eq!(*rx.get_ref(), "hello");
     /// ```
