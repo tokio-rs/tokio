@@ -45,8 +45,6 @@ cfg_if! {
                         all(not(target_os = "macos"),
                             not(target_os = "windows"),
                             not(target_os = "ios"))))] {
-        extern crate openssl;
-
         fn verify_failed(err: &Error) {
             assert!(format!("{}", err).contains("certificate verify failed"))
         }

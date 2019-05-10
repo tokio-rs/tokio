@@ -42,7 +42,7 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    pub fn main() -> Result<(), Box<::std::error::Error>> {
+    pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 }
