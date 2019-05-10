@@ -18,6 +18,7 @@ use http;
 use http::header::HeaderValue;
 use http::{Request, Response, StatusCode};
 use httparse;
+use serde::Serialize;
 use serde_json;
 use std::net::SocketAddr;
 use std::{env, fmt, io};
