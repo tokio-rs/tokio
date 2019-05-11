@@ -118,15 +118,17 @@ impl Stream for ReadDir {
                     });
                 }
                 ReadDirMode::Fallback(fallback) => match fallback.take().unwrap() {
-                    ReadDirStatus::Idle(mut std) => {
+                    ReadDirStatus::Idle(std) => {
                         // Start a new blocking task that fetches the next `DirEntry`.
-                        *fallback = Some(ReadDirStatus::Blocked(blocking(future::lazy(
-                            move || match std.next() {
-                                Some(Err(err)) => Err((std, err)),
-                                Some(Ok(item)) => Ok((std, Some(item))),
-                                None => Ok((std, None)),
-                            },
-                        ))));
+                        *fallback =
+                            Some(ReadDirStatus::Blocked(blocking(future::lazy(move || {
+                                let mut std = std;
+                                match std.next() {
+                                    Some(Err(err)) => Err((std, err)),
+                                    Some(Ok(item)) => Ok((std, Some(item))),
+                                    None => Ok((std, None)),
+                                }
+                            }))));
                     }
                     ReadDirStatus::Blocked(mut job) => match job.poll() {
                         Ok(Async::Ready((std, item))) => {
