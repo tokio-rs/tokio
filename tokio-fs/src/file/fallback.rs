@@ -61,8 +61,8 @@ enum BufferKind {
 /// The result of the last async operation.
 #[derive(Debug)]
 enum LastOp {
-    /// A `seek` operation with the `io::SeekFrom` argument has returned the `u64` result.
-    Seek(io::SeekFrom, u64),
+    /// A `seek` operation with the `io::SeekFrom` argument can succeed with the `u64` result.
+    Preseek(io::SeekFrom, u64),
 
     /// A `flush` operation has completed.
     Flush,
@@ -119,9 +119,34 @@ impl Fallback {
         self.update(|idle| match idle {
             None => panic!("`File` instance closed"),
             Some(mut state) => {
-                if let Some(LastOp::Seek(last_pos, output)) = state.last_op.take() {
+                // NOTE(stjepang): This is a hack.
+                //
+                // There are two naive ways of implementing this function:
+                //
+                // 1. Schedule a seek operation and return `Ready` immediately. But we also have to
+                //    return a value of type `u64`, which is the position of the cursor after the
+                //    seek operation. Unfortunately, we don't know whether the seek operation will
+                //    result in an error so we'd have to somehow track the position of the cursor.
+                //
+                // 2. Schedule a seek operation and return `NotReady`. Let the user keep polling
+                //    until the operation completes and then return the result of it. But now we
+                //    run into another problem. We'd like for an async operation to not move the
+                //    cursor unless `Ready` is returned. Put differently, we want the seek
+                //    operation to happen "atomically" at the moment `Ready` is returned.
+                //
+                // This brings us to a hacky solution that works okay, although it is not the
+                // nicest or the fastest one. Perhaps we'll figure out a better one in the future.
+                //
+                // First we schedule a "pre-seek" operation that only figures out the current and
+                // tfinal positions of the cursor, but doesn't really move it. We return an error
+                // early if the seek operation would fail.
+                //
+                // Finally, after the pre-seek operation completes, we can schedule an actual seek
+                // operation (which we know will succeed!) and return `Ready` immediately with the
+                // known final position of the cursor.
+                if let Some(LastOp::Preseek(last_pos, output)) = state.last_op.take() {
                     if last_pos == pos {
-                        return Update::Done(Some(state), output);
+                        return Update::Prefetch(Job::seek(state, pos), output);
                     }
                 }
 
@@ -130,7 +155,7 @@ impl Fallback {
                 } else if state.kind == BufferKind::Reader && !state.buffer.is_empty() {
                     Update::Block(Job::unread(state))
                 } else {
-                    Update::Block(Job::seek(state, pos))
+                    Update::Block(Job::preseek(state, pos))
                 }
             }
         })
@@ -402,13 +427,30 @@ impl Job {
         })))
     }
 
+    /// Creates a job that prepares a seek operation.
+    fn preseek(mut state: State, pos: io::SeekFrom) -> Job {
+        Job::new(move || {
+            // Find out the current position in the file.
+            let curr = match state.std.seek(io::SeekFrom::Current(0)) {
+                Ok(curr) => curr,
+                Err(err) => return (Some(state), Err(err)),
+            };
+            // Try executing a seek operation with `pos` as the argument.
+            let res = state.std.seek(pos).map(|output| {
+                // If successful, store the result of the seek operation.
+                state.last_op = Some(LastOp::Preseek(pos, output));
+                // Undo the seek operation to return to the original position.
+                state.std.seek(io::SeekFrom::Start(curr)).unwrap();
+            });
+            (Some(state), res)
+        })
+    }
+
     /// Creates a job that seeks to an offset.
     fn seek(mut state: State, pos: io::SeekFrom) -> Job {
         Job::new(move || {
-            let res = state
-                .std
-                .seek(pos)
-                .map(|output| state.last_op = Some(LastOp::Seek(pos, output)));
+            // This operation must succeed because a preseek operation has ensured so.
+            let res = state.std.seek(pos).map(|_| ());
             (Some(state), res)
         })
     }
