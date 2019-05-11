@@ -41,7 +41,7 @@
 //! Wait for SIGHUP on Unix
 //!
 //! ```rust,no_run
-//! # #![cfg(unix)]
+//! # #[cfg(unix)] fn dox() {
 //! use futures::{Future, Stream};
 //! use tokio_signal::unix::{Signal, SIGHUP};
 //!
@@ -51,6 +51,7 @@
 //!
 //! // Convert out stream into a future and block the program
 //! tokio::runtime::current_thread::block_on_all(stream.into_future()).ok().unwrap();
+//! # }
 //! ```
 
 use futures::stream::Stream;
