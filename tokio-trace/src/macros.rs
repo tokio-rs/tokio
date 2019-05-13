@@ -88,6 +88,7 @@
 /// let my_span = span!(Level::TRACE, "my span", my_struct = ?my_struct);
 /// # }
 /// ```
+///
 /// Shorthand for `field::display`:
 /// ```
 /// # #[macro_use]
