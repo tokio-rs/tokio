@@ -1234,7 +1234,7 @@ macro_rules! valueset {
         &[ $($out),*, (&$next, Some(&debug(&$val) as &Value))]
     };
     (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = %$val:expr $(,)*) => {
-        &[ $($out),+, (&$next, Some(&display(&$val) as &$Value))]
+        &[ $($out),+, (&$next, Some(&display(&$val) as &Value))]
     };
     (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = $val:expr $(,)*) => {
         &[ $($out),+, (&$next, Some(&$val as &Value))]
