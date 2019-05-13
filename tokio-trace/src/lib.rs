@@ -288,7 +288,8 @@
 //! ```rust
 //! #[macro_use]
 //! extern crate tokio_trace;
-//! use tokio_trace::{field, Level};
+//! use tokio_trace::Level;
+//!
 //! # #[derive(Debug)] pub struct Yak(String);
 //! # impl Yak { fn shave(&mut self, _: u32) {} }
 //! # fn find_a_razor() -> Result<u32, u32> { Ok(1) }
@@ -296,7 +297,7 @@
 //! pub fn shave_the_yak(yak: &mut Yak) {
 //!     // Create a new span for this invocation of `shave_the_yak`, annotated
 //!     // with  the yak being shaved as a *field* on the span.
-//!     span!(Level::TRACE, "shave_the_yak", yak = field::debug(&yak)).enter(|| {
+//!     span!(Level::TRACE, "shave_the_yak", yak = ?yak).enter(|| {
 //!         // Since the span is annotated with the yak, it is part of the context
 //!         // for everything happening inside the span. Therefore, we don't need
 //!         // to add it to the message for this event, as the `log` crate does.
@@ -308,7 +309,7 @@
 //!                     // We can add the razor as a field rather than formatting it
 //!                     // as part of the message, allowing subscribers to consume it
 //!                     // in a more structured manner:
-//!                     info!({ razor = field::display(razor) }, "Razor located");
+//!                     info!({ razor = %razor }, "Razor located");
 //!                     yak.shave(razor);
 //!                     break;
 //!                 }
