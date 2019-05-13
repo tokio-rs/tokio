@@ -7,15 +7,22 @@ matrix:
     - rust: stable
     - os: osx
     - rust: beta
-    - rust: nightly
 
     - rust: nightly
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libssl-dev
       before_script:
         - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin
       script:
+        - cargo test
         - cargo doc --no-deps --all-features
       after_success:
         - travis-cargo --only nightly doc-upload
+        - cargo tarpaulin -v --forward --out Xml
 
 script:
   - cargo test
