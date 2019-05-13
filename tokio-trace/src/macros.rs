@@ -1273,10 +1273,10 @@ macro_rules! valueset {
     };
 
     // == recursive case (more tts), empty out set ===
-    (@ { }, $next:expr, ($k:ident).+ = ?$_val:expr, $($rest:tt)+ ) => {
+    (@ { }, $next:expr, $($k:ident).+ = ?$val:expr, $($rest:tt)+ ) => {
         valueset!(@ { (&$next, Some(&debug(&$val) as &Value)) }, $next, $($rest)+ )
     };
-    (@ { }, $next:expr,  $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+    (@ { }, $next:expr, $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
         valueset!(@ { (&$next, Some(&display(&$val) as &Value)) }, $next, $($rest)+)
     };
     (@ { }, $next:expr, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
@@ -1293,7 +1293,7 @@ macro_rules! valueset {
             use $crate::field::{debug, display, Value};
             let mut iter = $fields.iter();
             $fields.value_set(valueset!(
-                @ {},
+                @ { },
                 iter.next().expect("FieldSet corrupted (this is a bug)"),
                 $($kvs)+
             ))
