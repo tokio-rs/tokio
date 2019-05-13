@@ -10,6 +10,7 @@ extern crate tokio_trace;
 
 #[test]
 fn span() {
+    span!(Level::DEBUG, target: "foo_events", "foo", bar.baz = ?2, quux = %3, quuux = 4);
     span!(Level::DEBUG, target: "foo_events", "foo", bar.baz = 2, quux = 3);
     span!(Level::DEBUG, target: "foo_events", "foo", bar.baz = 2, quux = 4,);
     span!(Level::DEBUG, target: "foo_events", "foo");
