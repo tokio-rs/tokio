@@ -89,7 +89,6 @@
 /// # }
 /// ```
 /// Shorthand for `field::display`:
-/// /// Shorthand for `field::debug`:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -107,8 +106,6 @@
 /// let my_span = span!(Level::TRACE, "my span", my_struct.field = %my_struct.field);
 /// # }
 /// ```
-///
-///
 ///
 /// Note that a span may have up to 32 fields. The following will not compile:
 /// ```rust,compile_fail
@@ -577,7 +574,43 @@ macro_rules! error_span {
 ///     event!(Level::Info, foo = 5, bad_field, bar = field::display("hello"))
 /// #}
 /// ```
+/// Shorthand for `field::debug`:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// #[derive(Debug)]
+/// struct MyStruct {
+///     field: &'static str,
+/// }
 ///
+/// let my_struct = MyStruct {
+///     field: "Hello world!"
+/// };
+///
+/// // `my_struct` will be recorded using its `fmt::Debug` implementation.
+/// event!(Level::TRACE, my_struct = ?my_struct);
+/// # }
+/// ```
+/// Shorthand for `field::display`:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// # #[derive(Debug)]
+/// # struct MyStruct {
+/// #     field: &'static str,
+/// # }
+/// #
+/// # let my_struct = MyStruct {
+/// #     field: "Hello world!"
+/// # };
+/// // `my_struct.field` will be recorded using its `fmt::Display` implementation.
+/// event!(Level::TRACE, my_struct.field = %my_struct.field);
+/// # }
+/// ```
 /// Events may have up to 32 fields. The following will not compile:
 /// ```rust,compile_fail
 ///  # #[macro_use]
@@ -637,46 +670,46 @@ macro_rules! event {
             { message = __tokio_trace_format_args!($($arg)+), $($fields)* }
         )
     });
-    (
-        target: $target:expr,
-        $lvl:expr,
-        { $( $($k:ident).+ = $val:expr ),* },
-        $($arg:tt)+
-    ) => ({
-        event!(
-            target: $target,
-            $lvl,
-            { message = __tokio_trace_format_args!($($arg)+), $( $($k).+ = $val ),* }
-        )
-    });
-    (target: $target:expr, $lvl:expr, $( $($k:ident).+ = $val:expr ),+, ) => (
-        event!(target: $target, $lvl, { $($($k).+ = $val),+ })
-    );
-    (target: $target:expr, $lvl:expr, $( $($k:ident).+ = $val:expr ),+ ) => (
-        event!(target: $target, $lvl, { $($($k).+ = $val),+ })
+    (target: $target:expr, $lvl:expr, $($k:ident).+ = $($fields:tt)* ) => (
+        event!(target: $target, $lvl, { $($k).+ = $($fields)* })
     );
     (target: $target:expr, $lvl:expr, $($arg:tt)+ ) => (
         event!(target: $target, $lvl, { }, $($arg)+)
     );
-    ( $lvl:expr, { $( $($k:ident).+ = $val:expr ),*, }, $($arg:tt)+ ) => (
+    ( $lvl:expr, { $($fields:tt)* }, $($arg:tt)+ ) => (
         event!(
             target: __tokio_trace_module_path!(),
             $lvl,
-            { message = __tokio_trace_format_args!($($arg)+), $($($k).+ = $val),* }
+            { message = __tokio_trace_format_args!($($arg)+), $($fields)* }
         )
     );
-    ( $lvl:expr, { $( $($k:ident).+ = $val:expr ),* }, $($arg:tt)+ ) => (
+    ( $lvl:expr, { $($fields:tt)* }, $($arg:tt)+ ) => (
         event!(
             target: __tokio_trace_module_path!(),
             $lvl,
-            { message = __tokio_trace_format_args!($($arg)+), $($($k).+ = $val),* }
+            { message = __tokio_trace_format_args!($($arg)+), $($fields)* }
         )
     );
-    ( $lvl:expr, $( $($k:ident).+ = $val:expr ),*, ) => (
-        event!(target: __tokio_trace_module_path!(), $lvl, { $($($k).+ = $val),* })
+    ( $lvl:expr, $($k:ident).+ = %$val:expr) => (
+        event!(
+            target: __tokio_trace_module_path!(), $lvl, { $($k).+ = &$crate::field::display(&$val) as &$crate::field::Value,})
     );
-    ( $lvl:expr, $( $($k:ident).+ = $val:expr ),* ) => (
-        event!(target: __tokio_trace_module_path!(), $lvl, { $($($k).+ = $val),* })
+    ( $lvl:expr,  $($k:ident).+ = ?$val:expr) => (
+        event!(
+            target: __tokio_trace_module_path!(), $lvl, { $($k).+ = &$crate::field::debug(&$val) as &$crate::field::Value,})
+    );
+    ( $lvl:expr, $($k:ident).+ = $val:expr) => (
+        event!(
+            target: __tokio_trace_module_path!(), $lvl, { $($k).+ = $val, })
+    );
+    ( $lvl:expr, $($k:ident).+ = %$val:expr, $($fields:tt)*) => (
+        event!(target: __tokio_trace_module_path!(), $lvl, { $($k).+ = &$crate::field::display(&$val) as &$crate::field::Value, $($fields)* })
+    );
+    ( $lvl:expr,  $($k:ident).+ = ?$val:expr, $($fields:tt)*) => (
+        event!(target: __tokio_trace_module_path!(), $lvl, { $($k).+ = &$crate::field::debug(&$val) as &$crate::field::Value, $($fields)* })
+    );
+    ( $lvl:expr, $($k:ident).+ = $val:expr, $($fields:tt)*) => (
+        event!(target: __tokio_trace_module_path!(), $lvl, { $($k).+ = $val, $($fields)* })
     );
     ( $lvl:expr, $($arg:tt)+ ) => (
         event!(target: __tokio_trace_module_path!(), $lvl, { }, $($arg)+)
@@ -1441,7 +1474,7 @@ macro_rules! level_to_log {
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! __tokio_trace_log {
-    (target: $target:expr, $level:expr, $( $($k:ident).+ $( = $val:expr )* ),* $(,)* ) => {
+    (target: $target:expr, $level:expr, $($field:tt)+ ) => {
         use $crate::log;
         let level = level_to_log!($level);
         if level <= log::STATIC_MAX_LEVEL {
@@ -1457,17 +1490,14 @@ macro_rules! __tokio_trace_log {
                     .line(Some(__tokio_trace_line!()))
                     .metadata(log_meta)
                     .args(__tokio_trace_format_args!(
-                        __tokio_trace_concat!(
-                            $(__tokio_trace_log!(@key $($k).+)),*
-                        ),
-                        $(
-                            __tokio_trace_log!(val:_or $($k).+ $( = $val)* )
-                        ),*
+                        mk_format_string!($($field)+),
+                        mk_format_args!($($field)+)
                     ))
                     .build());
             }
         }
     };
+
     (@key message) => { "{} " };
     (@key $($k:ident).+) => { __tokio_trace_concat!(__tokio_trace_stringify!( $($k).+ ), "={:?} ") };
     (val:_or $($k:ident).+ = $v:expr) => { $v };
@@ -1478,7 +1508,7 @@ macro_rules! __tokio_trace_log {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __tokio_trace_log {
-    (target: $target:expr, $level:expr, $( $($k:ident).+ $( = $val:expr )* ),* $(,)* ) => {};
+    (target: $target:expr, $level:expr, $($field:tt)+ ) => {};
 }
 
 #[cfg(feature = "log")]
@@ -1498,5 +1528,134 @@ macro_rules! __tokio_trace_disabled_span {
 macro_rules! __tokio_trace_disabled_span {
     ($meta:expr, $valueset:expr) => {
         $crate::Span::new_disabled($meta)
+    };
+}
+
+#[doc(hidden)]
+#[macro_export(local_inner_macros)]
+macro_rules! mk_format_string {
+
+    // === base case (no more tts), empty out set ===
+    (@ { }, message = $val:expr $(,)* ) => {
+        "{}"
+    };
+    (@ { }, $($k:ident).+ = ?$val:expr $(,)* ) => {
+        __tokio_trace_concat!(__tokio_trace_stringify!($($k).+), "={:?}")
+    };
+    (@ { }, $($k:ident).+ = %$val:expr $(,)*) => {
+        __tokio_trace_concat!(__tokio_trace_stringify!($($k).+), "={}")
+    };
+    (@ { }, $($k:ident).+ = $val:expr $(,)*) => {
+        __tokio_trace_concat!(__tokio_trace_stringify!($($k).+), "={:?}")
+    };
+
+    // === base case (no more tts), non-empty out set ===
+    // we have to have separate cases for empty and non-empty out sets because
+    // we need to insert a comma between out and the last value, and the
+    // `concat!` macro doesn't like its arguments to begin with a comma.
+    (@ { $($out:expr),+ }, message = $val:expr $(,)* ) => {
+        __tokio_trace_concat!( $($out),+, "{}")
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = ?$val:expr $(,)*) => {
+        __tokio_trace_concat!( $($out),+, __tokio_trace_stringify!($($k).+), "={:?}")
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = %$val:expr $(,)*) => {
+        __tokio_trace_concat!( $($out),+, __tokio_trace_stringify!($($k).+), "={:?}")
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = $val:expr $(,)*) => {
+        __tokio_trace_concat!( $($out),+, __tokio_trace_stringify!($($k).+), "={:?}")
+    };
+
+    // === recursive case (more tts), non-empty out set ===
+    (@ { $($out:expr),+ }, message = $val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { $($out),+, "{} ", }, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = ?$val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { $($out),+, __tokio_trace_stringify!($($k).+), "={:?} ", }, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { $($out),+, __tokio_trace_stringify!($($k).+), "={} ", }, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { $($out),+, __tokio_trace_stringify!($($k).+), "={:?} ", }, $($rest)+)
+    };
+
+    // == recursive case (more tts), empty out set ===
+    (@ { }, message = $val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { "{} ", }, $($rest)+)
+    };
+    (@ { }, $($k:ident).+ = ?$val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { __tokio_trace_stringify!($($k).+), "={:?} ", }, $($rest)+)
+    };
+    (@ { }, $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ {  __tokio_trace_stringify!($($k).+), "={} ", }, $($rest)+)
+    };
+    (@ { }, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        mk_format_string!(@ { __tokio_trace_stringify!($($k).+), "={:?} ", }, $($rest)+)
+    };
+
+    // === entry ===
+    ($($kvs:tt)+) => {
+        mk_format_string!(@ { }, $($kvs)+)
+    };
+}
+
+#[doc(hidden)]
+#[macro_export(local_inner_macros)]
+macro_rules! mk_format_args {
+
+    // === base case (no more tts), empty out set ===
+    (@ { }, $($k:ident).+ = ?$val:expr $(,)* ) => {
+        $val
+    };
+    (@ { }, $($k:ident).+ = %$val:expr $(,)*) => {
+        $val
+    };
+    (@ { }, $($k:ident).+ = $val:expr $(,)*) => {
+        $val
+    };
+
+    // === base case (no more tts), non-empty out set ===
+    // we have to have separate cases for empty and non-empty out sets because
+    // we need to insert a comma between out and the last value, and the
+    // `concat!` macro doesn't like its arguments to begin with a comma.
+    (@ { $($out:expr),+ }, $($k:ident).+ = ?$val:expr $(,)*) => {
+        $($out),+, $val
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = %$val:expr $(,)*) => {
+        $($out),+, $val
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = $val:expr $(,)*) => {
+        $($out),+, $val
+    };
+
+    // === recursive case (more tts), non-empty out set ===
+    (@ { $($out:expr),+ }, $($k:ident).+ = ?$val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $($out),+, $val }, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $($out),+, $val }, $($rest)+)
+    };
+    (@ { $($out:expr),+ }, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $($out),+, $val }, $($rest)+)
+    };
+
+    // == recursive case (more tts), empty out set ===
+    (@ { }, message = $val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $val }, $($rest)+)
+    };
+    (@ { }, $($k:ident).+ = ?$val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $val }, $($rest)+)
+    };
+    (@ { }, $($k:ident).+ = %$val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $val }, $($rest)+)
+    };
+    (@ { }, $($k:ident).+ = $val:expr, $($rest:tt)+) => {
+        mk_format_args!(@ { $val }, $($rest)+)
+    };
+
+    // === entry ===
+    ($($kvs:tt)+) => {
+        mk_format_args!(@ { }, $($kvs)+)
     };
 }
