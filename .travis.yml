@@ -23,6 +23,7 @@ matrix:
       after_success:
         - travis-cargo --only nightly doc-upload
         - cargo tarpaulin -v --forward --out Xml
+        - bash <(curl -s https://codecov.io/bash)
 
 script:
   - cargo test

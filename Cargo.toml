@@ -18,6 +18,7 @@ categories = ["asynchronous"]
 [badges]
 travis-ci = { repository = "alexcrichton/tokio-process" }
 appveyor = { repository = "alexcrichton/tokio-process" }
+codecov = { repository = "alexcrichton/tokio-process" }
 
 [dependencies]
 futures = "0.1.11"

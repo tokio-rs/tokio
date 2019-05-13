@@ -1,0 +1,6 @@
+ignore:
+  - "src/bin"
+  - "tests"
+
+comment:
+  behavior: new
