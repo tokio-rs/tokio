@@ -1,5 +1,5 @@
-trigger: ["master"]
-pr: ["master"]
+trigger: ["master", "v0.1.x"]
+pr: ["master", "v0.1.x"]
 
 jobs:
 # Check formatting

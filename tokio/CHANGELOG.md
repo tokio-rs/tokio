@@ -1,6 +1,17 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.20 (May 14, 2019)
+
+### Added
+- `tokio::runtime::Builder::panic_handler` allows configuring handling
+  panics on the runtime (#1055).
+
+# 0.1.19 (April 22, 2019)
+
+### Added
+- Re-export `tokio::sync::Mutex` primitive (#964).
+
 # 0.1.18 (March 22, 2019)
 
 ### Added

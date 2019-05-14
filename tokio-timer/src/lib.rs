@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.10")]
+#![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.11")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 //! Utilities for tracking time.
