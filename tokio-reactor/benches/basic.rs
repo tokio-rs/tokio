@@ -1,13 +1,7 @@
 #![feature(test)]
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate mio;
-extern crate num_cpus;
 extern crate test;
-extern crate tokio;
-extern crate tokio_io_pool;
-extern crate tokio_reactor;
 
 const NUM_YIELD: usize = 500;
 const TASKS_PER_CPU: usize = 100;

@@ -1,15 +1,13 @@
-use tokio_io::AsyncRead;
-
 use std::future::Future;
-use std::task::{self, Poll};
-
 use std::io;
 use std::mem;
 use std::pin::Pin;
+use std::task::{self, Poll};
+use tokio_io::AsyncRead;
 
 /// A future which can be used to read exactly enough bytes to fill a buffer.
 #[derive(Debug)]
-pub struct ReadExact<'a, T: ?Sized + 'a> {
+pub struct ReadExact<'a, T: ?Sized> {
     reader: &'a mut T,
     buf: &'a mut [u8],
 }
@@ -30,7 +28,7 @@ fn eof() -> io::Error {
 impl<'a, T: AsyncRead + ?Sized> Future for ReadExact<'a, T> {
     type Output = io::Result<()>;
 
-    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context<'_>) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

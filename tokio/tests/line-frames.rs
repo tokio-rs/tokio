@@ -1,16 +1,10 @@
-extern crate bytes;
-extern crate env_logger;
-extern crate futures;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_io;
-extern crate tokio_threadpool;
-
-use std::io;
-use std::net::Shutdown;
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, BytesMut};
+use env_logger;
 use futures::{Future, Sink, Stream};
+use std::io;
+use std::net::Shutdown;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::{Decoder, Encoder};
 use tokio_io::io::{read, write_all};

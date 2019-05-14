@@ -7,4 +7,4 @@ pub trait Now {
     fn now(&mut self) -> Instant;
 }
 
-pub use clock::Clock as SystemNow;
+pub use crate::clock::Clock as SystemNow;

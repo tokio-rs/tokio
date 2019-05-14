@@ -1,13 +1,12 @@
 #![allow(deprecated)]
 
-use std::fmt;
-
 use super::framed::Fuse;
-use codec::Decoder;
-use AsyncRead;
-
+use crate::codec::Decoder;
+use crate::AsyncRead;
 use bytes::BytesMut;
-use futures::{Async, Poll, Sink, StartSend, Stream};
+use futures::{try_ready, Async, Poll, Sink, StartSend, Stream};
+use log::trace;
+use std::fmt;
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 pub struct FramedRead<T, D> {
@@ -117,7 +116,7 @@ where
     T: fmt::Debug,
     D: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedRead")
             .field("inner", &self.inner.inner.0)
             .field("decoder", &self.inner.inner.1)

@@ -1,9 +1,8 @@
-use loom::{
+use crate::loom::{
     futures::task::{self, Task},
     sync::atomic::AtomicUsize,
     sync::CausalCell,
 };
-
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
@@ -290,7 +289,7 @@ impl Default for AtomicTask {
 }
 
 impl fmt::Debug for AtomicTask {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "AtomicTask")
     }
 }

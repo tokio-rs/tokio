@@ -7,8 +7,9 @@ name = "tokio"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.1.x" git tag.
-version = "0.1.19"
+# - Create "v0.2.x" git tag.
+version = "0.2.0"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
@@ -21,6 +22,7 @@ backed applications.
 """
 categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
+publish = false
 
 [features]
 default = [
@@ -69,25 +71,25 @@ futures = "0.1.20"
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-tokio-codec = { version = "0.1.0", optional = true }
-tokio-current-thread = { version = "0.1.6", optional = true }
-tokio-fs = { version = "0.1.6", optional = true }
-tokio-io = { version = "0.1.6", optional = true }
-tokio-executor = { version = "0.1.7", optional = true }
+tokio-codec = { version = "0.2.0", optional = true, path = "../tokio-codec" }
+tokio-current-thread = { version = "0.2.0", optional = true, path = "../tokio-current-thread" }
+tokio-fs = { version = "0.2.0", optional = true, path = "../tokio-fs" }
+tokio-io = { version = "0.2.0", optional = true, path = "../tokio-io" }
+tokio-executor = { version = "0.2.0", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "0.1.0", optional = true, path = "../tokio-macros" }
-tokio-reactor = { version = "0.1.1", optional = true }
-tokio-sync = { version = "0.1.5", optional = true }
-tokio-threadpool = { version = "0.1.14", optional = true }
-tokio-tcp = { version = "0.1.0", optional = true }
-tokio-udp = { version = "0.1.0", optional = true }
-tokio-timer = { version = "0.2.8", optional = true }
+tokio-reactor = { version = "0.2.0", optional = true, path = "../tokio-reactor" }
+tokio-sync = { version = "0.2.0", optional = true, path = "../tokio-sync" }
+tokio-threadpool = { version = "0.2.0", optional = true, path = "../tokio-threadpool" }
+tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp" }
+tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
+tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer" }
 tokio-trace-core = { version = "0.1", optional = true }
 
 # Needed until `reactor` is removed from `tokio`.
 mio = { version = "0.6.14", optional = true }
 
 # Needed for async/await preview support
-tokio-futures = { version = "0.1.0", optional = true, path = "../tokio-futures" }
+tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }
 
 [target.'cfg(unix)'.dependencies]
 tokio-uds = { version = "0.2.1", optional = true }
@@ -100,7 +102,6 @@ http = "0.1"
 httparse = "1.0"
 libc = "0.2"
 num_cpus = "1.0"
-serde = "1.0"
-serde_derive = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = "0.1"

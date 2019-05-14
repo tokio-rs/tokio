@@ -14,22 +14,17 @@
 //! this repository! Many of them recommend running this as a simple "hook up
 //! stdin/stdout to a server" to get up and running.
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate bytes;
-extern crate futures;
-extern crate tokio;
-extern crate tokio_io;
-
+use futures::sync::mpsc;
 use std::env;
 use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::thread;
-
-use futures::sync::mpsc;
+use tokio;
 use tokio::prelude::*;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Determine if we're going to run in TCP or UDP mode
     let mut args = env::args().skip(1).collect::<Vec<_>>();
     let tcp = match args.iter().position(|a| a == "--udp") {
@@ -124,8 +119,8 @@ mod tcp {
     use tokio::net::TcpStream;
     use tokio::prelude::*;
 
+    use crate::codec::Bytes;
     use bytes::BytesMut;
-    use codec::Bytes;
 
     use std::error::Error;
     use std::io;
@@ -133,8 +128,8 @@ mod tcp {
 
     pub fn connect(
         addr: &SocketAddr,
-        stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>,
-    ) -> Result<Box<Stream<Item = BytesMut, Error = io::Error> + Send>, Box<Error>> {
+        stdin: Box<dyn Stream<Item = Vec<u8>, Error = io::Error> + Send>,
+    ) -> Result<Box<dyn Stream<Item = BytesMut, Error = io::Error> + Send>, Box<dyn Error>> {
         let tcp = TcpStream::connect(addr);
 
         // After the TCP connection has been established, we set up our client
@@ -181,12 +176,12 @@ mod udp {
     use tokio::net::{UdpFramed, UdpSocket};
     use tokio::prelude::*;
 
-    use codec::Bytes;
+    use crate::codec::Bytes;
 
     pub fn connect(
         &addr: &SocketAddr,
-        stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>,
-    ) -> Result<Box<Stream<Item = BytesMut, Error = io::Error> + Send>, Box<Error>> {
+        stdin: Box<dyn Stream<Item = Vec<u8>, Error = io::Error> + Send>,
+    ) -> Result<Box<dyn Stream<Item = BytesMut, Error = io::Error> + Send>, Box<dyn Error>> {
         // We'll bind our UDP socket to a local IP/port, but for now we
         // basically let the OS pick both of those.
         let addr_to_bind = if addr.ip().is_ipv4() {

@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.3")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! UDP bindings for `tokio`.
 //!
@@ -18,16 +20,6 @@
 //! [`SendDgram`]: struct.SendDgram.html
 //! [`UdpFramed`]: struct.UdpFramed.html
 //! [`framed`]: struct.UdpSocket.html#method.framed
-
-extern crate bytes;
-#[macro_use]
-extern crate futures;
-extern crate mio;
-#[macro_use]
-extern crate log;
-extern crate tokio_codec;
-extern crate tokio_io;
-extern crate tokio_reactor;
 
 mod frame;
 mod recv_dgram;

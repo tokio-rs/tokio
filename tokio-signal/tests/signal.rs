@@ -1,9 +1,10 @@
 #![cfg(unix)]
-
-extern crate libc;
+#![deny(warnings, rust_2018_idioms)]
 
 pub mod support;
-use support::*;
+use crate::support::*;
+
+use libc;
 
 #[test]
 fn tokio_simple() {

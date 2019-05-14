@@ -11,30 +11,23 @@
 //! respectively. By default this will run I/O on all the cores your system has
 //! available, and it doesn't support HTTP request bodies.
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate bytes;
-extern crate http;
-extern crate httparse;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-extern crate time;
-extern crate tokio;
-extern crate tokio_io;
-
+use bytes::BytesMut;
+use http;
+use http::header::HeaderValue;
+use http::{Request, Response, StatusCode};
+use httparse;
+use serde::Serialize;
+use serde_json;
 use std::net::SocketAddr;
 use std::{env, fmt, io};
-
+use tokio;
 use tokio::codec::{Decoder, Encoder};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
-use bytes::BytesMut;
-use http::header::HeaderValue;
-use http::{Request, Response, StatusCode};
-
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
@@ -82,7 +75,7 @@ fn process(socket: TcpStream) {
 /// This function is a map from and HTTP request to a future of a response and
 /// represents the various handling a server might do. Currently the contents
 /// here are pretty uninteresting.
-fn respond(req: Request<()>) -> Box<Future<Item = Response<String>, Error = io::Error> + Send> {
+fn respond(req: Request<()>) -> Box<dyn Future<Item = Response<String>, Error = io::Error> + Send> {
     let f = future::lazy(move || {
         let mut response = Response::builder();
         let body = match req.uri().path() {
@@ -163,7 +156,7 @@ impl Encoder for Http {
                 Ok(())
             }
 
-            fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+            fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> fmt::Result {
                 fmt::write(self, args)
             }
         }
@@ -286,7 +279,7 @@ mod date {
     }));
 
     impl fmt::Display for Now {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             LAST.with(|cache| {
                 let mut cache = cache.borrow_mut();
                 let now = time::get_time();

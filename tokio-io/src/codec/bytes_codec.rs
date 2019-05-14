@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
+use crate::codec::{Decoder, Encoder};
 use bytes::{BufMut, Bytes, BytesMut};
-use codec::{Decoder, Encoder};
 use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.

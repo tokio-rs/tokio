@@ -1,13 +1,11 @@
 //! A channel for sending a single message between asynchronous tasks.
 
-use loom::{
+use crate::loom::{
     futures::task::{self, Task},
     sync::atomic::AtomicUsize,
     sync::CausalCell,
 };
-
 use futures::{Async, Future, Poll};
-
 use std::fmt;
 use std::mem::{self, ManuallyDrop};
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
@@ -45,7 +43,7 @@ pub mod error {
     // ===== impl RecvError =====
 
     impl fmt::Display for RecvError {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             use std::error::Error;
             write!(fmt, "{}", self.description())
         }
@@ -60,7 +58,7 @@ pub mod error {
     // ===== impl TryRecvError =====
 
     impl fmt::Display for TryRecvError {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             use std::error::Error;
             write!(fmt, "{}", self.description())
         }
@@ -105,9 +103,6 @@ struct State(usize);
 /// # Examples
 ///
 /// ```
-/// extern crate futures;
-/// extern crate tokio;
-///
 /// use tokio::sync::oneshot;
 /// use futures::Future;
 /// use std::thread;
@@ -451,7 +446,7 @@ impl<T> Drop for Inner<T> {
 }
 
 impl<T: fmt::Debug> fmt::Debug for Inner<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::sync::atomic::Ordering::Relaxed;
 
         fmt.debug_struct("Inner")
@@ -532,7 +527,7 @@ impl State {
 }
 
 impl fmt::Debug for State {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("State")
             .field("is_complete", &self.is_complete())
             .field("is_closed", &self.is_closed())

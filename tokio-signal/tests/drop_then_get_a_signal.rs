@@ -1,9 +1,10 @@
 #![cfg(unix)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate libc;
+use libc;
 
 pub mod support;
-use support::*;
+use crate::support::*;
 
 #[test]
 fn drop_then_get_a_signal() {

@@ -21,7 +21,6 @@
 //! Let's start with a basic example, establishing a TCP connection.
 //!
 //! ```rust
-//! # extern crate tokio;
 //! # fn dox() {
 //! use tokio::prelude::*;
 //! use tokio::net::TcpStream;
@@ -135,10 +134,10 @@
 //! [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 
+mod poll_evented;
+
+#[allow(deprecated)]
+pub use self::poll_evented::PollEvented;
 pub use tokio_reactor::{
     Background, Handle, PollEvented as PollEvented2, Reactor, Registration, Turn,
 };
-
-mod poll_evented;
-#[allow(deprecated)]
-pub use self::poll_evented::PollEvented;

@@ -1,8 +1,8 @@
+use crate::BufStream;
 use bytes::Buf;
 use futures::Poll;
 use std::error::Error;
 use std::fmt;
-use BufStream;
 
 /// Converts an `Iterator` into a `BufStream` which is always ready to yield the
 /// next value.
@@ -42,7 +42,7 @@ where
 }
 
 impl fmt::Display for Never {
-    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         unreachable!();
     }
 }

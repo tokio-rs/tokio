@@ -1,12 +1,7 @@
-extern crate bytes;
-extern crate futures;
-extern crate tokio_buf;
-
 use futures::Async::*;
 use std::io::Cursor;
 use tokio_buf::{util, BufStream};
 
-#[macro_use]
 mod support;
 
 type Buf = Cursor<&'static [u8]>;

@@ -25,7 +25,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -35,7 +35,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// let mut reader = Cursor::new([1, 2, 3, 4]);
     /// let mut output = [0u8; 5];
     ///
-    /// let bytes = await!(reader.read_async(&mut output[..])).unwrap();
+    /// let bytes = reader.read_async(&mut output[..]).await.unwrap();
     ///
     /// // This is only guaranteed to be 4 because `&[u8]` is a synchronous
     /// // reader. In a real system you could get anywhere from 1 to
@@ -59,7 +59,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -69,7 +69,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// let mut reader = Cursor::new([1, 2, 3, 4]);
     /// let mut output = [0u8; 4];
     ///
-    /// await!(reader.read_exact_async(&mut output)).unwrap();
+    /// reader.read_exact_async(&mut output).await.unwrap();
     ///
     /// assert_eq!(output, [1, 2, 3, 4]);
     /// });
@@ -78,7 +78,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// ## EOF is hit before `buf` is filled
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -88,7 +88,7 @@ pub trait AsyncReadExt: AsyncRead {
     /// let mut reader = Cursor::new([1, 2, 3, 4]);
     /// let mut output = [0u8; 5];
     ///
-    /// let result = await!(reader.read_exact_async(&mut output));
+    /// let result = reader.read_exact_async(&mut output).await;
     ///
     /// assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     /// });
@@ -110,7 +110,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -120,7 +120,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// let mut buf = [0u8; 5];
     /// let mut writer = Cursor::new(&mut buf[..]);
     ///
-    /// let n = await!(writer.write_async(&[1, 2, 3, 4])).unwrap();
+    /// let n = writer.write_async(&[1, 2, 3, 4]).await.unwrap();
     ///
     /// assert_eq!(writer.into_inner()[..n], [1, 2, 3, 4, 0][..n]);
     /// });
@@ -139,7 +139,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -149,7 +149,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// let mut buf = [0u8; 5];
     /// let mut writer = Cursor::new(&mut buf[..]);
     ///
-    /// await!(writer.write_all_async(&[1, 2, 3, 4])).unwrap();
+    /// writer.write_all_async(&[1, 2, 3, 4]).await.unwrap();
     ///
     /// assert_eq!(writer.into_inner(), [1, 2, 3, 4, 0]);
     /// });
@@ -163,7 +163,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(async_await, await_macro)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -175,15 +175,15 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// {
     ///     let mut writer = Cursor::new(&mut output[..]);
     ///     let mut buffered = BufWriter::new(writer);
-    ///     await!(buffered.write_all_async(&[1, 2])).unwrap();
-    ///     await!(buffered.write_all_async(&[3, 4])).unwrap();
-    ///     await!(buffered.flush_async()).unwrap();
+    ///     buffered.write_all_async(&[1, 2]).await.unwrap();
+    ///     buffered.write_all_async(&[3, 4]).await.unwrap();
+    ///     buffered.flush_async().await.unwrap();
     /// }
     ///
     /// assert_eq!(output, [1, 2, 3, 4, 0]);
     /// });
     /// ```
-    fn flush_async<'a>(&mut self) -> Flush<Self> {
+    fn flush_async<'a>(&mut self) -> Flush<'_, Self> {
         Flush::new(self)
     }
 }

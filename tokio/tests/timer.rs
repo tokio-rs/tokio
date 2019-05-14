@@ -1,13 +1,11 @@
-extern crate env_logger;
-extern crate futures;
-extern crate tokio;
-extern crate tokio_io;
+#![deny(warnings, rust_2018_idioms)]
 
-use tokio::prelude::*;
-use tokio::timer::*;
-
+use env_logger;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use tokio;
+use tokio::prelude::*;
+use tokio::timer::*;
 
 #[test]
 fn timer_with_runtime() {

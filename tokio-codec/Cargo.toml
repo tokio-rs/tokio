@@ -7,8 +7,9 @@ name = "tokio-codec"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.1.x" git tag.
-version = "0.1.1"
+# - Create "v0.2.x" git tag.
+version = "0.2.0"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>", "Bryan Burgers <bryan@burgers.io>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -18,8 +19,9 @@ description = """
 Utilities for encoding and decoding frames.
 """
 categories = ["asynchronous"]
+publish = false
 
 [dependencies]
-tokio-io = "0.1.7"
+tokio-io = { version = "0.2.0", path = "../tokio-io" }
 bytes = "0.4.7"
 futures = "0.1.18"

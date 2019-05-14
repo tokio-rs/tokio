@@ -1,10 +1,9 @@
-extern crate tokio_executor;
-extern crate tokio_timer;
-
-use tokio_timer::clock;
-use tokio_timer::clock::*;
+#![deny(warnings, rust_2018_idioms)]
 
 use std::time::Instant;
+use tokio_executor;
+use tokio_timer::clock;
+use tokio_timer::clock::*;
 
 struct ConstNow(Instant);
 

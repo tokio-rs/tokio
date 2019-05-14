@@ -13,7 +13,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```edition2018
-    /// #![feature(await_macro, async_await)]
+    /// #![feature(async_await)]
     /// tokio::run_async(async {
     /// // The extension trait can also be imported with
     /// // `use tokio::prelude::*`.
@@ -21,13 +21,13 @@ pub trait StreamExt: Stream {
     ///
     /// let mut stream = stream::iter_ok::<_, ()>(1..3);
     ///
-    /// assert_eq!(await!(stream.next()), Some(Ok(1)));
-    /// assert_eq!(await!(stream.next()), Some(Ok(2)));
-    /// assert_eq!(await!(stream.next()), Some(Ok(3)));
-    /// assert_eq!(await!(stream.next()), None);
+    /// assert_eq!(stream.next().await, Some(Ok(1)));
+    /// assert_eq!(stream.next().await, Some(Ok(2)));
+    /// assert_eq!(stream.next().await, Some(Ok(3)));
+    /// assert_eq!(stream.next().await, None);
     /// });
     /// ```
-    fn next(&mut self) -> Next<Self>
+    fn next(&mut self) -> Next<'_, Self>
     where
         Self: Sized + Unpin,
     {

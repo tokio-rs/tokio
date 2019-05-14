@@ -1,11 +1,9 @@
-use atomic::AtomicU64;
-use timer::{HandlePriv, Inner};
-use Error;
-
+use crate::atomic::AtomicU64;
+use crate::timer::{HandlePriv, Inner};
+use crate::Error;
 use crossbeam_utils::CachePadded;
 use futures::task::AtomicTask;
 use futures::Poll;
-
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::sync::atomic::AtomicBool;

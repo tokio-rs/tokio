@@ -18,19 +18,14 @@ Add this to your `Cargo.toml`:
 edition = "2018"
 
 # In the `[dependencies]` section
-tokio = {version = "0.1.15", features = ["async-await-preview"]}
+tokio = {version = "0.2.0", features = ["async-await-preview"]}
 ```
 
 Then, get started. In your application, add:
 
 ```rust
 // The nightly features that are commonly needed with async / await
-#![feature(await_macro, async_await)]
-
-// This pulls in the `tokio-futures` crate. While Rust 2018 doesn't require
-// `extern crate`, we need to pull in the macros.
-#[macro_use]
-extern crate tokio;
+#![feature(async_await)]
 
 fn main() {
     // And we are async...

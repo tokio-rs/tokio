@@ -30,7 +30,7 @@ where
     impl<T: std::future::Future> std::future::Future for Map<T> {
         type Output = Result<T::Output, ()>;
 
-        fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             match self.future().poll(cx) {
                 Poll::Ready(v) => Poll::Ready(Ok(v)),
                 Poll::Pending => Poll::Pending,

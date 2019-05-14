@@ -1,9 +1,7 @@
+use crate::AsyncRead;
+use futures::{try_ready, Future, Poll};
 use std::io;
 use std::mem;
-
-use futures::{Future, Poll};
-
-use AsyncRead;
 
 #[derive(Debug)]
 enum State<R, T> {

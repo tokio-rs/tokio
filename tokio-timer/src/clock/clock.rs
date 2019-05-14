@@ -1,12 +1,10 @@
-use clock::Now;
-use timer;
-
-use tokio_executor::Enter;
-
+use crate::clock::Now;
+use crate::timer;
 use std::cell::Cell;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio_executor::Enter;
 
 /// A handle to a source of time.
 ///
@@ -17,7 +15,7 @@ use std::time::Instant;
 /// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 #[derive(Default, Clone)]
 pub struct Clock {
-    now: Option<Arc<Now>>,
+    now: Option<Arc<dyn Now>>,
 }
 
 thread_local! {
@@ -92,7 +90,7 @@ impl timer::Now for Clock {
 }
 
 impl fmt::Debug for Clock {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Clock")
             .field("now", {
                 if self.now.is_some() {

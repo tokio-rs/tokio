@@ -1,28 +1,24 @@
-extern crate futures;
-extern crate tokio_current_thread;
-extern crate tokio_executor;
+#![deny(warnings, rust_2018_idioms)]
 
-use tokio_current_thread::{block_on_all, CurrentThread};
-
+use futures::future::{self, lazy};
+// This is not actually unused --- we need this trait to be in scope for
+// the tests that sue TaskExecutor::current().execute(). The compiler
+// doesn't realise that.
+#[allow(unused_imports)]
+use futures::future::Executor;
+use futures::prelude::*;
+use futures::sync::oneshot;
+use futures::task;
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
-
-use futures::future::{self, lazy};
-use futures::task;
-// This is not actually unused --- we need this trait to be in scope for
-// the tests that sue TaskExecutor::current().execute(). The compiler
-// doesn't realise that.
-#[allow(unused_imports)]
-use futures::future::Executor as _futures_Executor;
-use futures::prelude::*;
-use futures::sync::oneshot;
+use tokio_current_thread::{block_on_all, CurrentThread};
 
 mod from_block_on_all {
     use super::*;
-    fn test<F: Fn(Box<Future<Item = (), Error = ()>>) + 'static>(spawn: F) {
+    fn test<F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static>(spawn: F) {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
 
@@ -102,7 +98,7 @@ fn spawn_many() {
 mod does_not_set_global_executor_by_default {
     use super::*;
 
-    fn test<F: Fn(Box<Future<Item = (), Error = ()> + Send>) -> Result<(), E> + 'static, E>(
+    fn test<F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) -> Result<(), E> + 'static, E>(
         spawn: F,
     ) {
         block_on_all(lazy(|| {
@@ -127,7 +123,7 @@ mod does_not_set_global_executor_by_default {
 mod from_block_on_future {
     use super::*;
 
-    fn test<F: Fn(Box<Future<Item = (), Error = ()>>)>(spawn: F) {
+    fn test<F: Fn(Box<dyn Future<Item = (), Error = ()>>)>(spawn: F) {
         let cnt = Rc::new(Cell::new(0));
 
         let mut tokio_current_thread = CurrentThread::new();
@@ -181,8 +177,8 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<Future<Item = (), Error = ()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<Future<Item = (), Error = ()>>),
+        F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<dyn Future<Item = (), Error = ()>>),
     {
         let mut rc = Rc::new(());
 
@@ -383,8 +379,8 @@ mod and_turn {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<Future<Item = (), Error = ()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<Future<Item = (), Error = ()>>),
+        F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<dyn Future<Item = (), Error = ()>>),
     {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
@@ -459,7 +455,7 @@ mod in_drop {
     }
 
     struct MyFuture {
-        _data: Box<Any>,
+        _data: Box<dyn Any>,
     }
 
     impl Future for MyFuture {
@@ -473,8 +469,8 @@ mod in_drop {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<Future<Item = (), Error = ()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<Future<Item = (), Error = ()>>),
+        F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static,
+        G: Fn(&mut CurrentThread, Box<dyn Future<Item = (), Error = ()>>),
     {
         let mut tokio_current_thread = CurrentThread::new();
 
@@ -827,7 +823,7 @@ fn spawn_from_executor_with_handle() {
         Ok::<_, ()>(())
     }));
 
-    current_thread.run();
+    current_thread.run().unwrap();
 
     rx.wait().unwrap();
 }

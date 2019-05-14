@@ -1,7 +1,5 @@
 use super::File;
-
-use futures::{Future, Poll};
-
+use futures::{try_ready, Future, Poll};
 use std::fs::File as StdFile;
 use std::fs::Metadata;
 use std::io;
@@ -29,7 +27,7 @@ impl Future for MetadataFuture {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let metadata = try_ready!(::blocking_io(|| StdFile::metadata(self.std())));
+        let metadata = try_ready!(crate::blocking_io(|| StdFile::metadata(self.std())));
 
         let file = self.file.take().expect(POLL_AFTER_RESOLVE);
         Ok((file, metadata).into())

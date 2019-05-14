@@ -1,6 +1,6 @@
-use never::Never;
-use BufStream;
-use SizeHint;
+use crate::never::Never;
+use crate::BufStream;
+use crate::SizeHint;
 
 use futures::Poll;
 

@@ -1,21 +1,18 @@
-use ucred::{self, UCred};
-
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_reactor::{Handle, PollEvented};
-
+use crate::ucred::{self, UCred};
 use bytes::{Buf, BufMut};
 use futures::{Async, Future, Poll};
 use iovec::{self, IoVec};
 use libc;
 use mio::Ready;
 use mio_uds;
-
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_reactor::{Handle, PollEvented};
 
 /// A structure representing a connected Unix socket.
 ///
@@ -238,7 +235,7 @@ impl<'a> AsyncWrite for &'a UnixStream {
 }
 
 impl fmt::Debug for UnixStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

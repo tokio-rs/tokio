@@ -1,14 +1,10 @@
-extern crate futures;
-extern crate tokio_executor;
-extern crate tokio_timer;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
 mod support;
-use support::*;
-
-use tokio_timer::*;
+use crate::support::*;
 
 use futures::Stream;
+use tokio_timer::*;
 
 #[test]
 #[should_panic]

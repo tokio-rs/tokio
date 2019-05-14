@@ -1,8 +1,8 @@
 [package]
 name = "tokio-macros"
 version = "0.1.0"
-authors = ["Tokio Contributors <team@tokio.rs>"]
 edition = "2018"
+authors = ["Tokio Contributors <team@tokio.rs>"]
 publish = false
 
 [lib]

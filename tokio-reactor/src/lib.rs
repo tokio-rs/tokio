@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.9")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Event loop that drives Tokio I/O resources.
 //!
@@ -30,21 +32,6 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
 
-extern crate crossbeam_utils;
-#[macro_use]
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate mio;
-extern crate num_cpus;
-extern crate parking_lot;
-extern crate slab;
-extern crate tokio_executor;
-extern crate tokio_io;
-extern crate tokio_sync;
-
 pub(crate) mod background;
 mod poll_evented;
 mod registration;
@@ -58,13 +45,11 @@ pub use self::registration::Registration;
 
 // ===== Private imports =====
 
-use sharded_rwlock::RwLock;
-
+use crate::sharded_rwlock::RwLock;
 use futures::task::Task;
-use tokio_executor::park::{Park, Unpark};
-use tokio_executor::Enter;
-use tokio_sync::task::AtomicTask;
-
+use log::{debug, log_enabled, trace, Level};
+use mio::event::Evented;
+use slab::Slab;
 use std::cell::RefCell;
 use std::error::Error;
 use std::io;
@@ -76,10 +61,9 @@ use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 use std::{fmt, usize};
-
-use log::Level;
-use mio::event::Evented;
-use slab::Slab;
+use tokio_executor::park::{Park, Unpark};
+use tokio_executor::Enter;
+use tokio_sync::task::AtomicTask;
 
 /// The core reactor, or event loop.
 ///
@@ -467,7 +451,7 @@ impl Park for Reactor {
 }
 
 impl fmt::Debug for Reactor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Reactor")
     }
 }
@@ -519,7 +503,7 @@ impl Default for Handle {
 }
 
 impl fmt::Debug for Handle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Handle")
     }
 }
@@ -641,7 +625,7 @@ impl HandlePriv {
 }
 
 impl fmt::Debug for HandlePriv {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "HandlePriv")
     }
 }
@@ -652,7 +636,7 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    fn add_source(&self, source: &Evented) -> io::Result<usize> {
+    fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
@@ -690,7 +674,7 @@ impl Inner {
     }
 
     /// Deregisters an I/O resource from the reactor.
-    fn deregister_source(&self, source: &Evented) -> io::Result<()> {
+    fn deregister_source(&self, source: &dyn Evented) -> io::Result<()> {
         self.io.deregister(source)
     }
 
@@ -773,7 +757,7 @@ mod platform {
 // ===== impl SetFallbackError =====
 
 impl fmt::Display for SetFallbackError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }

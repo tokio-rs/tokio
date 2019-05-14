@@ -1,9 +1,7 @@
+use crate::AsyncRead;
+use futures::{Future, Poll};
 use std::io::{self, BufRead};
 use std::mem;
-
-use futures::{Future, Poll};
-
-use AsyncRead;
 
 /// A future which can be used to easily read the contents of a stream into a
 /// vector until the delimiter is reached.

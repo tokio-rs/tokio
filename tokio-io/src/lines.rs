@@ -1,9 +1,7 @@
+use crate::AsyncRead;
+use futures::{Poll, Stream};
 use std::io::{self, BufRead};
 use std::mem;
-
-use futures::{Poll, Stream};
-
-use AsyncRead;
 
 /// Combinator created by the top-level `lines` method which is a stream over
 /// the lines of text on an I/O object.

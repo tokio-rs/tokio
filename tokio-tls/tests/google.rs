@@ -1,21 +1,16 @@
-extern crate env_logger;
-extern crate futures;
-extern crate native_tls;
-extern crate tokio;
-extern crate tokio_io;
-extern crate tokio_tls;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
-extern crate cfg_if;
-
+use cfg_if::cfg_if;
+use env_logger;
+use futures::Future;
+use native_tls;
+use native_tls::TlsConnector;
 use std::io;
 use std::net::ToSocketAddrs;
-
-use futures::Future;
-use native_tls::TlsConnector;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio_io::io::{flush, read_to_end, write_all};
+use tokio_tls;
 
 macro_rules! t {
     ($e:expr) => {
@@ -36,8 +31,6 @@ cfg_if! {
                         all(not(target_os = "macos"),
                             not(target_os = "windows"),
                             not(target_os = "ios"))))] {
-        extern crate openssl;
-
         fn assert_bad_hostname_error(err: &io::Error) {
             let err = err.get_ref().unwrap();
             let err = err.downcast_ref::<native_tls::Error>().unwrap();
@@ -92,7 +85,7 @@ fn fetch_google() {
     assert!(data.starts_with(b"HTTP/1.0 "));
 
     let data = String::from_utf8_lossy(&data);
-    let data = data.trim_right();
+    let data = data.trim_end();
     assert!(data.ends_with("</html>") || data.ends_with("</HTML>"));
 }
 

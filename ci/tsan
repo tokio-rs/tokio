@@ -8,6 +8,8 @@ race:Weak*drop
 # `std` mpsc is not used in any Tokio code base. This race is triggered by some
 # rust runtime logic.
 race:std*mpsc_queue
+race:std*lang_start
+race:drop*std::thread*
 
 # Probably more fences in std.
 race:__call_tls_dtors

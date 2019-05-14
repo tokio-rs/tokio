@@ -1,19 +1,14 @@
-extern crate env_logger;
-extern crate futures;
-extern crate native_tls;
-extern crate tokio;
-extern crate tokio_tls;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
-extern crate cfg_if;
-
-use std::io::{self, Error};
-use std::net::ToSocketAddrs;
-
+use cfg_if::cfg_if;
+use env_logger;
 use futures::Future;
 use native_tls::TlsConnector;
+use std::io::{self, Error};
+use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
+use tokio_tls;
 
 macro_rules! t {
     ($e:expr) => {
@@ -50,8 +45,6 @@ cfg_if! {
                         all(not(target_os = "macos"),
                             not(target_os = "windows"),
                             not(target_os = "ios"))))] {
-        extern crate openssl;
-
         fn verify_failed(err: &Error) {
             assert!(format!("{}", err).contains("certificate verify failed"))
         }
@@ -66,10 +59,10 @@ cfg_if! {
             assert!(format!("{}", err).contains("was not trusted."))
         }
 
-        use assert_invalid_cert_chain as assert_expired_error;
-        use assert_invalid_cert_chain as assert_wrong_host;
-        use assert_invalid_cert_chain as assert_self_signed;
-        use assert_invalid_cert_chain as assert_untrusted_root;
+        use crate::assert_invalid_cert_chain as assert_expired_error;
+        use crate::assert_invalid_cert_chain as assert_wrong_host;
+        use crate::assert_invalid_cert_chain as assert_self_signed;
+        use crate::assert_invalid_cert_chain as assert_untrusted_root;
     } else {
         fn assert_expired_error(err: &Error) {
             let s = err.to_string();

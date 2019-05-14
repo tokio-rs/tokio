@@ -7,8 +7,9 @@ name = "tokio-signal"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.2.x" git tag.
-version = "0.2.8"
+# - Create "v0.3.x" git tag.
+version = "0.3.0"
+edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -18,6 +19,7 @@ description = """
 An implementation of an asynchronous Unix signal handling backed futures.
 """
 categories = ["asynchronous"]
+publish = false
 
 [badges]
 travis-ci = { repository = "tokio-rs/tokio" }
@@ -26,9 +28,9 @@ appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 [dependencies]
 futures = "0.1.11"
 mio = "0.6.14"
-tokio-reactor = "0.1.0"
-tokio-executor = "0.1.0"
-tokio-io = "0.1"
+tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
+tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
+tokio-io = { version = "0.2.0", path = "../tokio-io" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -36,7 +38,7 @@ mio-uds = "0.6"
 signal-hook-registry = "~1"
 
 [dev-dependencies]
-tokio = "0.1.8"
+tokio = { version = "0.2.0", path = "../tokio" }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"

@@ -7,8 +7,9 @@ name = "tokio-timer"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.2.x" git tag.
-version = "0.2.10"
+# - Create "v0.3.x" git tag.
+version = "0.3.0"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
@@ -18,10 +19,11 @@ homepage = "https://github.com/tokio-rs/tokio"
 description = """
 Timer facilities for Tokio
 """
+publish = false
 
 [dependencies]
 futures = "0.1.19"
-tokio-executor = "0.1.1"
+tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 crossbeam-utils = "0.6.0"
 
 # Backs `DelayQueue`
@@ -30,4 +32,4 @@ slab = "0.4.1"
 [dev-dependencies]
 rand = "0.6"
 tokio-mock-task = "0.1.0"
-tokio = "0.1.7"
+tokio = { version = "0.2.0", path = "../tokio" }

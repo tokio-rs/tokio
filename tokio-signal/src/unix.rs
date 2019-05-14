@@ -5,27 +5,24 @@
 
 #![cfg(unix)]
 
-pub extern crate libc;
-extern crate mio;
-extern crate mio_uds;
-extern crate signal_hook_registry;
+pub use libc;
 
 use std::io::prelude::*;
 use std::io::{self, Error, ErrorKind};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, ONCE_INIT};
 
-use self::libc::c_int;
-use self::mio_uds::UnixStream;
 use futures::future;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async, Future};
 use futures::{Poll, Stream};
+use libc::c_int;
+use mio_uds::UnixStream;
 use tokio_io::IoFuture;
 use tokio_reactor::{Handle, PollEvented};
 
-pub use self::libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
-pub use self::libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
+pub use libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
+pub use libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
 
 /// BSD-specific definitions
 #[cfg(any(
@@ -420,7 +417,7 @@ impl Drop for Signal {
 
 #[cfg(test)]
 mod tests {
-    extern crate tokio;
+    use tokio;
 
     use super::*;
 

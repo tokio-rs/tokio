@@ -1,8 +1,7 @@
+use crate::AsyncRead;
 use bytes::Buf;
-use futures::{Async, Poll};
+use futures::{try_ready, Async, Poll};
 use std::io as std_io;
-
-use AsyncRead;
 
 /// Writes bytes asynchronously.
 ///

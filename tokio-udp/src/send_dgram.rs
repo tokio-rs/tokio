@@ -1,9 +1,7 @@
 use super::socket::UdpSocket;
-
+use futures::{try_ready, Async, Future, Poll};
 use std::io;
 use std::net::SocketAddr;
-
-use futures::{Async, Future, Poll};
 
 /// A future used to write the entire contents of some data to a UDP socket.
 ///

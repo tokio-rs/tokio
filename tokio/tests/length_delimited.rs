@@ -1,16 +1,12 @@
-extern crate bytes;
-extern crate futures;
-extern crate tokio;
-
-use tokio::codec::*;
-use tokio::io::{AsyncRead, AsyncWrite};
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::Async::*;
 use futures::{Poll, Sink, Stream};
-
 use std::collections::VecDeque;
 use std::io;
+use tokio::codec::*;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{

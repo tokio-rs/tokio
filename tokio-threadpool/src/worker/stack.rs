@@ -1,6 +1,5 @@
-use config::MAX_WORKERS;
-use worker;
-
+use crate::config::MAX_WORKERS;
+use crate::worker;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};
 use std::{fmt, usize};
@@ -242,7 +241,7 @@ impl From<State> for usize {
 }
 
 impl fmt::Debug for State {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let head = self.head();
 
         let mut fmt = fmt.debug_struct("stack::State");

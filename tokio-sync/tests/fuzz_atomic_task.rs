@@ -1,6 +1,5 @@
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
 #[macro_use]
 extern crate loom;
 
@@ -8,15 +7,12 @@ extern crate loom;
 #[path = "../src/task/atomic_task.rs"]
 mod atomic_task;
 
-use atomic_task::AtomicTask;
-
+use crate::atomic_task::AtomicTask;
+use futures::future::poll_fn;
+use futures::Async;
 use loom::futures::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;
-
-use futures::future::poll_fn;
-use futures::Async;
-
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 

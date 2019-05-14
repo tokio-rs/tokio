@@ -1,5 +1,5 @@
-extern crate futures;
-extern crate tokio_threadpool;
+use futures;
+use tokio_threadpool;
 
 use self::tokio_threadpool::Builder;
 use futures::sync::oneshot;

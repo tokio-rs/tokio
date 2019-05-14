@@ -1,12 +1,9 @@
 #![allow(deprecated)]
 
-use {codec, AsyncRead, AsyncWrite};
-
+use crate::{codec, AsyncRead, AsyncWrite};
 use bytes::buf::Chain;
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
-
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
-
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};
@@ -174,7 +171,7 @@ where
     T: fmt::Debug,
     B::Buf: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Framed")
             .field("inner", &self.inner)
             .finish()
@@ -580,7 +577,7 @@ where
     T: fmt::Debug,
     B::Buf: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedWrite")
             .field("inner", &self.inner)
             .field("builder", &self.builder)
@@ -859,18 +856,16 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_io;
-    /// # extern crate bytes;
-    /// # use tokio_io::AsyncWrite;
-    /// # use tokio_io::codec::length_delimited;
-    /// # use bytes::BytesMut;
+    /// use tokio_io::AsyncWrite;
+    /// use tokio_io::codec::length_delimited;
+    /// use bytes::BytesMut;
+    ///
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// # let _: length_delimited::FramedWrite<T, BytesMut> =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_write(io);
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new_write<T, B>(&self, inner: T) -> FramedWrite<T, B>
     where
@@ -889,18 +884,16 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio_io;
-    /// # extern crate bytes;
-    /// # use tokio_io::{AsyncRead, AsyncWrite};
-    /// # use tokio_io::codec::length_delimited;
-    /// # use bytes::BytesMut;
+    /// use tokio_io::{AsyncRead, AsyncWrite};
+    /// use tokio_io::codec::length_delimited;
+    /// use bytes::BytesMut;
+    ///
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
     /// # let _: length_delimited::Framed<T, BytesMut> =
     /// length_delimited::Builder::new()
     ///     .length_field_length(2)
     ///     .new_framed(io);
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new_framed<T, B>(&self, inner: T) -> Framed<T, B>
     where
@@ -925,13 +918,13 @@ impl Builder {
 // ===== impl FrameTooBig =====
 
 impl fmt::Debug for FrameTooBig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FrameTooBig").finish()
     }
 }
 
 impl fmt::Display for FrameTooBig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.description())
     }
 }

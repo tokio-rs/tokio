@@ -1,16 +1,10 @@
 #![cfg(feature = "util")]
 
-extern crate bytes;
-extern crate futures;
-extern crate tokio_buf;
-
 use futures::Async::*;
 use futures::Future;
 use tokio_buf::{BufStream, BufStreamExt};
 
-#[macro_use]
 mod support;
-
 use support::*;
 
 #[test]

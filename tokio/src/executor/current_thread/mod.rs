@@ -19,8 +19,6 @@
 //! For example:
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate futures;
 //! # use tokio::executor::current_thread;
 //! use futures::future::lazy;
 //!
@@ -47,8 +45,6 @@
 //! More fine-grain control can be achieved by using [`CurrentThread`] directly.
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate futures;
 //! # use tokio::executor::current_thread::CurrentThread;
 //! use futures::future::{lazy, empty};
 //! use std::time::Duration;
@@ -141,7 +137,7 @@ impl<'a> Context<'a> {
 #[deprecated(since = "0.1.2", note = "use block_on_all instead")]
 #[doc(hidden)]
 pub fn run<F, R>(f: F) -> R
-    where F: FnOnce(&mut Context) -> R
+    where F: FnOnce(&mut Context<'_>) -> R
 {
     let mut context = Context {
         cancel: Cell::new(false),

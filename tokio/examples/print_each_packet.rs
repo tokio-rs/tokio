@@ -52,20 +52,17 @@
 //! ```
 //!
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate tokio;
-extern crate tokio_codec;
-
+use std::env;
+use std::net::SocketAddr;
+use tokio;
 use tokio::codec::Decoder;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 use tokio_codec::BytesCodec;
 
-use std::env;
-use std::net::SocketAddr;
-
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Allow passing an address to listen on as the first argument of this
     // program, but otherwise we'll just set up our TCP listener on
     // 127.0.0.1:8080 for connections.

@@ -1,14 +1,13 @@
 #![allow(deprecated)]
 
+use crate::codec::{Decoder, Encoder};
+use crate::framed::Fuse;
+use crate::{AsyncRead, AsyncWrite};
+use bytes::BytesMut;
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use log::trace;
 use std::fmt;
 use std::io::{self, Read};
-
-use codec::{Decoder, Encoder};
-use framed::Fuse;
-use {AsyncRead, AsyncWrite};
-
-use bytes::BytesMut;
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
 #[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
@@ -119,7 +118,7 @@ where
     T: fmt::Debug,
     U: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedWrite")
             .field("inner", &self.inner.get_ref().0)
             .field("encoder", &self.inner.get_ref().1)

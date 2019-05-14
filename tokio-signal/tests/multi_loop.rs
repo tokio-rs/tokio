@@ -1,12 +1,12 @@
 #![cfg(unix)]
-
-extern crate libc;
-
-use std::sync::mpsc::channel;
-use std::thread;
+#![deny(warnings, rust_2018_idioms)]
 
 pub mod support;
-use support::*;
+use crate::support::*;
+
+use libc;
+use std::sync::mpsc::channel;
+use std::thread;
 
 #[test]
 fn multi_loop() {

@@ -1,9 +1,7 @@
+use crate::AsyncRead;
+use futures::{try_ready, Future, Poll};
 use std::io;
 use std::mem;
-
-use futures::{Future, Poll};
-
-use AsyncRead;
 
 /// A future which can be used to easily read exactly enough bytes to fill
 /// a buffer.

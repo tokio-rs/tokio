@@ -1,7 +1,5 @@
-use UnixDatagram;
-
-use futures::{Async, Future, Poll};
-
+use crate::UnixDatagram;
+use futures::{try_ready, Async, Future, Poll};
 use std::io;
 use std::mem;
 

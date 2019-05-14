@@ -1,8 +1,7 @@
-extern crate futures;
-extern crate tokio_executor;
+#![deny(warnings, rust_2018_idioms)]
 
-use futures::{future::lazy, Future};
-use tokio_executor::DefaultExecutor;
+use futures::{self, future::lazy, Future};
+use tokio_executor::{self, DefaultExecutor};
 
 mod out_of_executor_context {
     use super::*;
@@ -10,7 +9,7 @@ mod out_of_executor_context {
 
     fn test<F, E>(spawn: F)
     where
-        F: Fn(Box<Future<Item = (), Error = ()> + Send>) -> Result<(), E>,
+        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) -> Result<(), E>,
     {
         let res = spawn(Box::new(lazy(|| Ok(()))));
         assert!(res.is_err());

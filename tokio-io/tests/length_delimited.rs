@@ -1,17 +1,12 @@
 // This file is testing deprecated code.
 #![allow(deprecated)]
 
-extern crate futures;
-extern crate tokio_io;
-
-use tokio_io::codec::length_delimited::*;
-use tokio_io::{AsyncRead, AsyncWrite};
-
 use futures::Async::*;
 use futures::{Poll, Sink, Stream};
-
 use std::collections::VecDeque;
 use std::io;
+use tokio_io::codec::length_delimited::*;
+use tokio_io::{AsyncRead, AsyncWrite};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{

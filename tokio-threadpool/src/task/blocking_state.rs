@@ -1,5 +1,4 @@
-use task::CanBlock;
-
+use crate::task::CanBlock;
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -80,7 +79,7 @@ impl From<BlockingState> for usize {
 }
 
 impl fmt::Debug for BlockingState {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BlockingState")
             .field("is_queued", &self.is_queued())
             .field("is_allocated", &self.is_allocated())

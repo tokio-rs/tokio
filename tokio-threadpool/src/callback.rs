@@ -1,13 +1,11 @@
-use worker::Worker;
-
+use crate::worker::Worker;
 use std::fmt;
 use std::sync::Arc;
-
 use tokio_executor::Enter;
 
 #[derive(Clone)]
 pub(crate) struct Callback {
-    f: Arc<Fn(&Worker, &mut Enter) + Send + Sync>,
+    f: Arc<dyn Fn(&Worker, &mut Enter) + Send + Sync>,
 }
 
 impl Callback {
@@ -24,7 +22,7 @@ impl Callback {
 }
 
 impl fmt::Debug for Callback {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "Fn")
     }
 }

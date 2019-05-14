@@ -1,12 +1,10 @@
-extern crate futures;
-extern crate tokio;
-
-use std::net;
-use std::thread;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::future;
 use futures::prelude::*;
 use futures::sync::oneshot;
+use std::net;
+use std::thread;
 use tokio::net::TcpListener;
 use tokio::reactor::Reactor;
 

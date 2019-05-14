@@ -41,14 +41,12 @@ mod list;
 mod unbounded;
 
 pub use self::bounded::{channel, Receiver, Sender};
-
 pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 pub mod error {
     //! Channel error types
 
     pub use super::bounded::{RecvError, SendError, TrySendError};
-
     pub use super::unbounded::{UnboundedRecvError, UnboundedSendError, UnboundedTrySendError};
 }
 

@@ -1,7 +1,5 @@
 use super::blocking_io;
-
 use futures::{Future, Poll};
-
 use std::fs::{self, Metadata};
 use std::io;
 use std::path::Path;

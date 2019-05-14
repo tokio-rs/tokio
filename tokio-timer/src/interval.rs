@@ -1,9 +1,6 @@
-use Delay;
-
-use clock;
-
-use futures::{Future, Poll, Stream};
-
+use crate::clock;
+use crate::Delay;
+use futures::{try_ready, Future, Poll, Stream};
 use std::time::{Duration, Instant};
 
 /// A stream representing notifications at fixed interval
@@ -56,7 +53,7 @@ impl Interval {
 
 impl Stream for Interval {
     type Item = Instant;
-    type Error = ::Error;
+    type Error = crate::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         // Wait for the delay to be done

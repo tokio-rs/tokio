@@ -54,8 +54,6 @@ an asynchronous application.
 A basic TCP echo server with Tokio:
 
 ```rust
-extern crate tokio;
-
 use tokio::prelude::*;
 use tokio::io::copy;
 use tokio::net::TcpListener;

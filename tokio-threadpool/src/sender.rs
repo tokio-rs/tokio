@@ -1,10 +1,9 @@
-use pool::{self, Lifecycle, Pool, MAX_FUTURES};
-use task::Task;
-
+use crate::pool::{self, Lifecycle, Pool, MAX_FUTURES};
+use crate::task::Task;
+use futures::{future, Future};
+use log::trace;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-
-use futures::{future, Future};
 use tokio_executor::{self, SpawnError};
 
 /// Submit futures to the associated thread pool for execution.
@@ -58,8 +57,6 @@ impl Sender {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio_threadpool;
-    /// # extern crate futures;
     /// # use tokio_threadpool::ThreadPool;
     /// use futures::future::{Future, lazy};
     ///
@@ -131,7 +128,7 @@ impl tokio_executor::Executor for Sender {
 
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         let mut s = &*self;
         tokio_executor::Executor::spawn(&mut s, future)
@@ -157,7 +154,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.prepare_for_spawn()?;
 

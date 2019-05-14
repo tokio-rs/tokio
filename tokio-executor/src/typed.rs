@@ -1,4 +1,4 @@
-use SpawnError;
+use crate::SpawnError;
 
 /// A value that spawns futures of a specific type.
 ///
@@ -21,11 +21,7 @@ use SpawnError;
 /// task is spawned.
 ///
 /// ```rust
-/// #[macro_use]
-/// extern crate futures;
-/// extern crate tokio;
-///
-/// use futures::{Future, Stream, Poll};
+/// use futures::{try_ready, Future, Stream, Poll};
 /// use tokio::executor::TypedExecutor;
 /// use tokio::sync::oneshot;
 ///
@@ -69,7 +65,6 @@ use SpawnError;
 ///         Ok(().into())
 ///     }
 /// }
-/// # pub fn main() {}
 /// ```
 ///
 /// By doing this, the `drain` fn can accept a stream that is `!Send` as long as
@@ -90,10 +85,8 @@ pub trait TypedExecutor<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio_executor;
-    /// # use tokio_executor::TypedExecutor;
-    /// # use futures::{Future, Poll};
+    /// use tokio_executor::TypedExecutor;
+    /// use futures::{Future, Poll};
     /// fn example<T>(my_executor: &mut T)
     /// where
     ///     T: TypedExecutor<MyFuture>,
@@ -112,7 +105,6 @@ pub trait TypedExecutor<T> {
     ///         Ok(().into())
     ///     }
     /// }
-    /// # fn main() {}
     /// ```
     fn spawn(&mut self, future: T) -> Result<(), SpawnError>;
 
@@ -134,10 +126,9 @@ pub trait TypedExecutor<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio_executor;
-    /// # use tokio_executor::TypedExecutor;
-    /// # use futures::{Future, Poll};
+    /// use tokio_executor::TypedExecutor;
+    /// use futures::{Future, Poll};
+    ///
     /// fn example<T>(my_executor: &mut T)
     /// where
     ///     T: TypedExecutor<MyFuture>,
@@ -160,7 +151,6 @@ pub trait TypedExecutor<T> {
     ///         Ok(().into())
     ///     }
     /// }
-    /// # fn main() {}
     /// ```
     fn status(&self) -> Result<(), SpawnError> {
         Ok(())

@@ -1,13 +1,12 @@
+use bytes::{Buf, BufMut};
+use futures::{try_ready, Async, Future, Poll};
+use iovec::IoVec;
+use mio;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
 use std::net::{self, Shutdown, SocketAddr};
 use std::time::Duration;
-
-use bytes::{Buf, BufMut};
-use futures::{Async, Future, Poll};
-use iovec::IoVec;
-use mio;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_reactor::{Handle, PollEvented};
 
@@ -23,22 +22,18 @@ use tokio_reactor::{Handle, PollEvented};
 /// # Examples
 ///
 /// ```
-/// # extern crate tokio;
-/// # extern crate futures;
 /// use futures::Future;
 /// use tokio::io::AsyncWrite;
 /// use tokio::net::TcpStream;
 /// use std::net::SocketAddr;
 ///
-/// # fn main() -> Result<(), Box<std::error::Error>> {
 /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
 /// let stream = TcpStream::connect(&addr);
 /// stream.map(|mut stream| {
 ///     // Attempt to write bytes asynchronously to the stream
 ///     stream.poll_write(&[1]);
 /// });
-/// # Ok(())
-/// # }
+/// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 pub struct TcpStream {
     io: PollEvented<mio::net::TcpStream>,
@@ -71,19 +66,15 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use futures::Future;
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr)
     ///     .map(|stream|
     ///         println!("successfully connected to {}", stream.local_addr().unwrap()));
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn connect(addr: &SocketAddr) -> ConnectFuture {
         use self::ConnectFutureState::*;
@@ -110,17 +101,13 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// # extern crate tokio;
-    /// # extern crate tokio_reactor;
     /// use tokio::net::TcpStream;
     /// use std::net::TcpStream as StdTcpStream;
     /// use tokio_reactor::Handle;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let std_stream = StdTcpStream::connect("127.0.0.1:34254")?;
     /// let stream = TcpStream::from_std(std_stream, &Handle::default())?;
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_std(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_stream(stream)?;
@@ -188,18 +175,15 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate mio;
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use mio::Ready;
     /// use futures::Async;
     /// use futures::Future;
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     match stream.poll_read_ready(Ready::readable()) {
     ///         Ok(Async::Ready(_)) => println!("read ready"),
@@ -207,8 +191,7 @@ impl TcpStream {
     ///         Err(e) => eprintln!("got error: {}", e),
     /// }
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
         self.io.poll_read_ready(mask)
@@ -232,16 +215,14 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use futures::Async;
     /// use futures::Future;
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:34254".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     match stream.poll_write_ready() {
     ///         Ok(Async::Ready(_)) => println!("write ready"),
@@ -249,8 +230,7 @@ impl TcpStream {
     ///         Err(e) => eprintln!("got error: {}", e),
     /// }
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
         self.io.poll_write_ready()
@@ -261,21 +241,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     assert_eq!(stream.local_addr().unwrap(),
     ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
@@ -285,21 +262,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     assert_eq!(stream.peer_addr().unwrap(),
     ///         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().peer_addr()
@@ -336,16 +310,14 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Async;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|mut stream| {
     ///     let mut buf = [0; 10];
     ///     match stream.poll_peek(&mut buf) {
@@ -354,8 +326,7 @@ impl TcpStream {
     ///        Err(e) => eprintln!("got error: {}", e),
     ///     }
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn poll_peek(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
         try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
@@ -379,20 +350,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::{Shutdown, SocketAddr};
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.shutdown(Shutdown::Both)
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
@@ -407,21 +375,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_nodelay(true).expect("set_nodelay call failed");;
     ///     assert_eq!(stream.nodelay().unwrap_or(false), true);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
         self.io.get_ref().nodelay()
@@ -438,20 +403,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_nodelay(true).expect("set_nodelay call failed");
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
         self.io.get_ref().set_nodelay(nodelay)
@@ -466,21 +428,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_recv_buffer_size(100).expect("set_recv_buffer_size failed");
     ///     assert_eq!(stream.recv_buffer_size().unwrap_or(0), 100);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn recv_buffer_size(&self) -> io::Result<usize> {
         self.io.get_ref().recv_buffer_size()
@@ -494,20 +453,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_recv_buffer_size(100).expect("set_recv_buffer_size failed");
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
         self.io.get_ref().set_recv_buffer_size(size)
@@ -522,21 +478,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_send_buffer_size(100).expect("set_send_buffer_size failed");
     ///     assert_eq!(stream.send_buffer_size().unwrap_or(0), 100);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn send_buffer_size(&self) -> io::Result<usize> {
         self.io.get_ref().send_buffer_size()
@@ -550,20 +503,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_send_buffer_size(100).expect("set_send_buffer_size failed");
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
         self.io.get_ref().set_send_buffer_size(size)
@@ -579,21 +529,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_keepalive(None).expect("set_keepalive failed");
     ///     assert_eq!(stream.keepalive().unwrap(), None);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn keepalive(&self) -> io::Result<Option<Duration>> {
         self.io.get_ref().keepalive()
@@ -615,20 +562,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_keepalive(None).expect("set_keepalive failed");
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
         self.io.get_ref().set_keepalive(keepalive)
@@ -643,21 +587,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_ttl(100).expect("set_ttl failed");
     ///     assert_eq!(stream.ttl().unwrap_or(0), 100);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
@@ -671,20 +612,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_ttl(100).expect("set_ttl failed");
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
@@ -700,21 +638,18 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_linger(None).expect("set_linger failed");
     ///     assert_eq!(stream.linger().unwrap(), None);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.io.get_ref().linger()
@@ -735,20 +670,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     stream.set_linger(None).expect("set_linger failed");
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.io.get_ref().set_linger(dur)
@@ -764,20 +696,17 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::net::TcpStream;
     /// use futures::Future;
     /// use std::net::SocketAddr;
     ///
-    /// # fn main() -> Result<(), Box<std::error::Error>> {
     /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     /// let stream = TcpStream::connect(&addr);
+    ///
     /// stream.map(|stream| {
     ///     let clone = stream.try_clone().unwrap();
     /// });
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     #[deprecated(since = "0.1.14", note = "use `split()` instead")]
     #[doc(hidden)]
@@ -948,7 +877,7 @@ impl<'a> AsyncWrite for &'a TcpStream {
 }
 
 impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

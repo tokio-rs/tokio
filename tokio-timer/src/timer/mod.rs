@@ -49,18 +49,16 @@ pub use self::handle::{with_default, Handle};
 pub use self::now::{Now, SystemNow};
 pub(crate) use self::registration::Registration;
 
-use atomic::AtomicU64;
-use wheel;
-use Error;
-
-use tokio_executor::park::{Park, ParkThread, Unpark};
-
+use crate::atomic::AtomicU64;
+use crate::wheel;
+use crate::Error;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::usize;
 use std::{cmp, fmt};
+use tokio_executor::park::{Park, ParkThread, Unpark};
 
 /// Timer implementation that drives [`Delay`], [`Interval`], and [`Timeout`].
 ///
@@ -162,7 +160,7 @@ pub(crate) struct Inner {
     process: AtomicStack,
 
     /// Unparks the timer thread.
-    unpark: Box<Unpark>,
+    unpark: Box<dyn Unpark>,
 }
 
 /// Maximum number of timeouts the system can handle concurrently.
@@ -266,7 +264,7 @@ where
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = ::ms(self.now.now() - self.inner.start, ::Round::Down);
+        let now = crate::ms(self.now.now() - self.inner.start, crate::Round::Down);
         let mut poll = wheel::Poll::new(now);
 
         while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
@@ -317,7 +315,7 @@ where
     ///
     /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        use wheel::InsertError;
+        use crate::wheel::InsertError;
 
         entry.set_when_internal(Some(when));
 
@@ -426,7 +424,7 @@ impl<T, N> Drop for Timer<T, N> {
 // ===== impl Inner =====
 
 impl Inner {
-    fn new(start: Instant, unpark: Box<Unpark>) -> Inner {
+    fn new(start: Instant, unpark: Box<dyn Unpark>) -> Inner {
         Inner {
             num: AtomicUsize::new(0),
             elapsed: AtomicU64::new(0),
@@ -479,12 +477,12 @@ impl Inner {
             return 0;
         }
 
-        ::ms(deadline - self.start, ::Round::Up)
+        crate::ms(deadline - self.start, crate::Round::Up)
     }
 }
 
 impl fmt::Debug for Inner {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Inner").finish()
     }
 }

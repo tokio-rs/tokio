@@ -4,14 +4,12 @@
 //!
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-use clock::now;
-use timer::Handle;
-use wheel::{self, Wheel};
-use {Delay, Error};
-
-use futures::{Future, Poll, Stream};
+use crate::clock::now;
+use crate::timer::Handle;
+use crate::wheel::{self, Wheel};
+use crate::{Delay, Error};
+use futures::{try_ready, Future, Poll, Stream};
 use slab::Slab;
-
 use std::cmp;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
@@ -67,16 +65,13 @@ use std::time::{Duration, Instant};
 ///
 /// Using `DelayQueue` to manage cache entries.
 ///
-/// ```rust
-/// #[macro_use]
-/// extern crate futures;
-/// extern crate tokio;
-/// # type CacheKey = String;
-/// # type Value = String;
+/// ```rust,no_run
 /// use tokio::timer::{delay_queue, DelayQueue, Error};
-/// use futures::{Async, Poll, Stream};
+/// use futures::{try_ready, Async, Poll, Stream};
 /// use std::collections::HashMap;
 /// use std::time::Duration;
+/// # type CacheKey = String;
+/// # type Value = String;
 ///
 /// struct Cache {
 ///     entries: HashMap<CacheKey, (Value, delay_queue::Key)>,
@@ -112,7 +107,6 @@ use std::time::{Duration, Instant};
 ///         Ok(Async::Ready(()))
 ///     }
 /// }
-/// # fn main() {}
 /// ```
 ///
 /// [`insert`]: #method.insert
@@ -301,11 +295,9 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
     /// use std::time::{Instant, Duration};
     ///
-    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
     ///     "foo", Instant::now() + Duration::from_secs(5));
@@ -313,7 +305,6 @@ impl<T> DelayQueue<T> {
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
     /// assert_eq!(*item.get_ref(), "foo");
-    /// # }
     /// ```
     ///
     /// [`poll`]: #method.poll
@@ -382,18 +373,15 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
     /// assert_eq!(*item.get_ref(), "foo");
-    /// # }
     /// ```
     ///
     /// [`poll`]: #method.poll
@@ -435,21 +423,18 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
     /// assert_eq!(*item.get_ref(), "foo");
-    /// # }
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
-        use wheel::Stack;
+        use crate::wheel::Stack;
 
         // Special case the `expired` queue
         if self.slab[key.index].expired {
@@ -486,11 +471,9 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
     /// use std::time::{Duration, Instant};
     ///
-    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
@@ -499,7 +482,6 @@ impl<T> DelayQueue<T> {
     /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
     /// // "foo"is now scheduled to be returned in 10 seconds
-    /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
         self.wheel.remove(&key.index, &mut self.slab);
@@ -543,11 +525,9 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
@@ -556,7 +536,6 @@ impl<T> DelayQueue<T> {
     /// delay_queue.reset(&key, Duration::from_secs(10));
     ///
     /// // "foo"is now scheduled to be returned in 10 seconds
-    /// # }
     /// ```
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
         self.reset_at(key, now() + timeout);
@@ -573,11 +552,9 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
     /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
     /// delay_queue.insert("foo", Duration::from_secs(5));
@@ -587,7 +564,6 @@ impl<T> DelayQueue<T> {
     /// delay_queue.clear();
     ///
     /// assert!(delay_queue.is_empty());
-    /// # }
     /// ```
     pub fn clear(&mut self) {
         self.slab.clear();
@@ -601,7 +577,8 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio_timer::DelayQueue;
+    /// use tokio_timer::DelayQueue;
+    ///
     /// let delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.capacity(), 10);
     /// ```
@@ -629,11 +606,14 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// # use tokio_timer::DelayQueue;
-    /// # use std::time::Duration;
+    /// use tokio_timer::DelayQueue;
+    /// use std::time::Duration;
+    ///
     /// let mut delay_queue = DelayQueue::new();
+    ///
     /// delay_queue.insert("hello", Duration::from_secs(10));
     /// delay_queue.reserve(10);
+    ///
     /// assert!(delay_queue.capacity() >= 11);
     /// ```
     pub fn reserve(&mut self, additional: usize) {
@@ -648,8 +628,9 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// # use tokio_timer::DelayQueue;
+    /// use tokio_timer::DelayQueue;
     /// use std::time::Duration;
+    ///
     /// let mut delay_queue = DelayQueue::new();
     /// assert!(delay_queue.is_empty());
     ///
@@ -679,7 +660,7 @@ impl<T> DelayQueue<T> {
                     try_ready!(delay.poll());
                 }
 
-                let now = ::ms(delay.deadline() - self.start, ::Round::Down);
+                let now = crate::ms(delay.deadline() - self.start, crate::Round::Down);
 
                 self.poll = wheel::Poll::new(now);
             }
@@ -702,7 +683,7 @@ impl<T> DelayQueue<T> {
         let when = if when < self.start {
             0
         } else {
-            ::ms(when - self.start, ::Round::Up)
+            crate::ms(when - self.start, crate::Round::Up)
         };
 
         cmp::max(when, self.wheel.elapsed())

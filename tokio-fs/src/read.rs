@@ -1,7 +1,7 @@
-use futures::{Async, Future, Poll};
+use crate::{file, File};
+use futures::{try_ready, Async, Future, Poll};
 use std::{io, mem, path::Path};
 use tokio_io;
-use {file, File};
 
 /// Creates a future which will open a file for reading and read the entire
 /// contents into a buffer and return said buffer.
@@ -11,18 +11,17 @@ use {file, File};
 /// # Examples
 ///
 /// ```no_run
-/// # extern crate tokio;
 /// use tokio::prelude::Future;
-/// fn main() {
-///     let task = tokio::fs::read("foo.txt").map(|data| {
-///         // do something with the contents of the file ...
-///         println!("foo.txt contains {} bytes", data.len());
-///     }).map_err(|e| {
-///         // handle errors
-///         eprintln!("IO error: {:?}", e);
-///     });
-///     tokio::run(task);
-/// }
+///
+/// let task = tokio::fs::read("foo.txt").map(|data| {
+///     // do something with the contents of the file ...
+///     println!("foo.txt contains {} bytes", data.len());
+/// }).map_err(|e| {
+///     // handle errors
+///     eprintln!("IO error: {:?}", e);
+/// });
+///
+/// tokio::run(task);
 /// ```
 pub fn read<P>(path: P) -> ReadFile<P>
 where

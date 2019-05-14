@@ -9,16 +9,13 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::{Handle, Reactor};
-
-use std::io;
-use std::sync::Mutex;
-
-use tokio_executor::enter;
-use tokio_threadpool as threadpool;
-
+use crate::reactor::{Handle, Reactor};
 use futures;
 use futures::future::Future;
+use tokio_executor::enter;
+use tokio_threadpool as threadpool;
+use std::io;
+use std::sync::Mutex;
 
 /// Handle to the Tokio runtime.
 ///
@@ -70,12 +67,10 @@ struct Inner {
 /// # Examples
 ///
 /// ```rust
-/// # extern crate tokio;
-/// # extern crate futures;
 /// # use futures::{Future, Stream};
 /// use tokio::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
 /// # unimplemented!();
 /// # }
 /// # fn dox() {
@@ -216,8 +211,6 @@ impl Runtime {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::Runtime;
     ///

@@ -1,18 +1,15 @@
-extern crate futures;
-extern crate native_tls;
-extern crate tokio;
-extern crate tokio_io;
-extern crate tokio_tls;
-
-use std::io;
-use std::net::ToSocketAddrs;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::Future;
 use native_tls::TlsConnector;
+use std::io;
+use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
+use tokio_io;
+use tokio_tls;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = Runtime::new()?;
     let addr = "www.rust-lang.org:443"
         .to_socket_addrs()?

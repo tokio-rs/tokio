@@ -1,7 +1,5 @@
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
-extern crate futures;
 #[macro_use]
 extern crate loom;
 
@@ -9,12 +7,10 @@ extern crate loom;
 #[allow(warnings)]
 mod semaphore;
 
-use semaphore::*;
-
-use futures::{future, Async, Future, Poll};
+use crate::semaphore::*;
+use futures::{future, try_ready, Async, Future, Poll};
 use loom::futures::block_on;
 use loom::thread;
-
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
