@@ -1,3 +1,8 @@
+# 0.2.11 (May 14, 2019)
+
+### Added
+- `Handle::timeout` API, replacing the deprecated `Handle::deadline` (#1074).
+
 # 0.2.10 (February 4, 2019)
 
 ### Fixed

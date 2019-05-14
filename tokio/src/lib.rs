@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.19")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.20")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(feature = "async-await-preview", feature(async_await, await_macro))]
