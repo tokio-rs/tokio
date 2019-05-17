@@ -1,4 +1,4 @@
-#[repr(usize)]
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum State {
     /// Task is currently idle
@@ -36,12 +36,12 @@ impl State {
     }
 }
 
-impl From<usize> for State {
-    fn from(src: usize) -> Self {
+impl From<u32> for State {
+    fn from(src: u32) -> Self {
         use self::State::*;
 
         debug_assert!(
-            src >= Idle as usize && src <= Aborted as usize,
+            src >= Idle as u32 && src <= Aborted as u32,
             "actual={}",
             src
         );
@@ -50,8 +50,8 @@ impl From<usize> for State {
     }
 }
 
-impl From<State> for usize {
+impl From<State> for u32 {
     fn from(src: State) -> Self {
-        src as usize
+        src as u32
     }
 }

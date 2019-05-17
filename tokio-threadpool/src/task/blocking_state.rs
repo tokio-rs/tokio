@@ -1,6 +1,6 @@
 use crate::task::CanBlock;
 use std::fmt;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// State tracking task level state to support `blocking`.
 ///
@@ -11,10 +11,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 ///
 /// b) If the task has been allocated capacity to block.
 #[derive(Eq, PartialEq)]
-pub(crate) struct BlockingState(usize);
+pub(crate) struct BlockingState(u32);
 
-const QUEUED: usize = 0b01;
-const ALLOCATED: usize = 0b10;
+const QUEUED: u32 = 0b01;
+const ALLOCATED: u32 = 0b10;
 
 impl BlockingState {
     /// Create a new, default, `BlockingState`.
@@ -31,7 +31,7 @@ impl BlockingState {
     /// Toggle the queued flag
     ///
     /// Returns the state before the flag has been toggled.
-    pub fn toggle_queued(state: &AtomicUsize, ordering: Ordering) -> BlockingState {
+    pub fn toggle_queued(state: &AtomicU32, ordering: Ordering) -> BlockingState {
         state.fetch_xor(QUEUED, ordering).into()
     }
 
@@ -46,7 +46,7 @@ impl BlockingState {
     ///
     /// If this returns `true`, then the task has the ability to block for the
     /// duration of the `poll`.
-    pub fn consume_allocation(state: &AtomicUsize, ordering: Ordering) -> CanBlock {
+    pub fn consume_allocation(state: &AtomicU32, ordering: Ordering) -> CanBlock {
         let state: Self = state.fetch_and(!ALLOCATED, ordering).into();
 
         if state.is_allocated() {
@@ -58,7 +58,7 @@ impl BlockingState {
         }
     }
 
-    pub fn notify_blocking(state: &AtomicUsize, ordering: Ordering) {
+    pub fn notify_blocking(state: &AtomicU32, ordering: Ordering) {
         let prev: Self = state.fetch_xor(ALLOCATED | QUEUED, ordering).into();
 
         debug_assert!(prev.is_queued());
@@ -66,14 +66,14 @@ impl BlockingState {
     }
 }
 
-impl From<usize> for BlockingState {
-    fn from(src: usize) -> BlockingState {
+impl From<u32> for BlockingState {
+    fn from(src: u32) -> BlockingState {
         BlockingState(src)
     }
 }
 
-impl From<BlockingState> for usize {
-    fn from(src: BlockingState) -> usize {
+impl From<BlockingState> for u32 {
+    fn from(src: BlockingState) -> u32 {
         src.0
     }
 }

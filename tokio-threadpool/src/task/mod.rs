@@ -12,7 +12,7 @@ use futures::{self, Async, Future};
 use log::trace;
 use std::cell::{Cell, UnsafeCell};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
-use std::sync::atomic::{AtomicPtr, AtomicUsize};
+use std::sync::atomic::{AtomicPtr, AtomicU32};
 use std::sync::Arc;
 use std::{fmt, panic, ptr};
 
@@ -22,10 +22,10 @@ use std::{fmt, panic, ptr};
 /// queue.
 pub(crate) struct Task {
     /// Task lifecycle state
-    state: AtomicUsize,
+    state: AtomicU32,
 
     /// Task blocking related state
-    blocking: AtomicUsize,
+    blocking: AtomicU32,
 
     /// Next pointer in the queue of tasks pending blocking capacity.
     next_blocking: AtomicPtr<Task>,
@@ -69,8 +69,8 @@ impl Task {
         let task_fut = executor::spawn(future);
 
         Task {
-            state: AtomicUsize::new(State::new().into()),
-            blocking: AtomicUsize::new(BlockingState::new().into()),
+            state: AtomicU32::new(State::new().into()),
+            blocking: AtomicU32::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
@@ -85,8 +85,8 @@ impl Task {
         let task_fut = executor::spawn(future);
 
         Task {
-            state: AtomicUsize::new(State::stub().into()),
-            blocking: AtomicUsize::new(BlockingState::new().into()),
+            state: AtomicU32::new(State::stub().into()),
+            blocking: AtomicU32::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
