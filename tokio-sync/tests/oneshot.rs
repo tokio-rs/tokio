@@ -1,13 +1,9 @@
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate tokio_mock_task;
-extern crate tokio_sync;
-
+use futures;
+use futures::prelude::*;
 use tokio_mock_task::*;
 use tokio_sync::oneshot;
-
-use futures::prelude::*;
 
 macro_rules! assert_ready {
     ($e:expr) => {{

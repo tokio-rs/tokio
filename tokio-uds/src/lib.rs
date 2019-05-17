@@ -1,23 +1,12 @@
 #![cfg(unix)]
 #![doc(html_root_url = "https://docs.rs/tokio-uds/0.2.5")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Unix Domain Sockets for Tokio.
 //!
 //! This crate provides APIs for using Unix Domain Sockets with Tokio.
-
-extern crate bytes;
-#[macro_use]
-extern crate futures;
-extern crate iovec;
-extern crate libc;
-#[macro_use]
-extern crate log;
-extern crate mio;
-extern crate mio_uds;
-extern crate tokio_codec;
-extern crate tokio_io;
-extern crate tokio_reactor;
 
 mod datagram;
 mod frame;
@@ -28,11 +17,11 @@ mod send_dgram;
 mod stream;
 mod ucred;
 
-pub use datagram::UnixDatagram;
-pub use frame::UnixDatagramFramed;
-pub use incoming::Incoming;
-pub use listener::UnixListener;
-pub use recv_dgram::RecvDgram;
-pub use send_dgram::SendDgram;
-pub use stream::{ConnectFuture, UnixStream};
-pub use ucred::UCred;
+pub use crate::datagram::UnixDatagram;
+pub use crate::frame::UnixDatagramFramed;
+pub use crate::incoming::Incoming;
+pub use crate::listener::UnixListener;
+pub use crate::recv_dgram::RecvDgram;
+pub use crate::send_dgram::SendDgram;
+pub use crate::stream::{ConnectFuture, UnixStream};
+pub use crate::ucred::UCred;

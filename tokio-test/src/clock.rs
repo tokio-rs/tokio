@@ -3,13 +3,12 @@
 //! # Example
 //!
 //! ```
-//! # #[macro_use] extern crate tokio_test;
-//! # extern crate futures;
-//! # extern crate tokio_timer;
-//! # use tokio_test::clock;
-//! # use tokio_timer::Delay;
-//! # use std::time::Duration;
-//! # use futures::Future;
+//! use tokio_test::clock;
+//! use tokio_test::{assert_ready, assert_not_ready};
+//! use tokio_timer::Delay;
+//! use std::time::Duration;
+//! use futures::Future;
+//!
 //! clock::mock(|handle| {
 //!     let mut delay = Delay::new(handle.now() + Duration::from_secs(1));
 //!

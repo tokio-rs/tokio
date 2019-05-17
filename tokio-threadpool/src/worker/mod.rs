@@ -6,16 +6,13 @@ pub(crate) use self::entry::WorkerEntry as Entry;
 pub(crate) use self::stack::Stack;
 pub(crate) use self::state::{Lifecycle, State};
 
-use notifier::Notifier;
-use pool::{self, BackupId, Pool};
-use sender::Sender;
-use shutdown::ShutdownTrigger;
-use task::{self, CanBlock, Task};
-
-use tokio_executor;
-
+use crate::notifier::Notifier;
+use crate::pool::{self, BackupId, Pool};
+use crate::sender::Sender;
+use crate::shutdown::ShutdownTrigger;
+use crate::task::{self, CanBlock, Task};
 use futures::{Async, Poll};
-
+use log::trace;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -23,6 +20,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tokio_executor;
 
 /// Thread worker
 ///
@@ -150,7 +148,7 @@ impl Worker {
     }
 
     /// Transition the current worker to a blocking worker
-    pub(crate) fn transition_to_blocking(&self) -> Poll<(), ::BlockingError> {
+    pub(crate) fn transition_to_blocking(&self) -> Poll<(), crate::BlockingError> {
         use self::CanBlock::*;
 
         // If we get this far, then `current_task` has been set.
@@ -447,7 +445,7 @@ impl Worker {
     }
 
     fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>) {
-        use task::Run::*;
+        use crate::task::Run::*;
 
         // If this is the first time this task is being polled, register it so that we can keep
         // track of tasks that are in progress.

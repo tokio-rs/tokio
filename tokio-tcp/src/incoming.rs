@@ -1,8 +1,7 @@
 use super::TcpListener;
 use super::TcpStream;
-
 use futures::stream::Stream;
-use futures::{Async, Poll};
+use futures::{try_ready, Async, Poll};
 use std::io;
 
 /// Stream returned by the `TcpListener::incoming` function representing the

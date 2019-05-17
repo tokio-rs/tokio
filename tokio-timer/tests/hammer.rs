@@ -1,21 +1,17 @@
-extern crate futures;
-extern crate rand;
-extern crate tokio_executor;
-extern crate tokio_timer;
-
-use tokio_executor::park::{Park, Unpark, UnparkThread};
-use tokio_timer::*;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::stream::FuturesUnordered;
 use futures::{Future, Stream};
+use rand;
 use rand::Rng;
-
 use std::cmp;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};
+use tokio_executor::park::{Park, Unpark, UnparkThread};
+use tokio_timer::*;
 
 struct Signal {
     rem: AtomicUsize,

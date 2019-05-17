@@ -1,18 +1,16 @@
-use park::{BoxPark, BoxUnpark};
-use task::Task;
-use worker::state::{State, PUSHED_MASK};
-
+use crate::park::{BoxPark, BoxUnpark};
+use crate::task::Task;
+use crate::worker::state::{State, PUSHED_MASK};
+use crossbeam_deque::{Steal, Stealer, Worker};
+use crossbeam_queue::SegQueue;
+use crossbeam_utils::CachePadded;
+use slab::Slab;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-
-use crossbeam_deque::{Steal, Stealer, Worker};
-use crossbeam_queue::SegQueue;
-use crossbeam_utils::CachePadded;
-use slab::Slab;
 
 // TODO: None of the fields should be public
 //
@@ -96,7 +94,7 @@ impl WorkerEntry {
     /// The `state` must have been obtained with an `Acquire` ordering.
     #[inline]
     pub fn notify(&self, mut state: State) -> bool {
-        use worker::Lifecycle::*;
+        use crate::worker::Lifecycle::*;
 
         loop {
             let mut next = state;
@@ -141,7 +139,7 @@ impl WorkerEntry {
     ///
     /// Returns `Err` if the worker has already terminated.
     pub fn signal_stop(&self, mut state: State) {
-        use worker::Lifecycle::*;
+        use crate::worker::Lifecycle::*;
 
         // Transition the worker state to signaled
         loop {
@@ -317,7 +315,7 @@ impl WorkerEntry {
 }
 
 impl fmt::Debug for WorkerEntry {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("WorkerEntry")
             .field("state", &self.state.load(Relaxed))
             .field("next_sleeper", &"UnsafeCell<usize>")

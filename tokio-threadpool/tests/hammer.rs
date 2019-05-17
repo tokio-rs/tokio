@@ -1,13 +1,10 @@
-extern crate futures;
-extern crate tokio_threadpool;
-
-use tokio_threadpool::*;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::{Future, Poll, Sink, Stream};
-
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::*;
 use std::sync::Arc;
+use tokio_threadpool::*;
 
 #[test]
 fn hammer() {

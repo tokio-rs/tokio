@@ -1,6 +1,5 @@
 use super::Entry;
-use wheel;
-
+use crate::wheel;
 use std::ptr;
 use std::sync::Arc;
 

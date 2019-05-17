@@ -1,8 +1,6 @@
-use pool::Pool;
-use task::{BlockingState, Task};
-
+use crate::pool::Pool;
+use crate::task::{BlockingState, Task};
 use futures::{Async, Poll};
-
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ptr;
@@ -111,7 +109,7 @@ impl Blocking {
     ///
     /// The caller must ensure that `task` has not previously been queued to be
     /// notified when capacity becomes available.
-    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), ::BlockingError> {
+    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), crate::BlockingError> {
         // This requires atomically claiming blocking capacity and if none is
         // available, queuing &task.
 
@@ -482,7 +480,7 @@ impl From<State> for usize {
 }
 
 impl fmt::Debug for State {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fmt = fmt.debug_struct("State");
 
         if self.is_ptr() {

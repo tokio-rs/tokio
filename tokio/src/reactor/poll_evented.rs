@@ -8,18 +8,16 @@
 
 #![allow(deprecated, warnings)]
 
+use crate::reactor::{Handle, Registration};
+use futures::{task, Async, Poll};
+use mio::event::Evented;
+use mio::Ready;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Mutex;
-
-use futures::{task, Async, Poll};
-use mio::event::Evented;
-use mio::Ready;
 use tokio_io::{AsyncRead, AsyncWrite};
-
-use reactor::{Handle, Registration};
 
 #[deprecated(since = "0.1.2", note = "PollEvented2 instead")]
 #[doc(hidden)]
@@ -40,7 +38,7 @@ struct Inner {
 }
 
 impl<E: fmt::Debug> fmt::Debug for PollEvented<E> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PollEvented").field("io", &self.io).finish()
     }
 }

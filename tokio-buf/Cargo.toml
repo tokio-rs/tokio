@@ -7,8 +7,9 @@ name = "tokio-buf"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.1.x" git tag.
-version = "0.1.1"
+# - Create "v0.2.x" git tag.
+version = "0.2.0"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -18,6 +19,7 @@ description = """
 Asynchronous stream of byte buffers
 """
 categories = ["asynchronous"]
+publish = false
 
 [dependencies]
 bytes = "0.4.10"

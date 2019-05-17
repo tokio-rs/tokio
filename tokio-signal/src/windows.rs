@@ -7,17 +7,11 @@
 
 #![cfg(windows)]
 
-extern crate mio;
-extern crate winapi;
-
 use std::cell::RefCell;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
-use self::winapi::shared::minwindef::*;
-use self::winapi::um::consoleapi::SetConsoleCtrlHandler;
-use self::winapi::um::wincon::*;
 use futures::future;
 use futures::stream::Fuse;
 use futures::sync::mpsc;
@@ -25,8 +19,11 @@ use futures::sync::oneshot;
 use futures::{Async, Future, Poll, Stream};
 use mio::Ready;
 use tokio_reactor::{Handle, PollEvented};
+use winapi::shared::minwindef::*;
+use winapi::um::consoleapi::SetConsoleCtrlHandler;
+use winapi::um::wincon::*;
 
-use IoFuture;
+use crate::IoFuture;
 
 static INIT: Once = ONCE_INIT;
 static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
@@ -158,7 +155,7 @@ fn global_init(handle: &Handle) -> io::Result<()> {
     let ready = reg.readiness.clone();
 
     let (tx, rx) = mpsc::unbounded();
-    let reg = try!(PollEvented::new_with_handle(reg, handle));
+    let reg = PollEvented::new_with_handle(reg, handle)?;
 
     unsafe {
         let state = Box::new(GlobalState {
@@ -348,12 +345,10 @@ impl mio::Evented for MyRegistration {
 
 #[cfg(test)]
 mod tests {
-    extern crate tokio;
-
-    use self::tokio::runtime::current_thread;
-    use self::tokio::timer::Timeout;
     use super::*;
     use std::time::Duration;
+    use tokio::runtime::current_thread;
+    use tokio::timer::Timeout;
 
     fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
         Timeout::new(future, Duration::from_secs(1)).map_err(|e| {

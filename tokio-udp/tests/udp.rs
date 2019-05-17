@@ -1,18 +1,12 @@
-extern crate futures;
-extern crate tokio_codec;
-extern crate tokio_udp;
-#[macro_use]
-extern crate tokio_io;
-extern crate bytes;
-extern crate env_logger;
-
-use std::io;
-use std::net::SocketAddr;
-
-use futures::{Future, Poll, Sink, Stream};
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, BytesMut};
+use env_logger;
+use futures::{Future, Poll, Sink, Stream};
+use std::io;
+use std::net::SocketAddr;
 use tokio_codec::{Decoder, Encoder};
+use tokio_io::try_nb;
 use tokio_udp::{UdpFramed, UdpSocket};
 
 macro_rules! t {
@@ -56,7 +50,7 @@ fn send_and_recv() {
 }
 
 trait SendFn {
-    fn send(&self, &mut UdpSocket, &[u8], &SocketAddr) -> Result<usize, io::Error>;
+    fn send(&self, _: &mut UdpSocket, _: &[u8], _: &SocketAddr) -> Result<usize, io::Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +63,7 @@ impl SendFn for SendTo {
         buf: &[u8],
         addr: &SocketAddr,
     ) -> Result<usize, io::Error> {
+        #[allow(deprecated)]
         socket.send_to(buf, addr)
     }
 }
@@ -84,6 +79,7 @@ impl SendFn for Send {
         addr: &SocketAddr,
     ) -> Result<usize, io::Error> {
         socket.connect(addr).expect("could not connect");
+        #[allow(deprecated)]
         socket.send(buf)
     }
 }
@@ -122,7 +118,7 @@ impl<S: SendFn> Future for SendMessage<S> {
 }
 
 trait RecvFn {
-    fn recv(&self, &mut UdpSocket, &mut [u8], &SocketAddr) -> Result<usize, io::Error>;
+    fn recv(&self, _: &mut UdpSocket, _: &mut [u8], _: &SocketAddr) -> Result<usize, io::Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -135,6 +131,7 @@ impl RecvFn for RecvFrom {
         buf: &mut [u8],
         expected_addr: &SocketAddr,
     ) -> Result<usize, io::Error> {
+        #[allow(deprecated)]
         socket.recv_from(buf).map(|(s, addr)| {
             assert_eq!(addr, *expected_addr);
             s
@@ -152,6 +149,7 @@ impl RecvFn for Recv {
         buf: &mut [u8],
         _: &SocketAddr,
     ) -> Result<usize, io::Error> {
+        #[allow(deprecated)]
         socket.recv(buf)
     }
 }

@@ -1,5 +1,7 @@
-#![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.7")]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Task execution related traits and utilities.
 //!
@@ -51,9 +53,6 @@
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
 
-extern crate crossbeam_utils;
-extern crate futures;
-
 mod enter;
 mod error;
 mod executor;
@@ -61,8 +60,8 @@ mod global;
 pub mod park;
 mod typed;
 
-pub use enter::{enter, Enter, EnterError};
-pub use error::SpawnError;
-pub use executor::Executor;
-pub use global::{spawn, with_default, DefaultExecutor};
-pub use typed::TypedExecutor;
+pub use crate::enter::{enter, Enter, EnterError};
+pub use crate::error::SpawnError;
+pub use crate::executor::Executor;
+pub use crate::global::{spawn, with_default, DefaultExecutor};
+pub use crate::typed::TypedExecutor;

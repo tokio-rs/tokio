@@ -1,12 +1,9 @@
 use super::{RecvDgram, SendDgram};
-
+use futures::{try_ready, Async, Poll};
+use mio;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-
-use futures::{Async, Poll};
-use mio;
-
 use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
@@ -422,7 +419,7 @@ impl UdpSocket {
 }
 
 impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

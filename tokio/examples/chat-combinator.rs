@@ -19,22 +19,20 @@
 //! connected clients they'll all join the same room and see everyone else's
 //! messages.
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate tokio;
-
-use tokio::io;
-use tokio::net::TcpListener;
-use tokio::prelude::*;
-
+use futures;
 use std::collections::HashMap;
 use std::env;
 use std::io::BufReader;
 use std::iter;
 use std::sync::{Arc, Mutex};
+use tokio;
+use tokio::io;
+use tokio::net::TcpListener;
+use tokio::prelude::*;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the TCP listener we'll accept connections on.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse()?;

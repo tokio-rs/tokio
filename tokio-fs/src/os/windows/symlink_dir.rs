@@ -1,8 +1,7 @@
+use futures::{Future, Poll};
 use std::io;
 use std::os::windows::fs;
 use std::path::Path;
-
-use futures::{Future, Poll};
 
 /// Creates a new directory symlink on the filesystem.
 ///
@@ -46,6 +45,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::symlink_dir(&self.src, &self.dst))
+        crate::blocking_io(|| fs::symlink_dir(&self.src, &self.dst))
     }
 }

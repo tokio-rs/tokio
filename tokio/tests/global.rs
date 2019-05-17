@@ -1,16 +1,15 @@
-extern crate env_logger;
-extern crate futures;
-extern crate tokio;
-extern crate tokio_io;
+#![deny(warnings, rust_2018_idioms)]
 
+use env_logger;
+use futures::prelude::*;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 use std::{io, thread};
-
-use futures::prelude::*;
+use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
+use tokio_io;
 
 macro_rules! t {
     ($e:expr) => {

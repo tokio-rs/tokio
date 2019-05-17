@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.1.6")]
-#![deny(warnings, missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! A single-threaded executor which executes tasks on the same thread from which
 //! they are spawned.
@@ -25,19 +27,11 @@
 //! [`block_on_all`]: fn.block_on_all.html
 //! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
 
-extern crate futures;
-extern crate tokio_executor;
-
 mod scheduler;
 
-use self::scheduler::Scheduler;
-
-use tokio_executor::park::{Park, ParkThread, Unpark};
-use tokio_executor::{Enter, SpawnError};
-
+use crate::scheduler::Scheduler;
 use futures::future::{ExecuteError, ExecuteErrorKind, Executor};
 use futures::{executor, Async, Future};
-
 use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
@@ -45,6 +39,8 @@ use std::rc::Rc;
 use std::sync::{atomic, mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
+use tokio_executor::park::{Park, ParkThread, Unpark};
+use tokio_executor::{Enter, SpawnError};
 
 /// Executes tasks on the current thread
 pub struct CurrentThread<P: Park = ParkThread> {
@@ -64,7 +60,7 @@ pub struct CurrentThread<P: Park = ParkThread> {
     spawn_handle: Handle,
 
     /// Receiver for futures spawned from other threads
-    spawn_receiver: mpsc::Receiver<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    spawn_receiver: mpsc::Receiver<Box<dyn Future<Item = (), Error = ()> + Send + 'static>>,
 
     /// The thread-local ID assigned to this executor.
     id: u64,
@@ -97,7 +93,7 @@ impl Turn {
 }
 
 /// A `CurrentThread` instance bound to a supplied execution context.
-pub struct Entered<'a, P: Park + 'a> {
+pub struct Entered<'a, P: Park> {
     executor: &'a mut CurrentThread<P>,
     enter: &'a mut Enter,
 }
@@ -109,7 +105,7 @@ pub struct RunError {
 }
 
 impl fmt::Display for RunError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }
@@ -127,7 +123,7 @@ pub struct RunTimeoutError {
 }
 
 impl fmt::Display for RunTimeoutError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }
@@ -149,7 +145,7 @@ pub struct TurnError {
 }
 
 impl fmt::Display for TurnError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }
@@ -167,7 +163,7 @@ pub struct BlockError<T> {
 }
 
 impl<T> fmt::Display for BlockError<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "Block error")
     }
 }
@@ -179,18 +175,22 @@ impl<T: fmt::Debug> Error for BlockError<T> {
 }
 
 /// This is mostly split out to make the borrow checker happy.
-struct Borrow<'a, U: 'a> {
+struct Borrow<'a, U> {
     id: u64,
     scheduler: &'a mut Scheduler<U>,
     num_futures: &'a atomic::AtomicUsize,
 }
 
 trait SpawnLocal {
-    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>, already_counted: bool);
+    fn spawn_local(
+        &mut self,
+        future: Box<dyn Future<Item = (), Error = ()>>,
+        already_counted: bool,
+    );
 }
 
 struct CurrentRunner {
-    spawn: Cell<Option<*mut SpawnLocal>>,
+    spawn: Cell<Option<*mut dyn SpawnLocal>>,
     id: Cell<Option<u64>>,
 }
 
@@ -386,7 +386,7 @@ impl<P: Park> CurrentThread<P> {
         &mut self.park
     }
 
-    fn borrow(&mut self) -> Borrow<P::Unpark> {
+    fn borrow(&mut self) -> Borrow<'_, P::Unpark> {
         Borrow {
             id: self.id,
             scheduler: &mut self.scheduler,
@@ -424,7 +424,7 @@ impl<P: Park> Drop for CurrentThread<P> {
 impl tokio_executor::Executor for CurrentThread {
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.borrow().spawn_local(future, false);
         Ok(())
@@ -442,7 +442,7 @@ where
 }
 
 impl<P: Park> fmt::Debug for CurrentThread<P> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("CurrentThread")
             .field("scheduler", &self.scheduler)
             .field(
@@ -616,7 +616,7 @@ impl<'a, P: Park> Entered<'a, P> {
 }
 
 impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Entered")
             .field("executor", &self.executor)
             .field("enter", &self.enter)
@@ -629,7 +629,7 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 /// Handle to spawn a future on the corresponding `CurrentThread` instance
 #[derive(Clone)]
 pub struct Handle {
-    sender: mpsc::Sender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    sender: mpsc::Sender<Box<dyn Future<Item = (), Error = ()> + Send + 'static>>,
     num_futures: Arc<atomic::AtomicUsize>,
     shut_down: Cell<bool>,
     notify: executor::NotifyHandle,
@@ -641,7 +641,7 @@ pub struct Handle {
 
 // Manual implementation because the Sender does not implement Debug
 impl fmt::Debug for Handle {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Handle")
             .field("shut_down", &self.shut_down.get())
             .finish()
@@ -731,7 +731,7 @@ impl TaskExecutor {
     /// Spawn a future onto the current `CurrentThread` instance.
     pub fn spawn_local(
         &mut self,
-        future: Box<Future<Item = (), Error = ()>>,
+        future: Box<dyn Future<Item = (), Error = ()>>,
     ) -> Result<(), SpawnError> {
         CURRENT.with(|current| match current.spawn.get() {
             Some(spawn) => {
@@ -746,7 +746,7 @@ impl TaskExecutor {
 impl tokio_executor::Executor for TaskExecutor {
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.spawn_local(future)
     }
@@ -791,7 +791,11 @@ impl<'a, U: Unpark> Borrow<'a, U> {
 }
 
 impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
-    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>, already_counted: bool) {
+    fn spawn_local(
+        &mut self,
+        future: Box<dyn Future<Item = (), Error = ()>>,
+        already_counted: bool,
+    ) {
         if !already_counted {
             // NOTE: we have a borrow of the Runtime, so we know that it isn't shut down.
             // NOTE: += 2 since LSB is the shutdown bit
@@ -804,7 +808,7 @@ impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
 // ===== impl CurrentRunner =====
 
 impl CurrentRunner {
-    fn set_spawn<F, R>(&self, spawn: &mut SpawnLocal, f: F) -> R
+    fn set_spawn<F, R>(&self, spawn: &mut dyn SpawnLocal, f: F) -> R
     where
         F: FnOnce() -> R,
     {
@@ -819,14 +823,14 @@ impl CurrentRunner {
 
         let _reset = Reset(self);
 
-        let spawn = unsafe { hide_lt(spawn as *mut SpawnLocal) };
+        let spawn = unsafe { hide_lt(spawn as *mut dyn SpawnLocal) };
         self.spawn.set(Some(spawn));
 
         f()
     }
 }
 
-unsafe fn hide_lt<'a>(p: *mut (SpawnLocal + 'a)) -> *mut (SpawnLocal + 'static) {
+unsafe fn hide_lt<'a>(p: *mut (dyn SpawnLocal + 'a)) -> *mut (dyn SpawnLocal + 'static) {
     use std::mem;
     mem::transmute(p)
 }

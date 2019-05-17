@@ -10,15 +10,12 @@
 //!
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
-extern crate futures;
-extern crate tokio;
-
+use futures::try_ready;
 use std::net::SocketAddr;
 use std::{env, io};
-
+use tokio;
 use tokio::net::UdpSocket;
 use tokio::prelude::*;
 
@@ -50,7 +47,7 @@ impl Future for Server {
     }
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>()?;
 

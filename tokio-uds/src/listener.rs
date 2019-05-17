@@ -1,16 +1,13 @@
-use {Incoming, UnixStream};
-
-use tokio_reactor::{Handle, PollEvented};
-
-use futures::{Async, Poll};
+use crate::{Incoming, UnixStream};
+use futures::{try_ready, Async, Poll};
 use mio::Ready;
 use mio_uds;
-
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use tokio_reactor::{Handle, PollEvented};
 
 /// A Unix socket which can accept connections from other Unix sockets.
 pub struct UnixListener {
@@ -134,7 +131,7 @@ impl UnixListener {
 }
 
 impl fmt::Debug for UnixListener {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
     }
 }

@@ -1,17 +1,12 @@
-extern crate futures;
-extern crate tokio_executor;
-extern crate tokio_timer;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
 mod support;
-use support::*;
-
-use tokio_timer::timer::Handle;
-use tokio_timer::*;
+use crate::support::*;
 
 use futures::Future;
-
 use std::time::{Duration, Instant};
+use tokio_timer::timer::Handle;
+use tokio_timer::*;
 
 #[test]
 fn immediate_delay() {

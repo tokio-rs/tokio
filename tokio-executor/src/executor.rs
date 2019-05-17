@@ -1,5 +1,5 @@
+use crate::SpawnError;
 use futures::Future;
-use SpawnError;
 
 /// A value that executes futures.
 ///
@@ -48,17 +48,15 @@ use SpawnError;
 /// # Examples
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate tokio_executor;
-/// # use tokio_executor::Executor;
-/// # fn docs(my_executor: &mut Executor) {
+/// use tokio_executor::Executor;
 /// use futures::future::lazy;
+///
+/// # fn docs(my_executor: &mut dyn Executor) {
 /// my_executor.spawn(Box::new(lazy(|| {
 ///     println!("running on the executor");
 ///     Ok(())
 /// }))).unwrap();
 /// # }
-/// # fn main() {}
 /// ```
 ///
 /// [`spawn`]: #tymethod.spawn
@@ -80,21 +78,19 @@ pub trait Executor {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio_executor;
-    /// # use tokio_executor::Executor;
-    /// # fn docs(my_executor: &mut Executor) {
+    /// use tokio_executor::Executor;
     /// use futures::future::lazy;
+    ///
+    /// # fn docs(my_executor: &mut dyn Executor) {
     /// my_executor.spawn(Box::new(lazy(|| {
     ///     println!("running on the executor");
     ///     Ok(())
     /// }))).unwrap();
     /// # }
-    /// # fn main() {}
     /// ```
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError>;
 
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
@@ -115,12 +111,10 @@ pub trait Executor {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio_executor;
-    /// # use tokio_executor::Executor;
-    /// # fn docs(my_executor: &mut Executor) {
+    /// use tokio_executor::Executor;
     /// use futures::future::lazy;
     ///
+    /// # fn docs(my_executor: &mut dyn Executor) {
     /// if my_executor.status().is_ok() {
     ///     my_executor.spawn(Box::new(lazy(|| {
     ///         println!("running on the executor");
@@ -130,7 +124,6 @@ pub trait Executor {
     ///     println!("the executor is not in a good state");
     /// }
     /// # }
-    /// # fn main() {}
     /// ```
     fn status(&self) -> Result<(), SpawnError> {
         Ok(())
@@ -140,7 +133,7 @@ pub trait Executor {
 impl<E: Executor + ?Sized> Executor for Box<E> {
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         (**self).spawn(future)
     }

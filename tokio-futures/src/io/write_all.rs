@@ -1,15 +1,13 @@
-use tokio_io::AsyncWrite;
-
 use std::future::Future;
-use std::task::{self, Poll};
-
 use std::io;
 use std::mem;
 use std::pin::Pin;
+use std::task::{self, Poll};
+use tokio_io::AsyncWrite;
 
 /// A future used to write the entire contents of a buffer.
 #[derive(Debug)]
-pub struct WriteAll<'a, T: ?Sized + 'a> {
+pub struct WriteAll<'a, T: ?Sized> {
     writer: &'a mut T,
     buf: &'a [u8],
 }
@@ -30,7 +28,7 @@ fn zero_write() -> io::Error {
 impl<'a, T: AsyncWrite + ?Sized> Future for WriteAll<'a, T> {
     type Output = io::Result<()>;
 
-    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context) -> Poll<io::Result<()>> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

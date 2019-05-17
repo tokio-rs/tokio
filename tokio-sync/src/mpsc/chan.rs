@@ -1,12 +1,10 @@
 use super::list;
-use futures::Poll;
-
-use loom::{
+use crate::loom::{
     futures::AtomicTask,
     sync::atomic::AtomicUsize,
     sync::{Arc, CausalCell},
 };
-
+use futures::Poll;
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
@@ -22,7 +20,7 @@ where
     S::Permit: fmt::Debug,
     S: fmt::Debug,
 {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Tx")
             .field("inner", &self.inner)
             .field("permit", &self.permit)
@@ -39,7 +37,7 @@ impl<T, S: Semaphore> fmt::Debug for Rx<T, S>
 where
     S: fmt::Debug,
 {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Rx").field("inner", &self.inner).finish()
     }
 }
@@ -99,7 +97,7 @@ impl<T, S> fmt::Debug for Chan<T, S>
 where
     S: fmt::Debug,
 {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Chan")
             .field("tx", &self.tx)
             .field("semaphore", &self.semaphore)
@@ -120,7 +118,7 @@ struct RxFields<T> {
 }
 
 impl<T> fmt::Debug for RxFields<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("RxFields")
             .field("list", &self.list)
             .field("rx_closed", &self.rx_closed)
@@ -337,7 +335,7 @@ impl<T, S> Drop for Chan<T, S> {
     }
 }
 
-use semaphore::TryAcquireError;
+use crate::semaphore::TryAcquireError;
 
 impl From<TryAcquireError> for TrySendError {
     fn from(src: TryAcquireError) -> TrySendError {
@@ -353,9 +351,9 @@ impl From<TryAcquireError> for TrySendError {
 
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
-use semaphore::Permit;
+use crate::semaphore::Permit;
 
-impl Semaphore for (::semaphore::Semaphore, usize) {
+impl Semaphore for (crate::semaphore::Semaphore, usize) {
     type Permit = Permit;
 
     fn new_permit() -> Permit {

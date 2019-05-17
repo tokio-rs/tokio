@@ -1,14 +1,11 @@
-extern crate env_logger;
-extern crate futures;
-extern crate tokio_io;
-extern crate tokio_tcp;
+#![deny(warnings, rust_2018_idioms)]
 
+use env_logger;
+use futures::stream::Stream;
+use futures::Future;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::thread;
-
-use futures::stream::Stream;
-use futures::Future;
 use tokio_io::io::copy;
 use tokio_io::AsyncRead;
 use tokio_tcp::TcpListener;

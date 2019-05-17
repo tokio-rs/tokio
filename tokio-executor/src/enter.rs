@@ -1,9 +1,8 @@
+use futures::{self, Future};
 use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
 use std::prelude::v1::*;
-
-use futures::{self, Future};
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
@@ -11,7 +10,7 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 ///
 /// For more details, see [`enter` documentation](fn.enter.html)
 pub struct Enter {
-    on_exit: Vec<Box<Callback>>,
+    on_exit: Vec<Box<dyn Callback>>,
     permanent: bool,
 }
 
@@ -22,7 +21,7 @@ pub struct EnterError {
 }
 
 impl fmt::Debug for EnterError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EnterError")
             .field("reason", &self.description())
             .finish()
@@ -30,7 +29,7 @@ impl fmt::Debug for EnterError {
 }
 
 impl fmt::Display for EnterError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }
@@ -94,7 +93,7 @@ impl Enter {
 }
 
 impl fmt::Debug for Enter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Enter").finish()
     }
 }

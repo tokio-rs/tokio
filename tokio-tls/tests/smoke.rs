@@ -1,23 +1,18 @@
-extern crate env_logger;
-extern crate futures;
-extern crate native_tls;
-extern crate tokio;
-extern crate tokio_io;
-extern crate tokio_tls;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
-extern crate cfg_if;
-
-use std::io::{self, Read, Write};
-use std::process::Command;
-
+use cfg_if::cfg_if;
+use env_logger;
 use futures::stream::Stream;
 use futures::{Future, Poll};
+use native_tls;
 use native_tls::{Identity, TlsAcceptor, TlsConnector};
+use std::io::{self, Read, Write};
+use std::process::Command;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
 use tokio_io::io::{copy, read_to_end, shutdown};
 use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_tls;
 
 macro_rules! t {
     ($e:expr) => {
@@ -130,9 +125,8 @@ fn openssl_keys() -> &'static Keys {
 
 cfg_if! {
     if #[cfg(feature = "rustls")] {
-        extern crate webpki;
-        extern crate untrusted;
-
+        use webpki;
+        use untrusted;
         use std::env;
         use std::fs::File;
         use std::process::Command;
@@ -230,8 +224,6 @@ cfg_if! {
                         all(not(target_os = "macos"),
                             not(target_os = "windows"),
                             not(target_os = "ios"))))] {
-        extern crate openssl;
-
         use std::fs::File;
         use std::env;
         use std::sync::{Once, ONCE_INIT};
@@ -250,8 +242,6 @@ cfg_if! {
             (t!(srv.build()).into(), t!(client.build()).into())
         }
     } else if #[cfg(any(target_os = "macos", target_os = "ios"))] {
-        extern crate security_framework;
-
         use std::env;
         use std::fs::File;
         use std::sync::{Once, ONCE_INIT};
@@ -269,8 +259,8 @@ cfg_if! {
             (t!(srv.build()).into(), t!(client.build()).into())
         }
     } else {
-        extern crate schannel;
-        extern crate winapi;
+        use schannel;
+        use winapi;
 
         use std::env;
         use std::fs::File;

@@ -1,8 +1,7 @@
+use futures::{Future, Poll};
 use std::fs;
 use std::io;
 use std::path::Path;
-
-use futures::{Future, Poll};
 
 /// Rename a file or directory to a new name, replacing the original file if
 /// `to` already exists.
@@ -46,6 +45,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::rename(&self.from, &self.to))
+        crate::blocking_io(|| fs::rename(&self.from, &self.to))
     }
 }

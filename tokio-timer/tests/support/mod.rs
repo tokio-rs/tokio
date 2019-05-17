@@ -11,6 +11,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[macro_export]
 macro_rules! assert_ready {
     ($f:expr) => {{
         use ::futures::Async::*;
@@ -33,12 +34,14 @@ macro_rules! assert_ready {
     }}
 }
 
+#[macro_export]
 macro_rules! assert_ready_eq {
     ($f:expr, $expect:expr) => {
         assert_eq!($f.poll().unwrap(), ::futures::Async::Ready($expect));
     };
 }
 
+#[macro_export]
 macro_rules! assert_not_ready {
     ($f:expr) => {{
         let res = $f.poll().unwrap();
@@ -53,6 +56,7 @@ macro_rules! assert_not_ready {
     }};
 }
 
+#[macro_export]
 macro_rules! assert_elapsed {
     ($f:expr) => {
         assert!($f.poll().unwrap_err().is_elapsed());

@@ -1,9 +1,7 @@
 #![feature(test)]
-#![cfg_attr(test, deny(warnings))]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
 extern crate test;
-extern crate tokio_sync;
 
 type Medium = [usize; 64];
 type Large = [Medium; 64];

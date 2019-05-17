@@ -1,10 +1,8 @@
+use super::encoder::Encoder;
+use crate::_tokio_codec::Framed;
+use crate::{AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use std::io;
-
-use super::encoder::Encoder;
-use {AsyncRead, AsyncWrite};
-
-use _tokio_codec::Framed;
 
 /// Decoding of frames via buffers.
 ///

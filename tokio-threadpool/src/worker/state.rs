@@ -93,7 +93,7 @@ impl From<State> for usize {
 }
 
 impl fmt::Debug for State {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("worker::State")
             .field("lifecycle", &self.lifecycle())
             .field("is_pushed", &self.is_pushed())

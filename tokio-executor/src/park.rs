@@ -44,12 +44,11 @@
 //! [up]: trait.Unpark.html
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
+use crossbeam_utils::sync::{Parker, Unparker};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
-
-use crossbeam_utils::sync::{Parker, Unparker};
 
 /// Block the current thread.
 ///
@@ -128,13 +127,13 @@ pub trait Unpark: Sync + Send + 'static {
     fn unpark(&self);
 }
 
-impl Unpark for Box<Unpark> {
+impl Unpark for Box<dyn Unpark> {
     fn unpark(&self) {
         (**self).unpark()
     }
 }
 
-impl Unpark for Arc<Unpark> {
+impl Unpark for Arc<dyn Unpark> {
     fn unpark(&self) {
         (**self).unpark()
     }

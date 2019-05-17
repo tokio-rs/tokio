@@ -1,11 +1,6 @@
 //! Echo everything received on STDIN to STDOUT.
 #![deny(deprecated, warnings)]
 
-extern crate futures;
-extern crate tokio_codec;
-extern crate tokio_fs;
-extern crate tokio_threadpool;
-
 use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio_fs::{stderr, stdin, stdout};
 use tokio_threadpool::Builder;
@@ -14,7 +9,7 @@ use futures::{Future, Sink, Stream};
 
 use std::io;
 
-pub fn main() -> Result<(), Box<std::error::Error>> {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = Builder::new().pool_size(1).build();
 
     pool.spawn({

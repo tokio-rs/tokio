@@ -1,8 +1,6 @@
+use crate::AsyncWrite;
+use futures::{try_ready, Async, Future, Poll};
 use std::io;
-
-use futures::{Async, Future, Poll};
-
-use AsyncWrite;
 
 /// A future used to fully shutdown an I/O object.
 ///

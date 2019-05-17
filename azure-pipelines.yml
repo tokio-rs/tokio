@@ -1,6 +1,9 @@
 trigger: ["master"]
 pr: ["master"]
 
+variables:
+  nightly: nightly-2019-05-09
+
 jobs:
 # Check formatting
 - template: ci/azure-rustfmt.yml
@@ -76,7 +79,7 @@ jobs:
   parameters:
     name: test_nightly
     displayName: Test Async / Await
-    rust: nightly-2019-04-25
+    rust: $(nightly)
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
@@ -94,11 +97,12 @@ jobs:
 - template: ci/azure-check-minrust.yml
   parameters:
     name: minrust
-    rust_version: 1.26.0
+    rust_version: 1.34.0
 
 - template: ci/azure-tsan.yml
   parameters:
     name: tsan
+    rust: $(nightly)
 
 - template: ci/azure-deploy-docs.yml
   parameters:

@@ -1,15 +1,9 @@
-extern crate bytes;
-extern crate futures;
-extern crate tokio_buf;
-extern crate tokio_mock_task;
-
 use futures::sync::mpsc;
 use futures::Async::*;
 use std::io::Cursor;
 use tokio_buf::{util, BufStream};
 use tokio_mock_task::MockTask;
 
-#[macro_use]
 mod support;
 
 type Buf = Cursor<&'static [u8]>;

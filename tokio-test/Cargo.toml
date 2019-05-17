@@ -7,8 +7,9 @@ name = "tokio-test"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.1.x" git tag.
-version = "0.1.0"
+# - Create "v0.2.x" git tag.
+version = "0.2.0"
+edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -22,5 +23,5 @@ publish = false
 
 [dependencies]
 futures = "0.1"
-tokio-timer = "0.2"
-tokio-executor = "0.1"
+tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
+tokio-executor = { version = "0.2.0", path = "../tokio-executor" }

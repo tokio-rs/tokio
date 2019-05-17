@@ -1,10 +1,9 @@
 //! Unix-specific extensions to primitives in the `tokio_fs` module.
 
+use futures::{Future, Poll};
 use std::io;
 use std::os::unix::fs;
 use std::path::Path;
-
-use futures::{Future, Poll};
 
 /// Creates a new symbolic link on the filesystem.
 ///
@@ -47,6 +46,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::symlink(&self.src, &self.dst))
+        crate::blocking_io(|| fs::symlink(&self.src, &self.dst))
     }
 }

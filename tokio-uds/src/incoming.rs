@@ -1,7 +1,5 @@
-use {UnixListener, UnixStream};
-
-use futures::{Poll, Stream};
-
+use crate::{UnixListener, UnixStream};
+use futures::{try_ready, Poll, Stream};
 use std::io;
 
 /// Stream of listeners

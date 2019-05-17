@@ -1,10 +1,8 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use {clock, Delay, Error};
-
+use crate::{clock, Delay, Error};
 use futures::future::Either;
-use futures::{Async, Future, Poll, Stream};
-
+use futures::{try_ready, Async, Future, Poll, Stream};
 use std::{
     error::Error as StdError,
     fmt::{Display, Formatter, Result as FmtResult},
@@ -139,7 +137,7 @@ impl<T> ThrottleError<T> {
 }
 
 impl<T: StdError> Display for ThrottleError<T> {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self.0 {
             Either::A(ref err) => write!(f, "stream error: {}", err),
             Either::B(ref err) => write!(f, "timer error: {}", err),
@@ -158,7 +156,7 @@ impl<T: StdError + 'static> StdError for ThrottleError<T> {
     // FIXME(taiki-e): When the minimum support version of tokio reaches Rust 1.30,
     // replace this with Error::source.
     #[allow(deprecated)]
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match self.0 {
             Either::A(ref err) => Some(err),
             Either::B(ref err) => Some(err),

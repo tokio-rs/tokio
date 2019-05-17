@@ -1,6 +1,6 @@
 pub(crate) mod futures {
+    pub(crate) use crate::task::AtomicTask;
     pub(crate) use futures::task;
-    pub(crate) use task::AtomicTask;
 }
 
 pub(crate) mod sync {

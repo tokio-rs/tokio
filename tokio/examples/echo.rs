@@ -19,18 +19,16 @@
 //! you! If you open up multiple terminals running the `connect` example you
 //! should be able to see them all make progress simultaneously.
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate tokio;
-
+use std::env;
+use std::net::SocketAddr;
+use tokio;
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
-use std::env;
-use std::net::SocketAddr;
-
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Allow passing an address to listen on as the first argument of this
     // program, but otherwise we'll just set up our TCP listener on
     // 127.0.0.1:8080 for connections.

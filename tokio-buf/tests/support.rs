@@ -1,9 +1,5 @@
 #![allow(unused)]
 
-extern crate bytes;
-extern crate futures;
-extern crate tokio_buf;
-
 use bytes::Buf;
 use futures::Async::*;
 use futures::Poll;
@@ -12,6 +8,7 @@ use tokio_buf::{BufStream, SizeHint};
 use std::collections::VecDeque;
 use std::io::Cursor;
 
+#[macro_export]
 macro_rules! assert_buf_eq {
     ($actual:expr, $expect:expr) => {{
         use bytes::Buf;
@@ -27,6 +24,7 @@ macro_rules! assert_buf_eq {
     }};
 }
 
+#[macro_export]
 macro_rules! assert_none {
     ($actual:expr) => {
         match $actual {
@@ -36,6 +34,7 @@ macro_rules! assert_none {
     };
 }
 
+#[macro_export]
 macro_rules! assert_not_ready {
     ($actual:expr) => {
         match $actual {

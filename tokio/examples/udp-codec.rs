@@ -6,20 +6,16 @@
 //! new message with a new destination. Overall, we then use this to construct a
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate env_logger;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_io;
-
+use env_logger;
 use std::net::SocketAddr;
-
+use tokio;
 use tokio::net::{UdpFramed, UdpSocket};
 use tokio::prelude::*;
 use tokio_codec::BytesCodec;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = env_logger::init();
 
     let addr: SocketAddr = "127.0.0.1:0".parse()?;

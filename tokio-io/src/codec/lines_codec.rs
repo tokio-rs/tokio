@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
+use crate::codec::{Decoder, Encoder};
 use bytes::{BufMut, BytesMut};
-use codec::{Decoder, Encoder};
 use std::{io, str};
 
 /// A simple `Codec` implementation that splits up data into lines.

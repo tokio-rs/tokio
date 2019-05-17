@@ -5,13 +5,11 @@ mod state;
 pub(crate) use self::blocking::{Blocking, CanBlock};
 use self::blocking_state::BlockingState;
 use self::state::State;
-
-use notifier::Notifier;
-use pool::Pool;
-
+use crate::notifier::Notifier;
+use crate::pool::Pool;
 use futures::executor::{self, Spawn};
 use futures::{self, Async, Future};
-
+use log::trace;
 use std::cell::{Cell, UnsafeCell};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
@@ -60,7 +58,7 @@ pub(crate) enum Run {
     Complete,
 }
 
-type BoxFuture = Box<Future<Item = (), Error = ()> + Send + 'static>;
+type BoxFuture = Box<dyn Future<Item = (), Error = ()> + Send + 'static>;
 
 // ===== impl Task =====
 
@@ -299,7 +297,7 @@ impl Task {
 }
 
 impl fmt::Debug for Task {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Task")
             .field("state", &self.state)
             .field("future", &"Spawn<BoxFuture>")

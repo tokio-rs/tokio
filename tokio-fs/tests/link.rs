@@ -1,8 +1,5 @@
-extern crate futures;
-extern crate tempdir;
-extern crate tokio_fs;
+#![deny(warnings, rust_2018_idioms)]
 
-use futures::Future;
 use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -38,6 +35,8 @@ fn test_hard_link() {
 #[cfg(unix)]
 #[test]
 fn test_symlink() {
+    use futures::Future;
+
     let dir = TempDir::new("base").unwrap();
     let src = dir.path().join("src.txt");
     let dst = dir.path().join("dst.txt");

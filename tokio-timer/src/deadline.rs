@@ -1,9 +1,7 @@
 #![allow(deprecated)]
 
-use Delay;
-
+use crate::Delay;
 use futures::{Async, Future, Poll};
-
 use std::error;
 use std::fmt;
 use std::time::Instant;
@@ -31,7 +29,7 @@ enum Kind<T> {
     Elapsed,
 
     /// Timer returned an error.
-    Timer(::Error),
+    Timer(crate::Error),
 }
 
 impl<T> Deadline<T> {
@@ -128,7 +126,7 @@ impl<T> DeadlineError<T> {
 
     /// Creates a new `DeadlineError` representing an error encountered by the
     /// timer implementation
-    pub fn timer(err: ::Error) -> DeadlineError<T> {
+    pub fn timer(err: crate::Error) -> DeadlineError<T> {
         DeadlineError(Kind::Timer(err))
     }
 
@@ -141,7 +139,7 @@ impl<T> DeadlineError<T> {
     }
 
     /// Consumes `self`, returning the error raised by the timer implementation.
-    pub fn into_timer(self) -> Option<::Error> {
+    pub fn into_timer(self) -> Option<crate::Error> {
         match self.0 {
             Kind::Timer(err) => Some(err),
             _ => None,
@@ -162,7 +160,7 @@ impl<T: error::Error> error::Error for DeadlineError<T> {
 }
 
 impl<T: fmt::Display> fmt::Display for DeadlineError<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
 
         match self.0 {

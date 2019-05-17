@@ -4,11 +4,9 @@
 //!
 //! [`Timeout`]: struct.Timeout.html
 
-use clock::now;
-use Delay;
-
+use crate::clock::now;
+use crate::Delay;
 use futures::{Async, Future, Poll, Stream};
-
 use std::error;
 use std::fmt;
 use std::time::{Duration, Instant};
@@ -31,8 +29,6 @@ use std::time::{Duration, Instant};
 /// example:
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate tokio;
 /// // import the `timeout` function, usually this is done
 /// // with `use tokio::prelude::*`
 /// use tokio::prelude::FutureExt;
@@ -40,7 +36,6 @@ use std::time::{Duration, Instant};
 /// use futures::sync::mpsc;
 /// use std::time::Duration;
 ///
-/// # fn main() {
 /// let (tx, rx) = mpsc::unbounded();
 /// # tx.unbounded_send(()).unwrap();
 /// # drop(tx);
@@ -55,7 +50,6 @@ use std::time::{Duration, Instant};
 /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
 /// process.timeout(Duration::from_millis(10))
 /// # ).unwrap();
-/// # }
 /// ```
 ///
 /// # Cancelation
@@ -89,7 +83,7 @@ enum Kind<T> {
     Elapsed,
 
     /// Timer returned an error.
-    Timer(::Error),
+    Timer(crate::Error),
 }
 
 impl<T> Timeout<T> {
@@ -107,14 +101,11 @@ impl<T> Timeout<T> {
     /// Create a new `Timeout` set to expire in 10 milliseconds.
     ///
     /// ```rust
-    /// # extern crate futures;
-    /// # extern crate tokio;
     /// use tokio::timer::Timeout;
     /// use futures::Future;
     /// use futures::sync::oneshot;
     /// use std::time::Duration;
     ///
-    /// # fn main() {
     /// let (tx, rx) = oneshot::channel();
     /// # tx.send(()).unwrap();
     ///
@@ -122,7 +113,6 @@ impl<T> Timeout<T> {
     /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
     /// Timeout::new(rx, Duration::from_millis(10))
     /// # ).unwrap();
-    /// # }
     /// ```
     pub fn new(value: T, timeout: Duration) -> Timeout<T> {
         let delay = Delay::new_timeout(now() + timeout, timeout);
@@ -265,7 +255,7 @@ impl<T> Error<T> {
 
     /// Creates a new `Error` representing an error encountered by the timer
     /// implementation
-    pub fn timer(err: ::Error) -> Error<T> {
+    pub fn timer(err: crate::Error) -> Error<T> {
         Error(Kind::Timer(err))
     }
 
@@ -278,7 +268,7 @@ impl<T> Error<T> {
     }
 
     /// Consumes `self`, returning the error raised by the timer implementation.
-    pub fn into_timer(self) -> Option<::Error> {
+    pub fn into_timer(self) -> Option<crate::Error> {
         match self.0 {
             Kind::Timer(err) => Some(err),
             _ => None,
@@ -299,7 +289,7 @@ impl<T: error::Error> error::Error for Error<T> {
 }
 
 impl<T: fmt::Display> fmt::Display for Error<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
 
         match self.0 {

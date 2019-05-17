@@ -1,8 +1,7 @@
+use futures::{Future, Poll};
 use std::fs;
 use std::io;
 use std::path::Path;
-
-use futures::{Future, Poll};
 
 /// Recursively create a directory and all of its parent components if they
 /// are missing.
@@ -40,6 +39,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::create_dir_all(&self.path))
+        crate::blocking_io(|| fs::create_dir_all(&self.path))
     }
 }

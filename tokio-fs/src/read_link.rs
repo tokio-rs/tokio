@@ -1,8 +1,7 @@
+use futures::{Future, Poll};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-
-use futures::{Future, Poll};
 
 /// Reads a symbolic link, returning the file that the link points to.
 ///
@@ -39,6 +38,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::read_link(&self.path))
+        crate::blocking_io(|| fs::read_link(&self.path))
     }
 }

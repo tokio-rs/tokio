@@ -153,8 +153,6 @@ The type level example for `tokio_timer::Timeout` provides a good example of a
 documentation test:
 
 ```
-/// # extern crate futures;
-/// # extern crate tokio;
 /// // import the `timeout` function, usually this is done
 /// // with `use tokio::prelude::*`
 /// use tokio::prelude::FutureExt;
@@ -192,8 +190,6 @@ If this were a documentation test for the `Timeout::new` function, then the
 example would explicitly use `Timeout::new`. For example:
 
 ```
-/// # extern crate futures;
-/// # extern crate tokio;
 /// use tokio::timer::Timeout;
 /// use futures::Future;
 /// use futures::sync::oneshot;

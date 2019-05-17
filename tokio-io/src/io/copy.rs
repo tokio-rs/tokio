@@ -1,8 +1,6 @@
+use crate::{AsyncRead, AsyncWrite};
+use futures::{try_ready, Future, Poll};
 use std::io;
-
-use futures::{Future, Poll};
-
-use {AsyncRead, AsyncWrite};
 
 /// A future which will copy all data from a reader into a writer.
 ///
