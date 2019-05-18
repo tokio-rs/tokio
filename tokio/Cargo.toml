@@ -57,6 +57,13 @@ timer = ["tokio-timer"]
 udp = ["tokio-udp"]
 uds = ["tokio-uds"]
 
+# This feature comes with no promise of stability. Things will
+# break with each patch release. Use at your own risk.
+async-await-preview = [
+  "tokio-futures/async-await-preview",
+  "tokio-macros/async-await-preview",
+]
+
 [dependencies]
 # Only non-optional dependency...
 futures = "0.1.20"
