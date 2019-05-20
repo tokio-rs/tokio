@@ -57,6 +57,9 @@ A high level description of each example is:
 
 * [`blocking`](blocking.rs) - perform heavy computation in blocking environment.
 
+* [`tee`](tee.rs) - clone of /usr/bin/tee. Read from standard input and write
+  to standard output and files
+
 If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
 to make a PR!
