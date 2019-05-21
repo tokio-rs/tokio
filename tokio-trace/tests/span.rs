@@ -392,7 +392,7 @@ fn add_field_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let span = span!(Level::TRACE, "foo", bar = 5, baz);
+        let span = span!(Level::TRACE, "foo", bar = 5, baz = _);
         span.record("baz", &true);
         span.enter(|| {})
     });
@@ -419,7 +419,7 @@ fn add_fields_only_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let span = span!(Level::TRACE, "foo", bar, baz);
+        let span = span!(Level::TRACE, "foo", bar = _, baz = _);
         span.record("bar", &5);
         span.record("baz", &true);
         span.enter(|| {})

@@ -87,7 +87,7 @@
 //! //  - "foo", with a value of 42,
 //! //  - "bar", with the value "false"
 //! //  - "baz", with no initial value
-//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false, baz);
+//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false, baz = _);
 //!
 //! // record a value for the field "baz" declared above:
 //! my_span.record("baz", &"hello world");
@@ -309,7 +309,7 @@
 //!                     // We can add the razor as a field rather than formatting it
 //!                     // as part of the message, allowing subscribers to consume it
 //!                     // in a more structured manner:
-//!                     info!({ razor = %razor }, "Razor located");
+//!                     info!({ %razor }, "Razor located");
 //!                     yak.shave(razor);
 //!                     break;
 //!                 }
