@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{field::display, subscriber::with_default, Level, Span};
+use tokio_trace::{
+    field::{debug, display},
+    subscriber::with_default,
+    Level, Span,
+};
 
 #[test]
 fn handles_to_the_same_span_are_equal() {
@@ -543,6 +547,64 @@ fn contextual_child() {
         span!(Level::TRACE, "foo").enter(|| {
             span!(Level::TRACE, "bar");
         })
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn display_shorthand() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("my_span").with_field(
+                field::mock("my_field")
+                    .with_value(&display("hello world"))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "my_span", my_field = %"hello world");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn debug_shorthand() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("my_span").with_field(
+                field::mock("my_field")
+                    .with_value(&debug("hello world"))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "my_span", my_field = ?"hello world");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn both_shorthands() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("my_span").with_field(
+                field::mock("display_field")
+                    .with_value(&display("hello world"))
+                    .and(field::mock("debug_field").with_value(&debug("hello world")))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "my_span", display_field = %"hello world", debug_field = ?"hello world");
     });
 
     handle.assert_finished();

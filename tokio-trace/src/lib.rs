@@ -94,6 +94,40 @@
 //! # }
 //!```
 //!
+//! The [`field::display`] and [`field::debug`] functions are used to record
+//! fields on spans or events using their `fmt::Display` and `fmt::Debug`
+//! implementations (rather than as typed data). This may be used in lieu of
+//! custom `Value` implementations for complex or user-defined types.
+//!
+//! In addition, the span and event macros permit the use of the `%` and `?`
+//! sigils as shorthand for `field::display` and `field::debug`, respectively.
+//! For example:
+//!
+//! ```
+//! # #[macro_use]
+//! # extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! #[derive(Debug)]
+//! struct MyStruct {
+//!     my_field: &'static str,
+//! }
+//!
+//! let my_struct = MyStruct {
+//!     my_field: "Hello world!"
+//! };
+//!
+//! let my_span = span!(
+//!     Level::TRACE,
+//!     "my_span",
+//!     // `my_struct` will be recorded using its `fmt::Debug` implementation.
+//!     my_struct = ?my_struct,
+//!     // `my_field` will be recorded using the implementation of `fmt::Display` for `&str`.
+//!     my_struct.my_field = %my_struct.my_field,
+//! );
+//! # }
+//!```
+//!
 //! ### When to use spans
 //!
 //! As a rule of thumb, spans should be used to represent discrete units of work
@@ -254,7 +288,8 @@
 //! ```rust
 //! #[macro_use]
 //! extern crate tokio_trace;
-//! use tokio_trace::{field, Level};
+//! use tokio_trace::Level;
+//!
 //! # #[derive(Debug)] pub struct Yak(String);
 //! # impl Yak { fn shave(&mut self, _: u32) {} }
 //! # fn find_a_razor() -> Result<u32, u32> { Ok(1) }
@@ -262,7 +297,7 @@
 //! pub fn shave_the_yak(yak: &mut Yak) {
 //!     // Create a new span for this invocation of `shave_the_yak`, annotated
 //!     // with  the yak being shaved as a *field* on the span.
-//!     span!(Level::TRACE, "shave_the_yak", yak = field::debug(&yak)).enter(|| {
+//!     span!(Level::TRACE, "shave_the_yak", yak = ?yak).enter(|| {
 //!         // Since the span is annotated with the yak, it is part of the context
 //!         // for everything happening inside the span. Therefore, we don't need
 //!         // to add it to the message for this event, as the `log` crate does.
@@ -274,7 +309,7 @@
 //!                     // We can add the razor as a field rather than formatting it
 //!                     // as part of the message, allowing subscribers to consume it
 //!                     // in a more structured manner:
-//!                     info!({ razor = field::display(razor) }, "Razor located");
+//!                     info!({ razor = %razor }, "Razor located");
 //!                     yak.shave(razor);
 //!                     break;
 //!                 }
@@ -387,6 +422,8 @@
 //! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
 //! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
 //! [metadata]: struct.Metadata.html
+//! [`field::display`]: field/fn.display.html
+//! [`field::debug`]: field/fn.debug.html
 //! [`tokio-trace-nursery`]: https://github.com/tokio-rs/tokio-trace-nursery
 //! [`tokio-trace-futures`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-futures
 //! [`tokio-trace-fmt`]: https://github.com/tokio-rs/tokio-trace-nursery/tree/master/tokio-trace-fmt
