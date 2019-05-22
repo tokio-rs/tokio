@@ -142,18 +142,6 @@ use std::{
 };
 use {dispatcher::Dispatch, field, Metadata};
 
-/// Trait implemented by types which have a span `Id`.
-#[deprecated(
-    since = "0.2.0",
-    note = "this is no longer necessary, use `Into<Option<&Id>>` instead"
-)]
-#[doc(hidden)]
-pub trait AsId: ::sealed::Sealed {
-    /// Returns the `Id` of the span that `self` corresponds to, or `None` if
-    /// this corresponds to a disabled span.
-    fn as_id(&self) -> Option<&Id>;
-}
-
 /// A handle representing a span, with the capability to enter the span if it
 /// exists.
 ///
@@ -685,56 +673,6 @@ impl<'a> fmt::Display for FmtAttrs<'a> {
             res = write!(f, "{}={:?} ", k, v);
         });
         res
-    }
-}
-
-// ===== impl AsId =====
-
-impl ::sealed::Sealed for Span {}
-
-impl AsId for Span {
-    fn as_id(&self) -> Option<&Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Span {}
-
-impl<'a> AsId for &'a Span {
-    fn as_id(&self) -> Option<&Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
-    }
-}
-
-impl ::sealed::Sealed for Id {}
-
-impl AsId for Id {
-    fn as_id(&self) -> Option<&Id> {
-        Some(self)
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Id {}
-
-impl<'a> AsId for &'a Id {
-    fn as_id(&self) -> Option<&Id> {
-        Some(self)
-    }
-}
-
-impl ::sealed::Sealed for Option<Id> {}
-
-impl AsId for Option<Id> {
-    fn as_id(&self) -> Option<&Id> {
-        self.as_ref()
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Option<Id> {}
-
-impl<'a> AsId for &'a Option<Id> {
-    fn as_id(&self) -> Option<&Id> {
-        self.as_ref()
     }
 }
 

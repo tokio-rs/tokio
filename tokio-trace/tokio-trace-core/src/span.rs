@@ -138,13 +138,25 @@ impl<'a> Attributes<'a> {
         }
     }
 
+    /// Returns a reference to the new span's explicitly-specified parent, if
+    /// there is one.
+    ///
+    /// Otherwise (if the new span is a root or is a child of the current span),
+    /// returns none.
+    pub fn parent(&self) -> Option<&Id> {
+        match self.parent {
+            Parent::Explicit(ref p) => Some(p),
+            _ => None,
+        }
+    }
+
     /// Returns the new span's explicitly-specified parent, if there is one.
     ///
     /// Otherwise (if the new span is a root or is a child of the current span),
     /// returns false.
-    pub fn parent(&self) -> Option<&Id> {
+    pub fn take_parent(self) -> Option<Id> {
         match self.parent {
-            Parent::Explicit(ref p) => Some(p),
+            Parent::Explicit(p) => Some(p),
             _ => None,
         }
     }
