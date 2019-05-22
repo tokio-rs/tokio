@@ -245,8 +245,8 @@ impl Span {
         meta: &'static Metadata<'static>,
         values: &field::ValueSet,
     ) -> Span {
-        let new_span = match parent.as_id() {
-            Some(parent) => Attributes::child_of(parent.clone(), meta, values),
+        let new_span = match parent.into() {
+            Some(parent) => Attributes::child_of(parent, meta, values),
             None => Attributes::new_root(meta, values),
         };
         Self::make(meta, new_span)
@@ -537,7 +537,7 @@ impl fmt::Debug for Span {
             .field("target", &self.meta.target());
 
         if let Some(ref inner) = self.inner {
-            span.field("id", &inner.id());
+            span.field("id", &inner.id);
         } else {
             span.field("disabled", &true);
         }
@@ -565,10 +565,18 @@ impl<'a> Into<Option<Id>> for &'a Span {
 }
 
 impl Into<Option<Id>> for Span {
-    fn into(self) -> Option<Id> {
+    fn into(mut self) -> Option<Id> {
         // since we're moving the span, it's not necessary to clone the ref
         // count.
         self.inner.take().map(|inner| inner.id)
+    }
+}
+
+impl Drop for Span {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            inner.subscriber.drop_span(inner.id);
+        }
     }
 }
 
@@ -620,12 +628,6 @@ impl cmp::PartialEq for Inner {
 impl Hash for Inner {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        self.subscriber.drop_span(self.id.clone());
     }
 }
 
