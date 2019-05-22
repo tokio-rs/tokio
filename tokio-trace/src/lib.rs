@@ -93,7 +93,17 @@
 //! my_span.record("baz", &"hello world");
 //! # }
 //!```
-//!
+//! As shorthand, local variables may be used as field values without an
+//! assignment, similar to [struct initializers]. For example:
+//! ```
+//! # #[macro_use]
+//! # extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! let user = "ferris";
+//! span!(Level::TRACE, "login", user);
+//! # }
+//!```
 //! The [`field::display`] and [`field::debug`] functions are used to record
 //! fields on spans or events using their `fmt::Display` and `fmt::Debug`
 //! implementations (rather than as typed data). This may be used in lieu of
@@ -121,9 +131,9 @@
 //!     Level::TRACE,
 //!     "my_span",
 //!     // `my_struct` will be recorded using its `fmt::Debug` implementation.
-//!     my_struct = ?my_struct,
+//!     ?my_struct,
 //!     // `my_field` will be recorded using the implementation of `fmt::Display` for `&str`.
-//!     my_struct.my_field = %my_struct.my_field,
+//!     %my_struct.my_field,
 //! );
 //! # }
 //!```
@@ -297,7 +307,7 @@
 //! pub fn shave_the_yak(yak: &mut Yak) {
 //!     // Create a new span for this invocation of `shave_the_yak`, annotated
 //!     // with  the yak being shaved as a *field* on the span.
-//!     span!(Level::TRACE, "shave_the_yak", yak = ?yak).enter(|| {
+//!     span!(Level::TRACE, "shave_the_yak", ?yak).enter(|| {
 //!         // Since the span is annotated with the yak, it is part of the context
 //!         // for everything happening inside the span. Therefore, we don't need
 //!         // to add it to the message for this event, as the `log` crate does.
