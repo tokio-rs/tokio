@@ -240,14 +240,11 @@ impl Span {
     /// [metadata]: ../metadata
     /// [field values]: ../field/struct.ValueSet.html
     /// [`follows_from`]: ../struct.Span.html#method.follows_from
-    pub fn child_of<I>(
-        parent: I,
+    pub fn child_of(
+        parent: impl Into<Option<Id>>,
         meta: &'static Metadata<'static>,
         values: &field::ValueSet,
-    ) -> Span
-    where
-        I: AsId,
-    {
+    ) -> Span {
         let new_span = match parent.as_id() {
             Some(parent) => Attributes::child_of(parent.clone(), meta, values),
             None => Attributes::new_root(meta, values),
@@ -561,6 +558,20 @@ impl fmt::Debug for Span {
     }
 }
 
+impl<'a> Into<Option<Id>> for &'a Span {
+    fn into(self) -> Option<Id> {
+        self.id()
+    }
+}
+
+impl Into<Option<Id>> for Span {
+    fn into(self) -> Option<Id> {
+        // since we're moving the span, it's not necessary to clone the ref
+        // count.
+        self.inner.take().map(|inner| inner.id)
+    }
+}
+
 // ===== impl Inner =====
 
 impl Inner {
@@ -585,7 +596,7 @@ impl Inner {
 
     /// Returns the span's ID.
     fn id(&self) -> Id {
-        self.id.clone()
+        self.subscriber.clone_span(&self.id)
     }
 
     fn record(&self, values: &Record) {
