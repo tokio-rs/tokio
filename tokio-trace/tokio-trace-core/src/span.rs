@@ -10,7 +10,7 @@ use {field, Metadata};
 ///
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`new_span`]: ../subscriber/trait.Subscriber.html#method.new_span
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 // TODO(eliza): when Tokio's minimum Rust version is >= 1.28, change the
 // internal representation to a `NonZeroU64`.
 pub struct Id(u64);
@@ -57,6 +57,14 @@ impl Id {
     /// Returns the span's ID as a  `u64`.
     pub fn into_u64(&self) -> u64 {
         self.0
+    }
+}
+
+#[deprecated(since = "0.2.1", note = "please use `Subscriber::clone_span` instead")]
+#[doc(hidden)]
+impl Clone for Id {
+    fn clone(&self) -> Self {
+        Id::from_u64(self.into_u64())
     }
 }
 
