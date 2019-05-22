@@ -346,6 +346,7 @@ impl Builder {
         // subscriber for the runtime.
         let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
 
+        let dispatch2 = dispatch.clone();
         let pool = self
             .threadpool_builder
             .around_worker(move |w, enter| {
@@ -354,7 +355,7 @@ impl Builder {
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
                         timer::with_default(&timer_handles[index], enter, |_| {
-                            trace::dispatcher::with_default(&dispatch, || {
+                            trace::dispatcher::with_default(&dispatch2, || {
                                 w.run();
                             })
                         });
@@ -381,6 +382,8 @@ impl Builder {
                 reactor_handle,
                 reactor: Mutex::new(Some(reactor)),
                 pool,
+                clock: self.clock.clone(),
+                dispatch,
             }),
         })
     }

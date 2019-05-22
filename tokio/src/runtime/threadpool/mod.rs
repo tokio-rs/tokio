@@ -11,8 +11,11 @@ pub use self::task_executor::TaskExecutor;
 
 use crate::reactor::{Handle, Reactor};
 use futures;
-use futures::future::Future;
-use tokio_executor::enter;
+use futures::future::{self, Future};
+use tokio_executor::{self, enter};
+use tokio_timer::clock::{self, Clock};
+use tokio_timer::timer;
+use tokio_trace_core as trace;
 use tokio_threadpool as threadpool;
 use std::io;
 use std::sync::Mutex;
@@ -46,6 +49,12 @@ struct Inner {
 
     /// Task execution pool.
     pool: threadpool::ThreadPool,
+
+    /// The runtime's Clock for use with block_on
+    clock: Clock,
+
+    /// The runtime's trace dispatcher for use with block_on
+    dispatch: trace::Dispatch,
 }
 
 // ===== impl Runtime =====
@@ -252,14 +261,32 @@ impl Runtime {
     /// future panics, or if called within an asynchronous execution context.
     pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
     where
-        F: Send + 'static + Future<Item = R, Error = E>,
-        R: Send + 'static,
-        E: Send + 'static,
+        F: Future<Item = R, Error = E>,
     {
+
         let mut entered = enter().expect("nested block_on");
         let (tx, rx) = futures::sync::oneshot::channel();
-        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        entered.block_on(rx).unwrap()
+        self.spawn(future::lazy(|| {
+            let timer = timer::Handle::current();
+            #[allow(deprecated)]
+            let reactor = Handle::current();
+            tx.send((timer, reactor)).unwrap();
+            Ok(())
+        }));
+        let (timer, reactor) = rx.wait().unwrap();
+
+        let inner = self.inner();
+        tokio_executor::with_default(&mut inner.pool.sender(), &mut entered, |enter| {
+            tokio_reactor::with_default(&reactor, enter, |enter| {
+                clock::with_default(&inner.clock, enter, |enter| {
+                    timer::with_default(&timer, enter, |enter| {
+                        trace::dispatcher::with_default(&inner.dispatch, || {
+                            enter.block_on(future)
+                        })
+                    })
+                })
+            })
+        })
     }
 
     /// Run a future to completion on the Tokio runtime, then wait for all
