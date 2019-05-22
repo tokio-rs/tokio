@@ -143,6 +143,11 @@ use std::{
 use {dispatcher::Dispatch, field, Metadata};
 
 /// Trait implemented by types which have a span `Id`.
+#[deprecated(
+    since = "0.2.0",
+    note = "this is no longer necessary, use `Into<Option<&Id>>` instead"
+)]
+#[doc(hidden)]
 pub trait AsId: ::sealed::Sealed {
     /// Returns the `Id` of the span that `self` corresponds to, or `None` if
     /// this corresponds to a disabled span.
@@ -464,12 +469,9 @@ impl Span {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
-    pub fn follows_from<I>(&self, from: I) -> &Self
-    where
-        I: AsId,
-    {
+    pub fn follows_from<I>(&self, from: impl for<'a> Into<Option<&'a Id>>) -> &Self {
         if let Some(ref inner) = self.inner {
-            if let Some(from) = from.as_id() {
+            if let Some(from) = from.into() {
                 inner.follows_from(from);
             }
         }
@@ -555,6 +557,12 @@ impl fmt::Debug for Span {
         }
 
         span.finish()
+    }
+}
+
+impl<'a> Into<Option<&'a Id>> for &'a Span {
+    fn into(self) -> Option<&'a Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
     }
 }
 
