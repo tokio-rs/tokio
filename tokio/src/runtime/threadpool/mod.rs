@@ -264,6 +264,7 @@ impl Runtime {
         F: Future<Item = R, Error = E>,
     {
         let mut entered = enter().expect("nested block_on");
+        let _blockable = threadpool::blockable();
 
         let (tx, rx) = futures::sync::oneshot::channel();
         self.spawn(future::lazy(|| {

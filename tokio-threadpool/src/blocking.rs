@@ -2,6 +2,16 @@ use crate::worker::Worker;
 use futures::{try_ready, Poll};
 use std::error::Error;
 use std::fmt;
+use std::cell::Cell;
+use std::marker::PhantomData;
+
+thread_local! {
+    static BLOCKABLE: Cell<bool> = Cell::new(false);
+}
+
+/// A guard type tracking the thread's blockable state.
+#[derive(Debug)]
+pub struct Blockable(PhantomData<*mut ()>);
 
 /// Error raised by `blocking`.
 pub struct BlockingError {
@@ -120,6 +130,11 @@ pub fn blocking<F, T>(f: F) -> Poll<T, BlockingError>
 where
     F: FnOnce() -> T,
 {
+    // if we're on a blockable thread, just run the closure
+    if BLOCKABLE.with(|c| c.get()) {
+        return Ok(f().into());
+    }
+
     let res = Worker::with_current(|worker| {
         let worker = match worker {
             Some(worker) => worker,
@@ -149,6 +164,31 @@ where
 
     // Return the result
     Ok(ret.into())
+}
+
+/// Registers the thread as "blockable" until the returned guard object is dropped.
+/// 
+/// Calls to `blocking` made on a blockable thread will immediately run the
+/// closure. This can be used when a thread is masquerading as part of a runtime,
+/// but its associated reactor is on another thread of execution so there's no
+/// danger when running blocking tasks.
+/// 
+/// # Panics
+/// 
+/// Panics if the thread is already registered as blockable.
+pub fn blockable() -> Blockable {
+    BLOCKABLE.with(|c| {
+        assert!(!c.get(), "thread is already blockable");
+        c.set(true);
+
+        Blockable(PhantomData)
+    })
+}
+
+impl Drop for Blockable {
+    fn drop(&mut self) {
+        BLOCKABLE.with(|c| c.set(false));
+    }
 }
 
 impl fmt::Display for BlockingError {

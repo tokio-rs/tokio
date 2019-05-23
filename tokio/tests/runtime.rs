@@ -234,6 +234,15 @@ fn block_on_timer() {
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
+#[test]
+fn block_on_blocking() {
+    let mut runtime = Runtime::new().unwrap();
+    let future = future::poll_fn(|| tokio_threadpool::blocking(|| 42));
+    assert_eq!(runtime.block_on(future).unwrap(), 42);
+    runtime.shutdown_on_idle().wait().unwrap();
+}
+
+
 mod from_block_on {
     use super::*;
 

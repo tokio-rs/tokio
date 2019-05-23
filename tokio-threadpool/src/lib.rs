@@ -143,7 +143,7 @@ mod task;
 mod thread_pool;
 mod worker;
 
-pub use crate::blocking::{blocking, BlockingError};
+pub use crate::blocking::{blockable, blocking, Blockable, BlockingError};
 pub use crate::builder::Builder;
 pub use crate::sender::Sender;
 pub use crate::shutdown::Shutdown;
