@@ -86,8 +86,8 @@ mod linux {
 
     use env_logger;
     use futures::{future, Future};
-    use net2::TcpStreamExt;
     use mio::unix::UnixReady;
+    use net2::TcpStreamExt;
     use tokio_io::AsyncRead;
 
     use std::io::Write;
