@@ -263,8 +263,8 @@ impl Runtime {
     where
         F: Future<Item = R, Error = E>,
     {
-
         let mut entered = enter().expect("nested block_on");
+
         let (tx, rx) = futures::sync::oneshot::channel();
         self.spawn(future::lazy(|| {
             let timer = timer::Handle::current();
@@ -305,20 +305,11 @@ impl Runtime {
     /// future panics, or if called within an asynchronous execution context.
     pub fn block_on_all<F, R, E>(mut self, future: F) -> Result<R, E>
     where
-        F: Send + 'static + Future<Item = R, Error = E>,
-        R: Send + 'static,
-        E: Send + 'static,
+        F: Future<Item = R, Error = E>,
     {
-        let mut entered = enter().expect("nested block_on_all");
-        let (tx, rx) = futures::sync::oneshot::channel();
-        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        let block = rx
-            .map_err(|_| unreachable!())
-            .and_then(move |r| {
-                self.shutdown_on_idle()
-                    .map(move |()| r)
-            });
-        entered.block_on(block).unwrap()
+        let r = self.block_on(future);
+        self.shutdown_on_idle().wait().unwrap();
+        r
     }
 
     /// Signals the runtime to shutdown once it becomes idle.
