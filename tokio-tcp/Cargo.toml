@@ -31,4 +31,5 @@ futures = "0.1.19"
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
+net2 = "*"
 tokio = { version = "0.2.0", path = "../tokio" }
