@@ -54,7 +54,7 @@
 /// # }
 /// ```
 ///
-/// As a shorthand, local variables may be used as field values without an
+/// As shorthand, local variables may be used as field values without an
 /// assignment, similar to [struct initializers]. For example:
 /// ```
 /// # #[macro_use]
@@ -62,7 +62,10 @@
 /// # use tokio_trace::Level;
 /// # fn main() {
 /// let user = "ferris";
+///
 /// span!(Level::TRACE, "login", user);
+/// // is equivalent to:
+/// span!(Level::TRACE, "login" user = user);
 /// # }
 ///```
 ///
