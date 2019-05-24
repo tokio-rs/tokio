@@ -105,7 +105,7 @@
 //!
 //! span!(Level::TRACE, "login", user);
 //! // is equivalent to:
-//! span!(Level::TRACE, "login" user = user);
+//! span!(Level::TRACE, "login", user = user);
 //! # }
 //!```
 //!
@@ -121,7 +121,7 @@
 //! ```
 //! # #[macro_use]
 //! # extern crate tokio_trace;
-//! # use tokio_trace::Level;
+//! # use tokio_trace::{Level, field};
 //! # fn main() {
 //! #[derive(Debug)]
 //! struct MyStruct {

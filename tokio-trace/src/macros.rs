@@ -65,7 +65,7 @@
 ///
 /// span!(Level::TRACE, "login", user);
 /// // is equivalent to:
-/// span!(Level::TRACE, "login" user = user);
+/// span!(Level::TRACE, "login", user = user);
 /// # }
 ///```
 ///
@@ -898,25 +898,25 @@ macro_rules! debug {
             $($arg)+
         )
     );
-    ($($k:ident).+ $($field:tt)+) => (
+    ($($k:ident).+ $($field:tt)*) => (
         event!(
             target: __tokio_trace_module_path!(),
             $crate::Level::DEBUG,
-            { $($k).+ $($field)+}
+            { $($k).+ $($field)*}
         )
     );
-    (?$($k:ident).+ $($field:tt)+) => (
+    (?$($k:ident).+ $($field:tt)*) => (
         event!(
             target: __tokio_trace_module_path!(),
             $crate::Level::DEBUG,
-            { ?$($k).+ $($field)+}
+            { ?$($k).+ $($field)*}
         )
     );
-    (%$($k:ident).+ $($field:tt)+) => (
+    (%$($k:ident).+ $($field:tt)*) => (
         event!(
             target: __tokio_trace_module_path!(),
             $crate::Level::DEBUG,
-            { %$($k).+ $($field)+}
+            { %$($k).+ $($field)*}
         )
     );
     ($($arg:tt)+) => (
@@ -946,7 +946,7 @@ macro_rules! debug {
 /// use tokio_trace::field;
 ///
 /// let addr = Ipv4Addr::new(127, 0, 0, 1);
-/// let conn= = Connection { port: 40, speed: 3.20 };
+/// let conn = Connection { port: 40, speed: 3.20 };
 ///
 /// info!({ port = conn.port }, "connected to {}", addr);
 /// info!(
