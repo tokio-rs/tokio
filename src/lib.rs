@@ -173,7 +173,7 @@ use tokio_io::io::{read_to_end};
 use tokio_io::{AsyncWrite, AsyncRead, IoFuture};
 use tokio_reactor::Handle;
 
-#[path = "unix.rs"]
+#[path = "unix/mod.rs"]
 #[cfg(unix)]
 mod imp;
 
