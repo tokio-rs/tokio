@@ -47,9 +47,9 @@ fn filters_are_reevaluated_for_different_call_sites() {
         // Enter "charlie" and then "dave". The dispatcher expects to see "dave" but
         // not "charlie."
         let charlie = span!(Level::TRACE, "charlie");
-        let dave = charlie.enter(|| {
+        let dave = charlie.in_scope(|| {
             let dave = span!(Level::TRACE, "dave");
-            dave.enter(|| {});
+            dave.in_scope(|| {});
             dave
         });
 
@@ -57,7 +57,7 @@ fn filters_are_reevaluated_for_different_call_sites() {
         assert_eq!(charlie_count.load(Ordering::Relaxed), 1);
         assert_eq!(dave_count.load(Ordering::Relaxed), 1);
 
-        charlie.enter(|| dave.enter(|| {}));
+        charlie.in_scope(|| dave.in_scope(|| {}));
 
         // The subscriber should see "dave" again, but the filter should not have
         // been called.
@@ -67,13 +67,13 @@ fn filters_are_reevaluated_for_different_call_sites() {
         // A different span with the same name has a different call site, so it
         // should cause the filter to be reapplied.
         let charlie2 = span!(Level::TRACE, "charlie");
-        charlie.enter(|| {});
+        charlie.in_scope(|| {});
         assert_eq!(charlie_count.load(Ordering::Relaxed), 2);
         assert_eq!(dave_count.load(Ordering::Relaxed), 1);
 
         // But, the filter should not be re-evaluated for the new "charlie" span
         // when it is re-entered.
-        charlie2.enter(|| span!(Level::TRACE, "dave").enter(|| {}));
+        charlie2.in_scope(|| span!(Level::TRACE, "dave").in_scope(|| {}));
         assert_eq!(charlie_count.load(Ordering::Relaxed), 2);
         assert_eq!(dave_count.load(Ordering::Relaxed), 2);
     });

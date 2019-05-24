@@ -125,7 +125,7 @@ fn main() {
 
     tokio_trace::subscriber::with_default(subscriber, || {
         let mut foo: u64 = 2;
-        span!(Level::TRACE, "my_great_span", foo_count = &foo).enter(|| {
+        span!(Level::TRACE, "my_great_span", foo_count = &foo).in_scope(|| {
             foo += 1;
             info!({ yak_shaved = true, yak_count = 1 }, "hi from inside my span");
             span!(
@@ -134,7 +134,7 @@ fn main() {
                 foo_count = &foo,
                 baz_count = 5
             )
-            .enter(|| {
+            .in_scope(|| {
                 warn!({ yak_shaved = false, yak_count = -1 }, "failed to shave yak");
             });
         });

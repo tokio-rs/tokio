@@ -9,7 +9,7 @@
 /// # use tokio_trace::Level;
 /// # fn main() {
 /// let span = span!(Level::TRACE, "my span");
-/// span.enter(|| {
+/// span.in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -33,7 +33,7 @@
 /// # extern crate tokio_trace;
 /// # use tokio_trace::Level;
 /// # fn main() {
-/// span!(Level::TRACE, "my span", foo = 2, bar = "a string").enter(|| {
+/// span!(Level::TRACE, "my span", foo = 2, bar = "a string").in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -305,7 +305,7 @@ macro_rules! span {
 /// # extern crate tokio_trace;
 /// # fn main() {
 /// let span = trace_span!("my span");
-/// span.enter(|| {
+/// span.in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -366,7 +366,7 @@ macro_rules! trace_span {
 /// # extern crate tokio_trace;
 /// # fn main() {
 /// let span = debug_span!("my span");
-/// span.enter(|| {
+/// span.in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -427,7 +427,7 @@ macro_rules! debug_span {
 /// # extern crate tokio_trace;
 /// # fn main() {
 /// let span = info_span!("my span");
-/// span.enter(|| {
+/// span.in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -488,7 +488,7 @@ macro_rules! info_span {
 /// # extern crate tokio_trace;
 /// # fn main() {
 /// let span = warn_span!("my span");
-/// span.enter(|| {
+/// span.in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -548,7 +548,7 @@ macro_rules! warn_span {
 /// # extern crate tokio_trace;
 /// # fn main() {
 /// let span = error_span!("my span");
-/// span.enter(|| {
+/// span.in_scope(|| {
 ///     // do work inside the span...
 /// });
 /// # }

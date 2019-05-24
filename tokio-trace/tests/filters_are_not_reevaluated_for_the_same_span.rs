@@ -44,9 +44,9 @@ fn filters_are_not_reevaluated_for_the_same_span() {
         // Enter "alice" and then "bob". The dispatcher expects to see "bob" but
         // not "alice."
         let alice = span!(Level::TRACE, "alice");
-        let bob = alice.enter(|| {
+        let bob = alice.in_scope(|| {
             let bob = span!(Level::TRACE, "bob");
-            bob.enter(|| ());
+            bob.in_scope(|| ());
             bob
         });
 
@@ -54,14 +54,14 @@ fn filters_are_not_reevaluated_for_the_same_span() {
         assert_eq!(alice_count.load(Ordering::Relaxed), 1);
         assert_eq!(bob_count.load(Ordering::Relaxed), 1);
 
-        alice.enter(|| bob.enter(|| {}));
+        alice.in_scope(|| bob.in_scope(|| {}));
 
         // The subscriber should see "bob" again, but the filter should not have
         // been called.
         assert_eq!(alice_count.load(Ordering::Relaxed), 1);
         assert_eq!(bob_count.load(Ordering::Relaxed), 1);
 
-        bob.enter(|| {});
+        bob.in_scope(|| {});
         assert_eq!(alice_count.load(Ordering::Relaxed), 1);
         assert_eq!(bob_count.load(Ordering::Relaxed), 1);
     });
