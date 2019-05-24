@@ -20,11 +20,11 @@ use std::sync::{
 #[test]
 fn filter_caching_is_lexically_scoped() {
     pub fn my_great_function() -> bool {
-        span!(Level::TRACE, "emily").enter(|| true)
+        span!(Level::TRACE, "emily").in_scope(|| true)
     }
 
     pub fn my_other_function() -> bool {
-        span!(Level::TRACE, "frank").enter(|| true)
+        span!(Level::TRACE, "frank").in_scope(|| true)
     }
 
     let count = Arc::new(AtomicUsize::new(0));
