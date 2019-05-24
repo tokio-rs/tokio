@@ -396,8 +396,15 @@ fn error() {
 
 #[test]
 fn field_shorthand_only() {
-    #[derive(Debug)] struct Position { x: f32, y: f32 }
-    let pos = Position { x: 3.234, y: -1.223 };
+    #[derive(Debug)]
+    struct Position {
+        x: f32,
+        y: f32,
+    }
+    let pos = Position {
+        x: 3.234,
+        y: -1.223,
+    };
 
     trace!(?pos.x, ?pos.y);
     debug!(?pos.x, ?pos.y);
@@ -406,7 +413,6 @@ fn field_shorthand_only() {
     error!(?pos.x, ?pos.y);
     event!(Level::TRACE, ?pos.x, ?pos.y);
 }
-
 
 #[test]
 fn callsite_macro_api() {
