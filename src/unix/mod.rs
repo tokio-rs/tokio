@@ -32,7 +32,7 @@ use mio::unix::{EventedFd, UnixReady};
 use mio::{PollOpt, Ready, Token};
 use mio::event::Evented;
 use mio;
-use self::reap::{EventedReaper, Kill, Wait};
+use self::reap::{Kill, Reaper, Wait};
 use self::tokio_signal::unix::Signal;
 use std::fmt;
 use std::io;
@@ -55,7 +55,7 @@ impl Kill for process::Child {
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
-    inner: EventedReaper<process::Child, FlattenStream<IoFuture<Signal>>>,
+    inner: Reaper<process::Child, FlattenStream<IoFuture<Signal>>>,
 }
 
 impl fmt::Debug for Child {
@@ -76,7 +76,7 @@ impl Child {
 
         let signal = Signal::with_handle(libc::SIGCHLD, handle).flatten_stream();
         let child = Child {
-            inner: EventedReaper::new(inner, signal),
+            inner: Reaper::new(inner, signal),
         };
 
         Ok((child, stdin, stdout, stderr))

@@ -18,12 +18,12 @@ pub trait Kill {
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.
 #[derive(Debug)]
-pub struct EventedReaper<W, S> {
+pub struct Reaper<W, S> {
     inner: W,
     signal: S,
 }
 
-impl<W, S> Deref for EventedReaper<W, S> {
+impl<W, S> Deref for Reaper<W, S> {
     type Target = W;
 
     fn deref(&self) -> &Self::Target {
@@ -31,7 +31,7 @@ impl<W, S> Deref for EventedReaper<W, S> {
     }
 }
 
-impl<W, S> EventedReaper<W, S> {
+impl<W, S> Reaper<W, S> {
     pub fn new(inner: W, signal: S) -> Self {
         Self {
             inner,
@@ -40,7 +40,7 @@ impl<W, S> EventedReaper<W, S> {
     }
 }
 
-impl<W, S> Future for EventedReaper<W, S>
+impl<W, S> Future for Reaper<W, S>
     where W: Wait,
           S: Stream<Error = io::Error>,
 {
@@ -88,7 +88,7 @@ impl<W, S> Future for EventedReaper<W, S>
     }
 }
 
-impl<W, S> Kill for EventedReaper<W, S>
+impl<W, S> Kill for Reaper<W, S>
     where W: Kill,
 {
     fn kill(&mut self) -> io::Result<()> {
@@ -169,10 +169,10 @@ mod test {
     }
 
     #[test]
-    fn evented_reaper() {
+    fn reaper() {
         let exit = ExitStatus::from_raw(0);
         let mock = MockWait::new(exit.clone(), 3);
-        let mut grim = EventedReaper::new(mock, MockStream::new(vec!(
+        let mut grim = Reaper::new(mock, MockStream::new(vec!(
             None,
             Some(()),
             None,
@@ -200,7 +200,7 @@ mod test {
     #[test]
     fn kill() {
         let exit = ExitStatus::from_raw(0);
-        let mut grim = EventedReaper::new(
+        let mut grim = Reaper::new(
             MockWait::new(exit, 0),
             MockStream::new(vec!(None))
         );
