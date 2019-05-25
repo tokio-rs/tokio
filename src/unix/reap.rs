@@ -15,78 +15,11 @@ pub trait Kill {
     fn kill(&mut self) -> io::Result<()>;
 }
 
-#[derive(Debug, PartialEq)]
-enum WaitResult {
-    Exited(ExitStatus),
-    Reaped,
-}
-
-/// An interface for safely reaping a child process.
-trait Reap {
-    /// Try to reap the child process if ready.
-    fn try_reap(&mut self) -> Poll<WaitResult, io::Error>;
-}
-
-#[derive(Debug)]
-struct Reaper<W> {
-    reaped: bool,
-    proc: W,
-}
-
-impl<W> Reaper<W> {
-    fn new(proc: W) -> Self {
-        Self {
-            reaped: false,
-            proc,
-        }
-    }
-
-    fn reaped(&self) -> bool {
-        self.reaped
-    }
-}
-
-impl<W> Deref for Reaper<W> {
-    type Target = W;
-
-    fn deref(&self) -> &Self::Target {
-        &self.proc
-    }
-}
-
-impl<W: Wait> Reap for Reaper<W> {
-    fn try_reap(&mut self) -> Poll<WaitResult, io::Error> {
-        if self.reaped {
-            return Ok(Async::Ready(WaitResult::Reaped));
-        }
-
-        match self.proc.try_wait()? {
-            Some(exit) => {
-                self.reaped = true;
-                Ok(Async::Ready(WaitResult::Exited(exit)))
-            },
-            None => Ok(Async::NotReady),
-        }
-    }
-}
-
-impl<W: Kill> Kill for Reaper<W> {
-    fn kill(&mut self) -> io::Result<()> {
-        // NB: ensure we don't issue a kill after we've reaped the child
-        // since its process identifier could have been reused.
-        if self.reaped {
-            Ok(())
-        } else {
-            self.proc.kill()
-        }
-    }
-}
-
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.
 #[derive(Debug)]
 pub struct EventedReaper<W, S> {
-    inner: Reaper<W>,
+    inner: W,
     signal: S,
 }
 
@@ -94,14 +27,14 @@ impl<W, S> Deref for EventedReaper<W, S> {
     type Target = W;
 
     fn deref(&self) -> &Self::Target {
-        &*self.inner
+        &self.inner
     }
 }
 
 impl<W, S> EventedReaper<W, S> {
     pub fn new(inner: W, signal: S) -> Self {
         Self {
-            inner: Reaper::new(inner),
+            inner,
             signal,
         }
     }
@@ -116,12 +49,6 @@ impl<W, S> Future for EventedReaper<W, S>
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            // Ensure we don't register for additional notifications
-            // if the child has already finished.
-            if self.inner.reaped() {
-                return Ok(Async::NotReady);
-            }
-
             // If the child hasn't exited yet, then it's our responsibility to
             // ensure the current task gets notified when it might be able to
             // make progress.
@@ -143,7 +70,7 @@ impl<W, S> Future for EventedReaper<W, S>
             // should not cause significant issues with parent futures.
             let registered_interest = self.signal.poll()?.is_not_ready();
 
-            if let Async::Ready(WaitResult::Exited(status)) = self.inner.try_reap()? {
+            if let Some(status) = self.inner.try_wait()? {
                 return Ok(Async::Ready(status));
             }
 
@@ -242,25 +169,6 @@ mod test {
     }
 
     #[test]
-    fn reaper() {
-        let exit = ExitStatus::from_raw(0);
-        let mock = MockWait::new(exit.clone(), 1);
-        let mut grim = Reaper::new(mock);
-
-        // Not yet exited
-        assert_eq!(Async::NotReady, grim.try_reap().expect("failed to wait"));
-        assert_eq!(1, grim.total_waits);
-
-        // Exited
-        assert_eq!(Async::Ready(WaitResult::Exited(exit)), grim.try_reap().expect("failed to wait"));
-        assert_eq!(2, grim.total_waits);
-
-        // Cannot call wait another time
-        assert_eq!(Async::Ready(WaitResult::Reaped), grim.try_reap().expect("failed to wait"));
-        assert_eq!(2, grim.total_waits);
-    }
-
-    #[test]
     fn evented_reaper() {
         let exit = ExitStatus::from_raw(0);
         let mock = MockWait::new(exit.clone(), 3);
@@ -287,11 +195,6 @@ mod test {
         assert_eq!(Async::Ready(exit), grim.poll().expect("failed to wait"));
         assert_eq!(4, grim.signal.total_polls);
         assert_eq!(4, grim.total_waits);
-
-        // Already reaped, no further calls
-        assert_eq!(Async::NotReady, grim.poll().expect("failed to poll"));
-        assert_eq!(4, grim.signal.total_polls);
-        assert_eq!(4, grim.total_waits);
     }
 
     #[test]
@@ -302,11 +205,6 @@ mod test {
             MockStream::new(vec!(None))
         );
 
-        grim.kill().unwrap();
-        assert_eq!(1, grim.total_kills);
-
-        // Do not kill after reaping
-        assert_eq!(Async::Ready(exit), grim.poll().expect("failed to poll"));
         grim.kill().unwrap();
         assert_eq!(1, grim.total_kills);
     }
