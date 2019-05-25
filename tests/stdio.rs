@@ -1,21 +1,16 @@
 extern crate futures;
-extern crate tokio;
-extern crate tokio_current_thread;
-extern crate tokio_io;
-extern crate tokio_process;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
+extern crate tokio_io;
+extern crate tokio_process;
 
 use std::io;
 use std::process::{Stdio, ExitStatus, Command};
-use std::time::Duration;
 
 use futures::future::Future;
 use futures::stream::{self, Stream};
 use tokio_io::io::{read_until, write_all, read_to_end};
 use tokio_process::{CommandExt, Child};
-use tokio::timer::Timeout;
 
 mod support;
 
@@ -72,7 +67,6 @@ fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = i
     Box::new(write.join(read).and_then(|_| cat))
 }
 
-#[test]
 /// Check for the following properties when feeding stdin and
 /// consuming stdout of a cat-like process:
 ///
@@ -84,9 +78,10 @@ fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = i
 /// - We read the same lines from the child that we fed it.
 ///
 /// - The child does produce EOF on stdout after the last line.
+#[test]
 fn feed_a_lot() {
     let child = cat().spawn_async().unwrap();
-    let status = tokio_current_thread::block_on_all(feed_cat(child, 10000)).unwrap();
+    let status = support::run_with_timeout(feed_cat(child, 10000)).unwrap();
     assert_eq!(status.code(), Some(0));
 }
 
@@ -103,7 +98,7 @@ fn drop_kills() {
 
     let future = writer.join(reader).map(|(_, (_, out))| out);
 
-    let output = tokio_current_thread::block_on_all(future).unwrap();
+    let output = support::run_with_timeout(future).unwrap();
     assert_eq!(output.len(), 0);
 }
 
@@ -114,7 +109,7 @@ fn wait_with_output_captures() {
     let out = child.wait_with_output();
 
     let future = write_all(stdin, b"1234").map(|p| p.1).join(out);
-    let ret = tokio_current_thread::block_on_all(future).unwrap();
+    let ret = support::run_with_timeout(future).unwrap();
     let (written, output) = ret;
 
     assert!(output.status.success());
@@ -129,10 +124,6 @@ fn status_closes_any_pipes() {
     // we would end up blocking forever (and time out).
     let child = cat().status_async().expect("failed to spawn child");
 
-    // NB: Deadline requires a timer registration which is provided by
-    // tokio's `current_thread::Runtime`, but isn't available by just using
-    // tokio's default CurrentThread executor which powers `current_thread::block_on_all`.
-    let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-    rt.block_on(Timeout::new(child, Duration::from_secs(1)))
+    support::run_with_timeout(child)
         .expect("time out exceeded! did we get stuck waiting on the child?");
 }
