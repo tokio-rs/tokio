@@ -58,27 +58,20 @@ impl fmt::Debug for Child {
 }
 
 impl Child {
-    pub fn new(inner: process::Child, handle: &Handle) -> Child {
-        Child {
+    pub fn new(mut inner: process::Child, handle: &Handle)
+        -> io::Result<(Child, Option<ChildStdin>, Option<ChildStdout>, Option<ChildStderr>)>
+    {
+        let stdin = stdio(inner.stdin.take(), handle)?;
+        let stdout = stdio(inner.stdout.take(), handle)?;
+        let stderr = stdio(inner.stderr.take(), handle)?;
+
+        let child = Child {
             inner: inner,
             reaped: false,
             sigchld: Signal::with_handle(libc::SIGCHLD, handle).flatten_stream(),
-        }
-    }
+        };
 
-    pub fn register_stdin(&mut self, handle: &Handle)
-                          -> io::Result<Option<ChildStdin>> {
-        stdio(self.inner.stdin.take(), handle)
-    }
-
-    pub fn register_stdout(&mut self, handle: &Handle)
-                           -> io::Result<Option<ChildStdout>> {
-        stdio(self.inner.stdout.take(), handle)
-    }
-
-    pub fn register_stderr(&mut self, handle: &Handle)
-                           -> io::Result<Option<ChildStderr>> {
-        stdio(self.inner.stderr.take(), handle)
+        Ok((child, stdin, stdout, stderr))
     }
 
     pub fn id(&self) -> u32 {

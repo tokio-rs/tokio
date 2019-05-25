@@ -164,7 +164,7 @@ extern crate tokio_reactor;
 extern crate mio;
 
 use std::io::{self, Read, Write};
-use std::process::{self, ExitStatus, Output, Stdio};
+use std::process::{Command, ExitStatus, Output, Stdio};
 
 use futures::{Future, Poll, IntoFuture};
 use futures::future::{Either, ok};
@@ -320,25 +320,16 @@ pub trait CommandExt {
 }
 
 
-impl CommandExt for process::Command {
+impl CommandExt for Command {
     fn spawn_async_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
-        let mut child = Child {
-            child: imp::Child::new(try!(self.spawn()), handle),
-            stdin: None,
-            stdout: None,
-            stderr: None,
-            kill_on_drop: true,
-        };
-        child.stdin = try!(child.child.register_stdin(handle)).map(|io| {
-            ChildStdin { inner: io }
-        });
-        child.stdout = try!(child.child.register_stdout(handle)).map(|io| {
-            ChildStdout { inner: io }
-        });
-        child.stderr = try!(child.child.register_stderr(handle)).map(|io| {
-            ChildStderr { inner: io }
-        });
-        Ok(child)
+        imp::Child::new(self.spawn()?, handle)
+            .map(|(child, stdin, stdout, stderr)| Child {
+                child,
+                stdin: stdin.map(|inner| ChildStdin { inner }),
+                stdout: stdout.map(|inner| ChildStdout { inner }),
+                stderr: stderr.map(|inner| ChildStderr { inner }),
+                kill_on_drop: true,
+            })
     }
 
     fn status_async_with_handle(&mut self, handle: &Handle) -> io::Result<StatusAsync> {

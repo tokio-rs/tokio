@@ -64,26 +64,19 @@ unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
 impl Child {
-    pub fn new(child: process::Child, _handle: &Handle) -> Child {
-        Child {
-            child: child,
+    pub fn new(mut inner: process::Child, handle: &Handle)
+        -> io::Result<(Child, Option<ChildStdin>, Option<ChildStdout>, Option<ChildStderr>)>
+    {
+        let stdin = stdio(inner.stdin.take(), handle)?;
+        let stdout = stdio(inner.stdout.take(), handle)?;
+        let stderr = stdio(inner.stderr.take(), handle)?;
+
+        let child = Child {
+            child: inner,
             waiting: None,
-        }
-    }
+        };
 
-    pub fn register_stdin(&mut self, handle: &Handle)
-                          -> io::Result<Option<ChildStdin>> {
-        stdio(self.child.stdin.take(), handle)
-    }
-
-    pub fn register_stdout(&mut self, handle: &Handle)
-                           -> io::Result<Option<ChildStdout>> {
-        stdio(self.child.stdout.take(), handle)
-    }
-
-    pub fn register_stderr(&mut self, handle: &Handle)
-                           -> io::Result<Option<ChildStderr>> {
-        stdio(self.child.stderr.take(), handle)
+        Ok((child, stdin, stdout, stderr))
     }
 
     pub fn id(&self) -> u32 {
