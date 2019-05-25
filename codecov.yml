@@ -3,4 +3,4 @@ ignore:
   - "tests"
 
 comment:
-  behavior: new
+  behavior: default
