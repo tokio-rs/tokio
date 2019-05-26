@@ -22,7 +22,7 @@ codecov = { repository = "alexcrichton/tokio-process" }
 
 [dependencies]
 futures = "0.1.11"
-mio = "0.6.5"
+mio = "=0.6.16" # TODO: investigate further and unpin this
 tokio-io = "0.1"
 tokio-reactor = "0.1"
 
