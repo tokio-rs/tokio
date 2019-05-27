@@ -2,7 +2,7 @@
 
 An implementation of process management for Tokio
 
-[![Build Status](https://travis-ci.org/alexcrichton/tokio-process.svg?branch=master)](https://travis-ci.org/alexcrichton/tokio-process)
+[![Build Status](https://travis-ci.com/alexcrichton/tokio-process.svg?branch=master)](https://travis-ci.com/alexcrichton/tokio-process)
 [![Build status](https://ci.appveyor.com/api/projects/status/43c8g7fy801e5902?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio-process)
 [![Crates.io](https://img.shields.io/crates/v/tokio-process.svg?maxAge=2592000)](https://crates.io/crates/tokio-process)
 [![Coverage](https://img.shields.io/codecov/c/github/alexcrichton/tokio-process/master.svg)](https://codecov.io/gh/alexcrichton/tokio-process)
