@@ -176,91 +176,91 @@ fn error_span_root() {
 #[test]
 fn span_with_parent() {
     let p = span!(Level::TRACE, "im_a_parent!");
-    span!(Level::DEBUG, target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 3);
-    span!(Level::DEBUG, target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 4,);
-    span!(Level::DEBUG, target: "foo_events", parent: &p, "foo");
-    span!(Level::DEBUG, target: "foo_events", parent: &p, "bar",);
+    span!(Level::DEBUG, target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    span!(Level::DEBUG, target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
+    span!(Level::DEBUG, target: "foo_events", parent: p.clone(), "foo");
+    span!(Level::DEBUG, target: "foo_events", parent: p.clone(), "bar",);
 
-    span!(Level::DEBUG, parent: &p, "foo", bar.baz = 2, quux = 3);
-    span!(Level::DEBUG, parent: &p, "foo", bar.baz = 2, quux = 4,);
+    span!(Level::DEBUG, parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    span!(Level::DEBUG, parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
 
-    span!(Level::DEBUG, parent: &p, "foo");
-    span!(Level::DEBUG, parent: &p, "bar",);
+    span!(Level::DEBUG, parent: p.clone(), "foo");
+    span!(Level::DEBUG, parent: p.clone(), "bar",);
 }
 
 #[test]
 fn trace_span_with_parent() {
     let p = span!(Level::TRACE, "im_a_parent!");
-    trace_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 3);
-    trace_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 4,);
-    trace_span!(target: "foo_events", parent: &p, "foo");
-    trace_span!(target: "foo_events", parent: &p, "bar",);
+    trace_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    trace_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
+    trace_span!(target: "foo_events", parent: p.clone(), "foo");
+    trace_span!(target: "foo_events", parent: p.clone(), "bar",);
 
-    trace_span!(parent: &p, "foo", bar.baz = 2, quux = 3);
-    trace_span!(parent: &p, "foo", bar.baz = 2, quux = 4,);
+    trace_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    trace_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
 
-    trace_span!(parent: &p, "foo");
-    trace_span!(parent: &p, "bar",);
+    trace_span!(parent: p.clone(), "foo");
+    trace_span!(parent: p.clone(), "bar",);
 }
 
 #[test]
 fn debug_span_with_parent() {
     let p = span!(Level::TRACE, "im_a_parent!");
-    debug_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 3);
-    debug_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 4,);
-    debug_span!(target: "foo_events", parent: &p, "foo");
-    debug_span!(target: "foo_events", parent: &p, "bar",);
+    debug_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    debug_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
+    debug_span!(target: "foo_events", parent: p.clone(), "foo");
+    debug_span!(target: "foo_events", parent: p.clone(), "bar",);
 
-    debug_span!(parent: &p, "foo", bar.baz = 2, quux = 3);
-    debug_span!(parent: &p, "foo", bar.baz = 2, quux = 4,);
+    debug_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    debug_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
 
-    debug_span!(parent: &p, "foo");
-    debug_span!(parent: &p, "bar",);
+    debug_span!(parent: p.clone(), "foo");
+    debug_span!(parent: p.clone(), "bar",);
 }
 
 #[test]
 fn info_span_with_parent() {
     let p = span!(Level::TRACE, "im_a_parent!");
-    info_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 3);
-    info_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 4,);
-    info_span!(target: "foo_events", parent: &p, "foo");
-    info_span!(target: "foo_events", parent: &p, "bar",);
+    info_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    info_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
+    info_span!(target: "foo_events", parent: p.clone(), "foo");
+    info_span!(target: "foo_events", parent: p.clone(), "bar",);
 
-    info_span!(parent: &p, "foo", bar.baz = 2, quux = 3);
-    info_span!(parent: &p, "foo", bar.baz = 2, quux = 4,);
+    info_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    info_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
 
-    info_span!(parent: &p, "foo");
-    info_span!(parent: &p, "bar",);
+    info_span!(parent: p.clone(), "foo");
+    info_span!(parent: p.clone(), "bar",);
 }
 
 #[test]
 fn warn_span_with_parent() {
     let p = span!(Level::TRACE, "im_a_parent!");
-    warn_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 3);
-    warn_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 4,);
-    warn_span!(target: "foo_events", parent: &p, "foo");
-    warn_span!(target: "foo_events", parent: &p, "bar",);
+    warn_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    warn_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
+    warn_span!(target: "foo_events", parent: p.clone(), "foo");
+    warn_span!(target: "foo_events", parent: p.clone(), "bar",);
 
-    warn_span!(parent: &p, "foo", bar.baz = 2, quux = 3);
-    warn_span!(parent: &p, "foo", bar.baz = 2, quux = 4,);
+    warn_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    warn_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
 
-    warn_span!(parent: &p, "foo");
-    warn_span!(parent: &p, "bar",);
+    warn_span!(parent: p.clone(), "foo");
+    warn_span!(parent: p.clone(), "bar",);
 }
 
 #[test]
 fn error_span_with_parent() {
     let p = span!(Level::TRACE, "im_a_parent!");
-    error_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 3);
-    error_span!(target: "foo_events", parent: &p, "foo", bar.baz = 2, quux = 4,);
-    error_span!(target: "foo_events", parent: &p, "foo");
-    error_span!(target: "foo_events", parent: &p, "bar",);
+    error_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    error_span!(target: "foo_events", parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
+    error_span!(target: "foo_events", parent: p.clone(), "foo");
+    error_span!(target: "foo_events", parent: p.clone(), "bar",);
 
-    error_span!(parent: &p, "foo", bar.baz = 2, quux = 3);
-    error_span!(parent: &p, "foo", bar.baz = 2, quux = 4,);
+    error_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 3);
+    error_span!(parent: p.clone(), "foo", bar.baz = 2, quux = 4,);
 
-    error_span!(parent: &p, "foo");
-    error_span!(parent: &p, "bar",);
+    error_span!(parent: p.clone(), "foo");
+    error_span!(parent: p.clone(), "bar",);
 }
 
 #[test]

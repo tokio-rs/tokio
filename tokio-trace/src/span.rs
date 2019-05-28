@@ -476,7 +476,7 @@ impl Span {
     }
 
     /// Returns this span's `Id`, if it is enabled.
-    pub fn id(&self) -> Option<Id> {
+    pub fn id(&self) -> Option<&Id> {
         self.inner.as_ref().map(Inner::id)
     }
 
@@ -560,12 +560,6 @@ impl fmt::Debug for Span {
 impl<'a> Into<Option<&'a Id>> for &'a Span {
     fn into(self) -> Option<&'a Id> {
         self.inner.as_ref().map(Inner::id)
-    }
-}
-
-impl<'a> Into<Option<Id>> for &'a Span {
-    fn into(self) -> Option<Id> {
-        self.id()
     }
 }
 
