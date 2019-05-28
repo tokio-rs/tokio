@@ -63,14 +63,14 @@ impl Id {
 #[deprecated(
     since = "0.2.1",
     note = "cloning span IDs can cause incorrect reference counts, use \
-           `Subscriber::clone_span` instead"
+            `Subscriber::clone_span` instead"
 )]
 #[doc(hidden)]
 impl Clone for Id {
     fn clone(&self) -> Self {
         panic!(
             "cloning span IDs can cause incorrect reference counts, use \
-            `Subscriber::clone_span` instead"
+             `Subscriber::clone_span` instead"
         )
     }
 }

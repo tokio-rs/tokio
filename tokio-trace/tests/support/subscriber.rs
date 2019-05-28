@@ -217,8 +217,10 @@ where
                         );
                     }
                     Some(Parent::Explicit(expected_parent)) => {
-                        let actual_parent =
-                            span.parent().and_then(|id| spans.get(&id.into_u64())).map(|s| s.name);
+                        let actual_parent = span
+                            .parent()
+                            .and_then(|id| spans.get(&id.into_u64()))
+                            .map(|s| s.name);
                         assert_eq!(Some(expected_parent.as_ref()), actual_parent);
                     }
                     Some(Parent::ContextualRoot) => {
@@ -240,8 +242,10 @@ where
                             name
                         );
                         let stack = self.current.lock().unwrap();
-                        let actual_parent =
-                            stack.last().and_then(|id| spans.get(&id.into_u64())).map(|s| s.name);
+                        let actual_parent = stack
+                            .last()
+                            .and_then(|id| spans.get(&id.into_u64()))
+                            .map(|s| s.name);
                         assert_eq!(Some(expected_parent.as_ref()), actual_parent);
                     }
                     None => {}
@@ -296,7 +300,9 @@ where
                     curr.as_ref(),
                     "exited span {:?}, but the current span was {:?}",
                     span.name,
-                    curr.as_ref().and_then(|id| spans.get(&id.into_u64())).map(|s| s.name)
+                    curr.as_ref()
+                        .and_then(|id| spans.get(&id.into_u64()))
+                        .map(|s| s.name)
                 );
             }
             Some(ex) => ex.bad(format_args!("exited span {:?}", span.name)),
@@ -304,12 +310,17 @@ where
     }
 
     fn clone_span(&self, id: &Id) -> Id {
-        let name = self.spans.lock().unwrap().get_mut(&id.into_u64()).map(|span| {
-            let name = span.name;
-            println!("clone_span: {}; id={:?}; refs={:?};", name, id, span.refs);
-            span.refs += 1;
-            name
-        });
+        let name = self
+            .spans
+            .lock()
+            .unwrap()
+            .get_mut(&id.into_u64())
+            .map(|span| {
+                let name = span.name;
+                println!("clone_span: {}; id={:?}; refs={:?};", name, id, span.refs);
+                span.refs += 1;
+                name
+            });
         if name.is_none() {
             println!("clone_span: id={:?};", id);
         }
