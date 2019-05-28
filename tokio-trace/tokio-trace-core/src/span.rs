@@ -60,11 +60,18 @@ impl Id {
     }
 }
 
-#[deprecated(since = "0.2.1", note = "please use `Subscriber::clone_span` instead")]
+#[deprecated(
+    since = "0.2.1",
+    note = "cloning span IDs can cause incorrect reference counts, use \
+           `Subscriber::clone_span` instead"
+)]
 #[doc(hidden)]
 impl Clone for Id {
     fn clone(&self) -> Self {
-        Id::from_u64(self.into_u64())
+        panic!(
+            "cloning span IDs can cause incorrect reference counts, use \
+            `Subscriber::clone_span` instead"
+        )
     }
 }
 
