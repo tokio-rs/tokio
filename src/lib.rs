@@ -70,39 +70,77 @@
 //! We can also read input line by line.
 //!
 //! ```no_run
+//! extern crate failure;
 //! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //! extern crate tokio_io;
 //!
-//! use std::io;
-//! use std::process::{Command, Stdio};
-//!
+//! use failure::Error;
 //! use futures::{Future, Stream};
-//! use tokio_process::{CommandExt, Child};
+//! use std::io::BufReader;
+//! use std::process::{Command, Stdio};
+//! use tokio_process::{Child, ChildStdout, CommandExt};
 //!
-//! fn print_lines(mut cat: Child) -> Box<Future<Item = (), Error = ()> + Send + 'static> {
-//!     let stdout = cat.stdout().take().unwrap();
-//!     let reader = io::BufReader::new(stdout);
-//!     let lines = tokio_io::io::lines(reader);
-//!     let cycle = lines.for_each(|l| {
-//!         println!("Line: {}", l);
-//!         Ok(())
-//!     });
+//! fn lines_stream(child: &mut Child) -> impl Stream<Item = String, Error = Error> + Send + 'static {
+//!     let stdout = child.stdout().take()
+//!         .expect("child did not have a handle to stdout");
 //!
-//!     let future = cycle.join(cat)
-//!         .map(|_| ())
-//!         .map_err(|e| panic!("{}", e));
-//!
-//!     Box::new(future)
+//!     tokio_io::io::lines(BufReader::new(stdout))
+//!         // Convert any io::Error into a failure::Error for better flexibility
+//!         .map_err(|e| Error::from(e))
+//!         // We print each line we've received here as an example of a way we can
+//!         // do something with the data. This can be changed to map the data to
+//!         // something else, or to consume it differently.
+//!         .inspect(|line| println!("Line: {}", line))
 //! }
 //!
 //! fn main() {
-//!     let mut cmd = Command::new("cat");
-//!     cmd.stdout(Stdio::piped());
+//!     // Lazily invoke any code so it can run directly within the tokio runtime
+//!     tokio::run(futures::lazy(|| {
+//!         let mut cmd = Command::new("cat");
 //!
-//!     let future = print_lines(cmd.spawn_async().expect("failed to spawn command"));
-//!     tokio::run(future);
+//!         // Specify that we want the command's standard output piped back to us.
+//!         // By default, standard input/output/error will be inherited from the
+//!         // current process (for example, this means that standard input will
+//!         // come from the keyboard and standard output/error will go directly to
+//!         // the terminal if this process is invoked from the command line).
+//!         cmd.stdout(Stdio::piped());
+//!
+//!         let mut child = cmd.spawn_async()
+//!             .expect("failed to spawn command");
+//!
+//!         let lines = lines_stream(&mut child);
+//!
+//!         // Spawning into the tokio runtime requires that the future's Item and
+//!         // Error are both `()`. This is because tokio doesn't know what to do
+//!         // with any results or errors, so it requires that we've handled them!
+//!         //
+//!         // We can replace these sample usages of the child's exit status (or
+//!         // an encountered error) perform some different actions if needed!
+//!         // For example, log the error, or send a message on a channel, etc.
+//!         let child_future = child
+//!                 .map(|status| println!("child status was: {}", status))
+//!                 .map_err(|e| panic!("error while running child: {}", e));
+//!
+//!         // Ensure the child process can live on within the runtime, otherwise
+//!         // the process will get killed if this handle is dropped
+//!         tokio::spawn(child_future);
+//!
+//!         // Return a future to tokio. This is the same as calling using
+//!         // `tokio::spawn` above, but without having to return a dummy future
+//!         // here.
+//!         lines
+//!             // Convert the stream of values into a future which will resolve
+//!             // once the entire stream has been consumed. In this example we
+//!             // don't need to do anything with the data within the `for_each`
+//!             // call, but you can extend this to do something else (keep in mind
+//!             // that the stream will not produce items until the future returned
+//!             // from the closure resolves).
+//!             .for_each(|_| Ok(()))
+//!             // Similarly we "handle" any errors that arise, as required by tokio.
+//!             .map_err(|e| panic!("error while processing lines: {}", e))
+//!     }));
 //! }
 //! ```
 //!
