@@ -165,7 +165,14 @@ pub struct Span {
 #[derive(Debug)]
 pub(crate) struct Inner {
     /// The span's ID, as provided by `subscriber`.
-    id: Id,
+    ///
+    /// This is an `Option` so that it can be `take`n in order to pass it by
+    /// value to `Subscriber::drop_span` in the drop impl, and so that it can be
+    /// moved out of the `Inner` when taking it by value. In any case where this
+    /// struct is not in the process of being dropped, this will be some.
+    ///
+    /// In general, it should be accessed through `self.id()`.
+    id: Option<Id>,
 
     /// The subscriber that will receive events relating to this span.
     ///
@@ -336,7 +343,9 @@ impl Span {
     /// [`Id`]: ../struct.Id.html
     pub fn enter<'a>(&'a self) -> Entered<'a> {
         if let Some(ref inner) = self.inner.as_ref() {
-            inner.subscriber.enter(&inner.id);
+            if let Some(id) = inner.id.as_ref() {
+                inner.subscriber.enter(id);
+            }
         }
         self.log(format_args!("-> {}", self.meta.name));
         Entered { span: self }
@@ -527,7 +536,7 @@ impl fmt::Debug for Span {
             .field("target", &self.meta.target());
 
         if let Some(ref inner) = self.inner {
-            span.field("id", &inner.id);
+            span.field("id", &inner.id());
         } else {
             span.field("disabled", &true);
         }
@@ -550,7 +559,7 @@ impl fmt::Debug for Span {
 
 impl<'a> Into<Option<&'a Id>> for &'a Span {
     fn into(self) -> Option<&'a Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
+        self.inner.as_ref().map(Inner::id)
     }
 }
 
@@ -564,15 +573,9 @@ impl Into<Option<Id>> for Span {
     fn into(mut self) -> Option<Id> {
         // since we're moving the span, it's not necessary to clone the ref
         // count.
-        self.inner.take().map(|inner| inner.id)
-    }
-}
-
-impl Drop for Span {
-    fn drop(&mut self) {
-        if let Some(inner) = self.inner.take() {
-            inner.subscriber.drop_span(inner.id);
-        }
+        self.inner
+            .take()
+            .map(|mut inner| inner.id.take().expect("inner.id only taken on drop"))
     }
 }
 
@@ -595,21 +598,26 @@ impl Inner {
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
     fn follows_from(&self, from: &Id) {
-        self.subscriber.record_follows_from(&self.id, &from)
+        self.subscriber.record_follows_from(self.id(), &from)
+    }
+
+    #[inline]
+    fn id(&self) -> &Id {
+        self.id.as_ref().expect("inner.id only taken on drop")
     }
 
     /// Returns the span's ID.
-    fn id(&self) -> Id {
-        self.subscriber.clone_span(&self.id)
+    fn clone_id(&self) -> Id {
+        self.subscriber.clone_span(self.id())
     }
 
     fn record(&self, values: &Record) {
-        self.subscriber.record(&self.id, values)
+        self.subscriber.record(self.id(), values)
     }
 
     fn new(id: Id, subscriber: &Dispatch) -> Self {
         Inner {
-            id,
+            id: Some(id),
             subscriber: subscriber.clone(),
         }
     }
@@ -630,9 +638,19 @@ impl Hash for Inner {
 impl Clone for Inner {
     fn clone(&self) -> Self {
         Inner {
-            id: self.subscriber.clone_span(&self.id),
+            id: Some(self.clone_id()),
             subscriber: self.subscriber.clone(),
         }
+    }
+}
+
+impl Drop for Inner {
+    #[inline]
+    fn drop(&mut self) {
+        if let Some(id) = self.id.take() {
+            self.subscriber.drop_span(id);
+        }
+
     }
 }
 
@@ -646,7 +664,9 @@ impl<'a> Drop for Entered<'a> {
         // Running this behaviour on drop rather than with an explicit function
         // call means that spans may still be exited when unwinding.
         if let Some(inner) = self.span.inner.as_ref() {
-            inner.subscriber.exit(&inner.id);
+            if let Some(id) = inner.id.as_ref() {
+                inner.subscriber.exit(id);
+            }
         }
         self.span.log(format_args!("<- {}", self.span.meta.name));
     }
