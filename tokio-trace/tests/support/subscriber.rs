@@ -35,7 +35,7 @@ struct SpanState {
 }
 
 struct Running<F: Fn(&Metadata) -> bool> {
-    spans: Mutex<HashMap<Id, SpanState>>,
+    spans: Mutex<HashMap<u64, SpanState>>,
     expected: Arc<Mutex<VecDeque<Expect>>>,
     current: Mutex<Vec<Id>>,
     ids: AtomicUsize,
@@ -147,7 +147,7 @@ where
         let spans = self.spans.lock().unwrap();
         let mut expected = self.expected.lock().unwrap();
         let span = spans
-            .get(id)
+            .get(&id.into_u64())
             .unwrap_or_else(|| panic!("no span for ID {:?}", id));
         println!("record: {}; id={:?}; values={:?};", span.name, id, values);
         let was_expected = if let Some(Expect::Visit(_, _)) = expected.front() {
@@ -185,8 +185,7 @@ where
     fn new_span(&self, span: &Attributes) -> Id {
         use span::Parent;
         let meta = span.metadata();
-        let id = self.ids.fetch_add(1, Ordering::SeqCst);
-        let id = Id::from_u64(id as u64);
+        let id = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         println!(
             "new_span: name={:?}; target={:?}; id={:?};",
             meta.name(),
@@ -219,7 +218,7 @@ where
                     }
                     Some(Parent::Explicit(expected_parent)) => {
                         let actual_parent =
-                            span.parent().and_then(|id| spans.get(id)).map(|s| s.name);
+                            span.parent().and_then(|id| spans.get(&id.into_u64())).map(|s| s.name);
                         assert_eq!(Some(expected_parent.as_ref()), actual_parent);
                     }
                     Some(Parent::ContextualRoot) => {
@@ -242,7 +241,7 @@ where
                         );
                         let stack = self.current.lock().unwrap();
                         let actual_parent =
-                            stack.last().and_then(|id| spans.get(id)).map(|s| s.name);
+                            stack.last().and_then(|id| spans.get(&id.into_u64())).map(|s| s.name);
                         assert_eq!(Some(expected_parent.as_ref()), actual_parent);
                     }
                     None => {}
@@ -250,36 +249,39 @@ where
             }
         }
         spans.insert(
-            id.clone(),
+            id,
             SpanState {
                 name: meta.name(),
                 refs: 1,
             },
         );
-        id
+        Id::from_u64(id)
     }
 
     fn enter(&self, id: &Id) {
-        let spans = self.spans.lock().unwrap();
-        if let Some(span) = spans.get(id) {
-            println!("enter: {}; id={:?};", span.name, id);
-            match self.expected.lock().unwrap().pop_front() {
-                None => {}
-                Some(Expect::Enter(ref expected_span)) => {
-                    if let Some(name) = expected_span.name() {
-                        assert_eq!(name, span.name);
+        {
+            let spans = self.spans.lock().unwrap();
+            if let Some(span) = spans.get(&id.into_u64()) {
+                println!("enter: {}; id={:?};", span.name, id);
+                match self.expected.lock().unwrap().pop_front() {
+                    None => {}
+                    Some(Expect::Enter(ref expected_span)) => {
+                        if let Some(name) = expected_span.name() {
+                            assert_eq!(name, span.name);
+                        }
                     }
+                    Some(ex) => ex.bad(format_args!("entered span {:?}", span.name)),
                 }
-                Some(ex) => ex.bad(format_args!("entered span {:?}", span.name)),
-            }
-        };
-        self.current.lock().unwrap().push(id.clone());
+            };
+        }
+        let id = self.clone_span(id);
+        self.current.lock().unwrap().push(id);
     }
 
     fn exit(&self, id: &Id) {
         let spans = self.spans.lock().unwrap();
         let span = spans
-            .get(id)
+            .get(&id.into_u64())
             .unwrap_or_else(|| panic!("no span for ID {:?}", id));
         println!("exit: {}; id={:?};", span.name, id);
         match self.expected.lock().unwrap().pop_front() {
@@ -294,7 +296,7 @@ where
                     curr.as_ref(),
                     "exited span {:?}, but the current span was {:?}",
                     span.name,
-                    curr.as_ref().and_then(|id| spans.get(id)).map(|s| s.name)
+                    curr.as_ref().and_then(|id| spans.get(&id.into_u64())).map(|s| s.name)
                 );
             }
             Some(ex) => ex.bad(format_args!("exited span {:?}", span.name)),
@@ -302,7 +304,7 @@ where
     }
 
     fn clone_span(&self, id: &Id) -> Id {
-        let name = self.spans.lock().unwrap().get_mut(id).map(|span| {
+        let name = self.spans.lock().unwrap().get_mut(&id.into_u64()).map(|span| {
             let name = span.name;
             println!("clone_span: {}; id={:?}; refs={:?};", name, id, span.refs);
             span.refs += 1;
@@ -321,13 +323,13 @@ where
         if was_expected {
             expected.pop_front();
         }
-        id.clone()
+        Id::from_u64(id.into_u64())
     }
 
     fn drop_span(&self, id: Id) {
         let mut is_event = false;
         let name = if let Ok(mut spans) = self.spans.try_lock() {
-            spans.get_mut(&id).map(|span| {
+            spans.get_mut(&id.into_u64()).map(|span| {
                 let name = span.name;
                 if name.contains("event") {
                     is_event = true;
