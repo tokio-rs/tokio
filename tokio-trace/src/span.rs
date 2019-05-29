@@ -343,9 +343,7 @@ impl Span {
     /// [`Id`]: ../struct.Id.html
     pub fn enter<'a>(&'a self) -> Entered<'a> {
         if let Some(ref inner) = self.inner.as_ref() {
-            if let Some(id) = inner.id.as_ref() {
-                inner.subscriber.enter(id);
-            }
+            inner.enter();
         }
         self.log(format_args!("-> {}", self.meta.name));
         Entered { span: self }
@@ -596,6 +594,19 @@ impl Inner {
     }
 
     #[inline]
+    fn enter(&self) {
+        self.subscriber.enter(self.id());
+    }
+
+    #[inline]
+    fn exit(&self) {
+        // don't panic in `exit`, as it can be called in `Drop`...
+        if let Some(id) = self.id.as_ref() {
+            self.subscriber.exit(id);
+        }
+    }
+
+    #[inline]
     fn id(&self) -> &Id {
         self.id.as_ref().expect("inner.id only taken on drop")
     }
@@ -658,9 +669,7 @@ impl<'a> Drop for Entered<'a> {
         // Running this behaviour on drop rather than with an explicit function
         // call means that spans may still be exited when unwinding.
         if let Some(inner) = self.span.inner.as_ref() {
-            if let Some(id) = inner.id.as_ref() {
-                inner.subscriber.exit(id);
-            }
+            inner.exit();
         }
         self.span.log(format_args!("<- {}", self.span.meta.name));
     }
