@@ -16,7 +16,9 @@ matrix:
     - rust: beta
 
     - rust: nightly
-      cache: $HOME/.cargo/bin
+      cache:
+        directories:
+          - $HOME/.cargo/bin
       sudo: required
       addons:
         apt:
