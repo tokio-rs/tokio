@@ -655,7 +655,6 @@ impl Drop for Inner {
         if let Some(id) = self.id.take() {
             self.subscriber.drop_span(id);
         }
-
     }
 }
 
