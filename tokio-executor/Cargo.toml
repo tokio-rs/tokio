@@ -24,7 +24,6 @@ publish = false
 
 [dependencies]
 crossbeam-utils = "0.6.2"
-futures = "0.1.19"
 
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio" }

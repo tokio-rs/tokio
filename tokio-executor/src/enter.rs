@@ -1,7 +1,7 @@
-use futures::{self, Future};
 use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
+use std::future::Future;
 use std::prelude::v1::*;
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
@@ -87,8 +87,9 @@ impl Enter {
 
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
-    pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
-        futures::executor::spawn(f).wait_future()
+    pub fn block_on<F: Future>(&mut self, f: F) -> F::Output {
+        // futures::executor::spawn(f).wait_future()
+        unimplemented!();
     }
 }
 

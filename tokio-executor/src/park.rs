@@ -45,6 +45,7 @@
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
 use crossbeam_utils::sync::{Parker, Unparker};
+use std::future::{Waker, RawWaker, RawWakerVTable};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -223,3 +224,31 @@ impl Unpark for UnparkThread {
         self.inner.unpark();
     }
 }
+
+impl UnparkThread {
+    pub fn into_waker(self) -> Waker {
+        use std::task::RawWakerVTable;
+
+        let vtable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+        let raw = RawWaker::new();
+        unimplemented!();
+    }
+}
+
+unsafe fn clone(*const ()) -> RawWaker {
+    unimplemented!();
+}
+
+unsafe fn wake(*const ()) {
+    unimplemented!();
+}
+
+unsafe fn wake_by_ref(*const ()) {
+    unimplemented!();
+}
+
+unsafe fn drop(*const ()) {
+    unimplemented!();
+}
+
+// const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone_raw, wake, wake, drop_raw);
