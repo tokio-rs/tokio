@@ -36,7 +36,7 @@ fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = i
     // Try to read `n + 1` lines, ensuring the last one is empty
     // (i.e. EOF is reached after `n` lines.
     let reader = io::BufReader::new(stdout);
-    let expected_numbers = stream::iter_ok(0..n + 1);
+    let expected_numbers = stream::iter_ok(0..=n);
     let read = expected_numbers.fold((reader, 0), move |(reader, i), _| {
         let done = i >= n;
         debug!("starting read from child");

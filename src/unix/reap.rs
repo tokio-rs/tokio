@@ -124,7 +124,7 @@ mod test {
     impl Wait for MockWait {
         fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
             let ret = if self.num_wait_until_status == self.total_waits {
-                Some(self.status.clone())
+                Some(self.status)
             } else {
                 None
             };
@@ -171,7 +171,7 @@ mod test {
     #[test]
     fn reaper() {
         let exit = ExitStatus::from_raw(0);
-        let mock = MockWait::new(exit.clone(), 3);
+        let mock = MockWait::new(exit, 3);
         let mut grim = Reaper::new(mock, MockStream::new(vec!(
             None,
             Some(()),

@@ -38,6 +38,7 @@ use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::process::{self, ExitStatus};
+use super::SpawnedChild;
 use tokio_io::IoFuture;
 use tokio_reactor::{Handle, PollEvented};
 
@@ -66,21 +67,24 @@ impl fmt::Debug for Child {
     }
 }
 
+pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Result<SpawnedChild> {
+    let mut child = cmd.spawn()?;
+    let stdin = stdio(child.stdin.take(), handle)?;
+    let stdout = stdio(child.stdout.take(), handle)?;
+    let stderr = stdio(child.stderr.take(), handle)?;
+
+    let signal = Signal::with_handle(libc::SIGCHLD, handle).flatten_stream();
+    Ok(SpawnedChild {
+        child: Child {
+            inner: Reaper::new(child, signal),
+        },
+        stdin,
+        stdout,
+        stderr,
+    })
+}
+
 impl Child {
-    pub fn new(mut inner: process::Child, handle: &Handle)
-        -> io::Result<(Child, Option<ChildStdin>, Option<ChildStdout>, Option<ChildStderr>)>
-    {
-        let stdin = stdio(inner.stdin.take(), handle)?;
-        let stdout = stdio(inner.stdout.take(), handle)?;
-        let stderr = stdio(inner.stderr.take(), handle)?;
-
-        let signal = Signal::with_handle(libc::SIGCHLD, handle).flatten_stream();
-        let child = Child {
-            inner: Reaper::new(inner, signal),
-        };
-
-        Ok((child, stdin, stdout, stderr))
-    }
 
     pub fn id(&self) -> u32 {
         self.inner.id()

@@ -319,15 +319,21 @@ pub trait CommandExt {
     fn output_async_with_handle(&mut self, handle: &Handle) -> OutputAsync;
 }
 
+struct SpawnedChild {
+    child: imp::Child,
+    stdin: Option<imp::ChildStdin>,
+    stdout: Option<imp::ChildStdout>,
+    stderr: Option<imp::ChildStderr>,
+}
 
 impl CommandExt for Command {
     fn spawn_async_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
-        imp::Child::new(self.spawn()?, handle)
-            .map(|(child, stdin, stdout, stderr)| Child {
-                child,
-                stdin: stdin.map(|inner| ChildStdin { inner }),
-                stdout: stdout.map(|inner| ChildStdout { inner }),
-                stderr: stderr.map(|inner| ChildStderr { inner }),
+        imp::spawn_child(self, handle)
+            .map(|spawned_child| Child {
+                child: spawned_child.child,
+                stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
+                stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
+                stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
                 kill_on_drop: true,
             })
     }
@@ -353,7 +359,7 @@ impl CommandExt for Command {
 
         let inner = self.spawn_async_with_handle(handle)
             .into_future()
-            .and_then(|c| c.wait_with_output());
+            .and_then(Child::wait_with_output);
 
         OutputAsync {
             inner: Box::new(inner),
@@ -445,9 +451,9 @@ impl Child {
         WaitWithOutput {
             inner: Box::new(self.join3(stdout, stderr).map(|(status, stdout, stderr)| {
                 Output {
-                    status: status,
-                    stdout: stdout,
-                    stderr: stderr,
+                    status,
+                    stdout,
+                    stderr,
                 }
             }))
         }

@@ -16,7 +16,7 @@ fn run_test() {
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let _ = stream::iter_ok((0..2).into_iter())
+        let _ = stream::iter_ok(0..2)
             .map(|i| Command::new("echo")
                  .arg(format!("I am spawned process #{}", i))
                  .stdin(Stdio::null())

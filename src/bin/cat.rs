@@ -10,10 +10,10 @@ fn main() {
     loop {
         line.clear();
         stdin.read_line(&mut line).unwrap();
-        if line.len() == 0 {
+        if line.is_empty() {
             break;
         }
-        stdout.write(line.as_bytes()).unwrap();
+        stdout.write_all(line.as_bytes()).unwrap();
     }
     stdout.flush().unwrap();
 }

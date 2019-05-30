@@ -23,6 +23,7 @@ use std::io;
 use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
 use std::process::{self, ExitStatus};
+use std::ptr;
 
 use futures::future::Fuse;
 use futures::sync::oneshot;
@@ -36,6 +37,7 @@ use self::winapi::um::synchapi::*;
 use self::winapi::um::threadpoollegacyapiset::*;
 use self::winapi::um::winbase::*;
 use self::winapi::um::winnt::*;
+use super::SpawnedChild;
 use tokio_reactor::{Handle, PollEvented};
 
 #[must_use = "futures do nothing unless polled"]
@@ -63,22 +65,24 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
-impl Child {
-    pub fn new(mut inner: process::Child, handle: &Handle)
-        -> io::Result<(Child, Option<ChildStdin>, Option<ChildStdout>, Option<ChildStderr>)>
-    {
-        let stdin = stdio(inner.stdin.take(), handle)?;
-        let stdout = stdio(inner.stdout.take(), handle)?;
-        let stderr = stdio(inner.stderr.take(), handle)?;
+pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Result<SpawnedChild> {
+    let mut child = cmd.spawn()?;
+    let stdin = stdio(child.stdin.take(), handle)?;
+    let stdout = stdio(child.stdout.take(), handle)?;
+    let stderr = stdio(child.stderr.take(), handle)?;
 
-        let child = Child {
-            child: inner,
+    Ok(SpawnedChild {
+        child: Child {
+            child,
             waiting: None,
-        };
+        },
+        stdin,
+        stdout,
+        stderr,
+    })
+}
 
-        Ok((child, stdin, stdout, stderr))
-    }
-
+impl Child {
     pub fn id(&self) -> u32 {
         self.child.id()
     }
@@ -103,7 +107,7 @@ impl Child {
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
-            let mut wait_object = 0 as *mut _;
+            let mut wait_object = ptr::null_mut();
             let rc = unsafe {
                 RegisterWaitForSingleObject(&mut wait_object,
                                             self.child.as_raw_handle(),
@@ -120,7 +124,7 @@ impl Child {
             }
             self.waiting = Some(Waiting {
                 rx: rx.fuse(),
-                wait_object: wait_object,
+                wait_object,
                 tx: ptr,
             });
         }
@@ -142,7 +146,7 @@ impl Drop for Waiting {
 unsafe extern "system" fn callback(ptr: PVOID,
                                    _timer_fired: BOOLEAN) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
-    drop(complete.take().unwrap().send(()));
+    let _ = complete.take().unwrap().send(());
 }
 
 pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
