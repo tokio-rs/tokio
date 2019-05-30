@@ -38,7 +38,12 @@ matrix:
         - cargo tarpaulin -v --forward --out Xml
         - bash <(curl -s https://codecov.io/bash)
 
+before_script:
+  - rustup component add clippy
+
 script:
+  - cargo clippy --all-targets --all-features
+  - cargo build
   - cargo test
 
 env:
