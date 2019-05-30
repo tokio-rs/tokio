@@ -1,6 +1,7 @@
 extern crate env_logger;
 extern crate futures;
 extern crate mio;
+extern crate net2;
 extern crate tokio_io;
 extern crate tokio_tcp;
 
@@ -84,13 +85,14 @@ fn accept2() {
     t.join().unwrap();
 }
 
-#[cfg(unix)]
-mod unix {
+#[cfg(target_os = "linux")]
+mod linux {
     use tokio_tcp::TcpStream;
 
     use env_logger;
     use futures::{future, Future};
     use mio::unix::UnixReady;
+    use net2::TcpStreamExt;
     use tokio_io::AsyncRead;
 
     use std::io::Write;
@@ -105,6 +107,7 @@ mod unix {
         let addr = t!(srv.local_addr());
         let t = thread::spawn(move || {
             let mut client = t!(srv.accept()).0;
+            client.set_linger(Some(Duration::from_millis(0))).unwrap();
             client.write(b"hello world").unwrap();
             thread::sleep(Duration::from_millis(200));
         });
