@@ -1,3 +1,8 @@
+# 0.2.0 (unreleased)
+
+### Removed
+- `Enter::make_permanent` and `Enter::on_exit` (#???)
+
 # 0.1.7 (March 22, 2019)
 
 ### Added
