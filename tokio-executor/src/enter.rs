@@ -30,12 +30,14 @@ impl fmt::Debug for EnterError {
 
 impl fmt::Display for EnterError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "attempted to run an executor while another executor is already running")
+        write!(
+            fmt,
+            "attempted to run an executor while another executor is already running"
+        )
     }
 }
 
-impl Error for EnterError {
-}
+impl Error for EnterError {}
 
 /// Marks the current thread as being within the dynamic extent of an
 /// executor.
@@ -55,9 +57,7 @@ pub fn enter() -> Result<Enter, EnterError> {
         } else {
             c.set(true);
 
-            Ok(Enter {
-                _p: PhantomData,
-            })
+            Ok(Enter { _p: PhantomData })
         }
     })
 }
