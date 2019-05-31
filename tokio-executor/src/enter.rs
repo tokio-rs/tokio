@@ -1,7 +1,8 @@
 use futures::{self, Future};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::fmt;
+use std::marker::PhantomData;
 use std::prelude::v1::*;
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
@@ -10,8 +11,7 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 ///
 /// For more details, see [`enter` documentation](fn.enter.html)
 pub struct Enter {
-    on_exit: Vec<Box<dyn Callback>>,
-    permanent: bool,
+    _p: PhantomData<RefCell<()>>,
 }
 
 /// An error returned by `enter` if an execution scope has already been
@@ -30,15 +30,14 @@ impl fmt::Debug for EnterError {
 
 impl fmt::Display for EnterError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.description())
+        write!(
+            fmt,
+            "attempted to run an executor while another executor is already running"
+        )
     }
 }
 
-impl Error for EnterError {
-    fn description(&self) -> &str {
-        "attempted to run an executor while another executor is already running"
-    }
-}
+impl Error for EnterError {}
 
 /// Marks the current thread as being within the dynamic extent of an
 /// executor.
@@ -58,33 +57,12 @@ pub fn enter() -> Result<Enter, EnterError> {
         } else {
             c.set(true);
 
-            Ok(Enter {
-                on_exit: Vec::new(),
-                permanent: false,
-            })
+            Ok(Enter { _p: PhantomData })
         }
     })
 }
 
 impl Enter {
-    /// Register a callback to be invoked if and when the thread
-    /// ceased to act as an executor.
-    pub fn on_exit<F>(&mut self, f: F)
-    where
-        F: FnOnce() + 'static,
-    {
-        self.on_exit.push(Box::new(f));
-    }
-
-    /// Treat the remainder of execution on this thread as part of an
-    /// executor; used mostly for thread pool worker threads.
-    ///
-    /// All registered `on_exit` callbacks are *dropped* without being
-    /// invoked.
-    pub fn make_permanent(mut self) {
-        self.permanent = true;
-    }
-
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
     pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
@@ -102,26 +80,7 @@ impl Drop for Enter {
     fn drop(&mut self) {
         ENTERED.with(|c| {
             assert!(c.get());
-
-            if self.permanent {
-                return;
-            }
-
-            for callback in self.on_exit.drain(..) {
-                callback.call();
-            }
-
             c.set(false);
         });
-    }
-}
-
-trait Callback: 'static {
-    fn call(self: Box<Self>);
-}
-
-impl<F: FnOnce() + 'static> Callback for F {
-    fn call(self: Box<Self>) {
-        (*self)()
     }
 }
