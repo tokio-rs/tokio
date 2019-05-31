@@ -45,10 +45,11 @@
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
 use crossbeam_utils::sync::{Parker, Unparker};
-use std::future::{Waker, RawWaker, RawWakerVTable};
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::mem;
 use std::sync::Arc;
+use std::task::{Waker, RawWaker, RawWakerVTable};
 use std::time::Duration;
 
 /// Block the current thread.
@@ -225,30 +226,43 @@ impl Unpark for UnparkThread {
     }
 }
 
-impl UnparkThread {
-    pub fn into_waker(self) -> Waker {
-        use std::task::RawWakerVTable;
+static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
-        let vtable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-        let raw = RawWaker::new();
-        unimplemented!();
+impl UnparkThread {
+    pub(crate) fn into_waker(self) -> Waker {
+        unsafe {
+            let raw = unparker_to_raw_waker(self.inner);
+            Waker::from_raw(raw)
+        }
     }
 }
 
-unsafe fn clone(*const ()) -> RawWaker {
-    unimplemented!();
+unsafe fn unparker_to_raw_waker(unparker: Unparker) -> RawWaker {
+    RawWaker::new(Unparker::into_raw(unparker), &VTABLE)
 }
 
-unsafe fn wake(*const ()) {
-    unimplemented!();
+unsafe fn clone(raw: *const ()) -> RawWaker {
+    let unparker = Unparker::from_raw(raw);
+
+    // Increment the ref count
+    mem::forget(unparker.clone());
+
+    unparker_to_raw_waker(unparker)
 }
 
-unsafe fn wake_by_ref(*const ()) {
-    unimplemented!();
+unsafe fn wake(raw: *const ()) {
+    let unparker = Unparker::from_raw(raw);
+    unparker.unpark();
 }
 
-unsafe fn drop(*const ()) {
-    unimplemented!();
+unsafe fn wake_by_ref(raw: *const ()) {
+    let unparker = Unparker::from_raw(raw);
+    unparker.unpark();
+
+    // We don't actually own a reference to the unparker
+    mem::forget(unparker);
 }
 
-// const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone_raw, wake, wake, drop_raw);
+unsafe fn drop(raw: *const ()) {
+    let _ = Unparker::from_raw(raw);
+}

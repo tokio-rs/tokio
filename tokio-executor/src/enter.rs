@@ -87,9 +87,25 @@ impl Enter {
 
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
-    pub fn block_on<F: Future>(&mut self, f: F) -> F::Output {
-        // futures::executor::spawn(f).wait_future()
-        unimplemented!();
+    pub fn block_on<F: Future>(&mut self, mut f: F) -> F::Output {
+        use crate::park::{ParkThread, Park};
+        use std::pin::Pin;
+        use std::task::Context;
+        use std::task::Poll::Ready;
+
+        let park = ParkThread::new();
+        let waker = park.unpark().into_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
+        // no longer be accessed, making the pinning safe.
+        let mut f = unsafe { Pin::new_unchecked(&mut f) };
+
+        loop {
+            if let Ready(v) = f.as_mut().poll(&mut cx) {
+                return v
+            }
+        }
     }
 }
 
