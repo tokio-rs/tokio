@@ -26,10 +26,10 @@ macro_rules! if_fuzz {
     }}
 }
 
-pub mod lock;
+// pub mod lock;
 mod loom;
-pub mod mpsc;
+// pub mod mpsc;
 pub mod oneshot;
-pub mod semaphore;
-pub mod task;
-pub mod watch;
+// pub mod semaphore;
+// pub mod task;
+// pub mod watch;
