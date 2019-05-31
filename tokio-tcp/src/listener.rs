@@ -178,6 +178,13 @@ impl TcpListener {
     /// # }
     /// ```
     pub fn poll_accept_std(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
+        // Error takes precedence, indicated by writable event on listening socket
+        if let Ok(_) = self.io.poll_write_ready() {
+            if let Some(e) = self.io.get_ref().take_error()? {
+                return Err(e);
+            }
+        }
+        
         try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
 
         match self.io.get_ref().accept_std() {
