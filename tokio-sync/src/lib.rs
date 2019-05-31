@@ -31,5 +31,5 @@ mod loom;
 // pub mod mpsc;
 pub mod oneshot;
 // pub mod semaphore;
-// pub mod task;
+pub mod task;
 // pub mod watch;

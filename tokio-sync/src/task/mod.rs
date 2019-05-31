@@ -1,5 +1,5 @@
 //! Thread-safe task notification primitives.
 
-mod atomic_task;
+mod atomic_waker;
 
-pub use self::atomic_task::AtomicTask;
+pub use self::atomic_waker::AtomicWaker;
