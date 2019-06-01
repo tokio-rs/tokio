@@ -53,8 +53,9 @@
 //! [`Receiver::poll`]: struct.Receiver.html#method.poll
 //! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
 
+use crate::task::AtomicWaker;
+
 use fnv::FnvHashMap;
-use futures::task::AtomicTask;
 use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use std::ops;
 use std::sync::atomic::AtomicUsize;

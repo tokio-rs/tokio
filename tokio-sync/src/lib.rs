@@ -32,4 +32,4 @@ mod loom;
 pub mod oneshot;
 // pub mod semaphore;
 pub mod task;
-// pub mod watch;
+pub mod watch;
