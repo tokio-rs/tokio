@@ -711,6 +711,12 @@ impl<T> Stream for DelayQueue<T> {
     }
 }
 
+impl<T> Default for DelayQueue<T> {
+    fn default() -> DelayQueue<T> {
+        DelayQueue::new()
+    }
+}
+
 impl<T> wheel::Stack for Stack<T> {
     type Owned = usize;
     type Borrowed = usize;
