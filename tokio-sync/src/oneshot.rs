@@ -1,12 +1,12 @@
 //! A channel for sending a single message between asynchronous tasks.
 
 use crate::loom::{
-    task::{self, Waker},
+    task::Waker,
     sync::atomic::AtomicUsize,
     sync::CausalCell,
 };
 
-use futures_macros::ready;
+use tokio_futures::ready;
 use std::fmt;
 use std::future::Future;
 use std::mem::{self, ManuallyDrop};

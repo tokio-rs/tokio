@@ -55,12 +55,15 @@
 
 use crate::task::AtomicWaker;
 
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use core::task::Poll::{Ready, Pending};
 use fnv::FnvHashMap;
-use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
+use tokio_futures::{ready, Sink, Stream};
 
 /// Receives values from the associated `Sender`.
 ///
@@ -103,31 +106,10 @@ pub mod error {
 
     use std::fmt;
 
-    /// Error produced when receiving a value fails.
-    #[derive(Debug)]
-    pub struct RecvError {
-        pub(crate) _p: (),
-    }
-
     /// Error produced when sending a value fails.
     #[derive(Debug)]
     pub struct SendError<T> {
         pub(crate) inner: T,
-    }
-
-    // ===== impl RecvError =====
-
-    impl fmt::Display for RecvError {
-        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            use std::error::Error;
-            write!(fmt, "{}", self.description())
-        }
-    }
-
-    impl ::std::error::Error for RecvError {
-        fn description(&self) -> &str {
-            "channel closed"
-        }
     }
 
     // ===== impl SendError =====
@@ -161,7 +143,7 @@ struct Shared<T> {
     watchers: Mutex<Watchers>,
 
     /// Task to notify when all watchers drop
-    cancel: AtomicTask,
+    cancel: AtomicWaker,
 }
 
 #[derive(Debug)]
@@ -172,7 +154,7 @@ struct Watchers {
 
 #[derive(Debug)]
 struct WatchInner {
-    task: AtomicTask,
+    waker: AtomicWaker,
 }
 
 const CLOSED: usize = 1;
@@ -217,7 +199,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
             next_id: INIT_ID + 1,
             watchers,
         }),
-        cancel: AtomicTask::new(),
+        cancel: AtomicWaker::new(),
     });
 
     let tx = Sender {
@@ -262,9 +244,9 @@ impl<T> Receiver<T> {
     ///
     /// Only the **most recent** value is returned. If the receiver is falling
     /// behind the sender, intermediate values are dropped.
-    pub fn poll_ref(&mut self) -> Poll<Option<Ref<'_, T>>, error::RecvError> {
+    pub fn poll_ref(&mut self, cx: &mut Context<'_>) -> Poll<Option<Ref<'_, T>>> {
         // Make sure the task is up to date
-        self.inner.task.register();
+        self.inner.waker.register_by_ref(cx.waker());
 
         let state = self.shared.version.load(SeqCst);
         let version = state & !CLOSED;
@@ -275,25 +257,24 @@ impl<T> Receiver<T> {
 
             let inner = self.shared.value.read().unwrap();
 
-            return Ok(Some(Ref { inner }).into());
+            return Ready(Some(Ref { inner }));
         }
 
         if CLOSED == state & CLOSED {
             // The `Store` handle has been dropped.
-            return Ok(None.into());
+            return Ready(None);
         }
 
-        Ok(Async::NotReady)
+        Pending
     }
 }
 
 impl<T: Clone> Stream for Receiver<T> {
     type Item = T;
-    type Error = error::RecvError;
 
-    fn poll(&mut self) -> Poll<Option<T>, error::RecvError> {
-        let item = try_ready!(self.poll_ref());
-        Ok(Async::Ready(item.map(|v_ref| v_ref.clone())))
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let item = ready!(self.poll_ref(cx));
+        Ready(item.map(|v_ref| v_ref.clone()))
     }
 }
 
@@ -333,14 +314,14 @@ impl<T> Drop for Receiver<T> {
 impl WatchInner {
     fn new() -> Self {
         WatchInner {
-            task: AtomicTask::new(),
+            waker: AtomicWaker::new(),
         }
     }
 }
 
 impl<T> Sender<T> {
     /// Broadcast a new value via the channel, notifying all receivers.
-    pub fn broadcast(&mut self, value: T) -> Result<(), error::SendError<T>> {
+    pub fn broadcast(&self, value: T) -> Result<(), error::SendError<T>> {
         let shared = match self.shared.upgrade() {
             Some(shared) => shared,
             // All `Watch` handles have been canceled
@@ -367,28 +348,35 @@ impl<T> Sender<T> {
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
-    pub fn poll_close(&mut self) -> Poll<(), ()> {
+    pub fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         match self.shared.upgrade() {
             Some(shared) => {
-                shared.cancel.register();
-                Ok(Async::NotReady)
+                shared.cancel.register_by_ref(cx.waker());
+                Pending
             }
-            None => Ok(Async::Ready(())),
+            None => Ready(()),
         }
     }
 }
 
-impl<T> Sink for Sender<T> {
-    type SinkItem = T;
-    type SinkError = error::SendError<T>;
+impl<T> Sink<T> for Sender<T> {
+    type Error = error::SendError<T>;
 
-    fn start_send(&mut self, item: T) -> StartSend<T, error::SendError<T>> {
-        let _ = self.broadcast(item)?;
-        Ok(AsyncSink::Ready)
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Ready(Ok(()))
     }
 
-    fn poll_complete(&mut self) -> Poll<(), error::SendError<T>> {
-        Ok(().into())
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        let _ = self.as_ref().get_ref().broadcast(item)?;
+        Ok(())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Ready(Ok(()))
     }
 }
 
@@ -398,7 +386,7 @@ fn notify_all<T>(shared: &Shared<T>) {
 
     for watcher in watchers.watchers.values() {
         // Notify the task
-        watcher.task.notify();
+        watcher.waker.wake();
     }
 }
 
@@ -425,6 +413,6 @@ impl<'a, T: 'a> ops::Deref for Ref<'a, T> {
 
 impl<T> Drop for Shared<T> {
     fn drop(&mut self) {
-        self.cancel.notify();
+        self.cancel.wake();
     }
 }

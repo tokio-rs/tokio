@@ -23,7 +23,7 @@ publish = false
 
 [dependencies]
 fnv = "1.0.6"
-futures-macros = { path = "/Users/carllerche/Code/Tokio/futures-macros/futures-macros" }
+tokio-futures = { version = "0.2.0", path = "../tokio-futures" }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }

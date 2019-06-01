@@ -1,7 +1,7 @@
 use crate::loom::{
     sync::atomic::AtomicUsize,
     sync::CausalCell,
-    task::{self, Waker},
+    task::Waker,
 };
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
