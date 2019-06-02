@@ -1,8 +1,8 @@
 use crate::worker::Worker;
 use futures::{try_ready, Poll};
+use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
-use std::cell::Cell;
 use std::marker::PhantomData;
 
 thread_local! {
@@ -167,14 +167,14 @@ where
 }
 
 /// Registers the thread as "blockable" until the returned guard object is dropped.
-/// 
+///
 /// Calls to `blocking` made on a blockable thread will immediately run the
 /// closure. This can be used when a thread is masquerading as part of a runtime,
 /// but its associated reactor is on another thread of execution so there's no
 /// danger when running blocking tasks.
-/// 
+///
 /// # Panics
-/// 
+///
 /// Panics if the thread is already registered as blockable.
 pub fn blockable() -> Blockable {
     BLOCKABLE.with(|c| {

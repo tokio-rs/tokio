@@ -242,7 +242,6 @@ fn block_on_blocking() {
     runtime.shutdown_on_idle().wait().unwrap();
 }
 
-
 mod from_block_on {
     use super::*;
 
