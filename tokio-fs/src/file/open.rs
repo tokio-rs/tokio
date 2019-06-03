@@ -1,8 +1,8 @@
 use super::File;
 use crate::blocking_pool::{blocking, Blocking};
 use futures::{future, try_ready, Async, Future, Poll};
-use std::fs::OpenOptions as StdOpenOptions;
 use std::fs::File as StdFile;
+use std::fs::OpenOptions as StdOpenOptions;
 use std::io;
 use std::path::Path;
 
