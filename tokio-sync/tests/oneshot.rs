@@ -60,50 +60,46 @@ fn close_rx() {
     assert_err!(tx.send(1));
 }
 
-/*
 #[test]
 fn explicit_close_poll() {
     // First, with message sent
     let (tx, mut rx) = oneshot::channel();
+    let mut task = MockTask::new();
 
-    assert!(tx.send(1).is_ok());
+    assert_ok!(tx.send(1));
 
     rx.close();
 
-    let value = assert_ready!(rx.poll());
+    let value = assert_ready_ok!(task.poll(&mut rx));
     assert_eq!(value, 1);
-
-    println!("~~~~~~~~~ TWO ~~~~~~~~~~");
 
     // Second, without the message sent
     let (mut tx, mut rx) = oneshot::channel::<i32>();
-    let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_close()));
+    assert_pending!(task.enter(|cx| tx.poll_close(cx)));
 
     rx.close();
 
-    assert!(task.is_notified());
+    assert!(task.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(tx.poll_close());
+    assert_ready!(task.enter(|cx| tx.poll_close(cx)));
 
-    assert!(tx.send(1).is_err());
-
-    assert!(rx.poll().is_err());
+    assert_err!(tx.send(1));
+    assert_ready_err!(task.poll(&mut rx));
 
     // Again, but without sending the value this time
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_close()));
+    assert_pending!(task.enter(|cx| tx.poll_close(cx)));
 
     rx.close();
 
-    assert!(task.is_notified());
+    assert!(task.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(tx.poll_close());
+    assert_ready!(task.enter(|cx| tx.poll_close(cx)));
 
-    assert!(rx.poll().is_err());
+    assert_ready_err!(task.poll(&mut rx));
 }
 
 #[test]
@@ -111,27 +107,26 @@ fn explicit_close_try_recv() {
     // First, with message sent
     let (tx, mut rx) = oneshot::channel();
 
-    assert!(tx.send(1).is_ok());
+    assert_ok!(tx.send(1));
 
     rx.close();
 
-    assert_eq!(rx.try_recv().unwrap(), 1);
-
-    println!("~~~~~~~~~ TWO ~~~~~~~~~~");
+    let val = assert_ok!(rx.try_recv());
+    assert_eq!(1, val);
 
     // Second, without the message sent
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut task = MockTask::new();
 
-    task.enter(|| assert_not_ready!(tx.poll_close()));
+    assert_pending!(task.enter(|cx| tx.poll_close(cx)));
 
     rx.close();
 
-    assert!(task.is_notified());
+    assert!(task.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(tx.poll_close());
+    assert_ready!(task.enter(|cx| tx.poll_close(cx)));
 
-    assert!(rx.try_recv().is_err());
+    assert_err!(rx.try_recv());
 }
 
 #[test]
@@ -142,11 +137,9 @@ fn close_try_recv_poll() {
 
     rx.close();
 
-    assert!(rx.try_recv().is_err());
+    assert_err!(rx.try_recv());
 
-    task.enter(|| {
-        let _ = rx.poll();
-    });
+    let _ = task.poll(&mut rx);
 }
 
 #[test]
@@ -155,19 +148,14 @@ fn drops_tasks() {
     let mut tx_task = MockTask::new();
     let mut rx_task = MockTask::new();
 
-    tx_task.enter(|| {
-        assert_not_ready!(tx.poll_close());
-    });
-
-    rx_task.enter(|| {
-        assert_not_ready!(rx.poll());
-    });
+    assert_pending!(tx_task.enter(|cx| tx.poll_close(cx)));
+    assert_pending!(rx_task.poll(&mut rx));
 
     drop(tx);
     drop(rx);
 
-    assert_eq!(1, tx_task.notifier_ref_count());
-    assert_eq!(1, rx_task.notifier_ref_count());
+    assert_eq!(1, tx_task.waker_ref_count());
+    assert_eq!(1, rx_task.waker_ref_count());
 }
 
 #[test]
@@ -177,26 +165,22 @@ fn receiver_changes_task() {
     let mut task1 = MockTask::new();
     let mut task2 = MockTask::new();
 
-    task1.enter(|| {
-        assert_not_ready!(rx.poll());
-    });
+    assert_pending!(task1.poll(&mut rx));
 
-    assert_eq!(2, task1.notifier_ref_count());
-    assert_eq!(1, task2.notifier_ref_count());
+    assert_eq!(2, task1.waker_ref_count());
+    assert_eq!(1, task2.waker_ref_count());
 
-    task2.enter(|| {
-        assert_not_ready!(rx.poll());
-    });
+    assert_pending!(task2.poll(&mut rx));
 
-    assert_eq!(1, task1.notifier_ref_count());
-    assert_eq!(2, task2.notifier_ref_count());
+    assert_eq!(1, task1.waker_ref_count());
+    assert_eq!(2, task2.waker_ref_count());
 
-    tx.send(1).unwrap();
+    assert_ok!(tx.send(1));
 
-    assert!(!task1.is_notified());
-    assert!(task2.is_notified());
+    assert!(!task1.is_woken());
+    assert!(task2.is_woken());
 
-    assert_ready!(rx.poll());
+    assert_ready_ok!(task2.poll(&mut rx));
 }
 
 #[test]
@@ -206,25 +190,20 @@ fn sender_changes_task() {
     let mut task1 = MockTask::new();
     let mut task2 = MockTask::new();
 
-    task1.enter(|| {
-        assert_not_ready!(tx.poll_close());
-    });
+    assert_pending!(task1.enter(|cx| tx.poll_close(cx)));
 
-    assert_eq!(2, task1.notifier_ref_count());
-    assert_eq!(1, task2.notifier_ref_count());
+    assert_eq!(2, task1.waker_ref_count());
+    assert_eq!(1, task2.waker_ref_count());
 
-    task2.enter(|| {
-        assert_not_ready!(tx.poll_close());
-    });
+    assert_pending!(task2.enter(|cx| tx.poll_close(cx)));
 
-    assert_eq!(1, task1.notifier_ref_count());
-    assert_eq!(2, task2.notifier_ref_count());
+    assert_eq!(1, task1.waker_ref_count());
+    assert_eq!(2, task2.waker_ref_count());
 
     drop(rx);
 
-    assert!(!task1.is_notified());
-    assert!(task2.is_notified());
+    assert!(!task1.is_woken());
+    assert!(task2.is_woken());
 
-    assert_ready!(tx.poll_close());
+    assert_ready!(task2.enter(|cx| tx.poll_close(cx)));
 }
-*/
