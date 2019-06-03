@@ -1,8 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio_sync::oneshot;
-use tokio_test::*;
 use tokio_test::task::MockTask;
+use tokio_test::*;
 
 trait AssertSend: Send {}
 impl AssertSend for oneshot::Sender<i32> {}

@@ -24,7 +24,7 @@
 mod macros;
 pub mod task;
 
-pub use assertive::{assert_ok, assert_err};
+pub use assertive::{assert_err, assert_ok};
 
 /*
 #[doc(hidden)]

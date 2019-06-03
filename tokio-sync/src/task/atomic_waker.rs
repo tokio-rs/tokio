@@ -1,8 +1,4 @@
-use crate::loom::{
-    sync::atomic::AtomicUsize,
-    sync::CausalCell,
-    task::Waker,
-};
+use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell, task::Waker};
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
@@ -168,7 +164,7 @@ impl AtomicWaker {
 
     fn do_register<W>(&self, waker: W)
     where
-        W: WakerRef
+        W: WakerRef,
     {
         debug!(" + register_task");
         match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {

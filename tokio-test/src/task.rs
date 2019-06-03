@@ -90,7 +90,6 @@ impl MockTask {
         Arc::strong_count(&self.waker)
     }
 
-
     fn waker(&self) -> Waker {
         unsafe {
             let raw = to_raw(self.waker.clone());

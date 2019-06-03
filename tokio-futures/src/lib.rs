@@ -6,11 +6,11 @@
 //! Futures
 
 pub mod future;
-pub mod stream;
 pub mod sink;
+pub mod stream;
 
 mod macros;
 
 pub use crate::future::Future;
-pub use crate::stream::Stream;
 pub use crate::sink::Sink;
+pub use crate::stream::Stream;

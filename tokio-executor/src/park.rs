@@ -46,10 +46,10 @@
 
 use crossbeam_utils::sync::{Parker, Unparker};
 use std::marker::PhantomData;
-use std::rc::Rc;
 use std::mem;
+use std::rc::Rc;
 use std::sync::Arc;
-use std::task::{Waker, RawWaker, RawWakerVTable};
+use std::task::{RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
 
 /// Block the current thread.

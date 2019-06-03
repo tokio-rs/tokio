@@ -56,8 +56,8 @@
 use crate::task::AtomicWaker;
 
 use core::pin::Pin;
+use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
-use core::task::Poll::{Ready, Pending};
 use fnv::FnvHashMap;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
