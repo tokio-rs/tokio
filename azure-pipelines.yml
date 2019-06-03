@@ -19,20 +19,20 @@ jobs:
     crates:
       # - tokio
 
-# Test crates that are platform specific
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_sub_cross
-    displayName: Test sub crates -
-    cross: true
-    crates:
-      # - tokio-fs
-      # - tokio-reactor
-      # - tokio-signal
-      # - tokio-tcp
-      # - tokio-tls
-      # - tokio-udp
-      # - tokio-uds
+# # Test crates that are platform specific
+# - template: ci/azure-test-stable.yml
+#   parameters:
+#     name: test_sub_cross
+#     displayName: Test sub crates -
+#     cross: true
+#     crates:
+#       - tokio-fs
+#       - tokio-reactor
+#       - tokio-signal
+#       - tokio-tcp
+#       - tokio-tls
+#       - tokio-udp
+#       - tokio-uds
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
@@ -54,26 +54,26 @@ jobs:
       # - tokio-trace/test-log-support
       # - tokio-trace/test_static_max_level_features
 
-- template: ci/azure-cargo-check.yml
-  parameters:
-    name: features
-    displayName: Check feature permtuations
-    rust: stable
-    crates:
-      # tokio:
-      #   - codec
-      #   - fs
-      #   - io
-      #   - reactor
-      #   - rt-full
-      #   - tcp
-      #   - timer
-      #   - udp
-      #   - uds
-      #   - sync
-      # tokio-buf:
-      #   - util
-
+# - template: ci/azure-cargo-check.yml
+#   parameters:
+#     name: features
+#     displayName: Check feature permtuations
+#     rust: stable
+#     crates:
+#       tokio:
+#         - codec
+#         - fs
+#         - io
+#         - reactor
+#         - rt-full
+#         - tcp
+#         - timer
+#         - udp
+#         - uds
+#         - sync
+#       tokio-buf:
+#         - util
+#
 # # Run async-await tests
 # - template: ci/azure-test-nightly.yml
 #   parameters:
