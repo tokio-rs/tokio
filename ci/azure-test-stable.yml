@@ -34,16 +34,9 @@ jobs:
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
-    - script: cargo test --lib
+    - script: cargo test --lib && cargo test --tests
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
-      displayName: cargo test -p ${{ crate }} --lib (PATCHED)
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-
-    - script: cargo test --tests
-      env:
-        LOOM_MAX_DURATION: 10
-        CI: 'True'
-      displayName: cargo test -p ${{ crate }} --tests (PATCHED)
+      displayName: cargo test -p ${{ crate }} (PATCHED)
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
