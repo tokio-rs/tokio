@@ -28,5 +28,5 @@ tokio-futures = { version = "0.2.0", path = "../tokio-futures" }
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
 # tokio = { version = "0.2.0", path = "../tokio" }
-tokio-mock-task = "0.1.1"
+tokio-test = { version = "0.2.0", path = "../tokio-test" }
 loom = { version = "0.1.1", features = ["futures"] }
