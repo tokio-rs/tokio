@@ -68,10 +68,7 @@ thread_local! {
 // ===== impl DefaultExecutor =====
 
 impl super::Executor for DefaultExecutor {
-    fn spawn(
-        &mut self,
-        future: Box<dyn Future<Output = ()> + Send>,
-    ) -> Result<(), SpawnError> {
+    fn spawn(&mut self, future: Box<dyn Future<Output = ()> + Send>) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }

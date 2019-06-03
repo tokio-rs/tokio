@@ -6,7 +6,7 @@ pub(crate) use std::task;
 
 pub(crate) mod sync {
     pub(crate) use std::sync::atomic;
-    pub(crate) use std::sync::Arc;
+    // pub(crate) use std::sync::Arc;
 
     use std::cell::UnsafeCell;
 
@@ -33,6 +33,8 @@ pub(crate) mod sync {
     }
 }
 
+/*
 pub(crate) fn yield_now() {
     ::std::sync::atomic::spin_loop_hint();
 }
+*/

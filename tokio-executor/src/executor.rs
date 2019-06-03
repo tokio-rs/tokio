@@ -88,10 +88,7 @@ pub trait Executor {
     /// }))).unwrap();
     /// # }
     /// ```
-    fn spawn(
-        &mut self,
-        future: Box<dyn Future<Output = ()> + Send>,
-    ) -> Result<(), SpawnError>;
+    fn spawn(&mut self, future: Box<dyn Future<Output = ()> + Send>) -> Result<(), SpawnError>;
 
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///
@@ -131,10 +128,7 @@ pub trait Executor {
 }
 
 impl<E: Executor + ?Sized> Executor for Box<E> {
-    fn spawn(
-        &mut self,
-        future: Box<dyn Future<Output = ()> + Send>,
-    ) -> Result<(), SpawnError> {
+    fn spawn(&mut self, future: Box<dyn Future<Output = ()> + Send>) -> Result<(), SpawnError> {
         (**self).spawn(future)
     }
 

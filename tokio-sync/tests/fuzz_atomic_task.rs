@@ -1,11 +1,12 @@
+#![cfg(feature = "broken")]
 #![deny(warnings, rust_2018_idioms)]
 
 #[macro_use]
 extern crate loom;
 
 #[allow(dead_code)]
-#[path = "../src/task/atomic_task.rs"]
-mod atomic_task;
+#[path = "../src/task/atomic_waker.rs"]
+mod atomic_waker;
 
 use crate::atomic_task::AtomicTask;
 use futures::future::poll_fn;

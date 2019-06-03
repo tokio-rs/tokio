@@ -20,11 +20,13 @@ macro_rules! debug {
     }
 }
 
+/*
 macro_rules! if_fuzz {
     ($($t:tt)*) => {{
         if false { $($t)* }
     }}
 }
+*/
 
 // pub mod lock;
 mod loom;

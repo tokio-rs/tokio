@@ -1,8 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::error::Error;
-use std::marker::PhantomData;
 use std::fmt;
 use std::future::Future;
+use std::marker::PhantomData;
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
@@ -65,7 +65,7 @@ impl Enter {
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
     pub fn block_on<F: Future>(&mut self, mut f: F) -> F::Output {
-        use crate::park::{ParkThread, Park};
+        use crate::park::{Park, ParkThread};
         use std::pin::Pin;
         use std::task::Context;
         use std::task::Poll::Ready;
@@ -80,7 +80,7 @@ impl Enter {
 
         loop {
             if let Ready(v) = f.as_mut().poll(&mut cx) {
-                return v
+                return v;
             }
         }
     }
