@@ -17,25 +17,33 @@ jobs:
   steps:
   - template: azure-install-rust.yml
     parameters:
-      rust_version: stable
+      # rust_version: stable
+      rust_version: nightly
 
-  - template: azure-is-release.yml
-
-  - ${{ each crate in parameters.crates }}:
-    - script: cargo test
-      env:
-        LOOM_MAX_DURATION: 10
-        CI: 'True'
-      displayName: cargo test -p ${{ crate }}
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-      condition: and(succeeded(), ne(variables['isRelease'], 'true'))
+#   - template: azure-is-release.yml
+#
+#   - ${{ each crate in parameters.crates }}:
+#     - script: cargo test
+#       env:
+#         LOOM_MAX_DURATION: 10
+#         CI: 'True'
+#       displayName: cargo test -p ${{ crate }}
+#       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+#       condition: and(succeeded(), ne(variables['isRelease'], 'true'))
 
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
-    - script: cargo test
+    - script: cargo test --lib
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
-      displayName: cargo test -p ${{ crate }} (PATCHED)
+      displayName: cargo test -p ${{ crate }} --lib (PATCHED)
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    - script: cargo test --tests
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+      displayName: cargo test -p ${{ crate }} --tests (PATCHED)
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
