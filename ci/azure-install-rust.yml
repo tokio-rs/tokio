@@ -2,6 +2,7 @@ steps:
   # Linux and macOS.
   - script: |
       set -e
+      echo "Installing toolchain: $RUSTUP_TOOLCHAIN"
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
       echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
     env:
@@ -22,6 +23,9 @@ steps:
 
   # All platforms.
   - script: |
-        rustc -Vv
-        cargo -V
+        rustup toolchain install nightly
+        rustup update
+        rustup toolchain list
+        rustc +nightly -Vv
+        cargo +nightly -V
     displayName: Query rust and cargo versions

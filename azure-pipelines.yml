@@ -5,10 +5,10 @@ variables:
   nightly: nightly-2019-05-09
 
 jobs:
-# Check formatting
-- template: ci/azure-rustfmt.yml
-  parameters:
-    name: rustfmt
+# # Check formatting
+# - template: ci/azure-rustfmt.yml
+#   parameters:
+#     name: rustfmt
 
 # Test top level crate
 # - template: ci/azure-test-stable.yml
@@ -42,8 +42,8 @@ jobs:
     crates:
       # - tokio-buf
       # - tokio-codec
-      # - tokio-current-thread
-      # - tokio-executor
+      - tokio-current-thread
+      - tokio-executor
       # - tokio-io
       - tokio-sync
       # - tokio-threadpool

@@ -1,39 +1,34 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use futures::future::{self, lazy};
-// This is not actually unused --- we need this trait to be in scope for
-// the tests that sue TaskExecutor::current().execute(). The compiler
-// doesn't realise that.
-#[allow(unused_imports)]
-use futures::future::Executor;
-use futures::prelude::*;
-use futures::sync::oneshot;
-use futures::task;
 use std::any::Any;
 use std::cell::{Cell, RefCell};
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
+use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
 use tokio_current_thread::{block_on_all, CurrentThread};
+use tokio_executor::TypedExecutor;
+use tokio_sync::oneshot;
 
 mod from_block_on_all {
     use super::*;
-    fn test<F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static>(spawn: F) {
+    fn test<F: Fn(Pin<Box<dyn Future<Output = ()>>>) + 'static>(spawn: F) {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
 
-        let msg = tokio_current_thread::block_on_all(lazy(move || {
+        let msg = tokio_current_thread::block_on_all(async move {
             c.set(1 + c.get());
 
             // Spawn!
-            spawn(Box::new(lazy(move || {
+            spawn(Box::pin(async move {
                 c.set(1 + c.get());
-                Ok::<(), ()>(())
-            })));
+            }));
 
-            Ok::<_, ()>("hello")
-        }))
-        .unwrap();
+            "hello"
+        });
 
         assert_eq!(2, cnt.get());
         assert_eq!(msg, "hello");
@@ -48,7 +43,7 @@ mod from_block_on_all {
     fn execute() {
         test(|f| {
             tokio_current_thread::TaskExecutor::current()
-                .execute(f)
+                .spawn(f)
                 .unwrap();
         });
     }
@@ -66,11 +61,10 @@ fn block_waits() {
     let cnt = Rc::new(Cell::new(0));
     let cnt2 = cnt.clone();
 
-    block_on_all(rx.then(move |_| {
+    block_on_all(async move {
+        rx.await.unwrap();
         cnt.set(1 + cnt.get());
-        Ok::<_, ()>(())
-    }))
-    .unwrap();
+    });
 
     assert_eq!(1, cnt2.get());
 }
@@ -84,10 +78,9 @@ fn spawn_many() {
 
     for _ in 0..ITER {
         let cnt = cnt.clone();
-        tokio_current_thread.spawn(lazy(move || {
+        tokio_current_thread.spawn(async move {
             cnt.set(1 + cnt.get());
-            Ok::<(), ()>(())
-        }));
+        });
     }
 
     tokio_current_thread.run().unwrap();
@@ -98,48 +91,36 @@ fn spawn_many() {
 mod does_not_set_global_executor_by_default {
     use super::*;
 
-    fn test<F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) -> Result<(), E> + 'static, E>(
+    fn test<F: Fn(Pin<Box<dyn Future<Output = ()> + Send>>) -> Result<(), E> + 'static, E>(
         spawn: F,
     ) {
-        block_on_all(lazy(|| {
-            spawn(Box::new(lazy(|| ok()))).unwrap_err();
-            ok()
-        }))
-        .unwrap()
+        block_on_all(async {
+            spawn(Box::pin(async {})).unwrap_err();
+        });
     }
 
     #[test]
     fn spawn() {
-        use tokio_executor::Executor;
         test(|f| tokio_executor::DefaultExecutor::current().spawn(f))
-    }
-
-    #[test]
-    fn execute() {
-        test(|f| tokio_executor::DefaultExecutor::current().execute(f))
     }
 }
 
 mod from_block_on_future {
     use super::*;
 
-    fn test<F: Fn(Box<dyn Future<Item = (), Error = ()>>)>(spawn: F) {
+    fn test<F: Fn(Pin<Box<dyn Future<Output = ()>>>)>(spawn: F) {
         let cnt = Rc::new(Cell::new(0));
+        let cnt2 = cnt.clone();
 
         let mut tokio_current_thread = CurrentThread::new();
 
-        tokio_current_thread
-            .block_on(lazy(|| {
-                let cnt = cnt.clone();
+        tokio_current_thread.block_on(async move {
+            let cnt3 = cnt2.clone();
 
-                spawn(Box::new(lazy(move || {
-                    cnt.set(1 + cnt.get());
-                    Ok(())
-                })));
-
-                Ok::<_, ()>(())
-            }))
-            .unwrap();
+            spawn(Box::pin(async move {
+                cnt3.set(1 + cnt3.get());
+            }));
+        });
 
         tokio_current_thread.run().unwrap();
 
@@ -155,35 +136,30 @@ mod from_block_on_future {
     fn execute() {
         test(|f| {
             tokio_current_thread::TaskExecutor::current()
-                .execute(f)
+                .spawn(f)
                 .unwrap();
         });
-    }
-}
-
-struct Never(Rc<()>);
-
-impl Future for Never {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        Ok(Async::NotReady)
     }
 }
 
 mod outstanding_tasks_are_dropped_when_executor_is_dropped {
     use super::*;
 
+    async fn never(_rc: Rc<()>) {
+        loop {
+            yield_once().await;
+        }
+    }
+
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<dyn Future<Item = (), Error = ()>>),
+        F: Fn(Pin<Box<dyn Future<Output = ()>>>) + 'static,
+        G: Fn(&mut CurrentThread, Pin<Box<dyn Future<Output = ()>>>),
     {
         let mut rc = Rc::new(());
 
         let mut tokio_current_thread = CurrentThread::new();
-        dotspawn(&mut tokio_current_thread, Box::new(Never(rc.clone())));
+        dotspawn(&mut tokio_current_thread, Box::pin(never(rc.clone())));
 
         drop(tokio_current_thread);
 
@@ -193,15 +169,13 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
         // Using the global spawn fn
 
         let mut rc = Rc::new(());
+        let rc2 = rc.clone();
 
         let mut tokio_current_thread = CurrentThread::new();
 
-        tokio_current_thread
-            .block_on(lazy(|| {
-                spawn(Box::new(Never(rc.clone())));
-                Ok::<_, ()>(())
-            }))
-            .unwrap();
+        tokio_current_thread.block_on(async move {
+            spawn(Box::pin(never(rc2)));
+        });
 
         drop(tokio_current_thread);
 
@@ -221,7 +195,7 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
         test(
             |f| {
                 tokio_current_thread::TaskExecutor::current()
-                    .execute(f)
+                    .spawn(f)
                     .unwrap();
             },
             // Note: `CurrentThread` doesn't currently implement
@@ -238,12 +212,9 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 #[test]
 #[should_panic]
 fn nesting_run() {
-    block_on_all(lazy(|| {
-        block_on_all(lazy(|| ok())).unwrap();
-
-        ok()
-    }))
-    .unwrap();
+    block_on_all(async {
+        block_on_all(async {});
+    });
 }
 
 mod run_in_future {
@@ -252,29 +223,23 @@ mod run_in_future {
     #[test]
     #[should_panic]
     fn spawn() {
-        block_on_all(lazy(|| {
-            tokio_current_thread::spawn(lazy(|| {
-                block_on_all(lazy(|| ok())).unwrap();
-                ok()
-            }));
-            ok()
-        }))
-        .unwrap();
+        block_on_all(async {
+            tokio_current_thread::spawn(async {
+                block_on_all(async {});
+            });
+        });
     }
 
     #[test]
     #[should_panic]
     fn execute() {
-        block_on_all(lazy(|| {
+        block_on_all(async {
             tokio_current_thread::TaskExecutor::current()
-                .execute(lazy(|| {
-                    block_on_all(lazy(|| ok())).unwrap();
-                    ok()
-                }))
+                .spawn(async {
+                    block_on_all(async {});
+                })
                 .unwrap();
-            ok()
-        }))
-        .unwrap();
+        });
     }
 }
 
@@ -282,23 +247,15 @@ mod run_in_future {
 fn tick_on_infini_future() {
     let num = Rc::new(Cell::new(0));
 
-    struct Infini {
-        num: Rc<Cell<usize>>,
-    }
-
-    impl Future for Infini {
-        type Item = ();
-        type Error = ();
-
-        fn poll(&mut self) -> Poll<(), ()> {
-            self.num.set(1 + self.num.get());
-            task::current().notify();
-            Ok(Async::NotReady)
+    async fn infini(num: Rc<Cell<usize>>) {
+        loop {
+            num.set(1 + num.get());
+            yield_once().await
         }
     }
 
     CurrentThread::new()
-        .spawn(Infini { num: num.clone() })
+        .spawn(infini(num.clone()))
         .turn(None)
         .unwrap();
 
@@ -307,56 +264,41 @@ fn tick_on_infini_future() {
 
 mod tasks_are_scheduled_fairly {
     use super::*;
-    struct Spin {
-        state: Rc<RefCell<[i32; 2]>>,
-        idx: usize,
-    }
 
-    impl Future for Spin {
-        type Item = ();
-        type Error = ();
+    async fn spin(state: Rc<RefCell<[i32; 2]>>, idx: usize) {
+        loop {
+            // borrow_mut scope
+            {
+                let mut state = state.borrow_mut();
 
-        fn poll(&mut self) -> Poll<(), ()> {
-            let mut state = self.state.borrow_mut();
+                if idx == 0 {
+                    let diff = state[0] - state[1];
 
-            if self.idx == 0 {
-                let diff = state[0] - state[1];
+                    assert!(diff.abs() <= 1);
 
-                assert!(diff.abs() <= 1);
+                    if state[0] >= 50 {
+                        return;
+                    }
+                }
 
-                if state[0] >= 50 {
-                    return Ok(().into());
+                state[idx] += 1;
+
+                if state[idx] >= 100 {
+                    return;
                 }
             }
 
-            state[self.idx] += 1;
-
-            if state[self.idx] >= 100 {
-                return Ok(().into());
-            }
-
-            task::current().notify();
-            Ok(Async::NotReady)
+            yield_once().await;
         }
     }
 
-    fn test<F: Fn(Spin)>(spawn: F) {
+    fn test<F: Fn(Pin<Box<dyn Future<Output = ()>>>)>(spawn: F) {
         let state = Rc::new(RefCell::new([0, 0]));
 
-        block_on_all(lazy(|| {
-            spawn(Spin {
-                state: state.clone(),
-                idx: 0,
-            });
-
-            spawn(Spin {
-                state: state,
-                idx: 1,
-            });
-
-            ok()
-        }))
-        .unwrap();
+        block_on_all(async move {
+            spawn(Box::pin(spin(state.clone(), 0)));
+            spawn(Box::pin(spin(state, 1)));
+        });
     }
 
     #[test]
@@ -368,7 +310,7 @@ mod tasks_are_scheduled_fairly {
     fn execute() {
         test(|f| {
             tokio_current_thread::TaskExecutor::current()
-                .execute(f)
+                .spawn(f)
                 .unwrap();
         })
     }
@@ -379,8 +321,8 @@ mod and_turn {
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<dyn Future<Item = (), Error = ()>>),
+        F: Fn(Pin<Box<dyn Future<Output = ()>>>) + 'static,
+        G: Fn(&mut CurrentThread, Pin<Box<dyn Future<Output = ()>>>),
     {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
@@ -388,24 +330,21 @@ mod and_turn {
         let mut tokio_current_thread = CurrentThread::new();
 
         // Spawn a basic task to get the executor to turn
-        dotspawn(&mut tokio_current_thread, Box::new(lazy(move || Ok(()))));
+        dotspawn(&mut tokio_current_thread, Box::pin(async {}));
 
         // Turn once...
         tokio_current_thread.turn(None).unwrap();
 
         dotspawn(
             &mut tokio_current_thread,
-            Box::new(lazy(move || {
+            Box::pin(async move {
                 c.set(1 + c.get());
 
                 // Spawn!
-                spawn(Box::new(lazy(move || {
+                spawn(Box::pin(async move {
                     c.set(1 + c.get());
-                    Ok::<(), ()>(())
-                })));
-
-                Ok(())
-            })),
+                }));
+            }),
         );
 
         // This does not run the newly spawned thread
@@ -429,7 +368,7 @@ mod and_turn {
         test(
             |f| {
                 tokio_current_thread::TaskExecutor::current()
-                    .execute(f)
+                    .spawn(f)
                     .unwrap();
             },
             // Note: `CurrentThread` doesn't currently implement
@@ -454,23 +393,12 @@ mod in_drop {
         }
     }
 
-    struct MyFuture {
-        _data: Box<dyn Any>,
-    }
-
-    impl Future for MyFuture {
-        type Item = ();
-        type Error = ();
-
-        fn poll(&mut self) -> Poll<(), ()> {
-            Ok(().into())
-        }
-    }
+    async fn noop(_data: Box<dyn Any>) {}
 
     fn test<F, G>(spawn: F, dotspawn: G)
     where
-        F: Fn(Box<dyn Future<Item = (), Error = ()>>) + 'static,
-        G: Fn(&mut CurrentThread, Box<dyn Future<Item = (), Error = ()>>),
+        F: Fn(Pin<Box<dyn Future<Output = ()>>>) + 'static,
+        G: Fn(&mut CurrentThread, Pin<Box<dyn Future<Output = ()>>>),
     {
         let mut tokio_current_thread = CurrentThread::new();
 
@@ -478,14 +406,11 @@ mod in_drop {
 
         dotspawn(
             &mut tokio_current_thread,
-            Box::new(MyFuture {
-                _data: Box::new(OnDrop(Some(move || {
-                    spawn(Box::new(lazy(move || {
-                        tx.send(()).unwrap();
-                        Ok(())
-                    })));
-                }))),
-            }),
+            Box::pin(noop(Box::new(OnDrop(Some(move || {
+                spawn(Box::pin(async move {
+                    tx.send(()).unwrap();
+                }));
+            }))))),
         );
 
         tokio_current_thread.block_on(rx).unwrap();
@@ -504,7 +429,7 @@ mod in_drop {
         test(
             |f| {
                 tokio_current_thread::TaskExecutor::current()
-                    .execute(f)
+                    .spawn(f)
                     .unwrap();
             },
             // Note: `CurrentThread` doesn't currently implement
@@ -519,6 +444,7 @@ mod in_drop {
 
 }
 
+/*
 #[test]
 fn hammer_turn() {
     use futures::sync::mpsc;
@@ -572,6 +498,7 @@ fn hammer_turn() {
         }
     }
 }
+*/
 
 #[test]
 fn turn_has_polled() {
@@ -579,7 +506,9 @@ fn turn_has_polled() {
 
     // Spawn oneshot receiver
     let (sender, receiver) = oneshot::channel::<()>();
-    tokio_current_thread.spawn(receiver.then(|_| Ok(())));
+    tokio_current_thread.spawn(async move {
+        let _ = receiver.await;
+    });
 
     // Turn once...
     let res = tokio_current_thread
@@ -674,30 +603,30 @@ fn turn_fair() {
 
     // Once an item is received on the oneshot channel, it will immediately
     // immediately make the second oneshot channel ready
-    tokio_current_thread.spawn(receiver.map_err(|_| unreachable!()).and_then(move |_| {
+
+    tokio_current_thread.spawn(async move {
+        receiver.await.unwrap();
         sender_2.send(()).unwrap();
         receiver_1_done_clone.set(true);
-
-        Ok(())
-    }));
+    });
 
     let receiver_2_done = Rc::new(Cell::new(false));
     let receiver_2_done_clone = receiver_2_done.clone();
 
-    tokio_current_thread.spawn(receiver_2.map_err(|_| unreachable!()).and_then(move |_| {
+    tokio_current_thread.spawn(async move {
+        receiver_2.await.unwrap();
         receiver_2_done_clone.set(true);
-        Ok(())
-    }));
+    });
 
     // The third receiver is only woken up from our Park implementation, it simulates
     // e.g. a socket that first has to be polled to know if it is ready now
     let receiver_3_done = Rc::new(Cell::new(false));
     let receiver_3_done_clone = receiver_3_done.clone();
 
-    tokio_current_thread.spawn(receiver_3.map_err(|_| unreachable!()).and_then(move |_| {
+    tokio_current_thread.spawn(async move {
+        receiver_3.await.unwrap();
         receiver_3_done_clone.set(true);
-        Ok(())
-    }));
+    });
 
     // First turn should've polled both and considered them not ready
     let res = tokio_current_thread
@@ -760,10 +689,9 @@ fn spawn_from_other_thread() {
 
     thread::spawn(move || {
         handle
-            .spawn(lazy(move || {
+            .spawn(async move {
                 sender.send(()).unwrap();
-                Ok(())
-            }))
+            })
             .unwrap();
     });
 
@@ -784,10 +712,9 @@ fn spawn_from_other_thread_unpark() {
         let _ = receiver_2.recv().unwrap();
 
         handle
-            .spawn(lazy(move || {
+            .spawn(async move {
                 sender_1.send(()).unwrap();
-                Ok(())
-            }))
+            })
             .unwrap();
     });
 
@@ -796,15 +723,14 @@ fn spawn_from_other_thread_unpark() {
     // lazy future below which will cause the future to be spawned from
     // the other thread. Then the executor will park but should be woken
     // up because *now* we have a new future to schedule
-    let _ = current_thread
-        .block_on(
-            lazy(move || {
-                sender_2.send(()).unwrap();
-                Ok(())
-            })
-            .and_then(|_| receiver_1),
-        )
-        .unwrap();
+    let _ = current_thread.block_on(async move {
+        // inlined 'lazy'
+        async move {
+            sender_2.send(()).unwrap();
+        }
+            .await;
+        receiver_1.await.unwrap();
+    });
 }
 
 #[test]
@@ -813,21 +739,34 @@ fn spawn_from_executor_with_handle() {
     let handle = current_thread.handle();
     let (tx, rx) = oneshot::channel();
 
-    current_thread.spawn(lazy(move || {
+    current_thread.spawn(async move {
         handle
-            .spawn(lazy(move || {
+            .spawn(async move {
                 tx.send(()).unwrap();
-                Ok(())
-            }))
+            })
             .unwrap();
-        Ok::<_, ()>(())
-    }));
+    });
 
-    current_thread.run().unwrap();
-
-    rx.wait().unwrap();
+    current_thread.block_on(rx).unwrap();
 }
 
-fn ok() -> future::FutureResult<(), ()> {
-    future::ok(())
+async fn yield_once() {
+    YieldOnce(false).await
+}
+
+struct YieldOnce(bool);
+
+impl Future for YieldOnce {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if self.0 {
+            Poll::Ready(())
+        } else {
+            self.0 = true;
+            // Push to the back of the executor's queue
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
 }

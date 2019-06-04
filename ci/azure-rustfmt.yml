@@ -10,6 +10,7 @@ jobs:
         rust_version: stable
     - script: |
         rustup component add rustfmt
+        cargo fmt --version
       displayName: Install rustfmt
     - script: |
         cargo fmt --all -- --check
