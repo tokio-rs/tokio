@@ -1,6 +1,7 @@
 use super::{Enter, Executor, SpawnError};
 use std::cell::Cell;
 use std::future::Future;
+use std::pin::Pin;
 
 /// Executes futures on the default executor for the current execution context.
 ///
@@ -68,7 +69,10 @@ thread_local! {
 // ===== impl DefaultExecutor =====
 
 impl super::Executor for DefaultExecutor {
-    fn spawn(&mut self, future: Box<dyn Future<Output = ()> + Send>) -> Result<(), SpawnError> {
+    fn spawn(
+        &mut self,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
+    ) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
     }
@@ -84,7 +88,7 @@ where
     T: Future<Output = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
-        super::Executor::spawn(self, Box::new(future))
+        super::Executor::spawn(self, Box::pin(future))
     }
 
     fn status(&self) -> Result<(), SpawnError> {
@@ -132,7 +136,7 @@ pub fn spawn<T>(future: T)
 where
     T: Future<Output = ()> + Send + 'static,
 {
-    DefaultExecutor::current().spawn(Box::new(future)).unwrap()
+    DefaultExecutor::current().spawn(Box::pin(future)).unwrap()
 }
 
 /// Set the default executor for the duration of the closure

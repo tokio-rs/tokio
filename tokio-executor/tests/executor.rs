@@ -4,6 +4,7 @@
 use tokio_executor::{self, DefaultExecutor};
 
 use std::future::Future;
+use std::pin::Pin;
 
 mod out_of_executor_context {
     use super::*;
@@ -11,9 +12,9 @@ mod out_of_executor_context {
 
     fn test<F, E>(spawn: F)
     where
-        F: Fn(Box<dyn Future<Output = ()> + Send>) -> Result<(), E>,
+        F: Fn(Pin<Box<dyn Future<Output = ()> + Send>>) -> Result<(), E>,
     {
-        let res = spawn(Box::new(async { () }));
+        let res = spawn(Box::pin(async {}));
         assert!(res.is_err());
     }
 
