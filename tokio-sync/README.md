@@ -2,7 +2,7 @@
 
 Synchronization utilities
 
-[Documentation](https://docs.rs/tokio-sync/0.1.5/tokio_sync/)
+[Documentation](https://docs.rs/tokio-sync/0.1.6/tokio_sync/)
 
 ## Overview
 
