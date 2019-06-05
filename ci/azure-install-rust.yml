@@ -1,3 +1,6 @@
+variables:
+  rust_version: ${{parameters.rust_version}}
+
 steps:
   # Linux and macOS.
   - script: |
@@ -17,10 +20,8 @@ steps:
     condition: eq(variables['Agent.OS'], 'Windows_NT')
 
   - script: |
-      rustup toolchain install $(RUSTUP_TOOLCHAIN)
-      rustup default $(RUSTUP_TOOLCHAIN)
-      env:
-        RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
+      rustup toolchain install $(rust_version)
+      rustup default $(rust_version)
 
   # All platforms.
   - script: |
