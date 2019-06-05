@@ -3,7 +3,7 @@ steps:
   - script: |
       set -e
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
-      export $PATH=$PATH:$HOME/.cargo/bin
+      export PATH=$PATH:$HOME/.cargo/bin
       rustup toolchain install $RUSTUP_TOOLCHAIN
       rustup default $RUSTUP_TOOLCHAIN
       echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
