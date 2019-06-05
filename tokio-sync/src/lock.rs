@@ -72,9 +72,11 @@ pub struct Lock<T> {
 #[derive(Debug)]
 pub struct LockGuard<T>(Lock<T>);
 
-// As long as T: Send, it's fine to send Lock<T> to other threads.
-// If T was not Send, sending a Lock<T> would be bad, since you can access T through Lock<T>.
+// As long as T: Send, it's fine to send and share Lock<T> between threads.
+// If T was not Send, sending and sharing a Lock<T> would be bad, since you can access T through
+// Lock<T>.
 unsafe impl<T> Send for Lock<T> where T: Send {}
+unsafe impl<T> Sync for Lock<T> where T: Send {}
 unsafe impl<T> Sync for LockGuard<T> where T: Send + Sync {}
 
 #[derive(Debug)]
