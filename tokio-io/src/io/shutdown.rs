@@ -1,6 +1,9 @@
 use crate::AsyncWrite;
-use futures::{try_ready, Async, Future, Poll};
+use std::future::Future;
 use std::io;
+use std::marker::Unpin;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A future used to fully shutdown an I/O object.
 ///
@@ -11,8 +14,8 @@ use std::io;
 ///
 /// [`shutdown`]: fn.shutdown.html
 #[derive(Debug)]
-pub struct Shutdown<A> {
-    a: Option<A>,
+pub struct Shutdown<'w, W: ?Sized> {
+    writer: &'w mut W,
 }
 
 /// Creates a future which will entirely shutdown an I/O object and then yield
@@ -21,22 +24,23 @@ pub struct Shutdown<A> {
 /// This function will consume the object provided if an error happens, and
 /// otherwise it will repeatedly call `shutdown` until it sees `Ok(())`,
 /// scheduling a retry if `WouldBlock` is seen along the way.
-pub fn shutdown<A>(a: A) -> Shutdown<A>
+pub fn shutdown<W>(writer: &mut W) -> Shutdown<'_, W>
 where
-    A: AsyncWrite,
+    W: AsyncWrite + Unpin + ?Sized,
 {
-    Shutdown { a: Some(a) }
+    Shutdown { writer }
 }
 
-impl<A> Future for Shutdown<A>
-where
-    A: AsyncWrite,
-{
-    type Item = A;
-    type Error = io::Error;
+// forward Unpin
+impl<'a, W: Unpin + ?Sized> Unpin for Shutdown<'_, W> {}
 
-    fn poll(&mut self) -> Poll<A, io::Error> {
-        try_ready!(self.a.as_mut().unwrap().shutdown());
-        Ok(Async::Ready(self.a.take().unwrap()))
+impl<W> Future for Shutdown<'_, W>
+where
+    W: AsyncWrite + Unpin + ?Sized,
+{
+    type Output = io::Result<()>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut *self.writer).poll_shutdown(cx)
     }
 }

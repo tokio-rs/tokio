@@ -23,7 +23,6 @@ publish = false
 
 [dependencies]
 bytes = "0.4.7"
-futures = "0.1.18"
 log = "0.4"
 
 [dev-dependencies]

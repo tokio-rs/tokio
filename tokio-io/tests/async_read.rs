@@ -1,3 +1,4 @@
+/*
 use bytes::{BufMut, BytesMut};
 use futures::Async;
 use std::io::{self, Read};
@@ -142,3 +143,4 @@ fn read_buf_translate_wouldblock_to_not_ready() {
     let mut buf = BytesMut::with_capacity(65);
     assert!(!R.read_buf(&mut buf).unwrap().is_ready());
 }
+*/

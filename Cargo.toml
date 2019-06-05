@@ -8,7 +8,7 @@ members = [
   "tokio-executor",
   # "tokio-fs",
   "tokio-futures",
-  # "tokio-io",
+  "tokio-io",
   # "tokio-macros",
   # "tokio-reactor",
   # "tokio-signal",

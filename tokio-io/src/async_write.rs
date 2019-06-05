@@ -1,7 +1,8 @@
-use crate::AsyncRead;
+//use crate::AsyncRead;
 use bytes::Buf;
-use futures::{try_ready, Async, Poll};
 use std::io as std_io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Writes bytes asynchronously.
 ///
@@ -33,7 +34,7 @@ use std::io as std_io;
 /// writer has successfully been flushed, a "would block" error means that the
 /// current task is ready to receive a notification when flushing can make more
 /// progress, and otherwise normal errors can happen as well.
-pub trait AsyncWrite: std_io::Write {
+pub trait AsyncWrite {
     /// Attempt to write bytes from `buf` into the object.
     ///
     /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
@@ -42,13 +43,11 @@ pub trait AsyncWrite: std_io::Write {
     /// `Ok(Async::NotReady)` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
     /// readable or is closed.
-    fn poll_write(&mut self, buf: &[u8]) -> Poll<usize, std_io::Error> {
-        match self.write(buf) {
-            Ok(t) => Ok(Async::Ready(t)),
-            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => return Ok(Async::NotReady),
-            Err(e) => return Err(e.into()),
-        }
-    }
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std_io::Error>>;
 
     /// Attempt to flush the object, ensuring that any buffered data reach
     /// their destination.
@@ -59,13 +58,7 @@ pub trait AsyncWrite: std_io::Write {
     /// `Ok(Async::NotReady)` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object can make
     /// progress towards flushing.
-    fn poll_flush(&mut self) -> Poll<(), std_io::Error> {
-        match self.flush() {
-            Ok(t) => Ok(Async::Ready(t)),
-            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => return Ok(Async::NotReady),
-            Err(e) => return Err(e.into()),
-        }
-    }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std_io::Error>>;
 
     /// Initiates or attempts to shut down this writer, returning success when
     /// the I/O connection has completely shut down.
@@ -125,26 +118,32 @@ pub trait AsyncWrite: std_io::Write {
     ///
     /// This function will panic if not called within the context of a future's
     /// task.
-    fn shutdown(&mut self) -> Poll<(), std_io::Error>;
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>)
+        -> Poll<Result<(), std_io::Error>>;
 
     /// Write a `Buf` into this value, returning how many bytes were written.
     ///
     /// Note that this method will advance the `buf` provided automatically by
     /// the number of bytes written.
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, std_io::Error>
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<Result<usize, std_io::Error>>
     where
         Self: Sized,
     {
         if !buf.has_remaining() {
-            return Ok(Async::Ready(0));
+            return Poll::Ready(Ok(0));
         }
 
-        let n = try_ready!(self.poll_write(buf.bytes()));
+        let n = ready!(self.poll_write(cx, buf.bytes()))?;
         buf.advance(n);
-        Ok(Async::Ready(n))
+        Poll::Ready(Ok(n))
     }
 }
 
+/*
 impl<T: ?Sized + AsyncWrite> AsyncWrite for Box<T> {
     fn shutdown(&mut self) -> Poll<(), std_io::Error> {
         (**self).shutdown()
@@ -219,3 +218,4 @@ impl AsyncWrite for std_io::Cursor<Box<[u8]>> {
         Ok(().into())
     }
 }
+*/
