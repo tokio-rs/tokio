@@ -13,4 +13,4 @@
 //! - [watch](watch/index.html), a single-producer, multi-consumer channel that
 //!   only stores the **most recently** sent value.
 
-pub use tokio_sync::{lock, mpsc, oneshot, watch};
+pub use tokio_sync::{/*lock, mpsc,*/ oneshot, watch};

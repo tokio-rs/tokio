@@ -92,7 +92,7 @@ pub mod reactor;
 pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
-pub mod util;
+//pub mod util;
 
 if_runtime! {
     pub mod executor;
