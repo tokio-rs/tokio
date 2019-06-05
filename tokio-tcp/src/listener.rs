@@ -1,10 +1,11 @@
-use super::Incoming;
+#[cfg(feature = "incoming")]
+use super::incoming::Incoming;
 use super::TcpStream;
-use futures::{try_ready, Async, Poll};
 use mio;
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
+use std::task::{Context, Poll};
 use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
@@ -61,15 +62,6 @@ impl TcpListener {
         Ok(TcpListener::new(l))
     }
 
-    #[deprecated(since = "0.1.2", note = "use poll_accept instead")]
-    #[doc(hidden)]
-    pub fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        match self.poll_accept()? {
-            Async::Ready(ret) => Ok(ret),
-            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
-        }
-    }
-
     /// Attempt to accept a connection and create a new connected `TcpStream` if
     /// successful.
     ///
@@ -105,22 +97,13 @@ impl TcpListener {
     /// }
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn poll_accept(&mut self) -> Poll<(TcpStream, SocketAddr), io::Error> {
-        let (io, addr) = try_ready!(self.poll_accept_std());
+    pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
+        let (io, addr) = ready!(self.poll_accept_std(cx))?;
 
         let io = mio::net::TcpStream::from_stream(io)?;
         let io = TcpStream::new(io);
 
-        Ok((io, addr).into())
-    }
-
-    #[deprecated(since = "0.1.2", note = "use poll_accept_std instead")]
-    #[doc(hidden)]
-    pub fn accept_std(&mut self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        match self.poll_accept_std()? {
-            Async::Ready(ret) => Ok(ret),
-            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
-        }
+        Poll::Ready(Ok((io, addr)))
     }
 
     /// Attempt to accept a connection and create a new connected `TcpStream` if
@@ -159,16 +142,16 @@ impl TcpListener {
     /// }
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn poll_accept_std(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
-        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
+    pub fn poll_accept_std(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().accept_std() {
-            Ok(pair) => Ok(pair.into()),
+            Ok(pair) => Poll::Ready(Ok(pair)),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(mio::Ready::readable())?;
-                Ok(Async::NotReady)
+                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
             }
-            Err(e) => Err(e),
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 
@@ -279,6 +262,7 @@ impl TcpListener {
     ///     });
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
+    #[cfg(feature = "incoming")]
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
     }
