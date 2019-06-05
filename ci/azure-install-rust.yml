@@ -17,10 +17,10 @@ steps:
     condition: eq(variables['Agent.OS'], 'Windows_NT')
 
   - script: |
-      rustup toolchain install $(parameters.rust_version)
-      rustup default $(parameters.rust_version)
-      # env:
-      #   RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
+      rustup toolchain install $(RUSTUP_TOOLCHAIN)
+      rustup default $(RUSTUP_TOOLCHAIN)
+      env:
+        RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
 
   # All platforms.
   - script: |
