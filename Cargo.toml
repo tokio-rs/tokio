@@ -10,7 +10,7 @@ members = [
   "tokio-futures",
   "tokio-io",
   # "tokio-macros",
-  # "tokio-reactor",
+  "tokio-reactor",
   # "tokio-signal",
   "tokio-sync",
   "tokio-test",
