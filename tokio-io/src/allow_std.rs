@@ -1,6 +1,7 @@
 use crate::{AsyncRead, AsyncWrite};
-use futures::{Async, Poll};
-use std::{fmt, io};
+use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A simple wrapper type which allows types that only implement
 /// `std::io::Read` or `std::io::Write` to be used in contexts which expect
@@ -37,57 +38,42 @@ impl<T> AllowStdIo<T> {
     }
 }
 
-impl<T> io::Write for AllowStdIo<T>
+// forward Unpin
+impl<T: Unpin> Unpin for AllowStdIo<T> {}
+
+impl<T> AsyncRead for AllowStdIo<T>
 where
-    T: io::Write,
+    T: io::Read + Unpin,
 {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.0.write_all(buf)
-    }
-    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> io::Result<()> {
-        self.0.write_fmt(fmt)
+    // TODO: override prepare_uninitialized_buffer once `Read::initializer` is stable.
+    // See rust-lang/rust #42788
+
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Poll::Ready(Ok(try_nb!(self.0.read(buf))))
     }
 }
 
 impl<T> AsyncWrite for AllowStdIo<T>
 where
-    T: io::Write,
+    T: io::Write + Unpin,
 {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        Ok(Async::Ready(()))
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Poll::Ready(Ok(try_nb!(self.0.write(buf))))
     }
-}
 
-impl<T> io::Read for AllowStdIo<T>
-where
-    T: io::Read,
-{
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(try_nb!(self.0.flush())))
     }
-    // TODO: implement the `initializer` fn when it stabilizes.
-    // See rust-lang/rust #42788
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
-        self.0.read_to_end(buf)
-    }
-    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
-        self.0.read_to_string(buf)
-    }
-    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
-        self.0.read_exact(buf)
-    }
-}
 
-impl<T> AsyncRead for AllowStdIo<T>
-where
-    T: io::Read,
-{
-    // TODO: override prepare_uninitialized_buffer once `Read::initializer` is stable.
-    // See rust-lang/rust #42788
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
 }

@@ -1,27 +1,20 @@
 use crate::AsyncRead;
-use futures::{try_ready, Future, Poll};
+use std::future::Future;
 use std::io;
-use std::mem;
-
-#[derive(Debug)]
-enum State<R, T> {
-    Pending { rd: R, buf: T },
-    Empty,
-}
+use std::marker::Unpin;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Tries to read some bytes directly into the given `buf` in asynchronous
 /// manner, returning a future type.
 ///
 /// The returned future will resolve to both the I/O stream and the buffer
 /// as well as the number of bytes read once the read operation is completed.
-pub fn read<R, T>(rd: R, buf: T) -> Read<R, T>
+pub fn read<'a, R>(reader: &'a mut R, buf: &'a mut [u8]) -> Read<'a, R>
 where
-    R: AsyncRead,
-    T: AsMut<[u8]>,
+    R: AsyncRead + Unpin + ?Sized,
 {
-    Read {
-        state: State::Pending { rd: rd, buf: buf },
-    }
+    Read { reader, buf }
 }
 
 /// A future which can be used to easily read available number of bytes to fill
@@ -29,30 +22,22 @@ where
 ///
 /// Created by the [`read`] function.
 #[derive(Debug)]
-pub struct Read<R, T> {
-    state: State<R, T>,
+pub struct Read<'a, R: ?Sized> {
+    reader: &'a mut R,
+    buf: &'a mut [u8],
 }
 
-impl<R, T> Future for Read<R, T>
+// forward Unpin
+impl<'a, R: Unpin + ?Sized> Unpin for Read<'_, R> {}
+
+impl<R> Future for Read<'_, R>
 where
-    R: AsyncRead,
-    T: AsMut<[u8]>,
+    R: AsyncRead + Unpin + ?Sized,
 {
-    type Item = (R, T, usize);
-    type Error = io::Error;
+    type Output = io::Result<usize>;
 
-    fn poll(&mut self) -> Poll<(R, T, usize), io::Error> {
-        let nread = match self.state {
-            State::Pending {
-                ref mut rd,
-                ref mut buf,
-            } => try_ready!(rd.poll_read(&mut buf.as_mut()[..])),
-            State::Empty => panic!("poll a Read after it's done"),
-        };
-
-        match mem::replace(&mut self.state, State::Empty) {
-            State::Pending { rd, buf } => Ok((rd, buf, nread).into()),
-            State::Empty => panic!("invalid internal state"),
-        }
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        let me = &mut *self;
+        Pin::new(&mut *me.reader).poll_read(cx, me.buf)
     }
 }

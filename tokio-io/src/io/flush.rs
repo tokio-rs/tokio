@@ -1,6 +1,9 @@
 use crate::AsyncWrite;
-use futures::{try_ready, Async, Future, Poll};
+use std::future::Future;
 use std::io;
+use std::marker::Unpin;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A future used to fully flush an I/O object.
 ///
@@ -10,9 +13,12 @@ use std::io;
 ///
 /// [`flush`]: fn.flush.html
 #[derive(Debug)]
-pub struct Flush<A> {
-    a: Option<A>,
+pub struct Flush<'w, W: Unpin + ?Sized> {
+    writer: &'w mut W,
 }
+
+// forward the Unpin
+impl<W: Unpin + ?Sized> Unpin for Flush<'_, W> {}
 
 /// Creates a future which will entirely flush an I/O object and then yield the
 /// object itself.
@@ -20,22 +26,20 @@ pub struct Flush<A> {
 /// This function will consume the object provided if an error happens, and
 /// otherwise it will repeatedly call `flush` until it sees `Ok(())`, scheduling
 /// a retry if `WouldBlock` is seen along the way.
-pub fn flush<A>(a: A) -> Flush<A>
+pub fn flush<W>(writer: &mut W) -> Flush<'_, W>
 where
-    A: AsyncWrite,
+    W: AsyncWrite + Unpin + ?Sized,
 {
-    Flush { a: Some(a) }
+    Flush { writer }
 }
 
-impl<A> Future for Flush<A>
+impl<W> Future for Flush<'_, W>
 where
-    A: AsyncWrite,
+    W: AsyncWrite + Unpin + ?Sized,
 {
-    type Item = A;
-    type Error = io::Error;
+    type Output = io::Result<()>;
 
-    fn poll(&mut self) -> Poll<A, io::Error> {
-        try_ready!(self.a.as_mut().unwrap().poll_flush());
-        Ok(Async::Ready(self.a.take().unwrap()))
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut *self.writer).poll_flush(cx)
     }
 }
