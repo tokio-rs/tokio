@@ -19,15 +19,15 @@ jobs:
 #     crates:
 #       - tokio
 
-# # Test crates that are platform specific
-# - template: ci/azure-test-stable.yml
-#   parameters:
-#     name: test_sub_cross
-#     displayName: Test sub crates -
-#     cross: true
-#     crates:
+# Test crates that are platform specific
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_sub_cross
+    displayName: Test sub crates (cross) -
+    cross: true
+    crates:
 #       - tokio-fs
-#       - tokio-reactor
+      - tokio-reactor
 #       - tokio-signal
 #       - tokio-tcp
 #       - tokio-tls
