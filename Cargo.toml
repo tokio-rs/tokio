@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-  # "tokio",
+  "tokio",
   # "tokio-buf",
   # "tokio-codec",
   "tokio-current-thread",

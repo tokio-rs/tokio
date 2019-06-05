@@ -39,40 +39,14 @@
 //! [`Executor`]: trait.Executor.html
 //! [`spawn`]: fn.spawn.html
 
-#[deprecated(
-    since = "0.1.8",
-    note = "use tokio-current-thread crate or functions in tokio::runtime::current_thread instead",
-)]
-#[doc(hidden)]
-pub mod current_thread;
-
-#[deprecated(since = "0.1.8", note = "use tokio-threadpool crate instead")]
-#[doc(hidden)]
-/// Re-exports of [`tokio-threadpool`], deprecated in favor of the crate.
-///
-/// [`tokio-threadpool`]: https://docs.rs/tokio-threadpool/0.1
-pub mod thread_pool {
-    pub use tokio_threadpool::{
-        Builder,
-        Sender,
-        Shutdown,
-        ThreadPool,
-    };
-}
-
+use std::future::Future;
 pub use tokio_executor::{Executor, TypedExecutor, DefaultExecutor, SpawnError};
-
-use futures::{Future, IntoFuture};
-use futures::future::{self, FutureResult};
 
 /// Return value from the `spawn` function.
 ///
 /// Currently this value doesn't actually provide any functionality. However, it
 /// provides a way to add functionality later without breaking backwards
 /// compatibility.
-///
-/// This also implements `IntoFuture` so that it can be used as the return value
-/// in a `for_each` loop.
 ///
 /// See [`spawn`] for more details.
 ///
@@ -126,18 +100,8 @@ pub struct Spawn(());
 ///
 /// [`DefaultExecutor`]: struct.DefaultExecutor.html
 pub fn spawn<F>(f: F) -> Spawn
-where F: Future<Item = (), Error = ()> + 'static + Send
+where F: Future<Output = ()> + 'static + Send
 {
     ::tokio_executor::spawn(f);
     Spawn(())
-}
-
-impl IntoFuture for Spawn {
-    type Future = FutureResult<(), ()>;
-    type Item = ();
-    type Error = ();
-
-    fn into_future(self) -> Self::Future {
-        future::ok(())
-    }
 }

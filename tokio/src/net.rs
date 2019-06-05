@@ -41,19 +41,10 @@ pub mod tcp {
     //! [`TcpListener`]: struct.TcpListener.html
     //! [incoming_method]: struct.TcpListener.html#method.incoming
     //! [`Incoming`]: struct.Incoming.html
-    pub use tokio_tcp::{ConnectFuture, Incoming, TcpListener, TcpStream};
+    pub use tokio_tcp::{TcpListener, TcpStream};
 }
 #[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
-
-#[cfg(feature = "tcp")]
-#[deprecated(note = "use `tokio::net::tcp::ConnectFuture` instead")]
-#[doc(hidden)]
-pub type ConnectFuture = self::tcp::ConnectFuture;
-#[cfg(feature = "tcp")]
-#[deprecated(note = "use `tokio::net::tcp::Incoming` instead")]
-#[doc(hidden)]
-pub type Incoming = self::tcp::Incoming;
 
 #[cfg(feature = "udp")]
 pub mod udp {
@@ -75,15 +66,6 @@ pub mod udp {
 }
 #[cfg(feature = "udp")]
 pub use self::udp::{UdpFramed, UdpSocket};
-
-#[cfg(feature = "udp")]
-#[deprecated(note = "use `tokio::net::udp::RecvDgram` instead")]
-#[doc(hidden)]
-pub type RecvDgram<T> = self::udp::RecvDgram<T>;
-#[cfg(feature = "udp")]
-#[deprecated(note = "use `tokio::net::udp::SendDgram` instead")]
-#[doc(hidden)]
-pub type SendDgram<T> = self::udp::SendDgram<T>;
 
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {

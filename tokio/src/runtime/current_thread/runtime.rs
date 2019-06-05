@@ -1,12 +1,12 @@
 use crate::runtime::current_thread::Builder;
-use futures::{future, Future};
 use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_current_thread::Handle as ExecutorHandle;
 use tokio_executor;
 use tokio_reactor::{self, Reactor};
-use tokio_timer::clock::{self, Clock};
-use tokio_timer::timer::{self, Timer};
+//use tokio_timer::clock::{self, Clock};
+//use tokio_timer::timer::{self, Timer};
 use std::fmt;
+use std::future::Future;
 use std::error::Error;
 use std::io;
 
@@ -19,10 +19,13 @@ use std::io;
 #[derive(Debug)]
 pub struct Runtime {
     reactor_handle: tokio_reactor::Handle,
-    timer_handle: timer::Handle,
-    clock: Clock,
-    executor: CurrentThread<Timer<Reactor>>,
+    //timer_handle: timer::Handle,
+    //clock: Clock,
+    executor: CurrentThread<Parker>,
 }
+
+//pub(super) type Parker = Timer<Reactor>;
+pub(super) type Parker = Reactor;
 
 /// Handle to spawn a future on the corresponding `CurrentThread` runtime instance
 #[derive(Debug, Clone)]
@@ -36,7 +39,7 @@ impl Handle {
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
     pub fn spawn<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
-    where F: Future<Item = (), Error = ()> + Send + 'static {
+    where F: Future<Output = ()> + Send + 'static {
         self.0.spawn(future)
     }
 
@@ -54,28 +57,9 @@ impl Handle {
     }
 }
 
-impl<T> future::Executor<T> for Handle
-where T: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
-        if let Err(e) = self.status() {
-            let kind = if e.is_at_capacity() {
-                future::ExecuteErrorKind::NoCapacity
-            } else {
-                future::ExecuteErrorKind::Shutdown
-            };
-
-            return Err(future::ExecuteError::new(kind, future));
-        }
-
-        let _ = self.spawn(future);
-        Ok(())
-    }
-}
-
 impl<T> crate::executor::TypedExecutor<T> for Handle
 where
-    T: Future<Item = (), Error = ()> + Send + 'static,
+    T: Future<Output = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), crate::executor::SpawnError> {
         Handle::spawn(self, future)
@@ -115,14 +99,14 @@ impl Runtime {
 
     pub(super) fn new2(
         reactor_handle: tokio_reactor::Handle,
-        timer_handle: timer::Handle,
-        clock: Clock,
-        executor: CurrentThread<Timer<Reactor>>) -> Runtime
+        //timer_handle: timer::Handle,
+        //clock: Clock,
+        executor: CurrentThread<Parker>) -> Runtime
     {
         Runtime {
             reactor_handle,
-            timer_handle,
-            clock,
+            //timer_handle,
+            //clock,
             executor,
         }
     }
@@ -165,7 +149,7 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
-    where F: Future<Item = (), Error = ()> + 'static,
+    where F: Future<Output = ()> + 'static,
     {
         self.executor.spawn(future);
         self
@@ -187,13 +171,12 @@ impl Runtime {
     ///
     /// The caller is responsible for ensuring that other spawned futures
     /// complete execution by calling `block_on` or `run`.
-    pub fn block_on<F>(&mut self, f: F) -> Result<F::Item, F::Error>
+    pub fn block_on<F>(&mut self, f: F) -> F::Output
         where F: Future
     {
         self.enter(|executor| {
             // Run the provided future
-            let ret = executor.block_on(f);
-            ret.map_err(|e| e.into_inner().expect("unexpected execution error"))
+            executor.block_on(f)
         })
     }
 
@@ -207,12 +190,12 @@ impl Runtime {
     }
 
     fn enter<F, R>(&mut self, f: F) -> R
-    where F: FnOnce(&mut current_thread::Entered<'_, Timer<Reactor>>) -> R
+    where F: FnOnce(&mut current_thread::Entered<'_, Parker>) -> R
     {
         let Runtime {
             ref reactor_handle,
-            ref timer_handle,
-            ref clock,
+            //ref timer_handle,
+            //ref clock,
             ref mut executor,
             ..
         } = *self;
@@ -223,8 +206,8 @@ impl Runtime {
         // This will set the default handle and timer to use inside the closure
         // and run the future.
         tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
-            clock::with_default(clock, enter, |enter| {
-                timer::with_default(&timer_handle, enter, |enter| {
+            //clock::with_default(clock, enter, |enter| {
+            //    timer::with_default(&timer_handle, enter, |enter| {
                     // The TaskExecutor is a fake executor that looks into the
                     // current single-threaded executor when used. This is a trick,
                     // because we need two mutable references to the executor (one
@@ -235,8 +218,8 @@ impl Runtime {
                         let mut executor = executor.enter(enter);
                         f(&mut executor)
                     })
-                })
-            })
+            //    })
+            //})
         })
     }
 }
