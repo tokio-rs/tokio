@@ -12,7 +12,7 @@ jobs:
   - template: azure-patch-crates.yml
 
   - script: cargo check --all
-    displayName: cargo +nightly check --all
+    displayName: cargo check --all
 
   # Check benches
   - script: cargo check --benches --all
