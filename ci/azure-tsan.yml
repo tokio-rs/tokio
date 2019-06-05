@@ -4,9 +4,9 @@ jobs:
   strategy:
     matrix:
       Timer:
-        cmd: cargo test -p tokio-timer --test hammer
+        cmd: cargo +nightly test -p tokio-timer --test hammer
       Threadpool:
-        cmd: cargo test -p tokio-threadpool --tests
+        cmd: cargo +nightly test -p tokio-threadpool --tests
   pool:
     vmImage: ubuntu-16.04
   steps:

@@ -15,5 +15,5 @@ jobs:
     displayName: cargo +nightly check --all
 
   # Check benches
-  - script: cargo check --benches --all
+  - script: cargo +nightly check --benches --all
     displayName: Check benchmarks
