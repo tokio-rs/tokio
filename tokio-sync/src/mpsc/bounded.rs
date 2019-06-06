@@ -1,6 +1,7 @@
 use super::chan;
-use futures::{Poll, Sink, StartSend, Stream};
+
 use std::fmt;
+use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
 ///
@@ -127,6 +128,11 @@ impl<T> Receiver<T> {
         Receiver { chan }
     }
 
+    /// TODO: Dox
+    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
+    }
+
     /// Closes the receiving half of a channel, without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
@@ -136,6 +142,7 @@ impl<T> Receiver<T> {
     }
 }
 
+#[cfg(feature = "async-traits")]
 impl<T> Stream for Receiver<T> {
     type Item = T;
     type Error = RecvError;
@@ -165,13 +172,13 @@ impl<T> Sender<T> {
     ///
     /// This method returns:
     ///
-    /// - `Ok(Async::Ready(_))` if capacity is reserved for a single message.
-    /// - `Ok(Async::NotReady)` if the channel may not have capacity, in which
+    /// - `Poll::Ready(Ok(_))` if capacity is reserved for a single message.
+    /// - `Poll::Pending` if the channel may not have capacity, in which
     ///   case the current task is queued to be notified once
     ///   capacity is available;
-    /// - `Err(SendError)` if the receiver has been dropped.
-    pub fn poll_ready(&mut self) -> Poll<(), SendError> {
-        self.chan.poll_ready().map_err(|_| SendError(()))
+    /// - `Poll::Ready(Err(SendError))` if the receiver has been dropped.
+    pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), SendError>> {
+        self.chan.poll_ready(cx).map_err(|_| SendError(()))
     }
 
     /// Attempts to send a message on this `Sender`, returning the message
@@ -182,30 +189,26 @@ impl<T> Sender<T> {
     }
 }
 
+#[cfg(feature = "async-traits")]
 impl<T> Sink for Sender<T> {
     type SinkItem = T;
     type SinkError = SendError;
 
     fn start_send(&mut self, msg: T) -> StartSend<T, Self::SinkError> {
-        use futures::Async::*;
-        use futures::AsyncSink;
-
         match self.poll_ready()? {
             Ready(_) => {
                 self.try_send(msg).map_err(|_| SendError(()))?;
                 Ok(AsyncSink::Ready)
             }
-            NotReady => Ok(AsyncSink::NotReady(msg)),
+            Pending => Ok(AsyncSink::NotReady(msg)),
         }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        use futures::Async::Ready;
         Ok(Ready(()))
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        use futures::Async::Ready;
         Ok(Ready(()))
     }
 }

@@ -1,6 +1,6 @@
 use super::chan;
 use crate::loom::sync::atomic::AtomicUsize;
-use futures::{Poll, Sink, StartSend, Stream};
+
 use std::fmt;
 
 /// Send values to the associated `UnboundedReceiver`.
@@ -92,6 +92,7 @@ impl<T> UnboundedReceiver<T> {
     }
 }
 
+#[cfg(feature = "async-traits")]
 impl<T> Stream for UnboundedReceiver<T> {
     type Item = T;
     type Error = UnboundedRecvError;
@@ -113,24 +114,21 @@ impl<T> UnboundedSender<T> {
     }
 }
 
+#[cfg(feature = "async-traits")]
 impl<T> Sink for UnboundedSender<T> {
     type SinkItem = T;
     type SinkError = UnboundedSendError;
 
     fn start_send(&mut self, msg: T) -> StartSend<T, Self::SinkError> {
-        use futures::AsyncSink;
-
         self.try_send(msg).map_err(|_| UnboundedSendError(()))?;
         Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        use futures::Async::Ready;
         Ok(Ready(()))
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        use futures::Async::Ready;
         Ok(Ready(()))
     }
 }

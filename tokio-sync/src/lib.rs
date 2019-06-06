@@ -33,18 +33,16 @@ macro_rules! ready {
     }};
 }
 
-/*
 macro_rules! if_fuzz {
     ($($t:tt)*) => {{
         if false { $($t)* }
     }}
 }
-*/
 
-// pub mod lock;
+pub mod lock;
 mod loom;
-// pub mod mpsc;
+pub mod mpsc;
 pub mod oneshot;
-// pub mod semaphore;
+pub mod semaphore;
 pub mod task;
 pub mod watch;

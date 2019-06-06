@@ -55,7 +55,6 @@
 
 use crate::task::AtomicWaker;
 
-use core::pin::Pin;
 use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;
@@ -239,7 +238,7 @@ impl<T> Receiver<T> {
     /// Attempts to receive the latest value sent via the channel.
     ///
     /// If a new, unobserved, value has been sent, a reference to it is
-    /// returned. If no new value has been sent, then `NotReady` is returned and
+    /// returned. If no new value has been sent, then `Pending` is returned and
     /// the current task is notified once a new value is sent.
     ///
     /// Only the **most recent** value is returned. If the receiver is falling
