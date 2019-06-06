@@ -1,6 +1,9 @@
 use crate::clock;
 use crate::Delay;
-use futures::{try_ready, Future, Poll, Stream};
+use futures_core::Stream;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{self, Poll};
 use std::time::{Duration, Instant};
 
 /// A stream representing notifications at fixed interval
@@ -53,20 +56,20 @@ impl Interval {
 
 impl Stream for Interval {
     type Item = Instant;
-    type Error = crate::Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         // Wait for the delay to be done
-        let _ = try_ready!(self.delay.poll());
+        ready!(Pin::new(&mut self.delay).poll(cx));
 
         // Get the `now` by looking at the `delay` deadline
         let now = self.delay.deadline();
 
         // The next interval value is `duration` after the one that just
         // yielded.
-        self.delay.reset(now + self.duration);
+        let next = now + self.duration;
+        self.delay.reset(next);
 
         // Return the current instant
-        Ok(Some(now).into())
+        Poll::Ready(Some(now))
     }
 }
