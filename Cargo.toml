@@ -15,7 +15,7 @@ members = [
   "tokio-sync",
   "tokio-test",
   # "tokio-threadpool",
-  # "tokio-timer",
+  "tokio-timer",
   "tokio-tcp",
   # "tokio-tls",
   # "tokio-trace",

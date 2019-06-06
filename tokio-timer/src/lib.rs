@@ -31,27 +31,36 @@
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
 
+macro_rules! ready {
+    ($e:expr) => (
+        match $e {
+            ::std::task::Poll::Ready(v) => v,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    )
+}
+
 pub mod clock;
+#[cfg(feature = "delay-queue")]
 pub mod delay_queue;
+#[cfg(feature = "throttle")]
 pub mod throttle;
 pub mod timeout;
 pub mod timer;
 
 mod atomic;
-mod deadline;
 mod delay;
 mod error;
+#[cfg(feature = "interval")]
 mod interval;
 mod wheel;
 
-#[deprecated(since = "0.2.6", note = "use Timeout instead")]
-#[doc(hidden)]
-#[allow(deprecated)]
-pub use deadline::{Deadline, DeadlineError};
 pub use delay::Delay;
+#[cfg(feature = "delay-queue")]
 #[doc(inline)]
 pub use delay_queue::DelayQueue;
 pub use error::Error;
+#[cfg(feature = "interval")]
 pub use interval::Interval;
 #[doc(inline)]
 pub use timeout::Timeout;

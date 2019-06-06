@@ -2,15 +2,15 @@ use crate::atomic::AtomicU64;
 use crate::timer::{HandlePriv, Inner};
 use crate::Error;
 use crossbeam_utils::CachePadded;
-use futures::task::AtomicTask;
-use futures::Poll;
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
+use std::task::{self, Poll};
 use std::time::{Duration, Instant};
 use std::u64;
+use tokio_sync::task::AtomicWaker;
 
 /// Internal state shared between a `Delay` instance and the timer.
 ///
@@ -46,7 +46,7 @@ pub(crate) struct Entry {
     state: AtomicU64,
 
     /// Task to notify once the deadline is reached.
-    task: AtomicTask,
+    waker: AtomicWaker,
 
     /// True when the entry is queued in the "process" stack. This value
     /// is set before pushing the value and unset after popping the value.
@@ -109,7 +109,7 @@ impl Entry {
         Entry {
             time: CachePadded::new(UnsafeCell::new(Time { deadline, duration })),
             inner: None,
-            task: AtomicTask::new(),
+            waker: AtomicWaker::new(),
             state: AtomicU64::new(0),
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
@@ -246,7 +246,7 @@ impl Entry {
             curr = actual;
         }
 
-        self.task.notify();
+        self.waker.wake();
     }
 
     pub fn error(&self) {
@@ -269,7 +269,7 @@ impl Entry {
             curr = actual;
         }
 
-        self.task.notify();
+        self.waker.wake();
     }
 
     pub fn cancel(entry: &Arc<Entry>) {
@@ -289,32 +289,31 @@ impl Entry {
         let _ = inner.queue(entry);
     }
 
-    pub fn poll_elapsed(&self) -> Poll<(), Error> {
-        use futures::Async::NotReady;
+    pub fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
 
         let mut curr = self.state.load(SeqCst);
 
         if is_elapsed(curr) {
-            if curr == ERROR {
-                return Err(Error::shutdown());
+            return Poll::Ready(if curr == ERROR {
+                Err(Error::shutdown())
             } else {
-                return Ok(().into());
-            }
+                Ok(())
+            });
         }
 
-        self.task.register();
+        self.waker.register_by_ref(cx.waker());
 
         curr = self.state.load(SeqCst).into();
 
         if is_elapsed(curr) {
-            if curr == ERROR {
-                return Err(Error::shutdown());
+            return Poll::Ready(if curr == ERROR {
+                Err(Error::shutdown())
             } else {
-                return Ok(().into());
-            }
+                Ok(())
+            });
         }
 
-        Ok(NotReady)
+        Poll::Pending
     }
 
     /// Only called by `Registration`
