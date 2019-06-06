@@ -1,6 +1,8 @@
-use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell, task::Waker};
+use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell};
+
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::task::Waker;
 
 /// A synchronization primitive for task waking.
 ///
