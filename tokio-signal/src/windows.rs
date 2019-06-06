@@ -201,8 +201,11 @@ impl Future for DriverTask {
         self.check_messages();
         self.check_events().unwrap();
 
-        // TODO: when to finish this task?
-        Ok(Async::NotReady)
+        if self.ctrl_c.tasks.is_empty() && self.ctrl_break.tasks.is_empty() {
+            Ok(Async::Ready(()))
+        } else {
+            Ok(Async::NotReady)
+        }
     }
 }
 
@@ -397,5 +400,7 @@ mod tests {
         rt.block_on(with_timeout(event_ctrl_break.into_future()))
             .ok()
             .expect("failed to run event");
+
+        let _ = rt.run();
     }
 }
