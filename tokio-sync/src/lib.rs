@@ -20,7 +20,7 @@ macro_rules! debug {
     }
 }
 
-/// Unwrap a ready value or propagate `Async::Pending`.
+/// Unwrap a ready value or propagate `Poll::Pending`.
 #[macro_export]
 macro_rules! ready {
     ($e:expr) => {{

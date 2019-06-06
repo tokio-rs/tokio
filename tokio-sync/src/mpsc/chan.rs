@@ -1,6 +1,6 @@
 use super::list;
 use crate::loom::{
-    AtomicWaker,
+    futures::AtomicWaker,
     sync::atomic::AtomicUsize,
     sync::{Arc, CausalCell},
 };

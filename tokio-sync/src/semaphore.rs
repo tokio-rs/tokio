@@ -9,7 +9,7 @@
 //! `Pending`. The task is woken once a permit becomes available.
 
 use crate::loom::{
-    AtomicWaker,
+    futures::AtomicWaker,
     sync::{
         atomic::{AtomicPtr, AtomicUsize},
         CausalCell,

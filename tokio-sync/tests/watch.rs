@@ -4,8 +4,6 @@ use tokio_sync::watch;
 use tokio_test::{assert_ready, assert_pending};
 use tokio_test::task::MockTask;
 
-use pin_utils::pin_mut;
-
 /*
 macro_rules! assert_ready {
     ($e:expr) => {{
@@ -98,6 +96,7 @@ fn single_rx_poll_next() {
 #[cfg(feature = "async-traits")]
 fn stream_impl() {
     use futures_core::Stream;
+    use pin_utils::pin_mut;
 
     let (tx, rx) = watch::channel("one");
     let mut task = MockTask::new();

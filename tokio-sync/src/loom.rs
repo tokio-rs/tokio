@@ -1,4 +1,6 @@
-pub(crate) use crate::task::AtomicWaker;
+pub(crate) mod futures {
+    pub(crate) use crate::task::AtomicWaker;
+}
 
 pub(crate) mod sync {
     pub(crate) use std::sync::atomic;

@@ -1,4 +1,3 @@
-#![cfg(feature = "broken")]
 #![deny(warnings, rust_2018_idioms)]
 
 #[macro_use]
@@ -18,7 +17,8 @@ mod mpsc;
 #[allow(warnings)]
 mod semaphore;
 
-use futures::{future::poll_fn, Stream};
+// use futures::{future::poll_fn, Stream};
+use async_util::future::poll_fn;
 use loom::futures::block_on;
 use loom::thread;
 
@@ -32,10 +32,10 @@ fn closing_tx() {
             drop(tx);
         });
 
-        let v = block_on(poll_fn(|| rx.poll())).unwrap();
+        let v = block_on(poll_fn(|cx| rx.poll_next(cx)));
         assert!(v.is_some());
 
-        let v = block_on(poll_fn(|| rx.poll())).unwrap();
+        let v = block_on(poll_fn(|cx| rx.poll_next(cx)));
         assert!(v.is_none());
     });
 }
