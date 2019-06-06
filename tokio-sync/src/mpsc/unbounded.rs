@@ -2,6 +2,7 @@ use super::chan;
 use crate::loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
+use std::task::{Context, Poll};
 
 /// Send values to the associated `UnboundedReceiver`.
 ///
@@ -81,6 +82,11 @@ type Semaphore = AtomicUsize;
 impl<T> UnboundedReceiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
+    }
+
+    /// TODO: dox
+    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
     }
 
     /// Closes the receiving half of a channel, without dropping it.
