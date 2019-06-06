@@ -63,7 +63,7 @@ use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
-use tokio_futures::{ready, Sink, Stream};
+// use tokio_futures::{Sink, Stream};
 
 /// Receives values from the associated `Sender`.
 ///
@@ -269,7 +269,18 @@ impl<T> Receiver<T> {
     }
 }
 
-impl<T: Clone> Stream for Receiver<T> {
+impl<T: Clone> Receiver<T> {
+    /// Attempts to clone the latest value sent via the channel.
+    ///
+    /// This is equivalent to calling `Clone` on the value returned by `poll_ref`.
+    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let item = ready!(self.poll_ref(cx));
+        Ready(item.map(|v_ref| v_ref.clone()))
+    }
+}
+
+#[cfg(feature = "async-traits")]
+impl<T: Clone> futures_core::Stream for Receiver<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
@@ -359,7 +370,8 @@ impl<T> Sender<T> {
     }
 }
 
-impl<T> Sink<T> for Sender<T> {
+#[cfg(feature = "async-traits")]
+impl<T> async_sink::Sink<T> for Sender<T> {
     type Error = error::SendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
