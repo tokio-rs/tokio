@@ -1,8 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio_sync::semaphore::{Permit, Semaphore};
-use tokio_test::{assert_ready_ok, assert_ready_err, assert_pending};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
 
 #[test]
 fn available_permits() {

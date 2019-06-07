@@ -7,8 +7,8 @@ use crate::loom::{
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
-use std::task::Poll::{Ready, Pending};
 
 /// Channel sender
 pub(crate) struct Tx<T, S: Semaphore> {
@@ -62,7 +62,8 @@ pub(crate) trait Semaphore {
 
     fn add_permit(&self);
 
-    fn poll_acquire(&self, cx: &mut Context<'_>, permit: &mut Self::Permit) -> Poll<Result<(), ()>>;
+    fn poll_acquire(&self, cx: &mut Context<'_>, permit: &mut Self::Permit)
+        -> Poll<Result<(), ()>>;
 
     fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), TrySendError>;
 

@@ -17,8 +17,8 @@ use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
+use std::task::Poll::Ready;
 use std::task::{Context, Poll};
-use std::task::Poll::{Ready};
 
 /// Unwrap a ready value or propagate `Poll::Pending`.
 #[macro_export]
@@ -53,9 +53,7 @@ fn basic_usage() {
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
             let me = &mut *self;
 
-            ready!(me
-                .waiter
-                .poll_acquire(cx, &me.shared.semaphore)).unwrap();
+            ready!(me.waiter.poll_acquire(cx, &me.shared.semaphore)).unwrap();
 
             let actual = me.shared.active.fetch_add(1, SeqCst);
             assert!(actual <= NUM - 1);
@@ -103,9 +101,7 @@ fn release() {
             thread::spawn(move || {
                 let mut permit = Permit::new();
 
-                block_on(poll_fn(|cx| {
-                    permit.poll_acquire(cx, &semaphore)
-                })).unwrap();
+                block_on(poll_fn(|cx| permit.poll_acquire(cx, &semaphore))).unwrap();
 
                 permit.release(&semaphore);
             });

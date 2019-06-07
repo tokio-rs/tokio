@@ -22,7 +22,7 @@ use loom;
 use loom::futures::{block_on, poll_future};
 use loom::thread;
 
-use std::task::Poll::{Ready, Pending};
+use std::task::Poll::{Pending, Ready};
 
 #[test]
 fn smoke() {

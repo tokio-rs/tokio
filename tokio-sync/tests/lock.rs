@@ -1,8 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio_sync::lock::Lock;
-use tokio_test::{assert_ready, assert_pending};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready};
 
 #[test]
 fn straight_execution() {

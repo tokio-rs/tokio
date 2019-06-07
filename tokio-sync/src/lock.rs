@@ -46,8 +46,8 @@ use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::task::{Poll, Context};
 use std::task::Poll::Ready;
+use std::task::{Context, Poll};
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///

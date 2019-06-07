@@ -14,7 +14,7 @@ use loom::sync::atomic::AtomicUsize;
 use loom::thread;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
-use std::task::Poll::{Ready, Pending};
+use std::task::Poll::{Pending, Ready};
 
 struct Chan {
     num: AtomicUsize,

@@ -1,8 +1,10 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio_sync::mpsc;
-use tokio_test::{assert_ok, assert_err, assert_ready, assert_ready_ok, assert_ready_err, assert_pending};
 use tokio_test::task::MockTask;
+use tokio_test::{
+    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
+};
 
 use std::sync::Arc;
 
@@ -252,7 +254,6 @@ fn send_recv_buffer_limited() {
         let val = assert_ready!(rx.poll_next(cx));
         assert_eq!(Some(2), val);
     });
-
 
     t1.enter(|cx| {
         assert_ready_ok!(tx.poll_ready(cx));

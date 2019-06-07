@@ -21,8 +21,8 @@ use std::fmt;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 use std::sync::Arc;
+use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
-use std::task::Poll::{Ready, Pending};
 use std::usize;
 
 /// Futures-aware semaphore.
@@ -176,7 +176,10 @@ impl Semaphore {
     }
 
     /// Poll for a permit
-    fn poll_permit(&self, mut permit: Option<(&mut Context<'_>, &mut Permit)>) -> Poll<Result<(), AcquireError>> {
+    fn poll_permit(
+        &self,
+        mut permit: Option<(&mut Context<'_>, &mut Permit)>,
+    ) -> Poll<Result<(), AcquireError>> {
         // Load the current state
         let mut curr = SemState::load(&self.state, Acquire);
 
@@ -571,7 +574,11 @@ impl Permit {
 
     /// Try to acquire the permit. If no permits are available, the current task
     /// is notified once a new permit becomes available.
-    pub fn poll_acquire(&mut self, cx: &mut Context<'_>, semaphore: &Semaphore) -> Poll<Result<(), AcquireError>> {
+    pub fn poll_acquire(
+        &mut self,
+        cx: &mut Context<'_>,
+        semaphore: &Semaphore,
+    ) -> Poll<Result<(), AcquireError>> {
         match self.state {
             PermitState::Idle => {}
             PermitState::Waiting => {

@@ -131,8 +131,7 @@ impl<T> async_sink::Sink<T> for UnboundedSender<T> {
     }
 
     fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
-        self.try_send(msg)
-            .map_err(|_| UnboundedSendError(()))
+        self.try_send(msg).map_err(|_| UnboundedSendError(()))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

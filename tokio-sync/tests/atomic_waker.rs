@@ -1,8 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
+use std::task::Waker;
 use tokio_sync::task::AtomicWaker;
 use tokio_test::task::MockTask;
-use std::task::Waker;
 
 trait AssertSend: Send {}
 trait AssertSync: Send {}
