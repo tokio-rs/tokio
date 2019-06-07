@@ -202,7 +202,10 @@ impl<T> async_sink::Sink<T> for Sender<T> {
     fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
         self.as_mut()
             .try_send(msg)
-            .map_err(SendError::from_try_send_error)
+            .map_err(|err| {
+                assert!(err.is_full(), "call `poll_ready` before sending");
+                SendError(())
+            })
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -215,13 +218,6 @@ impl<T> async_sink::Sink<T> for Sender<T> {
 }
 
 // ===== impl SendError =====
-
-impl SendError {
-    fn from_try_send_error<T>(err: TrySendError<T>) -> SendError {
-        assert!(!err.is_full(), "call `poll_ready` before sending");
-        SendError(())
-    }
-}
 
 impl fmt::Display for SendError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
