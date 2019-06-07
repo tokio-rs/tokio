@@ -9,8 +9,7 @@
 //! library, which can be used to implement networking protocols.
 //!
 //! Connecting to an address, via TCP, can be done using [`TcpStream`]'s
-//! [`connect`] method, which returns [`ConnectFuture`]. `ConnectFuture`
-//! implements a future which returns a `TcpStream`.
+//! [`connect`] method, which returns a future which returns a `TcpStream`.
 //!
 //! To listen on an address [`TcpListener`] can be used. `TcpListener`'s
 //! [`incoming`][incoming_method] method can be used to accept new connections.
@@ -19,16 +18,23 @@
 //!
 //! [`TcpStream`]: struct.TcpStream.html
 //! [`connect`]: struct.TcpStream.html#method.connect
-//! [`ConnectFuture`]: struct.ConnectFuture.html
 //! [`TcpListener`]: struct.TcpListener.html
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
 
+macro_rules! ready {
+    ($e:expr) => {
+        match $e {
+            ::std::task::Poll::Ready(t) => t,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    };
+}
+
+#[cfg(feature = "incoming")]
 mod incoming;
 mod listener;
 mod stream;
 
-pub use self::incoming::Incoming;
 pub use self::listener::TcpListener;
-pub use self::stream::ConnectFuture;
 pub use self::stream::TcpStream;

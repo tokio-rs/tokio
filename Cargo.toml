@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-  # "tokio",
+  "tokio",
   # "tokio-buf",
   # "tokio-codec",
   "tokio-current-thread",
@@ -10,13 +10,13 @@ members = [
   "tokio-futures",
   "tokio-io",
   # "tokio-macros",
-  # "tokio-reactor",
+  "tokio-reactor",
   # "tokio-signal",
   "tokio-sync",
   "tokio-test",
   # "tokio-threadpool",
-  # "tokio-timer",
-  # "tokio-tcp",
+  "tokio-timer",
+  "tokio-tcp",
   # "tokio-tls",
   # "tokio-trace",
   # "tokio-trace/tokio-trace-core",

@@ -1,8 +1,8 @@
-use crate::executor::current_thread::CurrentThread;
 use crate::runtime::current_thread::Runtime;
+use tokio_current_thread::CurrentThread;
 use tokio_reactor::Reactor;
-use tokio_timer::clock::Clock;
-use tokio_timer::timer::Timer;
+//use tokio_timer::clock::Clock;
+//use tokio_timer::timer::Timer;
 use std::io;
 
 /// Builds a Single-threaded runtime with custom configuration values.
@@ -35,8 +35,8 @@ use std::io;
 /// ```
 #[derive(Debug)]
 pub struct Builder {
-    /// The clock to use
-    clock: Clock,
+    // /// The clock to use
+    //clock: Clock,
 }
 
 impl Builder {
@@ -46,15 +46,17 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     pub fn new() -> Builder {
         Builder {
-            clock: Clock::new(),
+            //clock: Clock::new(),
         }
     }
 
+    /*
     /// Set the `Clock` instance that will be used by the runtime.
     pub fn clock(&mut self, clock: Clock) -> &mut Self {
         self.clock = clock;
         self
     }
+    */
 
     /// Create the configured `Runtime`.
     pub fn build(&mut self) -> io::Result<Runtime> {
@@ -64,18 +66,18 @@ impl Builder {
 
         // Place a timer wheel on top of the reactor. If there are no timeouts to fire, it'll let the
         // reactor pick up some new external events.
-        let timer = Timer::new_with_now(reactor, self.clock.clone());
-        let timer_handle = timer.handle();
+        //let timer = Timer::new_with_now(reactor, self.clock.clone());
+        //let timer_handle = timer.handle();
 
         // And now put a single-threaded executor on top of the timer. When there are no futures ready
         // to do something, it'll let the timer or the reactor to generate some new stimuli for the
         // futures to continue in their life.
-        let executor = CurrentThread::new_with_park(timer);
+        let executor = CurrentThread::new_with_park(reactor /*timer*/);
 
         let runtime = Runtime::new2(
             reactor_handle,
-            timer_handle,
-            self.clock.clone(),
+            //timer_handle,
+            //self.clock.clone(),
             executor);
 
         Ok(runtime)

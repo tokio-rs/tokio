@@ -1,7 +1,8 @@
 use crate::timer::{HandlePriv, Registration};
-use crate::Error;
-use futures::{Future, Poll};
+use std::future::Future;
+use std::pin::Pin;
 use std::time::{Duration, Instant};
+use std::task::{self, Poll};
 
 /// A future that completes at a specified instant in time.
 ///
@@ -72,6 +73,8 @@ impl Delay {
         self.registration.reset(deadline);
     }
 
+    // Used by `Timeout<Stream>`
+    #[cfg(feature = "timeout-stream")]
     pub(crate) fn reset_timeout(&mut self) {
         self.registration.reset_timeout();
     }
@@ -84,13 +87,24 @@ impl Delay {
 }
 
 impl Future for Delay {
-    type Item = ();
-    type Error = Error;
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         // Ensure the `Delay` instance is associated with a timer.
         self.register();
 
-        self.registration.poll_elapsed()
+        // `poll_elapsed` can return an error in two cases:
+        //
+        // - AtCapacity: this is a pathlogical case where far too many
+        //   delays have been scheduled.
+        // - Shutdown: No timer has been setup, which is a mis-use error.
+        //
+        // Both cases are extremely rare, and pretty accurately fit into
+        // "logic errors", so we just panic in this case. A user couldn't
+        // really do much better if we passed the error onwards.
+        match ready!(self.registration.poll_elapsed(cx)) {
+            Ok(()) => Poll::Ready(()),
+            Err(e) => panic!("timer error: {}", e),
+        }
     }
 }
