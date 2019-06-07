@@ -78,7 +78,10 @@ fn main() -> Result<(), Box<std::error::Error>> {
         .map(move |fanout_sink| {
             let tee_pipe = fanout_sink
                 .send_all(in_stream)
-                .map(|_| ()) // input finished
+                .map(|_| {
+                    // input finished
+                    std::process::exit(0);
+                })
                 .map_err(|e| {
                     // not sure when this error can happen
                     eprintln!("{}", e);
