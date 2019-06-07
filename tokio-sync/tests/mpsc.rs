@@ -37,33 +37,41 @@ fn send_recv_with_buffer() {
 }
 
 #[test]
-#[ignore]
 #[cfg(feature = "async-traits")]
 fn send_sink_recv_with_buffer() {
-    /*
-    let t1 = MockTask::new();
+    use async_sink::Sink;
+    use futures_core::Stream;
+    use pin_utils::pin_mut;
 
-    let (mut tx, mut rx) = mpsc::channel::<i32>(16);
+    let mut t1 = MockTask::new();
 
-    // Using poll_ready / try_send
-    assert_ready!(t1.enter(|cx| tx.poll_ready(cx)));
-    tx.try_send(1).unwrap();
+    let (tx, rx) = mpsc::channel::<i32>(16);
 
-    // Without poll_ready
-    tx.try_send(2).unwrap();
+    t1.enter(|cx| {
+        pin_mut!(tx);
 
-    drop(tx);
+        assert_ready_ok!(tx.as_mut().poll_ready(cx));
+        assert_ok!(tx.as_mut().start_send(1));
 
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(1));
+        assert_ready_ok!(tx.as_mut().poll_ready(cx));
+        assert_ok!(tx.as_mut().start_send(2));
 
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(2));
+        assert_ready_ok!(tx.as_mut().poll_flush(cx));
+        assert_ready_ok!(tx.as_mut().poll_close(cx));
+    });
 
-    let val = assert_ready!(rx.poll());
-    assert!(val.is_none());
-    */
-    unimplemented!();
+    t1.enter(|cx| {
+        pin_mut!(rx);
+
+        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        assert_eq!(val, Some(1));
+
+        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        assert_eq!(val, Some(2));
+
+        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        assert!(val.is_none());
+    });
 }
 
 #[test]
@@ -129,40 +137,40 @@ fn send_recv_unbounded() {
 
 #[test]
 #[cfg(feature = "async-traits")]
-#[ignore]
 fn sink_send_recv_unbounded() {
-    fn is_ready<T>(res: &AsyncSink<T>) -> bool {
-        match *res {
-            AsyncSink::Ready => true,
-            _ => false,
-        }
-    }
+    use async_sink::Sink;
+    use futures_core::Stream;
+    use pin_utils::pin_mut;
 
-    /*
-    let (mut tx, mut rx) = mpsc::unbounded_channel::<i32>();
+    let mut t1 = MockTask::new();
 
-    // Using `try_send`
-    tx.try_send(1).unwrap();
+    let (tx, rx) = mpsc::unbounded_channel::<i32>();
 
-    // Using `Sink` API
-    assert!(tx.start_send(2).unwrap().is_ready());
-    assert_ready!(tx.poll_complete());
+    t1.enter(|cx| {
+        pin_mut!(tx);
 
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(1));
+        assert_ready_ok!(tx.as_mut().poll_ready(cx));
+        assert_ok!(tx.as_mut().start_send(1));
 
-    let val = assert_ready!(rx.poll());
-    assert_eq!(val, Some(2));
+        assert_ready_ok!(tx.as_mut().poll_ready(cx));
+        assert_ok!(tx.as_mut().start_send(2));
 
-    assert_ready!(tx.poll_complete());
-    assert_ready!(tx.close());
+        assert_ready_ok!(tx.as_mut().poll_flush(cx));
+        assert_ready_ok!(tx.as_mut().poll_close(cx));
+    });
 
-    drop(tx);
+    t1.enter(|cx| {
+        pin_mut!(rx);
 
-    let val = assert_ready!(rx.poll());
-    assert!(val.is_none());
-    */
-    unimplemented!();
+        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        assert_eq!(val, Some(1));
+
+        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        assert_eq!(val, Some(2));
+
+        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        assert!(val.is_none());
+    });
 }
 
 #[test]

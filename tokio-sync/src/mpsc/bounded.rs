@@ -3,6 +3,9 @@ use super::chan;
 use std::fmt;
 use std::task::{Context, Poll};
 
+#[cfg(feature = "async-traits")]
+use std::pin::Pin;
+
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](fn.channel.html) function.
@@ -143,12 +146,11 @@ impl<T> Receiver<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> Stream for Receiver<T> {
+impl<T> futures_core::Stream for Receiver<T> {
     type Item = T;
-    type Error = RecvError;
 
-    fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
-        self.chan.recv().map_err(|_| RecvError(()))
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        Receiver::poll_next(self.get_mut(), cx)
     }
 }
 
@@ -190,30 +192,36 @@ impl<T> Sender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> Sink for Sender<T> {
-    type SinkItem = T;
-    type SinkError = SendError;
+impl<T> async_sink::Sink<T> for Sender<T> {
+    type Error = SendError;
 
-    fn start_send(&mut self, msg: T) -> StartSend<T, Self::SinkError> {
-        match self.poll_ready()? {
-            Ready(_) => {
-                self.try_send(msg).map_err(|_| SendError(()))?;
-                Ok(AsyncSink::Ready)
-            }
-            Pending => Ok(AsyncSink::NotReady(msg)),
-        }
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Sender::poll_ready(self.get_mut(), cx)
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(Ready(()))
+    fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
+        self.as_mut()
+            .try_send(msg)
+            .map_err(SendError::from_try_send_error)
     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(Ready(()))
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 }
 
 // ===== impl SendError =====
+
+impl SendError {
+    fn from_try_send_error<T>(err: TrySendError<T>) -> SendError {
+        assert!(!err.is_full(), "call `poll_ready` before sending");
+        SendError(())
+    }
+}
 
 impl fmt::Display for SendError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -62,7 +62,9 @@ use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
-// use tokio_futures::{Sink, Stream};
+
+#[cfg(feature = "async-traits")]
+use std::pin::Pin;
 
 /// Receives values from the associated `Sender`.
 ///

@@ -4,6 +4,9 @@ use crate::loom::sync::atomic::AtomicUsize;
 use std::fmt;
 use std::task::{Context, Poll};
 
+#[cfg(feature = "async-traits")]
+use std::pin::Pin;
+
 /// Send values to the associated `UnboundedReceiver`.
 ///
 /// Instances are created by the
@@ -99,12 +102,11 @@ impl<T> UnboundedReceiver<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> Stream for UnboundedReceiver<T> {
+impl<T> futures_core::Stream for UnboundedReceiver<T> {
     type Item = T;
-    type Error = UnboundedRecvError;
 
-    fn poll(&mut self) -> Poll<Option<T>, Self::Error> {
-        self.chan.recv().map_err(|_| UnboundedRecvError(()))
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
     }
 }
 
@@ -121,21 +123,24 @@ impl<T> UnboundedSender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> Sink for UnboundedSender<T> {
-    type SinkItem = T;
-    type SinkError = UnboundedSendError;
+impl<T> async_sink::Sink<T> for UnboundedSender<T> {
+    type Error = UnboundedSendError;
 
-    fn start_send(&mut self, msg: T) -> StartSend<T, Self::SinkError> {
-        self.try_send(msg).map_err(|_| UnboundedSendError(()))?;
-        Ok(AsyncSink::Ready)
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(Ready(()))
+    fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
+        self.try_send(msg)
+            .map_err(|_| UnboundedSendError(()))
     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(Ready(()))
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 }
 
