@@ -101,10 +101,12 @@
 //! //  - "foo", with a value of 42,
 //! //  - "bar", with the value "false"
 //! //  - "baz", with no initial value
-//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false, baz = _);
+//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false);
 //!
-//! // record a value for the field "baz" declared above:
-//! my_span.record("baz", &"hello world");
+// TODO(#1138): determine a new syntax for uninitialized span fields, and
+// re-enable this.
+// //! // record a value for the field "baz" declared above:
+// //! my_span.record("baz", &"hello world");
 //! # }
 //!```
 //!

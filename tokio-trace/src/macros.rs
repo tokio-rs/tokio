@@ -102,18 +102,20 @@
 /// # }
 ///```
 ///
-/// Field values may be recorded after the span is created. The `_` character is
-/// used to represent a field whose value has yet to be recorded:
-/// ```
-/// # #[macro_use]
-/// # extern crate tokio_trace;
-/// # use tokio_trace::Level;
-/// # fn main() {
-/// let my_span = span!(Level::TRACE, "my span", foo = 2, bar = _);
-/// my_span.record("bar", &7);
-/// # }
-/// ```
-///
+// TODO(#1138): determine a new syntax for uninitialized span fields, and
+// re-enable this.
+// /// Field values may be recorded after the span is created. The `_` character is
+// /// used to represent a field whose value has yet to be recorded:
+// /// ```
+// /// # #[macro_use]
+// /// # extern crate tokio_trace;
+// /// # use tokio_trace::Level;
+// /// # fn main() {
+// /// let my_span = span!(Level::TRACE, "my span", foo = 2, bar = _);
+// /// my_span.record("bar", &7);
+// /// # }
+// /// ```
+// ///
 /// The `?` sigil is shorthand for `field::debug`:
 /// ```
 /// # #[macro_use]
@@ -1423,9 +1425,12 @@ macro_rules! valueset {
     };
 
     // === recursive case (more tts), non-empty out set ===
-    (@{ $($out:expr),+ }, $next:expr, $($k:ident).+ = _, $($rest:tt)*) => {
-        valueset!(@ { $($out),+, (&$next, None) }, $next, $($rest)*)
-    };
+
+    // TODO(#1138): determine a new syntax for uninitialized span fields, and
+    // re-enable this.
+    // (@{ $($out:expr),+ }, $next:expr, $($k:ident).+ = _, $($rest:tt)*) => {
+    //     valueset!(@ { $($out),+, (&$next, None) }, $next, $($rest)*)
+    // };
     (@ { $($out:expr),+ }, $next:expr, $($k:ident).+ = ?$val:expr, $($rest:tt)*) => {
         valueset!(
             @ { $($out),+, (&$next, Some(&debug(&$val) as &Value)) },
@@ -1470,9 +1475,12 @@ macro_rules! valueset {
     };
 
     // == recursive case (more tts), empty out set ===
-    (@ { }, $next:expr, $($k:ident).+ = _, $($rest:tt)* ) => {
-        valueset!(@ { (&$next, None) }, $next, $($rest)* )
-    };
+
+    // TODO(#1138): determine a new syntax for uninitialized span fields, and
+    // re-enable this.
+    // (@ { }, $next:expr, $($k:ident).+ = _, $($rest:tt)* ) => {
+    //     valueset!(@ { (&$next, None) }, $next, $($rest)* )
+    // };
     (@ { }, $next:expr, $($k:ident).+ = ?$val:expr, $($rest:tt)* ) => {
         valueset!(@ { (&$next, Some(&debug(&$val) as &Value)) }, $next, $($rest)* )
     };
@@ -1530,9 +1538,11 @@ macro_rules! fieldset {
     (@ { } $($k:ident).+ = $val:expr, $($rest:tt)*) => {
         fieldset!(@ { __tokio_trace_stringify!($($k).+) } $($rest)*)
     };
-    (@ { } $($k:ident).+ = _, $($rest:tt)*) => {
-        fieldset!(@ { __tokio_trace_stringify!($($k).+) } $($rest)*)
-    };
+    // TODO(#1138): determine a new syntax for uninitialized span fields, and
+    // re-enable this.
+    // (@ { } $($k:ident).+ = _, $($rest:tt)*) => {
+    //     fieldset!(@ { __tokio_trace_stringify!($($k).+) } $($rest)*)
+    // };
     (@ { } ?$($k:ident).+, $($rest:tt)*) => {
         fieldset!(@ { __tokio_trace_stringify!($($k).+) } $($rest)*)
     };
@@ -1554,9 +1564,11 @@ macro_rules! fieldset {
     (@ { $($out:expr),+ } $($k:ident).+ = $val:expr, $($rest:tt)*) => {
         fieldset!(@ { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)*)
     };
-    (@ { $($out:expr),+ } $($k:ident).+ = _, $($rest:tt)*) => {
-        fieldset!(@ { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)*)
-    };
+    // TODO(#1138): determine a new syntax for uninitialized span fields, and
+    // re-enable this.
+    // (@ { $($out:expr),+ } $($k:ident).+ = _, $($rest:tt)*) => {
+    //     fieldset!(@ { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)*)
+    // };
     (@ { $($out:expr),+ } ?$($k:ident).+, $($rest:tt)*) => {
         fieldset!(@ { $($out),+, __tokio_trace_stringify!($($k).+) } $($rest)*)
     };
