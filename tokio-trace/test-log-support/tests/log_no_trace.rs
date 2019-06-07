@@ -55,11 +55,13 @@ fn test_always_log() {
     span!(Level::TRACE, "foo", bar = 3, baz = false);
     last(&a, "foo; bar=3 baz=false");
 
-    let span = span!(Level::TRACE, "foo", bar = _, baz = _);
-    span.record("bar", &3);
-    last(&a, "foo; bar=3");
-    span.record("baz", &"a string");
-    last(&a, "foo; baz=\"a string\"");
+    // TODO(#1138): determine a new syntax for uninitialized span fields, and
+    // re-enable these.
+    // let span = span!(Level::TRACE, "foo", bar = _, baz = _);
+    // span.record("bar", &3);
+    // last(&a, "foo; bar=3");
+    // span.record("baz", &"a string");
+    // last(&a, "foo; baz=\"a string\"");
 }
 
 fn last(state: &State, expected: &str) {
