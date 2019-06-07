@@ -1,4 +1,3 @@
-#![cfg(feature = "broken")]
 #![deny(warnings, rust_2018_idioms)]
 
 #[macro_use]

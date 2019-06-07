@@ -41,11 +41,13 @@
 //! [`LockGuard`]: struct.LockGuard.html
 
 use crate::semaphore;
-use futures::Async;
+
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::task::Poll::Ready;
+use std::task::{Context, Poll};
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
@@ -103,14 +105,12 @@ impl<T> Lock<T> {
     /// Try to acquire the lock.
     ///
     /// If the lock is already held, the current task is notified when it is released.
-    pub fn poll_lock(&mut self) -> Async<LockGuard<T>> {
-        if let Async::NotReady = self.permit.poll_acquire(&self.inner.s).unwrap_or_else(|_| {
+    pub fn poll_lock(&mut self, cx: &mut Context<'_>) -> Poll<LockGuard<T>> {
+        ready!(self.permit.poll_acquire(cx, &self.inner.s)).unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
-        }) {
-            return Async::NotReady;
-        }
+        });
 
         // We want to move the acquired permit into the guard,
         // and leave an unacquired one in self.
@@ -118,7 +118,7 @@ impl<T> Lock<T> {
             inner: self.inner.clone(),
             permit: ::std::mem::replace(&mut self.permit, semaphore::Permit::new()),
         };
-        Async::Ready(LockGuard(acquired))
+        Ready(LockGuard(acquired))
     }
 }
 
