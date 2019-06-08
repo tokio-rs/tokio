@@ -234,7 +234,7 @@ impl Runtime {
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
-        self.inner_mut().pool.sender().spawn(future).unwrap();
+        self.inner_mut().pool.spawn(future);
         self
     }
 
