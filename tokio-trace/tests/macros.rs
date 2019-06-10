@@ -395,6 +395,26 @@ fn error() {
 }
 
 #[test]
+fn field_shorthand_only() {
+    #[derive(Debug)]
+    struct Position {
+        x: f32,
+        y: f32,
+    }
+    let pos = Position {
+        x: 3.234,
+        y: -1.223,
+    };
+
+    trace!(?pos.x, ?pos.y);
+    debug!(?pos.x, ?pos.y);
+    info!(?pos.x, ?pos.y);
+    warn!(?pos.x, ?pos.y);
+    error!(?pos.x, ?pos.y);
+    event!(Level::TRACE, ?pos.x, ?pos.y);
+}
+
+#[test]
 fn callsite_macro_api() {
     // This test should catch any inadvertant breaking changes
     // caused bu changes to the macro.

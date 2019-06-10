@@ -89,7 +89,7 @@ fn get_host(host: &'static str) -> Error {
     let addr = format!("{}:443", host);
     let addr = t!(addr.to_socket_addrs()).next().unwrap();
 
-    let mut l = t!(Runtime::new());
+    let l = t!(Runtime::new());
     let client = TcpStream::connect(&addr);
     let data = client.and_then(move |socket| {
         let builder = TlsConnector::builder();

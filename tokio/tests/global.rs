@@ -89,7 +89,7 @@ fn hammer_split() {
 
         let cnt = Arc::new(AtomicUsize::new(0));
 
-        let mut rt = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
 
         fn split(socket: TcpStream, cnt: Arc<AtomicUsize>) {
             let socket = Arc::new(socket);
