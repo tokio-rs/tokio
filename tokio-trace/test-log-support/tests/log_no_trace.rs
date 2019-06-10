@@ -42,7 +42,7 @@ fn test_always_log() {
     info!(message = "hello world;", thingy = 42, other_thingy = 666);
     last(&a, "hello world; thingy=42 other_thingy=666");
 
-    let mut foo = span!(Level::TRACE, "foo");
+    let foo = span!(Level::TRACE, "foo");
     last(&a, "foo;");
     foo.in_scope(|| {
         last(&a, "-> foo");
@@ -55,11 +55,13 @@ fn test_always_log() {
     span!(Level::TRACE, "foo", bar = 3, baz = false);
     last(&a, "foo; bar=3 baz=false");
 
-    let mut span = span!(Level::TRACE, "foo", bar, baz);
-    span.record("bar", &3);
-    last(&a, "foo; bar=3");
-    span.record("baz", &"a string");
-    last(&a, "foo; baz=\"a string\"");
+    // TODO(#1138): determine a new syntax for uninitialized span fields, and
+    // re-enable these.
+    // let span = span!(Level::TRACE, "foo", bar = _, baz = _);
+    // span.record("bar", &3);
+    // last(&a, "foo; bar=3");
+    // span.record("baz", &"a string");
+    // last(&a, "foo; baz=\"a string\"");
 }
 
 fn last(state: &State, expected: &str) {

@@ -101,10 +101,27 @@
 //! //  - "foo", with a value of 42,
 //! //  - "bar", with the value "false"
 //! //  - "baz", with no initial value
-//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false, baz);
+//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false);
 //!
-//! // record a value for the field "baz" declared above:
-//! my_span.record("baz", &"hello world");
+// TODO(#1138): determine a new syntax for uninitialized span fields, and
+// re-enable this.
+// //! // record a value for the field "baz" declared above:
+// //! my_span.record("baz", &"hello world");
+//! # }
+//!```
+//!
+//! As shorthand, local variables may be used as field values without an
+//! assignment, similar to [struct initializers]. For example:
+//! ```
+//! # #[macro_use]
+//! # extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! let user = "ferris";
+//!
+//! span!(Level::TRACE, "login", user);
+//! // is equivalent to:
+//! span!(Level::TRACE, "login", user = user);
 //! # }
 //!```
 //!
@@ -120,7 +137,7 @@
 //! ```
 //! # #[macro_use]
 //! # extern crate tokio_trace;
-//! # use tokio_trace::Level;
+//! # use tokio_trace::{Level, field};
 //! # fn main() {
 //! #[derive(Debug)]
 //! struct MyStruct {
@@ -131,14 +148,9 @@
 //!     my_field: "Hello world!"
 //! };
 //!
-//! let my_span = span!(
-//!     Level::TRACE,
-//!     "my_span",
-//!     // `my_struct` will be recorded using its `fmt::Debug` implementation.
-//!     my_struct = ?my_struct,
-//!     // `my_field` will be recorded using the implementation of `fmt::Display` for `&str`.
-//!     my_struct.my_field = %my_struct.my_field,
-//! );
+//! span!(Level::TRACE,"my_span", ?my_struct, %my_struct.my_field);
+//! // is equivalent to:
+//! span!(Level::TRACE, "my_span", my_struct = field::debug(&my_struct), my_struct.my_field = field::display(&my_struct.my_field));
 //! # }
 //!```
 //!
@@ -311,7 +323,7 @@
 //! # fn find_a_razor() -> Result<u32, u32> { Ok(1) }
 //! # fn main() {
 //! pub fn shave_the_yak(yak: &mut Yak) {
-//!     let span = span!(Level::TRACE, "shave_the_yak", yak = ?yak);
+//!     let span = span!(Level::TRACE, "shave_the_yak", ?yak);
 //!     let _enter = span.enter();
 //!
 //!     // Since the span is annotated with the yak, it is part of the context
@@ -324,7 +336,7 @@
 //!                 // We can add the razor as a field rather than formatting it
 //!                 // as part of the message, allowing subscribers to consume it
 //!                 // in a more structured manner:
-//!                 info!({ razor = %razor }, "Razor located");
+//!                 info!({ %razor }, "Razor located");
 //!                 yak.shave(razor);
 //!                 break;
 //!             }

@@ -391,13 +391,17 @@ fn move_field_out_of_struct() {
     handle.assert_finished();
 }
 
+// TODO(#1138): determine a new syntax for uninitialized span fields, and
+// re-enable these.
+/*
 #[test]
 fn add_field_after_new_span() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(
             span::mock()
                 .named("foo")
-                .with_field(field::mock("bar").with_value(&5).only()),
+                .with_field(field::mock("bar").with_value(&5)
+                .and(field::mock("baz").with_value).only()),
         )
         .record(
             span::mock().named("foo"),
@@ -410,7 +414,7 @@ fn add_field_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let span = span!(Level::TRACE, "foo", bar = 5, baz);
+        let span = span!(Level::TRACE, "foo", bar = 5, baz = false);
         span.record("baz", &true);
         span.in_scope(|| {})
     });
@@ -437,7 +441,73 @@ fn add_fields_only_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let span = span!(Level::TRACE, "foo", bar, baz);
+        let span = span!(Level::TRACE, "foo", bar = _, baz = _);
+        span.record("bar", &5);
+        span.record("baz", &true);
+        span.in_scope(|| {})
+    });
+
+    handle.assert_finished();
+}
+*/
+
+#[test]
+fn record_new_value_for_field() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&5)
+                    .and(field::mock("baz").with_value(&false))
+                    .only(),
+            ),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let span = span!(Level::TRACE, "foo", bar = 5, baz = false);
+        span.record("baz", &true);
+        span.in_scope(|| {})
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn record_new_values_for_fields() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&4)
+                    .and(field::mock("baz").with_value(&false))
+                    .only(),
+            ),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("bar").with_value(&5).only(),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let span = span!(Level::TRACE, "foo", bar = 4, baz = false);
         span.record("bar", &5);
         span.record("baz", &true);
         span.in_scope(|| {})

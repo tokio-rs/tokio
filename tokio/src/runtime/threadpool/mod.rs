@@ -234,7 +234,7 @@ impl Runtime {
     pub fn spawn<F>(&self, future: F) -> &Self
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
-        self.inner().pool.sender().spawn(future).unwrap();
+        self.inner().pool.spawn(future);
         self
     }
 
