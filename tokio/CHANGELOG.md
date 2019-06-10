@@ -1,6 +1,11 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.1.21 (May 30, 2019)
+
+### Changed
+- Bump `tokio-trace-core` version to 0.2 (#1111).
+
 # 0.1.20 (May 14, 2019)
 
 ### Added
