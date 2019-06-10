@@ -63,7 +63,7 @@ fn fetch_google() {
     let addr = t!("google.com:443".to_socket_addrs()).next().unwrap();
 
     // Create an event loop and connect a socket to our resolved address.c
-    let mut l = t!(Runtime::new());
+    let l = t!(Runtime::new());
     let client = TcpStream::connect(&addr);
 
     // Send off the request by first negotiating an SSL handshake, then writing
@@ -97,7 +97,7 @@ fn wrong_hostname_error() {
 
     let addr = t!("google.com:443".to_socket_addrs()).next().unwrap();
 
-    let mut l = t!(Runtime::new());
+    let l = t!(Runtime::new());
     let client = TcpStream::connect(&addr);
     let data = client.and_then(move |socket| {
         let builder = TlsConnector::builder();

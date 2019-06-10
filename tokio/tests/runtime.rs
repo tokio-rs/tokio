@@ -229,7 +229,7 @@ fn block_on_timer() {
         Box::new(Delay::new(Instant::now() + Duration::from_millis(100)).map(move |_| x))
     }
 
-    let mut runtime = Runtime::new().unwrap();
+    let runtime = Runtime::new().unwrap();
     assert_eq!(runtime.block_on(after_1s(42)).unwrap(), 42);
     runtime.shutdown_on_idle().wait().unwrap();
 }
@@ -244,7 +244,7 @@ mod from_block_on {
         let cnt = Arc::new(Mutex::new(0));
         let c = cnt.clone();
 
-        let mut runtime = Runtime::new().unwrap();
+        let runtime = Runtime::new().unwrap();
         let msg = runtime
             .block_on(lazy(move || {
                 {
@@ -300,7 +300,7 @@ fn block_waits() {
     let cnt = Arc::new(Mutex::new(0));
     let c = cnt.clone();
 
-    let mut runtime = Runtime::new().unwrap();
+    let runtime = Runtime::new().unwrap();
     runtime
         .block_on(rx.then(move |_| {
             {
@@ -467,7 +467,7 @@ mod nested_enter {
     #[test]
     fn threadpool_block_on_in_run() {
         test(tokio::run, |fut| {
-            let mut rt = threadpool_new();
+            let rt = threadpool_new();
             rt.block_on(fut).unwrap();
         });
     }

@@ -98,7 +98,7 @@ where F: Future<Item = (), Error = ()> + Send + 'static,
 {
     // Check enter before creating a new Runtime...
     let mut entered = enter().expect("nested tokio::run");
-    let mut runtime = Runtime::new().expect("failed to start new Runtime");
+    let runtime = Runtime::new().expect("failed to start new Runtime");
     runtime.spawn(future);
     entered
         .block_on(runtime.shutdown_on_idle())
@@ -216,7 +216,7 @@ impl Runtime {
     ///
     /// # fn dox() {
     /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
     /// rt.spawn(future::lazy(|| {
@@ -231,10 +231,10 @@ impl Runtime {
     ///
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
-    pub fn spawn<F>(&mut self, future: F) -> &mut Self
+    pub fn spawn<F>(&self, future: F) -> &Self
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
-        self.inner_mut().pool.spawn(future);
+        self.inner().pool.spawn(future);
         self
     }
 
@@ -250,7 +250,7 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
+    pub fn block_on<F, R, E>(&self, future: F) -> Result<R, E>
     where
         F: Send + 'static + Future<Item = R, Error = E>,
         R: Send + 'static,
@@ -276,7 +276,7 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on_all<F, R, E>(mut self, future: F) -> Result<R, E>
+    pub fn block_on_all<F, R, E>(self, future: F) -> Result<R, E>
     where
         F: Send + 'static + Future<Item = R, Error = E>,
         R: Send + 'static,
@@ -374,10 +374,6 @@ impl Runtime {
 
     fn inner(&self) -> &Inner {
         self.inner.as_ref().unwrap()
-    }
-
-    fn inner_mut(&mut self) -> &mut Inner {
-        self.inner.as_mut().unwrap()
     }
 }
 
