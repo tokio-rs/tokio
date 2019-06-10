@@ -1,43 +1,6 @@
-# Tokio async/await preview
+# Tokio Futures
 
-This crate provides a preview of Tokio with async / await support. It is a shim
-layer on top of `tokio`.
-
-**This crate requires Rust nightly and does not provide API stability
-guarantees. You are living on the edge here.**
-
-## Usage
-
-To use this crate, you need to start with a Rust 2018 edition crate, with rustc
-1.35.0-nightly or later.
-
-Add this to your `Cargo.toml`:
-
-```toml
-# In the `[packages]` section
-edition = "2018"
-
-# In the `[dependencies]` section
-tokio = {version = "0.2.0", features = ["async-await-preview"]}
-```
-
-Then, get started. In your application, add:
-
-```rust
-// The nightly features that are commonly needed with async / await
-#![feature(async_await)]
-
-fn main() {
-    // And we are async...
-    tokio::run_async(async {
-        println!("Hello");
-    });
-}
-```
-
-Because nightly is required, run the app with `cargo +nightly run`
-
-Check the [examples](/async-await) directory for more.
+Asynchronous abstractions for the Tokio stack.
 
 ## License
 

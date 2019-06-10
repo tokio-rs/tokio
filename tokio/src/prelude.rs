@@ -13,12 +13,5 @@
 pub use std::future::Future;
 pub use std::task::{self, Poll};
 //pub use crate::util::{FutureExt, StreamExt};
-#[cfg(feature = "async-await-preview")]
-#[doc(inline)]
-pub use tokio_futures::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    sink::SinkExt,
-    stream::StreamExt as StreamAsyncExt,
-};
 #[cfg(feature = "io")]
 pub use tokio_io::{AsyncRead, AsyncWrite};
