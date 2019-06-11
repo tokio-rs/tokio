@@ -130,13 +130,21 @@ pub trait AsyncRead {
     */
 }
 
-/*
-impl<T: ?Sized + AsyncRead> AsyncRead for Box<T> {
+impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for Box<T> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         (**self).prepare_uninitialized_buffer(buf)
     }
+
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<usize, std_io::Error>> {
+        Pin::new(&mut **self).poll_read(cx, buf)
+    }
 }
 
+/*
 impl<'a, T: ?Sized + AsyncRead> AsyncRead for &'a mut T {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         (**self).prepare_uninitialized_buffer(buf)
