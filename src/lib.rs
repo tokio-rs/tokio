@@ -162,6 +162,13 @@ extern crate futures;
 extern crate tokio_io;
 extern crate tokio_reactor;
 
+#[cfg(unix)]
+#[macro_use]
+extern crate lazy_static;
+#[cfg(unix)]
+#[macro_use]
+extern crate log;
+
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 

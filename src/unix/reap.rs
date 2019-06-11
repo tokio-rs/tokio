@@ -2,15 +2,10 @@ use futures::{Async, Future, Poll, Stream};
 use std::io;
 use std::ops::Deref;
 use std::process::ExitStatus;
-
-/// An interface for waiting on a process to exit.
-pub trait Wait {
-    /// Try waiting for a process to exit in a non-blocking manner.
-    fn try_wait(&mut self) -> io::Result<Option<ExitStatus>>;
-}
+use super::orphan::Wait;
 
 /// An interface for killing a running process.
-pub trait Kill {
+pub(crate) trait Kill {
     /// Forcefully kill the process.
     fn kill(&mut self) -> io::Result<()>;
 }
@@ -18,7 +13,7 @@ pub trait Kill {
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.
 #[derive(Debug)]
-pub struct Reaper<W, S> {
+pub(crate) struct Reaper<W, S> {
     inner: W,
     signal: S,
 }
@@ -32,7 +27,7 @@ impl<W, S> Deref for Reaper<W, S> {
 }
 
 impl<W, S> Reaper<W, S> {
-    pub fn new(inner: W, signal: S) -> Self {
+    pub(crate) fn new(inner: W, signal: S) -> Self {
         Self {
             inner,
             signal,
@@ -122,6 +117,10 @@ mod test {
     }
 
     impl Wait for MockWait {
+        fn id(&self) -> u32 {
+            0
+        }
+
         fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
             let ret = if self.num_wait_until_status == self.total_waits {
                 Some(self.status)

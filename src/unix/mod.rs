@@ -25,6 +25,7 @@ extern crate libc;
 extern crate mio;
 extern crate tokio_signal;
 
+mod orphan;
 mod reap;
 
 use futures::future::FlattenStream;
@@ -32,6 +33,8 @@ use futures::{Future, Poll};
 use self::mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use self::mio::unix::{EventedFd, UnixReady};
 use self::mio::event::Evented;
+use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
+use self::reap::{Kill, Reaper};
 use self::tokio_signal::unix::Signal;
 use std::fmt;
 use std::io;
@@ -42,6 +45,10 @@ use tokio_io::IoFuture;
 use tokio_reactor::{Handle, PollEvented};
 
 impl Wait for process::Child {
+    fn id(&self) -> u32 {
+        self.id()
+    }
+
     fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
         self.try_wait()
     }
@@ -50,6 +57,28 @@ impl Wait for process::Child {
 impl Kill for process::Child {
     fn kill(&mut self) -> io::Result<()> {
         self.kill()
+    }
+}
+
+lazy_static! {
+    static ref ORPHAN_QUEUE: AtomicOrphanQueue<process::Child> = AtomicOrphanQueue::new();
+}
+
+struct GlobalOrphanQueue;
+
+impl fmt::Debug for GlobalOrphanQueue {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        ORPHAN_QUEUE.fmt(fmt)
+    }
+}
+
+impl OrphanQueue<process::Child> for GlobalOrphanQueue {
+    fn push_orphan(&self, orphan: process::Child) {
+        ORPHAN_QUEUE.push_orphan(orphan)
+    }
+
+    fn reap_orphans(&self) {
+        ORPHAN_QUEUE.reap_orphans()
     }
 }
 
