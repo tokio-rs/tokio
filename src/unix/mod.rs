@@ -22,17 +22,16 @@
 //! bad in theory...
 
 extern crate libc;
+extern crate mio;
 extern crate tokio_signal;
 
 mod reap;
 
 use futures::future::FlattenStream;
 use futures::{Future, Poll};
-use mio::unix::{EventedFd, UnixReady};
-use mio::{PollOpt, Ready, Token};
-use mio::event::Evented;
-use mio;
-use self::reap::{Kill, Reaper, Wait};
+use self::mio::{Poll as MioPoll, PollOpt, Ready, Token};
+use self::mio::unix::{EventedFd, UnixReady};
+use self::mio::event::Evented;
 use self::tokio_signal::unix::Signal;
 use std::fmt;
 use std::io;
@@ -130,7 +129,7 @@ pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
 
 impl<T> Evented for Fd<T> where T: AsRawFd {
     fn register(&self,
-                poll: &mio::Poll,
+                poll: &MioPoll,
                 token: Token,
                 interest: Ready,
                 opts: PollOpt)
@@ -142,7 +141,7 @@ impl<T> Evented for Fd<T> where T: AsRawFd {
     }
 
     fn reregister(&self,
-                  poll: &mio::Poll,
+                  poll: &MioPoll,
                   token: Token,
                   interest: Ready,
                   opts: PollOpt)
@@ -153,7 +152,7 @@ impl<T> Evented for Fd<T> where T: AsRawFd {
                                                 opts)
     }
 
-    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
+    fn deregister(&self, poll: &MioPoll) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }

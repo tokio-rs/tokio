@@ -161,7 +161,6 @@
 extern crate futures;
 extern crate tokio_io;
 extern crate tokio_reactor;
-extern crate mio;
 
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};

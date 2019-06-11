@@ -22,7 +22,6 @@ codecov = { repository = "alexcrichton/tokio-process" }
 
 [dependencies]
 futures = "0.1.11"
-mio = "0.6.5"
 tokio-io = "0.1"
 tokio-reactor = "0.1"
 
@@ -53,4 +52,5 @@ features = [
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+mio = "0.6.5"
 tokio-signal = "0.2.5"
