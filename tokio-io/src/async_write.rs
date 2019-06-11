@@ -143,12 +143,25 @@ pub trait AsyncWrite {
     }
 }
 
-/*
-impl<T: ?Sized + AsyncWrite> AsyncWrite for Box<T> {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        (**self).shutdown()
+impl<T: ?Sized + Unpin + AsyncWrite> AsyncWrite for Box<T> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std_io::Error>> {
+        Pin::new(&mut **self).poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std_io::Error>> {
+        Pin::new(&mut **self).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std_io::Error>> {
+        Pin::new(&mut **self).poll_shutdown(cx)
     }
 }
+
+/*
 impl<'a, T: ?Sized + AsyncWrite> AsyncWrite for &'a mut T {
     fn shutdown(&mut self) -> Poll<(), std_io::Error> {
         (**self).shutdown()
