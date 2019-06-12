@@ -26,8 +26,8 @@
 //! let my_span = span!(Level::INFO, "my_span", answer = 42);
 //! ```
 //!
-//! The documentation for the [`span!`] macro provides a complete set of
-//! examples for the various options that exist when creating spans.
+//! The documentation for the [`span!`] macro provides additional examples of
+//! the various options that exist when creating spans.
 //!
 //! The [`trace_span!`], [`debug_span!`], [`info_span!`], [`warn_span!`], and
 //! [`error_span!`] exist as shorthand for constructing spans at various
@@ -183,8 +183,8 @@
 //!
 //! ## Closing Spans
 //!
-//! Execution may enter and exit a span multiple times before that
-//! span is _closed_. Consider, for example, a future which has an associated
+//! Execution may enter and exit a span multiple times before that span is
+//! _closed_. Consider, for example, a future which has an associated
 //! span and enters that span every time it is polled:
 //! ```rust
 //! # extern crate tokio_trace;
@@ -225,7 +225,7 @@
 //! this to determine whether or not the span will be entered again.
 //!
 //! If there is only a single handle with the capacity to exit a span, dropping
-//! that handle "close" the span, since the capacity to enter it no longer
+//! that handle "closes" the span, since the capacity to enter it no longer
 //! exists. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;

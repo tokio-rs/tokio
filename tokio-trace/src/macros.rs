@@ -120,7 +120,7 @@
 ///
 /// // `my_struct` will be recorded using its `fmt::Debug` implementation.
 /// span!(Level::TRACE, "my span", foo = ?my_struct);
-/// // This is equivalent to
+/// // is equivalent to:
 /// span!(Level::TRACE, "my span", foo = tokio_trace::field::debug(&my_struct));
 /// # }
 /// ```
@@ -141,12 +141,12 @@
 /// # };
 /// // `my_struct.field` will be recorded using its `fmt::Display` implementation.
 /// span!(Level::TRACE, "my span", foo = %my_struct.field);
-/// // This is equivalent to
+/// // is equivalent to:
 /// span!(Level::TRACE, "my span", foo = tokio_trace::field::display(&my_struct.field));
 /// # }
 /// ```
 ///
-/// The `display` and `debug` sigils may also be used with local variable shorthand:
+/// The `%` and `?` sigils may also be used with local variable shorthand:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -370,6 +370,16 @@ macro_rules! span {
 /// # Examples
 ///
 /// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// trace_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::TRACE, "my_span")
+/// # }
+/// ```
+///
+/// ```rust
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
@@ -437,6 +447,16 @@ macro_rules! trace_span {
 /// [`span!`]: macro.span.html
 ///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// debug_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::DEBUG, "my_span")
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
@@ -508,6 +528,16 @@ macro_rules! debug_span {
 /// # Examples
 ///
 /// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// info_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::INFO, "my_span")
+/// # }
+/// ```
+///
+/// ```rust
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
@@ -577,6 +607,16 @@ macro_rules! info_span {
 /// # Examples
 ///
 /// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// info_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::INFO, "my_span")
+/// # }
+/// ```
+///
+/// ```rust
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
@@ -643,6 +683,16 @@ macro_rules! warn_span {
 /// [`span!`]: macro.span.html
 ///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// error_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::ERROR, "my_span")
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
