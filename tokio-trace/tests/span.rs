@@ -265,7 +265,7 @@ fn enter() {
         .run_with_handle();
     with_default(subscriber, || {
         let foo = span!(Level::TRACE, "foo");
-        let _enter = foo.enter();
+        foo.enter();
         debug!("dropping guard...");
     });
 

@@ -24,8 +24,8 @@
 //!
 //! # Core Concepts
 //!
-//! The core of `tokio-trace`'s API is composed of `Event`s, `Span`s, and
-//! `Subscriber`s. We'll cover these in turn.
+//! The core of `tokio-trace`'s API is composed of _spans_, _events_ and
+//! _subscribers_. We'll cover these in turn.
 //!
 //! ## Spans
 //!
