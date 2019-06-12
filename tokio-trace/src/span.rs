@@ -241,7 +241,7 @@ impl Span {
     /// [field values]: ../field/struct.ValueSet.html
     /// [`follows_from`]: ../struct.Span.html#method.follows_from
     pub fn child_of(
-        parent: impl Into<Option<&'a Id>>,
+        parent: impl for<'a> Into<Option<&'a Id>>,
         meta: &'static Metadata<'static>,
         values: &field::ValueSet,
     ) -> Span {
@@ -557,13 +557,13 @@ impl fmt::Debug for Span {
 
 impl<'a> Into<Option<&'a Id>> for &'a Span {
     fn into(self) -> Option<&'a Id> {
-        self.inner.as_ref().map(|inner| inner.id)
+        self.inner.as_ref().map(|inner| &inner.id)
     }
 }
 
 impl<'a> Into<Option<&'a Id>> for Span {
     fn into(self) -> Option<&'a Id> {
-        self.inner.as_ref().map(|inner| inner.id)
+        self.inner.as_ref().map(|inner| &inner.id)
     }
 }
 
