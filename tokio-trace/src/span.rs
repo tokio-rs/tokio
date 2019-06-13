@@ -241,12 +241,12 @@ impl Span {
     /// [field values]: ../field/struct.ValueSet.html
     /// [`follows_from`]: ../struct.Span.html#method.follows_from
     pub fn child_of(
-        parent: impl for<'a> Into<Option<&'a Id>>,
+        parent: impl Into<Option<Id>>,
         meta: &'static Metadata<'static>,
         values: &field::ValueSet,
     ) -> Span {
         let new_span = match parent.into() {
-            Some(parent) => Attributes::child_of(parent.clone(), meta, values),
+            Some(parent) => Attributes::child_of(parent, meta, values),
             None => Attributes::new_root(meta, values),
         };
         Self::make(meta, new_span)
@@ -561,9 +561,15 @@ impl<'a> Into<Option<&'a Id>> for &'a Span {
     }
 }
 
-impl<'a> Into<Option<&'a Id>> for Span {
-    fn into(self) -> Option<&'a Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
+impl<'a> Into<Option<Id>> for &'a Span {
+    fn into(self) -> Option<Id> {
+        self.inner.as_ref().map(Inner::id)
+    }
+}
+
+impl Into<Option<Id>> for Span {
+    fn into(self) -> Option<Id> {
+        self.inner.as_ref().map(Inner::id)
     }
 }
 
