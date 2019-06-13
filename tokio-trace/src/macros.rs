@@ -25,20 +25,18 @@
 /// # }
 /// ```
 ///
-/// # Fields
+/// ## Recording Fields
 ///
-/// Creating a span with fields:
+/// Span fields are written using the syntax `key = value`.
 /// ```
-/// # #[macro_use]
-/// # extern crate tokio_trace;
+/// # #[macro_use] extern crate tokio_trace;
 /// # use tokio_trace::Level;
 /// # fn main() {
-/// span!(Level::TRACE, "my span", foo = 2, bar = "a string").in_scope(|| {
-///     // do work inside the span...
-/// });
-/// # }
+/// // construct a new span with two fields:
+/// //  - "foo", with a value of 42,
+/// //  - "bar", with the value "false"
+/// let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false);
 /// ```
-///
 /// Note that a trailing comma on the final field is valid:
 /// ```
 /// # #[macro_use]
@@ -46,10 +44,10 @@
 /// # use tokio_trace::Level;
 /// # fn main() {
 /// span!(
-///     Level::TRACE,
-///     "my span",
-///     foo = 2,
-///     bar = "a string",
+///     Level::INFO,
+///     "my_span",
+///     foo = 42,
+///     bar = false,
 /// );
 /// # }
 /// ```
@@ -69,7 +67,7 @@
 /// # }
 ///```
 ///
-/// Field names can include dots:
+/// Field names can include dots, but should not be terminated by them:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -116,7 +114,7 @@
 // /// # }
 // /// ```
 // ///
-/// The `?` sigil is shorthand for `field::debug`:
+/// The `?` sigil is shorthand for [`field::debug`]:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -132,11 +130,13 @@
 /// };
 ///
 /// // `my_struct` will be recorded using its `fmt::Debug` implementation.
-/// let my_span = span!(Level::TRACE, "my span", foo = ?my_struct);
+/// span!(Level::TRACE, "my span", foo = ?my_struct);
+/// // This is equivalent to
+/// span!(Level::TRACE, "my span", foo = tokio_trace::field::debug(&my_struct));
 /// # }
 /// ```
 ///
-/// The `%` character is shorthand for `field::display`:
+/// The `%` character is shorthand for [`field::display`]:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -151,7 +151,9 @@
 /// #     field: "Hello world!"
 /// # };
 /// // `my_struct.field` will be recorded using its `fmt::Display` implementation.
-/// let my_span = span!(Level::TRACE, "my span", foo = %my_struct.field);
+/// span!(Level::TRACE, "my span", foo = %my_struct.field);
+/// // This is equivalent to
+/// span!(Level::TRACE, "my span", foo = tokio_trace::field::display(&my_struct.field));
 /// # }
 /// ```
 ///
@@ -190,7 +192,10 @@
 /// );
 /// # }
 /// ```
+///
 /// [struct initializers]: https://doc.rust-lang.org/book/ch05-01-defining-structs.html#using-the-field-init-shorthand-when-variables-and-fields-have-the-same-name
+/// [`field::debug`]: field/fn.display.html
+/// [`field::display`]: field/fn.display.html
 #[macro_export(local_inner_macros)]
 macro_rules! span {
     ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr) => {
