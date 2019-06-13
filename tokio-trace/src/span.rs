@@ -90,6 +90,10 @@
 //! # }
 //! ```
 //!
+//! **Note:** Since entering a span takes `&self`, and `Span`s are `Clone`,
+//! `Send`, and `Sync`, it is entirely valid for multiple threads to enter the
+//! same span concurrently.
+//!
 //! ## Span Relationships
 //!
 //! Spans form a tree structure — unless it is a root span, all spans have a
