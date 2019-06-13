@@ -33,7 +33,18 @@
 //! [`error_span!`] exist as shorthand for constructing spans at various
 //! verbosity levels.
 //!
-//! # Entering a Span
+//! ## Recording Span Creation
+//!
+//! The [`Attributes`] type contains data associated with a span, and is
+//! provided to the [`Subscriber`] when a new span is created. It contains
+//! the span's metadata, the ID of the span's parent if one was explicitly set,
+//! and any fields whose values were recorded when the span was constructed.
+//! The subscriber may then choose to cache the data for future use, record
+//! it in some manner, or discard it completely.
+//!
+//! # The Span Lifecycle
+//!
+//! ## Entering a Span
 //!
 //! A thread of execution is said to _enter_ a span when it begins executing,
 //! and _exit_ the span when it switches to another context. Spans may be
@@ -78,6 +89,8 @@
 //! });
 //! # }
 //! ```
+//!
+//! ## Span Relationships
 //!
 //! Spans form a tree structure — unless it is a root span, all spans have a
 //! _parent_, and may have one or more _children_. When a new span is created,
@@ -126,16 +139,45 @@
 //! # }
 //! ```
 //!
-//! ## Recording Span Creation
+//! A child span should typically be considered _part_ of its parent. For
+//! example, if a subscriber is recording the length of time spent in various
+//! spans, it should generally include the time spent in a span's children as
+//! part of that span's duration.
 //!
-//! The [`Attributes`] type contains data associated with a span, and is
-//! provided to the [`Subscriber`] when a new span is created. It contains
-//! the span's metadata, the ID of the span's parent if one was explicitly set,
-//! and any fields whose values were recorded when the span was constructed.
-//! The subscriber may then choose to cache the data for future use, record
-//! it in some manner, or discard it completely.
+//! In addition to having zero or one parent, a span may also _follow from_ any
+//! number of other spans. This indicates a causal relationship between the span
+//! and the spans that it follows from, but a follower is *not* typically
+//! considered part of the duration of the span it follows. Unlike the parent, a
+//! span may record that it follows from another span after it is created, using
+//! the [`follows_from`] method.
 //!
-//! # The Span Lifecycle
+//! For example:
+//! ```rust
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! let foo = span!(Level::INFO, "foo");
+//!
+//! // "bar" will be the root of its own trace tree.
+//! let bar = span!(Level::INFO, parent: None, "bar");
+//!
+//! // record that "bar" is causally linked to "foo"
+//! bar.follows_from(&foo);
+//! # }
+//! ```
+//!
+//! As an example, consider a listener task in a server. As the listener accepts
+//! incoming connections, it spawns new tasks that handle those connections. We
+//! might want to have a span representing the listener, and instrument each
+//! spawned handler task with its own span. We would want our instrumentation to
+//! record that the handler tasks were spawned as a result of the listener task.
+//! However, we might  not consider the handler tasks to be _part_ of the time
+//! spent in the listener taskm so we would not consider those spans children of
+//! the listener span. Instead, we would record that the handler tasks follow
+//! from the listener, recording the causal relationship but treating the spans
+//! as separate durations.
+//!
+//! ## Closing Spans
 //!
 //! Execution may enter and exit a span multiple times before that
 //! span is _closed_. Consider, for example, a future which has an associated
@@ -267,7 +309,8 @@
 //! [`Attributes`]: struct.Attributes.html
 //! [`enter`]: struct.Span.html#method.enter
 //! [`in_scope`]: struct.Span.html#method.in_scope
-//! [`guard`]: struct.Entered.html
+//! [`follows_from`]: struct.Span.html#method.follows_from
+//! [guard]: struct.Entered.html
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{
