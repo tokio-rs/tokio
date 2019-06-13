@@ -240,16 +240,13 @@ impl Span {
     /// [metadata]: ../metadata
     /// [field values]: ../field/struct.ValueSet.html
     /// [`follows_from`]: ../struct.Span.html#method.follows_from
-    pub fn child_of<I>(
-        parent: I,
+    pub fn child_of(
+        parent: impl Into<Option<Id>>,
         meta: &'static Metadata<'static>,
         values: &field::ValueSet,
-    ) -> Span
-    where
-        I: AsId,
-    {
-        let new_span = match parent.as_id() {
-            Some(parent) => Attributes::child_of(parent.clone(), meta, values),
+    ) -> Span {
+        let new_span = match parent.into() {
+            Some(parent) => Attributes::child_of(parent, meta, values),
             None => Attributes::new_root(meta, values),
         };
         Self::make(meta, new_span)
@@ -467,12 +464,9 @@ impl Span {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
-    pub fn follows_from<I>(&self, from: I) -> &Self
-    where
-        I: AsId,
-    {
+    pub fn follows_from(&self, from: impl for<'a> Into<Option<&'a Id>>) -> &Self {
         if let Some(ref inner) = self.inner {
-            if let Some(from) = from.as_id() {
+            if let Some(from) = from.into() {
                 inner.follows_from(from);
             }
         }
@@ -558,6 +552,24 @@ impl fmt::Debug for Span {
         }
 
         span.finish()
+    }
+}
+
+impl<'a> Into<Option<&'a Id>> for &'a Span {
+    fn into(self) -> Option<&'a Id> {
+        self.inner.as_ref().map(|inner| &inner.id)
+    }
+}
+
+impl<'a> Into<Option<Id>> for &'a Span {
+    fn into(self) -> Option<Id> {
+        self.inner.as_ref().map(Inner::id)
+    }
+}
+
+impl Into<Option<Id>> for Span {
+    fn into(self) -> Option<Id> {
+        self.inner.as_ref().map(Inner::id)
     }
 }
 
@@ -664,56 +676,6 @@ impl<'a> fmt::Display for FmtAttrs<'a> {
             res = write!(f, "{}={:?} ", k, v);
         });
         res
-    }
-}
-
-// ===== impl AsId =====
-
-impl ::sealed::Sealed for Span {}
-
-impl AsId for Span {
-    fn as_id(&self) -> Option<&Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Span {}
-
-impl<'a> AsId for &'a Span {
-    fn as_id(&self) -> Option<&Id> {
-        self.inner.as_ref().map(|inner| &inner.id)
-    }
-}
-
-impl ::sealed::Sealed for Id {}
-
-impl AsId for Id {
-    fn as_id(&self) -> Option<&Id> {
-        Some(self)
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Id {}
-
-impl<'a> AsId for &'a Id {
-    fn as_id(&self) -> Option<&Id> {
-        Some(self)
-    }
-}
-
-impl ::sealed::Sealed for Option<Id> {}
-
-impl AsId for Option<Id> {
-    fn as_id(&self) -> Option<&Id> {
-        self.as_ref()
-    }
-}
-
-impl<'a> ::sealed::Sealed for &'a Option<Id> {}
-
-impl<'a> AsId for &'a Option<Id> {
-    fn as_id(&self) -> Option<&Id> {
-        self.as_ref()
     }
 }
 
