@@ -118,6 +118,7 @@
 //!
 //! // Create and enter a span called "bar".
 //! let bar = span!(Level::INFO, "bar");
+//! let _enter = bar.enter();
 //!
 //! // Although we have currently entered "bar", "baz"'s parent span
 //! // will be "foo".

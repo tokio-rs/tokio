@@ -2,18 +2,22 @@
 ///
 /// # Examples
 ///
-/// Creating a new span with no fields:
+/// Creating a new span:
 /// ```
-/// # #[macro_use]
-/// # extern crate tokio_trace;
-/// # use tokio_trace::Level;
+/// #[macro_use]
+/// extern crate tokio_trace;
+/// use tokio_trace::Level;
 /// # fn main() {
 /// let span = span!(Level::TRACE, "my span");
-/// span.in_scope(|| {
-///     // do work inside the span...
-/// });
+/// let _enter = span.enter();
+/// // do work inside the span...
 /// # }
 /// ```
+///
+/// ## Setting Span Attributes
+///
+/// In addition to the level and name of the span, which are required, the
+/// [target] and [parent span] may be overridden. For example:
 ///
 /// Creating a span with custom target:
 /// ```
@@ -24,6 +28,54 @@
 /// span!(Level::TRACE, target: "app_span", "my span");
 /// # }
 /// ```
+///
+/// Creating a span with an explicit parent:
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// // Create, but do not enter, a span called "foo".
+/// let foo = span!(Level::INFO, "foo");
+///
+/// // Create and enter a span called "bar".
+/// let bar = span!(Level::INFO, "bar");
+/// let _enter = bar.enter();
+///
+/// // Although we have currently entered "bar", "baz"'s parent span
+/// // will be "foo".
+/// let baz = span!(Level::INFO, parent: &foo, "baz");
+/// # }
+/// ```
+///
+/// Creating a span _without_ a parent:
+///
+///```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// let foo = span!(Level::INFO, "foo");
+/// let _enter = foo.enter();
+///
+/// // Although we have currently entered "foo", "bar" will be created
+/// // as the root of its own trace tree:
+/// let bar = span!(Level::INFO, parent: None, "bar");
+/// # }
+/// ```
+///
+/// Both the parent and target may be overridden simultaenously:
+///
+///```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// let foo = span!(Level::INFO, "foo");
+//
+/// let bar = span!(Level::INFO, target: "bar_events", parent: &foo, "bar");
+/// # }
+/// ```
+///
+/// By default, the module path to the current Rust module will be used
+/// as the target, and the parent will be [determined contextually].
 ///
 /// ## Recording Fields
 ///
@@ -194,6 +246,9 @@
 /// ```
 ///
 /// [struct initializers]: https://doc.rust-lang.org/book/ch05-01-defining-structs.html#using-the-field-init-shorthand-when-variables-and-fields-have-the-same-name
+/// [target]: struct.Metadata.html#method.target
+/// [parent span]: span/struct.Attributes.html#method.parent
+/// [determined contextually]: span/struct.Attributes.html#method.is_contextual
 /// [`field::debug`]: field/fn.display.html
 /// [`field::display`]: field/fn.display.html
 #[macro_export(local_inner_macros)]
@@ -305,6 +360,13 @@ macro_rules! span {
 
 /// Constructs a span at the trace level.
 ///
+/// [Attributes] and [fields] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [Attributes]: macro.span.html#setting-span-attributes
+/// [fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
 ///
 /// ```rust
@@ -366,6 +428,13 @@ macro_rules! trace_span {
 }
 
 /// Constructs a span at the debug level.
+///
+/// [Attributes] and [fields] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [Attributes]: macro.span.html#setting-span-attributes
+/// [fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
 ///
 /// # Examples
 ///
@@ -429,6 +498,13 @@ macro_rules! debug_span {
 
 /// Constructs a span at the info level.
 ///
+/// [Attributes] and [fields] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [Attributes]: macro.span.html#setting-span-attributes
+/// [fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
 ///
 /// ```rust
@@ -491,6 +567,13 @@ macro_rules! info_span {
 
 /// Constructs a span at the warn level.
 ///
+/// [Attributes] and [fields] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [Attributes]: macro.span.html#setting-span-attributes
+/// [fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
 ///
 /// ```rust
@@ -551,6 +634,13 @@ macro_rules! warn_span {
     ($name:expr) => {warn_span!($name,)};
 }
 /// Constructs a span at the error level.
+///
+/// [Attributes] and [fields] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [Attributes]: macro.span.html#setting-span-attributes
+/// [fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
 ///
 /// # Examples
 ///
