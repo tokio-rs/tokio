@@ -176,7 +176,7 @@
 //! spawned handler task with its own span. We would want our instrumentation to
 //! record that the handler tasks were spawned as a result of the listener task.
 //! However, we might  not consider the handler tasks to be _part_ of the time
-//! spent in the listener taskm so we would not consider those spans children of
+//! spent in the listener task, so we would not consider those spans children of
 //! the listener span. Instead, we would record that the handler tasks follow
 //! from the listener, recording the causal relationship but treating the spans
 //! as separate durations.
