@@ -12,6 +12,16 @@ pub(crate) trait Wait {
     fn try_wait(&mut self) -> io::Result<Option<ExitStatus>>;
 }
 
+impl<'a, T: 'a + Wait> Wait for &'a mut T {
+    fn id(&self) -> u32 {
+        (**self).id()
+    }
+
+    fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        (**self).try_wait()
+    }
+}
+
 /// An interface for queueing up an orphaned process so that it can be reaped.
 pub(crate) trait OrphanQueue<T> {
     /// Add an orphan to the queue.
@@ -19,6 +29,16 @@ pub(crate) trait OrphanQueue<T> {
     /// Attempt to reap every process in the queue, ignoring any errors and
     /// enqueueing any orphans which have not yet exited.
     fn reap_orphans(&self);
+}
+
+impl<'a, T, O: 'a + OrphanQueue<T>> OrphanQueue<T> for &'a O {
+    fn push_orphan(&self, orphan: T) {
+        (**self).push_orphan(orphan);
+    }
+
+    fn reap_orphans(&self) {
+        (**self).reap_orphans()
+    }
 }
 
 /// An atomic implementation of `OrphanQueue`.

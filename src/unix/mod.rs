@@ -84,7 +84,7 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
-    inner: Reaper<process::Child, FlattenStream<IoFuture<Signal>>>,
+    inner: Reaper<process::Child, GlobalOrphanQueue, FlattenStream<IoFuture<Signal>>>,
 }
 
 impl fmt::Debug for Child {
@@ -104,7 +104,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let signal = Signal::with_handle(libc::SIGCHLD, handle).flatten_stream();
     Ok(SpawnedChild {
         child: Child {
-            inner: Reaper::new(child, signal),
+            inner: Reaper::new(child, GlobalOrphanQueue, signal),
         },
         stdin,
         stdout,
