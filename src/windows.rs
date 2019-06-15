@@ -27,7 +27,8 @@ use std::ptr;
 
 use futures::future::Fuse;
 use futures::sync::oneshot;
-use futures::{Future, Poll, Async} ;
+use futures::{Future, Poll, Async};
+use kill::Kill;
 use self::mio_named_pipes::NamedPipe;
 use self::winapi::shared::minwindef::*;
 use self::winapi::shared::winerror::*;
@@ -86,12 +87,19 @@ impl Child {
     pub fn id(&self) -> u32 {
         self.child.id()
     }
+}
 
-    pub fn kill(&mut self) -> io::Result<()> {
+impl Kill for Child {
+    fn kill(&mut self) -> io::Result<()> {
         self.child.kill()
     }
+}
 
-    pub fn poll_exit(&mut self) -> Poll<ExitStatus, io::Error> {
+impl Future for Child {
+    type Item = ExitStatus;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some(ref mut w) = self.waiting {
                 match w.rx.poll().expect("should not be canceled") {

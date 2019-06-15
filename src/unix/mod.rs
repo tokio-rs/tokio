@@ -30,11 +30,12 @@ mod reap;
 
 use futures::future::FlattenStream;
 use futures::{Future, Poll};
+use kill::Kill;
 use self::mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use self::mio::unix::{EventedFd, UnixReady};
 use self::mio::event::Evented;
 use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
-use self::reap::{Kill, Reaper};
+use self::reap::Reaper;
 use self::tokio_signal::unix::Signal;
 use std::fmt;
 use std::io;
@@ -113,16 +114,22 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
 }
 
 impl Child {
-
     pub fn id(&self) -> u32 {
         self.inner.id()
     }
+}
 
-    pub fn kill(&mut self) -> io::Result<()> {
+impl Kill for Child {
+    fn kill(&mut self) -> io::Result<()> {
         self.inner.kill()
     }
+}
 
-    pub fn poll_exit(&mut self) -> Poll<ExitStatus, io::Error> {
+impl Future for Child {
+    type Item = ExitStatus;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.inner.poll()
     }
 }

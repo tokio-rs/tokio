@@ -1,14 +1,9 @@
 use futures::{Async, Future, Poll, Stream};
+use kill::Kill;
 use std::io;
 use std::ops::Deref;
 use std::process::ExitStatus;
 use super::orphan::{OrphanQueue, Wait};
-
-/// An interface for killing a running process.
-pub(crate) trait Kill {
-    /// Forcefully kill the process.
-    fn kill(&mut self) -> io::Result<()>;
-}
 
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.

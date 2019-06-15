@@ -172,8 +172,9 @@ extern crate log;
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
-use futures::{Future, Poll, IntoFuture};
+use futures::{Async, Future, Poll, IntoFuture};
 use futures::future::{Either, ok};
+use kill::Kill;
 use std::fmt;
 use tokio_io::io::{read_to_end};
 use tokio_io::{AsyncWrite, AsyncRead, IoFuture};
@@ -186,6 +187,8 @@ mod imp;
 #[path = "windows.rs"]
 #[cfg(windows)]
 mod imp;
+
+mod kill;
 
 /// Extensions provided by this crate to the `Command` type in the standard
 /// library.
@@ -336,11 +339,10 @@ impl CommandExt for Command {
     fn spawn_async_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
         imp::spawn_child(self, handle)
             .map(|spawned_child| Child {
-                child: spawned_child.child,
+                child: ChildDropGuard::new(spawned_child.child),
                 stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
                 stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
                 stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
-                kill_on_drop: true,
             })
     }
 
@@ -373,6 +375,58 @@ impl CommandExt for Command {
     }
 }
 
+/// A drop guard which ensures the child process is killed on drop to maintain
+/// the contract of dropping a Future leads to "cancellation".
+#[derive(Debug)]
+struct ChildDropGuard<T: Kill> {
+    inner: T,
+    kill_on_drop: bool,
+}
+
+impl<T: Kill> ChildDropGuard<T> {
+    fn new(inner: T) -> Self {
+        Self {
+            inner,
+            kill_on_drop: true,
+        }
+    }
+
+    fn forget(&mut self) {
+        self.kill_on_drop = false;
+    }
+}
+
+impl<T: Kill> Kill for ChildDropGuard<T> {
+    fn kill(&mut self) -> io::Result<()> {
+        self.inner.kill()
+    }
+}
+
+impl<T: Kill> Drop for ChildDropGuard<T> {
+    fn drop(&mut self) {
+        if self.kill_on_drop {
+            drop(self.kill());
+        }
+    }
+}
+
+
+impl<T: Future + Kill> Future for ChildDropGuard<T> {
+    type Item = T::Item;
+    type Error = T::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let ret = self.inner.poll();
+
+        if let Ok(Async::Ready(_)) = ret {
+            // Avoid the overhead of trying to kill a reaped process
+            self.kill_on_drop = false;
+        }
+
+        ret
+    }
+}
+
 /// Representation of a child process spawned onto an event loop.
 ///
 /// This type is also a future which will yield the `ExitStatus` of the
@@ -389,8 +443,7 @@ impl CommandExt for Command {
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Child {
-    child: imp::Child,
-    kill_on_drop: bool,
+    child: ChildDropGuard<imp::Child>,
     stdin: Option<ChildStdin>,
     stdout: Option<ChildStdout>,
     stderr: Option<ChildStderr>,
@@ -399,7 +452,7 @@ pub struct Child {
 impl Child {
     /// Returns the OS-assigned process identifier associated with this child.
     pub fn id(&self) -> u32 {
-        self.child.id()
+        self.child.inner.id()
     }
 
     /// Forces the child to exit.
@@ -497,7 +550,7 @@ impl Child {
     /// # }
     /// ```
     pub fn forget(mut self) {
-        self.kill_on_drop = false;
+        self.child.forget();
     }
 }
 
@@ -506,15 +559,7 @@ impl Future for Child {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
-        self.child.poll_exit()
-    }
-}
-
-impl Drop for Child {
-    fn drop(&mut self) {
-        if self.kill_on_drop {
-            drop(self.kill());
-        }
+        self.child.poll()
     }
 }
 
@@ -706,5 +751,104 @@ mod sys {
         fn as_raw_handle(&self) -> RawHandle {
             self.inner.get_ref().as_raw_handle()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use futures::{Async, Future, Poll};
+    use kill::Kill;
+    use std::io;
+    use super::ChildDropGuard;
+
+    struct Mock {
+        num_kills: usize,
+        num_polls: usize,
+        poll_result: Poll<(), ()>,
+    }
+
+    impl Mock {
+        fn new() -> Self {
+            Self::with_result(Ok(Async::NotReady))
+        }
+
+        fn with_result(result: Poll<(), ()>) -> Self {
+            Self {
+                num_kills: 0,
+                num_polls: 0,
+                poll_result: result,
+            }
+        }
+    }
+
+    impl Kill for Mock {
+        fn kill(&mut self) -> io::Result<()> {
+            self.num_kills += 1;
+            Ok(())
+        }
+    }
+
+    impl Future for Mock {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+            self.num_polls += 1;
+            self.poll_result
+        }
+    }
+
+    #[test]
+    fn kills_on_drop() {
+        let mut mock = Mock::new();
+
+        {
+            let guard = ChildDropGuard::new(&mut mock);
+            drop(guard);
+        }
+
+        assert_eq!(1, mock.num_kills);
+        assert_eq!(0, mock.num_polls);
+    }
+
+    #[test]
+    fn no_kill_if_reaped() {
+        let mut mock_pending = Mock::with_result(Ok(Async::NotReady));
+        let mut mock_reaped = Mock::with_result(Ok(Async::Ready(())));
+        let mut mock_err = Mock::with_result(Err(()));
+
+        {
+            let mut guard = ChildDropGuard::new(&mut mock_pending);
+            let _ = guard.poll();
+
+            let mut guard = ChildDropGuard::new(&mut mock_reaped);
+            let _ = guard.poll();
+
+            let mut guard = ChildDropGuard::new(&mut mock_err);
+            let _ = guard.poll();
+        }
+
+        assert_eq!(1, mock_pending.num_kills);
+        assert_eq!(1, mock_pending.num_polls);
+
+        assert_eq!(0, mock_reaped.num_kills);
+        assert_eq!(1, mock_reaped.num_polls);
+
+        assert_eq!(1, mock_err.num_kills);
+        assert_eq!(1, mock_err.num_polls);
+    }
+
+    #[test]
+    fn no_kill_on_forget() {
+        let mut mock = Mock::new();
+
+        {
+            let mut guard = ChildDropGuard::new(&mut mock);
+            guard.forget();
+            drop(guard);
+        }
+
+        assert_eq!(0, mock.num_kills);
+        assert_eq!(0, mock.num_polls);
     }
 }
