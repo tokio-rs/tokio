@@ -584,6 +584,7 @@ mod test {
             )
         });
 
-        set_global_default(Dispatch::new(TestSubscriberA)).expect_err("double global dispatch set succeeded");
+        set_global_default(Dispatch::new(TestSubscriberA))
+            .expect_err("double global dispatch set succeeded");
     }
 }
