@@ -27,7 +27,7 @@ where
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
-pub fn set_global_default<S>(subscriber: S) -> bool
+pub fn set_global_default<S>(subscriber: S) -> Result<(), ()>
 where
     S: Subscriber + Send + Sync + 'static,
 {

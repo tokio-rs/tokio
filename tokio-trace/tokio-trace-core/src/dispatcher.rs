@@ -79,21 +79,21 @@ pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
 /// (using `with_default`.)
 ///
 /// Can only be set once; subsequent attempts to set the global default will fail.
-/// Returns whether the initialization was successful.
+/// Returns Err if the global default has already been set.
 ///
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
-pub fn set_global_default(dispatcher: Dispatch) -> bool {
+pub fn set_global_default(dispatcher: Dispatch) -> Result<(), ()> {
     if GLOBAL_INIT.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::SeqCst) == UNINITIALIZED
     {
         unsafe {
             GLOBAL_DISPATCH = Some(dispatcher.clone());
         }
         GLOBAL_INIT.store(INITIALIZED, Ordering::SeqCst);
-        true
+        Ok(())
     } else {
-        false
+        Err(())
     }
 }
 
@@ -560,10 +560,7 @@ mod test {
 
         // NOTE: can't have multiple tests that set the global dispatcher
         // unless you use doctests ¯\_(ツ)_/¯
-        assert!(
-            set_global_default(Dispatch::new(TestSubscriberA)),
-            "global dispatch set failed"
-        );
+        set_global_default(Dispatch::new(TestSubscriberA)).expect("global dispatch set failed");
         get_default(|current| {
             assert!(
                 current.is::<TestSubscriberA>(),
@@ -586,5 +583,7 @@ mod test {
                 "reset to global override failed"
             )
         });
+
+        set_global_default(Dispatch::new(TestSubscriberA)).expect_err("double global dispatch set succeeded");
     }
 }

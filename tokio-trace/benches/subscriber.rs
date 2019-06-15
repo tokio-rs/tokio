@@ -158,7 +158,8 @@ fn span_with_fields_record(b: &mut Bencher) {
 
     // Note: after this is invoked, everything will have the global subscriber set.
     c.bench_function("enter_span_global", |b| {
-        tokio_trace::subscriber::set_global_default(EnabledSubscriber);
+        tokio_trace::subscriber::set_global_default(EnabledSubscriber)
+            .expect("set global default failed");
         let span = span!(Level::TRACE, "span");
         b.iter(|| black_box(span.in_scope(|| {})))
     });
