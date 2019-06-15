@@ -75,8 +75,11 @@ pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
 }
 
 /// Sets this dispatch as the global default for the duration of the entire program.
-/// Can only be called once. Will be used as a fallback if no thread-local dispatcher
-/// has been set in a thread. Returns whether the initialization was successful.
+/// Will be used as a fallback if no thread-local dispatch has been set in a thread
+/// (using `with_default`.)
+///
+/// Can only be set once; subsequent attempts to set the global default will fail.
+/// Returns whether the initialization was successful.
 ///
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
