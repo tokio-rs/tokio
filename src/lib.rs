@@ -398,7 +398,13 @@ impl<T: Kill> ChildDropGuard<T> {
 
 impl<T: Kill> Kill for ChildDropGuard<T> {
     fn kill(&mut self) -> io::Result<()> {
-        self.inner.kill()
+        let ret = self.inner.kill();
+
+        if ret.is_ok() {
+            self.kill_on_drop = false;
+        }
+
+        ret
     }
 }
 
@@ -804,6 +810,20 @@ mod test {
 
         {
             let guard = ChildDropGuard::new(&mut mock);
+            drop(guard);
+        }
+
+        assert_eq!(1, mock.num_kills);
+        assert_eq!(0, mock.num_polls);
+    }
+
+    #[test]
+    fn no_kill_if_already_killed() {
+        let mut mock = Mock::new();
+
+        {
+            let mut guard = ChildDropGuard::new(&mut mock);
+            let _ = guard.kill();
             drop(guard);
         }
 
