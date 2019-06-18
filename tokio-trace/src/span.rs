@@ -191,7 +191,7 @@ pub(crate) struct Inner {
 /// [`Span::enter`]: ../struct.Span.html#method.enter
 /// [`Span`]: ../struct.Span.html
 #[derive(Debug)]
-#[must_use = "once a span has been entered, it should be exited"]
+#[must_use = "dropping this guard will exit the span"]
 pub struct Entered<'a> {
     span: &'a Span,
 }
@@ -205,7 +205,7 @@ pub struct Entered<'a> {
 ///
 /// [`Span::enter_unscoped`]: ../struct.Span.html#method.enter_unscoped
 #[derive(Debug)]
-#[must_use = "dropping an EnteredUnscoped will exit the span"]
+#[must_use = "dropping this guard will exit the span"]
 pub struct EnteredUnscoped {
     span: Option<Span>,
 }
