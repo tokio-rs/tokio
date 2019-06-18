@@ -878,7 +878,6 @@ impl Clone for Inner {
 
 // ===== log format helpers ======
 
-
 struct FmtValues<'a>(&'a Record<'a>);
 
 impl<'a> fmt::Display for FmtValues<'a> {
