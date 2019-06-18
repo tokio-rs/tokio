@@ -360,7 +360,7 @@ impl Span {
         Entered { span: self }
     }
 
-    /// TODO: ELIZA PUT DOCS HERE PLS
+    /// TODO: ELIZA PUT DOCS HERE PLSgit
     pub fn enter_owned(self) -> EnteredOwned {
         self.enter_inner();
         EnteredOwned { span: Some(self) }
@@ -688,12 +688,94 @@ impl<'a> Drop for Entered<'a> {
 // ===== impl EnteredOwned =====
 
 impl EnteredOwned {
-    /// Exits the span, consuming the entered guard, and returns the `Span`
+    /// Consumes the entered guard and exits the span, returning a `Span`
     /// handle that may then be entered again.
-    pub fn exit(self) -> Span {
+    pub fn exit(mut self) -> Span {
         let span = self.span.take().expect("must be moved to exit");
         span.exit_inner();
         span
+    }
+
+    /// Borrows the entered `Span`.
+    pub fn span(&self) -> &Span {
+        self.span
+            .as_ref()
+            .expect("span only taken on exit and drop")
+    }
+
+    // Note: We re-implement these methods by farming out to the inner `Span`,
+    // rather than implementing `Deref<Target = Span>`, as `Deref` is a bit
+    // more of a forward-compat hazard.
+
+    /// Returns a [`Field`](../field/struct.Field.html) for the field with the
+    /// given `name`, if one exists,
+    pub fn field<Q: ?Sized>(&self, field: &Q) -> Option<field::Field>
+    where
+        Q: field::AsField,
+    {
+        self.span().field(field)
+    }
+
+    /// Returns true if this `Span` has a field for the given
+    /// [`Field`](../field/struct.Field.html) or field name.
+    #[inline]
+    pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
+    where
+        Q: field::AsField,
+    {
+        self.field(field).is_some()
+    }
+
+    /// Visits that the field described by `field` has the value `value`.
+    pub fn record<Q: ?Sized, V>(&self, field: &Q, value: &V) -> &Self
+    where
+        Q: field::AsField,
+        V: field::Value,
+    {
+        self.span().record(field, value);
+        self
+    }
+
+    /// Visit all the fields in the span
+    pub fn record_all(&self, values: &field::ValueSet) -> &Self {
+        self.span().record_all(values);
+        self
+    }
+
+    /// Returns `true` if this span was disabled by the subscriber and does not
+    /// exist.
+    #[inline]
+    pub fn is_disabled(&self) -> bool {
+        self.span().is_disabled()
+    }
+
+    /// Indicates that the span with the given ID has an indirect causal
+    /// relationship with this span.
+    ///
+    /// This relationship differs somewhat from the parent-child relationship: a
+    /// span may have any number of prior spans, rather than a single one; and
+    /// spans are not considered to be executing _inside_ of the spans they
+    /// follow from. This means that a span may close even if subsequent spans
+    /// that follow from it are still open, and time spent inside of a
+    /// subsequent span should not be included in the time its precedents were
+    /// executing. This is used to model causal relationships such as when a
+    /// single future spawns several related background tasks, et cetera.
+    ///
+    /// If this span is disabled, or the resulting follows-from relationship
+    /// would be invalid, this function will do nothing.
+    pub fn follows_from(&self, from: impl for<'a> Into<Option<&'a Id>>) -> &Self {
+        self.span().follows_from(from);
+        self
+    }
+
+    /// Returns this span's `Id`, if it is enabled.
+    pub fn id(&self) -> Option<Id> {
+        self.span().id()
+    }
+
+    /// Returns this span's `Metadata`, if it is enabled.
+    pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
+        self.span().metadata()
     }
 }
 
@@ -707,6 +789,27 @@ impl Drop for EnteredOwned {
         }
     }
 }
+
+impl<'a> Into<Option<&'a Id>> for &'a EnteredOwned {
+    fn into(self) -> Option<&'a Id> {
+        self.span().into()
+    }
+}
+
+impl<'a> Into<Option<Id>> for &'a EnteredOwned {
+    fn into(self) -> Option<Id> {
+        self.span().into()
+    }
+}
+
+impl Into<Option<Id>> for EnteredOwned {
+    fn into(self) -> Option<Id> {
+        self.span().into()
+    }
+}
+
+// ===== log format helpers ======
+
 
 struct FmtValues<'a>(&'a Record<'a>);
 
