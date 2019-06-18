@@ -699,7 +699,16 @@ impl EnteredUnscoped {
         span
     }
 
+    /// Returns a new handle to the entered span.
+    ///
+    /// Dropping the returned handle will *not* exit the span.
+    pub fn clone_span(&self) -> Span {
+        self.span().clone()
+    }
+
     /// Borrows the entered `Span`.
+    // TODO(eliza): Consider making this pub, if we're willing to commit to
+    // `EnteredUnscoped` owning a `Span`?
     fn span(&self) -> &Span {
         self.span
             .as_ref()
