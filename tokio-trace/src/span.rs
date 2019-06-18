@@ -204,8 +204,8 @@ pub struct Entered<'a> {
 ///
 /// [`Span::enter`]: ../struct.Span.html#method.enter
 #[derive(Debug)]
-#[must_use = "dropping an EnteredOwned will exit the span"]
-pub struct EnteredOwned {
+#[must_use = "dropping an EnteredUnscoped will exit the span"]
+pub struct EnteredUnscoped {
     span: Option<Span>,
 }
 
@@ -287,7 +287,14 @@ impl Span {
     ///
     /// If this span is enabled by the current subscriber, then this function will
     /// call [`Subscriber::enter`] with the span's [`Id`], and dropping the guard
-    /// will call [`Subscriber::exit`]. If the span is disabled, this does nothing.
+    /// will call [`Subscriber::exit`]. If the span is disabled, this does
+    /// nothing.
+    ///
+    /// This function _borrows_ the span, and is thus intended for when a span
+    /// should be entered for the duration of a scope. If the span will be
+    /// entered for longer than the current scope, or the entered guard will be
+    /// stored in am object with a longer lifetime, [`enter_unscoped`] may
+    /// be used instead.
     ///
     /// # Examples
     ///
@@ -355,15 +362,31 @@ impl Span {
     /// [`Subscriber::enter`]: ../subscriber/trait.Subscriber.html#method.enter
     /// [`Subscriber::exit`]: ../subscriber/trait.Subscriber.html#method.exit
     /// [`Id`]: ../struct.Id.html
+    /// [`enter_unscoped`]: #method.enter_unscoped
     pub fn enter<'a>(&'a self) -> Entered<'a> {
         self.enter_inner();
         Entered { span: self }
     }
 
-    /// TODO: ELIZA PUT DOCS HERE PLSgit
-    pub fn enter_owned(self) -> EnteredOwned {
+    /// Enters the span, moving `self` into a guard which will exit the span
+    /// when dropped.
+    ///
+    /// Unlike [`enter`], the guard returned by `enter_unscoped` _moves_ the
+    /// span handle, and may therefore outlive the scope in which this method is
+    /// called.
+    ///
+    /// If this span is enabled by the current subscriber, then this function will
+    /// call [`Subscriber::enter`] with the span's [`Id`], and dropping the guard
+    /// will call [`Subscriber::exit`]. If the span is disabled, this does
+    /// nothing.
+    ///
+    /// [`Subscriber::enter`]: ../subscriber/trait.Subscriber.html#method.enter
+    /// [`Subscriber::exit`]: ../subscriber/trait.Subscriber.html#method.exit
+    /// [`Id`]: ../struct.Id.html
+    /// [`enter`]: #method.enter
+    pub fn enter_unscoped(self) -> EnteredUnscoped {
         self.enter_inner();
-        EnteredOwned { span: Some(self) }
+        EnteredUnscoped { span: Some(self) }
     }
 
     /// Executes the given function in the context of this span.
@@ -619,9 +642,9 @@ impl<'a> Drop for Entered<'a> {
     }
 }
 
-// ===== impl EnteredOwned =====
+// ===== impl EnteredUnscoped =====
 
-impl EnteredOwned {
+impl EnteredUnscoped {
     /// Consumes the entered guard and exits the span, returning a `Span`
     /// handle that may then be entered again.
     pub fn exit(mut self) -> Span {
@@ -713,30 +736,30 @@ impl EnteredOwned {
     }
 }
 
-impl Drop for EnteredOwned {
+impl Drop for EnteredUnscoped {
     #[inline]
     fn drop(&mut self) {
         // If the span has already been taken out of the guard, someone called
-        // `EnteredOwned::exit` manually. That's fine, just do nothing.
+        // `EnteredUnscoped::exit` manually. That's fine, just do nothing.
         if let Some(span) = self.span.as_ref() {
             span.exit_inner();
         }
     }
 }
 
-impl<'a> Into<Option<&'a Id>> for &'a EnteredOwned {
+impl<'a> Into<Option<&'a Id>> for &'a EnteredUnscoped {
     fn into(self) -> Option<&'a Id> {
         self.span().into()
     }
 }
 
-impl<'a> Into<Option<Id>> for &'a EnteredOwned {
+impl<'a> Into<Option<Id>> for &'a EnteredUnscoped {
     fn into(self) -> Option<Id> {
         self.span().into()
     }
 }
 
-impl Into<Option<Id>> for EnteredOwned {
+impl Into<Option<Id>> for EnteredUnscoped {
     fn into(self) -> Option<Id> {
         self.span().into()
     }
