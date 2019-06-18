@@ -1,6 +1,8 @@
 use crate::{AsyncRead, AsyncWrite};
-use futures::{try_ready, Future, Poll};
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A future which will copy all data from a reader into a writer.
 ///
@@ -9,10 +11,10 @@ use std::io;
 ///
 /// [`copy`]: fn.copy.html
 #[derive(Debug)]
-pub struct Copy<R, W> {
-    reader: Option<R>,
+pub struct Copy<'a, R, W> {
+    reader: &'a mut R,
     read_done: bool,
-    writer: Option<W>,
+    writer: &'a mut W,
     pos: usize,
     cap: usize,
     amt: u64,
@@ -30,15 +32,15 @@ pub struct Copy<R, W> {
 /// On success the number of bytes is returned and the `reader` and `writer` are
 /// consumed. On error the error is returned and the I/O objects are consumed as
 /// well.
-pub fn copy<R, W>(reader: R, writer: W) -> Copy<R, W>
+pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
 where
-    R: AsyncRead,
-    W: AsyncWrite,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
     Copy {
-        reader: Some(reader),
+        reader,
         read_done: false,
-        writer: Some(writer),
+        writer,
         amt: 0,
         pos: 0,
         cap: 0,
@@ -46,21 +48,20 @@ where
     }
 }
 
-impl<R, W> Future for Copy<R, W>
+impl<'a, R, W> Future for Copy<'a, R, W>
 where
-    R: AsyncRead,
-    W: AsyncWrite,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
-    type Item = (u64, R, W);
-    type Error = io::Error;
+    type Output = io::Result<u64>;
 
-    fn poll(&mut self) -> Poll<(u64, R, W), io::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         loop {
             // If our buffer is empty, then we need to read some data to
             // continue.
             if self.pos == self.cap && !self.read_done {
-                let reader = self.reader.as_mut().unwrap();
-                let n = try_ready!(reader.poll_read(&mut self.buf));
+                let me = &mut *self;
+                let n = ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut me.buf))?;
                 if n == 0 {
                     self.read_done = true;
                 } else {
@@ -71,13 +72,13 @@ where
 
             // If our buffer has some data, let's write it out!
             while self.pos < self.cap {
-                let writer = self.writer.as_mut().unwrap();
-                let i = try_ready!(writer.poll_write(&self.buf[self.pos..self.cap]));
+                let me = &mut *self;
+                let i = ready!(Pin::new(&mut *me.writer).poll_write(cx, &me.buf[me.pos..me.cap]))?;
                 if i == 0 {
-                    return Err(io::Error::new(
+                    return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::WriteZero,
                         "write zero byte into writer",
-                    ));
+                    )));
                 } else {
                     self.pos += i;
                     self.amt += i as u64;
@@ -88,10 +89,9 @@ where
             // data and finish the transfer.
             // done with the entire transfer.
             if self.pos == self.cap && self.read_done {
-                try_ready!(self.writer.as_mut().unwrap().poll_flush());
-                let reader = self.reader.take().unwrap();
-                let writer = self.writer.take().unwrap();
-                return Ok((self.amt, reader, writer).into());
+                let me = &mut *self;
+                ready!(Pin::new(&mut *me.writer).poll_flush(cx))?;
+                return Poll::Ready(Ok(self.amt));
             }
         }
     }

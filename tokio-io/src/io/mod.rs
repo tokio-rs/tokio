@@ -9,7 +9,7 @@
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
-//mod copy;
+mod copy;
 mod flush;
 mod read;
 //mod read_exact;
@@ -19,7 +19,7 @@ mod shutdown;
 mod write;
 //mod write_all;
 
-//pub use self::copy::{copy, Copy};
+pub use self::copy::{copy, Copy};
 pub use self::flush::{flush, Flush};
 pub use self::read::{read, Read};
 //pub use self::read_exact::read_exact;
