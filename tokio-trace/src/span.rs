@@ -606,72 +606,6 @@ impl Into<Option<Id>> for Span {
     }
 }
 
-// ===== impl Inner =====
-
-impl Inner {
-    /// Indicates that the span with the given ID has an indirect causal
-    /// relationship with this span.
-    ///
-    /// This relationship differs somewhat from the parent-child relationship: a
-    /// span may have any number of prior spans, rather than a single one; and
-    /// spans are not considered to be executing _inside_ of the spans they
-    /// follow from. This means that a span may close even if subsequent spans
-    /// that follow from it are still open, and time spent inside of a
-    /// subsequent span should not be included in the time its precedents were
-    /// executing. This is used to model causal relationships such as when a
-    /// single future spawns several related background tasks, et cetera.
-    ///
-    /// If this span is disabled, this function will do nothing. Otherwise, it
-    /// returns `Ok(())` if the other span was added as a precedent of this
-    /// span, or an error if this was not possible.
-    fn follows_from(&self, from: &Id) {
-        self.subscriber.record_follows_from(&self.id, &from)
-    }
-
-    /// Returns the span's ID.
-    fn id(&self) -> Id {
-        self.id.clone()
-    }
-
-    fn record(&self, values: &Record) {
-        self.subscriber.record(&self.id, values)
-    }
-
-    fn new(id: Id, subscriber: &Dispatch) -> Self {
-        Inner {
-            id,
-            subscriber: subscriber.clone(),
-        }
-    }
-}
-
-impl cmp::PartialEq for Inner {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Hash for Inner {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        self.subscriber.drop_span(self.id.clone());
-    }
-}
-
-impl Clone for Inner {
-    fn clone(&self) -> Self {
-        Inner {
-            id: self.subscriber.clone_span(&self.id),
-            subscriber: self.subscriber.clone(),
-        }
-    }
-}
-
 // ===== impl Entered =====
 
 impl<'a> Drop for Entered<'a> {
@@ -805,6 +739,72 @@ impl<'a> Into<Option<Id>> for &'a EnteredOwned {
 impl Into<Option<Id>> for EnteredOwned {
     fn into(self) -> Option<Id> {
         self.span().into()
+    }
+}
+
+// ===== impl Inner =====
+
+impl Inner {
+    /// Indicates that the span with the given ID has an indirect causal
+    /// relationship with this span.
+    ///
+    /// This relationship differs somewhat from the parent-child relationship: a
+    /// span may have any number of prior spans, rather than a single one; and
+    /// spans are not considered to be executing _inside_ of the spans they
+    /// follow from. This means that a span may close even if subsequent spans
+    /// that follow from it are still open, and time spent inside of a
+    /// subsequent span should not be included in the time its precedents were
+    /// executing. This is used to model causal relationships such as when a
+    /// single future spawns several related background tasks, et cetera.
+    ///
+    /// If this span is disabled, this function will do nothing. Otherwise, it
+    /// returns `Ok(())` if the other span was added as a precedent of this
+    /// span, or an error if this was not possible.
+    fn follows_from(&self, from: &Id) {
+        self.subscriber.record_follows_from(&self.id, &from)
+    }
+
+    /// Returns the span's ID.
+    fn id(&self) -> Id {
+        self.id.clone()
+    }
+
+    fn record(&self, values: &Record) {
+        self.subscriber.record(&self.id, values)
+    }
+
+    fn new(id: Id, subscriber: &Dispatch) -> Self {
+        Inner {
+            id,
+            subscriber: subscriber.clone(),
+        }
+    }
+}
+
+impl cmp::PartialEq for Inner {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Hash for Inner {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        self.subscriber.drop_span(self.id.clone());
+    }
+}
+
+impl Clone for Inner {
+    fn clone(&self) -> Self {
+        Inner {
+            id: self.subscriber.clone_span(&self.id),
+            subscriber: self.subscriber.clone(),
+        }
     }
 }
 
