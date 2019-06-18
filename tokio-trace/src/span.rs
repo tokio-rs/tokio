@@ -694,7 +694,10 @@ impl EnteredUnscoped {
     /// Consumes the entered guard and exits the span, returning a handle to the
     /// previously entered `Span` that may then be entered again.
     pub fn exit(mut self) -> Span {
-        let span = self.span.take().expect("span should only be taken once");
+        let span = self
+            .span
+            .take()
+            .expect("span should only have been taken if dropped");
         span.exit_inner();
         span
     }
