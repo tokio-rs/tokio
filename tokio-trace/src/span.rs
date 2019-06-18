@@ -699,7 +699,7 @@ impl EnteredUnscoped {
     }
 
     /// Borrows the entered `Span`.
-    pub fn span(&self) -> &Span {
+    fn span(&self) -> &Span {
         self.span
             .as_ref()
             .expect("span only taken on exit and drop")
