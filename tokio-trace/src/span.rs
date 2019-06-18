@@ -195,6 +195,20 @@ pub struct Entered<'a> {
     span: &'a Span,
 }
 
+/// A guard representing a span which has been entered and is currently
+/// executing.
+///
+/// When the guard is dropped, the span will be exited.
+///
+/// This is returned by the [`Span::enter`] function.
+///
+/// [`Span::enter`]: ../struct.Span.html#method.enter
+#[derive(Debug)]
+#[must_use = "dropping an EnteredOwned will exit the span"]
+pub struct EnteredOwned {
+    span: Option<Span>,
+}
+
 // ===== impl Span =====
 
 impl Span {
@@ -342,11 +356,14 @@ impl Span {
     /// [`Subscriber::exit`]: ../subscriber/trait.Subscriber.html#method.exit
     /// [`Id`]: ../struct.Id.html
     pub fn enter<'a>(&'a self) -> Entered<'a> {
-        if let Some(ref inner) = self.inner.as_ref() {
-            inner.subscriber.enter(&inner.id);
-        }
-        self.log(format_args!("-> {}", self.meta.name));
+        self.enter_inner();
         Entered { span: self }
+    }
+
+    /// TODO: ELIZA PUT DOCS HERE PLS
+    pub fn enter_owned(self) -> EnteredOwned {
+        self.enter_inner();
+        EnteredOwned { span: Some(self) }
     }
 
     /// Executes the given function in the context of this span.
@@ -485,6 +502,22 @@ impl Span {
         } else {
             None
         }
+    }
+
+    #[inline]
+    fn enter_inner(&self) {
+        if let Some(ref inner) = self.inner.as_ref() {
+            inner.subscriber.enter(&inner.id);
+        }
+        self.log(format_args!("-> {}", self.meta.name));
+    }
+
+    #[inline]
+    fn exit_inner(&self) {
+        if let Some(ref inner) = self.inner.as_ref() {
+            inner.subscriber.exit(&inner.id);
+        }
+        self.log(format_args!("<- {}", self.meta.name));
     }
 
     #[cfg(feature = "log")]
@@ -648,10 +681,30 @@ impl<'a> Drop for Entered<'a> {
         //
         // Running this behaviour on drop rather than with an explicit function
         // call means that spans may still be exited when unwinding.
-        if let Some(inner) = self.span.inner.as_ref() {
-            inner.subscriber.exit(&inner.id);
+        self.span.exit_inner();
+    }
+}
+
+// ===== impl EnteredOwned =====
+
+impl EnteredOwned {
+    /// Exits the span, consuming the entered guard, and returns the `Span`
+    /// handle that may then be entered again.
+    pub fn exit(self) -> Span {
+        let span = self.span.take().expect("must be moved to exit");
+        span.exit_inner();
+        span
+    }
+}
+
+impl Drop for EnteredOwned {
+    #[inline]
+    fn drop(&mut self) {
+        // If the span has already been taken out of the guard, someone called
+        // `EnteredOwned::exit` manually. That's fine, just do nothing.
+        if let Some(span) = self.span.as_ref() {
+            span.exit_inner();
         }
-        self.span.log(format_args!("<- {}", self.span.meta.name));
     }
 }
 
