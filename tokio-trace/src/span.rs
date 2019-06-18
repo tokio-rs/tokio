@@ -380,6 +380,50 @@ impl Span {
     /// will call [`Subscriber::exit`]. If the span is disabled, this does
     /// nothing.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[macro_use] extern crate tokio_trace;
+    /// # use tokio_trace::Level;
+    /// # fn main() {
+    /// let entered = span!(Level::INFO, "my_span").enter_unscoped();
+    /// ```
+    ///
+    /// Returning an entered span guard as part of a struct:
+    /// ```
+    /// # #[macro_use] extern crate tokio_trace;
+    /// # use tokio_trace::Level;
+    /// # fn main() {
+    /// pub struct Foo {
+    ///     name: &'static str,
+    ///     // ...
+    /// }
+    ///
+    /// pub struct FooWithSpan {
+    ///     enter: tokio_trace::span::EnteredUnscoped,
+    ///     foo: Foo,
+    /// }
+    ///
+    /// impl Foo {
+    ///     pub fn new(name: &'static str) -> Self {
+    ///         Foo {
+    ///             name,
+    ///            // ...
+    ///         }
+    ///     }
+    ///
+    ///     pub fn new_with_span(name: &'static str) -> FooWithSpan {
+    ///         let foo = Foo::new(name);
+    ///         let span = span!(Level::DEBUG, "foo", name);
+    ///         // The span will remain entered until the `FooWithSpan` is dropped.
+    ///         FooWithSpan {
+    ///             foo,
+    ///             span,
+    ///         }
+    ///     }
+    /// }
+    /// # }
+    /// ```
     /// [`Subscriber::enter`]: ../subscriber/trait.Subscriber.html#method.enter
     /// [`Subscriber::exit`]: ../subscriber/trait.Subscriber.html#method.exit
     /// [`Id`]: ../struct.Id.html
