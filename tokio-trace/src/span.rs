@@ -387,6 +387,7 @@ impl Span {
     /// # use tokio_trace::Level;
     /// # fn main() {
     /// let entered = span!(Level::INFO, "my_span").enter_unscoped();
+    /// # }
     /// ```
     ///
     /// Returning an entered span guard as part of a struct:
@@ -414,11 +415,11 @@ impl Span {
     ///
     ///     pub fn new_with_span(name: &'static str) -> FooWithSpan {
     ///         let foo = Foo::new(name);
-    ///         let span = span!(Level::DEBUG, "foo", name);
+    ///         let enter = span!(Level::DEBUG, "foo", name).enter_unscoped();
     ///         // The span will remain entered until the `FooWithSpan` is dropped.
     ///         FooWithSpan {
     ///             foo,
-    ///             span,
+    ///             enter,
     ///         }
     ///     }
     /// }

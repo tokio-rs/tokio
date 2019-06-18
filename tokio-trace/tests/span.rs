@@ -286,7 +286,7 @@ fn enter_unscoped() {
     with_default(subscriber, || {
         let foo = span!(Level::TRACE, "foo").enter_unscoped();
         debug!("entered");
-        foo.exit().enter_unscoped()
+        let _guard = foo.exit().enter_unscoped();
     });
 
     handle.assert_finished();
