@@ -139,6 +139,7 @@ pub use tokio_trace_core::span::{Attributes, Id, Record};
 use std::{
     cmp, fmt,
     hash::{Hash, Hasher},
+    marker::PhantomData,
 };
 use {dispatcher::Dispatch, field, Metadata};
 
@@ -203,11 +204,23 @@ pub struct Entered<'a> {
 ///
 /// This is returned by the [`Span::enter_unscoped`] function.
 ///
+/// **Note**: Unlike `Span`, this type is _not_ `Send`. If subscribers track the
+/// current span on a per-thread basis, then sending an entered guard between
+/// threads will lead to potentially surprising behaviour: the original thread
+/// will remain in the span, while the thread it was sent to will *not* enter
+/// the span. Instead, a _non-entered_ `Span` handle should be sent across
+/// threads, and the recipient should re-enter the span using that handle.
+///
+/// It is, however, safe to share references to this type across threads, so it
+/// does implement `Sync`.
+///
 /// [`Span::enter_unscoped`]: ../struct.Span.html#method.enter_unscoped
 #[derive(Debug)]
 #[must_use = "dropping this guard will exit the span"]
 pub struct EnteredUnscoped {
     span: Option<Span>,
+    // MutexGuard is used as a marker to make this guard `!Sync`.
+    _p: PhantomData<::std::sync::MutexGuard<'static, ()>>,
 }
 
 // ===== impl Span =====
@@ -432,7 +445,10 @@ impl Span {
     /// [`enter`]: #method.enter
     pub fn enter_unscoped(self) -> EnteredUnscoped {
         self.enter_inner();
-        EnteredUnscoped { span: Some(self) }
+        EnteredUnscoped {
+            span: Some(self),
+            _p: PhantomData,
+        }
     }
 
     /// Executes the given function in the context of this span.
@@ -944,8 +960,10 @@ mod test {
     use super::*;
 
     trait AssertSend: Send {}
-    impl AssertSend for Span {}
-
     trait AssertSync: Sync {}
+
+    impl AssertSend for Span {}
     impl AssertSync for Span {}
+
+    impl AssertSync for EnteredUnscoped {}
 }
