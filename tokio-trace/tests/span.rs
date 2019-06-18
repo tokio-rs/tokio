@@ -273,6 +273,26 @@ fn enter() {
 }
 
 #[test]
+fn enter_unscoped() {
+    let (subscriber, handle) = subscriber::mock()
+        .enter(span::mock().named("foo"))
+        .event(event::mock())
+        .exit(span::mock().named("foo"))
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        let foo = span!(Level::TRACE, "foo").enter_unscoped();
+        debug!("entered");
+        foo.exit().enter_unscoped()
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
 fn moved_field() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(
