@@ -182,13 +182,14 @@ pub(crate) struct Inner {
 }
 
 /// A guard representing a span which has been entered and is currently
-/// executing.
+/// executing, borrowed from a [`Span`] handle in this scope.
 ///
 /// When the guard is dropped, the span will be exited.
 ///
 /// This is returned by the [`Span::enter`] function.
 ///
 /// [`Span::enter`]: ../struct.Span.html#method.enter
+/// [`Span`]: ../struct.Span.html
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
 pub struct Entered<'a> {
@@ -200,9 +201,9 @@ pub struct Entered<'a> {
 ///
 /// When the guard is dropped, the span will be exited.
 ///
-/// This is returned by the [`Span::enter`] function.
+/// This is returned by the [`Span::enter_unscoped`] function.
 ///
-/// [`Span::enter`]: ../struct.Span.html#method.enter
+/// [`Span::enter_unscoped`]: ../struct.Span.html#method.enter_unscoped
 #[derive(Debug)]
 #[must_use = "dropping an EnteredUnscoped will exit the span"]
 pub struct EnteredUnscoped {
@@ -690,10 +691,10 @@ impl<'a> Drop for Entered<'a> {
 // ===== impl EnteredUnscoped =====
 
 impl EnteredUnscoped {
-    /// Consumes the entered guard and exits the span, returning a `Span`
-    /// handle that may then be entered again.
+    /// Consumes the entered guard and exits the span, returning a handle to the
+    /// previously entered `Span` that may then be entered again.
     pub fn exit(mut self) -> Span {
-        let span = self.span.take().expect("must be moved to exit");
+        let span = self.span.take().expect("span should only be taken once");
         span.exit_inner();
         span
     }
@@ -711,6 +712,9 @@ impl EnteredUnscoped {
 
     /// Returns a [`Field`](../field/struct.Field.html) for the field with the
     /// given `name`, if one exists,
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.field
     pub fn field<Q: ?Sized>(&self, field: &Q) -> Option<field::Field>
     where
         Q: field::AsField,
@@ -720,6 +724,9 @@ impl EnteredUnscoped {
 
     /// Returns true if this `Span` has a field for the given
     /// [`Field`](../field/struct.Field.html) or field name.
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.has_field
     #[inline]
     pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
@@ -729,6 +736,9 @@ impl EnteredUnscoped {
     }
 
     /// Visits that the field described by `field` has the value `value`.
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.record
     pub fn record<Q: ?Sized, V>(&self, field: &Q, value: &V) -> &Self
     where
         Q: field::AsField,
@@ -739,6 +749,9 @@ impl EnteredUnscoped {
     }
 
     /// Visit all the fields in the span
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.record_all
     pub fn record_all(&self, values: &field::ValueSet) -> &Self {
         self.span().record_all(values);
         self
@@ -746,6 +759,9 @@ impl EnteredUnscoped {
 
     /// Returns `true` if this span was disabled by the subscriber and does not
     /// exist.
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.is_disabled
     #[inline]
     pub fn is_disabled(&self) -> bool {
         self.span().is_disabled()
@@ -765,17 +781,26 @@ impl EnteredUnscoped {
     ///
     /// If this span is disabled, or the resulting follows-from relationship
     /// would be invalid, this function will do nothing.
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.follows_from
     pub fn follows_from(&self, from: impl for<'a> Into<Option<&'a Id>>) -> &Self {
         self.span().follows_from(from);
         self
     }
 
     /// Returns this span's `Id`, if it is enabled.
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.id
     pub fn id(&self) -> Option<Id> {
         self.span().id()
     }
 
     /// Returns this span's `Metadata`, if it is enabled.
+    ///
+    /// This calls the [corresponding method] on the entered `Span`.
+    /// [corresponding method]: ../struct.Span.html#method.metadata
     pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
         self.span().metadata()
     }
