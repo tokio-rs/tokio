@@ -1,7 +1,8 @@
 //use crate::split::{ReadHalf, WriteHalf};
 //use crate::{framed, split, AsyncWrite};
 use bytes::BufMut;
-use std::io as std_io;
+use std::io;
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -79,7 +80,7 @@ pub trait AsyncRead {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
-    ) -> Poll<Result<usize, std_io::Error>>;
+    ) -> Poll<io::Result<usize>>;
 
     /// Pull some bytes from this source into the specified `BufMut`, returning
     /// how many bytes were read.
@@ -91,7 +92,7 @@ pub trait AsyncRead {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut B,
-    ) -> Poll<Result<usize, std_io::Error>>
+    ) -> Poll<io::Result<usize>>
     where
         Self: Sized,
     {
@@ -112,48 +113,44 @@ pub trait AsyncRead {
             Poll::Ready(Ok(n))
         }
     }
+}
 
-    /*
-    /// Helper method for splitting this read/write object into two halves.
-    ///
-    /// The two halves returned implement the `Read` and `Write` traits,
-    /// respectively.
-    ///
-    /// To restore this read/write object from its `ReadHalf` and `WriteHalf`
-    /// use `unsplit`.
-    fn split(self) -> (ReadHalf<Self>, WriteHalf<Self>)
-    where
-        Self: AsyncWrite + Sized,
-    {
-        split::split(self)
+macro_rules! deref_async_read {
+    () => {
+        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+            (**self).prepare_uninitialized_buffer(buf)
+        }
+
+        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8])
+            -> Poll<io::Result<usize>>
+        {
+            Pin::new(&mut **self).poll_read(cx, buf)
+        }
     }
-    */
 }
 
 impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for Box<T> {
+    deref_async_read!();
+}
+
+impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for &mut T {
+    deref_async_read!();
+}
+
+impl<P> AsyncRead for Pin<P>
+where
+    P: DerefMut + Unpin,
+    P::Target: AsyncRead,
+{
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         (**self).prepare_uninitialized_buffer(buf)
     }
 
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
-    ) -> Poll<Result<usize, std_io::Error>> {
-        Pin::new(&mut **self).poll_read(cx, buf)
+    ) -> Poll<io::Result<usize>> {
+        self.get_mut().as_mut().poll_read(cx, buf)
     }
 }
-
-/*
-impl<'a, T: ?Sized + AsyncRead> AsyncRead for &'a mut T {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        (**self).prepare_uninitialized_buffer(buf)
-    }
-}
-
-impl<'a> AsyncRead for &'a [u8] {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
-        false
-    }
-}
-*/
