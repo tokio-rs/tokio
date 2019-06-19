@@ -27,9 +27,11 @@ where
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
-pub fn set_global_default<S>(subscriber: S) -> Result<(), ()>
+pub fn set_global_default<S>(subscriber: S) -> Result<(), SetGlobalDefaultError>
 where
     S: Subscriber + Send + Sync + 'static,
 {
     ::dispatcher::set_global_default(::Dispatch::new(subscriber))
 }
+
+pub use tokio_trace_core::dispatcher::SetGlobalDefaultError;

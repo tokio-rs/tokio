@@ -8,7 +8,7 @@ use {
 use std::{
     any::Any,
     cell::{Cell, RefCell},
-    fmt,
+    error, fmt,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Weak,
@@ -84,7 +84,7 @@ pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
-pub fn set_global_default(dispatcher: Dispatch) -> Result<(), ()> {
+pub fn set_global_default(dispatcher: Dispatch) -> Result<(), SetGlobalDefaultError> {
     if GLOBAL_INIT.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::SeqCst) == UNINITIALIZED
     {
         unsafe {
@@ -93,9 +93,21 @@ pub fn set_global_default(dispatcher: Dispatch) -> Result<(), ()> {
         GLOBAL_INIT.store(INITIALIZED, Ordering::SeqCst);
         Ok(())
     } else {
-        Err(())
+        Err(SetGlobalDefaultError { _no_construct: () })
     }
 }
+
+/// Returned if setting the global dispatcher fails.
+#[derive(Debug)]
+pub struct SetGlobalDefaultError {
+    _no_construct: (),
+}
+impl fmt::Display for SetGlobalDefaultError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("a global default trace dispatcher has already been set")
+    }
+}
+impl error::Error for SetGlobalDefaultError {}
 
 /// Executes a closure with a reference to this thread's current [dispatcher].
 ///
@@ -124,14 +136,19 @@ where
             if state.can_enter.replace(false) {
                 let _guard = Entered(&state.can_enter);
 
-                let default = &state.default.borrow();
+                let mut default = state.default.borrow_mut();
 
                 if default.is::<NoSubscriber>() && GLOBAL_INIT.load(Ordering::SeqCst) == INITIALIZED
                 {
-                    f(unsafe { GLOBAL_DISPATCH.as_ref().expect("invariant violated") })
-                } else {
-                    f(default)
+                    // don't redo this call on the next check
+                    unsafe {
+                        *default = GLOBAL_DISPATCH
+                            .as_ref()
+                            .expect("invariant violated")
+                            .clone()
+                    }
                 }
+                f(&*default)
             } else {
                 f(&Dispatch::none())
             }
