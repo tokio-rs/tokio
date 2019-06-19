@@ -2,7 +2,7 @@ trigger: ["master", "std-future"]
 pr: ["master", "std-future"]
 
 variables:
-  nightly: nightly-2019-05-09
+  nightly: nightly-2019-06-10
 
 jobs:
 # # Check formatting
@@ -25,6 +25,7 @@ jobs:
     name: test_sub_cross
     displayName: Test sub crates (cross) -
     cross: true
+    rust: $(nightly)
     crates:
 #       - tokio-fs
       - tokio-reactor
@@ -39,6 +40,8 @@ jobs:
   parameters:
     name: test_linux
     displayName: Test sub crates -
+    rust: $(nightly)
+    crates:
     crates:
       # - tokio-buf
       # - tokio-codec
