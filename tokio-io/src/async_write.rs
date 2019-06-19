@@ -1,6 +1,7 @@
 //use crate::AsyncRead;
 use bytes::Buf;
-use std::io as std_io;
+use std::io;
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -47,7 +48,7 @@ pub trait AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, std_io::Error>>;
+    ) -> Poll<Result<usize, io::Error>>;
 
     /// Attempt to flush the object, ensuring that any buffered data reach
     /// their destination.
@@ -58,7 +59,7 @@ pub trait AsyncWrite {
     /// `Ok(Async::NotReady)` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object can make
     /// progress towards flushing.
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std_io::Error>>;
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
 
     /// Initiates or attempts to shut down this writer, returning success when
     /// the I/O connection has completely shut down.
@@ -119,7 +120,7 @@ pub trait AsyncWrite {
     /// This function will panic if not called within the context of a future's
     /// task.
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>)
-        -> Poll<Result<(), std_io::Error>>;
+        -> Poll<Result<(), io::Error>>;
 
     /// Write a `Buf` into this value, returning how many bytes were written.
     ///
@@ -129,7 +130,7 @@ pub trait AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut B,
-    ) -> Poll<Result<usize, std_io::Error>>
+    ) -> Poll<Result<usize, io::Error>>
     where
         Self: Sized,
     {
@@ -143,92 +144,48 @@ pub trait AsyncWrite {
     }
 }
 
-impl<T: ?Sized + Unpin + AsyncWrite> AsyncWrite for Box<T> {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, std_io::Error>> {
-        Pin::new(&mut **self).poll_write(cx, buf)
-    }
+macro_rules! deref_async_write {
+    () => {
+        fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8])
+            -> Poll<io::Result<usize>>
+        {
+            Pin::new(&mut **self).poll_write(cx, buf)
+        }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std_io::Error>> {
-        Pin::new(&mut **self).poll_flush(cx)
-    }
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut **self).poll_flush(cx)
+        }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std_io::Error>> {
-        Pin::new(&mut **self).poll_shutdown(cx)
-    }
-}
-
-/*
-impl<'a, T: ?Sized + AsyncWrite> AsyncWrite for &'a mut T {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        (**self).shutdown()
+        fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut **self).poll_shutdown(cx)
+        }
     }
 }
 
-impl AsyncRead for std_io::Repeat {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
-    }
+impl<T: ?Sized + AsyncWrite + Unpin> AsyncWrite for Box<T> {
+    deref_async_write!();
 }
 
-impl AsyncWrite for std_io::Sink {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        Ok(().into())
-    }
+impl<T: ?Sized + AsyncWrite + Unpin> AsyncWrite for &mut T {
+    deref_async_write!();
 }
 
-impl<T: AsyncRead> AsyncRead for std_io::Take<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.get_ref().prepare_uninitialized_buffer(buf)
-    }
-}
-
-impl<T, U> AsyncRead for std_io::Chain<T, U>
+impl<P> AsyncWrite for Pin<P>
 where
-    T: AsyncRead,
-    U: AsyncRead,
+    P: DerefMut + Unpin,
+    P::Target: AsyncWrite,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        let (t, u) = self.get_ref();
-        // We don't need to execute the second initializer if the first one
-        // already zeroed the buffer out.
-        t.prepare_uninitialized_buffer(buf) || u.prepare_uninitialized_buffer(buf)
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8])
+        -> Poll<io::Result<usize>>
+    {
+        self.get_mut().as_mut().poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.get_mut().as_mut().poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.get_mut().as_mut().poll_shutdown(cx)
     }
 }
-
-impl<T: AsyncWrite> AsyncWrite for std_io::BufWriter<T> {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        try_ready!(self.poll_flush());
-        self.get_mut().shutdown()
-    }
-}
-
-impl<T: AsyncRead> AsyncRead for std_io::BufReader<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.get_ref().prepare_uninitialized_buffer(buf)
-    }
-}
-
-impl<T: AsRef<[u8]>> AsyncRead for std_io::Cursor<T> {}
-
-impl<'a> AsyncWrite for std_io::Cursor<&'a mut [u8]> {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        Ok(().into())
-    }
-}
-
-impl AsyncWrite for std_io::Cursor<Vec<u8>> {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        Ok(().into())
-    }
-}
-
-impl AsyncWrite for std_io::Cursor<Box<[u8]>> {
-    fn shutdown(&mut self) -> Poll<(), std_io::Error> {
-        Ok(().into())
-    }
-}
-*/

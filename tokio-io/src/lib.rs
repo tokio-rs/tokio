@@ -12,25 +12,6 @@
 //! [found online]: https://tokio.rs/docs/getting-started/core/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
-/// A convenience macro for working with `io::Result<T>` from the `Read` and
-/// `Write` traits.
-///
-/// This macro takes `io::Result<T>` as input, and returns `T` as the output. If
-/// the input type is of the `Err` variant, then `Poll::NotReady` is returned if
-/// it indicates `WouldBlock` or otherwise `Err` is returned.
-#[macro_export]
-macro_rules! try_nb {
-    ($e:expr) => {
-        match $e {
-            Ok(t) => t,
-            Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => {
-                return ::std::task::Poll::Pending;
-            }
-            Err(e) => return ::std::task::Poll::Ready(Err(e.into())),
-        }
-    };
-}
-
 macro_rules! ready {
     ($e:expr) => {
         match $e {
@@ -40,20 +21,8 @@ macro_rules! ready {
     };
 }
 
-pub mod io;
-
-mod allow_std;
 mod async_read;
 mod async_write;
-//mod lines;
-//mod split;
-mod window;
 
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
-
-fn _assert_objects() {
-    fn _assert<T>() {}
-    _assert::<Box<dyn AsyncRead>>();
-    _assert::<Box<dyn AsyncWrite>>();
-}

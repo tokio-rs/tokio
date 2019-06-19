@@ -26,4 +26,5 @@ bytes = "0.4.7"
 log = "0.4"
 
 [dev-dependencies]
-tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
+pin-utils = "0.1.0-alpha.4"
+tokio-test = { version = "0.2.0", path = "../tokio-test" }
