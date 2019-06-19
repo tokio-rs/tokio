@@ -81,6 +81,9 @@ pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
 /// Can only be set once; subsequent attempts to set the global default will fail.
 /// Returns Err if the global default has already been set.
 ///
+/// Note: Libraries should *NOT* call `set_global_default()`! That will cause conflicts when
+/// executables try to set them later.
+///
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
@@ -575,8 +578,8 @@ mod test {
             fn exit(&self, _: &span::Id) {}
         }
 
-        // NOTE: can't have multiple tests that set the global dispatcher
-        // unless you use doctests ¯\_(ツ)_/¯
+        // NOTE: if you want to have other tests that set the default dispatch you'll need to
+        // write them as integration tests in ../tests/
         set_global_default(Dispatch::new(TestSubscriberA)).expect("global dispatch set failed");
         get_default(|current| {
             assert!(

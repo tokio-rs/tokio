@@ -366,6 +366,26 @@
 //! implementation compatible with `tokio-trace`. A `Subscriber` implements a
 //! way of collecting trace data, such as by logging it to standard output.
 //!
+//! There currently aren't too many subscribers to choose from. The best one to use right now
+//!  is probably [`tokio-trace-fmt`], which logs to the terminal.
+//! The simplest way to use a subscriber is to call the `set_global_default` function:
+//!
+//! ```no_build
+//! #[macro_use]
+//! extern crate tokio_trace;
+//! let my_subscriber = FooSubscriber::new();
+//! tokio_trace::subscriber::set_global_default(my_subscriber).expect("setting tokio_trace default failed");
+//! ```
+//!
+//! Note: Libraries should *NOT* call `set_global_default()`! That will cause conflicts when
+//! executables try to set the default later.
+//!
+//! This subscriber will be used as the default in all threads for the remainder of the duration
+//! of the program, similar to how loggers work in the `log` crate.
+//!
+//! In addition, you can locally override the default subscriber, using the `tokio` pattern
+//! of executing code in a context. For example:
+//!
 //! Unlike the `log` crate, `tokio-trace` does *not* use a global `Subscriber`
 //! which is initialized once. Instead, it follows the `tokio` pattern of
 //! executing code in a context. For example:
@@ -399,9 +419,11 @@
 //! ```
 //!
 //! This approach allows trace data to be collected by multiple subscribers
-//! within different contexts in the program. Alternatively, a single subscriber
-//! may be constructed by the `main` function and all subsequent code executed
-//! with that subscriber as the default. Any trace events generated outside the
+//! within different contexts in the program. Note that the override only applies to the
+//! currently executing thread; other threads will not see the change from with_default.
+//! with that subscriber as the default.
+//!
+//! Any trace events generated outside the
 //! context of a subscriber will not be collected.
 //!
 //! The executable itself may use the `tokio-trace` crate to instrument itself

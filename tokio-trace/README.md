@@ -14,10 +14,10 @@ often be quite challenging. Since individual tasks are multiplexed on the same
 thread, associated events and log lines are intermixed making it difficult to
 trace the logic flow. `tokio-trace` expands upon logging-style diagnostics by
 allowing libraries and applications to record structured events with additional
-information about _temporality_ and _causality_ — unlike a log message, a span
+information about *temporality* and *causality* — unlike a log message, a span
 in `tokio-trace` has a beginning and end time, may be entered and exited by the
 flow of execution, and may exist within a nested tree of similar spans. In
-addition, `tokio-trace` spans are _structured_, with the ability to record typed
+addition, `tokio-trace` spans are *structured*, with the ability to record typed
 data as well as textual messages.
 
 The `tokio-trace` crate provides the APIs necessary for instrumenting libraries
@@ -139,11 +139,14 @@ extern crate tokio_trace;
 
 let my_subscriber = FooSubscriber::new();
 
-tokio_trace::subscriber::set_global_default(my_subscriber);
+tokio_trace::subscriber::set_global_default(my_subscriber).expect("setting tokio_trace default failed");
 ```
 
 This subscriber will be used as the default in all threads for the remainder of the duration
 of the program, similar to how loggers work in the `log` crate.
+
+Note: Libraries should *NOT* call `set_global_default()`! That will cause conflicts when
+executables try to set the default later.
 
 In addition, you can locally override the default subscriber, using the `tokio` pattern
 of executing code in a context. For example:

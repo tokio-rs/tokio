@@ -24,6 +24,9 @@ where
 /// Can only be set once; subsequent attempts to set the global default will fail.
 /// Returns whether the initialization was successful.
 ///
+/// Note: Libraries should *NOT* call `set_global_default()`! That will cause conflicts when
+/// executables try to set them later.
+///
 /// [span]: ../span/index.html
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
 /// [`Event`]: ../event/struct.Event.html
