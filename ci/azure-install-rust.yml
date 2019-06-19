@@ -30,6 +30,6 @@ steps:
         rustup toolchain install nightly
         rustup update
         rustup toolchain list
-        rustc +nightly -Vv
-        cargo +nightly -V
+        rustc -Vv
+        cargo -V
     displayName: Query rust and cargo versions
