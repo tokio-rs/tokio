@@ -220,9 +220,12 @@ where
                     Some(Parent::Explicit(expected_parent)) => {
                         let actual_parent =
                             span.parent().and_then(|id| spans.get(id)).map(|s| s.name);
-                        assert_eq!(Some(expected_parent.as_ref()), actual_parent,
+                        assert_eq!(
+                            Some(expected_parent.as_ref()),
+                            actual_parent,
                             "expected {:?} to have explicit parent {:?}",
-                            name, expected_parent,
+                            name,
+                            expected_parent,
                         );
                     }
                     Some(Parent::ContextualRoot) => {
@@ -246,9 +249,12 @@ where
                         let stack = self.current.lock().unwrap();
                         let actual_parent =
                             stack.last().and_then(|id| spans.get(id)).map(|s| s.name);
-                        assert_eq!(Some(expected_parent.as_ref()), actual_parent,
+                        assert_eq!(
+                            Some(expected_parent.as_ref()),
+                            actual_parent,
                             "expected {:?} to have contextual parent {:?}",
-                            name, expected_parent,
+                            name,
+                            expected_parent,
                         );
                     }
                     None => {}

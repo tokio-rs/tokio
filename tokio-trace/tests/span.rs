@@ -584,7 +584,6 @@ fn explicit_child() {
     handle.assert_finished();
 }
 
-
 #[test]
 fn explicit_child_at_levels() {
     let (subscriber, handle) = subscriber::mock()
