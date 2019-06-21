@@ -585,6 +585,30 @@ fn explicit_child() {
 }
 
 #[test]
+fn explicit_child_at_levels() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(span::mock().named("foo"))
+        .new_span(span::mock().named("a").with_explicit_parent(Some("foo")))
+        .new_span(span::mock().named("b").with_explicit_parent(Some("foo")))
+        .new_span(span::mock().named("c").with_explicit_parent(Some("foo")))
+        .new_span(span::mock().named("d").with_explicit_parent(Some("foo")))
+        .new_span(span::mock().named("e").with_explicit_parent(Some("foo")))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let foo = span!(Level::TRACE, "foo");
+        trace_span!(parent: foo.id(), "a");
+        debug_span!(parent: foo.id(), "b");
+        info_span!(parent: foo.id(), "c");
+        warn_span!(parent: foo.id(), "d");
+        error_span!(parent: foo.id(), "e");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
 fn explicit_child_regardless_of_ctx() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(span::mock().named("foo"))

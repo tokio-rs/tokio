@@ -330,6 +330,7 @@ macro_rules! trace_span {
         span!(
             $crate::Level::TRACE,
             target: __tokio_trace_module_path!(),
+            parent: $parent,
             $name,
             $($field)*
         )
@@ -391,6 +392,7 @@ macro_rules! debug_span {
         span!(
             $crate::Level::INFO,
             target: __tokio_trace_module_path!(),
+            parent: $parent,
             $name,
             $($field)*
         )
@@ -452,6 +454,7 @@ macro_rules! info_span {
         span!(
             $crate::Level::INFO,
             target: __tokio_trace_module_path!(),
+            parent: $parent,
             $name,
             $($field)*
         )
@@ -513,6 +516,7 @@ macro_rules! warn_span {
         span!(
             $crate::Level::WARN,
             target: __tokio_trace_module_path!(),
+            parent: $parent,
             $name,
             $($field)*
         )
@@ -573,6 +577,7 @@ macro_rules! error_span {
         span!(
             $crate::Level::ERROR,
             target: __tokio_trace_module_path!(),
+            parent: $parent,
             $name,
             $($field)*
         )
