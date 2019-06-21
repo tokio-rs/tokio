@@ -79,7 +79,7 @@ pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
 /// (using `with_default`.)
 ///
 /// Can only be set once; subsequent attempts to set the global default will fail.
-/// Returns Err if the global default has already been set.
+/// Returns `Err` if the global default has already been set.
 ///
 /// Note: Libraries should *NOT* call `set_global_default()`! That will cause conflicts when
 /// executables try to set them later.
