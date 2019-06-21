@@ -105,11 +105,13 @@ pub fn set_global_default(dispatcher: Dispatch) -> Result<(), SetGlobalDefaultEr
 pub struct SetGlobalDefaultError {
     _no_construct: (),
 }
+
 impl fmt::Display for SetGlobalDefaultError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("a global default trace dispatcher has already been set")
     }
 }
+
 impl error::Error for SetGlobalDefaultError {}
 
 /// Executes a closure with a reference to this thread's current [dispatcher].
@@ -147,7 +149,7 @@ where
                     unsafe {
                         *default = GLOBAL_DISPATCH
                             .as_ref()
-                            .expect("invariant violated")
+                            .expect("invariant violated: GLOBAL_DISPATCH must be initialized before GLOBAL_INIT is set")
                             .clone()
                     }
                 }
