@@ -1,9 +1,7 @@
+use crate::AsyncWrite;
+use futures::{try_ready, Future, Poll};
 use std::io;
 use std::mem;
-
-use futures::{Future, Poll};
-
-use AsyncWrite;
 
 /// A future used to write the entire contents of some data to a stream.
 ///

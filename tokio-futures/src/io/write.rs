@@ -1,14 +1,12 @@
-use tokio_io::AsyncWrite;
-
 use std::future::Future;
-use std::task::{self, Poll};
-
 use std::io;
 use std::pin::Pin;
+use std::task::{self, Poll};
+use tokio_io::AsyncWrite;
 
 /// A future used to write data.
 #[derive(Debug)]
-pub struct Write<'a, T: 'a + ?Sized> {
+pub struct Write<'a, T: ?Sized> {
     writer: &'a mut T,
     buf: &'a [u8],
 }
@@ -25,7 +23,7 @@ impl<'a, T: AsyncWrite + ?Sized> Write<'a, T> {
 impl<'a, T: AsyncWrite + ?Sized> Future for Write<'a, T> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context) -> Poll<io::Result<usize>> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context<'_>) -> Poll<io::Result<usize>> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

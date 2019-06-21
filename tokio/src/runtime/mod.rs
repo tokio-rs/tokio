@@ -36,12 +36,10 @@
 //! [idle].
 //!
 //! ```rust
-//! # extern crate tokio;
-//! # extern crate futures;
 //! # use futures::{Future, Stream};
 //! use tokio::net::TcpListener;
 //!
-//! # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+//! # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
 //! # unimplemented!();
 //! # }
 //! # fn dox() {
@@ -69,13 +67,11 @@
 //! A [`Runtime`] instance can also be used directly.
 //!
 //! ```rust
-//! # extern crate tokio;
-//! # extern crate futures;
 //! # use futures::{Future, Stream};
 //! use tokio::runtime::Runtime;
 //! use tokio::net::TcpListener;
 //!
-//! # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+//! # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
 //! # unimplemented!();
 //! # }
 //! # fn dox() {
@@ -122,4 +118,3 @@ pub use self::threadpool::{
     TaskExecutor,
     run,
 };
-

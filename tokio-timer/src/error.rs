@@ -1,5 +1,4 @@
 use self::Kind::*;
-
 use std::error;
 use std::fmt;
 
@@ -71,7 +70,7 @@ impl error::Error for Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         self.description().fmt(fmt)
     }

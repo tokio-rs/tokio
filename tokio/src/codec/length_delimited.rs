@@ -15,7 +15,6 @@
 //! byte stream into a stream of frames.
 //!
 //! ```
-//! # extern crate tokio;
 //! use tokio::io::{AsyncRead, AsyncWrite};
 //! use tokio::codec::*;
 //!
@@ -40,16 +39,12 @@
 //! Specifically, given the following:
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate bytes;
-//! # extern crate futures;
-//! #
 //! use tokio::io::{AsyncRead, AsyncWrite};
 //! use tokio::codec::*;
 //! use bytes::Bytes;
 //! use futures::{Sink, Future};
 //!
-//! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) -> Result<(), Box<std::error::Error>> {
+//! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) -> Result<(), Box<dyn std::error::Error>> {
 //!     let mut transport = Framed::new(io, LengthDelimitedCodec::new());
 //!     let frame = Bytes::from("hello world");
 //!
@@ -82,7 +77,6 @@
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # extern crate tokio;
 //! # use tokio::io::AsyncRead;
 //! # use tokio::codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -117,7 +111,6 @@
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # extern crate tokio;
 //! # use tokio::io::AsyncRead;
 //! # use tokio::codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -150,7 +143,6 @@
 //! **includes** the frame head length.
 //!
 //! ```
-//! # extern crate tokio;
 //! # use tokio::io::AsyncRead;
 //! # use tokio::codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -185,7 +177,6 @@
 //! frame head, including the frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # extern crate tokio;
 //! # use tokio::io::AsyncRead;
 //! # use tokio::codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -230,7 +221,6 @@
 //! included.
 //!
 //! ```
-//! # extern crate tokio;
 //! # use tokio::io::AsyncRead;
 //! # use tokio::codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -277,7 +267,6 @@
 //! length.
 //!
 //! ```
-//! # extern crate tokio;
 //! # use tokio::io::AsyncRead;
 //! # use tokio::codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
@@ -288,7 +277,6 @@
 //!     .num_skip(3)
 //!     .new_read(io);
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
@@ -324,8 +312,6 @@
 //! configuration:
 //!
 //! ```
-//! # extern crate tokio;
-//! # extern crate bytes;
 //! # use tokio::io::AsyncWrite;
 //! # use tokio::codec::length_delimited;
 //! # use bytes::BytesMut;
@@ -354,13 +340,11 @@
 //! [`Encoder`]: ../trait.Encoder.html
 //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
-use {
+use crate::{
     codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite},
     io::{AsyncRead, AsyncWrite},
 };
-
 use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
-
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};
@@ -609,7 +593,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -654,7 +637,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -679,7 +661,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -704,7 +685,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -739,7 +719,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -764,7 +743,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -788,7 +766,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -810,7 +787,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -835,7 +811,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -856,7 +831,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     /// # pub fn main() {
@@ -880,7 +854,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::io::AsyncRead;
     /// use tokio::codec::length_delimited::Builder;
     ///
@@ -906,8 +879,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate bytes;
     /// # use tokio::io::AsyncWrite;
     /// # use tokio::codec::length_delimited;
     /// # use bytes::BytesMut;
@@ -930,8 +901,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate bytes;
     /// # use tokio::io::{AsyncRead, AsyncWrite};
     /// # use tokio::codec::length_delimited;
     /// # use bytes::BytesMut;
@@ -964,13 +933,13 @@ impl Builder {
 // ===== impl FrameTooBig =====
 
 impl fmt::Debug for FrameTooBig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FrameTooBig").finish()
     }
 }
 
 impl fmt::Display for FrameTooBig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.description())
     }
 }

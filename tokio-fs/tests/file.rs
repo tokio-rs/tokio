@@ -1,19 +1,13 @@
-extern crate futures;
-extern crate rand;
-extern crate tempfile;
-extern crate tokio_fs;
-extern crate tokio_io;
-
-use tokio_fs::*;
-use tokio_io::io;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::future::poll_fn;
 use futures::Future;
 use rand::{distributions, thread_rng, Rng};
-use tempfile::Builder as TmpBuilder;
-
 use std::fs;
 use std::io::SeekFrom;
+use tempfile::Builder as TmpBuilder;
+use tokio_fs::*;
+use tokio_io::io;
 
 mod pool;
 

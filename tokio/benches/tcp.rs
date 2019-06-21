@@ -1,11 +1,5 @@
 #![feature(test)]
-#![deny(warnings)]
-
-extern crate futures;
-extern crate tokio;
-
-#[macro_use]
-extern crate tokio_io;
+#![deny(warnings, rust_2018_idioms)]
 
 pub extern crate test;
 
@@ -22,7 +16,7 @@ mod prelude {
 }
 
 mod connect_churn {
-    use prelude::*;
+    use crate::prelude::*;
 
     const NUM: usize = 300;
     const CONCURRENT: usize = 8;
@@ -153,8 +147,9 @@ mod connect_churn {
 }
 
 mod transfer {
-    use prelude::*;
+    use crate::prelude::*;
     use std::{cmp, mem};
+    use tokio_io::try_nb;
 
     const MB: usize = 3 * 1024 * 1024;
 
@@ -242,7 +237,7 @@ mod transfer {
     }
 
     mod small_chunks {
-        use prelude::*;
+        use crate::prelude::*;
 
         #[bench]
         fn one_thread(b: &mut Bencher) {
@@ -251,7 +246,7 @@ mod transfer {
     }
 
     mod big_chunks {
-        use prelude::*;
+        use crate::prelude::*;
 
         #[bench]
         fn one_thread(b: &mut Bencher) {

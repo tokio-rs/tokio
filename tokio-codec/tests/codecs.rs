@@ -1,5 +1,4 @@
-extern crate bytes;
-extern crate tokio_codec;
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, Bytes, BytesMut};
 use tokio_codec::{BytesCodec, Decoder, Encoder, LinesCodec};

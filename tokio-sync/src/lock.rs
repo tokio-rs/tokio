@@ -8,11 +8,9 @@
 //! This allows you to do something along the lines of:
 //!
 //! ```rust,no_run
-//! # #[macro_use]
-//! # extern crate futures;
-//! # extern crate tokio;
-//! # use futures::{future, Poll, Async, Future, Stream};
+//! use futures::{try_ready, future, Poll, Async, Future, Stream};
 //! use tokio::sync::lock::{Lock, LockGuard};
+//!
 //! struct MyType<S> {
 //!     lock: Lock<S>,
 //! }
@@ -37,14 +35,13 @@
 //!         }
 //!     }
 //! }
-//! # fn main() {}
 //! ```
 //!
-//!   [`Lock`]: struct.Lock.html
-//!   [`LockGuard`]: struct.LockGuard.html
+//! [`Lock`]: struct.Lock.html
+//! [`LockGuard`]: struct.LockGuard.html
 
+use crate::semaphore;
 use futures::Async;
-use semaphore;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -72,9 +69,11 @@ pub struct Lock<T> {
 #[derive(Debug)]
 pub struct LockGuard<T>(Lock<T>);
 
-// As long as T: Send, it's fine to send Lock<T> to other threads.
-// If T was not Send, sending a Lock<T> would be bad, since you can access T through Lock<T>.
+// As long as T: Send, it's fine to send and share Lock<T> between threads.
+// If T was not Send, sending and sharing a Lock<T> would be bad, since you can access T through
+// Lock<T>.
 unsafe impl<T> Send for Lock<T> where T: Send {}
+unsafe impl<T> Sync for Lock<T> where T: Send {}
 unsafe impl<T> Sync for LockGuard<T> where T: Send + Sync {}
 
 #[derive(Debug)]
@@ -176,7 +175,7 @@ impl<T> DerefMut for LockGuard<T> {
 }
 
 impl<T: fmt::Display> fmt::Display for LockGuard<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
 }

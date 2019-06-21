@@ -1,17 +1,13 @@
 #![cfg(unix)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate libc;
-extern crate tokio;
-extern crate tokio_signal;
-
-use self::libc::{c_int, getpid, kill};
-use self::tokio::timer::Timeout;
+use libc::{c_int, getpid, kill};
 use std::time::Duration;
+use tokio::timer::Timeout;
 
-pub use self::futures::{Future, Stream};
-pub use self::tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
-pub use self::tokio_signal::unix::Signal;
+pub use futures::{Future, Stream};
+pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
+pub use tokio_signal::unix::Signal;
 
 pub fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
     Timeout::new(future, Duration::from_secs(1)).map_err(|e| {

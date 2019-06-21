@@ -1,10 +1,8 @@
-use tokio_executor::park::{Park, Unpark};
-
+use crossbeam_utils::sync::{Parker, Unparker};
 use std::error::Error;
 use std::fmt;
 use std::time::Duration;
-
-use crossbeam_utils::sync::{Parker, Unparker};
+use tokio_executor::park::{Park, Unpark};
 
 /// Parks the thread.
 #[derive(Debug)]
@@ -85,7 +83,7 @@ impl Unpark for DefaultUnpark {
 // ===== impl ParkError =====
 
 impl fmt::Display for ParkError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.description().fmt(fmt)
     }
 }

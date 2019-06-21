@@ -1,13 +1,11 @@
 #![cfg(feature = "async-await-preview")]
-#![feature(await_macro)]
+#![feature(async_await, await_macro)]
 #![doc(html_root_url = "https://docs.rs/tokio-futures/0.1.0")]
-#![deny(missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! A preview of Tokio w/ `async` / `await` support.
-
-extern crate futures;
-extern crate tokio_io;
 
 /// Extracts the successful type of a `Poll<Result<T, E>>`.
 ///
@@ -23,13 +21,8 @@ macro_rules! try_ready {
 }
 
 #[macro_use]
-mod await;
+mod async_wait;
 pub mod compat;
 pub mod io;
 pub mod sink;
 pub mod stream;
-
-// Rename the `await` macro in `std`. This is used by the redefined
-// `await` macro in this crate.
-#[doc(hidden)]
-pub use std::await as std_await;

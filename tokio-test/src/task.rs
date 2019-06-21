@@ -6,8 +6,7 @@
 //! poll.
 //!
 //! ```
-//! # #[macro_use] extern crate tokio_test;
-//! # extern crate futures;
+//! # use tokio_test::assert_ready_eq;
 //! # use tokio_test::task::MockTask;
 //! # use futures::{sync::mpsc, Stream, Sink, Future, Async};
 //! let mut task = MockTask::new();
@@ -20,7 +19,6 @@
 
 use futures::executor::{spawn, Notify};
 use futures::{future, Async};
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 

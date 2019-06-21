@@ -1,9 +1,8 @@
 // Measure cost of different operations
 // to get a sense of performance tradeoffs
 #![feature(test)]
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate mio;
 extern crate test;
 
 use test::Bencher;

@@ -1,10 +1,7 @@
-extern crate futures;
-extern crate tokio_executor;
-extern crate tokio_timer;
+#![deny(warnings, rust_2018_idioms)]
 
-#[macro_use]
 mod support;
-use support::*;
+use crate::support::*;
 
 use futures::{prelude::*, sync::mpsc};
 use tokio_timer::throttle::Throttle;

@@ -1,9 +1,10 @@
 #![cfg(unix)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate libc;
+use libc;
 
 pub mod support;
-use support::*;
+use crate::support::*;
 
 const TEST_SIGNAL: libc::c_int = libc::SIGUSR1;
 

@@ -1,7 +1,5 @@
 use super::chan;
-
 use futures::{Poll, Sink, StartSend, Stream};
-
 use std::fmt;
 
 /// Send values to the associated `Receiver`.
@@ -20,7 +18,7 @@ impl<T> Clone for Sender<T> {
 }
 
 impl<T> fmt::Debug for Sender<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Sender")
             .field("chan", &self.chan)
             .finish()
@@ -36,7 +34,7 @@ pub struct Receiver<T> {
 }
 
 impl<T> fmt::Debug for Receiver<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Receiver")
             .field("chan", &self.chan)
             .finish()
@@ -80,9 +78,6 @@ pub struct RecvError(());
 /// # Examples
 ///
 /// ```rust
-/// extern crate futures;
-/// extern crate tokio;
-///
 /// use tokio::sync::mpsc::channel;
 /// use tokio::prelude::*;
 /// use futures::future::lazy;
@@ -114,7 +109,7 @@ pub struct RecvError(());
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
-    let semaphore = (::semaphore::Semaphore::new(buffer), buffer);
+    let semaphore = (crate::semaphore::Semaphore::new(buffer), buffer);
     let (tx, rx) = chan::channel(semaphore);
 
     let tx = Sender::new(tx);
@@ -125,7 +120,7 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Channel semaphore is a tuple of the semaphore implementation and a `usize`
 /// representing the channel bound.
-type Semaphore = (::semaphore::Semaphore, usize);
+type Semaphore = (crate::semaphore::Semaphore, usize);
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
@@ -218,7 +213,7 @@ impl<T> Sink for Sender<T> {
 // ===== impl SendError =====
 
 impl fmt::Display for SendError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
@@ -258,7 +253,7 @@ impl<T> TrySendError<T> {
 }
 
 impl<T: fmt::Debug> fmt::Display for TrySendError<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
@@ -288,7 +283,7 @@ impl<T> From<(T, chan::TrySendError)> for TrySendError<T> {
 // ===== impl RecvError =====
 
 impl fmt::Display for RecvError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }

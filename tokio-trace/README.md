@@ -56,7 +56,7 @@ to indicate that some code takes place within the context of that `Span`:
 ```rust
 // Construct a new span named "my span".
 let mut span = span!("my span");
-span.enter(|| {
+span.in_scope(|| {
     // Any trace events in this closure or code called by it will occur within
     // the span.
 });
@@ -88,7 +88,7 @@ use tokio_trace::field;
 pub fn shave_the_yak(yak: &mut Yak) {
     // Create a new span for this invocation of `shave_the_yak`, annotated
     // with  the yak being shaved as a *field* on the span.
-    span!("shave_the_yak", yak = field::debug(&yak)).enter(|| {
+    span!("shave_the_yak", yak = field::debug(&yak)).in_scope(|| {
         // Since the span is annotated with the yak, it is part of the context
         // for everything happening inside the span. Therefore, we don't need
         // to add it to the message for this event, as the `log` crate does.

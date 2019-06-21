@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-signal/0.2.8")]
-#![deny(missing_docs)]
+#![deny(missing_docs, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Asynchronous signal handling for Tokio
 //!
@@ -21,74 +23,49 @@
 //! Print out all ctrl-C notifications received
 //!
 //! ```rust,no_run
-//! extern crate futures;
-//! extern crate tokio;
-//! extern crate tokio_signal;
-//!
 //! use futures::{Future, Stream};
 //!
-//! fn main() {
-//!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
-//!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
+//! // Create an infinite stream of "Ctrl+C" notifications. Each item received
+//! // on this stream may represent multiple ctrl-c signals.
+//! let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
 //!
-//!     // Process each ctrl-c as it comes in
-//!     let prog = ctrl_c.for_each(|()| {
-//!         println!("ctrl-c received!");
-//!         Ok(())
-//!     });
+//! // Process each ctrl-c as it comes in
+//! let prog = ctrl_c.for_each(|()| {
+//!     println!("ctrl-c received!");
+//!     Ok(())
+//! });
 //!
-//!     tokio::runtime::current_thread::block_on_all(prog).unwrap();
-//! }
+//! tokio::runtime::current_thread::block_on_all(prog).unwrap();
 //! ```
 //!
 //! Wait for SIGHUP on Unix
 //!
 //! ```rust,no_run
-//! # extern crate futures;
-//! # extern crate tokio;
-//! # extern crate tokio_signal;
-//! # #[cfg(unix)]
-//! # mod foo {
-//! #
-//! extern crate futures;
-//! extern crate tokio;
-//! extern crate tokio_signal;
-//!
+//! # #[cfg(unix)] fn dox() {
 //! use futures::{Future, Stream};
 //! use tokio_signal::unix::{Signal, SIGHUP};
 //!
-//! fn main() {
-//!     // Like the previous example, this is an infinite stream of signals
-//!     // being received, and signals may be coalesced while pending.
-//!     let stream = Signal::new(SIGHUP).flatten_stream();
+//! // Like the previous example, this is an infinite stream of signals
+//! // being received, and signals may be coalesced while pending.
+//! let stream = Signal::new(SIGHUP).flatten_stream();
 //!
-//!     // Convert out stream into a future and block the program
-//!     tokio::runtime::current_thread::block_on_all(stream.into_future()).ok().unwrap();
-//! }
+//! // Convert out stream into a future and block the program
+//! tokio::runtime::current_thread::block_on_all(stream.into_future()).ok().unwrap();
 //! # }
-//! # fn main() {}
 //! ```
-
-extern crate futures;
-extern crate mio;
-extern crate tokio_executor;
-extern crate tokio_io;
-extern crate tokio_reactor;
-
-use std::io;
 
 use futures::stream::Stream;
 use futures::{future, Future};
+use std::io;
 use tokio_reactor::Handle;
 
 pub mod unix;
 pub mod windows;
 
 /// A future whose error is `io::Error`
-pub type IoFuture<T> = Box<Future<Item = T, Error = io::Error> + Send>;
+pub type IoFuture<T> = Box<dyn Future<Item = T, Error = io::Error> + Send>;
 /// A stream whose error is `io::Error`
-pub type IoStream<T> = Box<Stream<Item = T, Error = io::Error> + Send>;
+pub type IoStream<T> = Box<dyn Stream<Item = T, Error = io::Error> + Send>;
 
 /// Creates a stream which receives "ctrl-c" notifications sent to a process.
 ///
@@ -125,7 +102,7 @@ pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<IoStream<()>> {
         let handle = handle.clone();
         Box::new(future::lazy(move || {
             unix::Signal::with_handle(unix::libc::SIGINT, &handle)
-                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>)
+                .map(|x| Box::new(x.map(|_| ())) as Box<dyn Stream<Item = _, Error = _> + Send>)
         }))
     }
 
@@ -135,7 +112,7 @@ pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<IoStream<()>> {
         // Use lazy to ensure that `ctrl_c` gets called while on an event loop
         Box::new(future::lazy(move || {
             windows::Event::ctrl_c_handle(&handle)
-                .map(|x| Box::new(x) as Box<Stream<Item = _, Error = _> + Send>)
+                .map(|x| Box::new(x) as Box<dyn Stream<Item = _, Error = _> + Send>)
         }))
     }
 }

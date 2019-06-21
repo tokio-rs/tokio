@@ -1,5 +1,4 @@
-use wheel::Stack;
-
+use crate::wheel::Stack;
 use std::fmt;
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
@@ -209,7 +208,7 @@ impl<T: Stack> Level<T> {
 }
 
 impl<T> fmt::Debug for Level<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Level")
             .field("occupied", &self.occupied)
             .finish()

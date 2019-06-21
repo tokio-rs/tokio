@@ -1,8 +1,6 @@
 use super::chan;
-
+use crate::loom::sync::atomic::AtomicUsize;
 use futures::{Poll, Sink, StartSend, Stream};
-use loom::sync::atomic::AtomicUsize;
-
 use std::fmt;
 
 /// Send values to the associated `UnboundedReceiver`.
@@ -22,7 +20,7 @@ impl<T> Clone for UnboundedSender<T> {
 }
 
 impl<T> fmt::Debug for UnboundedSender<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("UnboundedSender")
             .field("chan", &self.chan)
             .finish()
@@ -39,7 +37,7 @@ pub struct UnboundedReceiver<T> {
 }
 
 impl<T> fmt::Debug for UnboundedReceiver<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("UnboundedReceiver")
             .field("chan", &self.chan)
             .finish()
@@ -140,7 +138,7 @@ impl<T> Sink for UnboundedSender<T> {
 // ===== impl UnboundedSendError =====
 
 impl fmt::Display for UnboundedSendError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
@@ -162,7 +160,7 @@ impl<T> UnboundedTrySendError<T> {
 }
 
 impl<T: fmt::Debug> fmt::Display for UnboundedTrySendError<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
@@ -184,7 +182,7 @@ impl<T> From<(T, chan::TrySendError)> for UnboundedTrySendError<T> {
 // ===== impl UnboundedRecvError =====
 
 impl fmt::Display for UnboundedRecvError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }

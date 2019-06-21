@@ -1,18 +1,15 @@
-use super::{Inner, Runtime};
-
-use reactor::Reactor;
-
-use std::io;
-use std::sync::Mutex;
-use std::time::Duration;
-use std::any::Any;
-
+use crate::reactor::Reactor;
 use num_cpus;
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 use tokio_trace_core as trace;
+use std::io;
+use std::sync::Mutex;
+use std::time::Duration;
+use std::any::Any;
+use super::{Inner, Runtime};
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -30,9 +27,6 @@ use tokio_trace_core as trace;
 /// # Examples
 ///
 /// ```
-/// extern crate tokio;
-/// extern crate tokio_timer;
-///
 /// use std::time::Duration;
 ///
 /// use tokio::runtime::Builder;
@@ -113,8 +107,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -126,7 +118,7 @@ impl Builder {
     /// ```
     pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(Box<Any + Send>) + Send + Sync + 'static,
+        F: Fn(Box<dyn Any + Send>) + Send + Sync + 'static,
     {
         self.threadpool_builder.panic_handler(f);
         self
@@ -143,8 +135,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -175,8 +165,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -205,8 +193,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     /// use std::time::Duration;
     ///
@@ -232,8 +218,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -258,8 +242,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -281,8 +263,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -307,8 +287,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -333,7 +311,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
     /// # use tokio::runtime::Builder;
     /// # pub fn main() {
     /// let runtime = Builder::new().build().unwrap();

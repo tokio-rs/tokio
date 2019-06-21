@@ -1,10 +1,6 @@
-use super::Borrow;
-use tokio_executor::park::Unpark;
-use tokio_executor::Enter;
-
+use crate::Borrow;
 use futures::executor::{self, NotifyHandle, Spawn, UnsafeNotify};
 use futures::{Async, Future};
-
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
@@ -15,6 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
 use std::sync::{Arc, Weak};
 use std::thread;
 use std::usize;
+use tokio_executor::park::Unpark;
+use tokio_executor::Enter;
 
 /// A generic task-aware scheduler.
 ///
@@ -24,7 +22,7 @@ pub struct Scheduler<U> {
     nodes: List<U>,
 }
 
-pub struct Notify<'a, U: 'a>(&'a Arc<Node<U>>);
+pub struct Notify<'a, U>(&'a Arc<Node<U>>);
 
 // A linked-list of nodes
 struct List<U> {
@@ -125,10 +123,10 @@ enum Dequeue<U> {
 }
 
 /// Wraps a spawned boxed future
-struct Task(Spawn<Box<Future<Item = (), Error = ()>>>);
+struct Task(Spawn<Box<dyn Future<Item = (), Error = ()>>>);
 
 /// A task that is scheduled. `turn` must be called
-pub struct Scheduled<'a, U: 'a> {
+pub struct Scheduled<'a, U> {
     task: &'a mut Task,
     notify: &'a Notify<'a, U>,
     done: &'a mut bool,
@@ -171,7 +169,7 @@ where
         self.inner.clone().into()
     }
 
-    pub fn schedule(&mut self, item: Box<Future<Item = (), Error = ()>>) {
+    pub fn schedule(&mut self, item: Box<dyn Future<Item = (), Error = ()>>) {
         // Get the current scheduler tick
         let tick_num = self.inner.tick_num.load(SeqCst);
 
@@ -259,7 +257,7 @@ where
                 //   assume is is complete (will return Ready or panic), in
                 //   which case we'll want to discard it regardless.
                 //
-                struct Bomb<'a, U: Unpark + 'a> {
+                struct Bomb<'a, U: Unpark> {
                     borrow: &'a mut Borrow<'a, U>,
                     enter: &'a mut Enter,
                     node: Option<Arc<Node<U>>>,
@@ -359,13 +357,13 @@ impl<'a, U: Unpark> Scheduled<'a, U> {
 }
 
 impl Task {
-    pub fn new(future: Box<Future<Item = (), Error = ()> + 'static>) -> Self {
+    pub fn new(future: Box<dyn Future<Item = (), Error = ()> + 'static>) -> Self {
         Task(executor::spawn(future))
     }
 }
 
 impl fmt::Debug for Task {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Task").finish()
     }
 }
@@ -399,7 +397,7 @@ fn release_node<U>(node: Arc<Node<U>>) {
 }
 
 impl<U> Debug for Scheduler<U> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "Scheduler {{ ... }}")
     }
 }
@@ -639,7 +637,7 @@ impl<'a, U> Clone for Notify<'a, U> {
 }
 
 impl<'a, U> fmt::Debug for Notify<'a, U> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Notify").finish()
     }
 }
@@ -687,8 +685,8 @@ unsafe impl<U: Unpark> UnsafeNotify for ArcNode<U> {
     }
 }
 
-unsafe fn hide_lt<U: Unpark>(p: *mut ArcNode<U>) -> *mut UnsafeNotify {
-    mem::transmute(p as *mut UnsafeNotify)
+unsafe fn hide_lt<U: Unpark>(p: *mut ArcNode<U>) -> *mut dyn UnsafeNotify {
+    mem::transmute(p as *mut dyn UnsafeNotify)
 }
 
 impl<U: Unpark> Node<U> {

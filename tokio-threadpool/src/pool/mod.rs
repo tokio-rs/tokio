@@ -9,23 +9,21 @@ pub(crate) use self::state::{Lifecycle, State, MAX_FUTURES};
 use self::backup::Handoff;
 use self::backup_stack::BackupStack;
 
-use config::Config;
-use shutdown::ShutdownTrigger;
-use task::{Blocking, Task};
-use worker::{self, Worker, WorkerId};
-
+use crate::config::Config;
+use crate::shutdown::ShutdownTrigger;
+use crate::task::{Blocking, Task};
+use crate::worker::{self, Worker, WorkerId};
+use crossbeam_deque::Injector;
+use crossbeam_utils::CachePadded;
 use futures::Poll;
-
+use log::{debug, error, trace};
+use rand;
 use std::cell::Cell;
 use std::num::Wrapping;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::{Arc, Weak};
 use std::thread;
-
-use crossbeam_deque::Injector;
-use crossbeam_utils::CachePadded;
-use rand;
 
 #[derive(Debug)]
 pub(crate) struct Pool {
@@ -202,7 +200,7 @@ impl Pool {
     }
 
     pub fn terminate_sleeping_workers(&self) {
-        use worker::Lifecycle::Signaled;
+        use crate::worker::Lifecycle::Signaled;
 
         trace!("  -> shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
@@ -221,7 +219,7 @@ impl Pool {
         }
     }
 
-    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), ::BlockingError> {
+    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), crate::BlockingError> {
         self.blocking.poll_blocking_capacity(task)
     }
 
@@ -395,7 +393,7 @@ impl Pool {
     pub fn signal_work(&self, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
-        use worker::Lifecycle::Signaled;
+        use crate::worker::Lifecycle::Signaled;
 
         if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
             let entry = &self.workers[idx];

@@ -1,5 +1,5 @@
-use super::Runtime;
 use std::future::Future;
+use super::Runtime;
 
 impl Runtime {
     /// Like `block_on`, but takes an `async` block

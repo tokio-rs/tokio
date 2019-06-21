@@ -11,12 +11,8 @@ jobs:
 
   - template: azure-patch-crates.yml
 
-  - script: cargo test
-    displayName: cargo +nightly test -p async-await
-    workingDirectory: $(Build.SourcesDirectory)/async-await
-
   - script: cargo check --all
-    displayName: cargo +nightly check --all
+    displayName: cargo check --all
 
   # Check benches
   - script: cargo check --benches --all

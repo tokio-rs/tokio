@@ -1,8 +1,6 @@
-use tokio_io::AsyncWrite;
-
 use futures::Poll;
-
 use std::io::{self, Stdout as StdStdout, Write};
+use tokio_io::AsyncWrite;
 
 /// A handle to the standard output stream of a process.
 ///
@@ -29,11 +27,11 @@ pub fn stdout() -> Stdout {
 
 impl Write for Stdout {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        ::would_block(|| self.std.write(buf))
+        crate::would_block(|| self.std.write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        ::would_block(|| self.std.flush())
+        crate::would_block(|| self.std.flush())
     }
 }
 

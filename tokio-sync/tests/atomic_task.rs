@@ -1,8 +1,4 @@
-#![deny(warnings)]
-
-extern crate futures;
-extern crate tokio_mock_task;
-extern crate tokio_sync;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::task::{self, Task};
 use tokio_mock_task::*;

@@ -1,14 +1,12 @@
-use tokio_io::AsyncRead;
-
 use std::future::Future;
-use std::task::{self, Poll};
-
 use std::io;
 use std::pin::Pin;
+use std::task::{self, Poll};
+use tokio_io::AsyncRead;
 
 /// A future which can be used to read bytes.
 #[derive(Debug)]
-pub struct Read<'a, T: ?Sized + 'a> {
+pub struct Read<'a, T: ?Sized> {
     reader: &'a mut T,
     buf: &'a mut [u8],
 }
@@ -25,7 +23,7 @@ impl<'a, T: AsyncRead + ?Sized> Read<'a, T> {
 impl<'a, T: AsyncRead + ?Sized> Future for Read<'a, T> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut task::Context<'_>) -> Poll<Self::Output> {
         use crate::compat::forward::convert_poll;
 
         let this = &mut *self;

@@ -1,7 +1,5 @@
 use super::File;
-
-use futures::{Future, Poll};
-
+use futures::{try_ready, Future, Poll};
 use std::io;
 
 /// Future returned by `File::seek`.

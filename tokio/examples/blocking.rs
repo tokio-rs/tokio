@@ -9,11 +9,11 @@
 //! Note how non-blocking threads are executed before blocking threads finish
 //! their task.
 
-extern crate tokio;
-extern crate tokio_threadpool;
+#![deny(warnings, rust_2018_idioms)]
 
 use std::thread;
 use std::time::Duration;
+use tokio;
 use tokio::prelude::*;
 use tokio::runtime::Builder;
 use tokio_threadpool::blocking;

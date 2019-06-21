@@ -1,13 +1,12 @@
 #![allow(deprecated)]
 
-use std::fmt;
-
-use codec::Decoder;
-use framed::Fuse;
-use AsyncRead;
-
+use crate::codec::Decoder;
+use crate::framed::Fuse;
+use crate::AsyncRead;
 use bytes::BytesMut;
-use futures::{Async, Poll, Sink, StartSend, Stream};
+use futures::{try_ready, Async, Poll, Sink, StartSend, Stream};
+use log::trace;
+use std::fmt;
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 #[deprecated(since = "0.1.7", note = "Moved to tokio-codec")]
@@ -121,7 +120,7 @@ where
     T: fmt::Debug,
     D: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedRead")
             .field("inner", &self.inner.inner.0)
             .field("decoder", &self.inner.inner.1)

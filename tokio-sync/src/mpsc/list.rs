@@ -1,12 +1,10 @@
 //! A concurrent, lock-free, FIFO list.
 
 use super::block::{self, Block};
-
-use loom::{
+use crate::loom::{
     self,
     sync::atomic::{AtomicPtr, AtomicUsize},
 };
-
 use std::fmt;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
@@ -214,7 +212,7 @@ impl<T> Tx<T> {
 }
 
 impl<T> fmt::Debug for Tx<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Tx")
             .field("block_tail", &self.block_tail.load(Relaxed))
             .field("tail_position", &self.tail_position.load(Relaxed))
@@ -339,7 +337,7 @@ impl<T> Rx<T> {
 }
 
 impl<T> fmt::Debug for Rx<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Rx")
             .field("head", &self.head)
             .field("index", &self.index)

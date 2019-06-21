@@ -1,15 +1,13 @@
 #![allow(deprecated)]
 
-use std::fmt;
-use std::io::{self, Read, Write};
-
-use codec::{Decoder, Encoder};
-use framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
-use framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
-use {AsyncRead, AsyncWrite};
-
+use crate::codec::{Decoder, Encoder};
+use crate::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
+use crate::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
+use crate::{AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use futures::{Poll, Sink, StartSend, Stream};
+use std::fmt;
+use std::io::{self, Read, Write};
 
 /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -174,7 +172,7 @@ where
     T: fmt::Debug,
     U: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Framed")
             .field("io", &self.inner.get_ref().get_ref().0)
             .field("codec", &self.inner.get_ref().get_ref().1)

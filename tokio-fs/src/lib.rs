@@ -1,5 +1,7 @@
-#![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.6")]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Asynchronous file and standard stream adaptation.
 //!
@@ -28,11 +30,6 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
-#[macro_use]
-extern crate futures;
-extern crate tokio_io;
-extern crate tokio_threadpool;
-
 mod create_dir;
 mod create_dir_all;
 pub mod file;
@@ -52,28 +49,27 @@ mod stdout;
 mod symlink_metadata;
 mod write;
 
-pub use create_dir::{create_dir, CreateDirFuture};
-pub use create_dir_all::{create_dir_all, CreateDirAllFuture};
-pub use file::File;
-pub use file::OpenOptions;
-pub use hard_link::{hard_link, HardLinkFuture};
-pub use metadata::{metadata, MetadataFuture};
-pub use read::{read, ReadFile};
-pub use read_dir::{read_dir, DirEntry, ReadDir, ReadDirFuture};
-pub use read_link::{read_link, ReadLinkFuture};
-pub use remove_dir::{remove_dir, RemoveDirFuture};
-pub use remove_file::{remove_file, RemoveFileFuture};
-pub use rename::{rename, RenameFuture};
-pub use set_permissions::{set_permissions, SetPermissionsFuture};
-pub use stderr::{stderr, Stderr};
-pub use stdin::{stdin, Stdin};
-pub use stdout::{stdout, Stdout};
-pub use symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
-pub use write::{write, WriteFile};
+pub use crate::create_dir::{create_dir, CreateDirFuture};
+pub use crate::create_dir_all::{create_dir_all, CreateDirAllFuture};
+pub use crate::file::File;
+pub use crate::file::OpenOptions;
+pub use crate::hard_link::{hard_link, HardLinkFuture};
+pub use crate::metadata::{metadata, MetadataFuture};
+pub use crate::read::{read, ReadFile};
+pub use crate::read_dir::{read_dir, DirEntry, ReadDir, ReadDirFuture};
+pub use crate::read_link::{read_link, ReadLinkFuture};
+pub use crate::remove_dir::{remove_dir, RemoveDirFuture};
+pub use crate::remove_file::{remove_file, RemoveFileFuture};
+pub use crate::rename::{rename, RenameFuture};
+pub use crate::set_permissions::{set_permissions, SetPermissionsFuture};
+pub use crate::stderr::{stderr, Stderr};
+pub use crate::stdin::{stdin, Stdin};
+pub use crate::stdout::{stdout, Stdout};
+pub use crate::symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
+pub use crate::write::{write, WriteFile};
 
 use futures::Async::*;
 use futures::Poll;
-
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
 

@@ -8,6 +8,9 @@ jobs:
     parameters:
       rust_version: stable
 
+  - script: sudo apt-get update
+    displayName: "apt-get update"
+
   - script: sudo apt-get install gcc-multilib
     displayName: "Install gcc-multilib"
 

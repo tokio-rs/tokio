@@ -1,16 +1,11 @@
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate tokio_mock_task;
-extern crate tokio_sync;
-
-use tokio_mock_task::*;
-use tokio_sync::mpsc;
-
+use futures;
 use futures::prelude::*;
-
 use std::sync::Arc;
 use std::thread;
+use tokio_mock_task::*;
+use tokio_sync::mpsc;
 
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}

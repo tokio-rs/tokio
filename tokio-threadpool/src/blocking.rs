@@ -1,7 +1,5 @@
-use worker::Worker;
-
-use futures::Poll;
-
+use crate::worker::Worker;
+use futures::{try_ready, Poll};
 use std::error::Error;
 use std::fmt;
 
@@ -80,9 +78,6 @@ pub struct BlockingError {
 /// that needs to be performed.
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate tokio_threadpool;
-///
 /// use tokio_threadpool::{ThreadPool, blocking};
 ///
 /// use futures::Future;
@@ -157,13 +152,13 @@ where
 }
 
 impl fmt::Display for BlockingError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.description())
     }
 }
 
 impl fmt::Debug for BlockingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BlockingError")
             .field("reason", &self.description())
             .finish()

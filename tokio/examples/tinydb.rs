@@ -39,16 +39,14 @@
 //! * `SET $key $value` - this will set the value of `$key` to `$value`,
 //!   returning the previous value, if any.
 
-#![deny(warnings)]
-
-extern crate tokio;
+#![deny(warnings, rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::env;
 use std::io::BufReader;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-
+use tokio;
 use tokio::io::{lines, write_all};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
@@ -83,7 +81,7 @@ enum Response {
     },
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());

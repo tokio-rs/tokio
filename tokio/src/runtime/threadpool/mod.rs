@@ -9,16 +9,13 @@ pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use reactor::{Handle, Reactor};
-
-use std::io;
-use std::sync::Mutex;
-
-use tokio_executor::enter;
-use tokio_threadpool as threadpool;
-
+use crate::reactor::{Handle, Reactor};
 use futures;
 use futures::future::Future;
+use tokio_executor::enter;
+use tokio_threadpool as threadpool;
+use std::io;
+use std::sync::Mutex;
 
 /// Handle to the Tokio runtime.
 ///
@@ -70,12 +67,10 @@ struct Inner {
 /// # Examples
 ///
 /// ```rust
-/// # extern crate tokio;
-/// # extern crate futures;
 /// # use futures::{Future, Stream};
 /// use tokio::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<Future<Item = (), Error = ()> + Send> {
+/// # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
 /// # unimplemented!();
 /// # }
 /// # fn dox() {
@@ -103,7 +98,7 @@ where F: Future<Item = (), Error = ()> + Send + 'static,
 {
     // Check enter before creating a new Runtime...
     let mut entered = enter().expect("nested tokio::run");
-    let mut runtime = Runtime::new().expect("failed to start new Runtime");
+    let runtime = Runtime::new().expect("failed to start new Runtime");
     runtime.spawn(future);
     entered
         .block_on(runtime.shutdown_on_idle())
@@ -216,14 +211,12 @@ impl Runtime {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
     /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
     /// rt.spawn(future::lazy(|| {
@@ -238,10 +231,10 @@ impl Runtime {
     ///
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
-    pub fn spawn<F>(&mut self, future: F) -> &mut Self
+    pub fn spawn<F>(&self, future: F) -> &Self
     where F: Future<Item = (), Error = ()> + Send + 'static,
     {
-        self.inner_mut().pool.sender().spawn(future).unwrap();
+        self.inner().pool.spawn(future);
         self
     }
 
@@ -257,7 +250,7 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
+    pub fn block_on<F, R, E>(&self, future: F) -> Result<R, E>
     where
         F: Send + 'static + Future<Item = R, Error = E>,
         R: Send + 'static,
@@ -283,7 +276,7 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on_all<F, R, E>(mut self, future: F) -> Result<R, E>
+    pub fn block_on_all<F, R, E>(self, future: F) -> Result<R, E>
     where
         F: Send + 'static + Future<Item = R, Error = E>,
         R: Send + 'static,
@@ -381,10 +374,6 @@ impl Runtime {
 
     fn inner(&self) -> &Inner {
         self.inner.as_ref().unwrap()
-    }
-
-    fn inner_mut(&mut self) -> &mut Inner {
-        self.inner.as_mut().unwrap()
     }
 }
 

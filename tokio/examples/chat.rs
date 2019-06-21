@@ -24,23 +24,19 @@
 //! connected clients they'll all join the same room and see everyone else's
 //! messages.
 
-#![deny(warnings)]
-
-extern crate tokio;
-#[macro_use]
-extern crate futures;
-extern crate bytes;
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::future::{self, Either};
 use futures::sync::mpsc;
-use tokio::io;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
-
+use futures::try_ready;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use tokio;
+use tokio::io;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::prelude::*;
 
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<Bytes>;
@@ -422,7 +418,7 @@ fn process(socket: TcpStream, state: Arc<Mutex<Shared>>) {
     tokio::spawn(connection);
 }
 
-pub fn main() -> Result<(), Box<std::error::Error>> {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the shared state. This is how all the peers communicate.
     //
     // The server task will hold a handle to this. For every new client, the

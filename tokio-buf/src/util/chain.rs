@@ -1,7 +1,7 @@
-use BufStream;
+use crate::BufStream;
 
 use either::Either;
-use futures::Poll;
+use futures::{try_ready, Poll};
 
 /// A buf stream that sequences two buf streams together.
 ///

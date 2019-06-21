@@ -1,10 +1,11 @@
+use futures::Future;
+
 #[cfg(feature = "timer")]
 #[allow(deprecated)]
 use tokio_timer::Deadline;
+
 #[cfg(feature = "timer")]
 use tokio_timer::Timeout;
-
-use futures::Future;
 
 #[cfg(feature = "timer")]
 use std::time::{Duration, Instant};
@@ -38,8 +39,6 @@ pub trait FutureExt: Future {
     /// # Examples
     ///
     /// ```
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// use tokio::prelude::*;
     /// use std::time::Duration;
     /// # use futures::future::{self, FutureResult};
@@ -81,7 +80,7 @@ impl<T: ?Sized> FutureExt for T where T: Future {}
 #[cfg(test)]
 mod test {
     use super::*;
-    use prelude::future;
+    use crate::prelude::future;
 
     #[cfg(feature = "timer")]
     #[test]

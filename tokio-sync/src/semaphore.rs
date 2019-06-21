@@ -8,7 +8,7 @@
 //! section. If no permits are available, then acquiring the semaphore returns
 //! `NotReady`. The task is notified once a permit becomes available.
 
-use loom::{
+use crate::loom::{
     futures::AtomicTask,
     sync::{
         atomic::{AtomicPtr, AtomicUsize},
@@ -16,9 +16,7 @@ use loom::{
     },
     yield_now,
 };
-
 use futures::Poll;
-
 use std::fmt;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
@@ -531,7 +529,7 @@ impl Semaphore {
 }
 
 impl fmt::Debug for Semaphore {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Semaphore")
             .field("state", &SemState::load(&self.state, Relaxed))
             .field("head", &self.head.with(|ptr| ptr))
@@ -683,7 +681,7 @@ fn to_try_acquire(_: AcquireError) -> TryAcquireError {
 }
 
 impl fmt::Display for AcquireError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
@@ -729,7 +727,7 @@ impl TryAcquireError {
 }
 
 impl fmt::Display for TryAcquireError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::error::Error;
         write!(fmt, "{}", self.description())
     }
@@ -1073,7 +1071,7 @@ impl SemState {
 }
 
 impl fmt::Debug for SemState {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fmt = fmt.debug_struct("SemState");
 
         if self.is_waiter() {

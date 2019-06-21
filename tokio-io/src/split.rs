@@ -1,10 +1,8 @@
-use std::io::{self, Read, Write};
-
+use crate::{AsyncRead, AsyncWrite};
 use bytes::{Buf, BufMut};
 use futures::sync::BiLock;
-use futures::{Async, Poll};
-
-use {AsyncRead, AsyncWrite};
+use futures::{try_ready, Async, Poll};
+use std::io::{self, Read, Write};
 
 /// The readable half of an object returned from `AsyncRead::split`.
 #[derive(Debug)]
@@ -112,14 +110,12 @@ fn wrap_as_io<T>(t: Async<T>) -> Result<Async<T>, io::Error> {
 
 #[cfg(test)]
 mod tests {
-    extern crate tokio_current_thread;
-
     use super::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
     use bytes::{BytesMut, IntoBuf};
     use futures::sync::BiLock;
     use futures::{future::lazy, future::ok, Async, Poll};
-
     use std::io::{self, Read, Write};
+    use tokio_current_thread;
 
     struct RW;
 

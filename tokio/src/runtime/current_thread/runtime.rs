@@ -1,14 +1,11 @@
+use crate::runtime::current_thread::Builder;
+use futures::{future, Future};
 use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_current_thread::Handle as ExecutorHandle;
-use runtime::current_thread::Builder;
-
+use tokio_executor;
 use tokio_reactor::{self, Reactor};
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
-use tokio_executor;
-
-use futures::{future, Future};
-
 use std::fmt;
 use std::error::Error;
 use std::io;
@@ -76,11 +73,11 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
     }
 }
 
-impl<T> ::executor::TypedExecutor<T> for Handle
+impl<T> crate::executor::TypedExecutor<T> for Handle
 where
     T: Future<Item = (), Error = ()> + Send + 'static,
 {
-    fn spawn(&mut self, future: T) -> Result<(), ::executor::SpawnError> {
+    fn spawn(&mut self, future: T) -> Result<(), crate::executor::SpawnError> {
         Handle::spawn(self, future)
     }
 }
@@ -92,7 +89,7 @@ pub struct RunError {
 }
 
 impl fmt::Display for RunError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.inner)
     }
 }
@@ -105,7 +102,7 @@ impl Error for RunError {
     // FIXME(taiki-e): When the minimum support version of tokio reaches Rust 1.30,
     // replace this with Error::source.
     #[allow(deprecated)]
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         self.inner.cause()
     }
 }
@@ -147,8 +144,6 @@ impl Runtime {
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate tokio;
-    /// # extern crate futures;
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::current_thread::Runtime;
     ///
@@ -212,7 +207,7 @@ impl Runtime {
     }
 
     fn enter<F, R>(&mut self, f: F) -> R
-    where F: FnOnce(&mut current_thread::Entered<Timer<Reactor>>) -> R
+    where F: FnOnce(&mut current_thread::Entered<'_, Timer<Reactor>>) -> R
     {
         let Runtime {
             ref reactor_handle,

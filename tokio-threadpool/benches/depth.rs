@@ -1,18 +1,13 @@
 #![feature(test)]
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate futures_cpupool;
-extern crate num_cpus;
 extern crate test;
-extern crate tokio_threadpool;
 
 const ITER: usize = 20_000;
 
 mod us {
     use futures::future;
     use std::sync::mpsc;
-    use test;
     use tokio_threadpool::*;
 
     #[bench]
@@ -47,7 +42,6 @@ mod cpupool {
     use futures_cpupool::*;
     use num_cpus;
     use std::sync::mpsc;
-    use test;
 
     #[bench]
     fn chained_spawn(b: &mut test::Bencher) {

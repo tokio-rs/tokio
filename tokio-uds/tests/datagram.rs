@@ -1,24 +1,14 @@
 #![cfg(unix)]
-
-extern crate bytes;
-extern crate futures;
-extern crate tempfile;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_uds;
-
-use tokio_uds::*;
-
-use std::str;
+#![deny(warnings, rust_2018_idioms)]
 
 use bytes::BytesMut;
-
+use futures::{Future, Sink, Stream};
+use std::str;
+use tempfile;
 use tokio::io;
 use tokio::runtime::current_thread::Runtime;
-
 use tokio_codec::{Decoder, Encoder};
-
-use futures::{Future, Sink, Stream};
+use tokio_uds::*;
 
 struct StringDatagramCodec;
 

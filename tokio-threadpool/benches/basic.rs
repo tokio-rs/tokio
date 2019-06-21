@@ -1,11 +1,7 @@
 #![feature(test)]
-#![deny(warnings)]
+#![deny(warnings, rust_2018_idioms)]
 
-extern crate futures;
-extern crate futures_cpupool;
-extern crate num_cpus;
 extern crate test;
-extern crate tokio_threadpool;
 
 const NUM_SPAWN: usize = 10_000;
 const NUM_YIELD: usize = 1_000;
@@ -17,7 +13,6 @@ mod threadpool {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
     use std::sync::{mpsc, Arc};
-    use test;
     use tokio_threadpool::*;
 
     #[bench]
@@ -97,7 +92,6 @@ mod cpupool {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
     use std::sync::{mpsc, Arc};
-    use test;
 
     #[bench]
     fn spawn_many(b: &mut test::Bencher) {

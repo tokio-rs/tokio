@@ -3,7 +3,8 @@ name = "tokio-futures"
 
 # When releasing to crates.io:
 # - Update html_root_url.
-version = "0.1.0"
+version = "0.2.0"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -13,6 +14,7 @@ description = """
 Experimental std::future::Future and async/await support for Tokio
 """
 categories = ["asynchronous"]
+publish = false
 
 [features]
 # This feature comes with no promise of stability. Things will
@@ -21,9 +23,9 @@ async-await-preview = ["futures/nightly"]
 
 [dependencies]
 futures = "0.1.23"
-tokio-io = "0.1.7"
+tokio-io = { version = "0.2.0", path = "../tokio-io" }
 
 [dev-dependencies]
 bytes = "0.4.9"
 hyper = "0.12.8"
-tokio = { version = "0.1.8", path = "../tokio" }
+tokio = { version = "0.2.0", path = "../tokio" }

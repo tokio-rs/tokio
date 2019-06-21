@@ -20,9 +20,6 @@ tokio-tls = "0.2"
 Next, add this to your crate:
 
 ```rust
-extern crate native_tls;
-extern crate tokio_tls;
-
 use tokio_tls::{TlsConnector, TlsAcceptor};
 ```
 

@@ -1,8 +1,6 @@
-use timer::{HandlePriv, Registration};
-use Error;
-
+use crate::timer::{HandlePriv, Registration};
+use crate::Error;
 use futures::{Future, Poll};
-
 use std::time::{Duration, Instant};
 
 /// A future that completes at a specified instant in time.

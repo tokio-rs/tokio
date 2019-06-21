@@ -1,5 +1,3 @@
-extern crate tokio_buf;
-
 use tokio_buf::SizeHint;
 
 #[test]

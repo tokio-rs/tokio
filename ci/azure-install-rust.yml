@@ -2,7 +2,10 @@ steps:
   # Linux and macOS.
   - script: |
       set -e
-      curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
+      curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+      export PATH=$PATH:$HOME/.cargo/bin
+      rustup toolchain install $RUSTUP_TOOLCHAIN
+      rustup default $RUSTUP_TOOLCHAIN
       echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
     env:
       RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}
@@ -12,8 +15,10 @@ steps:
   # Windows.
   - script: |
       curl -sSf -o rustup-init.exe https://win.rustup.rs
-      rustup-init.exe -y --default-toolchain %RUSTUP_TOOLCHAIN%
+      rustup-init.exe -y --default-toolchain none
       set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+      rustup toolchain install %RUSTUP_TOOLCHAIN%
+      rustup default %RUSTUP_TOOLCHAIN%
       echo "##vso[task.setvariable variable=PATH;]%PATH%;%USERPROFILE%\.cargo\bin"
     env:
       RUSTUP_TOOLCHAIN: ${{parameters.rust_version}}

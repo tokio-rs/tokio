@@ -22,7 +22,7 @@ pub mod error {
     pub use super::limit::LimitError;
 }
 
-use BufStream;
+use crate::BufStream;
 
 impl<T> BufStreamExt for T where T: BufStream {}
 

@@ -55,7 +55,7 @@ where
 {
     type Output = Result<T::Item, T::Error>;
 
-    fn poll(mut self: Pin<&mut Self>, _context: &mut Context) -> StdPoll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _context: &mut Context<'_>) -> StdPoll<Self::Output> {
         use futures::Async::{NotReady, Ready};
 
         // TODO: wire in cx

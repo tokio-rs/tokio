@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.14")]
-#![deny(warnings, missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! A work-stealing based thread pool for executing futures.
 //!
@@ -77,20 +79,6 @@
 //! [`blocking`]: fn.blocking.html
 //! [`runtime`]: https://docs.rs/tokio/0.1/tokio/runtime/
 
-extern crate tokio_executor;
-
-extern crate crossbeam_deque;
-extern crate crossbeam_queue;
-extern crate crossbeam_utils;
-#[macro_use]
-extern crate futures;
-extern crate num_cpus;
-extern crate rand;
-extern crate slab;
-
-#[macro_use]
-extern crate log;
-
 // ## Crate layout
 //
 // The primary type, `Pool`, holds the majority of a thread pool's state,
@@ -155,9 +143,9 @@ mod task;
 mod thread_pool;
 mod worker;
 
-pub use blocking::{blocking, BlockingError};
-pub use builder::Builder;
-pub use sender::Sender;
-pub use shutdown::Shutdown;
-pub use thread_pool::{SpawnHandle, ThreadPool};
-pub use worker::{Worker, WorkerId};
+pub use crate::blocking::{blocking, BlockingError};
+pub use crate::builder::Builder;
+pub use crate::sender::Sender;
+pub use crate::shutdown::Shutdown;
+pub use crate::thread_pool::{SpawnHandle, ThreadPool};
+pub use crate::worker::{Worker, WorkerId};

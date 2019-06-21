@@ -1,14 +1,15 @@
-// A tiny async TLS echo server with Tokio
-extern crate native_tls;
-extern crate tokio;
-extern crate tokio_tls;
+#![deny(warnings, rust_2018_idioms)]
 
+// A tiny async TLS echo server with Tokio
+use native_tls;
 use native_tls::Identity;
+use tokio;
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
+use tokio_tls;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Bind the server's socket
     let addr = "127.0.0.1:12345".parse()?;
     let tcp = TcpListener::bind(&addr)?;

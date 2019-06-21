@@ -1,9 +1,7 @@
-use super::Inner;
+use futures::{try_ready, Future, Poll};
 use tokio_threadpool as threadpool;
-
 use std::fmt;
-
-use futures::{Future, Poll};
+use super::Inner;
 
 /// A future that resolves when the Tokio `Runtime` is shut down.
 pub struct Shutdown {
@@ -28,7 +26,7 @@ impl Future for Shutdown {
 }
 
 impl fmt::Debug for Shutdown {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Shutdown")
             .field("inner", &"Box<Future<Item = (), Error = ()>>")
             .finish()

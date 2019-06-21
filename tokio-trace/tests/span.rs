@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 use std::thread;
-use tokio_trace::{field::display, subscriber::with_default, Level, Span};
+use tokio_trace::{
+    field::{debug, display},
+    subscriber::with_default,
+    Level, Span,
+};
 
 #[test]
 fn handles_to_the_same_span_are_equal() {
@@ -63,12 +67,12 @@ fn spans_always_go_to_the_subscriber_that_tagged_them() {
 
     let foo = with_default(subscriber1, || {
         let foo = span!(Level::TRACE, "foo");
-        foo.enter(|| {});
+        foo.in_scope(|| {});
         foo
     });
     // Even though we enter subscriber 2's context, the subscriber that
     // tagged the span should see the enter/exit.
-    with_default(subscriber2, move || foo.enter(|| {}));
+    with_default(subscriber2, move || foo.in_scope(|| {}));
 }
 
 #[test]
@@ -83,7 +87,7 @@ fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
         .run();
     let foo = with_default(subscriber1, || {
         let foo = span!(Level::TRACE, "foo");
-        foo.enter(|| {});
+        foo.in_scope(|| {});
         foo
     });
 
@@ -91,7 +95,7 @@ fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
     // tagged the span should see the enter/exit.
     thread::spawn(move || {
         with_default(subscriber::mock().run(), || {
-            foo.enter(|| {});
+            foo.in_scope(|| {});
         })
     })
     .join()
@@ -108,7 +112,7 @@ fn dropping_a_span_calls_drop_span() {
         .run_with_handle();
     with_default(subscriber, || {
         let span = span!(Level::TRACE, "foo");
-        span.enter(|| {});
+        span.in_scope(|| {});
         drop(span);
     });
 
@@ -125,7 +129,7 @@ fn span_closes_after_event() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        span!(Level::TRACE, "foo").enter(|| {
+        span!(Level::TRACE, "foo").in_scope(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
     });
@@ -146,10 +150,10 @@ fn new_span_after_event() {
         .done()
         .run_with_handle();
     with_default(subscriber, || {
-        span!(Level::TRACE, "foo").enter(|| {
+        span!(Level::TRACE, "foo").in_scope(|| {
             event!(Level::DEBUG, {}, "my event!");
         });
-        span!(Level::TRACE, "bar").enter(|| {});
+        span!(Level::TRACE, "bar").in_scope(|| {});
     });
 
     handle.assert_finished();
@@ -166,7 +170,7 @@ fn event_outside_of_span() {
         .run_with_handle();
     with_default(subscriber, || {
         debug!("my event!");
-        span!(Level::TRACE, "foo").enter(|| {});
+        span!(Level::TRACE, "foo").in_scope(|| {});
     });
 
     handle.assert_finished();
@@ -216,14 +220,14 @@ fn clone_and_drop_span_always_go_to_the_subscriber_that_tagged_the_span() {
 
     let foo = with_default(subscriber1, || {
         let foo = span!(Level::TRACE, "foo");
-        foo.enter(|| {});
+        foo.in_scope(|| {});
         foo
     });
     // Even though we enter subscriber 2's context, the subscriber that
     // tagged the span should see the enter/exit.
     with_default(subscriber2, move || {
         let foo2 = foo.clone();
-        foo.enter(|| {});
+        foo.in_scope(|| {});
         drop(foo);
         drop(foo2);
     });
@@ -242,9 +246,27 @@ fn span_closes_when_exited() {
     with_default(subscriber, || {
         let foo = span!(Level::TRACE, "foo");
 
-        foo.enter(|| {});
+        foo.in_scope(|| {});
 
         drop(foo);
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn enter() {
+    let (subscriber, handle) = subscriber::mock()
+        .enter(span::mock().named("foo"))
+        .event(event::mock())
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        let foo = span!(Level::TRACE, "foo");
+        let _enter = foo.enter();
+        debug!("dropping guard...");
     });
 
     handle.assert_finished();
@@ -272,7 +294,7 @@ fn moved_field() {
             "foo",
             bar = display(format!("hello from {}", from))
         );
-        span.enter(|| {});
+        span.in_scope(|| {});
     });
 
     handle.assert_finished();
@@ -315,7 +337,7 @@ fn borrowed_field() {
         let from = "my span";
         let mut message = format!("hello from {}", from);
         let span = span!(Level::TRACE, "foo", bar = display(&message));
-        span.enter(|| {
+        span.in_scope(|| {
             message.insert_str(10, " inside");
         });
     });
@@ -362,20 +384,24 @@ fn move_field_out_of_struct() {
         };
         let foo = span!(Level::TRACE, "foo", x = debug(pos.x), y = debug(pos.y));
         let bar = span!(Level::TRACE, "bar", position = debug(pos));
-        foo.enter(|| {});
-        bar.enter(|| {});
+        foo.in_scope(|| {});
+        bar.in_scope(|| {});
     });
 
     handle.assert_finished();
 }
 
+// TODO(#1138): determine a new syntax for uninitialized span fields, and
+// re-enable these.
+/*
 #[test]
 fn add_field_after_new_span() {
     let (subscriber, handle) = subscriber::mock()
         .new_span(
             span::mock()
                 .named("foo")
-                .with_field(field::mock("bar").with_value(&5).only()),
+                .with_field(field::mock("bar").with_value(&5)
+                .and(field::mock("baz").with_value).only()),
         )
         .record(
             span::mock().named("foo"),
@@ -388,9 +414,9 @@ fn add_field_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let span = span!(Level::TRACE, "foo", bar = 5, baz);
+        let span = span!(Level::TRACE, "foo", bar = 5, baz = false);
         span.record("baz", &true);
-        span.enter(|| {})
+        span.in_scope(|| {})
     });
 
     handle.assert_finished();
@@ -415,10 +441,76 @@ fn add_fields_only_after_new_span() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        let span = span!(Level::TRACE, "foo", bar, baz);
+        let span = span!(Level::TRACE, "foo", bar = _, baz = _);
         span.record("bar", &5);
         span.record("baz", &true);
-        span.enter(|| {})
+        span.in_scope(|| {})
+    });
+
+    handle.assert_finished();
+}
+*/
+
+#[test]
+fn record_new_value_for_field() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&5)
+                    .and(field::mock("baz").with_value(&false))
+                    .only(),
+            ),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let span = span!(Level::TRACE, "foo", bar = 5, baz = false);
+        span.record("baz", &true);
+        span.in_scope(|| {})
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn record_new_values_for_fields() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("foo").with_field(
+                field::mock("bar")
+                    .with_value(&4)
+                    .and(field::mock("baz").with_value(&false))
+                    .only(),
+            ),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("bar").with_value(&5).only(),
+        )
+        .record(
+            span::mock().named("foo"),
+            field::mock("baz").with_value(&true).only(),
+        )
+        .enter(span::mock().named("foo"))
+        .exit(span::mock().named("foo"))
+        .drop_span(span::mock().named("foo"))
+        .done()
+        .run_with_handle();
+
+    with_default(subscriber, || {
+        let span = span!(Level::TRACE, "foo", bar = 4, baz = false);
+        span.record("bar", &5);
+        span.record("baz", &true);
+        span.in_scope(|| {})
     });
 
     handle.assert_finished();
@@ -468,7 +560,7 @@ fn explicit_root_span_is_root_regardless_of_ctx() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!(Level::TRACE, "foo").enter(|| {
+        span!(Level::TRACE, "foo").in_scope(|| {
             span!(Level::TRACE, parent: None, "bar");
         })
     });
@@ -505,7 +597,7 @@ fn explicit_child_regardless_of_ctx() {
 
     with_default(subscriber, || {
         let foo = span!(Level::TRACE, "foo");
-        span!(Level::TRACE, "bar").enter(|| span!(Level::TRACE, parent: foo.id(), "baz"))
+        span!(Level::TRACE, "bar").in_scope(|| span!(Level::TRACE, parent: foo.id(), "baz"))
     });
 
     handle.assert_finished();
@@ -540,9 +632,67 @@ fn contextual_child() {
         .run_with_handle();
 
     with_default(subscriber, || {
-        span!(Level::TRACE, "foo").enter(|| {
+        span!(Level::TRACE, "foo").in_scope(|| {
             span!(Level::TRACE, "bar");
         })
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn display_shorthand() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("my_span").with_field(
+                field::mock("my_field")
+                    .with_value(&display("hello world"))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "my_span", my_field = %"hello world");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn debug_shorthand() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("my_span").with_field(
+                field::mock("my_field")
+                    .with_value(&debug("hello world"))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "my_span", my_field = ?"hello world");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn both_shorthands() {
+    let (subscriber, handle) = subscriber::mock()
+        .new_span(
+            span::mock().named("my_span").with_field(
+                field::mock("display_field")
+                    .with_value(&display("hello world"))
+                    .and(field::mock("debug_field").with_value(&debug("hello world")))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        span!(Level::TRACE, "my_span", display_field = %"hello world", debug_field = ?"hello world");
     });
 
     handle.assert_finished();

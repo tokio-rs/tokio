@@ -17,7 +17,6 @@ Next, add this to your crate:
 
 ```rust
 #[macro_use]
-extern crate tokio_test;
 ```
 
 You can find extensive documentation and examples about how to use this crate

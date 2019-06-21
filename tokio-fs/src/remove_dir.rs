@@ -1,8 +1,7 @@
+use futures::{Future, Poll};
 use std::fs;
 use std::io;
 use std::path::Path;
-
-use futures::{Future, Poll};
 
 /// Removes an existing, empty directory.
 ///
@@ -39,6 +38,6 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        ::blocking_io(|| fs::remove_dir(&self.path))
+        crate::blocking_io(|| fs::remove_dir(&self.path))
     }
 }

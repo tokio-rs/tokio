@@ -1,11 +1,9 @@
+use super::UdpSocket;
+use bytes::{BufMut, BytesMut};
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use log::trace;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
-
-use super::UdpSocket;
-
-use bytes::{BufMut, BytesMut};
 use tokio_codec::{Decoder, Encoder};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using

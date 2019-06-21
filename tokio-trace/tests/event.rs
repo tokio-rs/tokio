@@ -4,7 +4,11 @@ mod support;
 
 use self::support::*;
 
-use tokio_trace::{field::display, subscriber::with_default, Level};
+use tokio_trace::{
+    field::{debug, display},
+    subscriber::with_default,
+    Level,
+};
 
 #[test]
 fn event_without_message() {
@@ -185,5 +189,63 @@ fn move_field_out_of_struct() {
         debug!(x = debug(pos.x), y = debug(pos.y));
         debug!(target: "app_events", { position = debug(pos) }, "New position");
     });
+    handle.assert_finished();
+}
+
+#[test]
+fn display_shorthand() {
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("my_field")
+                    .with_value(&display("hello world"))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        event!(Level::TRACE, my_field = %"hello world");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn debug_shorthand() {
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("my_field")
+                    .with_value(&debug("hello world"))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        event!(Level::TRACE, my_field = ?"hello world");
+    });
+
+    handle.assert_finished();
+}
+
+#[test]
+fn both_shorthands() {
+    let (subscriber, handle) = subscriber::mock()
+        .event(
+            event::mock().with_fields(
+                field::mock("display_field")
+                    .with_value(&display("hello world"))
+                    .and(field::mock("debug_field").with_value(&debug("hello world")))
+                    .only(),
+            ),
+        )
+        .done()
+        .run_with_handle();
+    with_default(subscriber, || {
+        event!(Level::TRACE, display_field = %"hello world", debug_field = ?"hello world");
+    });
+
     handle.assert_finished();
 }

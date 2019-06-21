@@ -8,7 +8,8 @@ name = "tokio-io"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.12"
+version = "0.2.0"
+edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -18,6 +19,7 @@ description = """
 Core I/O primitives for asynchronous I/O in Rust.
 """
 categories = ["asynchronous"]
+publish = false
 
 [dependencies]
 bytes = "0.4.7"
@@ -25,4 +27,4 @@ futures = "0.1.18"
 log = "0.4"
 
 [dev-dependencies]
-tokio-current-thread = "0.1.1"
+tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }

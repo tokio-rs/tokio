@@ -1,4 +1,4 @@
-use futures::{Async, Poll, Sink, StartSend, Stream};
+use futures::{try_ready, Async, Poll, Sink, StartSend, Stream};
 
 /// A stream combinator which combines the yields the current item
 /// plus its count starting from 0.

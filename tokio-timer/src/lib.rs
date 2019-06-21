@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-timer/0.2.10")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Utilities for tracking time.
 //!
@@ -29,13 +31,6 @@
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
 
-extern crate tokio_executor;
-
-extern crate crossbeam_utils;
-#[macro_use]
-extern crate futures;
-extern crate slab;
-
 pub mod clock;
 pub mod delay_queue;
 pub mod throttle;
@@ -52,15 +47,15 @@ mod wheel;
 #[deprecated(since = "0.2.6", note = "use Timeout instead")]
 #[doc(hidden)]
 #[allow(deprecated)]
-pub use self::deadline::{Deadline, DeadlineError};
-pub use self::delay::Delay;
+pub use deadline::{Deadline, DeadlineError};
+pub use delay::Delay;
 #[doc(inline)]
-pub use self::delay_queue::DelayQueue;
-pub use self::error::Error;
-pub use self::interval::Interval;
+pub use delay_queue::DelayQueue;
+pub use error::Error;
+pub use interval::Interval;
 #[doc(inline)]
-pub use self::timeout::Timeout;
-pub use self::timer::{with_default, Timer};
+pub use timeout::Timeout;
+pub use timer::{with_default, Timer};
 
 use std::time::{Duration, Instant};
 

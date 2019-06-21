@@ -1,17 +1,14 @@
-extern crate futures;
-extern crate tokio_executor;
-extern crate tokio_reactor;
-extern crate tokio_tcp;
-
-use tokio_reactor::Reactor;
-use tokio_tcp::TcpListener;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures::executor::{spawn, Notify, Spawn};
 use futures::{Future, Stream};
-
 use std::mem;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
+use tokio_executor;
+use tokio_reactor;
+use tokio_reactor::Reactor;
+use tokio_tcp::TcpListener;
 
 #[test]
 fn test_drop_on_notify() {
@@ -30,7 +27,7 @@ fn test_drop_on_notify() {
 
     struct MyNotify;
 
-    type Task = Mutex<Spawn<Box<Future<Item = (), Error = ()>>>>;
+    type Task = Mutex<Spawn<Box<dyn Future<Item = (), Error = ()>>>>;
 
     impl Notify for MyNotify {
         fn notify(&self, _: usize) {
@@ -66,7 +63,7 @@ fn test_drop_on_notify() {
             .incoming()
             .for_each(|_| Ok(()))
             .map_err(|_| panic!())
-    }) as Box<Future<Item = (), Error = ()>>;
+    }) as Box<dyn Future<Item = (), Error = ()>>;
 
     let task = Arc::new(Mutex::new(spawn(task)));
     let notify = Arc::new(MyNotify);
