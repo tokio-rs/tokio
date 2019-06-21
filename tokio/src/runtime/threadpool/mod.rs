@@ -259,7 +259,7 @@ impl Runtime {
         let mut entered = enter().expect("nested block_on");
         let (tx, rx) = futures::sync::oneshot::channel();
         self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        entered.block_on(rx).unwrap()
+        entered.block_on(rx).expect("blocked on future paniced")
     }
 
     /// Run a future to completion on the Tokio runtime, then wait for all
@@ -286,7 +286,7 @@ impl Runtime {
         let (tx, rx) = futures::sync::oneshot::channel();
         self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
         let block = rx
-            .map_err(|_| unreachable!())
+            .map_err(|_| panic!("blocked on future paniced"))
             .and_then(move |r| {
                 self.shutdown_on_idle()
                     .map(move |()| r)
