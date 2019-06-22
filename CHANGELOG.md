@@ -5,8 +5,18 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.2.4] - 2019-06-21
+### Fixed
+* Proccesses "leaked" via `Child::forget` now reaped rather than left as zombies
+for the duration of the parent process.
+* Dropping a `Child` process no longer blocks the caller until the process fully
+exits. This avoids a pathological deadlock if the kernel doesn't kill the child.
 
-## [0.2.2] - 2018-11-01
+### Changed
+* Updated the example program for reading lines from a child process to be more
+flexible to be copy/pasted and iterated upon.
+
+## [0.2.3] - 2018-11-01
 ### Added
 * `ChildStd{in, out, err}` now implement `AsRawFd`/`AsRawHandle` on Unix/Windows
 systems, respectively.
@@ -67,7 +77,8 @@ the locally vendored `Command` type.
 ## 0.1.0 - 2016-09-10
 - First release!
 
-[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.2.3...HEAD
+[Unreleased]: https://github.com/alexcrichton/tokio-process/compare/0.2.4...HEAD
+[0.2.4]: https://github.com/alexcrichton/tokio-process/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/alexcrichton/tokio-process/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/alexcrichton/tokio-process/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/alexcrichton/tokio-process/compare/0.1.6...0.2.1
