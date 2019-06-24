@@ -1,9 +1,9 @@
-#![feature(test)]
-
 #[macro_use]
 extern crate tokio_trace;
-extern crate test;
-use test::Bencher;
+#[macro_use]
+extern crate criterion;
+
+use criterion::{black_box, Criterion};
 use tokio_trace::Level;
 
 use std::{
@@ -96,63 +96,63 @@ impl tokio_trace::Subscriber for VisitingSubscriber {
 
 const N_SPANS: usize = 100;
 
-#[bench]
-fn span_no_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        b.iter(|| span!(Level::TRACE, "span"))
+fn criterion_benchmark(c: &mut Criterion) {
+    c.bench_function("span_no_fields", |b| {
+        tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+            b.iter(|| span!(Level::TRACE, "span"))
+        });
+    });
+
+    c.bench_function("enter_span", |b| {
+        tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+            let span = span!(Level::TRACE, "span");
+            b.iter(|| black_box(span.in_scope(|| {})))
+        });
+    });
+
+    c.bench_function("span_repeatedly", |b| {
+        #[inline]
+        fn mk_span(i: u64) -> tokio_trace::Span {
+            span!(Level::TRACE, "span", i = i)
+        }
+
+        let n = black_box(N_SPANS);
+        tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+            b.iter(|| (0..n).fold(mk_span(0), |_, i| mk_span(i as u64)))
+        });
+    });
+
+    c.bench_function("span_with_fields", |b| {
+        tokio_trace::subscriber::with_default(EnabledSubscriber, || {
+            b.iter(|| {
+                span!(
+                    Level::TRACE,
+                    "span",
+                    foo = "foo",
+                    bar = "bar",
+                    baz = 3,
+                    quuux = tokio_trace::field::debug(0.99)
+                )
+            })
+        });
+    });
+
+    c.bench_function("span_with_fields_record", |b| {
+        let subscriber = VisitingSubscriber(Mutex::new(String::from("")));
+        tokio_trace::subscriber::with_default(subscriber, || {
+            b.iter(|| {
+                span!(
+                    Level::TRACE,
+                    "span",
+                    foo = "foo",
+                    bar = "bar",
+                    baz = 3,
+                    quuux = tokio_trace::field::debug(0.99)
+                )
+            })
+        });
     });
 }
 
-#[bench]
-fn enter_span(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        let span = span!(Level::TRACE, "span");
-        b.iter(|| test::black_box(span.in_scope(|| {})))
-    });
-}
-
-#[bench]
-fn span_repeatedly(b: &mut Bencher) {
-    #[inline]
-    fn mk_span(i: u64) -> tokio_trace::Span {
-        span!(Level::TRACE, "span", i = i)
-    }
-
-    let n = test::black_box(N_SPANS);
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        b.iter(|| (0..n).fold(mk_span(0), |_, i| mk_span(i as u64)))
-    });
-}
-
-#[bench]
-fn span_with_fields(b: &mut Bencher) {
-    tokio_trace::subscriber::with_default(EnabledSubscriber, || {
-        b.iter(|| {
-            span!(
-                Level::TRACE,
-                "span",
-                foo = "foo",
-                bar = "bar",
-                baz = 3,
-                quuux = tokio_trace::field::debug(0.99)
-            )
-        })
-    });
-}
-
-#[bench]
-fn span_with_fields_record(b: &mut Bencher) {
-    let subscriber = VisitingSubscriber(Mutex::new(String::from("")));
-    tokio_trace::subscriber::with_default(subscriber, || {
-        b.iter(|| {
-            span!(
-                Level::TRACE,
-                "span",
-                foo = "foo",
-                bar = "bar",
-                baz = 3,
-                quuux = tokio_trace::field::debug(0.99)
-            )
-        })
-    });
-}
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);
