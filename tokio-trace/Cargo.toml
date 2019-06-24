@@ -11,6 +11,7 @@ name = "tokio-trace"
 version = "0.1.0"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 documentation = "https://docs.rs/tokio-trace/0.1.0/tokio_trace"
@@ -21,7 +22,7 @@ categories = ["development-tools::debugging", "asynchronous"]
 keywords = ["logging", "tracing"]
 
 [dependencies]
-tokio-trace-core = "0.2"
+tokio-trace-core = { version = "0.2", path = "tokio-trace-core" }
 log = { version = "0.4", optional = true }
 cfg-if = "0.1.7"
 

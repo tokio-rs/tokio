@@ -8,8 +8,11 @@ use {
 use std::{
     any::Any,
     cell::{Cell, RefCell},
-    fmt,
-    sync::{Arc, Weak},
+    error, fmt,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Weak,
+    },
 };
 
 /// `Dispatch` trace data to a [`Subscriber`].
@@ -26,6 +29,13 @@ thread_local! {
         can_enter: Cell::new(true),
     };
 }
+
+static GLOBAL_INIT: AtomicUsize = AtomicUsize::new(UNINITIALIZED);
+const UNINITIALIZED: usize = 0;
+const INITIALIZING: usize = 1;
+const INITIALIZED: usize = 2;
+
+static mut GLOBAL_DISPATCH: Option<Dispatch> = None;
 
 /// The dispatch state of a thread.
 struct State {
@@ -63,6 +73,47 @@ pub fn with_default<T>(dispatcher: &Dispatch, f: impl FnOnce() -> T) -> T {
     let _guard = State::set_default(dispatcher.clone());
     f()
 }
+
+/// Sets this dispatch as the global default for the duration of the entire program.
+/// Will be used as a fallback if no thread-local dispatch has been set in a thread
+/// (using `with_default`.)
+///
+/// Can only be set once; subsequent attempts to set the global default will fail.
+/// Returns `Err` if the global default has already been set.
+///
+/// Note: Libraries should *NOT* call `set_global_default()`! That will cause conflicts when
+/// executables try to set them later.
+///
+/// [span]: ../span/index.html
+/// [`Subscriber`]: ../subscriber/trait.Subscriber.html
+/// [`Event`]: ../event/struct.Event.html
+pub fn set_global_default(dispatcher: Dispatch) -> Result<(), SetGlobalDefaultError> {
+    if GLOBAL_INIT.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::SeqCst) == UNINITIALIZED
+    {
+        unsafe {
+            GLOBAL_DISPATCH = Some(dispatcher.clone());
+        }
+        GLOBAL_INIT.store(INITIALIZED, Ordering::SeqCst);
+        Ok(())
+    } else {
+        Err(SetGlobalDefaultError { _no_construct: () })
+    }
+}
+
+/// Returned if setting the global dispatcher fails.
+#[derive(Debug)]
+pub struct SetGlobalDefaultError {
+    _no_construct: (),
+}
+
+impl fmt::Display for SetGlobalDefaultError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("a global default trace dispatcher has already been set")
+    }
+}
+
+impl error::Error for SetGlobalDefaultError {}
+
 /// Executes a closure with a reference to this thread's current [dispatcher].
 ///
 /// Note that calls to `get_default` should not be nested; if this function is
@@ -89,7 +140,20 @@ where
         .try_with(|state| {
             if state.can_enter.replace(false) {
                 let _guard = Entered(&state.can_enter);
-                f(&state.default.borrow())
+
+                let mut default = state.default.borrow_mut();
+
+                if default.is::<NoSubscriber>() && GLOBAL_INIT.load(Ordering::SeqCst) == INITIALIZED
+                {
+                    // don't redo this call on the next check
+                    unsafe {
+                        *default = GLOBAL_DISPATCH
+                            .as_ref()
+                            .expect("invariant violated: GLOBAL_DISPATCH must be initialized before GLOBAL_INIT is set")
+                            .clone()
+                    }
+                }
+                f(&*default)
             } else {
                 f(&Dispatch::none())
             }
@@ -483,5 +547,66 @@ mod test {
         }
 
         with_default(&Dispatch::new(TestSubscriber), || mk_span())
+    }
+
+    #[test]
+    fn global_dispatch() {
+        struct TestSubscriberA;
+        impl Subscriber for TestSubscriberA {
+            fn enabled(&self, _: &Metadata) -> bool {
+                true
+            }
+            fn new_span(&self, _: &span::Attributes) -> span::Id {
+                span::Id::from_u64(1)
+            }
+            fn record(&self, _: &span::Id, _: &span::Record) {}
+            fn record_follows_from(&self, _: &span::Id, _: &span::Id) {}
+            fn event(&self, _: &Event) {}
+            fn enter(&self, _: &span::Id) {}
+            fn exit(&self, _: &span::Id) {}
+        }
+        struct TestSubscriberB;
+        impl Subscriber for TestSubscriberB {
+            fn enabled(&self, _: &Metadata) -> bool {
+                true
+            }
+            fn new_span(&self, _: &span::Attributes) -> span::Id {
+                span::Id::from_u64(1)
+            }
+            fn record(&self, _: &span::Id, _: &span::Record) {}
+            fn record_follows_from(&self, _: &span::Id, _: &span::Id) {}
+            fn event(&self, _: &Event) {}
+            fn enter(&self, _: &span::Id) {}
+            fn exit(&self, _: &span::Id) {}
+        }
+
+        // NOTE: if you want to have other tests that set the default dispatch you'll need to
+        // write them as integration tests in ../tests/
+        set_global_default(Dispatch::new(TestSubscriberA)).expect("global dispatch set failed");
+        get_default(|current| {
+            assert!(
+                current.is::<TestSubscriberA>(),
+                "global dispatch get failed"
+            )
+        });
+
+        with_default(&Dispatch::new(TestSubscriberB), || {
+            get_default(|current| {
+                assert!(
+                    current.is::<TestSubscriberB>(),
+                    "thread-local override of global dispatch failed"
+                )
+            });
+        });
+
+        get_default(|current| {
+            assert!(
+                current.is::<TestSubscriberA>(),
+                "reset to global override failed"
+            )
+        });
+
+        set_global_default(Dispatch::new(TestSubscriberA))
+            .expect_err("double global dispatch set succeeded");
     }
 }

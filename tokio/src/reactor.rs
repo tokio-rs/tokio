@@ -115,7 +115,7 @@
 //!
 //! [`Reactor`]: struct.Reactor.html
 //! [`Registration`]: struct.Registration.html
-//! [runtime model]: https://tokio.rs/docs/getting-started/runtime-model/
+//! [runtime model]: https://tokio.rs/docs/internals/runtime-model/
 //! [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
 //! [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 //! [IOCP]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365198(v=vs.85).aspx
