@@ -54,6 +54,9 @@
 //! # }
 //! ```
 
+#[macro_use]
+extern crate lazy_static;
+
 use futures::stream::Stream;
 use futures::{future, Future};
 use std::io;

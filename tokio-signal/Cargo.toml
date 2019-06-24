@@ -27,6 +27,7 @@ appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
 futures = "0.1.11"
+lazy_static = "1"
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }

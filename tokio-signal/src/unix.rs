@@ -9,6 +9,7 @@ pub use libc;
 
 use std::io::prelude::*;
 use std::io::{self, Error, ErrorKind};
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
@@ -108,7 +109,7 @@ impl Default for SignalInfo {
 /// 2. Wake up driver tasks by writing a byte to a pipe
 ///
 /// Those two operations shoudl both be async-signal safe.
-fn action(globals: &'static Globals, signal: c_int) {
+fn action(globals: Pin<&'static Globals>, signal: c_int) {
     globals.record_event(signal as EventId);
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
@@ -138,7 +139,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     let mut registered = Ok(());
     siginfo.init.call_once(|| {
         registered = unsafe {
-            signal_hook_registry::register(signal, move || action(&globals, signal)).map(|_| ())
+            signal_hook_registry::register(signal, move || action(globals, signal)).map(|_| ())
         };
         if registered.is_ok() {
             siginfo.initialized.store(true, Ordering::Relaxed);

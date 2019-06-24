@@ -1,6 +1,7 @@
 use std::ops;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, Once};
+use std::sync::Mutex;
 
 use crate::os::{OsExtraData, OsStorage};
 use futures::sync::mpsc::Sender;
@@ -206,25 +207,19 @@ impl Globals {
     }
 }
 
-// FIXME: consider using Pin here after bumping minrust beyond 1.33
-pub(crate) fn globals() -> &'static Globals
+pub(crate) fn globals() -> Pin<&'static Globals>
 where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
-    static mut GLOBALS: *mut Globals = 0 as *mut Globals;
-    static INIT: Once = Once::new();
-
-    unsafe {
-        INIT.call_once(|| {
-            GLOBALS = Box::into_raw(Box::new(Globals {
-                extra: OsExtraData::init(),
-                registry: Registry::new(OsStorage::init()),
-            }));
-        });
-
-        &*GLOBALS
+    lazy_static! {
+        static ref GLOBALS: Pin<Box<Globals>> = Pin::new(Box::new(Globals {
+            extra: OsExtraData::init(),
+            registry: Registry::new(OsStorage::init()),
+        }));
     }
+
+    GLOBALS.as_ref()
 }
 
 #[cfg(test)]
