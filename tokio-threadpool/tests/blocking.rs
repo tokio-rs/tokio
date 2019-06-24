@@ -1,3 +1,4 @@
+extern crate tokio_executor;
 extern crate tokio_threadpool;
 
 extern crate env_logger;
@@ -42,6 +43,28 @@ fn basic() {
     }));
 
     rx2.recv().unwrap();
+}
+
+#[test]
+fn other_executors_can_run_inside_blocking() {
+    let _ = ::env_logger::try_init();
+
+    let pool = Builder::new().pool_size(1).max_blocking(1).build();
+
+    let (tx, rx) = mpsc::channel();
+
+    pool.spawn(lazy(move || {
+        let res = blocking(|| {
+            let _e = tokio_executor::enter().expect("nested blocking enter");
+            tx.send(()).unwrap();
+        })
+        .unwrap();
+
+        assert!(res.is_ready());
+        Ok(().into())
+    }));
+
+    rx.recv().unwrap();
 }
 
 #[test]

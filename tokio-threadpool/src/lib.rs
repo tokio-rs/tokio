@@ -1,5 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.14")]
 #![deny(warnings, missing_docs, missing_debug_implementations)]
+// Our MSRV doesn't allow us to fix these warnings yet
+#![allow(rust_2018_idioms)]
 
 //! A work-stealing based thread pool for executing futures.
 //!
