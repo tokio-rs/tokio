@@ -9,7 +9,7 @@ use std::process::{Stdio, ExitStatus, Command};
 
 use futures::future::Future;
 use futures::stream::{self, Stream};
-use tokio_io::io::{read_until, write_all, read_to_end};
+use tokio_io::io::{read_until, write_all};
 use tokio_process::{CommandExt, Child};
 
 mod support;
@@ -83,38 +83,6 @@ fn feed_a_lot() {
     let child = cat().spawn_async().unwrap();
     let status = support::run_with_timeout(feed_cat(child, 10000)).unwrap();
     assert_eq!(status.code(), Some(0));
-}
-
-// FIXME: delete this test once we have a resolution for #51
-// This test's setup is flaky, and setting up a consistent test is nearly
-// impossible: right now we invoke `cat` and immediately kill it, expecting
-// that it didn't write anything, but if there's something wrong with the
-// command itself (e.g. redirection issues, it doesn't actually print anything
-// out, etc.) this test can falsely pass. Attempting a solution which writes
-// some data, *then* kill the child, write more data, and assert that only the
-// first write is echoed back seems like a good approach, however, due to the
-// ordering of context switches or how the kernel buffers data we can get
-// inconsistent results. We can keep this test around for now, but as soon as
-// we have a solution for #51, we may have a better avenue for testing this
-// functionality.
-#[test]
-fn drop_kills() {
-    let mut child = cat().spawn_async().unwrap();
-    let stdin = child.stdin().take().unwrap();
-    let stdout = child.stdout().take().unwrap();
-    drop(child);
-
-    // Ignore all write errors since we expect a broken pipe here
-    let writer = write_all(stdin, b"1234").then(|_| Ok(()));
-    let reader = read_to_end(stdout, Vec::new());
-
-    let (_, output) = support::CurrentThreadRuntime::new()
-        .expect("failed to get rt")
-        .spawn(writer)
-        .block_on(support::with_timeout(reader))
-        .expect("failed to get output");
-
-    assert_eq!(output.len(), 0);
 }
 
 #[test]
