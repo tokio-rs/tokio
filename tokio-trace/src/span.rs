@@ -24,6 +24,7 @@
 //! /// Construct a new span at the `INFO` level named "my_span", with a single
 //! /// field named answer , with the value `42`.
 //! let my_span = span!(Level::INFO, "my_span", answer = 42);
+//! # }
 //! ```
 //!
 //! The documentation for the [`span!`] macro provides additional examples of
@@ -154,21 +155,6 @@
 //! considered part of the duration of the span it follows. Unlike the parent, a
 //! span may record that it follows from another span after it is created, using
 //! the [`follows_from`] method.
-//!
-//! For example:
-//! ```rust
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! let foo = span!(Level::INFO, "foo");
-//!
-//! // "bar" will be the root of its own trace tree.
-//! let bar = span!(Level::INFO, parent: None, "bar");
-//!
-//! // record that "bar" is causally linked to "foo"
-//! bar.follows_from(&foo);
-//! # }
-//! ```
 //!
 //! As an example, consider a listener task in a server. As the listener accepts
 //! incoming connections, it spawns new tasks that handle those connections. We

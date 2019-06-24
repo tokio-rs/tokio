@@ -25,6 +25,7 @@
 /// //  - "foo", with a value of 42,
 /// //  - "bar", with the value "false"
 /// let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false);
+/// # }
 /// ```
 /// Note that a trailing comma on the final field is valid:
 /// ```
@@ -375,7 +376,7 @@ macro_rules! span {
 /// # fn main() {
 /// trace_span!("my_span");
 /// // is equivalent to:
-/// span!(Level::TRACE, "my_span")
+/// span!(Level::TRACE, "my_span");
 /// # }
 /// ```
 ///
@@ -454,7 +455,7 @@ macro_rules! trace_span {
 /// # fn main() {
 /// debug_span!("my_span");
 /// // is equivalent to:
-/// span!(Level::DEBUG, "my_span")
+/// span!(Level::DEBUG, "my_span");
 /// # }
 /// ```
 ///
@@ -533,7 +534,7 @@ macro_rules! debug_span {
 /// # fn main() {
 /// info_span!("my_span");
 /// // is equivalent to:
-/// span!(Level::INFO, "my_span")
+/// span!(Level::INFO, "my_span");
 /// # }
 /// ```
 ///
@@ -612,7 +613,7 @@ macro_rules! info_span {
 /// # fn main() {
 /// info_span!("my_span");
 /// // is equivalent to:
-/// span!(Level::INFO, "my_span")
+/// span!(Level::INFO, "my_span");
 /// # }
 /// ```
 ///
@@ -690,7 +691,7 @@ macro_rules! warn_span {
 /// # fn main() {
 /// error_span!("my_span");
 /// // is equivalent to:
-/// span!(Level::ERROR, "my_span")
+/// span!(Level::ERROR, "my_span");
 /// # }
 /// ```
 ///
