@@ -8,10 +8,13 @@ use crate::clock::now;
 use crate::timer::Handle;
 use crate::wheel::{self, Wheel};
 use crate::{Delay, Error};
-use futures::{try_ready, Future, Poll, Stream};
+use futures_core::Stream;
 use slab::Slab;
 use std::cmp;
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{self, Poll};
 use std::time::{Duration, Instant};
 
 /// A queue of delayed elements.
@@ -177,7 +180,7 @@ pub struct Key {
 struct Stack<T> {
     /// Head of the stack
     head: Option<usize>,
-    _p: PhantomData<T>,
+    _p: PhantomData<fn() -> T>,
 }
 
 #[derive(Debug)]
@@ -645,19 +648,19 @@ impl<T> DelayQueue<T> {
     /// should be returned.
     ///
     /// A slot should be returned when the associated deadline has been reached.
-    fn poll_idx(&mut self) -> Poll<Option<usize>, Error> {
+    fn poll_idx(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Result<usize, Error>>> {
         use self::wheel::Stack;
 
         let expired = self.expired.pop(&mut self.slab);
 
         if expired.is_some() {
-            return Ok(expired.into());
+            return Poll::Ready(expired.map(Ok));
         }
 
         loop {
             if let Some(ref mut delay) = self.delay {
                 if !delay.is_elapsed() {
-                    try_ready!(delay.poll());
+                    ready!(Pin::new(&mut *delay).poll(cx));
                 }
 
                 let now = crate::ms(delay.deadline() - self.start, crate::Round::Down);
@@ -668,13 +671,13 @@ impl<T> DelayQueue<T> {
             self.delay = None;
 
             if let Some(idx) = self.wheel.poll(&mut self.poll, &mut self.slab) {
-                return Ok(Some(idx).into());
+                return Poll::Ready(Some(Ok(idx)));
             }
 
             if let Some(deadline) = self.next_deadline() {
                 self.delay = Some(self.handle.delay(deadline));
             } else {
-                return Ok(None.into());
+                return Poll::Ready(None);
             }
         }
     }
@@ -690,24 +693,29 @@ impl<T> DelayQueue<T> {
     }
 }
 
+// We never put `T` in a `Pin`...
+impl<T> Unpin for DelayQueue<T> {}
+
 impl<T> Stream for DelayQueue<T> {
-    type Item = Expired<T>;
-    type Error = Error;
+    // DelayQueue seems much more specific, where a user may care that it
+    // has reached capacity, so return those errors instead of panicking.
+    type Item = Result<Expired<T>, Error>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Error> {
-        let item = try_ready!(self.poll_idx()).map(|idx| {
-            let data = self.slab.remove(idx);
-            debug_assert!(data.next.is_none());
-            debug_assert!(data.prev.is_none());
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        let item = ready!(self.poll_idx(cx));
+        Poll::Ready(item.map(|result| {
+            result.map(|idx| {
+                let data = self.slab.remove(idx);
+                debug_assert!(data.next.is_none());
+                debug_assert!(data.prev.is_none());
 
-            Expired {
-                key: Key::new(idx),
-                data: data.inner,
-                deadline: self.start + Duration::from_millis(data.when),
-            }
-        });
-
-        Ok(item.into())
+                Expired {
+                    key: Key::new(idx),
+                    data: data.inner,
+                    deadline: self.start + Duration::from_millis(data.when),
+                }
+            })
+        }))
     }
 }
 

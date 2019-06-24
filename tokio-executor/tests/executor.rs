@@ -1,7 +1,10 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(await_macro, async_await)]
 
-use futures::{self, future::lazy, Future};
 use tokio_executor::{self, DefaultExecutor};
+
+use std::future::Future;
+use std::pin::Pin;
 
 mod out_of_executor_context {
     use super::*;
@@ -9,20 +12,14 @@ mod out_of_executor_context {
 
     fn test<F, E>(spawn: F)
     where
-        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) -> Result<(), E>,
+        F: Fn(Pin<Box<dyn Future<Output = ()> + Send>>) -> Result<(), E>,
     {
-        let res = spawn(Box::new(lazy(|| Ok(()))));
+        let res = spawn(Box::pin(async {}));
         assert!(res.is_err());
     }
 
     #[test]
     fn spawn() {
         test(|f| DefaultExecutor::current().spawn(f));
-    }
-
-    #[test]
-    fn execute() {
-        use futures::future::Executor as FuturesExecutor;
-        test(|f| DefaultExecutor::current().execute(f));
     }
 }

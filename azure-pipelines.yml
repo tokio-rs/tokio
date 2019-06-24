@@ -1,118 +1,120 @@
-trigger: ["master"]
-pr: ["master"]
+trigger: ["master", "std-future"]
+pr: ["master", "std-future"]
 
 variables:
-  nightly: nightly-2019-05-09
+  nightly: nightly-2019-06-10
 
 jobs:
-# Check formatting
-- template: ci/azure-rustfmt.yml
-  parameters:
-    name: rustfmt
+# # Check formatting
+# - template: ci/azure-rustfmt.yml
+#   parameters:
+#     name: rustfmt
 
 # Test top level crate
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_tokio
-    displayName: Test tokio
-    cross: true
-    crates:
-      - tokio
+# - template: ci/azure-test-stable.yml
+#   parameters:
+#     name: test_tokio
+#     displayName: Test tokio
+#     cross: true
+#     crates:
+#       - tokio
 
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml
   parameters:
     name: test_sub_cross
-    displayName: Test sub crates -
+    displayName: Test sub crates (cross) -
     cross: true
+    rust: $(nightly)
     crates:
-      - tokio-fs
+#       - tokio-fs
       - tokio-reactor
-      - tokio-signal
-      - tokio-tcp
-      - tokio-tls
-      - tokio-udp
-      - tokio-uds
+#       - tokio-signal
+#       - tokio-tcp
+#       - tokio-tls
+#       - tokio-udp
+#       - tokio-uds
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
   parameters:
     name: test_linux
     displayName: Test sub crates -
+    rust: $(nightly)
     crates:
-      - tokio-buf
-      - tokio-codec
+      # - tokio-buf
+      # - tokio-codec
       - tokio-current-thread
       - tokio-executor
       - tokio-io
       - tokio-sync
-      - tokio-threadpool
-      - tokio-timer
-      - tokio-test
-      - tokio-trace
-      - tokio-trace/tokio-trace-core
-      - tokio-trace/test-log-support
-      - tokio-trace/test_static_max_level_features
+      # - tokio-threadpool
+      # - tokio-timer
+      # - tokio-test
+      # - tokio-trace
+      # - tokio-trace/tokio-trace-core
+      # - tokio-trace/test-log-support
+      # - tokio-trace/test_static_max_level_features
 
-- template: ci/azure-cargo-check.yml
-  parameters:
-    name: features
-    displayName: Check feature permtuations
-    rust: stable
-    crates:
-      tokio:
-        - codec
-        - fs
-        - io
-        - reactor
-        - rt-full
-        - tcp
-        - timer
-        - udp
-        - uds
-        - sync
-      tokio-buf:
-        - util
-
-# Run async-await tests
-- template: ci/azure-test-nightly.yml
-  parameters:
-    name: test_nightly
-    displayName: Test Async / Await
-    rust: $(nightly)
-
-# Try cross compiling
-- template: ci/azure-cross-compile.yml
-  parameters:
-    name: cross_32bit_linux
-    target: i686-unknown-linux-gnu
-
-# This represents the minimum Rust version supported by
-# Tokio. Updating this should be done in a dedicated PR and
-# cannot be greater than two 0.x releases prior to the
-# current stable.
+# - template: ci/azure-cargo-check.yml
+#   parameters:
+#     name: features
+#     displayName: Check feature permtuations
+#     rust: stable
+#     crates:
+#       tokio:
+#         - codec
+#         - fs
+#         - io
+#         - reactor
+#         - rt-full
+#         - tcp
+#         - timer
+#         - udp
+#         - uds
+#         - sync
+#       tokio-buf:
+#         - util
 #
-# Tests are not run as tests may require newer versions of
-# rust.
-- template: ci/azure-check-minrust.yml
-  parameters:
-    name: minrust
-    rust_version: 1.34.0
-
-- template: ci/azure-tsan.yml
-  parameters:
-    name: tsan
-    rust: $(nightly)
-
-- template: ci/azure-deploy-docs.yml
-  parameters:
-    dependsOn:
-      - rustfmt
-      - test_tokio
-      - test_sub_cross
-      - test_linux
-      - features
-      - test_nightly
-      - cross_32bit_linux
-      - minrust
-      - tsan
+# # Run async-await tests
+# - template: ci/azure-test-nightly.yml
+#   parameters:
+#     name: test_nightly
+#     displayName: Test Async / Await
+#     rust: $(nightly)
+#
+# # Try cross compiling
+# - template: ci/azure-cross-compile.yml
+#   parameters:
+#     name: cross_32bit_linux
+#     target: i686-unknown-linux-gnu
+#
+# # This represents the minimum Rust version supported by
+# # Tokio. Updating this should be done in a dedicated PR and
+# # cannot be greater than two 0.x releases prior to the
+# # current stable.
+# #
+# # Tests are not run as tests may require newer versions of
+# # rust.
+# - template: ci/azure-check-minrust.yml
+#   parameters:
+#     name: minrust
+#     rust_version: 1.34.0
+#
+# - template: ci/azure-tsan.yml
+#   parameters:
+#     name: tsan
+#     rust: $(nightly)
+#
+# - template: ci/azure-deploy-docs.yml
+#   parameters:
+#     dependsOn:
+#       - rustfmt
+#       - test_tokio
+#       - test_sub_cross
+#       - test_linux
+#       - features
+#       - test_nightly
+#       - cross_32bit_linux
+#       - minrust
+#       - tsan

@@ -11,21 +11,16 @@ repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 documentation = "https://docs.rs/tokio-futures/0.1.0"
 description = """
-Experimental std::future::Future and async/await support for Tokio
+Utilities for working with futures, async, and await.
 """
 categories = ["asynchronous"]
 publish = false
 
 [features]
-# This feature comes with no promise of stability. Things will
-# break with each patch release. Use at your own risk.
-async-await-preview = ["futures/nightly"]
+all = []
+default = [
+  "all",
+]
 
 [dependencies]
-futures = "0.1.23"
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
-
-[dev-dependencies]
-bytes = "0.4.9"
-hyper = "0.12.8"
-tokio = { version = "0.2.0", path = "../tokio" }
+futures-core-preview = "0.3.0-alpha.16"

@@ -20,6 +20,19 @@ macro_rules! debug {
     }
 }
 
+/// Unwrap a ready value or propagate `Poll::Pending`.
+#[macro_export]
+macro_rules! ready {
+    ($e:expr) => {{
+        use std::task::Poll::{Pending, Ready};
+
+        match $e {
+            Ready(v) => v,
+            Pending => return Pending,
+        }
+    }};
+}
+
 macro_rules! if_fuzz {
     ($($t:tt)*) => {{
         if false { $($t)* }

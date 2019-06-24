@@ -27,6 +27,9 @@ steps:
 
   # All platforms.
   - script: |
+        rustup toolchain install nightly
+        rustup update
+        rustup toolchain list
         rustc -Vv
         cargo -V
     displayName: Query rust and cargo versions

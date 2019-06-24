@@ -1,10 +1,10 @@
-#[allow(deprecated)]
-use crate::codec::{Decoder, Encoder, Framed};
-use crate::split::{ReadHalf, WriteHalf};
-use crate::{framed, split, AsyncWrite};
+//use crate::split::{ReadHalf, WriteHalf};
+//use crate::{framed, split, AsyncWrite};
 use bytes::BufMut;
-use futures::{try_ready, Async, Poll};
-use std::io as std_io;
+use std::io;
+use std::ops::DerefMut;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Read bytes asynchronously.
 ///
@@ -15,23 +15,23 @@ use std::io as std_io;
 /// Specifically, this means that the `poll_read` function will return one of
 /// the following:
 ///
-/// * `Ok(Async::Ready(n))` means that `n` bytes of data was immediately read
+/// * `Poll::Ready(Ok(n))` means that `n` bytes of data was immediately read
 ///   and placed into the output buffer, where `n` == 0 implies that EOF has
 ///   been reached.
 ///
-/// * `Ok(Async::NotReady)` means that no data was read into the buffer
+/// * `Poll::Pending` means that no data was read into the buffer
 ///   provided. The I/O object is not currently readable but may become readable
 ///   in the future. Most importantly, **the current future's task is scheduled
 ///   to get unparked when the object is readable**. This means that like
 ///   `Future::poll` you'll receive a notification when the I/O object is
 ///   readable again.
 ///
-/// * `Err(e)` for other errors are standard I/O errors coming from the
+/// * `Poll::Ready(Err(e))` for other errors are standard I/O errors coming from the
 ///   underlying object.
 ///
 /// This trait importantly means that the `read` method only works in the
 /// context of a future's task. The object may panic if used outside of a task.
-pub trait AsyncRead: std_io::Read {
+pub trait AsyncRead {
     /// Prepares an uninitialized buffer to be safe to pass to `read`. Returns
     /// `true` if the supplied buffer was zeroed out.
     ///
@@ -70,19 +70,17 @@ pub trait AsyncRead: std_io::Read {
 
     /// Attempt to read from the `AsyncRead` into `buf`.
     ///
-    /// On success, returns `Ok(Async::Ready(num_bytes_read))`.
+    /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
     ///
     /// If no data is available for reading, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task (via
+    /// `Poll::Pending` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
     /// readable or is closed.
-    fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, std_io::Error> {
-        match self.read(buf) {
-            Ok(t) => Ok(Async::Ready(t)),
-            Err(ref e) if e.kind() == std_io::ErrorKind::WouldBlock => return Ok(Async::NotReady),
-            Err(e) => return Err(e.into()),
-        }
-    }
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>>;
 
     /// Pull some bytes from this source into the specified `BufMut`, returning
     /// how many bytes were read.
@@ -90,12 +88,16 @@ pub trait AsyncRead: std_io::Read {
     /// The `buf` provided will have bytes read into it and the internal cursor
     /// will be advanced if any bytes were read. Note that this method typically
     /// will not reallocate the buffer provided.
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, std_io::Error>
+    fn poll_read_buf<B: BufMut>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>>
     where
         Self: Sized,
     {
         if !buf.has_remaining_mut() {
-            return Ok(Async::Ready(0));
+            return Poll::Ready(Ok(0));
         }
 
         unsafe {
@@ -104,69 +106,51 @@ pub trait AsyncRead: std_io::Read {
 
                 self.prepare_uninitialized_buffer(b);
 
-                try_ready!(self.poll_read(b))
+                ready!(self.poll_read(cx, b))?
             };
 
             buf.advance_mut(n);
-            Ok(Async::Ready(n))
+            Poll::Ready(Ok(n))
         }
     }
+}
 
-    /// Provides a `Stream` and `Sink` interface for reading and writing to this
-    /// I/O object, using `Decode` and `Encode` to read and write the raw data.
-    ///
-    /// Raw I/O objects work with byte sequences, but higher-level code usually
-    /// wants to batch these into meaningful chunks, called "frames". This
-    /// method layers framing on top of an I/O object, by using the `Codec`
-    /// traits to handle encoding and decoding of messages frames. Note that
-    /// the incoming and outgoing frame types may be distinct.
-    ///
-    /// This function returns a *single* object that is both `Stream` and
-    /// `Sink`; grouping this into a single object is often useful for layering
-    /// things like gzip or TLS, which require both read and write access to the
-    /// underlying object.
-    ///
-    /// If you want to work more directly with the streams and sink, consider
-    /// calling `split` on the `Framed` returned by this method, which will
-    /// break them into separate objects, allowing them to interact more easily.
-    #[deprecated(since = "0.1.7", note = "Use tokio_codec::Decoder::framed instead")]
-    #[allow(deprecated)]
-    fn framed<T: Encoder + Decoder>(self, codec: T) -> Framed<Self, T>
-    where
-        Self: AsyncWrite + Sized,
-    {
-        framed::framed(self, codec)
-    }
+macro_rules! deref_async_read {
+    () => {
+        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+            (**self).prepare_uninitialized_buffer(buf)
+        }
 
-    /// Helper method for splitting this read/write object into two halves.
-    ///
-    /// The two halves returned implement the `Read` and `Write` traits,
-    /// respectively.
-    ///
-    /// To restore this read/write object from its `ReadHalf` and `WriteHalf`
-    /// use `unsplit`.
-    fn split(self) -> (ReadHalf<Self>, WriteHalf<Self>)
-    where
-        Self: AsyncWrite + Sized,
-    {
-        split::split(self)
+        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8])
+            -> Poll<io::Result<usize>>
+        {
+            Pin::new(&mut **self).poll_read(cx, buf)
+        }
     }
 }
 
-impl<T: ?Sized + AsyncRead> AsyncRead for Box<T> {
+impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for Box<T> {
+    deref_async_read!();
+}
+
+impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for &mut T {
+    deref_async_read!();
+}
+
+impl<P> AsyncRead for Pin<P>
+where
+    P: DerefMut + Unpin,
+    P::Target: AsyncRead,
+{
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         (**self).prepare_uninitialized_buffer(buf)
     }
-}
 
-impl<'a, T: ?Sized + AsyncRead> AsyncRead for &'a mut T {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        (**self).prepare_uninitialized_buffer(buf)
-    }
-}
-
-impl<'a> AsyncRead for &'a [u8] {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
-        false
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        self.get_mut().as_mut().poll_read(cx, buf)
     }
 }

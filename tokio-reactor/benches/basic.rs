@@ -1,6 +1,7 @@
 #![feature(test)]
 #![deny(warnings, rust_2018_idioms)]
 
+/*
 extern crate test;
 
 const NUM_YIELD: usize = 500;
@@ -129,3 +130,4 @@ mod io_pool {
         })
     }
 }
+*/

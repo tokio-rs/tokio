@@ -21,12 +21,18 @@ Synchronization utilities.
 categories = ["asynchronous"]
 publish = false
 
+[features]
+async-traits = ["async-sink", "futures-core-preview"]
+
 [dependencies]
 fnv = "1.0.6"
-futures = "0.1.19"
+async-sink = { git = "https://github.com/tokio-rs/async", optional = true }
+futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
 
 [dev-dependencies]
+async-util = { git = "https://github.com/tokio-rs/async" }
 env_logger = { version = "0.5", default-features = false }
-tokio = { version = "0.2.0", path = "../tokio" }
-tokio-mock-task = "0.1.1"
-loom = { version = "0.1.1", features = ["futures"] }
+pin-utils = "0.1.0-alpha.4"
+# tokio = { version = "0.2.0", path = "../tokio" }
+tokio-test = { version = "0.2.0", path = "../tokio-test" }
+loom = { git = "https://github.com/carllerche/loom", branch = "std-future2", features = ["futures"] }

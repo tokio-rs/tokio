@@ -20,13 +20,17 @@
 //! assert_ready!(fut.poll());
 //! ```
 
-pub mod clock;
+// pub mod clock;
 mod macros;
 pub mod task;
 
+pub use assertive::{assert_err, assert_ok};
+
+/*
 #[doc(hidden)]
 pub mod codegen {
     pub mod futures {
         pub use futures::*;
     }
 }
+*/

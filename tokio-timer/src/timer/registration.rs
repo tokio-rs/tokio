@@ -1,8 +1,7 @@
-use crate::clock::now;
 use crate::timer::{Entry, HandlePriv};
 use crate::Error;
-use futures::Poll;
 use std::sync::Arc;
+use std::task::{self, Poll};
 use std::time::{Duration, Instant};
 
 /// Registration with a timer.
@@ -43,8 +42,10 @@ impl Registration {
         Entry::reset(&mut self.entry);
     }
 
+    // Used by `Timeout<Stream>`
+    #[cfg(feature = "timeout-stream")]
     pub fn reset_timeout(&mut self) {
-        let deadline = now() + self.entry.time_ref().duration;
+        let deadline = crate::clock::now() + self.entry.time_ref().duration;
         self.entry.time_mut().deadline = deadline;
         Entry::reset(&mut self.entry);
     }
@@ -53,8 +54,8 @@ impl Registration {
         self.entry.is_elapsed()
     }
 
-    pub fn poll_elapsed(&self) -> Poll<(), Error> {
-        self.entry.poll_elapsed()
+    pub fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+        self.entry.poll_elapsed(cx)
     }
 }
 

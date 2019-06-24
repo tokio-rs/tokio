@@ -4,21 +4,21 @@
 extern crate loom;
 
 #[allow(dead_code)]
-#[path = "../src/task/atomic_task.rs"]
-mod atomic_task;
+#[path = "../src/task/atomic_waker.rs"]
+mod atomic_waker;
+use crate::atomic_waker::AtomicWaker;
 
-use crate::atomic_task::AtomicTask;
-use futures::future::poll_fn;
-use futures::Async;
+use async_util::future::poll_fn;
 use loom::futures::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
+use std::task::Poll::{Pending, Ready};
 
 struct Chan {
     num: AtomicUsize,
-    task: AtomicTask,
+    task: AtomicWaker,
 }
 
 #[test]
@@ -28,7 +28,7 @@ fn basic_notification() {
     loom::fuzz(|| {
         let chan = Arc::new(Chan {
             num: AtomicUsize::new(0),
-            task: AtomicTask::new(),
+            task: AtomicWaker::new(),
         });
 
         for _ in 0..NUM_NOTIFY {
@@ -36,19 +36,18 @@ fn basic_notification() {
 
             thread::spawn(move || {
                 chan.num.fetch_add(1, Relaxed);
-                chan.task.notify();
+                chan.task.wake();
             });
         }
 
-        block_on(poll_fn(move || {
-            chan.task.register();
+        block_on(poll_fn(move |cx| {
+            chan.task.register_by_ref(cx.waker());
 
             if NUM_NOTIFY == chan.num.load(Relaxed) {
-                return Ok(Async::Ready(()));
+                return Ready(());
             }
 
-            Ok::<_, ()>(Async::NotReady)
-        }))
-        .unwrap();
+            Pending
+        }));
     });
 }

@@ -1,144 +1,166 @@
-use bytes::{BufMut, BytesMut};
-use futures::Async;
-use std::io::{self, Read};
 use tokio_io::AsyncRead;
+use tokio_test::{assert_ready_ok, assert_ready_err};
+use tokio_test::task::MockTask;
+
+use bytes::{BufMut, BytesMut};
+use pin_utils::pin_mut;
+use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+#[test]
+fn assert_obj_safe() {
+    fn _assert<T>() {}
+    _assert::<Box<dyn AsyncRead>>();
+}
 
 #[test]
 fn read_buf_success() {
-    struct R;
+    struct Rd;
 
-    impl Read for R {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    impl AsyncRead for Rd {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut [u8]) -> Poll<io::Result<usize>>
+        {
             buf[0..11].copy_from_slice(b"hello world");
-            Ok(11)
+            Poll::Ready(Ok(11))
         }
     }
 
-    impl AsyncRead for R {}
-
     let mut buf = BytesMut::with_capacity(65);
+    let mut task = MockTask::new();
 
-    let n = match R.read_buf(&mut buf).unwrap() {
-        Async::Ready(n) => n,
-        _ => panic!(),
-    };
+    task.enter(|cx| {
+        let rd = Rd;
+        pin_mut!(rd);
 
-    assert_eq!(11, n);
-    assert_eq!(buf[..], b"hello world"[..]);
+        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
+
+        assert_eq!(11, n);
+        assert_eq!(buf[..], b"hello world"[..]);
+    });
 }
 
 #[test]
 fn read_buf_error() {
-    struct R;
+    struct Rd;
 
-    impl Read for R {
-        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
-            Err(io::Error::new(io::ErrorKind::Other, "other"))
+    impl AsyncRead for Rd {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut [u8]) -> Poll<io::Result<usize>>
+        {
+            let err = io::ErrorKind::Other.into();
+            Poll::Ready(Err(err))
         }
     }
 
-    impl AsyncRead for R {}
-
     let mut buf = BytesMut::with_capacity(65);
+    let mut task = MockTask::new();
 
-    let err = R.read_buf(&mut buf).unwrap_err();
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    task.enter(|cx| {
+        let rd = Rd;
+        pin_mut!(rd);
+
+        let err = assert_ready_err!(rd.poll_read_buf(cx, &mut buf));
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+    });
 }
 
 #[test]
 fn read_buf_no_capacity() {
-    struct R;
+    struct Rd;
 
-    impl Read for R {
-        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+    impl AsyncRead for Rd {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut [u8]) -> Poll<io::Result<usize>>
+        {
             unimplemented!();
         }
     }
 
-    impl AsyncRead for R {}
-
     // Can't create BytesMut w/ zero capacity, so fill it up
     let mut buf = BytesMut::with_capacity(64);
+    let mut task = MockTask::new();
+
     buf.put(&[0; 64][..]);
 
-    let n = match R.read_buf(&mut buf).unwrap() {
-        Async::Ready(n) => n,
-        _ => panic!(),
-    };
+    task.enter(|cx| {
+        let rd = Rd;
+        pin_mut!(rd);
 
-    assert_eq!(0, n);
+        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
+        assert_eq!(0, n);
+    });
 }
 
 #[test]
 fn read_buf_no_uninitialized() {
-    struct R;
+    struct Rd;
 
-    impl Read for R {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    impl AsyncRead for Rd {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut [u8]) -> Poll<io::Result<usize>>
+        {
             for b in buf {
                 assert_eq!(0, *b);
             }
 
-            Ok(0)
+            Poll::Ready(Ok(0))
         }
     }
 
-    impl AsyncRead for R {}
-
-    // Can't create BytesMut w/ zero capacity, so fill it up
     let mut buf = BytesMut::with_capacity(64);
+    let mut task = MockTask::new();
 
-    let n = match R.read_buf(&mut buf).unwrap() {
-        Async::Ready(n) => n,
-        _ => panic!(),
-    };
+    task.enter(|cx| {
+        let rd = Rd;
+        pin_mut!(rd);
 
-    assert_eq!(0, n);
+        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
+        assert_eq!(0, n);
+    });
 }
 
 #[test]
 fn read_buf_uninitialized_ok() {
-    struct R;
+    struct Rd;
 
-    impl Read for R {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            assert_eq!(buf[0..11], b"hello world"[..]);
-            Ok(0)
-        }
-    }
-
-    impl AsyncRead for R {
+    impl AsyncRead for Rd {
         unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
             false
+        }
+
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut [u8]) -> Poll<io::Result<usize>>
+        {
+            assert_eq!(buf[0..11], b"hello world"[..]);
+            Poll::Ready(Ok(0))
         }
     }
 
     // Can't create BytesMut w/ zero capacity, so fill it up
     let mut buf = BytesMut::with_capacity(64);
+    let mut task = MockTask::new();
+
     unsafe {
         buf.bytes_mut()[0..11].copy_from_slice(b"hello world");
     }
 
-    let n = match R.read_buf(&mut buf).unwrap() {
-        Async::Ready(n) => n,
-        _ => panic!(),
-    };
+    task.enter(|cx| {
+        let rd = Rd;
+        pin_mut!(rd);
 
-    assert_eq!(0, n);
-}
-
-#[test]
-fn read_buf_translate_wouldblock_to_not_ready() {
-    struct R;
-
-    impl Read for R {
-        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
-            Err(io::Error::new(io::ErrorKind::WouldBlock, ""))
-        }
-    }
-
-    impl AsyncRead for R {}
-
-    let mut buf = BytesMut::with_capacity(65);
-    assert!(!R.read_buf(&mut buf).unwrap().is_ready());
+        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
+        assert_eq!(0, n);
+    });
 }

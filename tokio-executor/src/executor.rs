@@ -1,5 +1,6 @@
 use crate::SpawnError;
-use futures::Future;
+use std::future::Future;
+use std::pin::Pin;
 
 /// A value that executes futures.
 ///
@@ -82,16 +83,14 @@ pub trait Executor {
     /// use futures::future::lazy;
     ///
     /// # fn docs(my_executor: &mut dyn Executor) {
-    /// my_executor.spawn(Box::new(lazy(|| {
+    /// my_executor.spawn(Box::pin(lazy(|| {
     ///     println!("running on the executor");
     ///     Ok(())
     /// }))).unwrap();
     /// # }
     /// ```
-    fn spawn(
-        &mut self,
-        future: Box<dyn Future<Item = (), Error = ()> + Send>,
-    ) -> Result<(), SpawnError>;
+    fn spawn(&mut self, future: Pin<Box<dyn Future<Output = ()> + Send>>)
+        -> Result<(), SpawnError>;
 
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///
@@ -116,7 +115,7 @@ pub trait Executor {
     ///
     /// # fn docs(my_executor: &mut dyn Executor) {
     /// if my_executor.status().is_ok() {
-    ///     my_executor.spawn(Box::new(lazy(|| {
+    ///     my_executor.spawn(Box::pin(lazy(|| {
     ///         println!("running on the executor");
     ///         Ok(())
     ///     }))).unwrap();
@@ -133,7 +132,7 @@ pub trait Executor {
 impl<E: Executor + ?Sized> Executor for Box<E> {
     fn spawn(
         &mut self,
-        future: Box<dyn Future<Item = (), Error = ()> + Send>,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), SpawnError> {
         (**self).spawn(future)
     }

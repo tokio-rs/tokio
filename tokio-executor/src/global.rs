@@ -1,6 +1,7 @@
 use super::{Enter, Executor, SpawnError};
-use futures::{future, Future};
 use std::cell::Cell;
+use std::future::Future;
+use std::pin::Pin;
 
 /// Executes futures on the default executor for the current execution context.
 ///
@@ -70,7 +71,7 @@ thread_local! {
 impl super::Executor for DefaultExecutor {
     fn spawn(
         &mut self,
-        future: Box<dyn Future<Item = (), Error = ()> + Send>,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
@@ -84,34 +85,14 @@ impl super::Executor for DefaultExecutor {
 
 impl<T> super::TypedExecutor<T> for DefaultExecutor
 where
-    T: Future<Item = (), Error = ()> + Send + 'static,
+    T: Future<Output = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
-        super::Executor::spawn(self, Box::new(future))
+        super::Executor::spawn(self, Box::pin(future))
     }
 
     fn status(&self) -> Result<(), SpawnError> {
         super::Executor::status(self)
-    }
-}
-
-impl<T> future::Executor<T> for DefaultExecutor
-where
-    T: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
-        if let Err(e) = super::Executor::status(self) {
-            let kind = if e.is_at_capacity() {
-                future::ExecuteErrorKind::NoCapacity
-            } else {
-                future::ExecuteErrorKind::Shutdown
-            };
-
-            return Err(future::ExecuteError::new(kind, future));
-        }
-
-        let _ = DefaultExecutor::with_current(|executor| executor.spawn(Box::new(future)));
-        Ok(())
     }
 }
 
@@ -153,9 +134,9 @@ where
 /// ```
 pub fn spawn<T>(future: T)
 where
-    T: Future<Item = (), Error = ()> + Send + 'static,
+    T: Future<Output = ()> + Send + 'static,
 {
-    DefaultExecutor::current().spawn(Box::new(future)).unwrap()
+    DefaultExecutor::current().spawn(Box::pin(future)).unwrap()
 }
 
 /// Set the default executor for the duration of the closure

@@ -1,7 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.20")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
-#![cfg_attr(feature = "async-await-preview", feature(async_await, await_macro))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
@@ -92,7 +91,7 @@ pub mod reactor;
 pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
-pub mod util;
+//pub mod util;
 
 if_runtime! {
     pub mod executor;
@@ -101,17 +100,3 @@ if_runtime! {
     pub use crate::executor::spawn;
     pub use crate::runtime::run;
 }
-
-// ===== Experimental async/await support =====
-
-#[cfg(feature = "async-await-preview")]
-mod async_await;
-
-#[cfg(feature = "async-await-preview")]
-pub use async_await::{run_async, spawn_async};
-
-#[cfg(feature = "async-await-preview")]
-pub use tokio_futures::async_wait;
-
-#[cfg(feature = "async-await-preview")]
-pub use tokio_macros::{main, test};

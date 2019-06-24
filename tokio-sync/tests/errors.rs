@@ -6,7 +6,6 @@ fn is_error<T: ::std::error::Error + Send + Sync>() {}
 fn mpsc_error_bound() {
     use tokio_sync::mpsc::error;
 
-    is_error::<error::RecvError>();
     is_error::<error::SendError>();
     is_error::<error::TrySendError<()>>();
     is_error::<error::UnboundedRecvError>();
@@ -26,6 +25,5 @@ fn oneshot_error_bound() {
 fn watch_error_bound() {
     use tokio_sync::watch::error;
 
-    is_error::<error::RecvError>();
     is_error::<error::SendError<()>>();
 }

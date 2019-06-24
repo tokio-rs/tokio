@@ -46,8 +46,10 @@
 
 use crossbeam_utils::sync::{Parker, Unparker};
 use std::marker::PhantomData;
+use std::mem;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::task::{RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
 
 /// Block the current thread.
@@ -222,4 +224,45 @@ impl Unpark for UnparkThread {
     fn unpark(&self) {
         self.inner.unpark();
     }
+}
+
+static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+
+impl UnparkThread {
+    pub(crate) fn into_waker(self) -> Waker {
+        unsafe {
+            let raw = unparker_to_raw_waker(self.inner);
+            Waker::from_raw(raw)
+        }
+    }
+}
+
+unsafe fn unparker_to_raw_waker(unparker: Unparker) -> RawWaker {
+    RawWaker::new(Unparker::into_raw(unparker), &VTABLE)
+}
+
+unsafe fn clone(raw: *const ()) -> RawWaker {
+    let unparker = Unparker::from_raw(raw);
+
+    // Increment the ref count
+    mem::forget(unparker.clone());
+
+    unparker_to_raw_waker(unparker)
+}
+
+unsafe fn wake(raw: *const ()) {
+    let unparker = Unparker::from_raw(raw);
+    unparker.unpark();
+}
+
+unsafe fn wake_by_ref(raw: *const ()) {
+    let unparker = Unparker::from_raw(raw);
+    unparker.unpark();
+
+    // We don't actually own a reference to the unparker
+    mem::forget(unparker);
+}
+
+unsafe fn drop(raw: *const ()) {
+    let _ = Unparker::from_raw(raw);
 }

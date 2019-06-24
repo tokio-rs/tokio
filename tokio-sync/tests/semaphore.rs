@@ -1,31 +1,13 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use futures;
-use tokio_mock_task::*;
 use tokio_sync::semaphore::{Permit, Semaphore};
-
-macro_rules! assert_ready {
-    ($e:expr) => {{
-        match $e {
-            Ok(futures::Async::Ready(v)) => v,
-            Ok(_) => panic!("not ready"),
-            Err(e) => panic!("error = {:?}", e),
-        }
-    }};
-}
-
-macro_rules! assert_not_ready {
-    ($e:expr) => {{
-        match $e {
-            Ok(futures::Async::NotReady) => {}
-            Ok(futures::Async::Ready(v)) => panic!("ready; value = {:?}", v),
-            Err(e) => panic!("error = {:?}", e),
-        }
-    }};
-}
+use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
 
 #[test]
 fn available_permits() {
+    let mut t1 = MockTask::new();
+
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
 
@@ -33,39 +15,39 @@ fn available_permits() {
     let mut permit = Permit::new();
     assert!(!permit.is_acquired());
 
-    assert_ready!(permit.poll_acquire(&s));
+    assert_ready_ok!(t1.enter(|cx| permit.poll_acquire(cx, &s)));
     assert_eq!(s.available_permits(), 99);
     assert!(permit.is_acquired());
 
     // Polling again on the same waiter does not claim a new permit
-    assert_ready!(permit.poll_acquire(&s));
+    assert_ready_ok!(t1.enter(|cx| permit.poll_acquire(cx, &s)));
     assert_eq!(s.available_permits(), 99);
     assert!(permit.is_acquired());
 }
 
 #[test]
 fn unavailable_permits() {
+    let mut t1 = MockTask::new();
+    let mut t2 = MockTask::new();
     let s = Semaphore::new(1);
 
     let mut permit_1 = Permit::new();
     let mut permit_2 = Permit::new();
 
     // Acquire the first permit
-    assert_ready!(permit_1.poll_acquire(&s));
+    assert_ready_ok!(t1.enter(|cx| permit_1.poll_acquire(cx, &s)));
     assert_eq!(s.available_permits(), 0);
 
-    let mut task = MockTask::new();
-
-    task.enter(|| {
+    t2.enter(|cx| {
         // Try to acquire the second permit
-        assert_not_ready!(permit_2.poll_acquire(&s));
+        assert_pending!(permit_2.poll_acquire(cx, &s));
     });
 
     permit_1.release(&s);
 
     assert_eq!(s.available_permits(), 0);
-    assert!(task.is_notified());
-    assert_ready!(permit_2.poll_acquire(&s));
+    assert!(t2.is_woken());
+    assert_ready_ok!(t2.enter(|cx| permit_2.poll_acquire(cx, &s)));
 
     permit_2.release(&s);
     assert_eq!(s.available_permits(), 1);
@@ -73,21 +55,22 @@ fn unavailable_permits() {
 
 #[test]
 fn zero_permits() {
+    let mut t1 = MockTask::new();
+
     let s = Semaphore::new(0);
     assert_eq!(s.available_permits(), 0);
 
     let mut permit = Permit::new();
-    let mut task = MockTask::new();
 
     // Try to acquire the permit
-    task.enter(|| {
-        assert_not_ready!(permit.poll_acquire(&s));
+    t1.enter(|cx| {
+        assert_pending!(permit.poll_acquire(cx, &s));
     });
 
     s.add_permits(1);
 
-    assert!(task.is_notified());
-    assert_ready!(permit.poll_acquire(&s));
+    assert!(t1.is_woken());
+    assert_ready_ok!(t1.enter(|cx| permit.poll_acquire(cx, &s)));
 }
 
 #[test]
@@ -99,6 +82,8 @@ fn validates_max_permits() {
 
 #[test]
 fn close_semaphore_prevents_acquire() {
+    let mut t1 = MockTask::new();
+
     let s = Semaphore::new(1);
     s.close();
 
@@ -106,29 +91,32 @@ fn close_semaphore_prevents_acquire() {
 
     let mut permit = Permit::new();
 
-    assert!(permit.poll_acquire(&s).is_err());
+    assert_ready_err!(t1.enter(|cx| permit.poll_acquire(cx, &s)));
     assert_eq!(1, s.available_permits());
 }
 
 #[test]
 fn close_semaphore_notifies_permit1() {
+    let mut t1 = MockTask::new();
+
     let s = Semaphore::new(0);
-
     let mut permit = Permit::new();
-    let mut task = MockTask::new();
 
-    task.enter(|| {
-        assert_not_ready!(permit.poll_acquire(&s));
-    });
+    assert_pending!(t1.enter(|cx| permit.poll_acquire(cx, &s)));
 
     s.close();
 
-    assert!(task.is_notified());
-    assert!(permit.poll_acquire(&s).is_err());
+    assert!(t1.is_woken());
+    assert_ready_err!(t1.enter(|cx| permit.poll_acquire(cx, &s)));
 }
 
 #[test]
 fn close_semaphore_notifies_permit2() {
+    let mut t1 = MockTask::new();
+    let mut t2 = MockTask::new();
+    let mut t3 = MockTask::new();
+    let mut t4 = MockTask::new();
+
     let s = Semaphore::new(2);
 
     let mut permit1 = Permit::new();
@@ -137,27 +125,19 @@ fn close_semaphore_notifies_permit2() {
     let mut permit4 = Permit::new();
 
     // Acquire a couple of permits
-    assert_ready!(permit1.poll_acquire(&s));
-    assert_ready!(permit2.poll_acquire(&s));
+    assert_ready_ok!(t1.enter(|cx| permit1.poll_acquire(cx, &s)));
+    assert_ready_ok!(t2.enter(|cx| permit2.poll_acquire(cx, &s)));
 
-    let mut task1 = MockTask::new();
-    let mut task2 = MockTask::new();
-
-    task1.enter(|| {
-        assert_not_ready!(permit3.poll_acquire(&s));
-    });
-
-    task2.enter(|| {
-        assert_not_ready!(permit4.poll_acquire(&s));
-    });
+    assert_pending!(t3.enter(|cx| permit3.poll_acquire(cx, &s)));
+    assert_pending!(t4.enter(|cx| permit4.poll_acquire(cx, &s)));
 
     s.close();
 
-    assert!(task1.is_notified());
-    assert!(task2.is_notified());
+    assert!(t3.is_woken());
+    assert!(t4.is_woken());
 
-    assert!(permit3.poll_acquire(&s).is_err());
-    assert!(permit4.poll_acquire(&s).is_err());
+    assert_ready_err!(t3.enter(|cx| permit3.poll_acquire(cx, &s)));
+    assert_ready_err!(t4.enter(|cx| permit4.poll_acquire(cx, &s)));
 
     assert_eq!(0, s.available_permits());
 
@@ -165,7 +145,7 @@ fn close_semaphore_notifies_permit2() {
 
     assert_eq!(1, s.available_permits());
 
-    assert!(permit1.poll_acquire(&s).is_err());
+    assert_ready_err!(t1.enter(|cx| permit1.poll_acquire(cx, &s)));
 
     permit2.release(&s);
 

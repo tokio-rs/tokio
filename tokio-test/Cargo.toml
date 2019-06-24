@@ -22,6 +22,7 @@ categories = ["asynchronous", "testing"]
 publish = false
 
 [dependencies]
-futures = "0.1"
-tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
+assertive = { git = "http://github.com/carllerche/assertive" }
+pin-convert = "0.1.0"
+# tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }

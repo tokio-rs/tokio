@@ -1,8 +1,9 @@
 use super::TcpListener;
 use super::TcpStream;
-use futures::stream::Stream;
-use futures::{try_ready, Async, Poll};
+use futures_core::stream::Stream;
 use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Stream returned by the `TcpListener::incoming` function representing the
 /// stream of sockets received from a listener.
@@ -19,11 +20,10 @@ impl Incoming {
 }
 
 impl Stream for Incoming {
-    type Item = TcpStream;
-    type Error = io::Error;
+    type Item = io::Result<TcpStream>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, io::Error> {
-        let (socket, _) = try_ready!(self.inner.poll_accept());
-        Ok(Async::Ready(Some(socket)))
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let (socket, _) = ready!(self.inner.poll_accept(cx))?;
+        Poll::Ready(Some(Ok(socket)))
     }
 }

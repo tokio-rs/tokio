@@ -17,115 +17,164 @@
 //! assert_ready_eq!(task.enter(|| rx.poll()), Some(()));
 //! ```
 
-use futures::executor::{spawn, Notify};
-use futures::{future, Async};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio_executor::enter;
+
+use pin_convert::AsPinMut;
+use std::future::Future;
+use std::mem;
 use std::sync::{Arc, Condvar, Mutex};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 /// Mock task
 ///
-/// A mock task is able to intercept and track notifications.
+/// A mock task is able to intercept and track wake notifications.
 #[derive(Debug)]
 pub struct MockTask {
-    notify: Arc<ThreadNotify>,
+    waker: Arc<ThreadWaker>,
 }
 
 #[derive(Debug)]
-struct ThreadNotify {
-    state: AtomicUsize,
-    mutex: Mutex<()>,
+struct ThreadWaker {
+    state: Mutex<usize>,
     condvar: Condvar,
 }
 
 const IDLE: usize = 0;
-const NOTIFY: usize = 1;
+const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
 impl MockTask {
     /// Create a new mock task
     pub fn new() -> Self {
         MockTask {
-            notify: Arc::new(ThreadNotify::new()),
+            waker: Arc::new(ThreadWaker::new()),
         }
+    }
+
+    /// Poll a future
+    pub fn poll<T, F>(&mut self, mut fut: T) -> Poll<F::Output>
+    where
+        T: AsPinMut<F>,
+        F: Future,
+    {
+        self.enter(|cx| fut.as_pin_mut().poll(cx))
     }
 
     /// Run a closure from the context of the task.
     ///
-    /// Any notifications resulting from the execution of the closure are
+    /// Any wake notifications resulting from the execution of the closure are
     /// tracked.
     pub fn enter<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce() -> R,
+        F: FnOnce(&mut Context<'_>) -> R,
     {
-        self.notify.clear();
+        let _enter = enter().unwrap();
 
-        let res = spawn(future::lazy(|| Ok::<_, ()>(f()))).poll_future_notify(&self.notify, 0);
+        self.waker.clear();
+        let waker = self.waker();
+        let mut cx = Context::from_waker(&waker);
 
-        match res.unwrap() {
-            Async::Ready(v) => v,
-            _ => unreachable!(),
-        }
+        f(&mut cx)
     }
 
-    /// Returns `true` if the inner future has received a readiness notification
+    /// Returns `true` if the inner future has received a wake notification
     /// since the last call to `enter`.
-    pub fn is_notified(&self) -> bool {
-        self.notify.is_notified()
+    pub fn is_woken(&self) -> bool {
+        self.waker.is_woken()
     }
 
-    /// Returns the number of references to the task notifier
+    /// Returns the number of references to the task waker
     ///
     /// The task itself holds a reference. The return value will never be zero.
-    pub fn notifier_ref_count(&self) -> usize {
-        Arc::strong_count(&self.notify)
+    pub fn waker_ref_count(&self) -> usize {
+        Arc::strong_count(&self.waker)
+    }
+
+    fn waker(&self) -> Waker {
+        unsafe {
+            let raw = to_raw(self.waker.clone());
+            Waker::from_raw(raw)
+        }
     }
 }
 
-impl ThreadNotify {
+impl ThreadWaker {
     fn new() -> Self {
-        ThreadNotify {
-            state: AtomicUsize::new(IDLE),
-            mutex: Mutex::new(()),
+        ThreadWaker {
+            state: Mutex::new(IDLE),
             condvar: Condvar::new(),
         }
     }
 
-    /// Clears any previously received notify, avoiding potential spurrious
-    /// notifications. This should only be called immediately before running the
+    /// Clears any previously received wakes, avoiding potential spurrious
+    /// wake notifications. This should only be called immediately before running the
     /// task.
     fn clear(&self) {
-        self.state.store(IDLE, Ordering::SeqCst);
+        *self.state.lock().unwrap() = IDLE;
     }
 
-    fn is_notified(&self) -> bool {
-        match self.state.load(Ordering::SeqCst) {
+    fn is_woken(&self) -> bool {
+        match *self.state.lock().unwrap() {
             IDLE => false,
-            NOTIFY => true,
+            WAKE => true,
             _ => unreachable!(),
         }
+    }
+
+    fn wake(&self) {
+        // First, try transitioning from IDLE -> NOTIFY, this does not require a
+        // lock.
+        let mut state = self.state.lock().unwrap();
+        let prev = *state;
+
+        if prev == WAKE {
+            return;
+        }
+
+        *state = WAKE;
+
+        if prev == IDLE {
+            return;
+        }
+
+        // The other half is sleeping, so we wake it up.
+        assert_eq!(prev, SLEEP);
+        self.condvar.notify_one();
     }
 }
 
-impl Notify for ThreadNotify {
-    fn notify(&self, _unpark_id: usize) {
-        // First, try transitioning from IDLE -> NOTIFY, this does not require a
-        // lock.
-        match self.state.compare_and_swap(IDLE, NOTIFY, Ordering::SeqCst) {
-            IDLE | NOTIFY => return,
-            SLEEP => {}
-            _ => unreachable!(),
-        }
+static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
-        // The other half is sleeping, this requires a lock
-        let _m = self.mutex.lock().unwrap();
+unsafe fn to_raw(waker: Arc<ThreadWaker>) -> RawWaker {
+    RawWaker::new(Arc::into_raw(waker) as *const (), &VTABLE)
+}
 
-        // Transition from SLEEP -> NOTIFY
-        match self.state.compare_and_swap(SLEEP, NOTIFY, Ordering::SeqCst) {
-            SLEEP => {}
-            _ => return,
-        }
+unsafe fn from_raw(raw: *const ()) -> Arc<ThreadWaker> {
+    Arc::from_raw(raw as *const ThreadWaker)
+}
 
-        // Wakeup the sleeper
-        self.condvar.notify_one();
-    }
+unsafe fn clone(raw: *const ()) -> RawWaker {
+    let waker = from_raw(raw);
+
+    // Increment the ref count
+    mem::forget(waker.clone());
+
+    to_raw(waker)
+}
+
+unsafe fn wake(raw: *const ()) {
+    let waker = from_raw(raw);
+    waker.wake();
+}
+
+unsafe fn wake_by_ref(raw: *const ()) {
+    let waker = from_raw(raw);
+    waker.wake();
+
+    // We don't actually own a reference to the unparker
+    mem::forget(waker);
+}
+
+unsafe fn drop(raw: *const ()) {
+    let _ = from_raw(raw);
 }

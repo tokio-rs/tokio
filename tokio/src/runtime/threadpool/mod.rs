@@ -2,9 +2,6 @@ mod builder;
 mod shutdown;
 mod task_executor;
 
-#[cfg(feature = "async-await-preview")]
-mod async_await;
-
 pub use self::builder::Builder;
 pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;

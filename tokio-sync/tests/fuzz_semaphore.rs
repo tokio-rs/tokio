@@ -8,12 +8,30 @@ extern crate loom;
 mod semaphore;
 
 use crate::semaphore::*;
-use futures::{future, try_ready, Async, Future, Poll};
+
+use async_util::future::poll_fn;
 use loom::futures::block_on;
 use loom::thread;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
+use std::task::Poll::Ready;
+use std::task::{Context, Poll};
+
+/// Unwrap a ready value or propagate `Poll::Pending`.
+#[macro_export]
+macro_rules! ready {
+    ($e:expr) => {{
+        use std::task::Poll::{Pending, Ready};
+
+        match $e {
+            Ready(v) => v,
+            Pending => return Pending,
+        }
+    }};
+}
 
 #[test]
 fn basic_usage() {
@@ -30,24 +48,22 @@ fn basic_usage() {
     }
 
     impl Future for Actor {
-        type Item = ();
-        type Error = ();
+        type Output = ();
 
-        fn poll(&mut self) -> Poll<(), ()> {
-            try_ready!(self
-                .waiter
-                .poll_acquire(&self.shared.semaphore)
-                .map_err(|_| ()));
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            let me = &mut *self;
 
-            let actual = self.shared.active.fetch_add(1, SeqCst);
+            ready!(me.waiter.poll_acquire(cx, &me.shared.semaphore)).unwrap();
+
+            let actual = me.shared.active.fetch_add(1, SeqCst);
             assert!(actual <= NUM - 1);
 
-            let actual = self.shared.active.fetch_sub(1, SeqCst);
+            let actual = me.shared.active.fetch_sub(1, SeqCst);
             assert!(actual <= NUM);
 
-            self.waiter.release(&self.shared.semaphore);
+            me.waiter.release(&me.shared.semaphore);
 
-            Ok(Async::Ready(()))
+            Ready(())
         }
     }
 
@@ -64,16 +80,14 @@ fn basic_usage() {
                 block_on(Actor {
                     waiter: Permit::new(),
                     shared,
-                })
-                .unwrap();
+                });
             });
         }
 
         block_on(Actor {
             waiter: Permit::new(),
             shared,
-        })
-        .unwrap();
+        });
     });
 }
 
@@ -87,11 +101,7 @@ fn release() {
             thread::spawn(move || {
                 let mut permit = Permit::new();
 
-                block_on(future::lazy(|| {
-                    permit.poll_acquire(&semaphore).unwrap();
-                    Ok::<_, ()>(())
-                }))
-                .unwrap();
+                block_on(poll_fn(|cx| permit.poll_acquire(cx, &semaphore))).unwrap();
 
                 permit.release(&semaphore);
             });
@@ -99,7 +109,7 @@ fn release() {
 
         let mut permit = Permit::new();
 
-        block_on(future::poll_fn(|| permit.poll_acquire(&semaphore))).unwrap();
+        block_on(poll_fn(|cx| permit.poll_acquire(cx, &semaphore))).unwrap();
 
         permit.release(&semaphore);
     });
@@ -119,9 +129,10 @@ fn basic_closing() {
                 let mut permit = Permit::new();
 
                 for _ in 0..2 {
-                    block_on(future::poll_fn(|| {
-                        permit.poll_acquire(&semaphore).map_err(|_| ())
+                    block_on(poll_fn(|cx| {
+                        permit.poll_acquire(cx, &semaphore).map_err(|_| ())
                     }))?;
+
                     permit.release(&semaphore);
                 }
 
@@ -146,8 +157,8 @@ fn concurrent_close() {
             thread::spawn(move || {
                 let mut permit = Permit::new();
 
-                block_on(future::poll_fn(|| {
-                    permit.poll_acquire(&semaphore).map_err(|_| ())
+                block_on(poll_fn(|cx| {
+                    permit.poll_acquire(cx, &semaphore).map_err(|_| ())
                 }))?;
 
                 permit.release(&semaphore);

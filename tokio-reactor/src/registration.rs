@@ -1,10 +1,10 @@
-use crate::{Direction, Handle, HandlePriv, Task};
-use futures::{task, Async, Poll};
+use crate::{Direction, Handle, HandlePriv};
 use log::debug;
 use mio::{self, Evented};
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::task::{Context, Poll, Waker};
 use std::{io, ptr, usize};
 
 /// Associates an I/O resource with the reactor instance that drives it.
@@ -59,17 +59,11 @@ struct Inner {
     token: usize,
 }
 
-#[derive(PartialEq)]
-enum Notify {
-    Yes,
-    No,
-}
-
 /// Tasks waiting on readiness notifications.
 #[derive(Debug)]
 struct Node {
     direction: Direction,
-    task: Task,
+    waker: Waker,
     next: *mut Node,
 }
 
@@ -228,7 +222,7 @@ impl Registration {
                         let node = *node;
                         let Node {
                             direction,
-                            task,
+                            waker,
                             next,
                         } = node;
 
@@ -240,7 +234,7 @@ impl Registration {
                         if !*flag {
                             *flag = true;
 
-                            inner.register(direction, task);
+                            inner.register(direction, waker);
                         }
 
                         ptr = next;
@@ -285,12 +279,12 @@ impl Registration {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_read_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Read, Notify::Yes)
-            .map(|v| match v {
-                Some(v) => Async::Ready(v),
-                _ => Async::NotReady,
-            })
+    pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
+        let v = self.poll_ready(Direction::Read, Some(cx))?;
+        match v {
+            Some(v) => Poll::Ready(Ok(v)),
+            None => Poll::Pending,
+        }
     }
 
     /// Consume any pending read readiness event.
@@ -301,7 +295,7 @@ impl Registration {
     ///
     /// [`poll_read_ready`]: #method.poll_read_ready
     pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Read, Notify::No)
+        self.poll_ready(Direction::Read, None)
     }
 
     /// Poll for events on the I/O resource's write readiness stream.
@@ -336,12 +330,12 @@ impl Registration {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.poll_ready(Direction::Write, Notify::Yes)
-            .map(|v| match v {
-                Some(v) => Async::Ready(v),
-                _ => Async::NotReady,
-            })
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
+        let v = self.poll_ready(Direction::Write, Some(cx))?;
+        match v {
+            Some(v) => Poll::Ready(Ok(v)),
+            None => Poll::Pending,
+        }
     }
 
     /// Consume any pending write readiness event.
@@ -352,10 +346,14 @@ impl Registration {
     ///
     /// [`poll_write_ready`]: #method.poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
-        self.poll_ready(Direction::Write, Notify::No)
+        self.poll_ready(Direction::Write, None)
     }
 
-    fn poll_ready(&self, direction: Direction, notify: Notify) -> io::Result<Option<mio::Ready>> {
+    fn poll_ready(
+        &self,
+        direction: Direction,
+        cx: Option<&mut Context<'_>>,
+    ) -> io::Result<Option<mio::Ready>> {
         let mut state = self.state.load(SeqCst);
 
         // Cache the node pointer
@@ -366,29 +364,28 @@ impl Registration {
                 INIT => {
                     return Err(io::Error::new(
                         io::ErrorKind::Other,
-                        "must call `register`
-                                              before poll_read_ready",
+                        "must call register before poll_read_ready",
                     ));
                 }
                 READY => {
                     let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
-                    return inner.poll_ready(direction, notify);
+                    return inner.poll_ready(direction, cx);
                 }
                 LOCKED => {
-                    if let Notify::No = notify {
+                    let cx = if let Some(ref cx) = cx {
+                        cx
+                    } else {
                         // Skip the notification tracking junk.
                         return Ok(None);
-                    }
+                    };
 
                     let next_ptr = (state & !LIFECYCLE_MASK) as *mut Node;
-
-                    let task = task::current();
 
                     // Get the node
                     let mut n = node.take().unwrap_or_else(|| {
                         Box::new(Node {
                             direction,
-                            task: task,
+                            waker: cx.waker().clone(),
                             next: ptr::null_mut(),
                         })
                     });
@@ -450,21 +447,21 @@ impl Inner {
         (inner, res)
     }
 
-    fn register(&self, direction: Direction, task: Task) {
+    fn register(&self, direction: Direction, waker: Waker) {
         if self.token == ERROR {
-            task.notify();
+            waker.wake();
             return;
         }
 
         let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => {
-                task.notify();
+                waker.wake();
                 return;
             }
         };
 
-        inner.register(self.token, direction, task);
+        inner.register(self.token, direction, waker);
     }
 
     fn deregister<E: Evented>(&self, io: &E) -> io::Result<()> {
@@ -483,7 +480,11 @@ impl Inner {
         inner.deregister_source(io)
     }
 
-    fn poll_ready(&self, direction: Direction, notify: Notify) -> io::Result<Option<mio::Ready>> {
+    fn poll_ready(
+        &self,
+        direction: Direction,
+        cx: Option<&mut Context<'_>>,
+    ) -> io::Result<Option<mio::Ready>> {
         if self.token == ERROR {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -513,16 +514,19 @@ impl Inner {
         let mut ready =
             mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
 
-        if ready.is_empty() && notify == Notify::Yes {
-            debug!("scheduling {:?} for: {}", direction, self.token);
-            // Update the task info
-            match direction {
-                Direction::Read => sched.reader.register(),
-                Direction::Write => sched.writer.register(),
-            }
+        if ready.is_empty() {
+            if let Some(cx) = cx {
+                debug!("scheduling {:?} for: {}", direction, self.token);
+                // Update the task info
+                match direction {
+                    Direction::Read => sched.reader.register_by_ref(cx.waker()),
+                    Direction::Write => sched.writer.register_by_ref(cx.waker()),
+                }
 
-            // Try again
-            ready = mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+                // Try again
+                ready =
+                    mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+            }
         }
 
         if ready.is_empty() {

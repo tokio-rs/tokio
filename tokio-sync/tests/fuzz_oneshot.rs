@@ -1,13 +1,28 @@
 #![deny(warnings, rust_2018_idioms)]
 
+/// Unwrap a ready value or propagate `Async::Pending`.
+#[macro_export]
+macro_rules! ready {
+    ($e:expr) => {{
+        use std::task::Poll::{Pending, Ready};
+
+        match $e {
+            Ready(v) => v,
+            Pending => return Pending,
+        }
+    }};
+}
+
 #[path = "../src/oneshot.rs"]
 #[allow(warnings)]
 mod oneshot;
 
-use futures::{self, Async, Future};
+// use futures::{self, Async, Future};
 use loom;
-use loom::futures::block_on;
+use loom::futures::{block_on, poll_future};
 use loom::thread;
+
+use std::task::Poll::{Pending, Ready};
 
 #[test]
 fn smoke() {
@@ -33,16 +48,14 @@ fn changing_rx_task() {
         });
 
         let rx = thread::spawn(move || {
-            let t1 = block_on(futures::future::poll_fn(|| Ok::<_, ()>(rx.poll().into()))).unwrap();
-
-            match t1 {
-                Ok(Async::Ready(value)) => {
+            match poll_future(&mut rx) {
+                Ready(Ok(value)) => {
                     // ok
                     assert_eq!(1, value);
                     None
                 }
-                Ok(Async::NotReady) => Some(rx),
-                Err(_) => unreachable!(),
+                Ready(Err(_)) => unimplemented!(),
+                Pending => Some(rx),
             }
         })
         .join()
@@ -56,6 +69,30 @@ fn changing_rx_task() {
     });
 }
 
+// TODO: Move this into `oneshot` proper.
+
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+struct OnClose<'a> {
+    tx: &'a mut oneshot::Sender<i32>,
+}
+
+impl<'a> OnClose<'a> {
+    fn new(tx: &'a mut oneshot::Sender<i32>) -> Self {
+        OnClose { tx }
+    }
+}
+
+impl<'a> Future for OnClose<'a> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        self.get_mut().tx.poll_close(cx)
+    }
+}
+
 #[test]
 fn changing_tx_task() {
     loom::fuzz(|| {
@@ -66,15 +103,11 @@ fn changing_tx_task() {
         });
 
         let tx = thread::spawn(move || {
-            let t1 = block_on(futures::future::poll_fn(|| {
-                Ok::<_, ()>(tx.poll_close().into())
-            }))
-            .unwrap();
+            let t1 = poll_future(&mut OnClose::new(&mut tx));
 
             match t1 {
-                Ok(Async::Ready(())) => None,
-                Ok(Async::NotReady) => Some(tx),
-                Err(_) => unreachable!(),
+                Ready(()) => None,
+                Pending => Some(tx),
             }
         })
         .join()
@@ -82,7 +115,7 @@ fn changing_tx_task() {
 
         if let Some(mut tx) = tx {
             // Previous task parked, use a new task...
-            block_on(futures::future::poll_fn(move || tx.poll_close())).unwrap();
+            block_on(OnClose::new(&mut tx));
         }
     });
 }

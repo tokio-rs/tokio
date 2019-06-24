@@ -24,9 +24,8 @@ publish = false
 
 [dependencies]
 crossbeam-utils = "0.6.0"
-futures = "0.1.19"
 lazy_static = "1.0.2"
-log = "0.4.1"
+log = "0.4.6"
 mio = "0.6.14"
 num_cpus = "1.8.0"
 parking_lot = "0.8"
