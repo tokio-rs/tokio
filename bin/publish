@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-USAGE="Release a tokio crate
+USAGE="Publish a new release of a tokio crate
 
 USAGE:
     $(basename "$0") [OPTIONS] [CRATE] [VERSION]

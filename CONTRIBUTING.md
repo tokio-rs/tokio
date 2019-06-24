@@ -427,7 +427,7 @@ When releasing a new version of a crate, follow these steps:
    the next step.
 7. **Release the crate.** Run the following command:
    ```bash
-   bin/release <NAME OF CRATE> <VERSION>
+   bin/publish <NAME OF CRATE> <VERSION>
    ```
 
    Your editor and prompt you to edit a message for the tag. Copy the changelog
