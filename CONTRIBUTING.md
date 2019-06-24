@@ -425,17 +425,9 @@ When releasing a new version of a crate, follow these steps:
 6. **Open a pull request with your changes.** Once that pull request has been
    approved by a maintainer and the pull request has been merged, continue to
    the next step.
-7. **Release the crate.** Run the following commands:
-
+7. **Release the crate.** Run the following command:
    ```bash
-   export CRATE="put the name of the crate here"
-   export VERSION="put the version being released here"
-   git checkout master &&
-   git pull &&
-   cargo package -p "$CRATE" &&
-   cargo publish -p "$CRATE" &&
-   git tag "$CRATE-$VERSION" &&
-   git push --tags
+   bin/release <NAME OF CRATE> <VERSION>
    ```
 
    Your editor and prompt you to edit a message for the tag. Copy the changelog
