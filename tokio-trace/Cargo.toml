@@ -22,7 +22,7 @@ categories = ["development-tools::debugging", "asynchronous"]
 keywords = ["logging", "tracing"]
 
 [dependencies]
-tokio-trace-core = { version = "0.2", path = "tokio-trace-core" }
+tokio-trace-core = { path = "./tokio-trace-core" }
 log = { version = "0.4", optional = true }
 cfg-if = "0.1.7"
 

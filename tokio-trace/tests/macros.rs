@@ -395,6 +395,280 @@ fn error() {
 }
 
 #[test]
+fn event_root() {
+    event!(Level::DEBUG, parent: None, foo = ?3, bar.baz = %2, quux = false);
+    event!(
+        Level::DEBUG,
+        parent: None,
+        foo = 3,
+        bar.baz = 2,
+        quux = false
+    );
+    event!(Level::DEBUG, parent: None, foo = 3, bar.baz = 3,);
+    event!(Level::DEBUG, parent: None, "foo");
+    event!(Level::DEBUG, parent: None, "foo: {}", 3);
+    event!(Level::DEBUG, parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    event!(Level::DEBUG, parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    event!(Level::DEBUG, parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    event!(Level::DEBUG, parent: None, { foo = ?2, bar.baz = %78 }, "quux");
+    event!(target: "foo_events", Level::DEBUG, parent: None, foo = 3, bar.baz = 2, quux = false);
+    event!(target: "foo_events", Level::DEBUG, parent: None, foo = 3, bar.baz = 3,);
+    event!(target: "foo_events", Level::DEBUG, parent: None, "foo");
+    event!(target: "foo_events", Level::DEBUG, parent: None, "foo: {}", 3);
+    event!(target: "foo_events", Level::DEBUG, parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    event!(target: "foo_events", Level::DEBUG, parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    event!(target: "foo_events", Level::DEBUG, parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    event!(target: "foo_events", Level::DEBUG, parent: None, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn trace_root() {
+    trace!(parent: None, foo = ?3, bar.baz = %2, quux = false);
+    trace!(parent: None, foo = 3, bar.baz = 2, quux = false);
+    trace!(parent: None, foo = 3, bar.baz = 3,);
+    trace!(parent: None, "foo");
+    trace!(parent: None, "foo: {}", 3);
+    trace!(parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    trace!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    trace!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    trace!(parent: None, { foo = 2, bar.baz = 78 }, "quux");
+    trace!(parent:None, { foo = ?2, bar.baz = %78 }, "quux");
+    trace!(target: "foo_events", parent: None, foo = 3, bar.baz = 2, quux = false);
+    trace!(target: "foo_events", parent: None, foo = 3, bar.baz = 3,);
+    trace!(target: "foo_events", parent: None, "foo");
+    trace!(target: "foo_events", parent: None, "foo: {}", 3);
+    trace!(target: "foo_events", parent: None,  { foo = 3, bar.baz = 80 }, "quux");
+    trace!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    trace!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    trace!(target: "foo_events", parent: None,  { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn debug_root() {
+    debug!(parent: None, foo = ?3, bar.baz = %2, quux = false);
+    debug!(parent: None, foo = 3, bar.baz = 2, quux = false);
+    debug!(parent: None, foo = 3, bar.baz = 3,);
+    debug!(parent: None, "foo");
+    debug!(parent: None, "foo: {}", 3);
+    debug!(parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    debug!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    debug!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    debug!(parent: None, { foo = 2, bar.baz = 78 }, "quux");
+    debug!(parent: None, { foo = ?2, bar.baz = %78 }, "quux");
+    debug!(target: "foo_events", parent: None, foo = 3, bar.baz = 2, quux = false);
+    debug!(target: "foo_events", parent: None, foo = 3, bar.baz = 3,);
+    debug!(target: "foo_events", parent: None, "foo");
+    debug!(target: "foo_events", parent: None, "foo: {}", 3);
+    debug!(target: "foo_events", parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    debug!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    debug!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    debug!(target: "foo_events", parent: None, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn info_root() {
+    info!(parent: None, foo = ?3, bar.baz = %2, quux = false);
+    info!(parent: None, foo = 3, bar.baz = 2, quux = false);
+    info!(parent: None, foo = 3, bar.baz = 3,);
+    info!(parent: None, "foo");
+    info!(parent: None, "foo: {}", 3);
+    info!(parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    info!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    info!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    info!(parent: None, { foo = 2, bar.baz = 78 }, "quux");
+    info!(parent: None, { foo = ?2, bar.baz = %78 }, "quux");
+    info!(target: "foo_events", parent: None, foo = 3, bar.baz = 2, quux = false);
+    info!(target: "foo_events", parent: None, foo = 3, bar.baz = 3,);
+    info!(target: "foo_events", parent: None, "foo");
+    info!(target: "foo_events", parent: None, "foo: {}", 3);
+    info!(target: "foo_events", parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    info!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    info!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    info!(target: "foo_events", parent: None, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn warn_root() {
+    warn!(parent: None, foo = ?3, bar.baz = %2, quux = false);
+    warn!(parent: None, foo = 3, bar.baz = 2, quux = false);
+    warn!(parent: None, foo = 3, bar.baz = 3,);
+    warn!(parent: None, "foo");
+    warn!(parent: None, "foo: {}", 3);
+    warn!(parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    warn!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    warn!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    warn!(parent: None, { foo = 2, bar.baz = 78 }, "quux");
+    warn!(parent: None, { foo = ?2, bar.baz = %78 }, "quux");
+    warn!(target: "foo_events", parent: None, foo = 3, bar.baz = 2, quux = false);
+    warn!(target: "foo_events", parent: None, foo = 3, bar.baz = 3,);
+    warn!(target: "foo_events", parent: None, "foo");
+    warn!(target: "foo_events", parent: None, "foo: {}", 3);
+    warn!(target: "foo_events", parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    warn!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    warn!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    warn!(target: "foo_events", parent: None, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn error_root() {
+    error!(parent: None, foo = ?3, bar.baz = %2, quux = false);
+    error!(parent: None, foo = 3, bar.baz = 2, quux = false);
+    error!(parent: None, foo = 3, bar.baz = 3,);
+    error!(parent: None, "foo");
+    error!(parent: None, "foo: {}", 3);
+    error!(parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    error!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    error!(parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    error!(parent: None, { foo = 2, bar.baz = 78 }, "quux");
+    error!(parent: None, { foo = ?2, bar.baz = %78 }, "quux");
+    error!(target: "foo_events", parent: None, foo = 3, bar.baz = 2, quux = false);
+    error!(target: "foo_events", parent: None, foo = 3, bar.baz = 3,);
+    error!(target: "foo_events", parent: None, "foo");
+    error!(target: "foo_events", parent: None, "foo: {}", 3);
+    error!(target: "foo_events", parent: None, { foo = 3, bar.baz = 80 }, "quux");
+    error!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    error!(target: "foo_events", parent: None, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    error!(target: "foo_events", parent: None, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn event_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    event!(Level::DEBUG, parent: &p, foo = ?3, bar.baz = %2, quux = false);
+    event!(Level::DEBUG, parent: &p, foo = 3, bar.baz = 2, quux = false);
+    event!(Level::DEBUG, parent: &p, foo = 3, bar.baz = 3,);
+    event!(Level::DEBUG, parent: &p, "foo");
+    event!(Level::DEBUG, parent: &p, "foo: {}", 3);
+    event!(Level::DEBUG, parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    event!(Level::DEBUG, parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    event!(Level::DEBUG, parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    event!(Level::DEBUG, parent: &p, { foo = ?2, bar.baz = %78 }, "quux");
+    event!(target: "foo_events", Level::DEBUG, parent: &p, foo = 3, bar.baz = 2, quux = false);
+    event!(target: "foo_events", Level::DEBUG, parent: &p, foo = 3, bar.baz = 3,);
+    event!(target: "foo_events", Level::DEBUG, parent: &p, "foo");
+    event!(target: "foo_events", Level::DEBUG, parent: &p, "foo: {}", 3);
+    event!(target: "foo_events", Level::DEBUG, parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    event!(target: "foo_events", Level::DEBUG, parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    event!(target: "foo_events", Level::DEBUG, parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    event!(target: "foo_events", Level::DEBUG, parent: &p, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn trace_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    trace!(parent: &p, foo = ?3, bar.baz = %2, quux = false);
+    trace!(parent: &p, foo = 3, bar.baz = 2, quux = false);
+    trace!(parent: &p, foo = 3, bar.baz = 3,);
+    trace!(parent: &p, "foo");
+    trace!(parent: &p, "foo: {}", 3);
+    trace!(parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    trace!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    trace!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    trace!(parent: &p, { foo = 2, bar.baz = 78 }, "quux");
+    trace!(parent: &p, { foo = ?2, bar.baz = %78 }, "quux");
+    trace!(target: "foo_events", parent: &p, foo = 3, bar.baz = 2, quux = false);
+    trace!(target: "foo_events", parent: &p, foo = 3, bar.baz = 3,);
+    trace!(target: "foo_events", parent: &p, "foo");
+    trace!(target: "foo_events", parent: &p, "foo: {}", 3);
+    trace!(target: "foo_events", parent: &p,  { foo = 3, bar.baz = 80 }, "quux");
+    trace!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    trace!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    trace!(target: "foo_events", parent: &p,  { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn debug_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    debug!(parent: &p, foo = ?3, bar.baz = %2, quux = false);
+    debug!(parent: &p, foo = 3, bar.baz = 2, quux = false);
+    debug!(parent: &p, foo = 3, bar.baz = 3,);
+    debug!(parent: &p, "foo");
+    debug!(parent: &p, "foo: {}", 3);
+    debug!(parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    debug!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    debug!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    debug!(parent: &p, { foo = 2, bar.baz = 78 }, "quux");
+    debug!(parent: &p, { foo = ?2, bar.baz = %78 }, "quux");
+    debug!(target: "foo_events", parent: &p, foo = 3, bar.baz = 2, quux = false);
+    debug!(target: "foo_events", parent: &p, foo = 3, bar.baz = 3,);
+    debug!(target: "foo_events", parent: &p, "foo");
+    debug!(target: "foo_events", parent: &p, "foo: {}", 3);
+    debug!(target: "foo_events", parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    debug!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    debug!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    debug!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn info_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    info!(parent: &p, foo = ?3, bar.baz = %2, quux = false);
+    info!(parent: &p, foo = 3, bar.baz = 2, quux = false);
+    info!(parent: &p, foo = 3, bar.baz = 3,);
+    info!(parent: &p, "foo");
+    info!(parent: &p, "foo: {}", 3);
+    info!(parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    info!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    info!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    info!(parent: &p, { foo = 2, bar.baz = 78 }, "quux");
+    info!(parent: &p, { foo = ?2, bar.baz = %78 }, "quux");
+    info!(target: "foo_events", parent: &p, foo = 3, bar.baz = 2, quux = false);
+    info!(target: "foo_events", parent: &p, foo = 3, bar.baz = 3,);
+    info!(target: "foo_events", parent: &p, "foo");
+    info!(target: "foo_events", parent: &p, "foo: {}", 3);
+    info!(target: "foo_events", parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    info!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    info!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    info!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn warn_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    warn!(parent: &p, foo = ?3, bar.baz = %2, quux = false);
+    warn!(parent: &p, foo = 3, bar.baz = 2, quux = false);
+    warn!(parent: &p, foo = 3, bar.baz = 3,);
+    warn!(parent: &p, "foo");
+    warn!(parent: &p, "foo: {}", 3);
+    warn!(parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    warn!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    warn!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    warn!(parent: &p, { foo = 2, bar.baz = 78 }, "quux");
+    warn!(parent: &p, { foo = ?2, bar.baz = %78 }, "quux");
+    warn!(target: "foo_events", parent: &p, foo = 3, bar.baz = 2, quux = false);
+    warn!(target: "foo_events", parent: &p, foo = 3, bar.baz = 3,);
+    warn!(target: "foo_events", parent: &p, "foo");
+    warn!(target: "foo_events", parent: &p, "foo: {}", 3);
+    warn!(target: "foo_events", parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    warn!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    warn!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    warn!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
+fn error_with_parent() {
+    let p = span!(Level::TRACE, "im_a_parent!");
+    error!(parent: &p, foo = ?3, bar.baz = %2, quux = false);
+    error!(parent: &p, foo = 3, bar.baz = 2, quux = false);
+    error!(parent: &p, foo = 3, bar.baz = 3,);
+    error!(parent: &p, "foo");
+    error!(parent: &p, "foo: {}", 3);
+    error!(parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    error!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    error!(parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    error!(parent: &p, { foo = 2, bar.baz = 78 }, "quux");
+    error!(parent: &p, { foo = ?2, bar.baz = %78 }, "quux");
+    error!(target: "foo_events", parent: &p, foo = 3, bar.baz = 2, quux = false);
+    error!(target: "foo_events", parent: &p, foo = 3, bar.baz = 3,);
+    error!(target: "foo_events", parent: &p, "foo");
+    error!(target: "foo_events", parent: &p, "foo: {}", 3);
+    error!(target: "foo_events", parent: &p, { foo = 3, bar.baz = 80 }, "quux");
+    error!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}", true);
+    error!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 79 }, "quux {:?}, {quux}", true, quux = false);
+    error!(target: "foo_events", parent: &p, { foo = 2, bar.baz = 78, }, "quux");
+}
+
+#[test]
 fn field_shorthand_only() {
     #[derive(Debug)]
     struct Position {
