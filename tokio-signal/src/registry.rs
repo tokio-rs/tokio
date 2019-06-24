@@ -200,6 +200,7 @@ impl Globals {
         self.registry.broadcast()
     }
 
+    #[cfg(unix)]
     pub(crate) fn storage(&self) -> &OsStorage {
         &self.registry.storage
     }

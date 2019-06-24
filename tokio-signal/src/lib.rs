@@ -59,12 +59,13 @@ use futures::{future, Future};
 use std::io;
 use tokio_reactor::Handle;
 
-#[cfg(unix)]
 mod registry;
 
 mod os {
     #[cfg(unix)]
     pub(crate) use super::unix::{OsExtraData, OsStorage};
+    #[cfg(windows)]
+    pub(crate) use super::windows::{OsExtraData, OsStorage};
 }
 
 pub mod unix;
