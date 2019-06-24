@@ -23,7 +23,7 @@
 //!
 //! For example:
 //!
-//! ```
+//! ```ignore
 //! use tokio::runtime::current_thread::Runtime;
 //! use tokio::prelude::*;
 //! use std::thread;
@@ -68,7 +68,7 @@ mod builder;
 mod runtime;
 
 pub use self::builder::Builder;
-pub use self::runtime::{Runtime, Handle};
+pub use self::runtime::{Handle, Runtime};
 pub use tokio_current_thread::spawn;
 pub use tokio_current_thread::TaskExecutor;
 
@@ -98,7 +98,6 @@ pub fn run<F>(future: F)
 where
     F: Future<Output = ()> + 'static,
 {
-
     let mut r = Runtime::new().expect("failed to start runtime on current thread");
     r.spawn(future);
     r.run().expect("failed to resolve remaining futures");

@@ -11,13 +11,13 @@ jobs:
 #     name: rustfmt
 
 # Test top level crate
-# - template: ci/azure-test-stable.yml
-#   parameters:
-#     name: test_tokio
-#     displayName: Test tokio
-#     cross: true
-#     crates:
-#       - tokio
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_tokio
+    displayName: Test tokio
+    cross: true
+    crates:
+      - tokio
 
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml

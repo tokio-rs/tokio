@@ -40,7 +40,7 @@
 //! [`spawn`]: fn.spawn.html
 
 use std::future::Future;
-pub use tokio_executor::{Executor, TypedExecutor, DefaultExecutor, SpawnError};
+pub use tokio_executor::{DefaultExecutor, Executor, SpawnError, TypedExecutor};
 
 /// Return value from the `spawn` function.
 ///
@@ -68,7 +68,7 @@ pub struct Spawn(());
 /// In this example, a server is started and `spawn` is used to start a new task
 /// that processes each received connection.
 ///
-/// ```rust
+/// ```rust,ignore
 /// # use futures::{Future, Stream};
 /// use tokio::net::TcpListener;
 ///
@@ -100,7 +100,8 @@ pub struct Spawn(());
 ///
 /// [`DefaultExecutor`]: struct.DefaultExecutor.html
 pub fn spawn<F>(f: F) -> Spawn
-where F: Future<Output = ()> + 'static + Send
+where
+    F: Future<Output = ()> + 'static + Send,
 {
     ::tokio_executor::spawn(f);
     Spawn(())
