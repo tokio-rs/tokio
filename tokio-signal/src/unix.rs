@@ -22,7 +22,7 @@ use mio_uds::UnixStream;
 use tokio_io::IoFuture;
 use tokio_reactor::{Handle, PollEvented};
 
-use crate::registry::{globals, EventId, EventInfo, Globals, Init, ListenerId, Storage};
+use crate::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 
 pub use libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
 pub use libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
@@ -253,7 +253,6 @@ impl Driver {
 pub struct Signal {
     driver: Driver,
     signal: c_int,
-    id: ListenerId,
     rx: Receiver<()>,
 }
 
@@ -320,11 +319,11 @@ impl Signal {
                 // more. NB: channels always guarantee at least one slot per sender,
                 // so we don't need additional slots
                 let (tx, rx) = channel(0);
-                let id = globals().register_listener(signal as EventId, tx);
+                globals().register_listener(signal as EventId, tx);
+
                 Ok(Signal {
                     driver: driver,
                     rx: rx,
-                    id: id,
                     signal: signal,
                 })
             })();
@@ -345,12 +344,6 @@ impl Stream for Signal {
             .map(|ready| ready.map(|item| item.map(|()| self.signal)))
             // receivers don't generate errors
             .map_err(|_| unreachable!())
-    }
-}
-
-impl Drop for Signal {
-    fn drop(&mut self) {
-        globals().deregister_listener(self.signal as EventId, self.id)
     }
 }
 

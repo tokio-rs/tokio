@@ -19,7 +19,7 @@ use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
 
-use crate::registry::{globals, EventId, EventInfo, Init, ListenerId, Storage};
+use crate::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::IoFuture;
 
 #[derive(Debug)]
@@ -87,8 +87,6 @@ static INIT: Once = ONCE_INIT;
 ///   two notifications.
 // FIXME: refactor and combine with unix::Signal
 pub struct Event {
-    event_type: DWORD,
-    id: ListenerId,
     rx: Receiver<()>,
 }
 
@@ -142,13 +140,9 @@ impl Event {
             }
 
             let (tx, rx) = channel(0);
-            let id = globals().register_listener(signum as EventId, tx);
+            globals().register_listener(signum as EventId, tx);
 
-            Ok(Async::Ready(Event {
-                event_type: signum,
-                id,
-                rx,
-            }))
+            Ok(Async::Ready(Event { rx }))
         });
 
         Box::new(new_signal)
@@ -164,12 +158,6 @@ impl Stream for Event {
             .poll()
             // receivers don't generate errors
             .map_err(|_| unreachable!())
-    }
-}
-
-impl Drop for Event {
-    fn drop(&mut self) {
-        globals().deregister_listener(self.event_type as EventId, self.id);
     }
 }
 

@@ -6,40 +6,6 @@ use std::sync::Mutex;
 use crate::os::{OsExtraData, OsStorage};
 use futures::sync::mpsc::Sender;
 
-/// A newtype which represents a unique identifier for each event listener.
-/// The id is derived by boxing the channel `Sender` associated with this instance
-/// and using its address in memory.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct ListenerId(usize);
-
-/// A newtype for uniquely identifying an object by its address on the heap.
-#[derive(Debug)]
-struct Id<T>(Box<T>);
-
-impl<T> Id<T> {
-    fn new(inner: T) -> Self {
-        Self(Box::new(inner))
-    }
-
-    fn id(&self) -> ListenerId {
-        ListenerId(&*self.0 as *const _ as usize)
-    }
-}
-
-impl<T> ops::Deref for Id<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-impl<T> ops::DerefMut for Id<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
-    }
-}
-
 pub(crate) type EventId = usize;
 
 /// State for a specific event, whether a notification is pending delivery,
@@ -47,7 +13,7 @@ pub(crate) type EventId = usize;
 #[derive(Default, Debug)]
 pub(crate) struct EventInfo {
     pending: AtomicBool,
-    recipients: Mutex<Vec<Id<Sender<()>>>>,
+    recipients: Mutex<Vec<Sender<()>>>,
 }
 
 /// An interface for retrieving the `EventInfo` for a particular eventId.
@@ -97,31 +63,14 @@ impl<S> Registry<S> {
 
 impl<S: Storage> Registry<S> {
     /// Register a new listener for `event_id`.
-    fn register_listener(&self, event_id: EventId, listener: Sender<()>) -> ListenerId {
-        let mut recipients = self
-            .storage
+    fn register_listener(&self, event_id: EventId, listener: Sender<()>) {
+        self.storage
             .event_info(event_id)
             .unwrap_or_else(|| panic!("invalid event_id: {}", event_id))
             .recipients
             .lock()
-            .unwrap();
-
-        let listener = Id::new(listener);
-        let id = listener.id();
-
-        recipients.push(listener);
-        id
-    }
-
-    /// Stop sending event notifications to a given listener.
-    fn deregister_listener(&self, event_id: EventId, listener_id: ListenerId) {
-        if let Some(event_info) = self.storage.event_info(event_id) {
-            event_info
-                .recipients
-                .lock()
-                .unwrap()
-                .retain(|listener| listener.id() != listener_id);
-        }
+            .unwrap()
+            .push(listener);
     }
 
     /// Mark `event_id` as having been delivered, without broadcasting it to
@@ -181,13 +130,8 @@ impl ops::Deref for Globals {
 
 impl Globals {
     /// Register a new listener for `event_id`.
-    pub(crate) fn register_listener(&self, event_id: EventId, listener: Sender<()>) -> ListenerId {
-        self.registry.register_listener(event_id, listener)
-    }
-
-    /// Stop sending event notifications to a given listener.
-    pub(crate) fn deregister_listener(&self, event_id: EventId, listener_id: ListenerId) {
-        self.registry.deregister_listener(event_id, listener_id)
+    pub(crate) fn register_listener(&self, event_id: EventId, listener: Sender<()>) {
+        self.registry.register_listener(event_id, listener);
     }
 
     /// Mark `event_id` as having been delivered, without broadcasting it to
@@ -296,67 +240,6 @@ mod tests {
 
         let (tx, _) = channel(0);
         registry.register_listener(1, tx);
-    }
-
-    #[test]
-    fn deregister_stops_events() {
-        let registry = Registry::new(vec![EventInfo::default()]);
-
-        let (first_tx, first_rx) = channel(0);
-        let (second_tx, second_rx) = channel(0);
-
-        registry.register_listener(0, first_tx);
-        let second_id = registry.register_listener(0, second_tx);
-
-        let (fire, wait) = oneshot::channel();
-        let rt = Runtime::new().unwrap();
-
-        rt.spawn(
-            wait.and_then(move |_| {
-                // Record some events which should get coalesced
-                registry.record_event(0);
-                registry.broadcast();
-
-                sleep(Duration::from_millis(100))
-                    .map_err(|e| panic!("{:#?}", e))
-                    .and_then(move |_| {
-                        registry.deregister_listener(0, second_id);
-
-                        registry.record_event(0);
-                        registry.broadcast();
-
-                        drop(registry);
-                        Ok(())
-                    })
-            })
-            .map_err(|e| panic!("{}", e)),
-        );
-
-        let (first_results, second_results) = rt
-            .block_on(futures::lazy(move || {
-                let _ = fire.send(());
-
-                first_rx.collect().join(second_rx.collect())
-            }))
-            .expect("failed to extract events");
-
-        assert_eq!(2, first_results.len());
-        assert_eq!(1, second_results.len());
-    }
-
-    #[test]
-    fn deregister_invalid_input_does_nothing() {
-        let registry = Registry::new(vec![EventInfo::default()]);
-
-        let (tx, rx) = channel(0);
-
-        let id = registry.register_listener(0, tx);
-
-        registry.deregister_listener(1, id); // Wrong eventId
-        registry.deregister_listener(0, ListenerId(42)); // Wrong listenerId
-
-        assert_eq!(1, registry.storage[0].recipients.lock().unwrap().len());
-        drop(rx);
     }
 
     #[test]
