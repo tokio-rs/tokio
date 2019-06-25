@@ -1,5 +1,6 @@
 //! Spans represent periods of time in the execution of a program.
 
+use parent::Parent;
 use {field, Metadata};
 
 /// Identifies a span within the context of a subscriber.
@@ -28,16 +29,6 @@ pub struct Attributes<'a> {
 #[derive(Debug)]
 pub struct Record<'a> {
     values: &'a field::ValueSet<'a>,
-}
-
-#[derive(Debug)]
-enum Parent {
-    /// The new span will be a root span.
-    Root,
-    /// The new span will be rooted in the current span.
-    Current,
-    /// The new span has an explicitly-specified parent.
-    Explicit(Id),
 }
 
 // ===== impl Span =====

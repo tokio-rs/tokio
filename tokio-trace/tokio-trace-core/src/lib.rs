@@ -195,6 +195,7 @@ pub mod dispatcher;
 pub mod event;
 pub mod field;
 pub mod metadata;
+mod parent;
 pub mod span;
 pub mod subscriber;
 
