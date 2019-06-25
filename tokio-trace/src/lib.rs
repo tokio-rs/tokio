@@ -24,12 +24,12 @@
 //!
 //! # Core Concepts
 //!
-//! The core of `tokio-trace`'s API is composed of `Event`s, `Span`s, and
-//! `Subscriber`s. We'll cover these in turn.
+//! The core of `tokio-trace`'s API is composed of _spans_, _events_ and
+//! _subscribers_. We'll cover these in turn.
 //!
-//! ## `Span`s
+//! ## Spans
 //!
-//! A [`Span`] represents a _period of time_ during which a program was executing
+//! A [`span`] represents a _period of time_ during which a program was executing
 //! in some context. A thread of execution is said to _enter_ a span when it
 //! begins executing in that context, and to _exit_ the span when switching to
 //! another context. The span in which a thread is currently executing is
@@ -49,153 +49,7 @@
 //! # }
 //!```
 //!
-//! The [`in_scope`] method may be used to execute a closure inside a
-//! span:
-//!
-//! ```
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! # let span = span!(Level::TRACE, "my_span");
-//! span.in_scope(|| {
-//!     // perform some more work in the context of `my_span`...
-//! });
-//! # }
-//!```
-//!
-//! Spans form a tree structure — unless it is a root span, all spans have a
-//! _parent_, and may have one or more _children_. When a new span is created,
-//! the current span becomes the new span's parent. The total execution time of
-//! a span consists of the time spent in that span and in the entire subtree
-//! represented by its children. Thus, a parent span always lasts for at least
-//! as long as the longest-executing span in its subtree.
-//!
-//! ```
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! // this span is considered the "root" of a new trace tree:
-//! span!(Level::INFO, "root").in_scope(|| {
-//!     // since we are now inside "root", this span is considered a child
-//!     // of "root":
-//!     span!(Level::DEBUG, "outer_child").in_scope(|| {
-//!         // this span is a child of "outer_child", which is in turn a
-//!         // child of "root":
-//!         span!(Level::TRACE, "inner_child").in_scope(|| {
-//!             // and so on...
-//!         });
-//!     });
-//! });
-//! # }
-//!```
-//!
-//! In addition, data may be associated with spans. A span may have _fields_ —
-//! a set of key-value pairs describing the state of the program during that
-//! span; an optional name, and metadata describing the source code location
-//! where the span was originally entered.
-//! ```
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! // construct a new span with three fields:
-//! //  - "foo", with a value of 42,
-//! //  - "bar", with the value "false"
-//! //  - "baz", with no initial value
-//! let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false);
-//!
-// TODO(#1138): determine a new syntax for uninitialized span fields, and
-// re-enable this.
-// //! // record a value for the field "baz" declared above:
-// //! my_span.record("baz", &"hello world");
-//! # }
-//!```
-//!
-//! As shorthand, local variables may be used as field values without an
-//! assignment, similar to [struct initializers]. For example:
-//! ```
-//! # #[macro_use]
-//! # extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! let user = "ferris";
-//!
-//! span!(Level::TRACE, "login", user);
-//! // is equivalent to:
-//! span!(Level::TRACE, "login", user = user);
-//! # }
-//!```
-//!
-//! The [`field::display`] and [`field::debug`] functions are used to record
-//! fields on spans or events using their `fmt::Display` and `fmt::Debug`
-//! implementations (rather than as typed data). This may be used in lieu of
-//! custom `Value` implementations for complex or user-defined types.
-//!
-//! In addition, the span and event macros permit the use of the `%` and `?`
-//! sigils as shorthand for `field::display` and `field::debug`, respectively.
-//! For example:
-//!
-//! ```
-//! # #[macro_use]
-//! # extern crate tokio_trace;
-//! # use tokio_trace::{Level, field};
-//! # fn main() {
-//! #[derive(Debug)]
-//! struct MyStruct {
-//!     my_field: &'static str,
-//! }
-//!
-//! let my_struct = MyStruct {
-//!     my_field: "Hello world!"
-//! };
-//!
-//! span!(Level::TRACE,"my_span", ?my_struct, %my_struct.my_field);
-//! // is equivalent to:
-//! span!(Level::TRACE, "my_span", my_struct = field::debug(&my_struct), my_struct.my_field = field::display(&my_struct.my_field));
-//! # }
-//!```
-//!
-//! ### When to use spans
-//!
-//! As a rule of thumb, spans should be used to represent discrete units of work
-//! (e.g., a given request's lifetime in a server) or periods of time spent in a
-//! given context (e.g., time spent interacting with an instance of an external
-//! system, such as a database).
-//!
-//! Which scopes in a program correspond to new spans depend somewhat on user
-//! intent. For example, consider the case of a loop in a program. Should we
-//! construct one span and perform the entire loop inside of that span, like:
-//! ```rust
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! # let n = 1;
-//! let span = span!(Level::TRACE, "my_loop");
-//! let _enter = span.enter();
-//! for i in 0..n {
-//!     # let _ = i;
-//!     // ...
-//! }
-//! # }
-//! ```
-//! Or, should we create a new span for each iteration of the loop, as in:
-//! ```rust
-//! # #[macro_use] extern crate tokio_trace;
-//! # use tokio_trace::Level;
-//! # fn main() {
-//! # let n = 1u64;
-//! for i in 0..n {
-//!     let span = span!(Level::TRACE, "my_loop", iteration = i);
-//!     let _enter = span.enter();
-//!     // ...
-//! }
-//! # }
-//! ```
-//!
-//! Depending on the circumstances, we might want to do either, or both. For
-//! example, if we want to know how long was spent in the loop overall, we would
-//! create a single span around the entire loop; whereas if we wanted to know how
-//! much time was spent in each individual iteration, we would enter a new span
-//! on every iteration.
+//! The [`span` module]'s documentation provides further details on how to use spans.
 //!
 //! ## Events
 //!
@@ -462,7 +316,8 @@
 //! ```
 //!
 //! [`log`]: https://docs.rs/log/0.4.6/log/
-//! [`Span`]: span/struct.Span.html
+//! [`span`]: span/index.html
+//! [`span` module]: span/index.html
 //! [`in_scope`]: span/struct.Span.html#method.in_scope
 //! [`Event`]: struct.Event.html
 //! [`Subscriber`]: subscriber/trait.Subscriber.html

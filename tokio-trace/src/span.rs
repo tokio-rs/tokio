@@ -1,6 +1,51 @@
-//! Spans represent periods of time in the execution of a program.
+//! Spans represent periods of time in which a program was executing in a
+//! particular context.
 //!
-//! # Entering a Span
+//! A span consists of [fields], user-defined key-value pairs of arbitrary data
+//! that describe the context the span represents, and [metadata], a fixed set
+//! of attributes that describe all `tokio-trace` spans and events. Each span is
+//! assigned an [`Id` ] by the subscriber that uniquely identifies it in relation
+//! to other spans.
+//!
+//! # Creating Spans
+//!
+//! Spans are created using the [`span!`] macro. This macro is invoked with a
+//! [verbosity level], followed by a set of attributes whose default values
+//! the user whishes to override, a string literal providing the span's name,
+//! and finally, between zero and 32 fields.
+//!
+//! For example:
+//! ```rust
+//! #[macro_use]
+//! extern crate tokio_trace;
+//! use tokio_trace::Level;
+//!
+//! # fn main() {
+//! /// Construct a new span at the `INFO` level named "my_span", with a single
+//! /// field named answer , with the value `42`.
+//! let my_span = span!(Level::INFO, "my_span", answer = 42);
+//! # }
+//! ```
+//!
+//! The documentation for the [`span!`] macro provides additional examples of
+//! the various options that exist when creating spans.
+//!
+//! The [`trace_span!`], [`debug_span!`], [`info_span!`], [`warn_span!`], and
+//! [`error_span!`] exist as shorthand for constructing spans at various
+//! verbosity levels.
+//!
+//! ## Recording Span Creation
+//!
+//! The [`Attributes`] type contains data associated with a span, and is
+//! provided to the [`Subscriber`] when a new span is created. It contains
+//! the span's metadata, the ID of the span's parent if one was explicitly set,
+//! and any fields whose values were recorded when the span was constructed.
+//! The subscriber may then choose to cache the data for future use, record
+//! it in some manner, or discard it completely.
+//!
+//! # The Span Lifecycle
+//!
+//! ## Entering a Span
 //!
 //! A thread of execution is said to _enter_ a span when it begins executing,
 //! and _exit_ the span when it switches to another context. Spans may be
@@ -13,13 +58,15 @@
 //! # use tokio_trace::Level;
 //! # fn main() {
 //! let my_var: u64 = 5;
-//! let my_span = span!(Level::TRACE, "my_span", my_var = &my_var);
+//! let my_span = span!(Level::TRACE, "my_span", my_var);
 //!
 //! // `my_span` exists but has not been entered.
 //!
+//! // Enter `my_span`...
 //! let _enter = my_span.enter();
 //!
 //! // Perform some work inside of the context of `my_span`...
+//! // Dropping the `_enter` guard will exit the span.
 //! # }
 //!```
 //!
@@ -44,11 +91,86 @@
 //! # }
 //! ```
 //!
+//! **Note:** Since entering a span takes `&self`, and `Span`s are `Clone`,
+//! `Send`, and `Sync`, it is entirely valid for multiple threads to enter the
+//! same span concurrently.
 //!
-//! # The Span Lifecycle
+//! ## Span Relationships
 //!
-//! Execution may enter and exit a span multiple times before that
-//! span is _closed_. Consider, for example, a future which has an associated
+//! Spans form a tree structure — unless it is a root span, all spans have a
+//! _parent_, and may have one or more _children_. When a new span is created,
+//! the current span becomes the new span's parent. The total execution time of
+//! a span consists of the time spent in that span and in the entire subtree
+//! represented by its children. Thus, a parent span always lasts for at least
+//! as long as the longest-executing span in its subtree.
+//!
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! // this span is considered the "root" of a new trace tree:
+//! span!(Level::INFO, "root").in_scope(|| {
+//!     // since we are now inside "root", this span is considered a child
+//!     // of "root":
+//!     span!(Level::DEBUG, "outer_child").in_scope(|| {
+//!         // this span is a child of "outer_child", which is in turn a
+//!         // child of "root":
+//!         span!(Level::TRACE, "inner_child").in_scope(|| {
+//!             // and so on...
+//!         });
+//!     });
+//!     // another span created here would also be a child of "root".
+//! });
+//! # }
+//!```
+//!
+//! In addition, the parent of a span may be explicitly specified in
+//! the `span!` macro. For example:
+//!
+//! ```rust
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! // Create, but do not enter, a span called "foo".
+//! let foo = span!(Level::INFO, "foo");
+//!
+//! // Create and enter a span called "bar".
+//! let bar = span!(Level::INFO, "bar");
+//! let _enter = bar.enter();
+//!
+//! // Although we have currently entered "bar", "baz"'s parent span
+//! // will be "foo".
+//! let baz = span!(Level::INFO, parent: &foo, "baz");
+//! # }
+//! ```
+//!
+//! A child span should typically be considered _part_ of its parent. For
+//! example, if a subscriber is recording the length of time spent in various
+//! spans, it should generally include the time spent in a span's children as
+//! part of that span's duration.
+//!
+//! In addition to having zero or one parent, a span may also _follow from_ any
+//! number of other spans. This indicates a causal relationship between the span
+//! and the spans that it follows from, but a follower is *not* typically
+//! considered part of the duration of the span it follows. Unlike the parent, a
+//! span may record that it follows from another span after it is created, using
+//! the [`follows_from`] method.
+//!
+//! As an example, consider a listener task in a server. As the listener accepts
+//! incoming connections, it spawns new tasks that handle those connections. We
+//! might want to have a span representing the listener, and instrument each
+//! spawned handler task with its own span. We would want our instrumentation to
+//! record that the handler tasks were spawned as a result of the listener task.
+//! However, we might  not consider the handler tasks to be _part_ of the time
+//! spent in the listener task, so we would not consider those spans children of
+//! the listener span. Instead, we would record that the handler tasks follow
+//! from the listener, recording the causal relationship but treating the spans
+//! as separate durations.
+//!
+//! ## Closing Spans
+//!
+//! Execution may enter and exit a span multiple times before that span is
+//! _closed_. Consider, for example, a future which has an associated
 //! span and enters that span every time it is polled:
 //! ```rust
 //! # extern crate tokio_trace;
@@ -64,10 +186,9 @@
 //!     type Error = ();
 //!
 //!     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//!         self.span.in_scope(|| {
-//!             // Do actual future work
+//!         let _enter = self.span.enter();
+//!         // Do actual future work...
 //! # Ok(Async::Ready(()))
-//!         })
 //!     }
 //! }
 //! ```
@@ -90,7 +211,7 @@
 //! this to determine whether or not the span will be entered again.
 //!
 //! If there is only a single handle with the capacity to exit a span, dropping
-//! that handle "close" the span, since the capacity to enter it no longer
+//! that handle "closes" the span, since the capacity to enter it no longer
 //! exists. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
@@ -117,15 +238,60 @@
 //! given ID, then no more handles to the span with that ID exist. The
 //! subscriber may then treat it as closed.
 //!
-//! # Accessing a Span's Attributes
+//! # When to use spans
 //!
-//! The [`Attributes`] type represents a *non-entering* reference to a `Span`'s data
-//! — a set of key-value pairs (known as _fields_), a creation timestamp,
-//! a reference to the span's parent in the trace tree, and metadata describing
-//! the source code location where the span was created. This data is provided
-//! to the [`Subscriber`] when the span is created; it may then choose to cache
-//! the data for future use, record it in some manner, or discard it completely.
+//! As a rule of thumb, spans should be used to represent discrete units of work
+//! (e.g., a given request's lifetime in a server) or periods of time spent in a
+//! given context (e.g., time spent interacting with an instance of an external
+//! system, such as a database).
 //!
+//! Which scopes in a program correspond to new spans depend somewhat on user
+//! intent. For example, consider the case of a loop in a program. Should we
+//! construct one span and perform the entire loop inside of that span, like:
+//!
+//! ```rust
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! # let n = 1;
+//! let span = span!(Level::TRACE, "my_loop");
+//! let _enter = span.enter();
+//! for i in 0..n {
+//!     # let _ = i;
+//!     // ...
+//! }
+//! # }
+//! ```
+//! Or, should we create a new span for each iteration of the loop, as in:
+//! ```rust
+//! # #[macro_use] extern crate tokio_trace;
+//! # use tokio_trace::Level;
+//! # fn main() {
+//! # let n = 1u64;
+//! for i in 0..n {
+//!     let span = span!(Level::TRACE, "my_loop", iteration = i);
+//!     let _enter = span.enter();
+//!     // ...
+//! }
+//! # }
+//! ```
+//!
+//! Depending on the circumstances, we might want to do either, or both. For
+//! example, if we want to know how long was spent in the loop overall, we would
+//! create a single span around the entire loop; whereas if we wanted to know how
+//! much time was spent in each individual iteration, we would enter a new span
+//! on every iteration.
+//!
+//! [fields]: ../field/index.html
+//! [metadata]: ../struct.Metadata.html
+//! [`Id`]: struct.Id.html
+//! [verbosity level]: ../struct.Level.html
+//! [`span!`]: ../macro.span.html
+//! [`trace_span!`]: ../macro.trace_span.html
+//! [`debug_span!`]: ../macro.debug_span.html
+//! [`info_span!`]: ../macro.info_span.html
+//! [`warn_span!`]: ../macro.warn_span.html
+//! [`error_span!`]: ../macro.error_span.html
 //! [`clone_span`]: ../subscriber/trait.Subscriber.html#method.clone_span
 //! [`drop_span`]: ../subscriber/trait.Subscriber.html#method.drop_span
 //! [`exit`]: ../subscriber/trait.Subscriber.html#tymethod.exit
@@ -133,7 +299,8 @@
 //! [`Attributes`]: struct.Attributes.html
 //! [`enter`]: struct.Span.html#method.enter
 //! [`in_scope`]: struct.Span.html#method.in_scope
-//! [`guard`]: struct.Entered.html
+//! [`follows_from`]: struct.Span.html#method.follows_from
+//! [guard]: struct.Entered.html
 pub use tokio_trace_core::span::{Attributes, Id, Record};
 
 use std::{

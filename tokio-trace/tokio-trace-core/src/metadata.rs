@@ -7,8 +7,21 @@ use std::fmt;
 
 /// Metadata describing a [span] or [event].
 ///
-/// This includes the source code location where the span occurred, the names of
-/// its fields, et cetera.
+/// All spans and events have the following metadata:
+/// - A [name], represented as a static string.
+/// - A [target], a string that categorizes part of the system where the span
+///   or event occurred. The `tokio_trace` macros default to using the module
+///   path where the span or event originated as the target, but it may be
+///   overridden.
+/// - A [verbosity level].
+/// - The names of the [fields] defined by the span or event.
+/// - Whether the metadata corresponds to a span or event.
+///
+/// In addition, the following optional metadata describing the source code
+/// location where the span or event originated _may_ be provided:
+/// - The [file name]
+/// - The [line number]
+/// - The [module path]
 ///
 /// Metadata is used by [`Subscriber`]s when filtering spans and events, and it
 /// may also be used as part of their data payload.
@@ -20,14 +33,22 @@ use std::fmt;
 /// filtering is based on metadata, rather than  on the constructed span.
 ///
 /// **Note**: Although instances of `Metadata` cannot be compared directly, they
-/// provide a method [`Metadata::id()`] which returns an an opaque [callsite
-/// identifier] which uniquely identifies the callsite where the metadata
-/// originated. This can be used for determining if two Metadata correspond to
+/// provide a method [`id`] which returns an an opaque [callsite identifier]
+/// which uniquely identifies the callsite where the metadata originated.
+/// This can be used for determining if two Metadata correspond to
 /// the same callsite.
 ///
-/// [span]: ../span
+/// [span]: ../span/index.html
+/// [event]: ../event/index.html
+/// [name]: #method.name
+/// [target]: #method.target
+/// [fields]: #method.fields
+/// [verbosity level]: #method.level
+/// [file name]: #method.file
+/// [line number]: #method.line
+/// [module path]: #method.module
 /// [`Subscriber`]: ../subscriber/trait.Subscriber.html
-/// [`Metadata::id()`]: struct.Metadata.html#method.id
+/// [`id`]: struct.Metadata.html#method.id
 /// [callsite identifier]: ../callsite/struct.Identifier.html
 // TODO: When `const fn` is stable, make this type's fields private.
 pub struct Metadata<'a> {
@@ -136,7 +157,7 @@ pub struct Metadata<'a> {
     pub kind: Kind,
 }
 
-/// Indicate whether the callsite is a span or event.
+/// Indicates whether the callsite is a span or event.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Kind(KindInner);
 
@@ -175,12 +196,12 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    /// Returns the set of fields on the described span.
+    /// Returns the names of the fields on the described span or event.
     pub fn fields(&self) -> &field::FieldSet {
         &self.fields
     }
 
-    /// Returns the level of verbosity of the described span.
+    /// Returns the level of verbosity of the described span or event.
     pub fn level(&self) -> &Level {
         &self.level
     }

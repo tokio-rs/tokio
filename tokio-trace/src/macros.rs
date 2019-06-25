@@ -2,43 +2,31 @@
 ///
 /// # Examples
 ///
-/// Creating a new span with no fields:
+/// Creating a new span:
 /// ```
-/// # #[macro_use]
-/// # extern crate tokio_trace;
-/// # use tokio_trace::Level;
+/// #[macro_use]
+/// extern crate tokio_trace;
+/// use tokio_trace::Level;
 /// # fn main() {
 /// let span = span!(Level::TRACE, "my span");
-/// span.in_scope(|| {
-///     // do work inside the span...
-/// });
+/// let _enter = span.enter();
+/// // do work inside the span...
 /// # }
 /// ```
 ///
-/// Creating a span with custom target:
+/// ## Recording Fields
+///
+/// Span fields are written using the syntax `key = value`.
 /// ```
-/// # #[macro_use]
-/// # extern crate tokio_trace;
+/// # #[macro_use] extern crate tokio_trace;
 /// # use tokio_trace::Level;
 /// # fn main() {
-/// span!(Level::TRACE, target: "app_span", "my span");
+/// // construct a new span with two fields:
+/// //  - "foo", with a value of 42,
+/// //  - "bar", with the value "false"
+/// let my_span = span!(Level::INFO, "my_span", foo = 42, bar = false);
 /// # }
 /// ```
-///
-/// # Fields
-///
-/// Creating a span with fields:
-/// ```
-/// # #[macro_use]
-/// # extern crate tokio_trace;
-/// # use tokio_trace::Level;
-/// # fn main() {
-/// span!(Level::TRACE, "my span", foo = 2, bar = "a string").in_scope(|| {
-///     // do work inside the span...
-/// });
-/// # }
-/// ```
-///
 /// Note that a trailing comma on the final field is valid:
 /// ```
 /// # #[macro_use]
@@ -46,10 +34,10 @@
 /// # use tokio_trace::Level;
 /// # fn main() {
 /// span!(
-///     Level::TRACE,
-///     "my span",
-///     foo = 2,
-///     bar = "a string",
+///     Level::INFO,
+///     "my_span",
+///     foo = 42,
+///     bar = false,
 /// );
 /// # }
 /// ```
@@ -69,7 +57,7 @@
 /// # }
 ///```
 ///
-/// Field names can include dots:
+/// Field names can include dots, but should not be terminated by them:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -116,7 +104,7 @@
 // /// # }
 // /// ```
 // ///
-/// The `?` sigil is shorthand for `field::debug`:
+/// The `?` sigil is shorthand for [`field::debug`]:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -132,11 +120,13 @@
 /// };
 ///
 /// // `my_struct` will be recorded using its `fmt::Debug` implementation.
-/// let my_span = span!(Level::TRACE, "my span", foo = ?my_struct);
+/// span!(Level::TRACE, "my span", foo = ?my_struct);
+/// // is equivalent to:
+/// span!(Level::TRACE, "my span", foo = tokio_trace::field::debug(&my_struct));
 /// # }
 /// ```
 ///
-/// The `%` character is shorthand for `field::display`:
+/// The `%` character is shorthand for [`field::display`]:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -151,11 +141,13 @@
 /// #     field: "Hello world!"
 /// # };
 /// // `my_struct.field` will be recorded using its `fmt::Display` implementation.
-/// let my_span = span!(Level::TRACE, "my span", foo = %my_struct.field);
+/// span!(Level::TRACE, "my span", foo = %my_struct.field);
+/// // is equivalent to:
+/// span!(Level::TRACE, "my span", foo = tokio_trace::field::display(&my_struct.field));
 /// # }
 /// ```
 ///
-/// The `display` and `debug` sigils may also be used with local variable shorthand:
+/// The `%` and `?` sigils may also be used with local variable shorthand:
 /// ```
 /// # #[macro_use]
 /// # extern crate tokio_trace;
@@ -190,7 +182,76 @@
 /// );
 /// # }
 /// ```
+///
+/// ## Setting Span Attributes
+///
+/// In addition to the level and name of the span, which are required, the
+/// [target] and [parent span] may be overridden. For example:
+///
+/// Creating a span with custom target:
+/// ```
+/// # #[macro_use]
+/// # extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// span!(Level::TRACE, target: "app_span", "my span");
+/// # }
+/// ```
+///
+/// Creating a span with an explicit parent:
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// // Create, but do not enter, a span called "foo".
+/// let foo = span!(Level::INFO, "foo");
+///
+/// // Create and enter a span called "bar".
+/// let bar = span!(Level::INFO, "bar");
+/// let _enter = bar.enter();
+///
+/// // Although we have currently entered "bar", "baz"'s parent span
+/// // will be "foo".
+/// let baz = span!(Level::INFO, parent: &foo, "baz");
+/// # }
+/// ```
+///
+/// Creating a span _without_ a parent:
+///
+///```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// let foo = span!(Level::INFO, "foo");
+/// let _enter = foo.enter();
+///
+/// // Although we have currently entered "foo", "bar" will be created
+/// // as the root of its own trace tree:
+/// let bar = span!(Level::INFO, parent: None, "bar");
+/// # }
+/// ```
+///
+/// Both the parent and target may be overridden simultaenously:
+///
+///```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// let foo = span!(Level::INFO, "foo");
+//
+/// let bar = span!(Level::INFO, target: "bar_events", parent: &foo, "bar");
+/// # }
+/// ```
+///
+/// By default, the module path to the current Rust module will be used
+/// as the target, and the parent will be [determined contextually].
+///
 /// [struct initializers]: https://doc.rust-lang.org/book/ch05-01-defining-structs.html#using-the-field-init-shorthand-when-variables-and-fields-have-the-same-name
+/// [target]: struct.Metadata.html#method.target
+/// [parent span]: span/struct.Attributes.html#method.parent
+/// [determined contextually]: span/struct.Attributes.html#method.is_contextual
+/// [`field::debug`]: field/fn.display.html
+/// [`field::display`]: field/fn.display.html
 #[macro_export(local_inner_macros)]
 macro_rules! span {
     ($lvl:expr, target: $target:expr, parent: $parent:expr, $name:expr) => {
@@ -300,7 +361,24 @@ macro_rules! span {
 
 /// Constructs a span at the trace level.
 ///
+/// [Fields] and [attributes] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [attributes]: macro.span.html#setting-span-attributes
+/// [Fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// trace_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::TRACE, "my_span");
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
@@ -362,7 +440,24 @@ macro_rules! trace_span {
 
 /// Constructs a span at the debug level.
 ///
+/// [Fields] and [attributes] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [attributes]: macro.span.html#setting-span-attributes
+/// [Fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// debug_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::DEBUG, "my_span");
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
@@ -424,7 +519,24 @@ macro_rules! debug_span {
 
 /// Constructs a span at the info level.
 ///
+/// [Fields] and [attributes] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [attributes]: macro.span.html#setting-span-attributes
+/// [Fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// info_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::INFO, "my_span");
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
@@ -486,7 +598,24 @@ macro_rules! info_span {
 
 /// Constructs a span at the warn level.
 ///
+/// [Fields] and [attributes] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [attributes]: macro.span.html#setting-span-attributes
+/// [Fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// info_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::INFO, "my_span");
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
@@ -547,7 +676,24 @@ macro_rules! warn_span {
 }
 /// Constructs a span at the error level.
 ///
+/// [Fields] and [attributes] are set using the same syntax as the [`span!`]
+/// macro.
+///
+/// [attributes]: macro.span.html#setting-span-attributes
+/// [Fields]: macro.span.html#recording-fields
+/// [`span!`]: macro.span.html
+///
 /// # Examples
+///
+/// ```rust
+/// # #[macro_use] extern crate tokio_trace;
+/// # use tokio_trace::Level;
+/// # fn main() {
+/// error_span!("my_span");
+/// // is equivalent to:
+/// span!(Level::ERROR, "my_span");
+/// # }
+/// ```
 ///
 /// ```rust
 /// # #[macro_use]
