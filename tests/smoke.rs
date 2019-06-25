@@ -14,8 +14,7 @@ fn simple() {
     let id = child.id();
     assert!(id > 0);
 
-    let status = support::run_with_timeout(&mut child)
-        .expect("failed to run future");
+    let status = support::run_with_timeout(&mut child).expect("failed to run future");
     assert_eq!(status.code(), Some(2));
 
     assert_eq!(child.id(), id);

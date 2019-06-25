@@ -172,12 +172,12 @@ extern crate log;
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
-use futures::{Async, Future, Poll, IntoFuture};
-use futures::future::{Either, ok};
+use futures::future::{ok, Either};
+use futures::{Async, Future, IntoFuture, Poll};
 use kill::Kill;
 use std::fmt;
-use tokio_io::io::{read_to_end};
-use tokio_io::{AsyncWrite, AsyncRead, IoFuture};
+use tokio_io::io::read_to_end;
+use tokio_io::{AsyncRead, AsyncWrite, IoFuture};
 use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
@@ -337,13 +337,12 @@ struct SpawnedChild {
 
 impl CommandExt for Command {
     fn spawn_async_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
-        imp::spawn_child(self, handle)
-            .map(|spawned_child| Child {
-                child: ChildDropGuard::new(spawned_child.child),
-                stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
-                stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
-                stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
-            })
+        imp::spawn_child(self, handle).map(|spawned_child| Child {
+            child: ChildDropGuard::new(spawned_child.child),
+            stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
+            stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
+            stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
+        })
     }
 
     fn status_async_with_handle(&mut self, handle: &Handle) -> io::Result<StatusAsync> {
@@ -355,9 +354,7 @@ impl CommandExt for Command {
             child.stdout.take();
             child.stderr.take();
 
-            StatusAsync {
-                inner: child,
-            }
+            StatusAsync { inner: child }
         })
     }
 
@@ -365,7 +362,8 @@ impl CommandExt for Command {
         self.stdout(Stdio::piped());
         self.stderr(Stdio::piped());
 
-        let inner = self.spawn_async_with_handle(handle)
+        let inner = self
+            .spawn_async_with_handle(handle)
             .into_future()
             .and_then(Child::wait_with_output);
 
@@ -415,7 +413,6 @@ impl<T: Kill> Drop for ChildDropGuard<T> {
         }
     }
 }
-
 
 impl<T: Future + Kill> Future for ChildDropGuard<T> {
     type Item = T::Item;
@@ -514,13 +511,14 @@ impl Child {
         };
 
         WaitWithOutput {
-            inner: Box::new(self.join3(stdout, stderr).map(|(status, stdout, stderr)| {
-                Output {
-                    status,
-                    stdout,
-                    stderr,
-                }
-            }))
+            inner: Box::new(
+                self.join3(stdout, stderr)
+                    .map(|(status, stdout, stderr)| Output {
+                        status,
+                        stdout,
+                        stderr,
+                    }),
+            ),
         }
     }
 
@@ -700,8 +698,7 @@ impl Read for ChildStdout {
     }
 }
 
-impl AsyncRead for ChildStdout {
-}
+impl AsyncRead for ChildStdout {}
 
 impl Read for ChildStderr {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
@@ -709,13 +706,12 @@ impl Read for ChildStderr {
     }
 }
 
-impl AsyncRead for ChildStderr {
-}
+impl AsyncRead for ChildStderr {}
 
 #[cfg(unix)]
 mod sys {
+    use super::{ChildStderr, ChildStdin, ChildStdout};
     use std::os::unix::io::{AsRawFd, RawFd};
-    use super::{ChildStdin, ChildStdout, ChildStderr};
 
     impl AsRawFd for ChildStdin {
         fn as_raw_fd(&self) -> RawFd {
@@ -738,8 +734,8 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
+    use super::{ChildStderr, ChildStdin, ChildStdout};
     use std::os::windows::io::{AsRawHandle, RawHandle};
-    use super::{ChildStdin, ChildStdout, ChildStderr};
 
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
@@ -762,10 +758,10 @@ mod sys {
 
 #[cfg(test)]
 mod test {
+    use super::ChildDropGuard;
     use futures::{Async, Future, Poll};
     use kill::Kill;
     use std::io;
-    use super::ChildDropGuard;
 
     struct Mock {
         num_kills: usize,

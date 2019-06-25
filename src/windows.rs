@@ -15,8 +15,8 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-extern crate winapi;
 extern crate mio_named_pipes;
+extern crate winapi;
 
 use std::fmt;
 use std::io;
@@ -25,10 +25,6 @@ use std::os::windows::process::ExitStatusExt;
 use std::process::{self, ExitStatus};
 use std::ptr;
 
-use futures::future::Fuse;
-use futures::sync::oneshot;
-use futures::{Future, Poll, Async};
-use kill::Kill;
 use self::mio_named_pipes::NamedPipe;
 use self::winapi::shared::minwindef::*;
 use self::winapi::shared::winerror::*;
@@ -39,6 +35,10 @@ use self::winapi::um::threadpoollegacyapiset::*;
 use self::winapi::um::winbase::*;
 use self::winapi::um::winnt::*;
 use super::SpawnedChild;
+use futures::future::Fuse;
+use futures::sync::oneshot;
+use futures::{Async, Future, Poll};
+use kill::Kill;
 use tokio_reactor::{Handle, PollEvented};
 
 #[must_use = "futures do nothing unless polled"]
@@ -107,28 +107,29 @@ impl Future for Child {
                     Async::NotReady => return Ok(Async::NotReady),
                 }
                 let status = try!(try_wait(&self.child)).expect("not ready yet");
-                return Ok(status.into())
+                return Ok(status.into());
             }
 
             if let Some(e) = try!(try_wait(&self.child)) {
-                return Ok(e.into())
+                return Ok(e.into());
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
             let mut wait_object = ptr::null_mut();
             let rc = unsafe {
-                RegisterWaitForSingleObject(&mut wait_object,
-                                            self.child.as_raw_handle(),
-                                            Some(callback),
-                                            ptr as *mut _,
-                                            INFINITE,
-                                            WT_EXECUTEINWAITTHREAD |
-                                              WT_EXECUTEONLYONCE)
+                RegisterWaitForSingleObject(
+                    &mut wait_object,
+                    self.child.as_raw_handle(),
+                    Some(callback),
+                    ptr as *mut _,
+                    INFINITE,
+                    WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE,
+                )
             };
             if rc == 0 {
                 let err = io::Error::last_os_error();
                 drop(unsafe { Box::from_raw(ptr) });
-                return Err(err)
+                return Err(err);
             }
             self.waiting = Some(Waiting {
                 rx: rx.fuse(),
@@ -151,8 +152,7 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: PVOID,
-                                   _timer_fired: BOOLEAN) {
+unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     let _ = complete.take().unwrap().send(());
 }
@@ -178,9 +178,9 @@ pub type ChildStdin = PollEvented<NamedPipe>;
 pub type ChildStdout = PollEvented<NamedPipe>;
 pub type ChildStderr = PollEvented<NamedPipe>;
 
-fn stdio<T>(option: Option<T>, handle: &Handle)
-            -> io::Result<Option<PollEvented<NamedPipe>>>
-    where T: IntoRawHandle,
+fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<NamedPipe>>>
+where
+    T: IntoRawHandle,
 {
     let io = match option {
         Some(io) => io,
