@@ -22,8 +22,8 @@ status() {
     printf "\e[32m\e[1m%${WIDTH}s\e[0m %s\n" "$1" "$2"
 }
 
-check_release() {
-    status "Checking" "if $CRATE v$VERSION can be released"
+verify() {
+    status "Verifying" "if $CRATE v$VERSION can be released"
     ACTUAL=$(cargo pkgid | sed -n 's/.*#\(.*\)/\1/p')
 
     if [ "$ACTUAL" != "$VERSION" ]; then
@@ -32,21 +32,27 @@ check_release() {
     fi
 
     if git tag -l | grep -Fxq "$TAG" ; then
-        err "git tag \"$TAG\" already exists"
+        err "git tag \`$TAG\` already exists"
+        exit 1
+    fi
+
+    PATH_DEPS=$(grep -F "path = \"" Cargo.toml | sed -e 's/^/  /')
+    if [ -n "$PATH_DEPS" ]; then
+        err "crate \`$CRATE\` contained path dependencies:\n$PATH_DEPS"
+        echo "path dependencies must be removed prior to release"
         exit 1
     fi
 }
 
 release() {
     status "Releasing" "$CRATE v$VERSION"
-    cargo package "$VERBOSE"
-    cargo publish "$VERBOSE" "$DRY_RUN"
+    cargo package $VERBOSE
+    cargo publish $VERBOSE $DRY_RUN
 
     status "Tagging" "$TAG"
     if [ -n "$DRY_RUN" ]; then
         echo "# git tag $TAG && git push --tags"
     else
-        set +x
         git tag "$TAG" && git push --tags
     fi
 }
@@ -57,6 +63,7 @@ do
 case "$1" in
     -v|--verbose)
     VERBOSE="--verbose"
+    set +x
     shift
     ;;
     -d|--dry-run)
@@ -102,7 +109,7 @@ if [ -n "$HELP" ]; then
 fi
 
 if [ -d "$CRATE" ]; then
-    (cd "$CRATE" && check_release && release )
+    (cd "$CRATE" && verify && release )
 else
     err "no such crate \"$CRATE\""
     exit 1

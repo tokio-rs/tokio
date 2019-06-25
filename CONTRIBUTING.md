@@ -405,6 +405,12 @@ When releasing a new version of a crate, follow these steps:
    4. When all path dependencies have been published, the dependent crate may
       be published.
 
+   To verify that a crate is ready to publish, run:
+
+   ```bash
+   bin/publish --dry-run <CRATE NAME> <CRATE VERSION>
+   ```
+
 2. **Update Cargo metadata.** After releasing any path dependencies, update the
    `version` field in `Cargo.toml` to the new version, and the `documentation`
    field to the docs.rs URL of the new version.
@@ -426,6 +432,7 @@ When releasing a new version of a crate, follow these steps:
    approved by a maintainer and the pull request has been merged, continue to
    the next step.
 7. **Release the crate.** Run the following command:
+
    ```bash
    bin/publish <NAME OF CRATE> <VERSION>
    ```
