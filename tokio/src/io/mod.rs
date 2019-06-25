@@ -45,3 +45,11 @@ pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
 // Re-export io::Error so that users don't have to deal
 // with conflicts when `use`ing `futures::io` and `std::io`.
 pub use std::io::{Error, ErrorKind, Result};
+
+mod copy;
+mod read;
+mod write;
+
+pub use self::copy::{copy, Copy};
+pub use self::read::{read, Read};
+pub use self::write::{write, Write};

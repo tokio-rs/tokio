@@ -20,7 +20,7 @@ use std::io;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use tokio::runtime::current_thread::Builder;
 /// use tokio_timer::clock::Clock;
 ///
@@ -36,7 +36,7 @@ use std::io;
 #[derive(Debug)]
 pub struct Builder {
     // /// The clock to use
-    //clock: Clock,
+//clock: Clock,
 }
 
 impl Builder {
@@ -78,7 +78,8 @@ impl Builder {
             reactor_handle,
             //timer_handle,
             //self.clock.clone(),
-            executor);
+            executor,
+        );
 
         Ok(runtime)
     }

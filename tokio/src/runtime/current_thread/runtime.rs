@@ -1,13 +1,13 @@
 use crate::runtime::current_thread::Builder;
-use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_current_thread::Handle as ExecutorHandle;
+use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_executor;
 use tokio_reactor::{self, Reactor};
 //use tokio_timer::clock::{self, Clock};
 //use tokio_timer::timer::{self, Timer};
+use std::error::Error;
 use std::fmt;
 use std::future::Future;
-use std::error::Error;
 use std::io;
 
 /// Single-threaded runtime provides a way to start reactor
@@ -39,7 +39,9 @@ impl Handle {
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
     pub fn spawn<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
-    where F: Future<Output = ()> + Send + 'static {
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
         self.0.spawn(future)
     }
 
@@ -101,8 +103,8 @@ impl Runtime {
         reactor_handle: tokio_reactor::Handle,
         //timer_handle: timer::Handle,
         //clock: Clock,
-        executor: CurrentThread<Parker>) -> Runtime
-    {
+        executor: CurrentThread<Parker>,
+    ) -> Runtime {
         Runtime {
             reactor_handle,
             //timer_handle,
@@ -127,7 +129,7 @@ impl Runtime {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore
     /// # use futures::{future, Future, Stream};
     /// use tokio::runtime::current_thread::Runtime;
     ///
@@ -149,7 +151,8 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
-    where F: Future<Output = ()> + 'static,
+    where
+        F: Future<Output = ()> + 'static,
     {
         self.executor.spawn(future);
         self
@@ -172,7 +175,8 @@ impl Runtime {
     /// The caller is responsible for ensuring that other spawned futures
     /// complete execution by calling `block_on` or `run`.
     pub fn block_on<F>(&mut self, f: F) -> F::Output
-        where F: Future
+    where
+        F: Future,
     {
         self.enter(|executor| {
             // Run the provided future
@@ -184,13 +188,12 @@ impl Runtime {
     /// spawned futures have completed.
     pub fn run(&mut self) -> Result<(), RunError> {
         self.enter(|executor| executor.run())
-            .map_err(|e| RunError {
-                inner: e,
-            })
+            .map_err(|e| RunError { inner: e })
     }
 
     fn enter<F, R>(&mut self, f: F) -> R
-    where F: FnOnce(&mut current_thread::Entered<'_, Parker>) -> R
+    where
+        F: FnOnce(&mut current_thread::Entered<'_, Parker>) -> R,
     {
         let Runtime {
             ref reactor_handle,
@@ -208,16 +211,16 @@ impl Runtime {
         tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
             //clock::with_default(clock, enter, |enter| {
             //    timer::with_default(&timer_handle, enter, |enter| {
-                    // The TaskExecutor is a fake executor that looks into the
-                    // current single-threaded executor when used. This is a trick,
-                    // because we need two mutable references to the executor (one
-                    // to run the provided future, another to install as the default
-                    // one). We use the fake one here as the default one.
-                    let mut default_executor = current_thread::TaskExecutor::current();
-                    tokio_executor::with_default(&mut default_executor, enter, |enter| {
-                        let mut executor = executor.enter(enter);
-                        f(&mut executor)
-                    })
+            // The TaskExecutor is a fake executor that looks into the
+            // current single-threaded executor when used. This is a trick,
+            // because we need two mutable references to the executor (one
+            // to run the provided future, another to install as the default
+            // one). We use the fake one here as the default one.
+            let mut default_executor = current_thread::TaskExecutor::current();
+            tokio_executor::with_default(&mut default_executor, enter, |enter| {
+                let mut executor = executor.enter(enter);
+                f(&mut executor)
+            })
             //    })
             //})
         })

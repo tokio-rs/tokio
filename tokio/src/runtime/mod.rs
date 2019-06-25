@@ -35,7 +35,7 @@
 //! "seed" the application, blocking the thread until the runtime becomes
 //! [idle].
 //!
-//! ```rust
+//! ```rust,ignore
 //! # use futures::{Future, Stream};
 //! use tokio::net::TcpListener;
 //!
@@ -66,7 +66,7 @@
 //!
 //! A [`Runtime`] instance can also be used directly.
 //!
-//! ```rust
+//! ```rust,ignore
 //! # use futures::{Future, Stream};
 //! use tokio::runtime::Runtime;
 //! use tokio::net::TcpListener;
@@ -111,11 +111,7 @@
 pub mod current_thread;
 //mod threadpool;
 
-pub use self::current_thread::{
-    Builder,
-    Runtime,
-    run,
-};
+pub use self::current_thread::{run, Builder, Runtime};
 /*
 pub use self::threadpool::{
     Builder,

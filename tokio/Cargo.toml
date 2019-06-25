@@ -85,6 +85,8 @@ tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp" }
 tokio-uds = { version = "0.2.1", optional = true }
 
 [dev-dependencies]
+tokio-test = { path = "../tokio-test" }
+pin-utils = "0.1.0-alpha.4"
 env_logger = { version = "0.5", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
 futures-cpupool = "0.1"
