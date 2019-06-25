@@ -34,7 +34,7 @@ jobs:
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
-    - script: cargo test --lib && cargo test --tests
+    - script: cargo test --lib && cargo test --tests && cargo test --examples
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'

@@ -99,4 +99,6 @@ if_runtime! {
 
     pub use crate::executor::spawn;
     pub use crate::runtime::run;
+
+    pub use tokio_macros::main;
 }
