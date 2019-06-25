@@ -102,4 +102,5 @@ if_runtime! {
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
     pub use tokio_macros::main;
+    pub use tokio_macros::test;
 }
