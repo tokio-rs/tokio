@@ -23,12 +23,13 @@ mod u8;
 pub mod util;
 
 pub use self::size_hint::SizeHint;
-#[doc(inline)]
-#[cfg(feature = "util")]
-pub use crate::util::BufStreamExt;
+// #[doc(inline)]
+// #[cfg(feature = "util")]
+// pub use crate::util::BufStreamExt;
 
 use bytes::Buf;
-use futures::Poll;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// An asynchronous stream of bytes.
 ///
@@ -53,22 +54,25 @@ pub trait BufStream {
     /// There are several possible return values, each indicating a distinct
     /// stream state:
     ///
-    /// - `Ok(Async::NotReady)` means that this stream's next value is not ready
+    /// - `Poll::Pending` means that this stream's next value is not ready
     /// yet. Implementations will ensure that the current task will be notified
     /// when the next value may be ready.
     ///
-    /// - `Ok(Async::Ready(Some(buf)))` means that the stream has successfully
+    /// - `Poll::Ready(Ok(Some(buf)))` means that the stream has successfully
     /// produced a value, `buf`, and may produce further values on subsequent
     /// `poll_buf` calls.
     ///
-    /// - `Ok(Async::Ready(None))` means that the stream has terminated, and
+    /// - `Poll::Ready(Ok(None))` means that the stream has terminated, and
     /// `poll_buf` should not be invoked again.
     ///
     /// # Panics
     ///
     /// Once a stream is finished, i.e. `Ready(None)` has been returned, further
     /// calls to `poll_buf` may result in a panic or other "bad behavior".
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error>;
+    fn poll_buf(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<Option<Self::Item>, Self::Error>>;
 
     /// Returns the bounds on the remaining length of the stream.
     ///

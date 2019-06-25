@@ -1,8 +1,9 @@
 use crate::BufStream;
 use bytes::Buf;
-use futures::Poll;
 use std::error::Error;
 use std::fmt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Converts an `Iterator` into a `BufStream` which is always ready to yield the
 /// next value.
@@ -36,8 +37,11 @@ where
     type Item = I::Item;
     type Error = Never;
 
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        Ok(self.iter.next().into())
+    fn poll_buf(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>, Self::Error> {
+        Ok(self.iter.next()).into()
     }
 }
 

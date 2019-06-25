@@ -1,6 +1,7 @@
 use crate::BufStream;
 use bytes::Buf;
-use futures::{Async, Poll, Stream};
+use std::task::{Context, Poll};
+use tokio_futures::Stream;
 
 /// Converts a `Stream` of `Buf` types into a `BufStream`.
 ///

@@ -1,7 +1,8 @@
 use crate::BufStream;
 
 use bytes::Buf;
-use futures::Poll;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Limits the stream to a maximum amount of data.
 #[derive(Debug)]
@@ -33,23 +34,21 @@ where
     type Item = T::Item;
     type Error = LimitError<T::Error>;
 
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        use futures::Async::Ready;
-
+    fn poll_buf(&mut self) -> Poll<Result<Option<Self::Item>, Self::Error>> {
         if self.stream.size_hint().lower() > self.remaining {
             return Err(LimitError { inner: None });
         }
 
         let res = self
             .stream
-            .poll_buf()
+            .poll_buf(cx)
             .map_err(|err| LimitError { inner: Some(err) });
 
         match res {
-            Ok(Ready(Some(ref buf))) => {
+            Poll::Ready(Ok(Some(ref buf))) => {
                 if buf.remaining() as u64 > self.remaining {
                     self.remaining = 0;
-                    return Err(LimitError { inner: None });
+                    return Poll::Ready(Err(LimitError { inner: None }));
                 }
 
                 self.remaining -= buf.remaining() as u64;

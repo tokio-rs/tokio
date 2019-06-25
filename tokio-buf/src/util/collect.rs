@@ -1,7 +1,7 @@
 use super::FromBufStream;
 use crate::BufStream;
 
-use futures::{try_ready, Future, Poll};
+use std::task::{Context, Poll};
 
 /// Consumes a buf stream, collecting the data into a single byte container.
 ///
