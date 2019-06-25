@@ -54,10 +54,22 @@
 //! # }
 //! ```
 
+#[macro_use]
+extern crate lazy_static;
+
 use futures::stream::Stream;
 use futures::{future, Future};
 use std::io;
 use tokio_reactor::Handle;
+
+mod registry;
+
+mod os {
+    #[cfg(unix)]
+    pub(crate) use super::unix::{OsExtraData, OsStorage};
+    #[cfg(windows)]
+    pub(crate) use super::windows::{OsExtraData, OsStorage};
+}
 
 pub mod unix;
 pub mod windows;

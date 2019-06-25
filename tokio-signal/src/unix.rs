@@ -9,17 +9,20 @@ pub use libc;
 
 use std::io::prelude::*;
 use std::io::{self, Error, ErrorKind};
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, Once, ONCE_INIT};
+use std::sync::{Once, ONCE_INIT};
 
 use futures::future;
-use futures::sync::mpsc::{channel, Receiver, Sender};
+use futures::sync::mpsc::{channel, Receiver};
 use futures::{Async, Future};
 use futures::{Poll, Stream};
 use libc::c_int;
 use mio_uds::UnixStream;
 use tokio_io::IoFuture;
 use tokio_reactor::{Handle, PollEvented};
+
+use crate::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 
 pub use libc::{SIGALRM, SIGHUP, SIGPIPE, SIGQUIT, SIGTRAP};
 pub use libc::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
@@ -43,88 +46,58 @@ pub mod bsd {
     pub use super::libc::SIGINFO;
 }
 
+pub(crate) type OsStorage = Vec<SignalInfo>;
+
 // Number of different unix signals
 // (FreeBSD has 33)
 const SIGNUM: usize = 33;
 
-type SignalSender = Sender<c_int>;
-
-struct SignalInfo {
-    pending: AtomicBool,
-    // The ones interested in this signal
-    recipients: Mutex<Vec<Box<SignalSender>>>,
-
-    init: Once,
-    initialized: AtomicBool,
+impl Init for OsStorage {
+    fn init() -> Self {
+        (0..SIGNUM).map(|_| SignalInfo::default()).collect()
+    }
 }
 
-struct Globals {
+impl Storage for OsStorage {
+    fn event_info(&self, id: EventId) -> Option<&EventInfo> {
+        self.get(id).map(|si| &si.event_info)
+    }
+
+    fn for_each<'a, F>(&'a self, f: F)
+    where
+        F: FnMut(&'a EventInfo),
+    {
+        self.iter().map(|si| &si.event_info).for_each(f)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct OsExtraData {
     sender: UnixStream,
     receiver: UnixStream,
-    signals: Vec<SignalInfo>,
 }
 
-impl Globals {
-    /// Register a new `Signal` instance's channel sender.
-    /// Returns a `SignalId` which should be later used for deregistering
-    /// this sender.
-    fn register_signal_sender(signal: c_int, tx: SignalSender) -> SignalId {
-        let tx = Box::new(tx);
-        let id = SignalId::from(&tx);
+impl Init for OsExtraData {
+    fn init() -> Self {
+        let (receiver, sender) = UnixStream::pair().expect("failed to create UnixStream");
 
-        let idx = signal as usize;
-        globals().signals[idx].recipients.lock().unwrap().push(tx);
-        id
-    }
-
-    /// Deregister a `Signal` instance's channel sender because the `Signal`
-    /// is no longer interested in receiving events (e.g. dropped).
-    fn deregister_signal_receiver(signal: c_int, id: SignalId) {
-        let idx = signal as usize;
-        let mut list = globals().signals[idx].recipients.lock().unwrap();
-        list.retain(|sender| SignalId::from(sender) != id);
+        Self { sender, receiver }
     }
 }
 
-/// A newtype which represents a unique identifier for each `Signal` instance.
-/// The id is derived by boxing the channel `Sender` associated with this instance
-/// and using its address in memory.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct SignalId(usize);
-
-impl<'a> From<&'a Box<SignalSender>> for SignalId {
-    fn from(tx: &'a Box<SignalSender>) -> Self {
-        SignalId(&**tx as *const _ as usize)
-    }
+pub(crate) struct SignalInfo {
+    event_info: EventInfo,
+    init: Once,
+    initialized: AtomicBool,
 }
 
 impl Default for SignalInfo {
     fn default() -> SignalInfo {
         SignalInfo {
-            pending: AtomicBool::new(false),
+            event_info: Default::default(),
             init: ONCE_INIT,
             initialized: AtomicBool::new(false),
-            recipients: Mutex::new(Vec::new()),
         }
-    }
-}
-
-static mut GLOBALS: *mut Globals = 0 as *mut Globals;
-
-fn globals() -> &'static Globals {
-    static INIT: Once = ONCE_INIT;
-
-    unsafe {
-        INIT.call_once(|| {
-            let (receiver, sender) = UnixStream::pair().unwrap();
-            let globals = Globals {
-                sender: sender,
-                receiver: receiver,
-                signals: (0..SIGNUM).map(|_| Default::default()).collect(),
-            };
-            GLOBALS = Box::into_raw(Box::new(globals));
-        });
-        &*GLOBALS
     }
 }
 
@@ -136,11 +109,12 @@ fn globals() -> &'static Globals {
 /// 2. Wake up driver tasks by writing a byte to a pipe
 ///
 /// Those two operations shoudl both be async-signal safe.
-fn action(slot: &SignalInfo, mut sender: &UnixStream) {
-    slot.pending.store(true, Ordering::SeqCst);
+fn action(globals: Pin<&'static Globals>, signal: c_int) {
+    globals.record_event(signal as EventId);
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
     // full pipe and then it will wake up anyway).
+    let mut sender = &globals.sender;
     drop(sender.write(&[1]));
 }
 
@@ -150,7 +124,7 @@ fn action(slot: &SignalInfo, mut sender: &UnixStream) {
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
 fn signal_enable(signal: c_int) -> io::Result<()> {
-    if signal_hook_registry::FORBIDDEN.contains(&signal) {
+    if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
             format!("Refusing to register signal {}", signal),
@@ -158,15 +132,14 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     }
 
     let globals = globals();
-    let siginfo = match globals.signals.get(signal as usize) {
+    let siginfo = match globals.storage().get(signal as EventId) {
         Some(slot) => slot,
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
     };
     let mut registered = Ok(());
     siginfo.init.call_once(|| {
         registered = unsafe {
-            signal_hook_registry::register(signal, move || action(siginfo, &globals.sender))
-                .map(|_| ())
+            signal_hook_registry::register(signal, move || action(globals, signal)).map(|_| ())
         };
         if registered.is_ok() {
             siginfo.initialized.store(true, Ordering::Relaxed);
@@ -197,7 +170,7 @@ impl Future for Driver {
         // Drain the data from the pipe and maintain interest in getting more
         self.drain();
         // Broadcast any signals which were received
-        self.broadcast();
+        globals().broadcast();
 
         // This task just lives until the end of the event loop
         Ok(Async::NotReady)
@@ -241,44 +214,6 @@ impl Driver {
             }
         }
     }
-
-    /// Go through all the signals and broadcast everything.
-    ///
-    /// Driver tasks wake up for *any* signal and simply process all globally
-    /// registered signal streams, so each task is sort of cooperatively working
-    /// for all the rest as well.
-    fn broadcast(&self) {
-        for (sig, slot) in globals().signals.iter().enumerate() {
-            // Any signal of this kind arrived since we checked last?
-            if !slot.pending.swap(false, Ordering::SeqCst) {
-                continue;
-            }
-
-            let signum = sig as c_int;
-            let mut recipients = slot.recipients.lock().unwrap();
-
-            // Notify all waiters on this signal that the signal has been
-            // received. If we can't push a message into the queue then we don't
-            // worry about it as everything is coalesced anyway. If the channel
-            // has gone away then we can remove that slot.
-            for i in (0..recipients.len()).rev() {
-                match recipients[i].try_send(signum) {
-                    Ok(()) => {}
-                    Err(ref e) if e.is_disconnected() => {
-                        recipients.swap_remove(i);
-                    }
-
-                    // Channel is full, ignore the error since the
-                    // receiver has already been woken up
-                    Err(e) => {
-                        // Sanity check in case this error type ever gets
-                        // additional variants we have not considered.
-                        debug_assert!(e.is_full());
-                    }
-                }
-            }
-        }
-    }
 }
 
 /// An implementation of `Stream` for receiving a particular type of signal.
@@ -318,8 +253,7 @@ impl Driver {
 pub struct Signal {
     driver: Driver,
     signal: c_int,
-    id: SignalId,
-    rx: Receiver<c_int>,
+    rx: Receiver<()>,
 }
 
 impl Signal {
@@ -385,11 +319,11 @@ impl Signal {
                 // more. NB: channels always guarantee at least one slot per sender,
                 // so we don't need additional slots
                 let (tx, rx) = channel(0);
-                let id = Globals::register_signal_sender(signal, tx);
+                globals().register_listener(signal as EventId, tx);
+
                 Ok(Signal {
                     driver: driver,
                     rx: rx,
-                    id: id,
                     signal: signal,
                 })
             })();
@@ -404,53 +338,26 @@ impl Stream for Signal {
 
     fn poll(&mut self) -> Poll<Option<c_int>, io::Error> {
         self.driver.poll().unwrap();
-        // receivers don't generate errors
-        self.rx.poll().map_err(|_| panic!())
-    }
-}
 
-impl Drop for Signal {
-    fn drop(&mut self) {
-        Globals::deregister_signal_receiver(self.signal, self.id);
+        self.rx
+            .poll()
+            .map(|ready| ready.map(|item| item.map(|()| self.signal)))
+            // receivers don't generate errors
+            .map_err(|_| unreachable!())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use tokio;
-
     use super::*;
 
     #[test]
-    fn dropped_signal_senders_are_cleaned_up() {
-        let mut rt =
-            self::tokio::runtime::current_thread::Runtime::new().expect("failed to init runtime");
+    fn signal_enable_error_on_invalid_input() {
+        signal_enable(-1).unwrap_err();
+    }
 
-        let signum = libc::SIGUSR1;
-        let signal = rt
-            .block_on(Signal::new(signum))
-            .expect("failed to create signal");
-
-        {
-            let recipients = globals().signals[signum as usize]
-                .recipients
-                .lock()
-                .unwrap();
-            assert!(!recipients.is_empty());
-        }
-
-        drop(signal);
-
-        unsafe {
-            assert_eq!(libc::kill(libc::getpid(), signum), 0);
-        }
-
-        {
-            let recipients = globals().signals[signum as usize]
-                .recipients
-                .lock()
-                .unwrap();
-            assert!(recipients.is_empty());
-        }
+    #[test]
+    fn signal_enable_error_on_forbidden_input() {
+        signal_enable(signal_hook_registry::FORBIDDEN[0]).unwrap_err();
     }
 }

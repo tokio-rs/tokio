@@ -7,26 +7,70 @@
 
 #![cfg(windows)]
 
-use std::cell::RefCell;
+use std::convert::TryFrom;
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
 use futures::future;
-use futures::stream::Fuse;
-use futures::sync::mpsc;
-use futures::sync::oneshot;
+use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async, Future, Poll, Stream};
-use mio::Ready;
-use tokio_reactor::{Handle, PollEvented};
+use tokio_reactor::Handle;
 use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
 
+use crate::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::IoFuture;
 
+#[derive(Debug)]
+pub(crate) struct OsStorage {
+    ctrl_c: EventInfo,
+    ctrl_break: EventInfo,
+}
+
+impl Init for OsStorage {
+    fn init() -> Self {
+        Self {
+            ctrl_c: EventInfo::default(),
+            ctrl_break: EventInfo::default(),
+        }
+    }
+}
+
+impl Storage for OsStorage {
+    fn event_info(&self, id: EventId) -> Option<&EventInfo> {
+        match DWORD::try_from(id) {
+            Ok(CTRL_C_EVENT) => Some(&self.ctrl_c),
+            Ok(CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
+            _ => None,
+        }
+    }
+
+    fn for_each<'a, F>(&'a self, mut f: F)
+    where
+        F: FnMut(&'a EventInfo),
+    {
+        f(&self.ctrl_c);
+        f(&self.ctrl_break);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct OsExtraData {
+    driver_waker: Sender<()>,
+}
+
+impl Init for OsExtraData {
+    fn init() -> Self {
+        let (driver_waker, driver_rx) = channel(0);
+
+        ::tokio_executor::spawn(DriverTask { rx: driver_rx });
+
+        Self { driver_waker }
+    }
+}
+
 static INIT: Once = ONCE_INIT;
-static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
 
 /// Stream of events discovered via `SetConsoleCtrlHandler`.
 ///
@@ -41,36 +85,14 @@ static mut GLOBAL_STATE: *mut GlobalState = 0 as *mut _;
 ///   processed quickly enough. This means that if two notifications are
 ///   received back-to-back, then the stream may only receive one item about the
 ///   two notifications.
+// FIXME: refactor and combine with unix::Signal
 pub struct Event {
-    reg: PollEvented<MyRegistration>,
-    _finished: oneshot::Sender<()>,
+    rx: Receiver<()>,
 }
 
-struct GlobalState {
-    ready: mio::SetReadiness,
-    tx: mpsc::UnboundedSender<Message>,
-    ctrl_c: GlobalEventState,
-    ctrl_break: GlobalEventState,
-}
-
-struct GlobalEventState {
-    ready: AtomicBool,
-}
-
-enum Message {
-    NewEvent(DWORD, oneshot::Sender<io::Result<Event>>),
-}
-
+#[derive(Debug)]
 struct DriverTask {
-    handle: Handle,
-    reg: PollEvented<MyRegistration>,
-    rx: Fuse<mpsc::UnboundedReceiver<Message>>,
-    ctrl_c: EventState,
-    ctrl_break: EventState,
-}
-
-struct EventState {
-    tasks: Vec<(RefCell<oneshot::Receiver<()>>, mio::SetReadiness)>,
+    rx: Receiver<()>,
 }
 
 impl Event {
@@ -106,29 +128,24 @@ impl Event {
         Event::new(CTRL_BREAK_EVENT, handle)
     }
 
-    fn new(signum: DWORD, handle: &Handle) -> IoFuture<Event> {
-        let handle = handle.clone();
+    fn new(signum: DWORD, _handle: &Handle) -> IoFuture<Event> {
         let new_signal = future::poll_fn(move || {
             let mut init = None;
             INIT.call_once(|| {
-                init = Some(global_init(&handle));
+                init = Some(global_init());
             });
 
             if let Some(Err(e)) = init {
                 return Err(e);
             }
 
-            let (tx, rx) = oneshot::channel();
-            let msg = Message::NewEvent(signum, tx);
-            let res = unsafe { (*GLOBAL_STATE).tx.clone().unbounded_send(msg) };
-            res.expect(
-                "failed to request a new signal stream, did the \
-                 first event loop go away?",
-            );
-            Ok(Async::Ready(rx.then(|r| r.unwrap())))
+            let (tx, rx) = channel(0);
+            globals().register_listener(signum as EventId, tx);
+
+            Ok(Async::Ready(Event { rx }))
         });
 
-        Box::new(new_signal.flatten())
+        Box::new(new_signal)
     }
 }
 
@@ -137,53 +154,19 @@ impl Stream for Event {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<()>, io::Error> {
-        if !self.reg.poll_read_ready(Ready::readable())?.is_ready() {
-            return Ok(Async::NotReady);
-        }
-        self.reg.clear_read_ready(Ready::readable())?;
-        self.reg
-            .get_ref()
-            .readiness
-            .set_readiness(mio::Ready::empty())
-            .expect("failed to set readiness");
-        Ok(Async::Ready(Some(())))
+        self.rx
+            .poll()
+            // receivers don't generate errors
+            .map_err(|_| unreachable!())
     }
 }
 
-fn global_init(handle: &Handle) -> io::Result<()> {
-    let reg = MyRegistration::new();
-    let ready = reg.readiness.clone();
-
-    let (tx, rx) = mpsc::unbounded();
-    let reg = PollEvented::new_with_handle(reg, handle)?;
-
+fn global_init() -> io::Result<()> {
     unsafe {
-        let state = Box::new(GlobalState {
-            ready: ready,
-            ctrl_c: GlobalEventState {
-                ready: AtomicBool::new(false),
-            },
-            ctrl_break: GlobalEventState {
-                ready: AtomicBool::new(false),
-            },
-            tx: tx,
-        });
-        GLOBAL_STATE = Box::into_raw(state);
-
         let rc = SetConsoleCtrlHandler(Some(handler), TRUE);
         if rc == 0 {
-            Box::from_raw(GLOBAL_STATE);
-            GLOBAL_STATE = 0 as *mut _;
             return Err(io::Error::last_os_error());
         }
-
-        ::tokio_executor::spawn(Box::new(DriverTask {
-            handle: handle.clone(),
-            rx: rx.fuse(),
-            reg: reg,
-            ctrl_c: EventState { tasks: Vec::new() },
-            ctrl_break: EventState { tasks: Vec::new() },
-        }));
 
         Ok(())
     }
@@ -194,153 +177,37 @@ impl Future for DriverTask {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
-        self.check_event_drops();
-        self.check_messages();
-        self.check_events().unwrap();
+        loop {
+            // Ensure we keep polling our waker until we know there are no more
+            // events (and therefore we've registered interest to be woken again).
+            match self.rx.poll() {
+                Ok(Async::Ready(Some(()))) => continue,
+                Ok(Async::Ready(None)) => panic!("driver got disconnected?"),
+                Ok(Async::NotReady) => break,
+                // receivers don't generate errors
+                Err(()) => unreachable!(),
+            }
+        }
 
-        // TODO: when to finish this task?
+        globals().broadcast();
+
+        // TODO(1000): when to finish this task?
         Ok(Async::NotReady)
     }
 }
 
-impl DriverTask {
-    fn check_event_drops(&mut self) {
-        self.ctrl_c
-            .tasks
-            .retain(|task| !task.0.borrow_mut().poll().is_err());
-        self.ctrl_break
-            .tasks
-            .retain(|task| !task.0.borrow_mut().poll().is_err());
-    }
-
-    fn check_messages(&mut self) {
-        loop {
-            // Acquire the next message
-            let message = match self.rx.poll().unwrap() {
-                Async::Ready(Some(e)) => e,
-                Async::Ready(None) | Async::NotReady => break,
-            };
-            let (sig, complete) = match message {
-                Message::NewEvent(sig, complete) => (sig, complete),
-            };
-
-            let event = if sig == CTRL_C_EVENT {
-                &mut self.ctrl_c
-            } else {
-                &mut self.ctrl_break
-            };
-
-            // Acquire the (registration, set_readiness) pair by... assuming
-            // we're on the event loop (true because of the spawn above).
-            let reg = MyRegistration::new();
-            let ready = reg.readiness.clone();
-
-            let reg = match PollEvented::new_with_handle(reg, &self.handle) {
-                Ok(reg) => reg,
-                Err(e) => {
-                    drop(complete.send(Err(e)));
-                    continue;
-                }
-            };
-
-            // Create the `Event` to pass back and then also keep a handle to
-            // the `SetReadiness` for ourselves internally.
-            let (tx, rx) = oneshot::channel();
-            drop(complete.send(Ok(Event {
-                reg: reg,
-                _finished: tx,
-            })));
-            event.tasks.push((RefCell::new(rx), ready));
-        }
-    }
-
-    fn check_events(&mut self) -> io::Result<()> {
-        if self.reg.poll_read_ready(Ready::readable())?.is_not_ready() {
-            return Ok(());
-        }
-        self.reg.clear_read_ready(Ready::readable())?;
-        self.reg
-            .get_ref()
-            .readiness
-            .set_readiness(mio::Ready::empty())
-            .expect("failed to set readiness");
-
-        if unsafe { (*GLOBAL_STATE).ctrl_c.ready.swap(false, Ordering::SeqCst) } {
-            for task in self.ctrl_c.tasks.iter() {
-                task.1.set_readiness(mio::Ready::readable()).unwrap();
-            }
-        }
-        if unsafe {
-            (*GLOBAL_STATE)
-                .ctrl_break
-                .ready
-                .swap(false, Ordering::SeqCst)
-        } {
-            for task in self.ctrl_break.tasks.iter() {
-                task.1.set_readiness(mio::Ready::readable()).unwrap();
-            }
-        }
-        Ok(())
-    }
-}
-
 unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
-    let event = match ty {
-        CTRL_C_EVENT => &(*GLOBAL_STATE).ctrl_c,
-        CTRL_BREAK_EVENT => &(*GLOBAL_STATE).ctrl_break,
-        _ => return FALSE,
-    };
-    if event.ready.swap(true, Ordering::SeqCst) {
-        FALSE
-    } else {
-        drop((*GLOBAL_STATE).ready.set_readiness(mio::Ready::readable()));
-        // TODO(1000): this will report that we handled a CTRL_BREAK_EVENT when
-        //       in fact we may not have any streams actually created for that
-        //       event.
-        TRUE
-    }
-}
+    let globals = globals();
+    globals.record_event(ty as EventId);
 
-struct MyRegistration {
-    registration: mio::Registration,
-    readiness: mio::SetReadiness,
-}
+    // FIXME: revisit this, we'd probably want to panic if the driver task goes away,
+    // but that would unwind across the FFI boundary...
+    let _ = globals.driver_waker.clone().try_send(());
 
-impl MyRegistration {
-    fn new() -> Self {
-        let (registration, readiness) = mio::Registration::new2();
-
-        Self {
-            registration,
-            readiness,
-        }
-    }
-}
-
-impl mio::Evented for MyRegistration {
-    fn register(
-        &self,
-        poll: &mio::Poll,
-        token: mio::Token,
-        events: mio::Ready,
-        opts: mio::PollOpt,
-    ) -> io::Result<()> {
-        self.registration.register(poll, token, events, opts)
-    }
-
-    fn reregister(
-        &self,
-        poll: &mio::Poll,
-        token: mio::Token,
-        events: mio::Ready,
-        opts: mio::PollOpt,
-    ) -> io::Result<()> {
-        self.registration.reregister(poll, token, events, opts)
-    }
-
-    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
-        mio::Evented::deregister(&self.registration, poll)
-    }
+    // TODO(1000): this will report that we handled a CTRL_BREAK_EVENT when
+    //       in fact we may not have any streams actually created for that
+    //       event.
+    TRUE
 }
 
 #[cfg(test)]
