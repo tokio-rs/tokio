@@ -72,7 +72,10 @@ fn lock() {
     let l = lock.lock();
     pin_mut!(l);
 
-    task.enter(|cx| assert_pending!(l.poll(cx)));
+    task.enter(|cx| assert_pending!(l.as_mut().poll(cx)));
+
     std::thread::sleep(std::time::Duration::from_millis(500));
     assert!(task.is_woken());
+    let result = task.enter(|cx| assert_ready!(l.as_mut().poll(cx)));
+    assert!(*result);
 }
