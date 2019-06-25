@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 #![deny(warnings, rust_2018_idioms)]
 
 use env_logger;
