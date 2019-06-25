@@ -1,6 +1,6 @@
 use super::orphan::{OrphanQueue, Wait};
+use crate::kill::Kill;
 use futures::{Async, Future, Poll, Stream};
-use kill::Kill;
 use std::io;
 use std::ops::Deref;
 use std::process::ExitStatus;

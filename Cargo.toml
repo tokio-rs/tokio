@@ -5,6 +5,7 @@ name = "tokio-process"
 # - Update CHANGELOG.md.
 # - Create "X.Y.Z" git tag.
 version = "0.2.4"
+edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"

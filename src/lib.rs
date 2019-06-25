@@ -172,9 +172,9 @@ extern crate log;
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
+use crate::kill::Kill;
 use futures::future::{ok, Either};
 use futures::{Async, Future, IntoFuture, Poll};
-use kill::Kill;
 use std::fmt;
 use tokio_io::io::read_to_end;
 use tokio_io::{AsyncRead, AsyncWrite, IoFuture};
@@ -759,8 +759,8 @@ mod sys {
 #[cfg(test)]
 mod test {
     use super::ChildDropGuard;
+    use crate::kill::Kill;
     use futures::{Async, Future, Poll};
-    use kill::Kill;
     use std::io;
 
     struct Mock {

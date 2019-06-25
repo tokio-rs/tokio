@@ -35,9 +35,9 @@ use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use self::tokio_signal::unix::Signal;
 use super::SpawnedChild;
+use crate::kill::Kill;
 use futures::future::FlattenStream;
 use futures::{Future, Poll};
-use kill::Kill;
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -216,6 +216,6 @@ where
             return Err(io::Error::last_os_error());
         }
     }
-    let io = try!(PollEvented::new_with_handle(Fd(io), handle));
+    let io = PollEvented::new_with_handle(Fd(io), handle)?;
     Ok(Some(io))
 }

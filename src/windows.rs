@@ -106,11 +106,11 @@ impl Future for Child {
                     Async::Ready(()) => {}
                     Async::NotReady => return Ok(Async::NotReady),
                 }
-                let status = try!(try_wait(&self.child)).expect("not ready yet");
+                let status = try_wait(&self.child)?.expect("not ready yet");
                 return Ok(status.into());
             }
 
-            if let Some(e) = try!(try_wait(&self.child)) {
+            if let Some(e) = try_wait(&self.child)? {
                 return Ok(e.into());
             }
             let (tx, rx) = oneshot::channel();
@@ -187,6 +187,6 @@ where
         None => return Ok(None),
     };
     let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
-    let io = try!(PollEvented::new_with_handle(pipe, handle));
+    let io = PollEvented::new_with_handle(pipe, handle)?;
     Ok(Some(io))
 }
