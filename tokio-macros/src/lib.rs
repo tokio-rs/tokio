@@ -21,7 +21,7 @@ use syn::spanned::Spanned;
 /// }
 /// ```
 #[proc_macro_attribute]
-#[cfg(not(test))]
+#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
