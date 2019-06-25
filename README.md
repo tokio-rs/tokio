@@ -2,12 +2,7 @@
 
 An implementation of process management for Tokio
 
-[![Build Status](https://travis-ci.com/alexcrichton/tokio-process.svg?branch=master)](https://travis-ci.com/alexcrichton/tokio-process)
-[![Build status](https://ci.appveyor.com/api/projects/status/43c8g7fy801e5902?svg=true)](https://ci.appveyor.com/project/alexcrichton/tokio-process)
-[![Crates.io](https://img.shields.io/crates/v/tokio-process.svg?maxAge=2592000)](https://crates.io/crates/tokio-process)
-[![Coverage](https://img.shields.io/codecov/c/github/alexcrichton/tokio-process/master.svg)](https://codecov.io/gh/alexcrichton/tokio-process)
-
-[Documentation](https://docs.rs/tokio-process)
+[Documentation](https://docs.rs/tokio-process/0.2.4/tokio_process)
 
 ## Usage
 
@@ -18,26 +13,36 @@ First, add this to your `Cargo.toml`:
 tokio-process = "0.2"
 ```
 
-Next, add this to your crate:
+Next you can use this in conjunction with the `tokio` and `futures` crates:
 
-```rust
-extern crate tokio_process;
+```rust,no_run
+use std::process::Command;
+
+use futures::Future;
+use tokio_process::CommandExt;
+
+fn main() {
+    // Use the standard library's `Command` type to build a process and
+    // then execute it via the `CommandExt` trait.
+    let child = Command::new("echo").arg("hello").arg("world").spawn_async();
+
+    // Make sure our child succeeded in spawning and process the result
+    let future = child
+        .expect("failed to spawn")
+        .map(|status| println!("exit status: {}", status))
+        .map_err(|e| panic!("failed to wait for exit: {}", e));
+
+    // Send the future to the tokio runtime for execution
+    tokio::run(future)
+}
 ```
 
+## License
 
-# License
-
-This project is licensed under either of
-
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
-   http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or
-   http://opensource.org/licenses/MIT)
-
-at your option.
+This project is licensed under the [MIT license](./LICENSE).
 
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in tokio-process by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+for inclusion in Tokio by you, shall be licensed as MIT, without any additional
+terms or conditions.
