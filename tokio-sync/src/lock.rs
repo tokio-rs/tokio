@@ -44,7 +44,9 @@ use crate::semaphore;
 
 use std::cell::UnsafeCell;
 use std::fmt;
+use std::future::Future;
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll::Ready;
 use std::task::{Context, Poll};
@@ -70,6 +72,12 @@ pub struct Lock<T> {
 /// will succeed yet again.
 #[derive(Debug)]
 pub struct LockGuard<T>(Lock<T>);
+
+/// A future that resolves to a `LockGuard`.
+#[derive(Debug)]
+pub struct LockFuture<'a, T> {
+    lock: &'a mut Lock<T>,
+}
 
 // As long as T: Send, it's fine to send and share Lock<T> between threads.
 // If T was not Send, sending and sharing a Lock<T> would be bad, since you can access T through
@@ -119,6 +127,11 @@ impl<T> Lock<T> {
             permit: ::std::mem::replace(&mut self.permit, semaphore::Permit::new()),
         };
         Ready(LockGuard(acquired))
+    }
+
+    /// A future that resolves on acquiring the lock and returns the `LockGuard`.
+    pub fn lock(&mut self) -> LockFuture<'_, T> {
+        LockFuture { lock: self }
     }
 }
 
@@ -177,5 +190,14 @@ impl<T> DerefMut for LockGuard<T> {
 impl<T: fmt::Display> fmt::Display for LockGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
+    }
+}
+
+impl<T> Future for LockFuture<'_, T> {
+    type Output = LockGuard<T>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let me = &mut *self;
+        Pin::new(&mut *me.lock).poll_lock(cx)
     }
 }
