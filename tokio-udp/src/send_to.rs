@@ -10,18 +10,14 @@ use std::task::{Context, Poll};
 /// This `struct` is created by [`send_to`](super::UdpSocket::send_to).
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
-pub struct SendTo<'socket, 'b> {
-    socket: &'socket mut UdpSocket,
+pub struct SendTo<'a, 'b> {
+    socket: &'a mut UdpSocket,
     buf: &'b [u8],
     target: &'b SocketAddr,
 }
 
-impl<'socket, 'b> SendTo<'socket, 'b> {
-    pub(super) fn new(
-        socket: &'socket mut UdpSocket,
-        buf: &'b [u8],
-        target: &'b SocketAddr,
-    ) -> Self {
+impl<'a, 'b> SendTo<'a, 'b> {
+    pub(super) fn new(socket: &'a mut UdpSocket, buf: &'b [u8], target: &'b SocketAddr) -> Self {
         Self {
             socket,
             buf,
@@ -30,7 +26,7 @@ impl<'socket, 'b> SendTo<'socket, 'b> {
     }
 }
 
-impl<'socket, 'b> Future for SendTo<'socket, 'b> {
+impl<'a, 'b> Future for SendTo<'a, 'b> {
     type Output = io::Result<usize>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

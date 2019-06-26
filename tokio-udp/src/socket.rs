@@ -60,7 +60,7 @@ impl UdpSocket {
     /// will resolve to an error if the socket is not connected.
     ///
     /// [`connect`]: #method.connect
-    pub fn send<'socket, 'buf>(&'socket mut self, buf: &'buf [u8]) -> Send<'socket, 'buf> {
+    pub fn send<'a, 'b>(&'a mut self, buf: &'b [u8]) -> Send<'a, 'b> {
         Send::new(self, buf)
     }
 
@@ -106,7 +106,7 @@ impl UdpSocket {
     /// will fail if the socket is not connected.
     ///
     /// [`connect`]: #method.connect
-    pub fn recv<'socket, 'buf>(&'socket mut self, buf: &'buf mut [u8]) -> Recv<'socket, 'buf> {
+    pub fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> Recv<'a, 'b> {
         Recv::new(self, buf)
     }
 
@@ -150,11 +150,7 @@ impl UdpSocket {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    pub fn send_to<'socket, 'b>(
-        &'socket mut self,
-        buf: &'b [u8],
-        target: &'b SocketAddr,
-    ) -> SendTo<'socket, 'b> {
+    pub fn send_to<'a, 'b>(&'a mut self, buf: &'b [u8], target: &'b SocketAddr) -> SendTo<'a, 'b> {
         SendTo::new(self, buf, target)
     }
 
@@ -194,10 +190,7 @@ impl UdpSocket {
     /// The function must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
-    pub fn recv_from<'socket, 'buf>(
-        &'socket mut self,
-        buf: &'buf mut [u8],
-    ) -> RecvFrom<'socket, 'buf> {
+    pub fn recv_from<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> RecvFrom<'a, 'b> {
         RecvFrom::new(self, buf)
     }
 
