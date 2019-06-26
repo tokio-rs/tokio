@@ -1,6 +1,7 @@
 use super::{RecvDgram, SendDgram};
 use futures::{try_ready, Async, Poll};
 use mio;
+use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -415,6 +416,18 @@ impl UdpSocket {
     /// [`join_multicast_v6`]: #method.join_multicast_v6
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
+    }
+}
+
+impl TryFrom<UdpSocket> for mio::net::UdpSocket {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: UdpSocket) -> Result<Self, Self::Error> {
+        value.io.into_inner()
     }
 }
 

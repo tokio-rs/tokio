@@ -2,6 +2,7 @@
 use super::incoming::Incoming;
 use super::TcpStream;
 use mio;
+use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
@@ -310,6 +311,18 @@ impl TcpListener {
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
+    }
+}
+
+impl TryFrom<TcpListener> for mio::net::TcpListener {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: TcpListener) -> Result<Self, Self::Error> {
+        value.io.into_inner()
     }
 }
 

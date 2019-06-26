@@ -5,6 +5,7 @@ use iovec::{self, IoVec};
 use libc;
 use mio::Ready;
 use mio_uds;
+use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
@@ -124,6 +125,18 @@ impl UnixStream {
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
+    }
+}
+
+impl TryFrom<UnixStream> for mio_uds::UnixStream {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
+        value.io.into_inner()
     }
 }
 
