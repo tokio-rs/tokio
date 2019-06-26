@@ -1,7 +1,6 @@
 use std::fmt;
 use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
+use std::task::{Context, Poll};
 
 use super::framed::Fuse;
 use super::Decoder;
@@ -117,6 +116,7 @@ where
         Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_close(cx)
     }
 }
+
 impl<T, D> fmt::Debug for FramedRead<T, D>
 where
     T: fmt::Debug,
