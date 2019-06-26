@@ -33,8 +33,6 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --lib && cargo test --all --tests
-    - (cd tokio-trace/test-log-support && cargo test)
-    - (cd tokio-trace/test_static_max_level_features && cargo test)
     - cargo doc --all
   # TODO: Re-enable
   # i686_test_script:

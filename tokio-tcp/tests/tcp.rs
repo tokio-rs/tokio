@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(feature = "broken")]
 
 use env_logger;
 use futures::{Future, Stream};
