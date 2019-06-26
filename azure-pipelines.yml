@@ -31,7 +31,7 @@ jobs:
 #       - tokio-fs
       - tokio-reactor
 #       - tokio-signal
-#       - tokio-tcp
+      - tokio-tcp
 #       - tokio-tls
       - tokio-udp
 #       - tokio-uds
@@ -51,8 +51,8 @@ jobs:
       - tokio-macros
       - tokio-sync
       # - tokio-threadpool
-      # - tokio-timer
-      # - tokio-test
+      - tokio-timer
+      - tokio-test
       # - tokio-trace
       # - tokio-trace/tokio-trace-core
       # - tokio-trace/test-log-support
