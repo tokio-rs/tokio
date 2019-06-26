@@ -1,41 +1,38 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio_test::assert_ready_ok;
-use tokio_test::task::MockTask;
+use tokio_test::assert_ok;
 
-use pin_utils::pin_mut;
-use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[test]
-fn read() {
-    struct Rd;
+#[tokio::test]
+async fn read() {
+    #[derive(Default)]
+    struct Rd {
+        poll_cnt: usize,
+    }
 
     impl AsyncRead for Rd {
         fn poll_read(
-            self: Pin<&mut Self>,
+            mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
             buf: &mut [u8],
         ) -> Poll<io::Result<usize>> {
+            assert_eq!(0, self.poll_cnt);
+            self.poll_cnt +=1 ;
+
             buf[0..11].copy_from_slice(b"hello world");
             Poll::Ready(Ok(11))
         }
     }
 
     let mut buf = Box::new([0; 11]);
-    let mut task = MockTask::new();
+    let mut rd = Rd::default();
 
-    task.enter(|cx| {
-        let mut rd = Rd;
-
-        let read = rd.read(&mut buf[..]);
-        pin_mut!(read);
-
-        let n = assert_ready_ok!(read.poll(cx));
-        assert_eq!(n, 11);
-        assert_eq!(buf[..], b"hello world"[..]);
-    });
+    let n = assert_ok!(rd.read(&mut buf[..]).await);
+    assert_eq!(n, 11);
+    assert_eq!(buf[..], b"hello world"[..]);
 }
