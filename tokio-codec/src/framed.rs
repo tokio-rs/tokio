@@ -9,7 +9,7 @@ use crate::decoder::Decoder;
 use crate::encoder::Encoder;
 use crate::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
 use crate::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
-use tokio_futures::Stream;
+use tokio_futures::{Sink, Stream};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
@@ -162,28 +162,30 @@ where
     }
 }
 
-// TODO update sink impl
-// impl<T, U> Sink for Framed<T, U>
-// where
-//     T: AsyncWrite,
-//     U: Encoder,
-//     U::Error: From<io::Error>,
-// {
-//     type SinkItem = U::Item;
-//     type SinkError = U::Error;
+impl<T, I, U> Sink<I> for Framed<T, U>
+where
+    T: AsyncWrite + Unpin,
+    U: Encoder<Item = I> + Unpin,
+    U::Error: From<io::Error>,
+{
+    type Error = U::Error;
 
-//     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-//         self.inner.get_mut().start_send(item)
-//     }
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(Pin::get_mut(self).inner.get_mut()).poll_ready(cx)
+    }
 
-//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-//         self.inner.get_mut().poll_complete()
-//     }
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        Pin::new(Pin::get_mut(self).inner.get_mut()).start_send(item)
+    }
 
-//     fn close(&mut self) -> Poll<(), Self::SinkError> {
-//         self.inner.get_mut().close()
-//     }
-// }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(Pin::get_mut(self).inner.get_mut()).poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(Pin::get_mut(self).inner.get_mut()).poll_close(cx)
+    }
+}
 
 impl<T, U> fmt::Debug for Framed<T, U>
 where

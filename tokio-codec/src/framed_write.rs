@@ -7,7 +7,8 @@ use std::io::{self, Read};
 use super::framed::Fuse;
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
-use tokio_futures::Stream;
+use crate::try_ready;
+use tokio_futures::{Sink, Stream};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
@@ -111,7 +112,7 @@ where
     type Item = T::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(self.get_mut()).poll_next(cx)
+        Pin::new(Pin::get_mut(self).get_mut()).poll_next(cx)
     }
 }
 
@@ -226,6 +227,73 @@ impl<T> FramedWrite2<T> {
 //     }
 // }
 
+impl<I, T> Sink<I> for FramedWrite2<T>
+where
+    T: AsyncWrite + Encoder<Item = I> + Unpin,
+{
+    type Error = T::Error;
+
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
+        // *still* over 8KiB, then apply backpressure (reject the send).
+        if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
+            match self.as_mut().poll_flush(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                Poll::Ready(Ok(())) => (),
+            };
+
+            if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
+                return Poll::Pending;
+            }
+        }
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        let pinned = Pin::get_mut(self);
+        pinned.inner.encode(item, &mut pinned.buffer)?;
+        Ok(())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        trace!("flushing framed transport");
+        let pinned = Pin::get_mut(self);
+
+        while !pinned.buffer.is_empty() {
+            trace!("writing; remaining={}", pinned.buffer.len());
+
+            let buf = &pinned.buffer;
+            let n = try_ready!(Pin::new(&mut pinned.inner).poll_write(cx, &buf));
+
+            if n == 0 {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    "failed to \
+                     write frame to transport",
+                )
+                .into()));
+            }
+
+            // TODO: Add a way to `bytes` to do this w/o returning the drained
+            // data.
+            let _ = pinned.buffer.split_to(n);
+        }
+
+        // Try flushing the underlying IO
+        try_ready!(Pin::new(&mut pinned.inner).poll_flush(cx));
+
+        trace!("framed transport flushed");
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let () = try_ready!(Pin::as_mut(&mut self).poll_flush(cx));
+        let () = try_ready!(Pin::new(&mut self.inner).poll_shutdown(cx));
+        Poll::Ready(Ok(()))
+    }
+}
+
 impl<T: Decoder> Decoder for FramedWrite2<T> {
     type Item = T::Item;
     type Error = T::Error;
@@ -255,6 +323,6 @@ impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        Pin::new(self.get_mut()).poll_read(cx, buf)
+        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
     }
 }
