@@ -25,3 +25,4 @@ publish = false
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
 bytes = "0.4.7"
 futures = "0.1.18"
+log = "0.4"
