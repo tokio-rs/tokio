@@ -19,10 +19,22 @@ use syn::spanned::Spanned;
 ///
 /// ## Usage
 ///
+/// ### Select runtime
+///
 /// ```rust
 ///#![feature(async_await)]
 ///
 /// #[tokio::main(single_thread)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+/// ### Using default
+///
+/// ```rust
+///#![feature(async_await)]
+///
+/// #[tokio::main]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -69,7 +81,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#attrs)*
             fn #name() #ret {
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on_async(async { #body })
+                rt.block_on(async { #body })
             }
         },
         RuntimeType::Single => quote! {
@@ -94,7 +106,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 /// #![feature(async_await)]
 ///
-/// #[tokio_macros::test]
+/// #[tokio::test]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
