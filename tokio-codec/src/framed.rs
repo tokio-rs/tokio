@@ -10,7 +10,9 @@ use crate::encoder::Encoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
-use futures::{Poll, Sink, StartSend, Stream};
+// use futures::{Poll, Sink, StartSend, Stream};
+use std::task::{Context, Poll};
+use std::pin::Pin;
 
 /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -148,47 +150,48 @@ impl<T, U> Framed<T, U> {
     }
 }
 
-impl<T, U> Stream for Framed<T, U>
-where
-    T: AsyncRead,
-    U: Decoder,
-{
-    type Item = U::Item;
-    type Error = U::Error;
+// TODO update stream and sink impl
+// impl<T, U> Stream for Framed<T, U>
+// where
+//     T: AsyncRead,
+//     U: Decoder,
+// {
+//     type Item = U::Item;
+//     type Error = U::Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.inner.poll()
-    }
-}
+//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+//         self.inner.poll()
+//     }
+// }
 
-impl<T, U> Sink for Framed<T, U>
-where
-    T: AsyncWrite,
-    U: Encoder,
-    U::Error: From<io::Error>,
-{
-    type SinkItem = U::Item;
-    type SinkError = U::Error;
+// impl<T, U> Sink for Framed<T, U>
+// where
+//     T: AsyncWrite,
+//     U: Encoder,
+//     U::Error: From<io::Error>,
+// {
+//     type SinkItem = U::Item;
+//     type SinkError = U::Error;
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        self.inner.get_mut().start_send(item)
-    }
+//     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+//         self.inner.get_mut().start_send(item)
+//     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.get_mut().poll_complete()
-    }
+//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+//         self.inner.get_mut().poll_complete()
+//     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.get_mut().close()
-    }
-}
+//     fn close(&mut self) -> Poll<(), Self::SinkError> {
+//         self.inner.get_mut().close()
+//     }
+// }
 
 impl<T, U> fmt::Debug for Framed<T, U>
 where
     T: fmt::Debug,
     U: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Framed")
             .field("io", &self.inner.get_ref().get_ref().0)
             .field("codec", &self.inner.get_ref().get_ref().1)
@@ -208,6 +211,14 @@ impl<T: AsyncRead, U> AsyncRead for Fuse<T, U> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.0.prepare_uninitialized_buffer(buf)
     }
+
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8]
+    ) -> Poll<Result<usize, io::Error>> {
+        unimplemented!() // TODO
+    }
 }
 
 impl<T: Write, U> Write for Fuse<T, U> {
@@ -221,8 +232,22 @@ impl<T: Write, U> Write for Fuse<T, U> {
 }
 
 impl<T: AsyncWrite, U> AsyncWrite for Fuse<T, U> {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        self.0.shutdown()
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8]
+    ) -> Poll<Result<usize, io::Error>> {
+        // TODO reimplement
+        unimplemented!()
+    }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        // TODO reimplement
+        unimplemented!()
+    }
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        // AsyncWrite::poll_shutdown(self.0, cx)
+        // TODO reimplement
+        unimplemented!()
     }
 }
 

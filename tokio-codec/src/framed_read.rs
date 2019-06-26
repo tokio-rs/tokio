@@ -8,7 +8,8 @@ use tokio_io::AsyncRead;
 use log::trace;
 
 use bytes::BytesMut;
-use futures::{Async, Poll, Sink, StartSend, Stream};
+use std::task::Poll;
+// use futures::{Async, Poll, Sink, StartSend, Stream};
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 pub struct FramedRead<T, D> {
@@ -80,45 +81,46 @@ impl<T, D> FramedRead<T, D> {
     }
 }
 
-impl<T, D> Stream for FramedRead<T, D>
-where
-    T: AsyncRead,
-    D: Decoder,
-{
-    type Item = D::Item;
-    type Error = D::Error;
+// TODO update stream and sink impls
+// impl<T, D> Stream for FramedRead<T, D>
+// where
+//     T: AsyncRead,
+//     D: Decoder,
+// {
+//     type Item = D::Item;
+//     type Error = D::Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.inner.poll()
-    }
-}
+//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+//         self.inner.poll()
+//     }
+// }
 
-impl<T, D> Sink for FramedRead<T, D>
-where
-    T: Sink,
-{
-    type SinkItem = T::SinkItem;
-    type SinkError = T::SinkError;
+// impl<T, D> Sink for FramedRead<T, D>
+// where
+//     T: Sink,
+// {
+//     type SinkItem = T::SinkItem;
+//     type SinkError = T::SinkError;
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        self.inner.inner.0.start_send(item)
-    }
+//     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+//         self.inner.inner.0.start_send(item)
+//     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.inner.0.poll_complete()
-    }
+//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+//         self.inner.inner.0.poll_complete()
+//     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.inner.0.close()
-    }
-}
+//     fn close(&mut self) -> Poll<(), Self::SinkError> {
+//         self.inner.inner.0.close()
+//     }
+// }
 
 impl<T, D> fmt::Debug for FramedRead<T, D>
 where
     T: fmt::Debug,
     D: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedRead")
             .field("inner", &self.inner.inner.0)
             .field("decoder", &self.inner.inner.1)
@@ -171,47 +173,48 @@ impl<T> FramedRead2<T> {
     }
 }
 
-impl<T> Stream for FramedRead2<T>
-where
-    T: AsyncRead + Decoder,
-{
-    type Item = T::Item;
-    type Error = T::Error;
+// TODO update Stream impl
+// impl<T> Stream for FramedRead2<T>
+// where
+//     T: AsyncRead + Decoder,
+// {
+//     type Item = T::Item;
+//     type Error = T::Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            // Repeatedly call `decode` or `decode_eof` as long as it is
-            // "readable". Readable is defined as not having returned `None`. If
-            // the upstream has returned EOF, and the decoder is no longer
-            // readable, it can be assumed that the decoder will never become
-            // readable again, at which point the stream is terminated.
-            if self.is_readable {
-                if self.eof {
-                    let frame = self.inner.decode_eof(&mut self.buffer)?;
-                    return Ok(Async::Ready(frame));
-                }
+//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+//         loop {
+//             // Repeatedly call `decode` or `decode_eof` as long as it is
+//             // "readable". Readable is defined as not having returned `None`. If
+//             // the upstream has returned EOF, and the decoder is no longer
+//             // readable, it can be assumed that the decoder will never become
+//             // readable again, at which point the stream is terminated.
+//             if self.is_readable {
+//                 if self.eof {
+//                     let frame = self.inner.decode_eof(&mut self.buffer)?;
+//                     return Ok(Async::Ready(frame));
+//                 }
 
-                trace!("attempting to decode a frame");
+//                 trace!("attempting to decode a frame");
 
-                if let Some(frame) = self.inner.decode(&mut self.buffer)? {
-                    trace!("frame decoded from buffer");
-                    return Ok(Async::Ready(Some(frame)));
-                }
+//                 if let Some(frame) = self.inner.decode(&mut self.buffer)? {
+//                     trace!("frame decoded from buffer");
+//                     return Ok(Async::Ready(Some(frame)));
+//                 }
 
-                self.is_readable = false;
-            }
+//                 self.is_readable = false;
+//             }
 
-            assert!(!self.eof);
+//             assert!(!self.eof);
 
-            // Otherwise, try to read more data and try again. Make sure we've
-            // got room for at least one byte to read to ensure that we don't
-            // get a spurious 0 that looks like EOF
-            self.buffer.reserve(1);
-            if 0 == try_ready!(self.inner.read_buf(&mut self.buffer)) {
-                self.eof = true;
-            }
+//             // Otherwise, try to read more data and try again. Make sure we've
+//             // got room for at least one byte to read to ensure that we don't
+//             // get a spurious 0 that looks like EOF
+//             self.buffer.reserve(1);
+//             if 0 == try_ready!(self.inner.read_buf(&mut self.buffer)) {
+//                 self.eof = true;
+//             }
 
-            self.is_readable = true;
-        }
-    }
-}
+//             self.is_readable = true;
+//         }
+//     }
+// }

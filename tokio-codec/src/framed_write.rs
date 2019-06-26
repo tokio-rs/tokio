@@ -10,7 +10,9 @@ use crate::encoder::Encoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
-use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use std::task::{Poll, Context};
+use std::pin::Pin;
+// use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
 pub struct FramedWrite<T, E> {
@@ -79,45 +81,46 @@ impl<T, E> FramedWrite<T, E> {
     }
 }
 
-impl<T, E> Sink for FramedWrite<T, E>
-where
-    T: AsyncWrite,
-    E: Encoder,
-{
-    type SinkItem = E::Item;
-    type SinkError = E::Error;
+// TODO update sink and stream impl
+// impl<T, E> Sink for FramedWrite<T, E>
+// where
+//     T: AsyncWrite,
+//     E: Encoder,
+// {
+//     type SinkItem = E::Item;
+//     type SinkError = E::Error;
 
-    fn start_send(&mut self, item: E::Item) -> StartSend<E::Item, E::Error> {
-        self.inner.start_send(item)
-    }
+//     fn start_send(&mut self, item: E::Item) -> StartSend<E::Item, E::Error> {
+//         self.inner.start_send(item)
+//     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.poll_complete()
-    }
+//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+//         self.inner.poll_complete()
+//     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(self.inner.close()?)
-    }
-}
+//     fn close(&mut self) -> Poll<(), Self::SinkError> {
+//         Ok(self.inner.close()?)
+//     }
+// }
 
-impl<T, D> Stream for FramedWrite<T, D>
-where
-    T: Stream,
-{
-    type Item = T::Item;
-    type Error = T::Error;
+// impl<T, D> Stream for FramedWrite<T, D>
+// where
+//     T: Stream,
+// {
+//     type Item = T::Item;
+//     type Error = T::Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.inner.inner.0.poll()
-    }
-}
+//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+//         self.inner.inner.0.poll()
+//     }
+// }
 
 impl<T, U> fmt::Debug for FramedWrite<T, U>
 where
     T: fmt::Debug,
     U: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FramedWrite")
             .field("inner", &self.inner.get_ref().0)
             .field("encoder", &self.inner.get_ref().1)
@@ -164,63 +167,64 @@ impl<T> FramedWrite2<T> {
     }
 }
 
-impl<T> Sink for FramedWrite2<T>
-where
-    T: AsyncWrite + Encoder,
-{
-    type SinkItem = T::Item;
-    type SinkError = T::Error;
+// TODO update sink impl
+// impl<T> Sink for FramedWrite2<T>
+// where
+//     T: AsyncWrite + Encoder,
+// {
+//     type SinkItem = T::Item;
+//     type SinkError = T::Error;
 
-    fn start_send(&mut self, item: T::Item) -> StartSend<T::Item, T::Error> {
-        // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
-        // *still* over 8KiB, then apply backpressure (reject the send).
-        if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
-            self.poll_complete()?;
+//     fn start_send(&mut self, item: T::Item) -> StartSend<T::Item, T::Error> {
+//         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
+//         // *still* over 8KiB, then apply backpressure (reject the send).
+//         if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
+//             self.poll_complete()?;
 
-            if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
-                return Ok(AsyncSink::NotReady(item));
-            }
-        }
+//             if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
+//                 return Ok(AsyncSink::NotReady(item));
+//             }
+//         }
 
-        self.inner.encode(item, &mut self.buffer)?;
+//         self.inner.encode(item, &mut self.buffer)?;
 
-        Ok(AsyncSink::Ready)
-    }
+//         Ok(AsyncSink::Ready)
+//     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        trace!("flushing framed transport");
+//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+//         trace!("flushing framed transport");
 
-        while !self.buffer.is_empty() {
-            trace!("writing; remaining={}", self.buffer.len());
+//         while !self.buffer.is_empty() {
+//             trace!("writing; remaining={}", self.buffer.len());
 
-            let n = try_ready!(self.inner.poll_write(&self.buffer));
+//             let n = try_ready!(self.inner.poll_write(&self.buffer));
 
-            if n == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::WriteZero,
-                    "failed to \
-                     write frame to transport",
-                )
-                .into());
-            }
+//             if n == 0 {
+//                 return Err(io::Error::new(
+//                     io::ErrorKind::WriteZero,
+//                     "failed to \
+//                      write frame to transport",
+//                 )
+//                 .into());
+//             }
 
-            // TODO: Add a way to `bytes` to do this w/o returning the drained
-            // data.
-            let _ = self.buffer.split_to(n);
-        }
+//             // TODO: Add a way to `bytes` to do this w/o returning the drained
+//             // data.
+//             let _ = self.buffer.split_to(n);
+//         }
 
-        // Try flushing the underlying IO
-        try_ready!(self.inner.poll_flush());
+//         // Try flushing the underlying IO
+//         try_ready!(self.inner.poll_flush());
 
-        trace!("framed transport flushed");
-        return Ok(Async::Ready(()));
-    }
+//         trace!("framed transport flushed");
+//         return Ok(Async::Ready(()));
+//     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        try_ready!(self.poll_complete());
-        Ok(self.inner.shutdown()?)
-    }
-}
+//     fn close(&mut self) -> Poll<(), Self::SinkError> {
+//         try_ready!(self.poll_complete());
+//         Ok(self.inner.shutdown()?)
+//     }
+// }
 
 impl<T: Decoder> Decoder for FramedWrite2<T> {
     type Item = T::Item;
@@ -244,5 +248,12 @@ impl<T: Read> Read for FramedWrite2<T> {
 impl<T: AsyncRead> AsyncRead for FramedWrite2<T> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
+    }
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8]
+    ) -> Poll<Result<usize, io::Error>> {
+        unimplemented!() // TODO
     }
 }
