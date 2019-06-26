@@ -6,7 +6,7 @@
 //! # Organization
 //!
 //! * [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
-//! * [`UdpSocket`] and [`UdpFramed`] provide functionality for communication over UDP
+//! * [`UdpSocket`] provides functionality for communication over UDP
 //! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
 //! Unix Domain Stream Socket **(available on Unix only)**
 //! * [`UnixDatagram`] and [`UnixDatagramFramed`] provide functionality for communication
@@ -16,7 +16,6 @@
 //! [`TcpListener`]: struct.TcpListener.html
 //! [`TcpStream`]: struct.TcpStream.html
 //! [`UdpSocket`]: struct.UdpSocket.html
-//! [`UdpFramed`]: struct.UdpFramed.html
 //! [`UnixListener`]: struct.UnixListener.html
 //! [`UnixStream`]: struct.UnixStream.html
 //! [`UnixDatagram`]: struct.UnixDatagram.html
@@ -52,20 +51,17 @@ pub mod udp {
     //!
     //! The main struct for UDP is the [`UdpSocket`], which represents a UDP socket.
     //! Reading and writing to it can be done using futures, which return the
-    //! [`RecvDgram`] and [`SendDgram`] structs respectively.
-    //!
-    //! For convenience it's also possible to convert raw datagrams into higher-level
-    //! frames.
+    //! [`Recv`], [`Send`], [`RecvFrom`], [`SendTo`] structs respectively.
     //!
     //! [`UdpSocket`]: struct.UdpSocket.html
-    //! [`RecvDgram`]: struct.RecvDgram.html
-    //! [`SendDgram`]: struct.SendDgram.html
-    //! [`UdpFramed`]: struct.UdpFramed.html
-    //! [`framed`]: struct.UdpSocket.html#method.framed
-    pub use tokio_udp::{RecvDgram, SendDgram, UdpFramed, UdpSocket};
+    //! [`Recv`]: struct.Recv.html
+    //! [`Send`]: struct.Send.html
+    //! [`RecvFrom`]: struct.RecvFrom.html
+    //! [`SendTo`]: struct.SendTo.html
+    pub use tokio_udp::{UdpSocket, Recv, Send, RecvFrom, SendTo};
 }
 #[cfg(feature = "udp")]
-pub use self::udp::{UdpFramed, UdpSocket};
+pub use self::udp::UdpSocket;
 
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {

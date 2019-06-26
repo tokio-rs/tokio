@@ -1,9 +1,10 @@
-use super::{RecvDgram, SendDgram};
-use futures::{try_ready, Async, Poll};
+use super::{Recv, RecvFrom, Send, SendTo};
 use mio;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a UDP socket.
@@ -52,13 +53,19 @@ impl UdpSocket {
         self.io.get_ref().connect(*addr)
     }
 
-    #[deprecated(since = "0.1.2", note = "use poll_send instead")]
-    #[doc(hidden)]
-    pub fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.poll_send(buf)? {
-            Async::Ready(n) => Ok(n),
-            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
-        }
+    /// Returns a future that sends data on the socket to the remote address to which it is connected.
+    /// On success, the future will resolve to the number of bytes written.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. The future
+    /// will resolve to an error if the socket is not connected.
+    ///
+    /// [`connect`]: #method.connect
+    ///
+    /// # Panics
+    ///
+    /// If the future is polled outside of a task context.
+    pub fn send<'socket, 'buf>(&'socket mut self, buf: &'buf [u8]) -> Send<'socket, 'buf> {
+        Send::new(self, buf)
     }
 
     /// Sends data on the socket to the remote address to which it is connected.
@@ -70,35 +77,49 @@ impl UdpSocket {
     ///
     /// # Return
     ///
-    /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
+    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
     ///
     /// If the socket is not ready for writing, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes writable.
     ///
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_send(&mut self, buf: &[u8]) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_write_ready());
+    pub fn poll_send(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.io.poll_write_ready(cx))?;
 
         match self.io.get_ref().send(buf) {
-            Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready()?;
-                Ok(Async::NotReady)
+                self.io.clear_write_ready(cx)?;
+                Poll::Pending
             }
-            Err(e) => Err(e),
+            x => Poll::Ready(x),
         }
     }
 
-    #[deprecated(since = "0.1.2", note = "use poll_recv instead")]
-    #[doc(hidden)]
-    pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.poll_recv(buf)? {
-            Async::Ready(n) => Ok(n),
-            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
-        }
+    /// Returns a future that receives a single datagram message on the socket from
+    /// the remote address to which it is connected. On success, the future will resolve
+    /// to the number of bytes read.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. The future
+    /// will fail if the socket is not connected.
+    ///
+    /// [`connect`]: #method.connect
+    ///
+    /// # Panics
+    ///
+    /// If the future is polled outside of a task context.
+    pub fn recv<'socket, 'buf>(&'socket mut self, buf: &'buf mut [u8]) -> Recv<'socket, 'buf> {
+        Recv::new(self, buf)
     }
 
     /// Receives a single datagram message on the socket from the remote address to
@@ -115,35 +136,46 @@ impl UdpSocket {
     ///
     /// # Return
     ///
-    /// On success, returns `Ok(Async::Ready(num_bytes_read))`.
+    /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
     ///
     /// If no data is available for reading, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes receivable or is closed.
     ///
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_recv(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
+    pub fn poll_recv(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().recv(buf) {
-            Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(mio::Ready::readable())?;
-                Ok(Async::NotReady)
+                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
             }
-            Err(e) => Err(e),
+            x => Poll::Ready(x),
         }
     }
 
-    #[deprecated(since = "0.1.2", note = "use poll_send_to instead")]
-    #[doc(hidden)]
-    pub fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        match self.poll_send_to(buf, target)? {
-            Async::Ready(n) => Ok(n),
-            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
-        }
+    /// Returns a future that sends data on the socket to the given address.
+    /// On success, the future will resolve to the number of bytes written.
+    ///
+    /// The future will resolve to an error if the IP version of the socket does
+    /// not match that of `target`.
+    ///
+    /// # Panics
+    ///
+    /// If the future is polled outside of a task context.
+    pub fn send_to<'socket, 'b>(
+        &'socket mut self,
+        buf: &'b [u8],
+        target: &'b SocketAddr,
+    ) -> SendTo<'socket, 'b> {
+        SendTo::new(self, buf, target)
     }
 
     /// Sends data on the socket to the given address. On success, returns the
@@ -154,56 +186,47 @@ impl UdpSocket {
     ///
     /// # Return
     ///
-    /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
+    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
     ///
     /// If the socket is not ready for writing, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
+    /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes writable.
     ///
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_send_to(&mut self, buf: &[u8], target: &SocketAddr) -> Poll<usize, io::Error> {
-        try_ready!(self.io.poll_write_ready());
+    pub fn poll_send_to(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        target: &SocketAddr,
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.io.poll_write_ready(cx))?;
 
         match self.io.get_ref().send_to(buf, target) {
-            Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready()?;
-                Ok(Async::NotReady)
+                self.io.clear_write_ready(cx)?;
+                Poll::Pending
             }
-            Err(e) => Err(e),
+            x => Poll::Ready(x),
         }
     }
 
-    /// Creates a future that will write the entire contents of the buffer
-    /// `buf` provided as a datagram to this socket.
+    /// Returns a future that receives a single datagram on the socket. On success,
+    /// the future resolves to the number of bytes read and the origin.
     ///
-    /// The returned future will return after data has been written to the
-    /// outbound socket. The future will resolve to the stream as well as the
-    /// buffer (for reuse if needed).
+    /// The function must be called with valid byte array `buf` of sufficient size
+    /// to hold the message bytes. If a message is too long to fit in the supplied
+    /// buffer, excess bytes may be discarded.
     ///
-    /// Any error which happens during writing will cause both the stream and
-    /// the buffer to get destroyed. Note that failure to write the entire
-    /// buffer is considered an error for the purposes of sending a datagram.
+    /// # Panics
     ///
-    /// The `buf` parameter here only requires the `AsRef<[u8]>` trait, which
-    /// should be broadly applicable to accepting data which can be converted
-    /// to a slice.
-    pub fn send_dgram<T>(self, buf: T, addr: &SocketAddr) -> SendDgram<T>
-    where
-        T: AsRef<[u8]>,
-    {
-        SendDgram::new(self, buf, *addr)
-    }
-
-    #[deprecated(since = "0.1.2", note = "use poll_recv_from instead")]
-    #[doc(hidden)]
-    pub fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        match self.poll_recv_from(buf)? {
-            Async::Ready(ret) => Ok(ret),
-            Async::NotReady => Err(io::ErrorKind::WouldBlock.into()),
-        }
+    /// If the future is polled outside of a task context.
+    pub fn recv_from<'socket, 'buf>(
+        &'socket mut self,
+        buf: &'buf mut [u8],
+    ) -> RecvFrom<'socket, 'buf> {
+        RecvFrom::new(self, buf)
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
@@ -213,37 +236,20 @@ impl UdpSocket {
     ///
     /// This function will panic if called outside the context of a future's
     /// task.
-    pub fn poll_recv_from(&mut self, buf: &mut [u8]) -> Poll<(usize, SocketAddr), io::Error> {
-        try_ready!(self.io.poll_read_ready(mio::Ready::readable()));
+    pub fn poll_recv_from(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<(usize, SocketAddr), io::Error>> {
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().recv_from(buf) {
-            Ok(n) => Ok(n.into()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(mio::Ready::readable())?;
-                Ok(Async::NotReady)
+                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
             }
-            Err(e) => Err(e),
+            x => Poll::Ready(x),
         }
-    }
-
-    /// Creates a future that receive a datagram to be written to the buffer
-    /// provided.
-    ///
-    /// The returned future will return after a datagram has been received on
-    /// this socket. The future will resolve to the socket, the buffer, the
-    /// amount of data read, and the address the data was received from.
-    ///
-    /// An error during reading will cause the socket and buffer to get
-    /// destroyed.
-    ///
-    /// The `buf` parameter here only requires the `AsMut<[u8]>` trait, which
-    /// should be broadly applicable to accepting data which can be converted
-    /// to a slice.
-    pub fn recv_dgram<T>(self, buf: T) -> RecvDgram<T>
-    where
-        T: AsMut<[u8]>,
-    {
-        RecvDgram::new(self, buf)
     }
 
     /// Check the UDP socket's read readiness state.
@@ -252,11 +258,11 @@ impl UdpSocket {
     /// can be any value, including platform specific readiness, **except**
     /// `writable`.
     ///
-    /// If the socket is not ready for receiving then `Async::NotReady` is
+    /// If the socket is not ready for receiving then `Poll::Pending` is
     /// returned and the current task is notified once a new event is received.
     ///
     /// The socket will remain in a read-ready state until calls to `poll_recv`
-    /// return `NotReady`.
+    /// return `Poll::Pending`.
     ///
     /// # Panics
     ///
@@ -264,23 +270,27 @@ impl UdpSocket {
     ///
     /// * `ready` includes writable.
     /// * called from outside of a task context.
-    pub fn poll_read_ready(&self, mask: mio::Ready) -> Poll<mio::Ready, io::Error> {
-        self.io.poll_read_ready(mask)
+    pub fn poll_read_ready(
+        &self,
+        cx: &mut Context<'_>,
+        mask: mio::Ready,
+    ) -> Poll<Result<mio::Ready, io::Error>> {
+        self.io.poll_read_ready(cx, mask)
     }
 
     /// Check the UDP socket's write readiness state.
     ///
-    /// If the socket is not ready for sending then `Async::NotReady` is
+    /// If the socket is not ready for sending then `Poll::Pending` is
     /// returned and the current task is notified once a new event is received.
     ///
     /// The I/O resource will remain in a write-ready state until calls to
-    /// `poll_send` return `NotReady`.
+    /// `poll_send` return `Poll::Pending`.
     ///
     /// # Panics
     ///
     /// This function panics if called from outside of a task context.
-    pub fn poll_write_ready(&self) -> Poll<mio::Ready, io::Error> {
-        self.io.poll_write_ready()
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<Result<mio::Ready, io::Error>> {
+        self.io.poll_write_ready(cx)
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.

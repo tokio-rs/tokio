@@ -22,13 +22,13 @@ categories = ["asynchronous"]
 publish = false
 
 [dependencies]
-tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
+# tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
+# tokio-io = { version = "0.2.0", path = "../tokio-io" }
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
-bytes = "0.4"
+# bytes = "0.4"
 mio = "0.6.14"
 log = "0.4"
-futures = "0.1.19"
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
+tokio = { version = "0.2.0", path = "../tokio", default-features = false, features = ["rt-full"] }
