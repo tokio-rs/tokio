@@ -1,7 +1,7 @@
-use bytes::{BufMut, Bytes, BytesMut};
-use std::io;
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
+use bytes::{BufMut, Bytes, BytesMut};
+use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

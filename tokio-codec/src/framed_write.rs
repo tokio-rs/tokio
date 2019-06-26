@@ -1,17 +1,18 @@
 #![allow(deprecated)]
 
+use log::trace;
 use std::fmt;
 use std::io::{self, Read};
-use log::trace;
 
 use super::framed::Fuse;
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
+use tokio_futures::Stream;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
-use std::task::{Poll, Context};
 use std::pin::Pin;
+use std::task::{Context, Poll};
 // use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
@@ -103,17 +104,18 @@ impl<T, E> FramedWrite<T, E> {
 //     }
 // }
 
-// impl<T, D> Stream for FramedWrite<T, D>
-// where
-//     T: Stream,
-// {
-//     type Item = T::Item;
-//     type Error = T::Error;
+impl<T, D> Stream for FramedWrite<T, D>
+where
+    T: Stream,
+{
+    type Item = T::Item;
 
-//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-//         self.inner.inner.0.poll()
-//     }
-// }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // self.map_unchecked_mut(|s| &mut s.inner).poll_next(cx)
+        // self.inner.inner.0.poll()
+        unimplemented!() // TODO
+    }
+}
 
 impl<T, U> fmt::Debug for FramedWrite<T, U>
 where
@@ -249,11 +251,13 @@ impl<T: AsyncRead> AsyncRead for FramedWrite2<T> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
     }
+
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8]
+        buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        unimplemented!() // TODO
+        self.map_unchecked_mut(|fw| &mut fw.inner)
+            .poll_read(cx, buf)
     }
 }

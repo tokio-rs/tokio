@@ -24,9 +24,9 @@ mod framed_write;
 mod lines_codec;
 
 pub use crate::bytes_codec::BytesCodec;
-pub use crate::lines_codec::LinesCodec;
 pub use crate::decoder::Decoder;
 pub use crate::encoder::Encoder;
 pub use crate::framed::{Framed, FramedParts};
 pub use crate::framed_read::FramedRead;
 pub use crate::framed_write::FramedWrite;
+pub use crate::lines_codec::LinesCodec;

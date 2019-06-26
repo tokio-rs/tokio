@@ -1,7 +1,7 @@
-use bytes::{BufMut, BytesMut};
-use std::{cmp, io, str, usize};
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
+use bytes::{BufMut, BytesMut};
+use std::{cmp, io, str, usize};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

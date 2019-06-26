@@ -1,15 +1,15 @@
-#![allow(deprecated)]
-
 use std::fmt;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 use super::framed::Fuse;
 use super::Decoder;
+use tokio_futures::Stream;
 use tokio_io::AsyncRead;
-use log::trace;
 
 use bytes::BytesMut;
-use std::task::Poll;
-// use futures::{Async, Poll, Sink, StartSend, Stream};
+use log::trace;
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 pub struct FramedRead<T, D> {
@@ -81,20 +81,19 @@ impl<T, D> FramedRead<T, D> {
     }
 }
 
-// TODO update stream and sink impls
-// impl<T, D> Stream for FramedRead<T, D>
-// where
-//     T: AsyncRead,
-//     D: Decoder,
-// {
-//     type Item = D::Item;
-//     type Error = D::Error;
+impl<T, D> Stream for FramedRead<T, D>
+where
+    T: AsyncRead,
+    D: Decoder,
+{
+    type Item = Result<D::Item, D::Error>;
 
-//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-//         self.inner.poll()
-//     }
-// }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.map_unchecked_mut(|fr| &mut fr.inner).poll_next(cx)
+    }
+}
 
+// TODO update sink impls
 // impl<T, D> Sink for FramedRead<T, D>
 // where
 //     T: Sink,
@@ -173,48 +172,48 @@ impl<T> FramedRead2<T> {
     }
 }
 
-// TODO update Stream impl
-// impl<T> Stream for FramedRead2<T>
-// where
-//     T: AsyncRead + Decoder,
-// {
-//     type Item = T::Item;
-//     type Error = T::Error;
+impl<T> Stream for FramedRead2<T>
+where
+    T: AsyncRead + Decoder,
+{
+    type Item = Result<T::Item, T::Error>;
 
-//     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-//         loop {
-//             // Repeatedly call `decode` or `decode_eof` as long as it is
-//             // "readable". Readable is defined as not having returned `None`. If
-//             // the upstream has returned EOF, and the decoder is no longer
-//             // readable, it can be assumed that the decoder will never become
-//             // readable again, at which point the stream is terminated.
-//             if self.is_readable {
-//                 if self.eof {
-//                     let frame = self.inner.decode_eof(&mut self.buffer)?;
-//                     return Ok(Async::Ready(frame));
-//                 }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // TODO update Stream impl
+        // loop {
+        //     // Repeatedly call `decode` or `decode_eof` as long as it is
+        //     // "readable". Readable is defined as not having returned `None`. If
+        //     // the upstream has returned EOF, and the decoder is no longer
+        //     // readable, it can be assumed that the decoder will never become
+        //     // readable again, at which point the stream is terminated.
+        //     if self.is_readable {
+        //         if self.eof {
+        //             let frame = self.inner.decode_eof(&mut self.buffer)?;
+        //             return Ok(Async::Ready(frame));
+        //         }
 
-//                 trace!("attempting to decode a frame");
+        //         trace!("attempting to decode a frame");
 
-//                 if let Some(frame) = self.inner.decode(&mut self.buffer)? {
-//                     trace!("frame decoded from buffer");
-//                     return Ok(Async::Ready(Some(frame)));
-//                 }
+        //         if let Some(frame) = self.inner.decode(&mut self.buffer)? {
+        //             trace!("frame decoded from buffer");
+        //             return Ok(Async::Ready(Some(frame)));
+        //         }
 
-//                 self.is_readable = false;
-//             }
+        //         self.is_readable = false;
+        //     }
 
-//             assert!(!self.eof);
+        //     assert!(!self.eof);
 
-//             // Otherwise, try to read more data and try again. Make sure we've
-//             // got room for at least one byte to read to ensure that we don't
-//             // get a spurious 0 that looks like EOF
-//             self.buffer.reserve(1);
-//             if 0 == try_ready!(self.inner.read_buf(&mut self.buffer)) {
-//                 self.eof = true;
-//             }
+        //     // Otherwise, try to read more data and try again. Make sure we've
+        //     // got room for at least one byte to read to ensure that we don't
+        //     // get a spurious 0 that looks like EOF
+        //     self.buffer.reserve(1);
+        //     if 0 == try_ready!(self.inner.read_buf(&mut self.buffer)) {
+        //         self.eof = true;
+        //     }
 
-//             self.is_readable = true;
-//         }
-//     }
-// }
+        //     self.is_readable = true;
+        // }
+        unimplemented!()
+    }
+}
