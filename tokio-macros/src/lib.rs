@@ -17,9 +17,11 @@ use syn::spanned::Spanned;
 /// ```
 /// #[tokio::main]
 /// async fn main() {
-///     println!("Hello world");
+///     println!("Hello from Tokio!");
 /// }
+/// ```
 #[proc_macro_attribute]
+#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
@@ -38,7 +40,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let result = quote! {
         fn #name() #ret {
             let mut rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on_async(async { #body })
+            rt.block_on(async { #body })
         }
     };
 
@@ -49,7 +51,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// #[tokio::test]
 /// async fn my_test() {
 ///     assert!(true);

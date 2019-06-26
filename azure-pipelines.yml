@@ -48,6 +48,7 @@ jobs:
       - tokio-current-thread
       - tokio-executor
       - tokio-io
+      - tokio-macros
       - tokio-sync
       # - tokio-threadpool
       # - tokio-timer

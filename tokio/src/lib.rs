@@ -99,4 +99,7 @@ if_runtime! {
 
     pub use crate::executor::spawn;
     pub use crate::runtime::run;
+
+    #[cfg(not(test))] // Work around for rust-lang/rust#62127
+    pub use tokio_macros::main;
 }
