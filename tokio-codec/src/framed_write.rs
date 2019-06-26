@@ -82,27 +82,31 @@ impl<T, E> FramedWrite<T, E> {
     }
 }
 
-// TODO update sink impl
-// impl<T, E> Sink for FramedWrite<T, E>
-// where
-//     T: AsyncWrite,
-//     E: Encoder,
-// {
-//     type SinkItem = E::Item;
-//     type SinkError = E::Error;
+// This impl just defers to the underlying FramedWrite2
+impl<T, I, E> Sink<I> for FramedWrite<T, E>
+where
+    T: AsyncWrite + Unpin,
+    E: Encoder<Item = I> + Unpin,
+    E::Error: From<io::Error>,
+{
+    type Error = E::Error;
 
-//     fn start_send(&mut self, item: E::Item) -> StartSend<E::Item, E::Error> {
-//         self.inner.start_send(item)
-//     }
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_ready(cx)
+    }
 
-//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-//         self.inner.poll_complete()
-//     }
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        Pin::new(&mut Pin::get_mut(self).inner).start_send(item)
+    }
 
-//     fn close(&mut self) -> Poll<(), Self::SinkError> {
-//         Ok(self.inner.close()?)
-//     }
-// }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_close(cx)
+    }
+}
 
 impl<T, D> Stream for FramedWrite<T, D>
 where
@@ -167,65 +171,6 @@ impl<T> FramedWrite2<T> {
         &mut self.inner
     }
 }
-
-// TODO update sink impl
-// impl<T> Sink for FramedWrite2<T>
-// where
-//     T: AsyncWrite + Encoder,
-// {
-//     type SinkItem = T::Item;
-//     type SinkError = T::Error;
-
-//     fn start_send(&mut self, item: T::Item) -> StartSend<T::Item, T::Error> {
-//         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
-//         // *still* over 8KiB, then apply backpressure (reject the send).
-//         if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
-//             self.poll_complete()?;
-
-//             if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
-//                 return Ok(AsyncSink::NotReady(item));
-//             }
-//         }
-
-//         self.inner.encode(item, &mut self.buffer)?;
-
-//         Ok(AsyncSink::Ready)
-//     }
-
-//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-//         trace!("flushing framed transport");
-
-//         while !self.buffer.is_empty() {
-//             trace!("writing; remaining={}", self.buffer.len());
-
-//             let n = try_ready!(self.inner.poll_write(&self.buffer));
-
-//             if n == 0 {
-//                 return Err(io::Error::new(
-//                     io::ErrorKind::WriteZero,
-//                     "failed to \
-//                      write frame to transport",
-//                 )
-//                 .into());
-//             }
-
-//             // TODO: Add a way to `bytes` to do this w/o returning the drained
-//             // data.
-//             let _ = self.buffer.split_to(n);
-//         }
-
-//         // Try flushing the underlying IO
-//         try_ready!(self.inner.poll_flush());
-
-//         trace!("framed transport flushed");
-//         return Ok(Async::Ready(()));
-//     }
-
-//     fn close(&mut self) -> Poll<(), Self::SinkError> {
-//         try_ready!(self.poll_complete());
-//         Ok(self.inner.shutdown()?)
-//     }
-// }
 
 impl<I, T> Sink<I> for FramedWrite2<T>
 where

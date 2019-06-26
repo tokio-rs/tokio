@@ -5,7 +5,7 @@ use std::task::Poll;
 
 use super::framed::Fuse;
 use super::Decoder;
-use tokio_futures::Stream;
+use tokio_futures::{Sink, Stream};
 use tokio_io::AsyncRead;
 
 use bytes::BytesMut;
@@ -93,27 +93,30 @@ where
     }
 }
 
-// TODO update sink impls
-// impl<T, D> Sink for FramedRead<T, D>
-// where
-//     T: Sink,
-// {
-//     type SinkItem = T::SinkItem;
-//     type SinkError = T::SinkError;
+// This impl just defers to the underlying T: Sink
+impl<T, I, D> Sink<I> for FramedRead<T, D>
+where
+    T: Sink<I> + Unpin,
+    D: Unpin,
+{
+    type Error = T::Error;
 
-//     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-//         self.inner.inner.0.start_send(item)
-//     }
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_ready(cx)
+    }
 
-//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-//         self.inner.inner.0.poll_complete()
-//     }
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        Pin::new(&mut Pin::get_mut(self).inner.inner.0).start_send(item)
+    }
 
-//     fn close(&mut self) -> Poll<(), Self::SinkError> {
-//         self.inner.inner.0.close()
-//     }
-// }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_flush(cx)
+    }
 
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_close(cx)
+    }
+}
 impl<T, D> fmt::Debug for FramedRead<T, D>
 where
     T: fmt::Debug,
