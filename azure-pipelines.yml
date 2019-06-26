@@ -33,7 +33,7 @@ jobs:
 #       - tokio-signal
 #       - tokio-tcp
 #       - tokio-tls
-#       - tokio-udp
+      - tokio-udp
 #       - tokio-uds
 
 # Test crates that are NOT platform specific

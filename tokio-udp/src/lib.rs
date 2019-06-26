@@ -10,23 +10,28 @@
 //!
 //! The main struct for UDP is the [`UdpSocket`], which represents a UDP socket.
 //! Reading and writing to it can be done using futures, which return the
-//! [`RecvDgram`] and [`SendDgram`] structs respectively.
-//!
-//! For convenience it's also possible to convert raw datagrams into higher-level
-//! frames.
-//!
-//! [`UdpSocket`]: struct.UdpSocket.html
-//! [`RecvDgram`]: struct.RecvDgram.html
-//! [`SendDgram`]: struct.SendDgram.html
-//! [`UdpFramed`]: struct.UdpFramed.html
-//! [`framed`]: struct.UdpSocket.html#method.framed
+//! [`Recv`], [`Send`], [`RecvFrom`] and [`SendTo`] structs respectively.
 
-mod frame;
-mod recv_dgram;
-mod send_dgram;
+macro_rules! ready {
+    ($e:expr) => {
+        match $e {
+            ::std::task::Poll::Ready(t) => t,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    };
+}
+
+// mod frame;
+mod recv;
+mod recv_from;
+mod send;
+mod send_to;
 mod socket;
 
-pub use self::frame::UdpFramed;
-pub use self::recv_dgram::RecvDgram;
-pub use self::send_dgram::SendDgram;
+// pub use self::frame::UdpFramed;
+pub use self::recv::Recv;
+pub use self::recv_from::RecvFrom;
+pub use self::send::Send;
+pub use self::send_to::SendTo;
+
 pub use self::socket::UdpSocket;

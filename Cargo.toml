@@ -20,6 +20,6 @@ members = [
   # "tokio-tls",
   # "tokio-trace",
   # "tokio-trace/tokio-trace-core",
-  # "tokio-udp",
+  "tokio-udp",
   # "tokio-uds",
 ]
