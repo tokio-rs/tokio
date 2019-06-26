@@ -132,3 +132,38 @@ fn copy() {
         assert_eq!(wr.0[..], b"hello world"[..]);
     });
 }
+
+#[test]
+fn read_exact() {
+    struct Rd {
+        val: &'static [u8; 11],
+    }
+
+    impl AsyncRead for Rd {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut [u8]
+        ) -> Poll<io::Result<usize>> {
+            let me = &mut *self;
+            let len = buf.len();
+
+            buf[..].copy_from_slice(&me.val[..len]);
+            Poll::Ready(Ok(buf.len()))
+        }
+    }
+
+    let mut buf = Box::new([0; 8]);
+    let mut task = MockTask::new();
+
+    task.enter(|cx| {
+        let mut rd = Rd { val: b"hello world" };
+
+        let read = tokio::io::read_exact(&mut rd, &mut buf[..]);
+        pin_mut!(read);
+
+        let n = assert_ready_ok!(read.poll(cx));
+        assert_eq!(n, 8);
+        assert_eq!(buf[..], b"hello wo"[..]);
+    });
+}
