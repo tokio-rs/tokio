@@ -49,7 +49,9 @@ pub use std::io::{Error, ErrorKind, Result};
 mod copy;
 mod read;
 mod write;
+mod read_exact;
 
 pub use self::copy::{copy, Copy};
 pub use self::read::{read, Read};
 pub use self::write::{write, Write};
+pub use self::read_exact::{read_exact, ReadExact};
