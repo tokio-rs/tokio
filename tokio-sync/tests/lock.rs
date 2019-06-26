@@ -1,7 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use pin_utils::pin_mut;
-use std::future::Future;
 use tokio_sync::lock::Lock;
 use tokio_test::task::MockTask;
 use tokio_test::{assert_pending, assert_ready};
@@ -61,7 +60,7 @@ fn lock() {
         pin_mut!(l);
 
         let mut task = MockTask::new();
-        let mut g = task.enter(|cx| assert_ready!(l.poll(cx)));
+        let mut g = assert_ready!(task.poll(&mut l));
         std::thread::sleep(std::time::Duration::from_millis(500));
         *g = true;
         drop(g);
@@ -72,7 +71,10 @@ fn lock() {
     let l = lock.lock();
     pin_mut!(l);
 
-    task.enter(|cx| assert_pending!(l.poll(cx)));
+    assert_pending!(task.poll(&mut l));
+
     std::thread::sleep(std::time::Duration::from_millis(500));
     assert!(task.is_woken());
+    let result = assert_ready!(task.poll(&mut l));
+    assert!(*result);
 }
