@@ -14,7 +14,7 @@ pub struct Write<'a, W: ?Sized> {
 
 /// Tries to write some bytes from the given `buf` to the writer in an
 /// asynchronous manner, returning a future.
-pub fn write<'a, W>(writer: &'a mut W, buf: &'a [u8]) -> Write<'a, W>
+pub(crate) fn write<'a, W>(writer: &'a mut W, buf: &'a [u8]) -> Write<'a, W>
 where
     W: AsyncWrite + Unpin + ?Sized,
 {
