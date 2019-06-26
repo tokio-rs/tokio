@@ -60,10 +60,6 @@ impl UdpSocket {
     /// will resolve to an error if the socket is not connected.
     ///
     /// [`connect`]: #method.connect
-    ///
-    /// # Panics
-    ///
-    /// If the future is polled outside of a task context.
     pub fn send<'socket, 'buf>(&'socket mut self, buf: &'buf [u8]) -> Send<'socket, 'buf> {
         Send::new(self, buf)
     }
@@ -82,10 +78,6 @@ impl UdpSocket {
     /// If the socket is not ready for writing, the method returns
     /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes writable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called from outside of a task context.
     pub fn poll_send(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -114,10 +106,6 @@ impl UdpSocket {
     /// will fail if the socket is not connected.
     ///
     /// [`connect`]: #method.connect
-    ///
-    /// # Panics
-    ///
-    /// If the future is polled outside of a task context.
     pub fn recv<'socket, 'buf>(&'socket mut self, buf: &'buf mut [u8]) -> Recv<'socket, 'buf> {
         Recv::new(self, buf)
     }
@@ -141,10 +129,6 @@ impl UdpSocket {
     /// If no data is available for reading, the method returns
     /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes receivable or is closed.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called from outside of a task context.
     pub fn poll_recv(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -166,10 +150,6 @@ impl UdpSocket {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    ///
-    /// # Panics
-    ///
-    /// If the future is polled outside of a task context.
     pub fn send_to<'socket, 'b>(
         &'socket mut self,
         buf: &'b [u8],
@@ -191,10 +171,6 @@ impl UdpSocket {
     /// If the socket is not ready for writing, the method returns
     /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes writable.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called from outside of a task context.
     pub fn poll_send_to(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -218,10 +194,6 @@ impl UdpSocket {
     /// The function must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
-    ///
-    /// # Panics
-    ///
-    /// If the future is polled outside of a task context.
     pub fn recv_from<'socket, 'buf>(
         &'socket mut self,
         buf: &'buf mut [u8],
@@ -231,11 +203,6 @@ impl UdpSocket {
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called outside the context of a future's
-    /// task.
     pub fn poll_recv_from(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -269,7 +236,6 @@ impl UdpSocket {
     /// This function panics if:
     ///
     /// * `ready` includes writable.
-    /// * called from outside of a task context.
     pub fn poll_read_ready(
         &self,
         cx: &mut Context<'_>,
@@ -285,10 +251,6 @@ impl UdpSocket {
     ///
     /// The I/O resource will remain in a write-ready state until calls to
     /// `poll_send` return `Poll::Pending`.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<Result<mio::Ready, io::Error>> {
         self.io.poll_write_ready(cx)
     }
