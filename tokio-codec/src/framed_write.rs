@@ -13,7 +13,6 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-// use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
 pub struct FramedWrite<T, E> {
@@ -82,7 +81,7 @@ impl<T, E> FramedWrite<T, E> {
     }
 }
 
-// TODO update sink and stream impl
+// TODO update sink impl
 // impl<T, E> Sink for FramedWrite<T, E>
 // where
 //     T: AsyncWrite,
@@ -106,14 +105,13 @@ impl<T, E> FramedWrite<T, E> {
 
 impl<T, D> Stream for FramedWrite<T, D>
 where
-    T: Stream,
+    T: Stream + Unpin,
+    D: Unpin,
 {
     type Item = T::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // self.map_unchecked_mut(|s| &mut s.inner).poll_next(cx)
-        // self.inner.inner.0.poll()
-        unimplemented!() // TODO
+        Pin::new(self.get_mut()).poll_next(cx)
     }
 }
 
@@ -247,7 +245,7 @@ impl<T: Read> Read for FramedWrite2<T> {
     }
 }
 
-impl<T: AsyncRead> AsyncRead for FramedWrite2<T> {
+impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
     }
@@ -257,7 +255,6 @@ impl<T: AsyncRead> AsyncRead for FramedWrite2<T> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        self.map_unchecked_mut(|fw| &mut fw.inner)
-            .poll_read(cx, buf)
+        Pin::new(self.get_mut()).poll_read(cx, buf)
     }
 }

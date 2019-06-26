@@ -152,17 +152,17 @@ impl<T, U> Framed<T, U> {
 
 impl<T, U> Stream for Framed<T, U>
 where
-    T: AsyncRead,
-    U: Decoder,
+    T: AsyncRead + Unpin,
+    U: Decoder + Unpin,
 {
     type Item = Result<U::Item, U::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.map_unchecked_mut(|fw| &mut fw.inner).poll_next(cx)
+        Pin::new(&mut self.get_mut().inner).poll_next(cx)
     }
 }
 
-// TODO update stream and sink impl
+// TODO update sink impl
 // impl<T, U> Sink for Framed<T, U>
 // where
 //     T: AsyncWrite,
@@ -206,7 +206,7 @@ impl<T: Read, U> Read for Fuse<T, U> {
     }
 }
 
-impl<T: AsyncRead, U> AsyncRead for Fuse<T, U> {
+impl<T: AsyncRead + Unpin, U: Unpin> AsyncRead for Fuse<T, U> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.0.prepare_uninitialized_buffer(buf)
     }
@@ -216,7 +216,7 @@ impl<T: AsyncRead, U> AsyncRead for Fuse<T, U> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        self.map_unchecked_mut(|fw| &mut fw.0).poll_read(cx, buf)
+        Pin::new(&mut self.get_mut().0).poll_read(cx, buf)
     }
 }
 
@@ -230,21 +230,21 @@ impl<T: Write, U> Write for Fuse<T, U> {
     }
 }
 
-impl<T: AsyncWrite, U> AsyncWrite for Fuse<T, U> {
+impl<T: AsyncWrite + Unpin, U: Unpin> AsyncWrite for Fuse<T, U> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        AsyncWrite::poll_write(self.map_unchecked_mut(|fw| &mut fw.0), cx, buf)
+        Pin::new(&mut self.get_mut().0).poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        AsyncWrite::poll_flush(self.map_unchecked_mut(|fw| &mut fw.0), cx)
+        Pin::new(&mut self.get_mut().0).poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        AsyncWrite::poll_shutdown(self.map_unchecked_mut(|fw| &mut fw.0), cx)
+        Pin::new(&mut self.get_mut().0).poll_shutdown(cx)
     }
 }
 
