@@ -1,6 +1,7 @@
 use bytes::{Buf, BufMut};
 use iovec::IoVec;
 use mio;
+use std::convert::TryFrom;
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -706,6 +707,18 @@ impl TcpStream {
         // - https://github.com/tokio-rs/tokio/issues/774#issuecomment-451059317
         let msg = "`TcpStream::try_clone()` is deprecated because it doesn't work as intended";
         Err(io::Error::new(io::ErrorKind::Other, msg))
+    }
+}
+
+impl TryFrom<TcpStream> for mio::net::TcpStream {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
+        value.io.into_inner()
     }
 }
 

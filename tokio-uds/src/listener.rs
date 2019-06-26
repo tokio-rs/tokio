@@ -2,6 +2,7 @@ use crate::{Incoming, UnixStream};
 use futures::{try_ready, Async, Poll};
 use mio::Ready;
 use mio_uds;
+use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -127,6 +128,18 @@ impl UnixListener {
     /// resolves to the sockets the are accepted on this listener.
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
+    }
+}
+
+impl TryFrom<UnixListener> for mio_uds::UnixListener {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
+        value.io.into_inner()
     }
 }
 
