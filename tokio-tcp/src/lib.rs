@@ -2,6 +2,7 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! TCP bindings for `tokio`.
 //!
