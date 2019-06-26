@@ -1,18 +1,16 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt};
-use tokio_test::assert_ready_ok;
-use tokio_test::task::MockTask;
+use tokio_test::assert_ok;
 
 use bytes::BytesMut;
-use pin_utils::pin_mut;
-use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[test]
-fn copy() {
+#[tokio::test]
+async fn copy() {
     struct Rd(bool);
 
     impl AsyncRead for Rd {
@@ -54,18 +52,10 @@ fn copy() {
     }
 
     let buf = BytesMut::with_capacity(64);
-    let mut task = MockTask::new();
+    let mut rd = Rd(true);
+    let mut wr = Wr(buf);
 
-    task.enter(|cx| {
-        let mut rd = Rd(true);
-        let mut wr = Wr(buf);
-
-        let copy = rd.copy(&mut wr);
-        pin_mut!(copy);
-
-        let n = assert_ready_ok!(copy.poll(cx));
-
-        assert_eq!(n, 11);
-        assert_eq!(wr.0[..], b"hello world"[..]);
-    });
+    let n = assert_ok!(rd.copy(&mut wr).await);
+    assert_eq!(n, 11);
+    assert_eq!(wr.0[..], b"hello world"[..]);
 }

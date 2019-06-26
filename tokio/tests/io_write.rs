@@ -1,18 +1,16 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio_test::assert_ready_ok;
-use tokio_test::task::MockTask;
+use tokio_test::assert_ok;
 
 use bytes::BytesMut;
-use pin_utils::pin_mut;
-use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[test]
-fn write() {
+#[tokio::test]
+async fn write() {
     struct Wr(BytesMut);
 
     impl AsyncWrite for Wr {
@@ -34,15 +32,8 @@ fn write() {
         }
     }
 
-    let mut task = MockTask::new();
+    let mut wr = Wr(BytesMut::with_capacity(64));
 
-    task.enter(|cx| {
-        let mut wr = Wr(BytesMut::with_capacity(64));
-
-        let write = wr.write(b"hello world");
-        pin_mut!(write);
-
-        let n = assert_ready_ok!(write.poll(cx));
-        assert_eq!(n, 11);
-    });
+    let n = assert_ok!(wr.write(b"hello world").await);
+    assert_eq!(n, 11);
 }
