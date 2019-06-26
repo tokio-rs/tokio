@@ -4,23 +4,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(t) => t,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
-
-/// A future which will copy all data from a reader into a writer.
-///
-/// Created by the [`copy`] function, this future will resolve to the number of
-/// bytes copied or an error if one happens.
-///
-/// [`copy`]: fn.copy.html
 #[derive(Debug)]
-pub struct Copy<'a, R, W> {
+pub struct Copy<'a, R: ?Sized, W: ?Sized> {
     reader: &'a mut R,
     read_done: bool,
     writer: &'a mut W,
@@ -30,21 +15,10 @@ pub struct Copy<'a, R, W> {
     buf: Box<[u8]>,
 }
 
-/// Creates a future which represents copying all the bytes from one object to
-/// another.
-///
-/// The returned future will copy all the bytes read from `reader` into the
-/// `writer` specified. This future will only complete once the `reader` has hit
-/// EOF and all bytes have been written to and flushed from the `writer`
-/// provided.
-///
-/// On success the number of bytes is returned and the `reader` and `writer` are
-/// consumed. On error the error is returned and the I/O objects are consumed as
-/// well.
-pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
+pub(crate) fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
 {
     Copy {
         reader,
@@ -59,8 +33,8 @@ where
 
 impl<'a, R, W> Future for Copy<'a, R, W>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
 {
     type Output = io::Result<u64>;
 

@@ -10,7 +10,7 @@ use tokio_io::AsyncRead;
 ///
 /// The returned future will resolve to both the I/O stream and the buffer
 /// as well as the number of bytes read once the read operation is completed.
-pub fn read<'a, R>(reader: &'a mut R, buf: &'a mut [u8]) -> Read<'a, R>
+pub(crate) fn read<'a, R>(reader: &'a mut R, buf: &'a mut [u8]) -> Read<'a, R>
 where
     R: AsyncRead + Unpin + ?Sized,
 {

@@ -74,6 +74,15 @@ macro_rules! if_runtime {
     )*)
 }
 
+macro_rules! ready {
+    ($e:expr) => {
+        match $e {
+            ::std::task::Poll::Ready(t) => t,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    };
+}
+
 #[cfg(feature = "timer")]
 pub mod clock;
 #[cfg(feature = "codec")]
