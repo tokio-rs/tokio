@@ -217,6 +217,25 @@ impl<T> Sender<T> {
         Pending
     }
 
+    /// Wait for the associated [`Receiver`] handle to drop.
+    ///
+    /// # Return
+    ///
+    /// Returns a `Future` which must be awaited on.
+    ///
+    /// [`Receiver`]: struct.Receiver.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    pub async fn closed(&mut self) {
+        use async_util::future::poll_fn;
+
+        poll_fn(|cx| self.poll_close(cx)).await
+    }
+
     /// Check if the associated [`Receiver`] handle has been dropped.
     ///
     /// Unlike [`poll_close`], this function does not register a task for
