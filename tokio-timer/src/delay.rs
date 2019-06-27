@@ -1,8 +1,8 @@
 use crate::timer::{HandlePriv, Registration};
 use std::future::Future;
 use std::pin::Pin;
-use std::time::{Duration, Instant};
 use std::task::{self, Poll};
+use std::time::{Duration, Instant};
 
 /// A future that completes at a specified instant in time.
 ///

@@ -290,7 +290,6 @@ impl Entry {
     }
 
     pub fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-
         let mut curr = self.state.load(SeqCst);
 
         if is_elapsed(curr) {

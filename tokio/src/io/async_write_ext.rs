@@ -15,7 +15,8 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// unimplemented!();
     /// ````
     fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
-        where Self: Unpin,
+    where
+        Self: Unpin,
     {
         write(self, src)
     }

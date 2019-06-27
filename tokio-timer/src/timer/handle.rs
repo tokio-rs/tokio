@@ -3,7 +3,7 @@ use crate::{Delay, Error, /*Interval,*/ Timeout};
 use std::cell::RefCell;
 use std::fmt;
 use std::sync::{Arc, Weak};
-use std::time::{/*Duration,*/ Instant};
+use std::time::Instant;
 use tokio_executor::Enter;
 
 /// Handle to timer instance.

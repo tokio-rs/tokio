@@ -22,7 +22,7 @@ async fn read() {
             buf: &mut [u8],
         ) -> Poll<io::Result<usize>> {
             assert_eq!(0, self.poll_cnt);
-            self.poll_cnt +=1 ;
+            self.poll_cnt += 1;
 
             buf[0..11].copy_from_slice(b"hello world");
             Poll::Ready(Ok(11))

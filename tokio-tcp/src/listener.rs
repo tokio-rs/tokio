@@ -98,7 +98,10 @@ impl TcpListener {
     /// }
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
+    pub fn poll_accept(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
         let (io, addr) = ready!(self.poll_accept_std(cx))?;
 
         let io = mio::net::TcpStream::from_stream(io)?;
@@ -143,7 +146,10 @@ impl TcpListener {
     /// }
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn poll_accept_std(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
+    pub fn poll_accept_std(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().accept_std() {
