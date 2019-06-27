@@ -644,7 +644,7 @@ pub struct Handle {
 impl fmt::Debug for Handle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Handle")
-            .field("shut_down", &self.is_shutting_down())
+            .field("shut_down", &self.is_shut_down())
             .finish()
     }
 }
@@ -693,14 +693,14 @@ impl Handle {
     /// This allows a caller to avoid creating the task if the call to `spawn`
     /// has a high likelihood of failing.
     pub fn status(&self) -> Result<(), SpawnError> {
-        if self.is_shutting_down() {
+        if self.is_shut_down() {
             return Err(SpawnError::shutdown());
         }
 
         Ok(())
     }
 
-    fn is_shutting_down(&self) -> bool {
+    fn is_shut_down(&self) -> bool {
         // LSB of "num_futures" is the shutdown bit
         let num_futures = self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
         num_futures % 2 == 1
