@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio_sync::oneshot;
 use tokio_test::task::MockTask;
@@ -21,6 +22,14 @@ fn send_recv() {
 
     let val = assert_ready_ok!(task.poll(&mut rx));
     assert_eq!(val, 1);
+}
+
+#[tokio::test]
+async fn async_send_recv() {
+    let (tx, rx) = oneshot::channel();
+
+    assert_ok!(tx.send(1));
+    assert_eq!(1, assert_ok!(rx.await));
 }
 
 #[test]
@@ -58,6 +67,17 @@ fn close_rx() {
     assert_ready!(task.enter(|cx| tx.poll_close(cx)));
 
     assert_err!(tx.send(1));
+}
+
+#[tokio::test]
+async fn async_rx_closed() {
+    let (mut tx, rx) = oneshot::channel::<()>();
+
+    tokio::spawn(async move {
+        drop(rx);
+    });
+
+    tx.closed().await;
 }
 
 #[test]

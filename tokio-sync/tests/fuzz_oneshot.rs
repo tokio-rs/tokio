@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 /// Unwrap a ready value or propagate `Async::Pending`.
 #[macro_export]

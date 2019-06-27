@@ -132,7 +132,14 @@ impl<T> Receiver<T> {
     }
 
     /// TODO: Dox
-    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+    pub async fn recv(&mut self) -> Option<T> {
+        use async_util::future::poll_fn;
+
+        poll_fn(|cx| self.poll_recv(cx)).await
+    }
+
+    /// TODO: Dox
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
 
@@ -150,7 +157,7 @@ impl<T> futures_core::Stream for Receiver<T> {
     type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        Receiver::poll_next(self.get_mut(), cx)
+        self.get_mut().poll_recv(cx)
     }
 }
 
@@ -188,6 +195,21 @@ impl<T> Sender<T> {
     pub fn try_send(&mut self, message: T) -> Result<(), TrySendError<T>> {
         self.chan.try_send(message)?;
         Ok(())
+    }
+
+    /// Send a value, waiting until there is capacity.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    pub async fn send(&mut self, value: T) -> Result<(), SendError> {
+        use async_util::future::poll_fn;
+
+        poll_fn(|cx| self.poll_ready(cx)).await?;
+
+        self.try_send(value).map_err(|_| SendError(()))
     }
 }
 

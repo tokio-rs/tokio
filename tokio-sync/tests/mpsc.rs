@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio_sync::mpsc;
 use tokio_test::task::MockTask;
@@ -28,14 +29,28 @@ fn send_recv_with_buffer() {
 
     drop(tx);
 
-    let val = assert_ready!(t2.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t2.enter(|cx| rx.poll_recv(cx)));
     assert_eq!(val, Some(1));
 
-    let val = assert_ready!(t2.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t2.enter(|cx| rx.poll_recv(cx)));
     assert_eq!(val, Some(2));
 
-    let val = assert_ready!(t2.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t2.enter(|cx| rx.poll_recv(cx)));
     assert!(val.is_none());
+}
+
+#[tokio::test]
+async fn async_send_recv_with_buffer() {
+    let (mut tx, mut rx) = mpsc::channel(16);
+
+    tokio::spawn(async move {
+        assert_ok!(tx.send(1).await);
+        assert_ok!(tx.send(2).await);
+    });
+
+    assert_eq!(Some(1), rx.recv().await);
+    assert_eq!(Some(2), rx.recv().await);
+    assert_eq!(None, rx.recv().await);
 }
 
 #[test]
@@ -65,13 +80,13 @@ fn send_sink_recv_with_buffer() {
     t1.enter(|cx| {
         pin_mut!(rx);
 
-        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        let val = assert_ready!(rx.as_mut().poll_next(cx));
         assert_eq!(val, Some(1));
 
-        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        let val = assert_ready!(rx.as_mut().poll_next(cx));
         assert_eq!(val, Some(2));
 
-        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        let val = assert_ready!(rx.as_mut().poll_next(cx));
         assert!(val.is_none());
     });
 }
@@ -97,7 +112,7 @@ fn start_send_past_cap() {
 
     drop(tx1);
 
-    let val = t3.enter(|cx| assert_ready!(rx.poll_next(cx)));
+    let val = t3.enter(|cx| assert_ready!(rx.poll_recv(cx)));
     assert!(val.is_some());
 
     assert!(t2.is_woken());
@@ -105,7 +120,7 @@ fn start_send_past_cap() {
 
     drop(tx2);
 
-    let val = t3.enter(|cx| assert_ready!(rx.poll_next(cx)));
+    let val = t3.enter(|cx| assert_ready!(rx.poll_recv(cx)));
     assert!(val.is_none());
 }
 
@@ -125,16 +140,30 @@ fn send_recv_unbounded() {
     assert_ok!(tx.try_send(1));
     assert_ok!(tx.try_send(2));
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert_eq!(val, Some(1));
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert_eq!(val, Some(2));
 
     drop(tx);
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert!(val.is_none());
+}
+
+#[tokio::test]
+async fn async_send_recv_unbounded() {
+    let (mut tx, mut rx) = mpsc::unbounded_channel();
+
+    tokio::spawn(async move {
+        assert_ok!(tx.try_send(1));
+        assert_ok!(tx.try_send(2));
+    });
+
+    assert_eq!(Some(1), rx.recv().await);
+    assert_eq!(Some(2), rx.recv().await);
+    assert_eq!(None, rx.recv().await);
 }
 
 #[test]
@@ -164,13 +193,13 @@ fn sink_send_recv_unbounded() {
     t1.enter(|cx| {
         pin_mut!(rx);
 
-        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        let val = assert_ready!(rx.as_mut().poll_next(cx));
         assert_eq!(val, Some(1));
 
-        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        let val = assert_ready!(rx.as_mut().poll_next(cx));
         assert_eq!(val, Some(2));
 
-        let val = assert_ready!(Stream::poll_next(rx.as_mut(), cx));
+        let val = assert_ready!(rx.as_mut().poll_next(cx));
         assert!(val.is_none());
     });
 }
@@ -189,7 +218,7 @@ fn no_t_bounds_buffer() {
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().try_send(NoImpls).is_ok());
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert!(val.is_some());
 }
 
@@ -207,7 +236,7 @@ fn no_t_bounds_unbounded() {
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().try_send(NoImpls).is_ok());
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert!(val.is_some());
 }
 
@@ -234,7 +263,7 @@ fn send_recv_buffer_limited() {
 
     t2.enter(|cx| {
         // Take the value
-        let val = assert_ready!(rx.poll_next(cx));
+        let val = assert_ready!(rx.poll_recv(cx));
         assert_eq!(Some(1), val);
     });
 
@@ -251,7 +280,7 @@ fn send_recv_buffer_limited() {
 
     t2.enter(|cx| {
         // Take the value
-        let val = assert_ready!(rx.poll_next(cx));
+        let val = assert_ready!(rx.poll_recv(cx));
         assert_eq!(Some(2), val);
     });
 
@@ -269,7 +298,7 @@ fn recv_close_gets_none_idle() {
     rx.close();
 
     t1.enter(|cx| {
-        let val = assert_ready!(rx.poll_next(cx));
+        let val = assert_ready!(rx.poll_recv(cx));
         assert!(val.is_none());
         assert_ready_err!(tx.poll_ready(cx));
     });
@@ -298,7 +327,7 @@ fn recv_close_gets_none_reserved() {
         assert_ready_err!(tx2.poll_ready(cx));
     });
 
-    t3.enter(|cx| assert_pending!(rx.poll_next(cx)));
+    t3.enter(|cx| assert_pending!(rx.poll_recv(cx)));
 
     assert!(!t1.is_woken());
     assert!(!t2.is_woken());
@@ -308,10 +337,10 @@ fn recv_close_gets_none_reserved() {
     assert!(t3.is_woken());
 
     t3.enter(|cx| {
-        let v = assert_ready!(rx.poll_next(cx));
+        let v = assert_ready!(rx.poll_recv(cx));
         assert_eq!(v, Some(123));
 
-        let v = assert_ready!(rx.poll_next(cx));
+        let v = assert_ready!(rx.poll_recv(cx));
         assert!(v.is_none());
     });
 }
@@ -324,7 +353,7 @@ fn tx_close_gets_none() {
 
     // Run on a task context
     t1.enter(|cx| {
-        let v = assert_ready!(rx.poll_next(cx));
+        let v = assert_ready!(rx.poll_recv(cx));
         assert!(v.is_none());
     });
 }
@@ -341,16 +370,16 @@ fn try_send_fail() {
     let err = assert_err!(tx.try_send("fail"));
     assert!(err.is_full());
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert_eq!(val, Some("hello"));
 
     assert_ok!(tx.try_send("goodbye"));
     drop(tx);
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert_eq!(val, Some("goodbye"));
 
-    let val = assert_ready!(t1.enter(|cx| rx.poll_next(cx)));
+    let val = assert_ready!(t1.enter(|cx| rx.poll_recv(cx)));
     assert!(val.is_none());
 }
 
