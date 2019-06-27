@@ -103,7 +103,6 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```ignore
-/// ```
 /// #![feature(async_await)]
 ///
 /// #[tokio::test]
