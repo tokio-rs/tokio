@@ -45,7 +45,7 @@ jobs:
     rust: $(nightly)
     crates:
       # - tokio-buf
-      # - tokio-codec
+      - tokio-codec
       - tokio-current-thread
       - tokio-executor
       - tokio-io
