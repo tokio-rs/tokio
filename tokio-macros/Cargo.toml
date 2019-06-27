@@ -8,7 +8,7 @@ name = "tokio-macros"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 publish = false
@@ -22,3 +22,6 @@ proc-macro = true
 proc-macro2 = "0.4.27"
 quote = "0.6.11"
 syn = { version = "0.15.27", features = ["full", "extra-traits", "visit-mut"] }
+
+[dev-dependencies]
+tokio = { version = "0.2.0", path = "../tokio", default-features = false, features = ["rt-full"] }
