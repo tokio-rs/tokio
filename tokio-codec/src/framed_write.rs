@@ -220,8 +220,7 @@ where
                 .into()));
             }
 
-            // TODO: Add a way to `bytes` to do this w/o returning the drained
-            // data.
+            // TODO: Add a way to `bytes` to do this w/o returning the drained data.
             let _ = pinned.buffer.split_to(n);
         }
 
@@ -268,6 +267,7 @@ impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
+        // TODO use pin! macros
         Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
     }
 }

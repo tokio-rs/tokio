@@ -1,4 +1,4 @@
-// #![deny(warnings, rust_2018_idioms)]
+#![deny(warnings, rust_2018_idioms)]
 
 use std::collections::VecDeque;
 use std::io::{self, Read};
