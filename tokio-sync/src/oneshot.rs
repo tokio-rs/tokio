@@ -175,7 +175,7 @@ impl<T> Sender<T> {
     /// registered to receive a notification if the `Receiver` handle goes away.
     ///
     /// [`Receiver`]: struct.Receiver.html
-    pub fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+    pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         let inner = self.inner.as_ref().unwrap();
 
         let mut state = State::load(&inner.state, Acquire);
@@ -233,16 +233,16 @@ impl<T> Sender<T> {
     pub async fn closed(&mut self) {
         use async_util::future::poll_fn;
 
-        poll_fn(|cx| self.poll_close(cx)).await
+        poll_fn(|cx| self.poll_closed(cx)).await
     }
 
     /// Check if the associated [`Receiver`] handle has been dropped.
     ///
-    /// Unlike [`poll_close`], this function does not register a task for
+    /// Unlike [`poll_closed`], this function does not register a task for
     /// wakeup upon close.
     ///
     /// [`Receiver`]: struct.Receiver.html
-    /// [`poll_close`]: struct.Sender.html#method.poll_close
+    /// [`poll_closed`]: struct.Sender.html#method.poll_closed
     pub fn is_closed(&self) -> bool {
         let inner = self.inner.as_ref().unwrap();
 
