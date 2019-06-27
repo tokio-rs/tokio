@@ -36,7 +36,7 @@ use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::{atomic, mpsc, Arc};
+use std::sync::{atomic, Arc};
 use std::task::{Context, Poll, Waker};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -61,7 +61,7 @@ pub struct CurrentThread<P: Park = ParkThread> {
     spawn_handle: Handle,
 
     /// Receiver for futures spawned from other threads
-    spawn_receiver: mpsc::Receiver<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
+    spawn_receiver: crossbeam_channel::Receiver<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
 
     /// The thread-local ID assigned to this executor.
     id: u64,
@@ -270,7 +270,7 @@ impl<P: Park> CurrentThread<P> {
     pub fn new_with_park(park: P) -> Self {
         let unpark = park.unpark();
 
-        let (spawn_sender, spawn_receiver) = mpsc::channel();
+        let (spawn_sender, spawn_receiver) = crossbeam_channel::unbounded();
         let thread = thread::current().id();
         let id = EXECUTOR_ID.with(|idc| {
             let id = idc.get();
@@ -292,7 +292,7 @@ impl<P: Park> CurrentThread<P> {
                 sender: spawn_sender,
                 num_futures,
                 waker,
-                shut_down: Cell::new(false),
+                shut_down: Arc::new(atomic::AtomicBool::new(false)),
                 thread,
                 id,
             },
@@ -631,9 +631,9 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 /// Handle to spawn a future on the corresponding `CurrentThread` instance
 #[derive(Clone)]
 pub struct Handle {
-    sender: mpsc::Sender<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
+    sender: crossbeam_channel::Sender<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
     num_futures: Arc<atomic::AtomicUsize>,
-    shut_down: Cell<bool>,
+    shut_down: Arc<atomic::AtomicBool>,
     /// Waker to the Scheduler
     waker: Waker,
     thread: thread::ThreadId,
@@ -646,7 +646,7 @@ pub struct Handle {
 impl fmt::Debug for Handle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Handle")
-            .field("shut_down", &self.shut_down.get())
+            .field("shut_down", &self.shut_down.load(atomic::Ordering::SeqCst))
             .finish()
     }
 }
@@ -669,7 +669,7 @@ impl Handle {
             }
         }
 
-        if self.shut_down.get() {
+        if self.shut_down.load(atomic::Ordering::SeqCst) {
             return Err(SpawnError::shutdown());
         }
 
@@ -680,7 +680,7 @@ impl Handle {
             self.num_futures.fetch_sub(2, atomic::Ordering::SeqCst);
 
             // Once the Runtime is shutting down, we know it won't come back.
-            self.shut_down.set(true);
+            self.shut_down.store(true, atomic::Ordering::SeqCst);
 
             return Err(SpawnError::shutdown());
         }
@@ -702,7 +702,7 @@ impl Handle {
     /// This allows a caller to avoid creating the task if the call to `spawn`
     /// has a high likelihood of failing.
     pub fn status(&self) -> Result<(), SpawnError> {
-        if self.shut_down.get() {
+        if self.shut_down.load(atomic::Ordering::SeqCst) {
             return Err(SpawnError::shutdown());
         }
 

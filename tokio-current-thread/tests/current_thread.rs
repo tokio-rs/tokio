@@ -750,6 +750,14 @@ fn spawn_from_executor_with_handle() {
     current_thread.block_on(rx).unwrap();
 }
 
+#[test]
+fn handle_is_sync() {
+    let current_thread = CurrentThread::new();
+    let handle = current_thread.handle();
+
+    let _box: Box<dyn Sync> = Box::new(handle);
+}
+
 async fn yield_once() {
     YieldOnce(false).await
 }

@@ -24,6 +24,7 @@ publish = false
 
 [dependencies]
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
+crossbeam-channel = "0.3.8"
 
 [dev-dependencies]
 tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
