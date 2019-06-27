@@ -751,6 +751,17 @@ fn spawn_from_executor_with_handle() {
 }
 
 #[test]
+fn handle_status() {
+    let current_thread = CurrentThread::new();
+    let handle = current_thread.handle();
+    assert!(handle.status().is_ok());
+
+    drop(current_thread);
+    assert!(handle.spawn(async { () }).is_err());
+    assert!(handle.status().is_err());
+}
+
+#[test]
 fn handle_is_sync() {
     let current_thread = CurrentThread::new();
     let handle = current_thread.handle();
