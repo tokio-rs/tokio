@@ -67,12 +67,14 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 
     for arg in args {
         match arg {
-            syn::NestedMeta::Meta(syn::Meta::Word(ident)) => match ident.to_string().to_lowercase().as_str() {
-                "multi_thread" => runtime = RuntimeType::Multi,
-                "single_thread" => runtime = RuntimeType::Single,
-                name => panic!("Unknown attribute {} is specified", name),
-            },
-            _ => ()
+            syn::NestedMeta::Meta(syn::Meta::Word(ident)) => {
+                match ident.to_string().to_lowercase().as_str() {
+                    "multi_thread" => runtime = RuntimeType::Multi,
+                    "single_thread" => runtime = RuntimeType::Single,
+                    name => panic!("Unknown attribute {} is specified", name),
+                }
+            }
+            _ => (),
         }
     }
 
@@ -90,7 +92,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
                 rt.block_on(async { #body })
             }
-        }
+        },
     };
 
     result.into()

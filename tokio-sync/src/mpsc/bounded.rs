@@ -209,8 +209,7 @@ impl<T> Sender<T> {
 
         poll_fn(|cx| self.poll_ready(cx)).await?;
 
-        self.try_send(value)
-            .map_err(|_| SendError(()))
+        self.try_send(value).map_err(|_| SendError(()))
     }
 }
 
