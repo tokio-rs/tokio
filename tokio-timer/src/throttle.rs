@@ -67,7 +67,10 @@ impl<T: Stream> Stream for Throttle<T> {
                 self.as_mut().get_unchecked_mut().has_delayed = true;
             }
 
-            let value = ready!(self.as_mut().map_unchecked_mut(|me| &mut me.stream).poll_next(cx));
+            let value = ready!(self
+                .as_mut()
+                .map_unchecked_mut(|me| &mut me.stream)
+                .poll_next(cx));
 
             if value.is_some() {
                 self.as_mut().get_unchecked_mut().delay.reset_timeout();

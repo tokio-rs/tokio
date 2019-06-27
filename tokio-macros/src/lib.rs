@@ -10,24 +10,50 @@ use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
-/// Define the program entry point
+/// Marks async function to be executed by selected runtime.
 ///
-/// # Examples
+/// ## Options:
 ///
+/// - `single_thread` - Uses `current_thread`.
+/// - `multi_thread` - Uses multi-threaded runtime. Used by default.
+///
+/// ## Usage
+///
+/// ### Select runtime
+///
+/// ```rust
+///#![feature(async_await)]
+///
+/// #[tokio::main(single_thread)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
 /// ```
+/// ### Using default
+///
+/// ```rust
+///#![feature(async_await)]
+///
 /// #[tokio::main]
 /// async fn main() {
-///     println!("Hello from Tokio!");
+///     println!("Hello world");
 /// }
 /// ```
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+    enum RuntimeType {
+        Single,
+        Multi,
+    }
+
     let input = syn::parse_macro_input!(item as syn::ItemFn);
+    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
     let ret = &input.decl.output;
     let name = &input.ident;
     let body = &input.block;
+    let attrs = &input.attrs;
 
     if input.asyncness.is_none() {
         let tokens = quote_spanned! { input.span() =>
@@ -37,21 +63,48 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         return TokenStream::from(tokens);
     }
 
-    let result = quote! {
-        fn #name() #ret {
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async { #body })
+    let mut runtime = RuntimeType::Multi;
+
+    for arg in args {
+        match arg {
+            syn::NestedMeta::Meta(syn::Meta::Word(ident)) => match ident.to_string().to_lowercase().as_str() {
+                "multi_thread" => runtime = RuntimeType::Multi,
+                "single_thread" => runtime = RuntimeType::Single,
+                name => panic!("Unknown attribute {} is specified", name),
+            },
+            _ => ()
+        }
+    }
+
+    let result = match runtime {
+        RuntimeType::Multi => quote! {
+            #(#attrs)*
+            fn #name() #ret {
+                let mut rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async { #body })
+            }
+        },
+        RuntimeType::Single => quote! {
+            #(#attrs)*
+            fn #name() #ret {
+                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+                rt.block_on(async { #body })
+            }
         }
     };
 
     result.into()
 }
 
-/// Define a Tokio aware unit test
+/// Marks async function to be executed by runtime, suitable to test enviornment
+///
+/// Uses `current_thread` runtime.
 ///
 /// # Examples
 ///
 /// ```ignore
+/// #![feature(async_await)]
+///
 /// #[tokio::test]
 /// async fn my_test() {
 ///     assert!(true);

@@ -193,7 +193,11 @@ impl TcpStream {
     /// });
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn poll_read_ready(&self, cx: &mut Context<'_>, mask: mio::Ready) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_read_ready(
+        &self,
+        cx: &mut Context<'_>,
+        mask: mio::Ready,
+    ) -> Poll<io::Result<mio::Ready>> {
         self.io.poll_read_ready(cx, mask)
     }
 
@@ -729,11 +733,19 @@ impl AsyncRead for TcpStream {
         false
     }
 
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.io).poll_read(cx, buf)
     }
 
-    fn poll_read_buf<B: BufMut>(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut B) -> Poll<io::Result<usize>> {
+    fn poll_read_buf<B: BufMut>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         let r = unsafe {
@@ -795,7 +807,11 @@ impl AsyncRead for TcpStream {
 }
 
 impl AsyncWrite for TcpStream {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.io).poll_write(cx, buf)
     }
 
@@ -809,7 +825,11 @@ impl AsyncWrite for TcpStream {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_write_buf<B: Buf>(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut B) -> Poll<io::Result<usize>> {
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_write_ready(cx))?;
 
         let r = {

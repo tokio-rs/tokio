@@ -6,7 +6,6 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.
 pub trait AsyncReadExt: AsyncRead {
-
     /// Copy all data from `self` into the provided `AsyncWrite`.
     ///
     /// The returned future will copy all the bytes read from `reader` into the
@@ -24,9 +23,9 @@ pub trait AsyncReadExt: AsyncRead {
     /// unimplemented!();
     /// ```
     fn copy<'a, W>(&'a mut self, dst: &'a mut W) -> Copy<'a, Self, W>
-        where
-            Self: Unpin,
-            W: AsyncWrite + Unpin + ?Sized,
+    where
+        Self: Unpin,
+        W: AsyncWrite + Unpin + ?Sized,
     {
         copy(self, dst)
     }
@@ -42,7 +41,8 @@ pub trait AsyncReadExt: AsyncRead {
     /// unimplemented!();
     /// ```
     fn read<'a>(&'a mut self, dst: &'a mut [u8]) -> Read<'a, Self>
-        where Self: Unpin,
+    where
+        Self: Unpin,
     {
         read(self, dst)
     }
@@ -55,7 +55,8 @@ pub trait AsyncReadExt: AsyncRead {
     /// unimplemented!();
     /// ```
     fn read_exact<'a>(&'a mut self, dst: &'a mut [u8]) -> ReadExact<'a, Self>
-        where Self: Unpin,
+    where
+        Self: Unpin,
     {
         read_exact(self, dst)
     }

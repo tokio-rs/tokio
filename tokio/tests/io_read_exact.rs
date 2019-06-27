@@ -18,7 +18,7 @@ async fn read_exact() {
         fn poll_read(
             mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8]
+            buf: &mut [u8],
         ) -> Poll<io::Result<usize>> {
             let me = &mut *self;
             let len = buf.len();
@@ -29,7 +29,9 @@ async fn read_exact() {
     }
 
     let mut buf = Box::new([0; 8]);
-    let mut rd = Rd { val: b"hello world" };
+    let mut rd = Rd {
+        val: b"hello world",
+    };
 
     let n = assert_ok!(rd.read_exact(&mut buf[..]).await);
     assert_eq!(n, 8);

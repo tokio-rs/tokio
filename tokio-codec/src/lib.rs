@@ -15,9 +15,21 @@
 //! [`Stream`]: #
 //! [transports]: #
 
+#[macro_use]
+mod macros;
+
 mod bytes_codec;
+mod decoder;
+mod encoder;
+mod framed;
+mod framed_read;
+mod framed_write;
 mod lines_codec;
 
 pub use crate::bytes_codec::BytesCodec;
+pub use crate::decoder::Decoder;
+pub use crate::encoder::Encoder;
+pub use crate::framed::{Framed, FramedParts};
+pub use crate::framed_read::FramedRead;
+pub use crate::framed_write::FramedWrite;
 pub use crate::lines_codec::LinesCodec;
-pub use tokio_io::_tokio_codec::{Decoder, Encoder, Framed, FramedParts, FramedRead, FramedWrite};
