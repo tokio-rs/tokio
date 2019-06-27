@@ -7,7 +7,6 @@ use std::io::{self, Read};
 use super::framed::Fuse;
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
-use crate::try_ready;
 use tokio_futures::{Sink, Stream};
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -92,19 +91,19 @@ where
     type Error = E::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_ready(cx)
+        pin!(Pin::get_mut(self).inner).poll_ready(cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
-        Pin::new(&mut Pin::get_mut(self).inner).start_send(item)
+        pin!(Pin::get_mut(self).inner).start_send(item)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_flush(cx)
+        pin!(Pin::get_mut(self).inner).poll_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_close(cx)
+        pin!(Pin::get_mut(self).inner).poll_close(cx)
     }
 }
 
@@ -209,7 +208,7 @@ where
             trace!("writing; remaining={}", pinned.buffer.len());
 
             let buf = &pinned.buffer;
-            let n = try_ready!(Pin::new(&mut pinned.inner).poll_write(cx, &buf));
+            let n = try_ready!(pin!(pinned.inner).poll_write(cx, &buf));
 
             if n == 0 {
                 return Poll::Ready(Err(io::Error::new(
@@ -225,15 +224,15 @@ where
         }
 
         // Try flushing the underlying IO
-        try_ready!(Pin::new(&mut pinned.inner).poll_flush(cx));
+        try_ready!(pin!(pinned.inner).poll_flush(cx));
 
         trace!("framed transport flushed");
         Poll::Ready(Ok(()))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let () = try_ready!(Pin::as_mut(&mut self).poll_flush(cx));
-        let () = try_ready!(Pin::new(&mut self.inner).poll_shutdown(cx));
+        let () = try_ready!(pin!(self).poll_flush(cx));
+        let () = try_ready!(pin!(self.inner).poll_shutdown(cx));
         Poll::Ready(Ok(()))
     }
 }
@@ -267,7 +266,6 @@ impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        // TODO use pin! macros
-        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+        pin!(Pin::get_mut(self).inner).poll_read(cx, buf)
     }
 }

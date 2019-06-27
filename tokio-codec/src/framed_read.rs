@@ -88,7 +88,7 @@ where
     type Item = Result<D::Item, D::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.get_mut().inner).poll_next(cx)
+        pin!(self.get_mut().inner).poll_next(cx)
     }
 }
 
@@ -101,19 +101,19 @@ where
     type Error = T::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_ready(cx)
+        pin!(Pin::get_mut(self).inner.inner.0).poll_ready(cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
-        Pin::new(&mut Pin::get_mut(self).inner.inner.0).start_send(item)
+        pin!(Pin::get_mut(self).inner.inner.0).start_send(item)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_flush(cx)
+        pin!(Pin::get_mut(self).inner.inner.0).poll_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut Pin::get_mut(self).inner.inner.0).poll_close(cx)
+        pin!(Pin::get_mut(self).inner.inner.0).poll_close(cx)
     }
 }
 
@@ -211,7 +211,7 @@ where
             // got room for at least one byte to read to ensure that we don't
             // get a spurious 0 that looks like EOF
             pinned.buffer.reserve(1);
-            let bytect = match Pin::new(&mut pinned.inner).poll_read_buf(cx, &mut pinned.buffer)? {
+            let bytect = match pin!(pinned.inner).poll_read_buf(cx, &mut pinned.buffer)? {
                 Poll::Ready(ct) => ct,
                 Poll::Pending => return Poll::Pending,
             };

@@ -3,8 +3,8 @@
 use bytes::{BufMut, BytesMut};
 use std::collections::VecDeque;
 use tokio_codec::{Encoder, FramedWrite};
-use tokio_io::AsyncWrite;
 use tokio_futures::Sink;
+use tokio_io::AsyncWrite;
 use tokio_test::assert_ready;
 use tokio_test::task::MockTask;
 
@@ -77,7 +77,7 @@ fn write_hits_backpressure() {
         Ok(b"".to_vec()),
     };
 
-    for i in 0 ..= ITER {
+    for i in 0..=ITER {
         let mut b = BytesMut::with_capacity(4);
         b.put_u32_be(i as u32);
 
@@ -102,7 +102,6 @@ fn write_hits_backpressure() {
     let mut task = MockTask::new();
     let mut framed = FramedWrite::new(mock, U32Encoder);
     task.enter(|cx| {
-
         // Send 8KB. This fills up FramedWrite2 buffer
         for i in 0..ITER {
             assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());

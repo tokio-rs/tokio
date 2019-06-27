@@ -158,7 +158,7 @@ where
     type Item = Result<U::Item, U::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.get_mut().inner).poll_next(cx)
+        pin!(self.get_mut().inner).poll_next(cx)
     }
 }
 
@@ -218,7 +218,7 @@ impl<T: AsyncRead + Unpin, U: Unpin> AsyncRead for Fuse<T, U> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        Pin::new(&mut self.get_mut().0).poll_read(cx, buf)
+        pin!(self.get_mut().0).poll_read(cx, buf)
     }
 }
 
@@ -238,15 +238,15 @@ impl<T: AsyncWrite + Unpin, U: Unpin> AsyncWrite for Fuse<T, U> {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        Pin::new(&mut self.get_mut().0).poll_write(cx, buf)
+        pin!(self.get_mut().0).poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        Pin::new(&mut self.get_mut().0).poll_flush(cx)
+        pin!(self.get_mut().0).poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        Pin::new(&mut self.get_mut().0).poll_shutdown(cx)
+        pin!(self.get_mut().0).poll_shutdown(cx)
     }
 }
 
