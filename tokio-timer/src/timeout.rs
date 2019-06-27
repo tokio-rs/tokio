@@ -72,7 +72,6 @@ pub struct Timeout<T> {
     delay: Delay,
 }
 
-
 /// Error returned by `Timeout`.
 #[derive(Debug)]
 pub struct Elapsed(());
@@ -170,7 +169,7 @@ where
         unsafe {
             match self.map_unchecked_mut(|me| &mut me.delay).poll(cx) {
                 Poll::Ready(()) => Poll::Ready(Err(Elapsed(()))),
-                Poll::Pending => Poll::Pending
+                Poll::Pending => Poll::Pending,
             }
         }
     }

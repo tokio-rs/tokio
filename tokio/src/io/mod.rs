@@ -40,8 +40,8 @@ mod async_read_ext;
 mod async_write_ext;
 mod copy;
 mod read;
-mod write;
 mod read_exact;
+mod write;
 
 pub use self::async_read_ext::AsyncReadExt;
 pub use self::async_write_ext::AsyncWriteExt;

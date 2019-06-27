@@ -119,8 +119,7 @@ pub trait AsyncWrite {
     ///
     /// This function will panic if not called within the context of a future's
     /// task.
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>)
-        -> Poll<Result<(), io::Error>>;
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
 
     /// Write a `Buf` into this value, returning how many bytes were written.
     ///
@@ -175,9 +174,11 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncWrite,
 {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8])
-        -> Poll<io::Result<usize>>
-    {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
         self.get_mut().as_mut().poll_write(cx, buf)
     }
 

@@ -7,7 +7,7 @@ jobs:
   steps:
     - template: azure-install-rust.yml
       parameters:
-        rust_version: stable
+        rust_version: ${{ parameters.rust }}
     - script: |
         rustup component add rustfmt
         cargo fmt --version

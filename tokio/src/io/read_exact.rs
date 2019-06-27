@@ -11,11 +11,15 @@ use tokio_io::AsyncRead;
 /// Created by the [`read_exact`] function.
 ///
 /// [`read_exact`]: fn.read_exact.html
-pub(crate) fn read_exact<'a, A>(reader: &'a mut A, buf: &'a mut[u8]) -> ReadExact<'a, A>
+pub(crate) fn read_exact<'a, A>(reader: &'a mut A, buf: &'a mut [u8]) -> ReadExact<'a, A>
 where
-    A: AsyncRead + Unpin + ?Sized
+    A: AsyncRead + Unpin + ?Sized,
 {
-    ReadExact { reader, buf, pos: 0 }
+    ReadExact {
+        reader,
+        buf,
+        pos: 0,
+    }
 }
 
 /// Creates a future which will read exactly enough bytes to fill `buf`,
@@ -28,7 +32,6 @@ pub struct ReadExact<'a, A: ?Sized> {
     buf: &'a mut [u8],
     pos: usize,
 }
-
 
 fn eof() -> io::Error {
     io::Error::new(io::ErrorKind::UnexpectedEof, "early eof")

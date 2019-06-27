@@ -5,10 +5,11 @@ variables:
   nightly: nightly-2019-06-10
 
 jobs:
-# # Check formatting
-# - template: ci/azure-rustfmt.yml
-#   parameters:
-#     name: rustfmt
+# Check formatting
+- template: ci/azure-rustfmt.yml
+  parameters:
+    rust: $(nightly)
+    name: rustfmt
 
 # Test top level crate
 - template: ci/azure-test-stable.yml
