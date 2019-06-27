@@ -25,14 +25,14 @@ publish = false
 async-traits = ["async-sink", "futures-core-preview"]
 
 [dependencies]
-fnv = "1.0.6"
+async-util = { git = "https://github.com/tokio-rs/async" }
 async-sink = { git = "https://github.com/tokio-rs/async", optional = true }
+fnv = "1.0.6"
 futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
 
 [dev-dependencies]
-async-util = { git = "https://github.com/tokio-rs/async" }
 env_logger = { version = "0.5", default-features = false }
 pin-utils = "0.1.0-alpha.4"
-# tokio = { version = "0.2.0", path = "../tokio" }
+tokio = { version = "*", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
 loom = { git = "https://github.com/carllerche/loom", branch = "std-future2", features = ["futures"] }
