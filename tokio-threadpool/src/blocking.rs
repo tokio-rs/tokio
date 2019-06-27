@@ -1,7 +1,8 @@
 use crate::worker::Worker;
-use futures::{try_ready, Poll};
+
 use std::error::Error;
 use std::fmt;
+use std::task::Poll;
 
 /// Error raised by `blocking`.
 pub struct BlockingError {
@@ -116,7 +117,7 @@ pub struct BlockingError {
 ///     pool.shutdown_on_idle().wait().unwrap();
 /// }
 /// ```
-pub fn blocking<F, T>(f: F) -> Poll<T, BlockingError>
+pub fn blocking<F, T>(f: F) -> Poll<Result<T, BlockingError>>
 where
     F: FnOnce() -> T,
 {
@@ -124,7 +125,7 @@ where
         let worker = match worker {
             Some(worker) => worker,
             None => {
-                return Err(BlockingError { _p: () });
+                return Poll::Ready(Err(BlockingError { _p: () }));
             }
         };
 
@@ -135,7 +136,7 @@ where
     });
 
     // If the transition cannot happen, exit early
-    try_ready!(res);
+    ready!(res)?;
 
     // Currently in blocking mode, so call the inner closure
     let ret = f();
@@ -148,7 +149,7 @@ where
     });
 
     // Return the result
-    Ok(ret.into())
+    Poll::Ready(Ok(ret))
 }
 
 impl fmt::Display for BlockingError {

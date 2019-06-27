@@ -1,14 +1,26 @@
-#![deny(warnings, rust_2018_idioms)]
+#![deny(/* warnings, */ rust_2018_idioms)]
+#![feature(async_await)]
 
-use futures::future::{lazy, poll_fn};
-use futures::*;
+use tokio_threadpool::*;
+use tokio_test::*;
+
+use async_util::future::poll_fn;
 use rand::*;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::*;
 use std::sync::*;
+use std::task::{Poll, Waker};
 use std::thread;
 use std::time::Duration;
-use tokio_threadpool::*;
+
+macro_rules! ready {
+    ($e:expr) => {
+        match $e {
+            ::std::task::Poll::Ready(t) => t,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    };
+}
 
 #[test]
 fn basic() {
@@ -19,21 +31,18 @@ fn basic() {
     let (tx1, rx1) = mpsc::channel();
     let (tx2, rx2) = mpsc::channel();
 
-    pool.spawn(lazy(move || {
+    pool.spawn(async move {
         let res = blocking(|| {
             let v = rx1.recv().unwrap();
             tx2.send(v).unwrap();
-        })
-        .unwrap();
+        });
 
-        assert!(res.is_ready());
-        Ok(().into())
-    }));
+        assert_ready!(res).unwrap();
+    });
 
-    pool.spawn(lazy(move || {
+    pool.spawn(async move {
         tx1.send(()).unwrap();
-        Ok(().into())
-    }));
+    });
 
     rx2.recv().unwrap();
 }
@@ -51,8 +60,8 @@ fn notify_task_on_capacity() {
         let rem = rem.clone();
         let tx = tx.clone();
 
-        pool.spawn(lazy(move || {
-            poll_fn(move || {
+        pool.spawn(async move {
+            poll_fn(move |_| {
                 blocking(|| {
                     thread::sleep(Duration::from_millis(100));
                     let prev = rem.fetch_sub(1, Relaxed);
@@ -62,8 +71,8 @@ fn notify_task_on_capacity() {
                     }
                 })
                 .map_err(|e| panic!("blocking err {:?}", e))
-            })
-        }));
+            }).await.unwrap()
+        });
     }
 
     rx.recv().unwrap();
@@ -73,10 +82,7 @@ fn notify_task_on_capacity() {
 
 #[test]
 fn capacity_is_use_it_or_lose_it() {
-    use futures::sync::oneshot;
-    use futures::task::Task;
-    use futures::Async::*;
-    use futures::*;
+    use tokio_sync::oneshot;
 
     // TODO: Run w/ bigger pool size
 
@@ -88,74 +94,72 @@ fn capacity_is_use_it_or_lose_it() {
     let (tx4, rx4) = mpsc::channel();
 
     // First, fill the blocking capacity
-    pool.spawn(lazy(move || {
-        poll_fn(move || {
+    pool.spawn(async move {
+        poll_fn(move |_| {
             blocking(|| {
                 rx1.recv().unwrap();
             })
-            .map_err(|_| panic!())
-        })
-    }));
+        }).await.unwrap()
+    });
 
-    pool.spawn(lazy(move || {
-        rx2.map_err(|_| panic!()).and_then(|task: Task| {
-            poll_fn(move || {
-                blocking(|| {
-                    // Notify the other task
-                    task.notify();
+    pool.spawn(async move {
+        let task: Waker = rx2.await.unwrap();
 
-                    // Block until woken
-                    rx3.recv().unwrap();
-                })
-                .map_err(|_| panic!())
+        poll_fn(move |_| {
+            blocking(|| {
+                // Notify the other task
+                task.wake_by_ref();
+
+                // Block until woken
+                rx3.recv().unwrap();
             })
-        })
-    }));
+        }).await.unwrap();
+    });
 
     // Spawn a future that will try to block, get notified, then not actually
     // use the blocking
     let mut i = 0;
     let mut tx2 = Some(tx2);
 
-    pool.spawn(lazy(move || {
-        poll_fn(move || {
+    pool.spawn(async move {
+        poll_fn(move |cx| {
             match i {
                 0 => {
                     i = 1;
 
                     let res = blocking(|| unreachable!()).map_err(|_| panic!());
 
-                    assert!(res.unwrap().is_not_ready());
+                    assert_pending!(res);
 
                     // Unblock the first blocker
                     tx1.send(()).unwrap();
 
-                    return Ok(NotReady);
+                    return Poll::Pending
                 }
                 1 => {
                     i = 2;
 
                     // Skip blocking, and notify the second task that it should
                     // start blocking
-                    let me = task::current();
+                    let me = cx.waker().clone();
                     tx2.take().unwrap().send(me).unwrap();
 
-                    return Ok(NotReady);
+                    return Poll::Pending
                 }
                 2 => {
                     let res = blocking(|| unreachable!()).map_err(|_| panic!());
 
-                    assert!(res.unwrap().is_not_ready());
+                    assert_pending!(res);
 
                     // Unblock the first blocker
                     tx3.send(()).unwrap();
                     tx4.send(()).unwrap();
-                    Ok(().into())
+                    Poll::Ready(())
                 }
                 _ => unreachable!(),
             }
-        })
-    }));
+        }).await
+    });
 
     rx4.recv().unwrap();
 }
@@ -173,33 +177,32 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
     {
         let exited = exited.clone();
 
-        pool.spawn(lazy(move || {
-            poll_fn(move || {
+        pool.spawn(async move {
+            poll_fn(move |_| {
                 blocking(|| {
                     enter_tx.send(()).unwrap();
                     exit_rx.recv().unwrap();
                     exited.store(true, Relaxed);
                 })
-                .map_err(|_| panic!())
-            })
-        }));
+            }).await.unwrap()
+        });
     }
 
     // Wait for the task to block
     let _ = enter_rx.recv().unwrap();
 
     // Spawn another task that attempts to block
-    pool.spawn(lazy(move || {
-        poll_fn(move || {
-            let res = blocking(|| {}).unwrap();
+    pool.spawn(async move {
+        poll_fn(move |_| {
+            let res = blocking(|| {});
 
             assert_eq!(res.is_ready(), exited.load(Relaxed));
 
             try_tx.send(res.is_ready()).unwrap();
 
-            Ok(res)
-        })
-    }));
+            res.map(|_| ())
+        }).await
+    });
 
     // Wait for the second task to try to block (and not be ready).
     let res = try_rx.recv().unwrap();
@@ -230,15 +233,14 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
             let rem = rem.clone();
             let tx = tx.clone();
 
-            pool.spawn(lazy(move || {
-                poll_fn(move || {
+            pool.spawn(async move {
+                poll_fn(move |_| {
                     // First block
                     let res = blocking(|| {
                         thread::sleep(Duration::from_millis(100));
-                    })
-                    .map_err(|e| panic!("blocking err {:?}", e));
+                    });
 
-                    try_ready!(res);
+                    ready!(res).unwrap();
 
                     let res = blocking(|| {
                         thread::sleep(Duration::from_millis(100));
@@ -249,11 +251,11 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
                         }
                     });
 
-                    assert!(res.unwrap().is_ready());
+                    assert!(res.is_ready());
 
-                    Ok(().into())
-                })
-            }));
+                    Poll::Ready(())
+                }).await
+            });
         }
 
         rx.recv().unwrap();
@@ -294,18 +296,16 @@ fn shutdown() {
             let barrier = barrier.clone();
             let tx = tx.clone();
 
-            pool.spawn(lazy(move || {
+            pool.spawn(async move {
                 let res = blocking(|| {
                     barrier.wait();
                     Ok::<_, ()>(())
-                })
-                .unwrap();
+                });
 
                 tx.send(()).unwrap();
 
                 assert!(res.is_ready());
-                Ok(().into())
-            }));
+            });
         }
 
         for _ in 0..BLOCKING {
@@ -356,10 +356,10 @@ fn hammer() {
                 let cnt_task = cnt_task.clone();
                 let cnt_block = cnt_block.clone();
 
-                pool.spawn(lazy(move || {
+                pool.spawn(async move {
                     cnt_task.fetch_add(1, Relaxed);
 
-                    poll_fn(move || {
+                    poll_fn(move |_| {
                         blocking(|| {
                             match sleep {
                                 Skip => {}
@@ -378,12 +378,12 @@ fn hammer() {
                             cnt_block.fetch_add(1, Relaxed);
                         })
                         .map_err(|_| panic!())
-                    })
-                }));
+                    }).await.unwrap()
+                });
             }
 
             // Wait for the work to complete
-            pool.shutdown_on_idle().wait().unwrap();
+            pool.shutdown_on_idle().wait();
 
             assert_eq!(n, cnt_task.load(Relaxed));
             assert_eq!(n, cnt_block.load(Relaxed));

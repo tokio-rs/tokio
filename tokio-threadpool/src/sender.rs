@@ -1,10 +1,13 @@
 use crate::pool::{self, Lifecycle, Pool, MAX_FUTURES};
 use crate::task::Task;
-use futures::{future, Future};
+
+use tokio_executor::{self, SpawnError};
+
 use log::trace;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-use tokio_executor::{self, SpawnError};
 
 /// Submit futures to the associated thread pool for execution.
 ///
@@ -75,10 +78,10 @@ impl Sender {
     /// ```
     pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
     where
-        F: Future<Item = (), Error = ()> + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
     {
         let mut s = self;
-        tokio_executor::Executor::spawn(&mut s, Box::new(future))
+        tokio_executor::Executor::spawn(&mut s, Box::pin(future))
     }
 
     /// Logic to prepare for spawning
@@ -128,7 +131,7 @@ impl tokio_executor::Executor for Sender {
 
     fn spawn(
         &mut self,
-        future: Box<dyn Future<Item = (), Error = ()> + Send>,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), SpawnError> {
         let mut s = &*self;
         tokio_executor::Executor::spawn(&mut s, future)
@@ -154,7 +157,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 
     fn spawn(
         &mut self,
-        future: Box<dyn Future<Item = (), Error = ()> + Send>,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), SpawnError> {
         self.prepare_for_spawn()?;
 
@@ -175,34 +178,14 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 
 impl<T> tokio_executor::TypedExecutor<T> for Sender
 where
-    T: Future<Item = (), Error = ()> + Send + 'static,
+    T: Future<Output = ()> + Send + 'static,
 {
     fn status(&self) -> Result<(), tokio_executor::SpawnError> {
         tokio_executor::Executor::status(self)
     }
 
     fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
-        tokio_executor::Executor::spawn(self, Box::new(future))
-    }
-}
-
-impl<T> future::Executor<T> for Sender
-where
-    T: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
-        if let Err(e) = tokio_executor::Executor::status(self) {
-            let kind = if e.is_at_capacity() {
-                future::ExecuteErrorKind::NoCapacity
-            } else {
-                future::ExecuteErrorKind::Shutdown
-            };
-
-            return Err(future::ExecuteError::new(kind, future));
-        }
-
-        let _ = self.spawn(future);
-        Ok(())
+        tokio_executor::Executor::spawn(self, Box::pin(future))
     }
 }
 
