@@ -1,10 +1,15 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use bytes::{Buf, BufMut, BytesMut, IntoBuf};
-use futures::{Future, Stream};
 use std::io::{self, Read};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
 use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
+use tokio_current_thread::block_on_all;
 use tokio_io::AsyncRead;
+
+use bytes::{Buf, BufMut, BytesMut, IntoBuf};
+use futures::prelude::{FutureExt, StreamExt};
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
 
@@ -49,7 +54,15 @@ impl Read for DontReadIntoThis {
     }
 }
 
-impl AsyncRead for DontReadIntoThis {}
+impl AsyncRead for DontReadIntoThis {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        unreachable!()
+    }
+}
 
 #[test]
 fn can_read_from_existing_buf() {
@@ -58,12 +71,12 @@ fn can_read_from_existing_buf() {
 
     let framed = Framed::from_parts(parts);
 
-    let num = framed
-        .into_future()
-        .map(|(first_num, _)| first_num.unwrap())
-        .wait()
-        .map_err(|e| e.0)
-        .unwrap();
+    let num = block_on_all(
+        framed
+            .into_future()
+            .map(|(first_num, _)| first_num.unwrap()),
+    )
+    .unwrap();
 
     assert_eq!(num, 42);
 }
