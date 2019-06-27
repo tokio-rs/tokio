@@ -292,7 +292,6 @@ impl<P: Park> CurrentThread<P> {
                 sender: spawn_sender,
                 num_futures,
                 waker,
-                shut_down: Arc::new(atomic::AtomicBool::new(false)),
                 thread,
                 id,
             },
@@ -633,7 +632,6 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 pub struct Handle {
     sender: crossbeam_channel::Sender<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
     num_futures: Arc<atomic::AtomicUsize>,
-    shut_down: Arc<atomic::AtomicBool>,
     /// Waker to the Scheduler
     waker: Waker,
     thread: thread::ThreadId,
@@ -646,7 +644,7 @@ pub struct Handle {
 impl fmt::Debug for Handle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Handle")
-            .field("shut_down", &self.shut_down.load(atomic::Ordering::SeqCst))
+            .field("shut_down", &self.is_shutting_down())
             .finish()
     }
 }
@@ -669,18 +667,11 @@ impl Handle {
             }
         }
 
-        if self.shut_down.load(atomic::Ordering::SeqCst) {
-            return Err(SpawnError::shutdown());
-        }
-
         // NOTE: += 2 since LSB is the shutdown bit
         let pending = self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
         if pending % 2 == 1 {
             // Bring the count back so we still know when the Runtime is idle.
             self.num_futures.fetch_sub(2, atomic::Ordering::SeqCst);
-
-            // Once the Runtime is shutting down, we know it won't come back.
-            self.shut_down.store(true, atomic::Ordering::SeqCst);
 
             return Err(SpawnError::shutdown());
         }
@@ -702,11 +693,17 @@ impl Handle {
     /// This allows a caller to avoid creating the task if the call to `spawn`
     /// has a high likelihood of failing.
     pub fn status(&self) -> Result<(), SpawnError> {
-        if self.shut_down.load(atomic::Ordering::SeqCst) {
+        if self.is_shutting_down() {
             return Err(SpawnError::shutdown());
         }
 
         Ok(())
+    }
+
+    fn is_shutting_down(&self) -> bool {
+        // LSB of "num_futures" is the shutdown bit
+        let num_futures = self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
+        num_futures % 2 == 1
     }
 }
 
