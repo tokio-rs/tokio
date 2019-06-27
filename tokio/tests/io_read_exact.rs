@@ -1,17 +1,15 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio_test::assert_ready_ok;
-use tokio_test::task::MockTask;
+use tokio_test::assert_ok;
 
-use pin_utils::pin_mut;
-use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[test]
-fn read_exact() {
+#[tokio::test]
+async fn read_exact() {
     struct Rd {
         val: &'static [u8; 11],
     }
@@ -31,16 +29,9 @@ fn read_exact() {
     }
 
     let mut buf = Box::new([0; 8]);
-    let mut task = MockTask::new();
+    let mut rd = Rd { val: b"hello world" };
 
-    task.enter(|cx| {
-        let mut rd = Rd { val: b"hello world" };
-
-        let read = rd.read_exact(&mut buf[..]);
-        pin_mut!(read);
-
-        let n = assert_ready_ok!(read.poll(cx));
-        assert_eq!(n, 8);
-        assert_eq!(buf[..], b"hello wo"[..]);
-    });
+    let n = assert_ok!(rd.read_exact(&mut buf[..]).await);
+    assert_eq!(n, 8);
+    assert_eq!(buf[..], b"hello wo"[..]);
 }
