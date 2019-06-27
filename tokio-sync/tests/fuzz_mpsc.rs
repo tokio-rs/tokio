@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 #[macro_use]
 extern crate loom;
@@ -32,10 +33,10 @@ fn closing_tx() {
             drop(tx);
         });
 
-        let v = block_on(poll_fn(|cx| rx.poll_next(cx)));
+        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
         assert!(v.is_some());
 
-        let v = block_on(poll_fn(|cx| rx.poll_next(cx)));
+        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
         assert!(v.is_none());
     });
 }
