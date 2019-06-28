@@ -173,8 +173,8 @@ The crates included as part of Tokio are:
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
-* [`tracing`]: A framework for application-level tracing and async-aware
-  diagnostics.
+* [`tracing`] (formerly `tokio-trace`): A framework for application-level
+  tracing and async-aware diagnostics.
 
 * [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
   `tokio`.
