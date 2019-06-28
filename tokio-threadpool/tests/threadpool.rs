@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::*;
 use std::sync::{mpsc, Arc};
-use std::task::{Poll, Context, Waker};
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 thread_local!(static FOO: Cell<u32> = Cell::new(0));
@@ -267,19 +267,21 @@ fn many_multishot_futures() {
             let mut cycle_tx = start_tx.clone();
             let mut rem = CYCLES;
 
-            pool_tx.spawn(async move {
-                for _ in 0..CYCLES {
-                    let msg = chain_rx.recv().await.unwrap();
+            pool_tx
+                .spawn(async move {
+                    for _ in 0..CYCLES {
+                        let msg = chain_rx.recv().await.unwrap();
 
-                    rem -= 1;
+                        rem -= 1;
 
-                    if rem == 0 {
-                        final_tx.send(msg).await.unwrap();
-                    } else {
-                        cycle_tx.send(msg).await.unwrap();
+                        if rem == 0 {
+                            final_tx.send(msg).await.unwrap();
+                        } else {
+                            cycle_tx.send(msg).await.unwrap();
+                        }
                     }
-                }
-            }).unwrap();
+                })
+                .unwrap();
 
             start_txs.push(start_tx);
             final_rxs.push(final_rx);
@@ -341,7 +343,8 @@ fn busy_threadpool_is_not_idle() {
 
     tx.spawn(async move {
         term_rx.await.unwrap();
-    }).unwrap();
+    })
+    .unwrap();
 
     let mut idle = pool.shutdown_on_idle();
 

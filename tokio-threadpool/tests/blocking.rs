@@ -1,8 +1,8 @@
 #![deny(/* warnings, */ rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio_threadpool::*;
 use tokio_test::*;
+use tokio_threadpool::*;
 
 use async_util::future::poll_fn;
 use rand::*;
@@ -71,7 +71,9 @@ fn notify_task_on_capacity() {
                     }
                 })
                 .map_err(|e| panic!("blocking err {:?}", e))
-            }).await.unwrap()
+            })
+            .await
+            .unwrap()
         });
     }
 
@@ -99,7 +101,9 @@ fn capacity_is_use_it_or_lose_it() {
             blocking(|| {
                 rx1.recv().unwrap();
             })
-        }).await.unwrap()
+        })
+        .await
+        .unwrap()
     });
 
     pool.spawn(async move {
@@ -113,7 +117,9 @@ fn capacity_is_use_it_or_lose_it() {
                 // Block until woken
                 rx3.recv().unwrap();
             })
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
     });
 
     // Spawn a future that will try to block, get notified, then not actually
@@ -134,7 +140,7 @@ fn capacity_is_use_it_or_lose_it() {
                     // Unblock the first blocker
                     tx1.send(()).unwrap();
 
-                    return Poll::Pending
+                    return Poll::Pending;
                 }
                 1 => {
                     i = 2;
@@ -144,7 +150,7 @@ fn capacity_is_use_it_or_lose_it() {
                     let me = cx.waker().clone();
                     tx2.take().unwrap().send(me).unwrap();
 
-                    return Poll::Pending
+                    return Poll::Pending;
                 }
                 2 => {
                     let res = blocking(|| unreachable!()).map_err(|_| panic!());
@@ -158,7 +164,8 @@ fn capacity_is_use_it_or_lose_it() {
                 }
                 _ => unreachable!(),
             }
-        }).await
+        })
+        .await
     });
 
     rx4.recv().unwrap();
@@ -184,7 +191,9 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
                     exit_rx.recv().unwrap();
                     exited.store(true, Relaxed);
                 })
-            }).await.unwrap()
+            })
+            .await
+            .unwrap()
         });
     }
 
@@ -201,7 +210,8 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
             try_tx.send(res.is_ready()).unwrap();
 
             res.map(|_| ())
-        }).await
+        })
+        .await
     });
 
     // Wait for the second task to try to block (and not be ready).
@@ -254,7 +264,8 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
                     assert!(res.is_ready());
 
                     Poll::Ready(())
-                }).await
+                })
+                .await
             });
         }
 
@@ -378,7 +389,9 @@ fn hammer() {
                             cnt_block.fetch_add(1, Relaxed);
                         })
                         .map_err(|_| panic!())
-                    }).await.unwrap()
+                    })
+                    .await
+                    .unwrap()
                 });
             }
 

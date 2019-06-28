@@ -156,5 +156,5 @@ pub use crate::blocking::{blocking, BlockingError};
 pub use crate::builder::Builder;
 pub use crate::sender::Sender;
 pub use crate::shutdown::Shutdown;
-pub use crate::thread_pool::{ThreadPool};
+pub use crate::thread_pool::ThreadPool;
 pub use crate::worker::{Worker, WorkerId};

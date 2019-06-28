@@ -220,7 +220,10 @@ impl Pool {
         }
     }
 
-    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<Result<(), crate::BlockingError>> {
+    pub fn poll_blocking_capacity(
+        &self,
+        task: &Arc<Task>,
+    ) -> Poll<Result<(), crate::BlockingError>> {
         self.blocking.poll_blocking_capacity(task)
     }
 

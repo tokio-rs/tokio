@@ -7,7 +7,7 @@ use crossbeam_deque::Injector;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Poll, Context};
+use std::task::{Context, Poll};
 
 /// Future that resolves when the thread pool is shutdown.
 ///

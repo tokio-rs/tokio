@@ -9,7 +9,6 @@ use crate::pool::Pool;
 use crate::waker::Waker;
 
 use log::trace;
-use std::{fmt, panic, ptr};
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
 use std::pin::Pin;
@@ -17,6 +16,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::{fmt, panic, ptr};
 
 /// Harness around a future.
 ///
@@ -109,10 +109,7 @@ impl Task {
             _ => panic!("unexpected task state; {:?}", actual),
         }
 
-        trace!(
-            "Task::run; state={:?}",
-            State::from(me.state.load(Relaxed))
-        );
+        trace!("Task::run; state={:?}", State::from(me.state.load(Relaxed)));
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained.
@@ -144,11 +141,7 @@ impl Task {
 
             let mut cx = Context::from_waker(&mut waker);
 
-            let ret =
-                g.0.as_mut()
-                    .unwrap()
-                    .as_mut()
-                    .poll(&mut cx);
+            let ret = g.0.as_mut().unwrap().as_mut().poll(&mut cx);
 
             g.1 = false;
 

@@ -1,7 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio_sync::{oneshot, mpsc};
+use tokio_sync::{mpsc, oneshot};
 use tokio_threadpool::*;
 
 use std::future::Future;
@@ -45,7 +45,8 @@ fn hammer() {
 
         let cnt = Arc::new(AtomicUsize::new(0));
 
-        let (mut listen_tx, mut listen_rx) = mpsc::unbounded_channel::<oneshot::Sender<oneshot::Sender<()>>>();
+        let (mut listen_tx, mut listen_rx) =
+            mpsc::unbounded_channel::<oneshot::Sender<oneshot::Sender<()>>>();
 
         pool.spawn({
             let c1 = cnt.clone();

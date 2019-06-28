@@ -7,7 +7,7 @@ use std::ptr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::Arc;
-use std::task::{Poll};
+use std::task::Poll;
 use std::thread;
 
 /// Manages the state around entering a blocking section and tasks that are
@@ -110,7 +110,10 @@ impl Blocking {
     ///
     /// The caller must ensure that `task` has not previously been queued to be
     /// notified when capacity becomes available.
-    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<Result<(), crate::BlockingError>> {
+    pub fn poll_blocking_capacity(
+        &self,
+        task: &Arc<Task>,
+    ) -> Poll<Result<(), crate::BlockingError>> {
         // This requires atomically claiming blocking capacity and if none is
         // available, queuing &task.
 
