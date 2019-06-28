@@ -2,6 +2,7 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! Utilities for tracking time.
 //!
@@ -41,9 +42,8 @@ macro_rules! ready {
 }
 
 pub mod clock;
-#[cfg(feature = "delay-queue")]
 pub mod delay_queue;
-#[cfg(feature = "throttle")]
+#[cfg(feature = "async-traits")]
 pub mod throttle;
 pub mod timeout;
 pub mod timer;
@@ -51,16 +51,13 @@ pub mod timer;
 mod atomic;
 mod delay;
 mod error;
-#[cfg(feature = "interval")]
 mod interval;
 mod wheel;
 
 pub use delay::Delay;
-#[cfg(feature = "delay-queue")]
 #[doc(inline)]
 pub use delay_queue::DelayQueue;
 pub use error::Error;
-#[cfg(feature = "interval")]
 pub use interval::Interval;
 #[doc(inline)]
 pub use timeout::Timeout;

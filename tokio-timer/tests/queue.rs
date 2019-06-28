@@ -1,5 +1,4 @@
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
 
 mod support;
 use crate::support::*;
