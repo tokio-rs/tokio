@@ -32,7 +32,7 @@ jobs:
     crates:
 #       - tokio-fs
       tokio-reactor: []
-#       - tokio-signal
+      tokio-signal: []
       tokio-tcp:
         - incoming
 #       - tokio-tls

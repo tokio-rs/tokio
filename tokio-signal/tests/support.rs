@@ -1,27 +1,22 @@
 #![cfg(unix)]
 #![deny(warnings, rust_2018_idioms)]
 
+use futures_util::future::FutureExt;
 use libc::{c_int, getpid, kill};
+use std::future::Future;
 use std::time::Duration;
-use tokio::timer::Timeout;
+use tokio_timer::Timeout;
 
-pub use futures::{Future, Stream};
+pub use futures_util::future;
+pub use futures_util::stream::StreamExt;
 pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
 pub use tokio_signal::unix::Signal;
 
-pub fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
-    Timeout::new(future, Duration::from_secs(1)).map_err(|e| {
-        if e.is_timer() {
-            panic!("failed to register timer");
-        } else if e.is_elapsed() {
-            panic!("timed out")
-        } else {
-            e.into_inner().expect("missing inner error")
-        }
-    })
+pub fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
+    Timeout::new(future, Duration::from_secs(1)).map(Result::unwrap)
 }
 
-pub fn run_with_timeout<F>(rt: &mut CurrentThreadRuntime, future: F) -> Result<F::Item, F::Error>
+pub fn run_with_timeout<F>(rt: &mut CurrentThreadRuntime, future: F) -> F::Output
 where
     F: Future,
 {

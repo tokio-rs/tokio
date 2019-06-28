@@ -29,7 +29,5 @@ fn dropping_loops_does_not_cause_starvation() {
 
     send_signal(TEST_SIGNAL);
 
-    let signal_future = signal.into_future().map_err(|(e, _)| e);
-
-    run_with_timeout(&mut rt, signal_future).expect("failed to get signal");
+    run_with_timeout(&mut rt, signal.into_future());
 }

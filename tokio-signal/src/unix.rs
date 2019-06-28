@@ -7,20 +7,21 @@
 
 pub use libc;
 
-use std::io::prelude::*;
-use std::io::{self, Error, ErrorKind};
+use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, ONCE_INIT};
 
-use futures::future;
-use futures::sync::mpsc::{channel, Receiver};
-use futures::{Async, Future};
-use futures::{Poll, Stream};
+use crate::IoFuture;
+use futures_core::stream::Stream;
+use futures_util::future::{self, FutureExt};
 use libc::c_int;
 use mio_uds::UnixStream;
-use tokio_io::IoFuture;
+use std::future::Future;
+use std::task::{Context, Poll};
+use tokio_io::AsyncRead;
 use tokio_reactor::{Handle, PollEvented};
+use tokio_sync::mpsc::{channel, Receiver};
 
 use crate::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 
@@ -163,17 +164,15 @@ struct Driver {
 }
 
 impl Future for Driver {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<(), ()> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Drain the data from the pipe and maintain interest in getting more
-        self.drain();
+        self.drain(cx);
         // Broadcast any signals which were received
         globals().broadcast();
 
-        // This task just lives until the end of the event loop
-        Ok(Async::NotReady)
+        Poll::Pending
     }
 }
 
@@ -204,13 +203,13 @@ impl Driver {
     /// We do *NOT* use the existence of any read bytes as evidence a sigal was
     /// received since the `pending` flags would have already been set if that
     /// was the case. See #38 for more info.
-    fn drain(&mut self) {
+    fn drain(mut self: Pin<&mut Self>, cx: &mut Context<'_>) {
         loop {
-            match self.wakeup.read(&mut [0; 128]) {
-                Ok(0) => panic!("EOF on self-pipe"),
-                Ok(_) => {}
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
-                Err(e) => panic!("Bad read on self-pipe: {}", e),
+            match Pin::new(&mut self.wakeup).poll_read(cx, &mut [0; 128]) {
+                Poll::Ready(Ok(0)) => panic!("EOF on self-pipe"),
+                Poll::Ready(Ok(_)) => {}
+                Poll::Ready(Err(e)) => panic!("Bad read on self-pipe: {}", e),
+                Poll::Pending => break,
             }
         }
     }
@@ -306,44 +305,36 @@ impl Signal {
     /// channels will receive the signal notification.
     pub fn with_handle(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
         let handle = handle.clone();
-        Box::new(future::lazy(move || {
-            let result = (|| {
-                // Turn the signal delivery on once we are ready for it
-                signal_enable(signal)?;
+        future::lazy(move |_| {
+            // Turn the signal delivery on once we are ready for it
+            signal_enable(signal)?;
 
-                // Ensure there's a driver for our associated event loop processing
-                // signals.
-                let driver = Driver::new(&handle)?;
+            // Ensure there's a driver for our associated event loop processing
+            // signals.
+            let driver = Driver::new(&handle)?;
 
-                // One wakeup in a queue is enough, no need for us to buffer up any
-                // more. NB: channels always guarantee at least one slot per sender,
-                // so we don't need additional slots
-                let (tx, rx) = channel(0);
-                globals().register_listener(signal as EventId, tx);
+            // One wakeup in a queue is enough, no need for us to buffer up any
+            // more.
+            let (tx, rx) = channel(1);
+            globals().register_listener(signal as EventId, tx);
 
-                Ok(Signal {
-                    driver: driver,
-                    rx: rx,
-                    signal: signal,
-                })
-            })();
-            future::result(result)
-        }))
+            Ok(Signal {
+                driver: driver,
+                rx: rx,
+                signal: signal,
+            })
+        })
+        .boxed()
     }
 }
 
 impl Stream for Signal {
     type Item = c_int;
-    type Error = io::Error;
 
-    fn poll(&mut self) -> Poll<Option<c_int>, io::Error> {
-        self.driver.poll().unwrap();
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let _ = Pin::new(&mut self.driver).poll(cx);
 
-        self.rx
-            .poll()
-            .map(|ready| ready.map(|item| item.map(|()| self.signal)))
-            // receivers don't generate errors
-            .map_err(|_| unreachable!())
+        self.rx.poll_recv(cx).map(|item| item.map(|()| self.signal))
     }
 }
 

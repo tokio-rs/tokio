@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use crate::os::{OsExtraData, OsStorage};
-use futures::sync::mpsc::Sender;
+use tokio_sync::mpsc::Sender;
 
 pub(crate) type EventId = usize;
 
@@ -98,7 +98,7 @@ impl<S: Storage> Registry<S> {
             for i in (0..recipients.len()).rev() {
                 match recipients[i].try_send(()) {
                     Ok(()) => {}
-                    Err(ref e) if e.is_disconnected() => {
+                    Err(ref e) if e.is_closed() => {
                         recipients.swap_remove(i);
                     }
 
@@ -169,65 +169,53 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::sync::mpsc::channel;
-    use futures::sync::oneshot;
-    use futures::{Future, Stream};
+    use futures_util::{future, StreamExt};
+    use tokio_sync::mpsc::channel;
+    use tokio_sync::oneshot;
 
-    use std::time::Duration;
-    use tokio::runtime::Runtime;
-    use tokio_timer::sleep;
-
-    #[test]
-    fn smoke() {
+    #[tokio::test]
+    async fn smoke() {
         let registry = Registry::new(vec![
             EventInfo::default(),
             EventInfo::default(),
             EventInfo::default(),
         ]);
 
-        let (first_tx, first_rx) = channel(0);
-        let (second_tx, second_rx) = channel(0);
-        let (third_tx, third_rx) = channel(0);
+        let (first_tx, first_rx) = channel(3);
+        let (second_tx, second_rx) = channel(3);
+        let (third_tx, third_rx) = channel(3);
 
         registry.register_listener(0, first_tx);
         registry.register_listener(1, second_tx);
         registry.register_listener(2, third_tx);
 
         let (fire, wait) = oneshot::channel();
-        let rt = Runtime::new().unwrap();
 
-        rt.spawn(
-            wait.and_then(move |_| {
-                // Record some events which should get coalesced
-                registry.record_event(0);
-                registry.record_event(0);
-                registry.record_event(1);
-                registry.record_event(1);
-                registry.broadcast();
+        tokio::spawn(async {
+            wait.await.expect("wait failed");
 
-                sleep(Duration::from_millis(100))
-                    .map_err(|e| panic!("{:#?}", e))
-                    .and_then(move |_| {
-                        registry.record_event(0);
-                        registry.broadcast();
+            // Record some events which should get coalesced
+            registry.record_event(0);
+            registry.record_event(0);
+            registry.record_event(1);
+            registry.record_event(1);
+            registry.broadcast();
 
-                        drop(registry);
-                        Ok(())
-                    })
-            })
-            .map_err(|e| panic!("{}", e)),
+            // Send subsequent signal
+            registry.record_event(0);
+            registry.broadcast();
+
+            drop(registry);
+        });
+
+        let _ = fire.send(());
+        let all = future::join3(
+            first_rx.collect::<Vec<_>>(),
+            second_rx.collect::<Vec<_>>(),
+            third_rx.collect::<Vec<_>>(),
         );
 
-        let (first_results, second_results, third_results) = rt
-            .block_on(futures::lazy(move || {
-                let _ = fire.send(());
-
-                first_rx
-                    .collect()
-                    .join3(second_rx.collect(), third_rx.collect())
-            }))
-            .expect("failed to extract events");
-
+        let (first_results, second_results, third_results) = all.await;
         assert_eq!(2, first_results.len());
         assert_eq!(1, second_results.len());
         assert_eq!(0, third_results.len());
@@ -238,7 +226,7 @@ mod tests {
     fn register_panics_on_invalid_input() {
         let registry = Registry::new(vec![EventInfo::default()]);
 
-        let (tx, _) = channel(0);
+        let (tx, _) = channel(1);
         registry.register_listener(1, tx);
     }
 
@@ -248,13 +236,13 @@ mod tests {
         registry.record_event(42);
     }
 
-    #[test]
-    fn broadcast_cleans_up_disconnected_listeners() {
+    #[tokio::test]
+    async fn broadcast_cleans_up_disconnected_listeners() {
         let registry = Registry::new(vec![EventInfo::default()]);
 
-        let (first_tx, first_rx) = channel(0);
-        let (second_tx, second_rx) = channel(0);
-        let (third_tx, third_rx) = channel(0);
+        let (first_tx, first_rx) = channel(1);
+        let (second_tx, second_rx) = channel(1);
+        let (third_tx, third_rx) = channel(1);
 
         registry.register_listener(0, first_tx);
         registry.register_listener(0, second_tx);
@@ -264,28 +252,20 @@ mod tests {
         drop(second_rx);
 
         let (fire, wait) = oneshot::channel();
-        let rt = Runtime::new().unwrap();
+        //let mut rt = Runtime::new().unwrap();
 
-        rt.spawn(
-            wait.and_then(move |_| {
-                // Record some events which should get coalesced
-                registry.record_event(0);
-                registry.broadcast();
+        tokio::spawn(async {
+            wait.await.expect("wait failed");
 
-                assert_eq!(1, registry.storage[0].recipients.lock().unwrap().len());
-                drop(registry);
+            registry.record_event(0);
+            registry.broadcast();
 
-                Ok(())
-            })
-            .map_err(|e| panic!("{}", e)),
-        );
+            assert_eq!(1, registry.storage[0].recipients.lock().unwrap().len());
+            drop(registry);
+        });
 
-        let results = rt
-            .block_on(futures::lazy(move || {
-                let _ = fire.send(());
-                third_rx.collect()
-            }))
-            .expect("failed to extract events");
+        let _ = fire.send(());
+        let results: Vec<()> = third_rx.collect().await;
 
         assert_eq!(1, results.len());
     }

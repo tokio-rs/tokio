@@ -1,22 +1,20 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use tokio;
-use tokio_signal;
-
-use futures::{Future, Stream};
+use futures_util::future;
+use futures_util::stream::StreamExt;
 
 /// how many signals to handle before exiting
 const STOP_AFTER: u64 = 10;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // tokio_signal provides a convenience builder for Ctrl+C
     // this even works cross-platform: linux and windows!
     //
     // `fn ctrl_c()` produces a `Future` of the actual stream-initialisation
-    // the `flatten_stream()` convenience method lazily defers that
-    // initialisation, allowing us to use it 'as if' it is already the
-    // stream we want, reducing boilerplate Future-handling.
-    let endless_stream = tokio_signal::ctrl_c().flatten_stream();
+    // so first we await until the signal is ready.
+    let endless_stream = tokio_signal::ctrl_c().await?;
     // don't keep going forever: convert the endless stream to a bounded one.
     let limited_stream = endless_stream.take(STOP_AFTER);
 
@@ -36,30 +34,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Stream::for_each is a powerful primitive provided by the Futures crate.
     // It turns a Stream into a Future that completes after all stream-items
     // have been completed, or the first time the closure returns an error
-    let future = limited_stream.for_each(|()| {
-        // Note how we manipulate the counter without any fancy synchronisation.
-        // The borrowchecker realises there can't be any conflicts, so the closure
-        // can just capture it.
-        counter += 1;
-        println!(
-            "Ctrl+C received {} times! {} more before exit",
-            counter,
-            STOP_AFTER - counter
-        );
+    let future = limited_stream
+        .map(|result| result.expect("failed to get event"))
+        .for_each(|()| {
+            // Note how we manipulate the counter without any fancy synchronisation.
+            // The borrowchecker realises there can't be any conflicts, so the closure
+            // can just capture it.
+            counter += 1;
+            println!(
+                "Ctrl+C received {} times! {} more before exit",
+                counter,
+                STOP_AFTER - counter
+            );
 
-        // return Ok-result to continue handling the stream
-        Ok(())
-    });
+            // return a result to continue handling the stream
+            future::ready(())
+        });
 
     // Up until now, we haven't really DONE anything, just prepared
-    // now it's time to actually schedule, and thus execute, the stream
-    // on our event loop
-    // FIXME(1000): windows uses a global driver task which doesn't terminate
-    // on its own, so if we use block_on_all our application will never exit
-    //tokio::runtime::current_thread::block_on_all(future)?;
-    tokio::runtime::current_thread::Runtime::new()
-        .expect("failed to start runtime on current thread")
-        .block_on(future)?;
+    // now it's time to actually the results!
+    future.await;
 
     println!("Stream ended, quiting the program.");
     Ok(())
