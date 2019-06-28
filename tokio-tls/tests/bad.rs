@@ -1,13 +1,12 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use cfg_if::cfg_if;
 use env_logger;
-use futures::Future;
 use native_tls::TlsConnector;
 use std::io::{self, Error};
 use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
-use tokio::runtime::Runtime;
 use tokio_tls;
 
 macro_rules! t {
@@ -83,46 +82,44 @@ cfg_if! {
     }
 }
 
-fn get_host(host: &'static str) -> Error {
+async fn get_host(host: &'static str) -> Error {
     drop(env_logger::try_init());
 
     let addr = format!("{}:443", host);
     let addr = t!(addr.to_socket_addrs()).next().unwrap();
 
-    let l = t!(Runtime::new());
-    let client = TcpStream::connect(&addr);
-    let data = client.and_then(move |socket| {
-        let builder = TlsConnector::builder();
-        let cx = builder.build().unwrap();
-        let cx = tokio_tls::TlsConnector::from(cx);
-        cx.connect(host, socket)
-            .map_err(|e| Error::new(io::ErrorKind::Other, e))
-    });
+    let socket = t!(TcpStream::connect(&addr).await);
+    let builder = TlsConnector::builder();
+    let cx = t!(builder.build());
+    let cx = tokio_tls::TlsConnector::from(cx);
+    let res = cx
+        .connect(host, socket)
+        .await
+        .map_err(|e| Error::new(io::ErrorKind::Other, e));
 
-    let res = l.block_on(data);
     assert!(res.is_err());
     res.err().unwrap()
 }
 
-#[test]
-fn expired() {
-    assert_expired_error(&get_host("expired.badssl.com"))
+#[tokio::test]
+async fn expired() {
+    assert_expired_error(&get_host("expired.badssl.com").await)
 }
 
 // TODO: the OSX builders on Travis apparently fail this tests spuriously?
 //       passes locally though? Seems... bad!
-#[test]
+#[tokio::test]
 #[cfg_attr(all(target_os = "macos", feature = "force-openssl"), ignore)]
-fn wrong_host() {
-    assert_wrong_host(&get_host("wrong.host.badssl.com"))
+async fn wrong_host() {
+    assert_wrong_host(&get_host("wrong.host.badssl.com").await)
 }
 
-#[test]
-fn self_signed() {
-    assert_self_signed(&get_host("self-signed.badssl.com"))
+#[tokio::test]
+async fn self_signed() {
+    assert_self_signed(&get_host("self-signed.badssl.com").await)
 }
 
-#[test]
-fn untrusted_root() {
-    assert_untrusted_root(&get_host("untrusted-root.badssl.com"))
+#[tokio::test]
+async fn untrusted_root() {
+    assert_untrusted_root(&get_host("untrusted-root.badssl.com").await)
 }

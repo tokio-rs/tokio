@@ -17,7 +17,7 @@ members = [
   "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
-  # "tokio-tls",
+  "tokio-tls",
   "tokio-udp",
   "tokio-uds",
 ]
