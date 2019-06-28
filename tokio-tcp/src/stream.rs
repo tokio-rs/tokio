@@ -1,10 +1,11 @@
+use crate::split::{split, TcpStreamReadHalf, TcpStreamWriteHalf};
 use bytes::{Buf, BufMut};
 use iovec::IoVec;
 use mio;
 use std::convert::TryFrom;
 use std::fmt;
 use std::future::Future;
-use std::io;
+use std::io::{self, Read, Write};
 use std::mem;
 use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
@@ -712,37 +713,45 @@ impl TcpStream {
         let msg = "`TcpStream::try_clone()` is deprecated because it doesn't work as intended";
         Err(io::Error::new(io::ErrorKind::Other, msg))
     }
-}
 
-impl TryFrom<TcpStream> for mio::net::TcpStream {
-    type Error = io::Error;
-
-    /// Consumes value, returning the mio I/O object.
+    /// Split a `TcpStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
     ///
-    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
-    /// resource deregistration that happens during the call.
-    fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
-        value.io.into_inner()
-    }
-}
-
-// ===== impl Read / Write =====
-
-impl AsyncRead for TcpStream {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split(self) -> (TcpStreamReadHalf, TcpStreamWriteHalf) {
+        split(self)
     }
 
-    fn poll_read(
-        mut self: Pin<&mut Self>,
+    // == Poll IO functions that takes `&self` ==
+    //
+    // They are not public because (taken from the doc of `PollEvented`):
+    //
+    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
+    // caller must ensure that there are at most two tasks that use a
+    // `PollEvented` instance concurrently. One for reading and one for writing.
+    // While violating this requirement is "safe" from a Rust memory model point
+    // of view, it will result in unexpected behavior in the form of lost
+    // notifications and tasks hanging.
+
+    pub(crate) fn poll_read_priv(
+        &self,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.io).poll_read(cx, buf)
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+
+        match self.io.get_ref().read(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
+            }
+            x => Poll::Ready(x),
+        }
     }
 
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
+    pub(crate) fn poll_read_buf_priv<B: BufMut>(
+        &self,
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
@@ -804,29 +813,25 @@ impl AsyncRead for TcpStream {
             Err(e) => Poll::Ready(Err(e)),
         }
     }
-}
 
-impl AsyncWrite for TcpStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
+    pub(crate) fn poll_write_priv(
+        &self,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.io).poll_write(cx, buf)
+        ready!(self.io.poll_write_ready(cx))?;
+
+        match self.io.get_ref().write(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_write_ready(cx)?;
+                Poll::Pending
+            }
+            x => Poll::Ready(x),
+        }
     }
 
-    #[inline]
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // tcp flush is a no-op
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
+    pub(crate) fn poll_write_buf_priv<B: Buf>(
+        &self,
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
@@ -853,6 +858,70 @@ impl AsyncWrite for TcpStream {
             }
             Err(e) => Poll::Ready(Err(e)),
         }
+    }
+}
+
+impl TryFrom<TcpStream> for mio::net::TcpStream {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
+        value.io.into_inner()
+    }
+}
+
+// ===== impl Read / Write =====
+
+impl AsyncRead for TcpStream {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        false
+    }
+
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_read_priv(cx, buf)
+    }
+
+    fn poll_read_buf<B: BufMut>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        self.poll_read_buf_priv(cx, buf)
+    }
+}
+
+impl AsyncWrite for TcpStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_priv(cx, buf)
+    }
+
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        // tcp flush is a no-op
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_buf_priv(cx, buf)
     }
 }
 
