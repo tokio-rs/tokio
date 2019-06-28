@@ -168,6 +168,23 @@ The crates included as part of Tokio are:
 [`tokio-udp`]: tokio-udp
 [`tokio-uds`]: tokio-uds
 
+## Related Projects
+
+In addition to the crates in this repository, the Tokio project also maintains
+several other libraries, including:
+
+* [`tracing`] (formerly `tokio-trace`): A framework for application-level
+  tracing and async-aware diagnostics.
+
+* [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
+  `tokio`.
+
+* [`bytes`]: Utilities for working with bytes, including efficient byte buffers.
+
+[`tracing`]: https://github.com/tokio-rs/tracing
+[`mio`]: https://github.com/tokio-rs/mio
+[`bytes`]: https://github.com/tokio-rs/bytes
+
 ## Supported Rust Versions
 
 Tokio is built against the latest stable, nightly, and beta Rust releases. The
