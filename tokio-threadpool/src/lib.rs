@@ -131,21 +131,30 @@
 
 pub mod park;
 
+macro_rules! ready {
+    ($e:expr) => {
+        match $e {
+            ::std::task::Poll::Ready(t) => t,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    };
+}
+
 mod blocking;
 mod builder;
 mod callback;
 mod config;
-mod notifier;
 mod pool;
 mod sender;
 mod shutdown;
 mod task;
 mod thread_pool;
+mod waker;
 mod worker;
 
 pub use crate::blocking::{blocking, BlockingError};
 pub use crate::builder::Builder;
 pub use crate::sender::Sender;
 pub use crate::shutdown::Shutdown;
-pub use crate::thread_pool::{SpawnHandle, ThreadPool};
+pub use crate::thread_pool::ThreadPool;
 pub use crate::worker::{Worker, WorkerId};

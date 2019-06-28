@@ -24,7 +24,9 @@ publish = false
 
 [dependencies]
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
-futures = "0.1.19"
+tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
+
+arc-waker = { git = "https://github.com/tokio-rs/async" }
 crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"
 crossbeam-utils = "0.6.4"
@@ -35,7 +37,6 @@ log = "0.4"
 
 [dev-dependencies]
 env_logger = "0.5"
-
-# For comparison benchmarks
-futures-cpupool = "0.1.7"
-threadpool = "1.7.1"
+async-util = { git = "https://github.com/tokio-rs/async" }
+tokio = { version = "0.2.0", path = "../tokio" }
+tokio-test = { version = "0.2.0", path = "../tokio-test" }

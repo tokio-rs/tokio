@@ -1,12 +1,13 @@
 use crate::pool::Pool;
 use crate::task::{BlockingState, Task};
-use futures::{Async, Poll};
+
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ptr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::Arc;
+use std::task::Poll;
 use std::thread;
 
 /// Manages the state around entering a blocking section and tasks that are
@@ -109,7 +110,10 @@ impl Blocking {
     ///
     /// The caller must ensure that `task` has not previously been queued to be
     /// notified when capacity becomes available.
-    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), crate::BlockingError> {
+    pub fn poll_blocking_capacity(
+        &self,
+        task: &Arc<Task>,
+    ) -> Poll<Result<(), crate::BlockingError>> {
         // This requires atomically claiming blocking capacity and if none is
         // available, queuing &task.
 
@@ -193,7 +197,7 @@ impl Blocking {
 
                 // The node was queued to be notified once capacity is made
                 // available.
-                Ok(Async::NotReady)
+                Poll::Pending
             }
             None => {
                 debug_assert!(curr.remaining_capacity() > 0);
@@ -208,7 +212,7 @@ impl Blocking {
                 }
 
                 // Capacity has been obtained
-                Ok(().into())
+                Poll::Ready(Ok(()))
             }
         }
     }

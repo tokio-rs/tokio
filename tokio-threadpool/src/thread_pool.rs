@@ -2,8 +2,8 @@ use crate::builder::Builder;
 use crate::pool::Pool;
 use crate::sender::Sender;
 use crate::shutdown::{Shutdown, ShutdownTrigger};
-use futures::sync::oneshot;
-use futures::{Future, Poll};
+
+use std::future::Future;
 use std::sync::Arc;
 
 /// Work-stealing based thread pool for executing futures.
@@ -72,10 +72,13 @@ impl ThreadPool {
     /// version that returns a `Result` instead of panicking.
     pub fn spawn<F>(&self, future: F)
     where
-        F: Future<Item = (), Error = ()> + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
     {
         self.sender().spawn(future).unwrap();
     }
+
+    /*
+     * TODO: Bring back
 
     /// Spawn a future on to the thread pool, return a future representing
     /// the produced value.
@@ -113,6 +116,8 @@ impl ThreadPool {
     {
         SpawnHandle(oneshot::spawn(future, self.sender()))
     }
+
+    */
 
     /// Return a reference to the sender handle
     ///
@@ -183,10 +188,14 @@ impl Drop for ThreadPool {
             drop(inner);
 
             // Wait until all worker threads terminate and the threadpool's resources clean up.
-            let _ = shutdown.wait();
+            let mut enter = tokio_executor::enter().unwrap();
+            enter.block_on(shutdown);
         }
     }
 }
+
+/*
+ * TODO: Bring back
 
 /// Handle returned from ThreadPool::spawn_handle.
 ///
@@ -205,3 +214,5 @@ impl<T, E> Future for SpawnHandle<T, E> {
         self.0.poll()
     }
 }
+
+*/

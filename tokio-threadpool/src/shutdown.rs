@@ -1,9 +1,13 @@
 use crate::task::Task;
 use crate::worker;
+
+use tokio_sync::task::AtomicWaker;
+
 use crossbeam_deque::Injector;
-use futures::task::AtomicTask;
-use futures::{Async, Future, Poll};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
 
 /// Future that resolves when the thread pool is shutdown.
 ///
@@ -27,7 +31,7 @@ pub struct Shutdown {
 #[derive(Debug)]
 struct Inner {
     /// The task to notify when the threadpool completes the shutdown process.
-    task: AtomicTask,
+    task: AtomicWaker,
     /// `true` if the threadpool has been shut down.
     completed: bool,
 }
@@ -38,20 +42,25 @@ impl Shutdown {
             inner: trigger.inner.clone(),
         }
     }
+
+    /// Wait for the shutdown to complete
+    pub fn wait(self) {
+        let mut enter = tokio_executor::enter().unwrap();
+        enter.block_on(self);
+    }
 }
 
 impl Future for Shutdown {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<(), ()> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let inner = self.inner.lock().unwrap();
 
         if !inner.completed {
-            inner.task.register();
-            Ok(Async::NotReady)
+            inner.task.register_by_ref(cx.waker());
+            Poll::Pending
         } else {
-            Ok(().into())
+            Poll::Ready(())
         }
     }
 }
@@ -74,7 +83,7 @@ impl ShutdownTrigger {
     ) -> ShutdownTrigger {
         ShutdownTrigger {
             inner: Arc::new(Mutex::new(Inner {
-                task: AtomicTask::new(),
+                task: AtomicWaker::new(),
                 completed: false,
             })),
             workers,
@@ -96,6 +105,6 @@ impl Drop for ShutdownTrigger {
         // Notify the task interested in shutdown.
         let mut inner = self.inner.lock().unwrap();
         inner.completed = true;
-        inner.task.notify();
+        inner.task.wake();
     }
 }

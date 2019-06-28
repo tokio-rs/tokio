@@ -1,23 +1,21 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use futures::future::lazy;
-use futures::{Async, Future, Poll, Sink, Stream};
-use std::cell::Cell;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::*;
-use std::sync::{mpsc, Arc};
-use std::time::Duration;
 use tokio_executor::park::{Park, Unpark};
+use tokio_test::assert_pending;
 use tokio_threadpool::park::{DefaultPark, DefaultUnpark};
 use tokio_threadpool::*;
 
-thread_local!(static FOO: Cell<u32> = Cell::new(0));
+use std::cell::Cell;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::*;
+use std::sync::{mpsc, Arc};
+use std::task::{Context, Poll, Waker};
+use std::time::Duration;
 
-fn ignore_results<F: Future + Send + 'static>(
-    f: F,
-) -> Box<dyn Future<Item = (), Error = ()> + Send> {
-    Box::new(f.map(|_| ()).map_err(|_| ()))
-}
+thread_local!(static FOO: Cell<u32> = Cell::new(0));
 
 #[test]
 fn natural_shutdown_simple_futures() {
@@ -47,26 +45,24 @@ fn natural_shutdown_simple_futures() {
 
             let a = {
                 let (t, rx) = mpsc::channel();
-                tx.spawn(lazy(move || {
+                tx.spawn(async move {
                     // Makes sure this runs on a worker thread
                     FOO.with(|f| assert_eq!(f.get(), 0));
 
                     t.send("one").unwrap();
-                    Ok(())
-                }))
+                })
                 .unwrap();
                 rx
             };
 
             let b = {
                 let (t, rx) = mpsc::channel();
-                tx.spawn(lazy(move || {
+                tx.spawn(async move {
                     // Makes sure this runs on a worker thread
                     FOO.with(|f| assert_eq!(f.get(), 0));
 
                     t.send("two").unwrap();
-                    Ok(())
-                }))
+                })
                 .unwrap();
                 rx
             };
@@ -77,7 +73,7 @@ fn natural_shutdown_simple_futures() {
             assert_eq!("two", b.recv().unwrap());
 
             // Wait for the pool to shutdown
-            pool.shutdown().wait().unwrap();
+            pool.shutdown().wait();
 
             // Assert that at least one thread started
             let num_inc = num_inc.load(Relaxed);
@@ -102,11 +98,10 @@ fn force_shutdown_drops_futures() {
         struct Never(Arc<AtomicUsize>);
 
         impl Future for Never {
-            type Item = ();
-            type Error = ();
+            type Output = ();
 
-            fn poll(&mut self) -> Poll<(), ()> {
-                Ok(Async::NotReady)
+            fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+                Poll::Pending
             }
         }
 
@@ -131,7 +126,7 @@ fn force_shutdown_drops_futures() {
         tx.spawn(Never(num_drop.clone())).unwrap();
 
         // Wait for the pool to shutdown
-        pool.shutdown_now().wait().unwrap();
+        pool.shutdown_now().wait();
 
         // Assert that only a single thread was spawned.
         let a = num_inc.load(Relaxed);
@@ -159,11 +154,10 @@ fn drop_threadpool_drops_futures() {
         struct Never(Arc<AtomicUsize>);
 
         impl Future for Never {
-            type Item = ();
-            type Error = ();
+            type Output = ();
 
-            fn poll(&mut self) -> Poll<(), ()> {
-                Ok(Async::NotReady)
+            fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+                Poll::Pending
             }
         }
 
@@ -219,15 +213,14 @@ fn many_oneshot_futures() {
 
         for _ in 0..NUM {
             let cnt = cnt.clone();
-            tx.spawn(lazy(move || {
+            tx.spawn(async move {
                 cnt.fetch_add(1, Relaxed);
-                Ok(())
-            }))
+            })
             .unwrap();
         }
 
         // Wait for the pool to shutdown
-        pool.shutdown().wait().unwrap();
+        pool.shutdown().wait();
 
         let num = cnt.load(Relaxed);
         assert_eq!(num, NUM);
@@ -236,7 +229,7 @@ fn many_oneshot_futures() {
 
 #[test]
 fn many_multishot_futures() {
-    use futures::sync::mpsc;
+    use tokio::sync::mpsc;
 
     const CHAIN: usize = 200;
     const CYCLES: usize = 5;
@@ -255,57 +248,61 @@ fn many_multishot_futures() {
             let (start_tx, mut chain_rx) = mpsc::channel(10);
 
             for _ in 0..CHAIN {
-                let (next_tx, next_rx) = mpsc::channel(10);
-
-                let rx = chain_rx.map_err(|e| panic!("{:?}", e));
+                let (mut next_tx, next_rx) = mpsc::channel(10);
 
                 // Forward all the messages
                 pool_tx
-                    .spawn(
-                        next_tx
-                            .send_all(rx)
-                            .map(|_| ())
-                            .map_err(|e| panic!("{:?}", e)),
-                    )
+                    .spawn(async move {
+                        while let Some(v) = chain_rx.recv().await {
+                            next_tx.send(v).await.unwrap();
+                        }
+                    })
                     .unwrap();
 
                 chain_rx = next_rx;
             }
 
             // This final task cycles if needed
-            let (final_tx, final_rx) = mpsc::channel(10);
-            let cycle_tx = start_tx.clone();
+            let (mut final_tx, final_rx) = mpsc::channel(10);
+            let mut cycle_tx = start_tx.clone();
             let mut rem = CYCLES;
 
-            let task = chain_rx.take(CYCLES as u64).for_each(move |msg| {
-                rem -= 1;
-                let send = if rem == 0 {
-                    final_tx.clone().send(msg)
-                } else {
-                    cycle_tx.clone().send(msg)
-                };
+            pool_tx
+                .spawn(async move {
+                    for _ in 0..CYCLES {
+                        let msg = chain_rx.recv().await.unwrap();
 
-                send.then(|res| {
-                    res.unwrap();
-                    Ok(())
+                        rem -= 1;
+
+                        if rem == 0 {
+                            final_tx.send(msg).await.unwrap();
+                        } else {
+                            cycle_tx.send(msg).await.unwrap();
+                        }
+                    }
                 })
-            });
-            pool_tx.spawn(ignore_results(task)).unwrap();
+                .unwrap();
 
             start_txs.push(start_tx);
             final_rxs.push(final_rx);
         }
 
-        for start_tx in start_txs {
-            start_tx.send("ping").wait().unwrap();
-        }
+        {
+            let mut e = tokio_executor::enter().unwrap();
 
-        for final_rx in final_rxs {
-            final_rx.wait().next().unwrap().unwrap();
+            e.block_on(async move {
+                for mut start_tx in start_txs {
+                    start_tx.send("ping").await.unwrap();
+                }
+
+                for mut final_rx in final_rxs {
+                    final_rx.recv().await.unwrap();
+                }
+            });
         }
 
         // Shutdown the pool
-        pool.shutdown().wait().unwrap();
+        pool.shutdown().wait();
     }
 }
 
@@ -316,30 +313,27 @@ fn global_executor_is_configured() {
 
     let (signal_tx, signal_rx) = mpsc::channel();
 
-    tx.spawn(lazy(move || {
-        tokio_executor::spawn(lazy(move || {
+    tx.spawn(async move {
+        tokio_executor::spawn(async move {
             signal_tx.send(()).unwrap();
-            Ok(())
-        }));
-
-        Ok(())
-    }))
+        });
+    })
     .unwrap();
 
     signal_rx.recv().unwrap();
 
-    pool.shutdown().wait().unwrap();
+    pool.shutdown().wait();
 }
 
 #[test]
 fn new_threadpool_is_idle() {
     let pool = ThreadPool::new();
-    pool.shutdown_on_idle().wait().unwrap();
+    pool.shutdown_on_idle().wait();
 }
 
 #[test]
 fn busy_threadpool_is_not_idle() {
-    use futures::sync::oneshot;
+    use tokio_sync::oneshot;
 
     // let pool = ThreadPool::new();
     let pool = Builder::new().pool_size(4).max_blocking(2).build();
@@ -347,26 +341,31 @@ fn busy_threadpool_is_not_idle() {
 
     let (term_tx, term_rx) = oneshot::channel();
 
-    tx.spawn(term_rx.then(|_| Ok(()))).unwrap();
+    tx.spawn(async move {
+        term_rx.await.unwrap();
+    })
+    .unwrap();
 
     let mut idle = pool.shutdown_on_idle();
 
     struct IdleFut<'a>(&'a mut Shutdown);
 
     impl<'a> Future for IdleFut<'a> {
-        type Item = ();
-        type Error = ();
-        fn poll(&mut self) -> Poll<(), ()> {
-            assert!(self.0.poll().unwrap().is_not_ready());
-            Ok(Async::Ready(()))
+        type Output = ();
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            assert_pending!(Pin::new(&mut self.as_mut().0).poll(cx));
+            Poll::Ready(())
         }
     }
 
-    IdleFut(&mut idle).wait().unwrap();
+    let idle_fut = IdleFut(&mut idle);
+    tokio_executor::enter().unwrap().block_on(idle_fut);
 
     term_tx.send(()).unwrap();
 
-    idle.wait().unwrap();
+    let idle_fut = IdleFut(&mut idle);
+    tokio_executor::enter().unwrap().block_on(idle_fut);
 }
 
 #[test]
@@ -377,10 +376,9 @@ fn panic_in_task() {
     struct Boom;
 
     impl Future for Boom {
-        type Item = ();
-        type Error = ();
+        type Output = ();
 
-        fn poll(&mut self) -> Poll<(), ()> {
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
             panic!();
         }
     }
@@ -393,7 +391,7 @@ fn panic_in_task() {
 
     tx.spawn(Boom).unwrap();
 
-    pool.shutdown_on_idle().wait().unwrap();
+    pool.shutdown_on_idle().wait();
 }
 
 #[test]
@@ -407,15 +405,15 @@ fn count_panics() {
         })
         .build();
     // Spawn a future that will panic.
-    pool.spawn(lazy(|| -> Result<(), ()> { panic!() }));
-    pool.shutdown_on_idle().wait().unwrap();
+    pool.spawn(async { panic!() });
+    pool.shutdown_on_idle().wait();
     let counter = counter.load(Relaxed);
     assert_eq!(counter, 1);
 }
 
 #[test]
 fn multi_threadpool() {
-    use futures::sync::oneshot;
+    use tokio_sync::oneshot;
 
     let pool1 = ThreadPool::new();
     let pool2 = ThreadPool::new();
@@ -423,35 +421,21 @@ fn multi_threadpool() {
     let (tx, rx) = oneshot::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
-    pool2.spawn({
-        rx.and_then(move |_| {
-            done_tx.send(()).unwrap();
-            Ok(())
-        })
-        .map_err(|e| panic!("err={:?}", e))
+    pool2.spawn(async move {
+        rx.await.unwrap();
+        done_tx.send(()).unwrap();
     });
 
-    pool1.spawn(lazy(move || {
+    pool1.spawn(async move {
         tx.send(()).unwrap();
-        Ok(())
-    }));
+    });
 
     done_rx.recv().unwrap();
 }
 
 #[test]
 fn eagerly_drops_futures() {
-    use futures::future::{empty, lazy, Future};
-    use futures::task;
     use std::sync::mpsc;
-
-    struct NotifyOnDrop(mpsc::Sender<()>);
-
-    impl Drop for NotifyOnDrop {
-        fn drop(&mut self) {
-            self.0.send(()).unwrap();
-        }
-    }
 
     struct MyPark {
         inner: DefaultPark,
@@ -497,9 +481,6 @@ fn eagerly_drops_futures() {
     let (park_tx, park_rx) = mpsc::sync_channel(0);
     let (unpark_tx, unpark_rx) = mpsc::sync_channel(0);
 
-    // Get the signal that the handler dropped.
-    let notify_on_drop = NotifyOnDrop(drop_tx);
-
     let pool = tokio_threadpool::Builder::new()
         .custom_park(move |_| MyPark {
             inner: DefaultPark::new(),
@@ -508,29 +489,33 @@ fn eagerly_drops_futures() {
         })
         .build();
 
-    pool.spawn(lazy(move || {
-        // Get a handle to the current task.
-        let task = task::current();
+    struct MyTask {
+        task_tx: Option<mpsc::Sender<Waker>>,
+        drop_tx: mpsc::Sender<()>,
+    }
 
-        // Send it to the main thread to hold on to.
-        task_tx.send(task).unwrap();
+    impl Future for MyTask {
+        type Output = ();
 
-        // This future will never resolve, it is only used to hold on to thee
-        // `notify_on_drop` handle.
-        empty::<(), ()>().then(move |_| {
-            // This code path should never be reached.
-            if true {
-                panic!()
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            if let Some(tx) = self.get_mut().task_tx.take() {
+                tx.send(cx.waker().clone()).unwrap();
             }
 
-            // Explicitly drop `notify_on_drop` here, this is mostly to ensure
-            // that the `notify_on_drop` handle gets moved into the task. It
-            // will actually get dropped when the runtime is dropped.
-            drop(notify_on_drop);
+            Poll::Pending
+        }
+    }
 
-            Ok(())
-        })
-    }));
+    impl Drop for MyTask {
+        fn drop(&mut self) {
+            self.drop_tx.send(()).unwrap();
+        }
+    }
+
+    pool.spawn(MyTask {
+        task_tx: Some(task_tx),
+        drop_tx,
+    });
 
     // Wait until we get the task handle.
     let task = task_rx.recv().unwrap();

@@ -6,21 +6,22 @@ pub(crate) use self::entry::WorkerEntry as Entry;
 pub(crate) use self::stack::Stack;
 pub(crate) use self::state::{Lifecycle, State};
 
-use crate::notifier::Notifier;
 use crate::pool::{self, BackupId, Pool};
 use crate::sender::Sender;
 use crate::shutdown::ShutdownTrigger;
 use crate::task::{self, CanBlock, Task};
-use futures::{Async, Poll};
+
+use tokio_executor;
+
 use log::trace;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
+use std::task::Poll;
 use std::thread;
 use std::time::Duration;
-use tokio_executor;
 
 /// Thread worker
 ///
@@ -148,7 +149,7 @@ impl Worker {
     }
 
     /// Transition the current worker to a blocking worker
-    pub(crate) fn transition_to_blocking(&self) -> Poll<(), crate::BlockingError> {
+    pub(crate) fn transition_to_blocking(&self) -> Poll<Result<(), crate::BlockingError>> {
         use self::CanBlock::*;
 
         // If we get this far, then `current_task` has been set.
@@ -161,7 +162,7 @@ impl Worker {
 
             // The task has already requested capacity to block, but there is
             // none yet available.
-            NoCapacity => return Ok(Async::NotReady),
+            NoCapacity => return Poll::Pending,
 
             // The task has yet to ask for capacity
             CanRequest => {
@@ -169,12 +170,12 @@ impl Worker {
                 // is available, register the task to be notified once capacity
                 // becomes available.
                 match self.pool.poll_blocking_capacity(task_ref)? {
-                    Async::Ready(()) => {
+                    Poll::Ready(()) => {
                         self.current_task.set_can_block(Allocated);
                     }
-                    Async::NotReady => {
+                    Poll::Pending => {
                         self.current_task.set_can_block(NoCapacity);
-                        return Ok(Async::NotReady);
+                        return Poll::Pending;
                     }
                 }
             }
@@ -187,7 +188,7 @@ impl Worker {
         if self.is_blocking.get() {
             // The thread is already in blocking mode, so there is nothing else
             // to do. Return `Ready` and allow the caller to block the thread.
-            return Ok(().into());
+            return Poll::Ready(Ok(()));
         }
 
         trace!("transition to blocking state");
@@ -200,7 +201,7 @@ impl Worker {
         // Track that the thread has now fully entered the blocking state.
         self.is_blocking.set(true);
 
-        Ok(().into())
+        Poll::Ready(Ok(()))
     }
 
     /// Transition from blocking
@@ -223,11 +224,6 @@ impl Worker {
         const MAX_SPINS: usize = 3;
         const LIGHT_SLEEP_INTERVAL: usize = 32;
 
-        // Get the notifier.
-        let notify = Arc::new(Notifier {
-            pool: self.pool.clone(),
-        });
-
         let mut first = true;
         let mut spin_cnt = 0;
         let mut tick = 0;
@@ -236,7 +232,7 @@ impl Worker {
             first = false;
 
             // Run the next available task
-            if self.try_run_task(&notify) {
+            if self.try_run_task(&self.pool) {
                 if self.is_blocking.get() {
                     // Exit out of the run state
                     return;
@@ -291,12 +287,12 @@ impl Worker {
     ///
     /// Returns `true` if work was found.
     #[inline]
-    fn try_run_task(&self, notify: &Arc<Notifier>) -> bool {
-        if self.try_run_owned_task(notify) {
+    fn try_run_task(&self, pool: &Arc<Pool>) -> bool {
+        if self.try_run_owned_task(pool) {
             return true;
         }
 
-        self.try_steal_task(notify)
+        self.try_steal_task(pool)
     }
 
     /// Checks the worker's current state, updating it as needed.
@@ -381,11 +377,11 @@ impl Worker {
     /// Runs the next task on this worker's queue.
     ///
     /// Returns `true` if work was found.
-    fn try_run_owned_task(&self, notify: &Arc<Notifier>) -> bool {
+    fn try_run_owned_task(&self, pool: &Arc<Pool>) -> bool {
         // Poll the internal queue for a task to run
         match self.entry().pop_task() {
             Some(task) => {
-                self.run_task(task, notify);
+                self.run_task(task, pool);
                 true
             }
             None => false,
@@ -395,7 +391,7 @@ impl Worker {
     /// Tries to steal a task from another worker.
     ///
     /// Returns `true` if work was found
-    fn try_steal_task(&self, notify: &Arc<Notifier>) -> bool {
+    fn try_steal_task(&self, pool: &Arc<Pool>) -> bool {
         use crossbeam_deque::Steal;
 
         debug_assert!(!self.is_blocking.get());
@@ -411,7 +407,7 @@ impl Worker {
                     Steal::Success(task) => {
                         trace!("stole task from another worker");
 
-                        self.run_task(task, notify);
+                        self.run_task(task, pool);
 
                         trace!(
                             "try_steal_task -- signal_work; self={}; from={}",
@@ -444,7 +440,7 @@ impl Worker {
         found_work
     }
 
-    fn run_task(&self, task: Arc<Task>, notify: &Arc<Notifier>) {
+    fn run_task(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         use crate::task::Run::*;
 
         // If this is the first time this task is being polled, register it so that we can keep
@@ -454,7 +450,7 @@ impl Worker {
             self.entry().register_task(&task);
         }
 
-        let run = self.run_task2(&task, notify);
+        let run = self.run_task2(&task, pool);
 
         // TODO: Try to claim back the worker state in case the backup thread
         // did not start up fast enough. This is a performance optimization.
@@ -528,7 +524,7 @@ impl Worker {
     ///
     /// Great care is needed to ensure that `current_task` is unset in this
     /// function.
-    fn run_task2(&self, task: &Arc<Task>, notify: &Arc<Notifier>) -> task::Run {
+    fn run_task2(&self, task: &Arc<Task>, pool: &Arc<Pool>) -> task::Run {
         struct Guard<'a> {
             worker: &'a Worker,
         }
@@ -562,7 +558,7 @@ impl Worker {
         // function returns, even if the return is caused by a panic.
         let _g = Guard { worker: self };
 
-        task.run(notify)
+        Task::run(task, pool)
     }
 
     /// Put the worker to sleep
