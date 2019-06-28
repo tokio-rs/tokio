@@ -64,7 +64,7 @@ fn notify_task_on_capacity() {
             poll_fn(move |_| {
                 blocking(|| {
                     thread::sleep(Duration::from_millis(100));
-                    let prev = rem.fetch_sub(1, Relaxed);
+                    let prev = rem.fetch_sub(1, SeqCst);
 
                     if prev == 1 {
                         tx.send(()).unwrap();
@@ -79,7 +79,7 @@ fn notify_task_on_capacity() {
 
     rx.recv().unwrap();
 
-    assert_eq!(0, rem.load(Relaxed));
+    assert_eq!(0, rem.load(SeqCst));
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
                 blocking(|| {
                     enter_tx.send(()).unwrap();
                     exit_rx.recv().unwrap();
-                    exited.store(true, Relaxed);
+                    exited.store(true, SeqCst);
                 })
             })
             .await
@@ -205,7 +205,7 @@ fn blocking_thread_does_not_take_over_shutdown_worker_thread() {
         poll_fn(move |_| {
             let res = blocking(|| {});
 
-            assert_eq!(res.is_ready(), exited.load(Relaxed));
+            assert_eq!(res.is_ready(), exited.load(SeqCst));
 
             try_tx.send(res.is_ready()).unwrap();
 
@@ -254,7 +254,7 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
 
                     let res = blocking(|| {
                         thread::sleep(Duration::from_millis(100));
-                        let prev = rem.fetch_sub(1, Relaxed);
+                        let prev = rem.fetch_sub(1, SeqCst);
 
                         if prev == 1 {
                             tx.send(()).unwrap();
@@ -271,7 +271,7 @@ fn blocking_one_time_gets_capacity_for_multiple_blocks() {
 
         rx.recv().unwrap();
 
-        assert_eq!(0, rem.load(Relaxed));
+        assert_eq!(0, rem.load(SeqCst));
     }
 }
 
@@ -293,10 +293,10 @@ fn shutdown() {
                 .pool_size(1)
                 .max_blocking(BLOCKING)
                 .after_start(move || {
-                    num_inc.fetch_add(1, Relaxed);
+                    num_inc.fetch_add(1, SeqCst);
                 })
                 .before_stop(move || {
-                    num_dec.fetch_add(1, Relaxed);
+                    num_dec.fetch_add(1, SeqCst);
                 })
                 .build()
         };
@@ -326,8 +326,8 @@ fn shutdown() {
         // Shutdown
         drop(pool);
 
-        assert_eq!(11, num_inc.load(Relaxed));
-        assert_eq!(11, num_dec.load(Relaxed));
+        assert_eq!(11, num_inc.load(SeqCst));
+        assert_eq!(11, num_dec.load(SeqCst));
     }
 }
 
@@ -368,7 +368,7 @@ fn hammer() {
                 let cnt_block = cnt_block.clone();
 
                 pool.spawn(async move {
-                    cnt_task.fetch_add(1, Relaxed);
+                    cnt_task.fetch_add(1, SeqCst);
 
                     poll_fn(move |_| {
                         blocking(|| {
@@ -386,7 +386,7 @@ fn hammer() {
                                 }
                             }
 
-                            cnt_block.fetch_add(1, Relaxed);
+                            cnt_block.fetch_add(1, SeqCst);
                         })
                         .map_err(|_| panic!())
                     })
@@ -398,8 +398,8 @@ fn hammer() {
             // Wait for the work to complete
             pool.shutdown_on_idle().wait();
 
-            assert_eq!(n, cnt_task.load(Relaxed));
-            assert_eq!(n, cnt_block.load(Relaxed));
+            assert_eq!(n, cnt_task.load(SeqCst));
+            assert_eq!(n, cnt_block.load(SeqCst));
         }
     }
 }
