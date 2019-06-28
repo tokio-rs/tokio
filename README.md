@@ -96,7 +96,7 @@ fn main() {
 }
 ```
 
-More examples can be found [here](tokio/examples).
+More examples can be found [here](tokio/examples_old).
 
 ## Getting Help
 
