@@ -28,6 +28,9 @@ use tokio_io::{AsyncRead, AsyncWrite};
 pub struct TcpStreamReadHalf(Arc<TcpStream>);
 
 /// Write half of a `TcpStream`.
+///
+/// Note that in the `AsyncWrite` implemenation of `TcpStreamWriteHalf`,
+/// `poll_shutdown` actually shuts down the TCP stream in the write direction.
 #[derive(Debug)]
 pub struct TcpStreamWriteHalf(Arc<TcpStream>);
 
