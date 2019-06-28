@@ -12,7 +12,7 @@ use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
-use tokio_trace_core as trace;
+use tracing_core as trace;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
