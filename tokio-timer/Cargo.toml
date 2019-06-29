@@ -39,4 +39,5 @@ futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
 rand = "0.6"
 tokio = { version = "0.2.0", path = "../tokio" }
 tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
+tokio-sync = { version = "0.2.0", path = "../tokio-sync", features = ["async-traits"] }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
