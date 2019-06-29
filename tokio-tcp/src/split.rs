@@ -65,7 +65,7 @@ impl TcpStreamReadHalf {
     pub fn reunite(self, other: TcpStreamWriteHalf) -> Result<TcpStream, ReuniteError> {
         if Arc::ptr_eq(&self.0, &other.0) {
             drop(other);
-            Ok(Arc::try_unwrap(self.0).unwrap())
+            Ok(Arc::try_unwrap(self.0).expect("tokio_tcp: try_unwrap failed in reunite"))
         } else {
             Err(ReuniteError(self, other))
         }
