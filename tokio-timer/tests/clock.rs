@@ -1,7 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use std::time::Instant;
-use tokio_executor;
 use tokio_timer::clock;
 use tokio_timer::clock::*;
 
@@ -39,9 +38,7 @@ fn execution_context() {
     let now = ConstNow(Instant::now());
     let clock = Clock::new_with_now(now);
 
-    let mut enter = tokio_executor::enter().unwrap();
-
-    with_default(&clock, &mut enter, |_| {
+    with_default(&clock, || {
         let a = Instant::now();
         let b = clock::now();
 
