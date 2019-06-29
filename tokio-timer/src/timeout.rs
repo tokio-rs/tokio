@@ -6,8 +6,6 @@
 
 use crate::clock::now;
 use crate::Delay;
-#[cfg(feature = "timeout-stream")]
-use futures_core::Stream;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -175,10 +173,10 @@ where
     }
 }
 
-#[cfg(feature = "timeout-stream")]
-impl<T> Stream for Timeout<T>
+#[cfg(feature = "async-traits")]
+impl<T> futures_core::Stream for Timeout<T>
 where
-    T: Stream,
+    T: futures_core::Stream,
 {
     type Item = Result<T::Item, Elapsed>;
 
@@ -202,8 +200,10 @@ where
             }
 
             // Now check the timer
-            ready!(self.map_unchecked_mut(|me| &mut me.delay).poll(cx));
+            ready!(self.as_mut().map_unchecked_mut(|me| &mut me.delay).poll(cx));
+
             // if delay was ready, timeout elapsed!
+            self.as_mut().get_unchecked_mut().delay.reset_timeout();
             Poll::Ready(Some(Err(Elapsed(()))))
         }
     }

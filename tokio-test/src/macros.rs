@@ -87,17 +87,3 @@ macro_rules! assert_ready_eq {
         assert_eq!(val, $expect, $($msg),*)
     };
 }
-
-/*
-/// Assert if the deadline has passed
-#[macro_export]
-macro_rules! assert_elapsed {
-    ($e:expr) => {
-        assert!($e.unwrap_err().is_elapsed());
-    };
-
-    ($e:expr, $($msg:expr),+) => {
-        assert!($e.unwrap_err().is_elapsed(), $msg);
-    };
-}
-*/
