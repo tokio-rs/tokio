@@ -2,8 +2,8 @@
 #![cfg(feature = "async-traits")]
 
 use tokio_sync::mpsc;
-use tokio_test::{clock, assert_pending, assert_ready_eq};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready_eq, clock};
 use tokio_timer::throttle::Throttle;
 
 use futures_core::Stream;
@@ -13,7 +13,7 @@ macro_rules! poll {
     ($task:ident, $stream:ident) => {{
         use std::pin::Pin;
         $task.enter(|cx| Pin::new(&mut $stream).poll_next(cx))
-    }}
+    }};
 }
 
 #[test]

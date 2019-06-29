@@ -1,8 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio_test::{clock, assert_ready, assert_pending};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready, clock};
 use tokio_timer::timer::Handle;
 use tokio_timer::Delay;
 

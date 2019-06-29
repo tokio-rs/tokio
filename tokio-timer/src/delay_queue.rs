@@ -348,7 +348,10 @@ impl<T> DelayQueue<T> {
     }
 
     /// TODO: Dox... also is the fn signature correct?
-    pub fn poll_next(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Result<Expired<T>, Error>>> {
+    pub fn poll_next(
+        &mut self,
+        cx: &mut task::Context<'_>,
+    ) -> Poll<Option<Result<Expired<T>, Error>>> {
         let item = ready!(self.poll_idx(cx));
         Poll::Ready(item.map(|result| {
             result.map(|idx| {

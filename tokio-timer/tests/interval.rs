@@ -1,8 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio_test::{clock, assert_ready_eq, assert_pending};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready_eq, clock};
 use tokio_timer::*;
 
 use std::time::Duration;
@@ -24,7 +24,9 @@ fn usage() {
         let mut int = Interval::new(start, ms(300));
 
         macro_rules! poll {
-            () => { task.enter(|cx| int.poll_next(cx)) }
+            () => {
+                task.enter(|cx| int.poll_next(cx))
+            };
         }
 
         assert_ready_eq!(poll!(), Some(start));

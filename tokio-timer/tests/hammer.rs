@@ -190,7 +190,10 @@ fn hammer_reset() {
                     impl Future for Select {
                         type Output = Delay;
 
-                        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                        fn poll(
+                            mut self: Pin<&mut Self>,
+                            cx: &mut Context<'_>,
+                        ) -> Poll<Self::Output> {
                             let res = Pin::new(self.a.as_mut().unwrap()).poll(cx);
 
                             if res.is_ready() {

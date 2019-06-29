@@ -1,7 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use tokio_test::{clock, assert_ready, assert_pending, assert_ok};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_ok, assert_pending, assert_ready, clock};
 use tokio_timer::*;
 
 use std::time::Duration;
@@ -9,7 +9,7 @@ use std::time::Duration;
 macro_rules! poll {
     ($task:ident, $queue:ident) => {
         $task.enter(|cx| $queue.poll_next(cx))
-    }
+    };
 }
 
 macro_rules! assert_ready_ok {
@@ -18,7 +18,7 @@ macro_rules! assert_ready_ok {
             Some(v) => v,
             None => panic!("None"),
         })
-    }}
+    }};
 }
 
 #[test]

@@ -2,8 +2,10 @@
 #![feature(async_await)]
 
 use tokio_sync::oneshot;
-use tokio_test::{clock, assert_ready, assert_ready_ok, assert_ready_err, assert_pending, assert_err};
 use tokio_test::task::MockTask;
+use tokio_test::{
+    assert_err, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, clock,
+};
 use tokio_timer::*;
 
 use std::time::Duration;
@@ -14,7 +16,7 @@ fn simultaneous_deadline_future_completion() {
 
     clock::mock(|clock| {
         // Create a future that is immediately ready
-        let fut = Box::pin(Timeout::new_at(async { }, clock.now()));
+        let fut = Box::pin(Timeout::new_at(async {}, clock.now()));
 
         // Ready!
         assert_ready_ok!(t.poll(fut));
@@ -90,7 +92,7 @@ struct Empty;
 
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Poll, Context};
+use std::task::{Context, Poll};
 
 impl Future for Empty {
     type Output = ();
@@ -132,7 +134,7 @@ macro_rules! poll {
     ($task:ident, $stream:ident) => {{
         use futures_core::Stream;
         $task.enter(|cx| Pin::new(&mut $stream).poll_next(cx))
-    }}
+    }};
 }
 
 #[test]
