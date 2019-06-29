@@ -65,6 +65,10 @@ impl TcpStreamReadHalf {
     pub fn reunite(self, other: TcpStreamWriteHalf) -> Result<TcpStream, ReuniteError> {
         if Arc::ptr_eq(&self.0, &other.0) {
             drop(other);
+            // Only two instances of the `Arc` are ever created, one for the
+            // reader and one for the writer, and those `Arc`s are never exposed
+            // externally. And so when we drop one here, the other one must be
+            // the only remaining one.
             Ok(Arc::try_unwrap(self.0).expect("tokio_tcp: try_unwrap failed in reunite"))
         } else {
             Err(ReuniteError(self, other))
