@@ -19,5 +19,5 @@ members = [
   "tokio-tcp",
   # "tokio-tls",
   "tokio-udp",
-  # "tokio-uds",
+  "tokio-uds",
 ]

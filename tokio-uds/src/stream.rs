@@ -1,17 +1,19 @@
 use crate::ucred::{self, UCred};
 use bytes::{Buf, BufMut};
-use futures::{Async, Future, Poll};
-use iovec::{self, IoVec};
-use libc;
+use futures_core::future::FusedFuture;
+use iovec::IoVec;
 use mio::Ready;
 use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::future::Future;
+use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_reactor::{Handle, PollEvented};
 
@@ -27,15 +29,9 @@ pub struct UnixStream {
 /// Future returned by `UnixStream::connect` which will resolve to a
 /// `UnixStream` when the stream is connected.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless polled"]
 pub struct ConnectFuture {
-    inner: State,
-}
-
-#[derive(Debug)]
-enum State {
-    Waiting(UnixStream),
-    Error(io::Error),
-    Empty,
+    stream: Option<io::Result<UnixStream>>,
 }
 
 impl UnixStream {
@@ -49,13 +45,7 @@ impl UnixStream {
         P: AsRef<Path>,
     {
         let res = mio_uds::UnixStream::connect(path).map(UnixStream::new);
-
-        let inner = match res {
-            Ok(stream) => State::Waiting(stream),
-            Err(e) => State::Error(e),
-        };
-
-        ConnectFuture { inner }
+        ConnectFuture { stream: Some(res) }
     }
 
     /// Consumes a `UnixStream` in the standard library and returns a
@@ -89,13 +79,13 @@ impl UnixStream {
     }
 
     /// Test whether this socket is ready to be read or not.
-    pub fn poll_read_ready(&self, ready: Ready) -> Poll<Ready, io::Error> {
-        self.io.poll_read_ready(ready)
+    pub fn poll_read_ready(&self, cx: &mut Context<'_>, ready: Ready) -> Poll<io::Result<Ready>> {
+        self.io.poll_read_ready(cx, ready)
     }
 
     /// Test whether this socket is ready to be written to or not.
-    pub fn poll_write_ready(&self) -> Poll<Ready, io::Error> {
-        self.io.poll_write_ready()
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+        self.io.poll_write_ready(cx)
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -140,109 +130,128 @@ impl TryFrom<UnixStream> for mio_uds::UnixStream {
     }
 }
 
-impl Read for UnixStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io.read(buf)
-    }
-}
-
-impl Write for UnixStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.io.write(buf)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.io.flush()
-    }
-}
-
 impl AsyncRead for UnixStream {
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
         false
     }
 
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        <&UnixStream>::read_buf(&mut &*self, buf)
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.io).poll_read(cx, buf)
+    }
+
+    fn poll_read_buf<B: BufMut>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+
+        let r = unsafe {
+            // The `IoVec` type can't have a 0-length size, so we create a bunch
+            // of dummy versions on the stack with 1 length which we'll quickly
+            // overwrite.
+            let b1: &mut [u8] = &mut [0];
+            let b2: &mut [u8] = &mut [0];
+            let b3: &mut [u8] = &mut [0];
+            let b4: &mut [u8] = &mut [0];
+            let b5: &mut [u8] = &mut [0];
+            let b6: &mut [u8] = &mut [0];
+            let b7: &mut [u8] = &mut [0];
+            let b8: &mut [u8] = &mut [0];
+            let b9: &mut [u8] = &mut [0];
+            let b10: &mut [u8] = &mut [0];
+            let b11: &mut [u8] = &mut [0];
+            let b12: &mut [u8] = &mut [0];
+            let b13: &mut [u8] = &mut [0];
+            let b14: &mut [u8] = &mut [0];
+            let b15: &mut [u8] = &mut [0];
+            let b16: &mut [u8] = &mut [0];
+            let mut bufs: [&mut IoVec; 16] = [
+                b1.into(),
+                b2.into(),
+                b3.into(),
+                b4.into(),
+                b5.into(),
+                b6.into(),
+                b7.into(),
+                b8.into(),
+                b9.into(),
+                b10.into(),
+                b11.into(),
+                b12.into(),
+                b13.into(),
+                b14.into(),
+                b15.into(),
+                b16.into(),
+            ];
+            let n = buf.bytes_vec_mut(&mut bufs);
+            self.io.get_ref().read_bufs(&mut bufs[..n])
+        };
+
+        match r {
+            Ok(n) => {
+                unsafe {
+                    buf.advance_mut(n);
+                }
+                Poll::Ready(Ok(n))
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
+            }
+            Err(e) => Poll::Ready(Err(e)),
+        }
     }
 }
 
 impl AsyncWrite for UnixStream {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        <&UnixStream>::shutdown(&mut &*self)
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.io).poll_write(cx, buf)
     }
 
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        <&UnixStream>::write_buf(&mut &*self, buf)
-    }
-}
-
-impl<'a> Read for &'a UnixStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&self.io).read(buf)
-    }
-}
-
-impl<'a> Write for &'a UnixStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&self.io).write(buf)
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        (&self.io).flush()
-    }
-}
-
-impl<'a> AsyncRead for &'a UnixStream {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <UnixStream>::poll_read_ready(self, Ready::readable())? {
-            return Ok(Async::NotReady);
-        }
-        unsafe {
-            let r = read_ready(buf, self.as_raw_fd());
-            if r == -1 {
-                let e = io::Error::last_os_error();
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.clear_read_ready(Ready::readable())?;
-                    Ok(Async::NotReady)
-                } else {
-                    Err(e)
-                }
-            } else {
-                let r = r as usize;
-                buf.advance_mut(r);
-                Ok(r.into())
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.io.poll_write_ready(cx))?;
+
+        let r = {
+            // The `IoVec` type can't have a zero-length size, so create a dummy
+            // version from a 1-length slice which we'll overwrite with the
+            // `bytes_vec` method.
+            static DUMMY: &[u8] = &[0];
+            let iovec = <&IoVec>::from(DUMMY);
+            let mut bufs = [iovec; 64];
+            let n = buf.bytes_vec(&mut bufs);
+            self.io.get_ref().write_bufs(&bufs[..n])
+        };
+        match r {
+            Ok(n) => {
+                buf.advance(n);
+                Poll::Ready(Ok(n))
             }
-        }
-    }
-}
-
-impl<'a> AsyncWrite for &'a UnixStream {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        Ok(().into())
-    }
-
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <UnixStream>::poll_write_ready(self)? {
-            return Ok(Async::NotReady);
-        }
-        unsafe {
-            let r = write_ready(buf, self.as_raw_fd());
-            if r == -1 {
-                let e = io::Error::last_os_error();
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.clear_write_ready()?;
-                    Ok(Async::NotReady)
-                } else {
-                    Err(e)
-                }
-            } else {
-                let r = r as usize;
-                buf.advance(r);
-                Ok(r.into())
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_write_ready(cx)?;
+                Poll::Pending
             }
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
@@ -260,106 +269,33 @@ impl AsRawFd for UnixStream {
 }
 
 impl Future for ConnectFuture {
-    type Item = UnixStream;
-    type Error = io::Error;
+    type Output = io::Result<UnixStream>;
 
-    fn poll(&mut self) -> Poll<UnixStream, io::Error> {
-        use std::mem;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let stream = self
+            .stream
+            .take()
+            .expect("ConnectFuture polled after completion")?;
 
-        match self.inner {
-            State::Waiting(ref mut stream) => {
-                if let Async::NotReady = stream.io.poll_write_ready()? {
-                    return Ok(Async::NotReady);
-                }
-
-                if let Some(e) = stream.io.get_ref().take_error()? {
-                    return Err(e);
-                }
+        match stream.io.poll_write_ready(cx) {
+            Poll::Pending => {
+                self.stream = Some(Ok(stream));
+                return Poll::Pending;
             }
-            State::Error(_) => {
-                let e = match mem::replace(&mut self.inner, State::Empty) {
-                    State::Error(e) => e,
-                    _ => unreachable!(),
-                };
-
-                return Err(e);
-            }
-            State::Empty => panic!("can't poll stream twice"),
+            Poll::Ready(Err(e)) => return Err(e).into(),
+            _ => (),
         }
 
-        match mem::replace(&mut self.inner, State::Empty) {
-            State::Waiting(stream) => Ok(Async::Ready(stream)),
-            _ => unreachable!(),
+        if let Some(e) = stream.io.get_ref().take_error()? {
+            return Err(e).into();
         }
+
+        Ok(stream).into()
     }
 }
 
-unsafe fn read_ready<B: BufMut>(buf: &mut B, raw_fd: RawFd) -> isize {
-    // The `IoVec` type can't have a 0-length size, so we create a bunch
-    // of dummy versions on the stack with 1 length which we'll quickly
-    // overwrite.
-    let b1: &mut [u8] = &mut [0];
-    let b2: &mut [u8] = &mut [0];
-    let b3: &mut [u8] = &mut [0];
-    let b4: &mut [u8] = &mut [0];
-    let b5: &mut [u8] = &mut [0];
-    let b6: &mut [u8] = &mut [0];
-    let b7: &mut [u8] = &mut [0];
-    let b8: &mut [u8] = &mut [0];
-    let b9: &mut [u8] = &mut [0];
-    let b10: &mut [u8] = &mut [0];
-    let b11: &mut [u8] = &mut [0];
-    let b12: &mut [u8] = &mut [0];
-    let b13: &mut [u8] = &mut [0];
-    let b14: &mut [u8] = &mut [0];
-    let b15: &mut [u8] = &mut [0];
-    let b16: &mut [u8] = &mut [0];
-    let mut bufs: [&mut IoVec; 16] = [
-        b1.into(),
-        b2.into(),
-        b3.into(),
-        b4.into(),
-        b5.into(),
-        b6.into(),
-        b7.into(),
-        b8.into(),
-        b9.into(),
-        b10.into(),
-        b11.into(),
-        b12.into(),
-        b13.into(),
-        b14.into(),
-        b15.into(),
-        b16.into(),
-    ];
-
-    let n = buf.bytes_vec_mut(&mut bufs);
-    read_ready_vecs(&mut bufs[..n], raw_fd)
-}
-
-unsafe fn read_ready_vecs(bufs: &mut [&mut IoVec], raw_fd: RawFd) -> isize {
-    let iovecs = iovec::unix::as_os_slice_mut(bufs);
-
-    libc::readv(raw_fd, iovecs.as_ptr(), iovecs.len() as i32)
-}
-
-unsafe fn write_ready<B: Buf>(buf: &mut B, raw_fd: RawFd) -> isize {
-    // The `IoVec` type can't have a zero-length size, so create a dummy
-    // version from a 1-length slice which we'll overwrite with the
-    // `bytes_vec` method.
-    static DUMMY: &[u8] = &[0];
-    let iovec = <&IoVec>::from(DUMMY);
-    let mut bufs = [
-        iovec, iovec, iovec, iovec, iovec, iovec, iovec, iovec, iovec, iovec, iovec, iovec, iovec,
-        iovec, iovec, iovec,
-    ];
-
-    let n = buf.bytes_vec(&mut bufs);
-    write_ready_vecs(&bufs[..n], raw_fd)
-}
-
-unsafe fn write_ready_vecs(bufs: &[&IoVec], raw_fd: RawFd) -> isize {
-    let iovecs = iovec::unix::as_os_slice(bufs);
-
-    libc::writev(raw_fd, iovecs.as_ptr(), iovecs.len() as i32)
+impl FusedFuture for ConnectFuture {
+    fn is_terminated(&self) -> bool {
+        self.stream.is_none()
+    }
 }

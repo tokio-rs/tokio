@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 #![cfg(unix)]
 #![deny(warnings, rust_2018_idioms)]
 

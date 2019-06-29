@@ -1,51 +1,32 @@
 #![cfg(unix)]
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use futures::sync::oneshot;
-use futures::{Future, Stream};
+use futures::future::try_join;
 use tempfile::Builder;
-use tokio::io;
-use tokio::runtime::current_thread::Runtime;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_uds::*;
 
-macro_rules! t {
-    ($e:expr) => {
-        match $e {
-            Ok(e) => e,
-            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-        }
-    };
-}
-
-#[test]
-fn echo() {
+#[tokio::test]
+async fn accept_read_write() -> std::io::Result<()> {
     let dir = Builder::new().prefix("tokio-uds-tests").tempdir().unwrap();
     let sock_path = dir.path().join("connect.sock");
 
-    let mut rt = Runtime::new().unwrap();
+    let mut listener = UnixListener::bind(&sock_path)?;
 
-    let server = t!(UnixListener::bind(&sock_path));
-    let (tx, rx) = oneshot::channel();
+    let accept = listener.accept();
+    let connect = UnixStream::connect(&sock_path);
+    let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
-    rt.spawn({
-        server
-            .incoming()
-            .into_future()
-            .and_then(move |(sock, _)| {
-                tx.send(sock.unwrap()).unwrap();
-                Ok(())
-            })
-            .map_err(|e| panic!("err={:?}", e))
-    });
-
-    let client = rt.block_on(UnixStream::connect(&sock_path)).unwrap();
-    let server = rt.block_on(rx).unwrap();
-
-    // Write to the client
-    rt.block_on(io::write_all(client, b"hello")).unwrap();
-
-    // Read from the server
-    let (_, buf) = rt.block_on(io::read_to_end(server, vec![])).unwrap();
-
-    assert_eq!(buf, b"hello");
+    // Write to the client. TODO: Switch to write_all.
+    let write_len = client.write(b"hello").await?;
+    assert_eq!(write_len, 5);
+    drop(client);
+    // Read from the server. TODO: Switch to read_to_end.
+    let mut buf = [0u8; 5];
+    server.read_exact(&mut buf).await?;
+    assert_eq!(&buf, b"hello");
+    let len = server.read(&mut buf).await?;
+    assert_eq!(len, 0);
+    Ok(())
 }
