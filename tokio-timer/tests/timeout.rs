@@ -130,6 +130,7 @@ fn deadline_future_elapses() {
     });
 }
 
+#[cfg(feature = "async-traits")]
 macro_rules! poll {
     ($task:ident, $stream:ident) => {{
         use futures_core::Stream;
