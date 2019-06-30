@@ -52,5 +52,5 @@ pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
 pub use tokio_io::{AsyncRead, AsyncWrite};
 
 // Re-export io::Error so that users don't have to deal
-// with conflicts when `use`ing `futures::io` and `std::io`.
+// with conflicts when `use`ing `tokio::io` and `std::io`.
 pub use std::io::{Error, ErrorKind, Result};
