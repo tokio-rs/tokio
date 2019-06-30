@@ -18,8 +18,6 @@ members = [
   "tokio-timer",
   "tokio-tcp",
   # "tokio-tls",
-  # "tokio-trace",
-  # "tokio-trace/tokio-trace-core",
   "tokio-udp",
   # "tokio-uds",
 ]

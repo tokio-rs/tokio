@@ -50,7 +50,7 @@ rt-full = [
   "tokio-executor",
   "tokio-macros",
 #  "tokio-threadpool",
-#  "tokio-trace-core",
+  "tracing-core",
 ]
 sync = ["tokio-sync"]
 tcp = ["tokio-tcp"]
@@ -77,7 +77,7 @@ tokio-sync = { version = "0.2.0", optional = true, path = "../tokio-sync" }
 tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp" }
 tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
 #tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer" }
-#tokio-trace-core = { version = "0.2", optional = true }
+tracing-core = { version = "0.1", optional = true }
 
 # Needed for async/await preview support
 #tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }
