@@ -40,3 +40,10 @@ jobs:
         CI: 'True'
       displayName: cargo test -p ${{ crate }} (PATCHED)
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    - ${{ each feature in crate.value }}:
+      - script: cargo test --tests --no-default-features --features ${{ $feature }}
+        env:
+          LOOM_MAX_DURATION: 10
+          CI: 'True'
+        displayName: cargo
