@@ -52,7 +52,7 @@ jobs:
       - tokio-sync
       - tokio-macros
       # - tokio-threadpool
-      - tokio-timer
+      - tokio-timer:
         async-traits
       - tokio-test
       # - tokio-trace
