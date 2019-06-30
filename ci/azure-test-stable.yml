@@ -47,3 +47,6 @@ jobs:
           LOOM_MAX_DURATION: 10
           CI: 'True'
         displayName: cargo test --tests --no-default-features --features ${{ $feature }}
+
+      - script: cargo test --examples --no-default-features --features ${{ $feature }}
+        displayName: cargo test --examples --no-default-features --features ${{ $feature }}
