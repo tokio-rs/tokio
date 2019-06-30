@@ -1,68 +1,72 @@
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 
-mod support;
-use crate::support::*;
-
-use futures::sync::{mpsc, oneshot};
-use futures::{future, Future, Stream};
+use tokio_sync::oneshot;
+use tokio_test::task::MockTask;
+use tokio_test::{
+    assert_err, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, clock,
+};
 use tokio_timer::*;
+
+use std::time::Duration;
 
 #[test]
 fn simultaneous_deadline_future_completion() {
-    mocked(|_, time| {
-        // Create a future that is immediately ready
-        let fut = future::ok::<_, ()>(());
+    let mut t = MockTask::new();
 
-        // Wrap it with a deadline
-        let mut fut = Timeout::new_at(fut, time.now());
+    clock::mock(|clock| {
+        // Create a future that is immediately ready
+        let fut = Box::pin(Timeout::new_at(async {}, clock.now()));
 
         // Ready!
-        assert_ready!(fut);
+        assert_ready_ok!(t.poll(fut));
     });
 }
 
 #[test]
 fn completed_future_past_deadline() {
-    mocked(|_, time| {
-        // Create a future that is immediately ready
-        let fut = future::ok::<_, ()>(());
+    let mut t = MockTask::new();
 
+    clock::mock(|clock| {
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(fut, time.now() - ms(1000));
+        let fut = Timeout::new_at(async {}, clock.now() - ms(1000));
+        let fut = Box::pin(fut);
 
         // Ready!
-        assert_ready!(fut);
+        assert_ready_ok!(t.poll(fut));
     });
 }
 
 #[test]
 fn future_and_deadline_in_future() {
-    mocked(|timer, time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         // Not yet complete
         let (tx, rx) = oneshot::channel();
 
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(rx, time.now() + ms(100));
+        let mut fut = Timeout::new_at(rx, clock.now() + ms(100));
 
-        // Ready!
-        assert_not_ready!(fut);
+        assert_pending!(t.poll(&mut fut));
 
         // Turn the timer, it runs for the elapsed time
-        advance(timer, ms(90));
+        clock.advance(ms(90));
 
-        assert_not_ready!(fut);
+        assert_pending!(t.poll(&mut fut));
 
         // Complete the future
         tx.send(()).unwrap();
 
-        assert_ready!(fut);
+        assert_ready_ok!(t.poll(&mut fut)).unwrap();
     });
 }
 
 #[test]
 fn future_and_timeout_in_future() {
-    mocked(|timer, _time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         // Not yet complete
         let (tx, rx) = oneshot::channel();
 
@@ -70,107 +74,133 @@ fn future_and_timeout_in_future() {
         let mut fut = Timeout::new(rx, ms(100));
 
         // Ready!
-        assert_not_ready!(fut);
+        assert_pending!(t.poll(&mut fut));
 
         // Turn the timer, it runs for the elapsed time
-        advance(timer, ms(90));
+        clock.advance(ms(90));
 
-        assert_not_ready!(fut);
+        assert_pending!(t.poll(&mut fut));
 
         // Complete the future
         tx.send(()).unwrap();
 
-        assert_ready!(fut);
+        assert_ready_ok!(t.poll(&mut fut)).unwrap();
     });
+}
+
+struct Empty;
+
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+impl Future for Empty {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+        Poll::Pending
+    }
 }
 
 #[test]
 fn deadline_now_elapses() {
-    mocked(|_, time| {
-        let fut = future::empty::<(), ()>();
+    let mut t = MockTask::new();
 
+    clock::mock(|clock| {
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(fut, time.now());
+        let mut fut = Timeout::new_at(Empty, clock.now());
 
-        assert_elapsed!(fut);
+        assert_ready_err!(t.poll(&mut fut));
     });
 }
 
 #[test]
 fn deadline_future_elapses() {
-    mocked(|timer, time| {
-        let fut = future::empty::<(), ()>();
+    let mut t = MockTask::new();
 
+    clock::mock(|clock| {
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(fut, time.now() + ms(300));
+        let mut fut = Timeout::new_at(Empty, clock.now() + ms(300));
 
-        assert_not_ready!(fut);
+        assert_pending!(t.poll(&mut fut));
 
-        advance(timer, ms(300));
+        clock.advance(ms(300));
 
-        assert_elapsed!(fut);
+        assert_ready_err!(t.poll(&mut fut));
     });
 }
 
-#[test]
-fn future_errors_first() {
-    mocked(|_, time| {
-        let fut = future::err::<(), ()>(());
-
-        // Wrap it with a deadline
-        let mut fut = Timeout::new_at(fut, time.now() + ms(100));
-
-        // Ready!
-        assert!(fut.poll().unwrap_err().is_inner());
-    });
+#[cfg(feature = "async-traits")]
+macro_rules! poll {
+    ($task:ident, $stream:ident) => {{
+        use futures_core::Stream;
+        $task.enter(|cx| Pin::new(&mut $stream).poll_next(cx))
+    }};
 }
 
 #[test]
+#[cfg(feature = "async-traits")]
 fn stream_and_timeout_in_future() {
-    mocked(|timer, _time| {
+    use tokio_sync::mpsc;
+
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         // Not yet complete
-        let (tx, rx) = mpsc::unbounded();
+        let (mut tx, rx) = mpsc::unbounded_channel();
 
         // Wrap it with a deadline
         let mut stream = Timeout::new(rx, ms(100));
 
         // Not ready
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
 
         // Turn the timer, it runs for the elapsed time
-        advance(timer, ms(90));
+        clock.advance(ms(90));
 
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
 
         // Complete the future
-        tx.unbounded_send(()).unwrap();
+        tx.try_send(()).unwrap();
 
-        let item = assert_ready!(stream);
+        let item = assert_ready!(poll!(t, stream));
         assert!(item.is_some());
     });
 }
 
 #[test]
+#[cfg(feature = "async-traits")]
 fn idle_stream_timesout_periodically() {
-    mocked(|timer, _time| {
+    use tokio_sync::mpsc;
+
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         // Not yet complete
-        let (_tx, rx) = mpsc::unbounded::<()>();
+        let (_tx, rx) = mpsc::unbounded_channel::<()>();
 
         // Wrap it with a deadline
         let mut stream = Timeout::new(rx, ms(100));
 
         // Not ready
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
 
         // Turn the timer, it runs for the elapsed time
-        advance(timer, ms(100));
+        clock.advance(ms(100));
 
-        assert_elapsed!(stream);
+        let v = assert_ready!(poll!(t, stream)).unwrap();
+        assert_err!(v);
+
         // Stream's timeout should reset
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
 
         // Turn the timer, it runs for the elapsed time
-        advance(timer, ms(100));
-        assert_elapsed!(stream);
+        clock.advance(ms(100));
+        let v = assert_ready!(poll!(t, stream)).unwrap();
+        assert_err!(v)
     });
+}
+
+fn ms(n: u64) -> Duration {
+    Duration::from_millis(n)
 }

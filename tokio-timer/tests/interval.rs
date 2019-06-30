@@ -1,43 +1,55 @@
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 
-mod support;
-use crate::support::*;
-
-use futures::Stream;
+use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready_eq, clock};
 use tokio_timer::*;
+
+use std::time::Duration;
 
 #[test]
 #[should_panic]
 fn interval_zero_duration() {
-    mocked(|_, time| {
-        let _ = Interval::new(time.now(), ms(0));
+    clock::mock(|clock| {
+        let _ = Interval::new(clock.now(), ms(0));
     });
 }
 
 #[test]
 fn usage() {
-    mocked(|timer, time| {
-        let start = time.now();
+    let mut task = MockTask::new();
+
+    clock::mock(|clock| {
+        let start = clock.now();
         let mut int = Interval::new(start, ms(300));
 
-        assert_ready_eq!(int, Some(start));
-        assert_not_ready!(int);
+        macro_rules! poll {
+            () => {
+                task.enter(|cx| int.poll_next(cx))
+            };
+        }
 
-        advance(timer, ms(100));
-        assert_not_ready!(int);
+        assert_ready_eq!(poll!(), Some(start));
+        assert_pending!(poll!());
 
-        advance(timer, ms(200));
-        assert_ready_eq!(int, Some(start + ms(300)));
-        assert_not_ready!(int);
+        clock.advance(ms(100));
+        assert_pending!(poll!());
 
-        advance(timer, ms(400));
-        assert_ready_eq!(int, Some(start + ms(600)));
-        assert_not_ready!(int);
+        clock.advance(ms(200));
+        assert_ready_eq!(poll!(), Some(start + ms(300)));
+        assert_pending!(poll!());
 
-        advance(timer, ms(500));
-        assert_ready_eq!(int, Some(start + ms(900)));
-        assert_ready_eq!(int, Some(start + ms(1200)));
-        assert_not_ready!(int);
+        clock.advance(ms(400));
+        assert_ready_eq!(poll!(), Some(start + ms(600)));
+        assert_pending!(poll!());
+
+        clock.advance(ms(500));
+        assert_ready_eq!(poll!(), Some(start + ms(900)));
+        assert_ready_eq!(poll!(), Some(start + ms(1200)));
+        assert_pending!(poll!());
     });
+}
+
+fn ms(n: u64) -> Duration {
+    Duration::from_millis(n)
 }

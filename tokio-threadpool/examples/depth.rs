@@ -1,3 +1,5 @@
+#![cfg(features = "broken")]
+
 extern crate env_logger;
 extern crate futures;
 extern crate tokio_threadpool;

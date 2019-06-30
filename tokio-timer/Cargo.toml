@@ -22,32 +22,22 @@ Timer facilities for Tokio
 publish = false
 
 [features]
-# individual `Stream` impls if you so desire
-delay-queue = ["futures-core-preview"]
-interval = ["futures-core-preview"]
-timeout-stream = ["futures-core-preview"]
-throttle = ["futures-core-preview"]
-
-# easily enable all `Stream` impls
-streams = [
-    "delay-queue",
-    "interval",
-    "timeout-stream",
-    "throttle",
-]
+async-traits = ["futures-core-preview"]
 
 [dependencies]
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
-crossbeam-utils = "0.6.0"
 
+async-util = { git = "https://github.com/tokio-rs/async" }
+crossbeam-utils = "0.6.0"
 # Backs `DelayQueue`
 slab = "0.4.1"
-
 # optionals
 futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
 
 [dev-dependencies]
 rand = "0.6"
-tokio-mock-task = "0.1.0"
 tokio = { version = "0.2.0", path = "../tokio" }
+tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
+tokio-sync = { version = "0.2.0", path = "../tokio-sync", features = ["async-traits"] }
+tokio-test = { version = "0.2.0", path = "../tokio-test" }

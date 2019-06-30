@@ -8,7 +8,7 @@ use crate::clock::now;
 use crate::timer::Handle;
 use crate::wheel::{self, Wheel};
 use crate::{Delay, Error};
-use futures_core::Stream;
+
 use slab::Slab;
 use std::cmp;
 use std::future::Future;
@@ -345,6 +345,34 @@ impl<T> DelayQueue<T> {
         }
 
         Key::new(key)
+    }
+
+    /// TODO: Dox... also is the fn signature correct?
+    pub fn poll_next(
+        &mut self,
+        cx: &mut task::Context<'_>,
+    ) -> Poll<Option<Result<Expired<T>, Error>>> {
+        let item = ready!(self.poll_idx(cx));
+        Poll::Ready(item.map(|result| {
+            result.map(|idx| {
+                let data = self.slab.remove(idx);
+                debug_assert!(data.next.is_none());
+                debug_assert!(data.prev.is_none());
+
+                Expired {
+                    key: Key::new(idx),
+                    data: data.inner,
+                    deadline: self.start + Duration::from_millis(data.when),
+                }
+            })
+        }))
+    }
+
+    /// TODO: Dox... also is the fn signature correct?
+    pub async fn next(&mut self) -> Option<Result<Expired<T>, Error>> {
+        use async_util::future::poll_fn;
+
+        poll_fn(|cx| self.poll_next(cx)).await
     }
 
     /// Insert `value` into the queue set to expire after the requested duration
@@ -696,26 +724,14 @@ impl<T> DelayQueue<T> {
 // We never put `T` in a `Pin`...
 impl<T> Unpin for DelayQueue<T> {}
 
-impl<T> Stream for DelayQueue<T> {
+#[cfg(feature = "async-traits")]
+impl<T> futures_core::Stream for DelayQueue<T> {
     // DelayQueue seems much more specific, where a user may care that it
     // has reached capacity, so return those errors instead of panicking.
     type Item = Result<Expired<T>, Error>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        let item = ready!(self.poll_idx(cx));
-        Poll::Ready(item.map(|result| {
-            result.map(|idx| {
-                let data = self.slab.remove(idx);
-                debug_assert!(data.next.is_none());
-                debug_assert!(data.prev.is_none());
-
-                Expired {
-                    key: Key::new(idx),
-                    data: data.inner,
-                    deadline: self.start + Duration::from_millis(data.when),
-                }
-            })
-        }))
+    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        DelayQueue::poll_next(self.get_mut(), cx)
     }
 }
 

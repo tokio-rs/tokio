@@ -20,14 +20,14 @@
 //! });
 //! ```
 
-use futures::{future::lazy, Future};
+use tokio_executor::park::{Park, Unpark};
+use tokio_timer::clock::{Clock, Now};
+use tokio_timer::Timer;
+
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tokio_executor::park::{Park, Unpark};
-use tokio_timer::clock::{Clock, Now};
-use tokio_timer::Timer;
 
 /// Run the provided closure with a `MockClock` that starts at the current time.
 pub fn mock<F, R>(f: F) -> R
@@ -123,17 +123,16 @@ impl MockClock {
     where
         F: FnOnce(&mut Handle) -> R,
     {
-        let mut enter = ::tokio_executor::enter().unwrap();
-
-        ::tokio_timer::clock::with_default(&self.clock, &mut enter, |enter| {
+        ::tokio_timer::clock::with_default(&self.clock, || {
             let park = self.time.mock_park();
             let timer = Timer::new(park);
             let handle = timer.handle();
             let time = self.time.clone();
 
-            ::tokio_timer::with_default(&handle, enter, |_| {
+            ::tokio_timer::with_default(&handle, || {
                 let mut handle = Handle::new(timer, time);
-                lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()
+                f(&mut handle)
+                // lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()
             })
         })
     }
@@ -145,8 +144,13 @@ impl Handle {
     }
 
     /// Turn the internal timer and mock park for the provided duration.
-    pub fn turn(&mut self, duration: Option<Duration>) {
-        self.timer.turn(duration).unwrap();
+    pub fn turn(&mut self) {
+        self.timer.turn(None).unwrap();
+    }
+
+    /// Turn the internal timer and mock park for the provided duration.
+    pub fn turn_for(&mut self, duration: Duration) {
+        self.timer.turn(Some(duration)).unwrap();
     }
 
     /// Advance the `MockClock` by the provided duration.
@@ -156,13 +160,25 @@ impl Handle {
 
         while inner.lock().unwrap().now() < deadline {
             let dur = deadline - inner.lock().unwrap().now();
-            self.turn(Some(dur));
+            self.turn_for(dur);
         }
+    }
+
+    /// Returns the total amount of time the time has been advanced.
+    pub fn advanced(&self) -> Duration {
+        self.time.inner.lock().unwrap().advance
     }
 
     /// Get the currently mocked time
     pub fn now(&mut self) -> Instant {
         self.time.now()
+    }
+
+    /// Turn the internal timer once, but force "parking" for `duration` regardless of any pending
+    /// timeouts
+    pub fn park_for(&mut self, duration: Duration) {
+        self.time.inner.lock().unwrap().park_for = Some(duration);
+        self.turn()
     }
 }
 

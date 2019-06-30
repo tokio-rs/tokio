@@ -74,7 +74,7 @@ impl Delay {
     }
 
     // Used by `Timeout<Stream>`
-    #[cfg(feature = "timeout-stream")]
+    #[cfg(feature = "async-traits")]
     pub(crate) fn reset_timeout(&mut self) {
         self.registration.reset_timeout();
     }

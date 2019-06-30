@@ -19,7 +19,8 @@ jobs:
     displayName: Test tokio
     cross: true
     crates:
-      - tokio
+      tokio:
+        - default
 
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml
@@ -30,11 +31,14 @@ jobs:
     rust: $(nightly)
     crates:
 #       - tokio-fs
-      - tokio-reactor
+      tokio-reactor:
+        - default
 #       - tokio-signal
-      - tokio-tcp
+      tokio-tcp:
+        - default
 #       - tokio-tls
-      - tokio-udp
+      tokio-udp:
+        - default
 #       - tokio-uds
 
 # Test crates that are NOT platform specific
@@ -45,15 +49,24 @@ jobs:
     rust: $(nightly)
     crates:
       # - tokio-buf
-      - tokio-codec
-      - tokio-current-thread
-      - tokio-executor
-      - tokio-io
-      - tokio-sync
-      - tokio-macros
+      tokio-codec:
+        - default
+      tokio-current-thread:
+        - default
+      tokio-executor:
+        - default
+      tokio-io:
+        - default
+      tokio-sync:
+        - default
+      tokio-macros:
+        - default
       # - tokio-threadpool
-      - tokio-timer
-      - tokio-test
+      tokio-timer:
+        - default
+        - async-traits
+      tokio-test:
+        - default
 
 # - template: ci/azure-cargo-check.yml
 #   parameters:

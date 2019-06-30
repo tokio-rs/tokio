@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::fmt;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
-use tokio_executor::Enter;
 
 /// Handle to timer instance.
 ///
@@ -58,9 +57,9 @@ thread_local! {
 ///
 /// [`Delay`]: ../struct.Delay.html
 /// [`Delay::new`]: ../struct.Delay.html#method.new
-pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
+pub fn with_default<F, R>(handle: &Handle, f: F) -> R
 where
-    F: FnOnce(&mut Enter) -> R,
+    F: FnOnce() -> R,
 {
     // Ensure that the timer is removed from the thread-local context
     // when leaving the scope. This handles cases that involve panicking.
@@ -96,7 +95,7 @@ where
             *current = Some(handle.clone());
         }
 
-        f(enter)
+        f()
     })
 }
 
