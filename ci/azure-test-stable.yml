@@ -35,11 +35,11 @@ jobs:
 
   - ${{ each crate in parameters.crates }}:
     - ${{ each feature in crate.value }}:
-      - script: cargo test --tests --no-default-features --features ${{ $feature }}
+      - script: cargo test --tests --no-default-features --features ${{ feature }}
         env:
           LOOM_MAX_DURATION: 10
           CI: 'True'
-        displayName: cargo test --tests --no-default-features --features ${{ $feature }}
+        displayName: cargo test --tests --no-default-features --features ${{ feature }}
 
-      - script: cargo test --examples --no-default-features --features ${{ $feature }}
-        displayName: cargo test --examples --no-default-features --features ${{ $feature }}
+      - script: cargo test --examples --no-default-features --features ${{ feature }}
+        displayName: cargo test --examples --no-default-features --features ${{ feature }}
