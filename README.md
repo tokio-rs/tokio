@@ -107,6 +107,8 @@ First, see if the answer to your question can be found in the [Guides] or the
 the [Tokio Gitter channel][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
+[Guides]: https://tokio.rs/docs/getting-started/hello-world/
+[API documentation]: https://docs.rs/tokio/0.1.20/tokio
 [chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
