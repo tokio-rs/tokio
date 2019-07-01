@@ -16,7 +16,5 @@ tokio-threadpool = { path = "tokio-threadpool" }
 tokio-timer = { path = "tokio-timer" }
 tokio-tcp = { path = "tokio-tcp" }
 tokio-tls = { path = "tokio-tls" }
-tokio-trace = { path = "tokio-trace" }
-tokio-trace-core = { path = "tokio-trace/tokio-trace-core" }
 tokio-udp = { path = "tokio-udp" }
 tokio-uds = { path = "tokio-uds" }

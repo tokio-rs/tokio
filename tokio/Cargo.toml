@@ -37,6 +37,7 @@ default = [
 ]
 
 codec = ["io", "tokio-codec"]
+experimental-tracing = ["tracing-core"]
 fs = ["tokio-fs"]
 io = ["bytes", "tokio-io"]
 reactor = ["io", "mio", "tokio-reactor"]
@@ -47,7 +48,6 @@ rt-full = [
   "tokio-current-thread",
   "tokio-executor",
   "tokio-threadpool",
-  "tokio-trace-core",
 ]
 sync = ["tokio-sync"]
 tcp = ["tokio-tcp"]
@@ -73,7 +73,7 @@ tokio-threadpool = { version = "0.1.14", optional = true }
 tokio-tcp = { version = "0.1.0", optional = true }
 tokio-udp = { version = "0.1.0", optional = true }
 tokio-timer = { version = "0.2.8", optional = true }
-tokio-trace-core = { version = "0.2", optional = true }
+tracing-core = { version = "0.1", optional = true }
 
 # Needed until `reactor` is removed from `tokio`.
 mio = { version = "0.6.14", optional = true }
