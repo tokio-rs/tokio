@@ -47,7 +47,6 @@ rt-full = [
   "tokio-current-thread",
   "tokio-executor",
   "tokio-threadpool",
-  "tokio-macros",
   "tracing-core",
 ]
 sync = ["tokio-sync"]
