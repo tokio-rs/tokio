@@ -64,6 +64,7 @@ jobs:
         - udp
         - uds
         - sync
+        - experimental-tracing
       tokio-buf:
         - util
 

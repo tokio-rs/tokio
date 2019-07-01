@@ -37,6 +37,7 @@ default = [
 ]
 
 codec = ["io", "tokio-codec"]
+experimental-tracing = ["tracing-core"]
 fs = ["tokio-fs"]
 io = ["bytes", "tokio-io"]
 reactor = ["io", "mio", "tokio-reactor"]
@@ -47,8 +48,6 @@ rt-full = [
   "tokio-current-thread",
   "tokio-executor",
   "tokio-threadpool",
-  "tokio-macros",
-  "tracing-core",
 ]
 sync = ["tokio-sync"]
 tcp = ["tokio-tcp"]
