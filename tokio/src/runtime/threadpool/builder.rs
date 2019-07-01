@@ -12,6 +12,8 @@ use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
+
+#[cfg(feature = "experimental-tracing")]
 use tracing_core as trace;
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -367,6 +369,7 @@ impl Builder {
         // TODO(eliza): when `tracing-core` is stable enough to take a
         // public API dependency, we should allow users to set a custom
         // subscriber for the runtime.
+        #[cfg(feature = "experimental-tracing")]
         let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
 
         let pool = self
@@ -377,9 +380,14 @@ impl Builder {
                 tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
                     clock::with_default(&clock, enter, |enter| {
                         timer::with_default(&timer_handles[index], enter, |_| {
+
+                            #[cfg(feature = "experimental-tracing")]
                             trace::dispatcher::with_default(&dispatch, || {
                                 w.run();
-                            })
+                            });
+
+                            #[cfg(not(feature = "experimental-tracing"))]
+                            w.run();
                         });
                     })
                 });

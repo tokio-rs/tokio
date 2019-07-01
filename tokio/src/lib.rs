@@ -103,6 +103,8 @@ extern crate tokio_threadpool;
 extern crate tokio_timer;
 #[cfg(feature = "udp")]
 extern crate tokio_udp;
+#[cfg(feature = "experimental-tracing")]
+extern crate tracing_core;
 
 #[cfg(all(unix, feature = "uds"))]
 extern crate tokio_uds;
@@ -128,7 +130,6 @@ pub mod util;
 
 if_runtime! {
     extern crate tokio_executor;
-    extern crate tracing_core;
     pub mod executor;
     pub mod runtime;
 
