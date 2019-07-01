@@ -81,12 +81,3 @@
 //! [`DelayQueue`]: struct.DelayQueue.html
 
 pub use tokio_timer::{delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout};
-
-#[deprecated(since = "0.1.8", note = "use Timeout instead")]
-#[allow(deprecated)]
-#[doc(hidden)]
-pub type Deadline<T> = ::tokio_timer::Deadline<T>;
-#[deprecated(since = "0.1.8", note = "use Timeout instead")]
-#[allow(deprecated)]
-#[doc(hidden)]
-pub type DeadlineError<T> = ::tokio_timer::DeadlineError<T>;

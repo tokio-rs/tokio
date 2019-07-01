@@ -1,8 +1,8 @@
 pub use crate::util::enumerate::Enumerate;
 
-use futures::Stream;
 #[cfg(feature = "timer")]
 use std::time::Duration;
+
 #[cfg(feature = "timer")]
 use tokio_timer::{throttle::Throttle, Timeout};
 
