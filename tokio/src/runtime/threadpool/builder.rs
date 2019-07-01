@@ -364,7 +364,7 @@ impl Builder {
         let clock = self.clock.clone();
 
         // Get the current trace dispatcher.
-        // TODO(eliza): when `tokio-trace-core` is stable enough to take a
+        // TODO(eliza): when `tracing-core` is stable enough to take a
         // public API dependency, we should allow users to set a custom
         // subscriber for the runtime.
         let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);

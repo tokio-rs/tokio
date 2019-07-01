@@ -128,7 +128,7 @@ pub mod util;
 
 if_runtime! {
     extern crate tokio_executor;
-    extern crate tokio_trace_core;
+    extern crate tracing_core;
     pub mod executor;
     pub mod runtime;
 
