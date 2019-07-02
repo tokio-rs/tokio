@@ -10,8 +10,8 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
+pub use crate::util::FutureExt;
 pub use std::future::Future;
 pub use std::task::{self, Poll};
-//pub use crate::util::{FutureExt, StreamExt};
 #[cfg(feature = "io")]
 pub use tokio_io::{AsyncRead, AsyncWrite};

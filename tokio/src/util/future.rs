@@ -1,14 +1,10 @@
-use futures::Future;
-
-#[cfg(feature = "timer")]
-#[allow(deprecated)]
-use tokio_timer::Deadline;
-
 #[cfg(feature = "timer")]
 use tokio_timer::Timeout;
 
 #[cfg(feature = "timer")]
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use std::future::Future;
 
 /// An extension trait for `Future` that provides a variety of convenient
 /// combinator functions.
@@ -62,31 +58,6 @@ pub trait FutureExt: Future {
     {
         Timeout::new(self, timeout)
     }
-
-    #[cfg(feature = "timer")]
-    #[deprecated(since = "0.1.8", note = "use `timeout` instead")]
-    #[allow(deprecated)]
-    #[doc(hidden)]
-    fn deadline(self, deadline: Instant) -> Deadline<Self>
-    where
-        Self: Sized,
-    {
-        Deadline::new(self, deadline)
-    }
 }
 
 impl<T: ?Sized> FutureExt for T where T: Future {}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::prelude::future;
-
-    #[cfg(feature = "timer")]
-    #[test]
-    fn timeout_polls_at_least_once() {
-        let base_future = future::result::<(), ()>(Ok(()));
-        let timeouted_future = base_future.timeout(Duration::new(0, 0));
-        assert!(timeouted_future.wait().is_ok());
-    }
-}

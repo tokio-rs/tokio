@@ -1,112 +1,95 @@
-#![cfg(feature = "broken")]
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use env_logger;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
 use tokio;
 use tokio::prelude::*;
+// use tokio::sync::mpsc;
 use tokio::timer::*;
 
-#[test]
-fn timer_with_runtime() {
-    let _ = env_logger::try_init();
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
-    let when = Instant::now() + Duration::from_millis(100);
+#[test]
+fn timer_with_threaded_runtime() {
+    use tokio::runtime::Runtime;
+
+    let mut rt = Runtime::new().unwrap();
     let (tx, rx) = mpsc::channel();
 
-    tokio::run({
-        Delay::new(when)
-            .map_err(|e| panic!("unexpected error; err={:?}", e))
-            .and_then(move |_| {
-                assert!(Instant::now() >= when);
-                tx.send(()).unwrap();
-                Ok(())
-            })
+    rt.spawn(async move {
+        let when = Instant::now() + Duration::from_millis(100);
+
+        Delay::new(when).await;
+        assert!(Instant::now() >= when);
+
+        tx.send(()).unwrap();
     });
 
+    rt.run().unwrap();
     rx.recv().unwrap();
 }
 
 #[test]
-fn starving() {
-    use futures::{task, Async, Poll};
+fn timer_with_current_thread_runtime() {
+    use tokio::runtime::current_thread::Runtime;
 
-    let _ = env_logger::try_init();
+    let mut rt = Runtime::new().unwrap();
+    let (tx, rx) = mpsc::channel();
+
+    rt.spawn(async move {
+        let when = Instant::now() + Duration::from_millis(100);
+
+        Delay::new(when).await;
+        assert!(Instant::now() >= when);
+
+        tx.send(()).unwrap();
+    });
+
+    rt.run().unwrap();
+    rx.recv().unwrap();
+}
+
+#[tokio::test]
+async fn starving() {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
 
     struct Starve(Delay, u64);
 
     impl Future for Starve {
-        type Item = u64;
-        type Error = ();
+        type Output = u64;
 
-        fn poll(&mut self) -> Poll<Self::Item, ()> {
-            if self.0.poll().unwrap().is_ready() {
-                return Ok(self.1.into());
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<u64> {
+            if Pin::new(&mut self.0).poll(cx).is_ready() {
+                return Poll::Ready(self.1);
             }
 
             self.1 += 1;
 
-            task::current().notify();
+            cx.waker().wake_by_ref();
 
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 
     let when = Instant::now() + Duration::from_millis(20);
     let starve = Starve(Delay::new(when), 0);
 
-    let (tx, rx) = mpsc::channel();
-
-    tokio::run({
-        starve.and_then(move |_ticks| {
-            assert!(Instant::now() >= when);
-            tx.send(()).unwrap();
-            Ok(())
-        })
-    });
-
-    rx.recv().unwrap();
+    starve.await;
+    assert!(Instant::now() >= when);
 }
 
-#[test]
-fn deadline() {
-    use futures::future;
+#[tokio::test]
+async fn timeout() {
+    use tokio::sync::oneshot;
 
-    let _ = env_logger::try_init();
+    let (_tx, rx) = oneshot::channel::<()>();
 
-    let when = Instant::now() + Duration::from_millis(20);
-    let (tx, rx) = mpsc::channel();
+    let now = Instant::now();
+    let dur = Duration::from_millis(20);
 
-    #[allow(deprecated)]
-    tokio::run({
-        future::empty::<(), ()>().deadline(when).then(move |res| {
-            assert!(res.is_err());
-            tx.send(()).unwrap();
-            Ok(())
-        })
-    });
-
-    rx.recv().unwrap();
-}
-
-#[test]
-fn timeout() {
-    use futures::future;
-
-    let _ = env_logger::try_init();
-
-    let (tx, rx) = mpsc::channel();
-
-    tokio::run({
-        future::empty::<(), ()>()
-            .timeout(Duration::from_millis(20))
-            .then(move |res| {
-                assert!(res.is_err());
-                tx.send(()).unwrap();
-                Ok(())
-            })
-    });
-
-    rx.recv().unwrap();
+    let res = rx.timeout(dur).await;
+    assert!(res.is_err());
+    assert!(Instant::now() >= now + dur);
 }
