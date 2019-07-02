@@ -42,7 +42,7 @@ jobs:
       displayName: cargo test --tests
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
     - script: cargo test --examples
-      displayName: cargo test --examples --features ${{ feature }}
+      displayName: cargo test --examples
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
     # Run with each specified feature
