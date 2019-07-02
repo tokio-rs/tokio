@@ -1,3 +1,8 @@
+# 0.1.15 (June 2, 2019)
+
+### Changed
+- Allow other executors inside `threadpool::blocking` (#1155).
+
 # 0.1.14 (April 22, 2019)
 
 ### Added
