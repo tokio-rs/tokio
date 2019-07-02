@@ -33,7 +33,7 @@ jobs:
 #       - tokio-fs
       tokio-reactor: []
 #       - tokio-signal
-      tokio-tcp: []
+      tokio-tcp:
         - incoming
 #       - tokio-tls
       tokio-udp: []
