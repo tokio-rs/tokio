@@ -32,13 +32,14 @@ jobs:
     crates:
 #       - tokio-fs
       tokio-reactor:
-        - default
+        - ''
 #       - tokio-signal
       tokio-tcp:
-        - default
+        - ''
+        - incoming
 #       - tokio-tls
       tokio-udp:
-        - default
+        - ''
 #       - tokio-uds
 
 # Test crates that are NOT platform specific
@@ -50,23 +51,24 @@ jobs:
     crates:
       # - tokio-buf
       tokio-codec:
-        - default
+        - ''
       tokio-current-thread:
-        - default
+        - ''
       tokio-executor:
-        - default
+        - ''
       tokio-io:
-        - default
+        - ''
       tokio-sync:
-        - default
+        - ''
+        - async-traits
       tokio-macros:
-        - default
+        - ''
       # - tokio-threadpool
       tokio-timer:
-        - default
+        - ''
         - async-traits
       tokio-test:
-        - default
+        - ''
 
 # - template: ci/azure-cargo-check.yml
 #   parameters:
