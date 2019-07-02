@@ -14,17 +14,17 @@ use std::task::{Context, Poll};
 /// Specifically, this means that the `poll_write` function will return one of
 /// the following:
 ///
-/// * `Ok(Async::Ready(n))` means that `n` bytes of data was immediately
+/// * `Poll::Ready(Ok(n))` means that `n` bytes of data was immediately
 ///   written.
 ///
-/// * `Ok(Async::NotReady)` means that no data was written from the buffer
+/// * `Poll::Pending` means that no data was written from the buffer
 ///   provided. The I/O object is not currently writable but may become writable
 ///   in the future. Most importantly, **the current future's task is scheduled
 ///   to get unparked when the object is writable**. This means that like
 ///   `Future::poll` you'll receive a notification when the I/O object is
 ///   writable again.
 ///
-/// * `Err(e)` for other errors are standard I/O errors coming from the
+/// * `Poll::Ready(Err(e))` for other errors are standard I/O errors coming from the
 ///   underlying object.
 ///
 /// This trait importantly means that the `write` method only works in the
@@ -38,10 +38,10 @@ use std::task::{Context, Poll};
 pub trait AsyncWrite {
     /// Attempt to write bytes from `buf` into the object.
     ///
-    /// On success, returns `Ok(Async::Ready(num_bytes_written))`.
+    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
     ///
     /// If the object is not ready for writing, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task (via
+    /// `Poll::Pending` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
     /// readable or is closed.
     fn poll_write(
@@ -53,10 +53,10 @@ pub trait AsyncWrite {
     /// Attempt to flush the object, ensuring that any buffered data reach
     /// their destination.
     ///
-    /// On success, returns `Ok(Async::Ready(()))`.
+    /// On success, returns `Poll::Ready(Ok(()))`.
     ///
     /// If flushing cannot immediately complete, this method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task (via
+    /// `Poll::Pending` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object can make
     /// progress towards flushing.
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
@@ -89,21 +89,21 @@ pub trait AsyncWrite {
     ///
     /// # Return value
     ///
-    /// This function returns a `Poll<(), io::Error>` classified as such:
+    /// This function returns a `Poll<io::Result<()>>` classified as such:
     ///
-    /// * `Ok(Async::Ready(()))` - indicates that the connection was
+    /// * `Poll::Ready(Ok(()))` - indicates that the connection was
     ///   successfully shut down and is now safe to deallocate/drop/close
     ///   resources associated with it. This method means that the current task
     ///   will no longer receive any notifications due to this method and the
     ///   I/O object itself is likely no longer usable.
     ///
-    /// * `Ok(Async::NotReady)` - indicates that shutdown is initiated but could
+    /// * `Poll::Pending` - indicates that shutdown is initiated but could
     ///   not complete just yet. This may mean that more I/O needs to happen to
     ///   continue this shutdown operation. The current task is scheduled to
     ///   receive a notification when it's otherwise ready to continue the
     ///   shutdown operation. When woken up this method should be called again.
     ///
-    /// * `Err(e)` - indicates a fatal error has happened with shutdown,
+    /// * `Poll::Ready(Err(e))` - indicates a fatal error has happened with shutdown,
     ///   indicating that the shutdown operation did not complete successfully.
     ///   This typically means that the I/O object is no longer usable.
     ///
