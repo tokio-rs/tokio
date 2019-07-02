@@ -2,7 +2,7 @@
 use tokio_timer::Timeout;
 
 #[cfg(feature = "timer")]
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use std::future::Future;
 
