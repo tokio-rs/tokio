@@ -118,8 +118,8 @@ fn lines_decoder_max_length() {
 
     // Line that's one character too long. This could cause an out of bounds
     // error if we peek at the next characters using slice indexing.
-    // buf.put("aaabbbc");
-    // assert!(codec.decode(buf).is_err());
+    buf.put("aaabbbc");
+    assert!(codec.decode(buf).is_err());
 }
 
 #[test]

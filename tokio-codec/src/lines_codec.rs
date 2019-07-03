@@ -1,6 +1,7 @@
+use crate::decoder::Decoder;
+use crate::encoder::Encoder;
 use bytes::{BufMut, BytesMut};
-use std::{cmp, io, str, usize};
-use tokio_io::_tokio_codec::{Decoder, Encoder};
+use std::{cmp, fmt, io, str, usize};
 
 /// A simple `Codec` implementation that splits up data into lines.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -117,11 +118,9 @@ fn without_carriage_return(s: &[u8]) -> &[u8] {
 
 impl Decoder for LinesCodec {
     type Item = String;
-    // TODO: in the next breaking change, this should be changed to a custom
-    // error type that indicates the "max length exceeded" condition better.
-    type Error = io::Error;
+    type Error = LinesCodecError;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
         loop {
             // Determine how far into the buffer we'll search for a newline. If
             // there's no max_length set, we'll read to the end of the buffer.
@@ -149,10 +148,7 @@ impl Decoder for LinesCodec {
                     // newline, return an error and start discarding on the
                     // next call.
                     self.is_discarding = true;
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        "line length limit exceeded",
-                    ))
+                    Err(LinesCodecError::MaxLineLengthExceeded)
                 } else {
                     // We didn't find a line or reach the length limit, so the next
                     // call will resume searching at the current offset.
@@ -163,7 +159,7 @@ impl Decoder for LinesCodec {
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
         Ok(match self.decode(buf)? {
             Some(frame) => Some(frame),
             None => {
@@ -184,12 +180,35 @@ impl Decoder for LinesCodec {
 
 impl Encoder for LinesCodec {
     type Item = String;
-    type Error = io::Error;
+    type Error = LinesCodecError;
 
-    fn encode(&mut self, line: String, buf: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, line: String, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
         buf.reserve(line.len() + 1);
         buf.put(line);
         buf.put_u8(b'\n');
         Ok(())
     }
 }
+
+#[derive(Debug)]
+pub enum LinesCodecError {
+    MaxLineLengthExceeded,
+    Io(io::Error),
+}
+
+impl fmt::Display for LinesCodecError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LinesCodecError::MaxLineLengthExceeded => write!(f, "max line length exceeded"),
+            LinesCodecError::Io(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl From<io::Error> for LinesCodecError {
+    fn from(e: io::Error) -> LinesCodecError {
+        LinesCodecError::Io(e)
+    }
+}
+
+impl std::error::Error for LinesCodecError {}

@@ -28,8 +28,6 @@ task:
       echo "~~~~ Cargo.toml ~~~~"
       cat Cargo.toml
       echo "~~~~~~~~~~~~~~~~~~~~"
-  cargo_cache:
-    folder: $HOME/.cargo/registry
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --lib && cargo test --all --tests
@@ -39,5 +37,3 @@ task:
   #   - . $HOME/.cargo/env
   #   - |
   #     cargo test --all --exclude tokio-tls --exclude tokio-macros --target i686-unknown-freebsd
-  before_cache_script:
-    - rm -rf $HOME/.cargo/registry/index

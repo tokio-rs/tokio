@@ -1,5 +1,7 @@
 # Tokio
 
+ _NOTE_: Tokio's [`master`](https://github.com/tokio-rs/tokio) branch is currently in the process of moving to `std::future::Future`, for `v0.1.x` based tokio releases please check out the [`v0.1.x`](https://github.com/tokio-rs/tokio/tree/v0.1.x) branch.
+
 A runtime for writing reliable, asynchronous, and slim applications with
 the Rust programming language. It is:
 
@@ -167,6 +169,23 @@ The crates included as part of Tokio are:
 [`tokio-timer`]: tokio-timer
 [`tokio-udp`]: tokio-udp
 [`tokio-uds`]: tokio-uds
+
+## Related Projects
+
+In addition to the crates in this repository, the Tokio project also maintains
+several other libraries, including:
+
+* [`tracing`] (formerly `tokio-trace`): A framework for application-level
+  tracing and async-aware diagnostics.
+
+* [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
+  `tokio`.
+
+* [`bytes`]: Utilities for working with bytes, including efficient byte buffers.
+
+[`tracing`]: https://github.com/tokio-rs/tracing
+[`mio`]: https://github.com/tokio-rs/mio
+[`bytes`]: https://github.com/tokio-rs/bytes
 
 ## Supported Rust Versions
 

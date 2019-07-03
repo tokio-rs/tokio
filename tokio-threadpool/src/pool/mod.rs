@@ -15,7 +15,7 @@ use crate::task::{Blocking, Task};
 use crate::worker::{self, Worker, WorkerId};
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
-use futures::Poll;
+
 use log::{debug, error, trace};
 use rand;
 use std::cell::Cell;
@@ -23,6 +23,7 @@ use std::num::Wrapping;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::{Arc, Weak};
+use std::task::Poll;
 use std::thread;
 
 #[derive(Debug)]
@@ -219,7 +220,10 @@ impl Pool {
         }
     }
 
-    pub fn poll_blocking_capacity(&self, task: &Arc<Task>) -> Poll<(), crate::BlockingError> {
+    pub fn poll_blocking_capacity(
+        &self,
+        task: &Arc<Task>,
+    ) -> Poll<Result<(), crate::BlockingError>> {
         self.blocking.poll_blocking_capacity(task)
     }
 

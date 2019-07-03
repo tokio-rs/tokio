@@ -1,6 +1,6 @@
 use crate::clock;
 use crate::Delay;
-use futures_core::Stream;
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
@@ -52,12 +52,9 @@ impl Interval {
     pub(crate) fn new_with_delay(delay: Delay, duration: Duration) -> Interval {
         Interval { delay, duration }
     }
-}
 
-impl Stream for Interval {
-    type Item = Instant;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+    /// TODO: dox
+    pub fn poll_next(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Instant>> {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
 
@@ -71,5 +68,21 @@ impl Stream for Interval {
 
         // Return the current instant
         Poll::Ready(Some(now))
+    }
+
+    /// TODO: dox
+    pub async fn next(&mut self) -> Option<Instant> {
+        use async_util::future::poll_fn;
+
+        poll_fn(|cx| self.poll_next(cx)).await
+    }
+}
+
+#[cfg(feature = "async-traits")]
+impl futures_core::Stream for Interval {
+    type Item = Instant;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        Interval::poll_next(self.get_mut(), cx)
     }
 }

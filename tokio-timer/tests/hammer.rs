@@ -1,18 +1,21 @@
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 
-use futures::stream::FuturesUnordered;
-use futures::{Future, Stream};
+use tokio_current_thread::CurrentThread;
+use tokio_executor::park::{Park, Unpark, UnparkThread};
+use tokio_timer::{Delay, Timer};
+
 use rand;
 use rand::Rng;
 use std::cmp;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Barrier};
+use std::task::{Context, Poll};
 use std::thread;
 use std::time::{Duration, Instant};
-use tokio_executor::park::{Park, Unpark, UnparkThread};
-use tokio_timer::*;
 
 struct Signal {
     rem: AtomicUsize,
@@ -43,7 +46,7 @@ fn hammer_complete() {
             let done = done.clone();
 
             thread::spawn(move || {
-                let mut exec = FuturesUnordered::new();
+                let mut exec = CurrentThread::new();
                 let mut rng = rand::thread_rng();
 
                 barrier.wait();
@@ -51,18 +54,18 @@ fn hammer_complete() {
                 for _ in 0..PER_THREAD {
                     let deadline =
                         Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let delay = handle.delay(deadline);
 
-                    exec.push({
-                        handle.delay(deadline).and_then(move |_| {
-                            let now = Instant::now();
-                            assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
-                            Ok(())
-                        })
+                    exec.spawn(async move {
+                        delay.await;
+
+                        let now = Instant::now();
+                        assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
                     });
                 }
 
                 // Run the logic
-                exec.for_each(|_| Ok(())).wait().unwrap();
+                exec.run().unwrap();
 
                 if 1 == done.rem.fetch_sub(1, SeqCst) {
                     done.unpark.unpark();
@@ -100,7 +103,7 @@ fn hammer_cancel() {
             let done = done.clone();
 
             thread::spawn(move || {
-                let mut exec = FuturesUnordered::new();
+                let mut exec = CurrentThread::new();
                 let mut rng = rand::thread_rng();
 
                 barrier.wait();
@@ -117,23 +120,16 @@ fn hammer_cancel() {
                     let delay = handle.delay(deadline1);
                     let join = handle.timeout(delay, deadline2);
 
-                    exec.push({
-                        join.and_then(move |_| {
-                            let now = Instant::now();
-                            assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
-                            Ok(())
-                        })
+                    exec.spawn(async move {
+                        let _ = join.await;
+
+                        let now = Instant::now();
+                        assert!(now >= deadline, "deadline greater by {:?}", deadline - now);
                     });
                 }
 
                 // Run the logic
-                exec.or_else(|e| {
-                    assert!(e.is_elapsed());
-                    Ok::<_, ()>(())
-                })
-                .for_each(|_| Ok(()))
-                .wait()
-                .unwrap();
+                exec.run().unwrap();
 
                 if 1 == done.rem.fetch_sub(1, SeqCst) {
                     done.unpark.unpark();
@@ -171,7 +167,7 @@ fn hammer_reset() {
             let done = done.clone();
 
             thread::spawn(move || {
-                let mut exec = FuturesUnordered::new();
+                let mut exec = CurrentThread::new();
                 let mut rng = rand::thread_rng();
 
                 barrier.wait();
@@ -186,44 +182,56 @@ fn hammer_reset() {
                     let deadline3 =
                         deadline2 + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
-                    exec.push({
-                        handle
-                            .delay(deadline1)
-                            // Select over a second delay
-                            .select2(handle.delay(deadline2))
-                            .map_err(|e| panic!("boom; err={:?}", e))
-                            .and_then(move |res| {
-                                use futures::future::Either::*;
+                    struct Select {
+                        a: Option<Delay>,
+                        b: Option<Delay>,
+                    }
 
-                                let now = Instant::now();
-                                assert!(
-                                    now >= deadline1,
-                                    "deadline greater by {:?}",
-                                    deadline1 - now
-                                );
+                    impl Future for Select {
+                        type Output = Delay;
 
-                                let mut other = match res {
-                                    A((_, other)) => other,
-                                    B((_, other)) => other,
-                                };
+                        fn poll(
+                            mut self: Pin<&mut Self>,
+                            cx: &mut Context<'_>,
+                        ) -> Poll<Self::Output> {
+                            let res = Pin::new(self.a.as_mut().unwrap()).poll(cx);
 
-                                other.reset(deadline3);
-                                other
-                            })
-                            .and_then(move |_| {
-                                let now = Instant::now();
-                                assert!(
-                                    now >= deadline3,
-                                    "deadline greater by {:?}",
-                                    deadline3 - now
-                                );
-                                Ok(())
-                            })
+                            if res.is_ready() {
+                                return Poll::Ready(self.a.take().unwrap());
+                            }
+
+                            let res = Pin::new(self.b.as_mut().unwrap()).poll(cx);
+
+                            if res.is_ready() {
+                                return Poll::Ready(self.b.take().unwrap());
+                            }
+
+                            Poll::Pending
+                        }
+                    }
+
+                    let s = Select {
+                        a: Some(handle.delay(deadline1)),
+                        b: Some(handle.delay(deadline2)),
+                    };
+
+                    exec.spawn(async move {
+                        let mut delay = s.await;
+
+                        let now = Instant::now();
+                        assert!(
+                            now >= deadline1,
+                            "deadline greater by {:?}",
+                            deadline1 - now
+                        );
+
+                        delay.reset(deadline3);
+                        delay.await;
                     });
                 }
 
                 // Run the logic
-                exec.for_each(|_| Ok(())).wait().unwrap();
+                exec.run().unwrap();
 
                 if 1 == done.rem.fetch_sub(1, SeqCst) {
                     done.unpark.unpark();

@@ -1,6 +1,6 @@
 use tokio_io::AsyncRead;
-use tokio_test::{assert_ready_ok, assert_ready_err};
 use tokio_test::task::MockTask;
+use tokio_test::{assert_ready_err, assert_ready_ok};
 
 use bytes::{BufMut, BytesMut};
 use pin_utils::pin_mut;
@@ -22,8 +22,8 @@ fn read_buf_success() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8]) -> Poll<io::Result<usize>>
-        {
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             buf[0..11].copy_from_slice(b"hello world");
             Poll::Ready(Ok(11))
         }
@@ -51,8 +51,8 @@ fn read_buf_error() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            _buf: &mut [u8]) -> Poll<io::Result<usize>>
-        {
+            _buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             let err = io::ErrorKind::Other.into();
             Poll::Ready(Err(err))
         }
@@ -78,8 +78,8 @@ fn read_buf_no_capacity() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            _buf: &mut [u8]) -> Poll<io::Result<usize>>
-        {
+            _buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             unimplemented!();
         }
     }
@@ -107,8 +107,8 @@ fn read_buf_no_uninitialized() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8]) -> Poll<io::Result<usize>>
-        {
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             for b in buf {
                 assert_eq!(0, *b);
             }
@@ -141,8 +141,8 @@ fn read_buf_uninitialized_ok() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8]) -> Poll<io::Result<usize>>
-        {
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             assert_eq!(buf[0..11], b"hello world"[..]);
             Poll::Ready(Ok(0))
         }

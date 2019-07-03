@@ -1,8 +1,8 @@
 use crate::timer::{HandlePriv, Registration};
 use std::future::Future;
 use std::pin::Pin;
-use std::time::{Duration, Instant};
 use std::task::{self, Poll};
+use std::time::{Duration, Instant};
 
 /// A future that completes at a specified instant in time.
 ///
@@ -74,7 +74,7 @@ impl Delay {
     }
 
     // Used by `Timeout<Stream>`
-    #[cfg(feature = "timeout-stream")]
+    #[cfg(feature = "async-traits")]
     pub(crate) fn reset_timeout(&mut self) {
         self.registration.reset_timeout();
     }

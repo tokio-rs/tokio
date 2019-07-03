@@ -3,7 +3,7 @@
 members = [
   "tokio",
   # "tokio-buf",
-  # "tokio-codec",
+  "tokio-codec",
   "tokio-current-thread",
   "tokio-executor",
   # "tokio-fs",
@@ -14,12 +14,10 @@ members = [
   # "tokio-signal",
   "tokio-sync",
   "tokio-test",
-  # "tokio-threadpool",
+  "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
   # "tokio-tls",
-  # "tokio-trace",
-  # "tokio-trace/tokio-trace-core",
   "tokio-udp",
   # "tokio-uds",
 ]

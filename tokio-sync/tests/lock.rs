@@ -51,6 +51,7 @@ fn readiness() {
 }
 
 #[test]
+#[ignore]
 fn lock() {
     let mut lock = Lock::new(false);
 

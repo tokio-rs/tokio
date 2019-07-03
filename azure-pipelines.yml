@@ -5,10 +5,11 @@ variables:
   nightly: nightly-2019-06-10
 
 jobs:
-# # Check formatting
-# - template: ci/azure-rustfmt.yml
-#   parameters:
-#     name: rustfmt
+# Check formatting
+- template: ci/azure-rustfmt.yml
+  parameters:
+    rust: $(nightly)
+    name: rustfmt
 
 # Test top level crate
 - template: ci/azure-test-stable.yml
@@ -18,7 +19,8 @@ jobs:
     displayName: Test tokio
     cross: true
     crates:
-      - tokio
+      tokio:
+        - default
 
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml
@@ -29,11 +31,14 @@ jobs:
     rust: $(nightly)
     crates:
 #       - tokio-fs
-      - tokio-reactor
+      tokio-reactor:
+        - default
 #       - tokio-signal
-      - tokio-tcp
+      tokio-tcp:
+        - default
 #       - tokio-tls
-      - tokio-udp
+      tokio-udp:
+        - default
 #       - tokio-uds
 
 # Test crates that are NOT platform specific
@@ -44,19 +49,24 @@ jobs:
     rust: $(nightly)
     crates:
       # - tokio-buf
-      # - tokio-codec
-      - tokio-current-thread
-      - tokio-executor
-      - tokio-io
-      - tokio-macros
-      - tokio-sync
+      tokio-codec:
+        - default
+      tokio-current-thread:
+        - default
+      tokio-executor:
+        - default
+      tokio-io:
+        - default
+      tokio-sync:
+        - default
+      tokio-macros:
+        - default
       # - tokio-threadpool
-      - tokio-timer
-      - tokio-test
-      # - tokio-trace
-      # - tokio-trace/tokio-trace-core
-      # - tokio-trace/test-log-support
-      # - tokio-trace/test_static_max_level_features
+      tokio-timer:
+        - default
+        - async-traits
+      tokio-test:
+        - default
 
 # - template: ci/azure-cargo-check.yml
 #   parameters:

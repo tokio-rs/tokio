@@ -53,13 +53,13 @@ pub trait AsyncRead {
     ///
     /// This function isn't actually `unsafe` to call but `unsafe` to implement.
     /// The implementer must ensure that either the whole `buf` has been zeroed
-    /// or `read_buf()` overwrites the buffer without reading it and returns
+    /// or `poll_read_buf()` overwrites the buffer without reading it and returns
     /// correct value.
     ///
-    /// This function is called from [`read_buf`].
+    /// This function is called from [`poll_read_buf`].
     ///
     /// [`io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-    /// [`read_buf`]: #method.read_buf
+    /// [`poll_read_buf`]: #method.poll_read_buf
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         for i in 0..buf.len() {
             buf[i] = 0;

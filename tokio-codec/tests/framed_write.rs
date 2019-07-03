@@ -1,11 +1,17 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use bytes::{BufMut, BytesMut};
-use futures::{Poll, Sink};
 use std::collections::VecDeque;
-use std::io::{self, Write};
 use tokio_codec::{Encoder, FramedWrite};
+use tokio_futures::Sink;
 use tokio_io::AsyncWrite;
+use tokio_test::assert_ready;
+use tokio_test::task::MockTask;
+
+use std::io::{self, Write};
+use std::pin::Pin;
+use std::task::Poll::{Pending, Ready};
+use std::task::{Context, Poll};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
@@ -13,6 +19,12 @@ macro_rules! mock {
         v.extend(vec![$($x),*]);
         Mock { calls: v }
     }};
+}
+
+macro_rules! pin {
+    ($id:ident) => {
+        Pin::new(&mut $id)
+    };
 }
 
 struct U32Encoder;
@@ -31,22 +43,28 @@ impl Encoder for U32Encoder {
 
 #[test]
 fn write_multi_frame_in_packet() {
+    let mut task = MockTask::new();
     let mock = mock! {
         Ok(b"\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x02".to_vec()),
     };
-
     let mut framed = FramedWrite::new(mock, U32Encoder);
-    assert!(framed.start_send(0).unwrap().is_ready());
-    assert!(framed.start_send(1).unwrap().is_ready());
-    assert!(framed.start_send(2).unwrap().is_ready());
 
-    // Nothing written yet
-    assert_eq!(1, framed.get_ref().calls.len());
+    task.enter(|cx| {
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(0).is_ok());
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(1).is_ok());
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(2).is_ok());
 
-    // Flush the writes
-    assert!(framed.poll_complete().unwrap().is_ready());
+        // Nothing written yet
+        assert_eq!(1, framed.get_ref().calls.len());
 
-    assert_eq!(0, framed.get_ref().calls.len());
+        // Flush the writes
+        assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());
+
+        assert_eq!(0, framed.get_ref().calls.len());
+    });
 }
 
 #[test]
@@ -59,7 +77,7 @@ fn write_hits_backpressure() {
         Ok(b"".to_vec()),
     };
 
-    for i in 0..(ITER + 1) {
+    for i in 0..=ITER {
         let mut b = BytesMut::with_capacity(4);
         b.put_u32_be(i as u32);
 
@@ -70,7 +88,7 @@ fn write_hits_backpressure() {
                 if data.len() < ITER {
                     data.extend_from_slice(&b[..]);
                     continue;
-                }
+                } // else fall through and create a new buffer
             }
             _ => unreachable!(),
         }
@@ -78,27 +96,38 @@ fn write_hits_backpressure() {
         // Push a new new chunk
         mock.calls.push_back(Ok(b[..].to_vec()));
     }
+    // 1 'wouldblock', 4 * 2KB buffers, 1 b-byte buffer
+    assert_eq!(mock.calls.len(), 6);
 
+    let mut task = MockTask::new();
     let mut framed = FramedWrite::new(mock, U32Encoder);
+    task.enter(|cx| {
+        // Send 8KB. This fills up FramedWrite2 buffer
+        for i in 0..ITER {
+            assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+            assert!(pin!(framed).start_send(i as u32).is_ok());
+        }
 
-    for i in 0..ITER {
-        assert!(framed.start_send(i as u32).unwrap().is_ready());
-    }
+        // Now we poll_ready which forces a flush. The mock pops the front message
+        // and decides to block.
+        assert!(pin!(framed).poll_ready(cx).is_pending());
 
-    // This should reject
-    assert!(!framed.start_send(ITER as u32).unwrap().is_ready());
+        // We poll again, forcing another flush, which this time succeeds
+        // The whole 8KB buffer is flushed
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
 
-    // This should succeed and start flushing the buffer.
-    assert!(framed.start_send(ITER as u32).unwrap().is_ready());
+        // Send more data. This matches the final message expected by the mock
+        assert!(pin!(framed).start_send(ITER as u32).is_ok());
 
-    // Flush the rest of the buffer
-    assert!(framed.poll_complete().unwrap().is_ready());
+        // Flush the rest of the buffer
+        assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());
 
-    // Ensure the mock is empty
-    assert_eq!(0, framed.get_ref().calls.len());
+        // Ensure the mock is empty
+        assert_eq!(0, framed.get_ref().calls.len());
+    })
 }
 
-// ===== Mock ======
+// // ===== Mock ======
 
 struct Mock {
     calls: VecDeque<io::Result<Vec<u8>>>,
@@ -123,7 +152,23 @@ impl Write for Mock {
 }
 
 impl AsyncWrite for Mock {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        Ok(().into())
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, io::Error>> {
+        match Pin::get_mut(self).write(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Pending,
+            other => Ready(other),
+        }
+    }
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        match Pin::get_mut(self).flush() {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Pending,
+            other => Ready(other),
+        }
+    }
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        unimplemented!()
     }
 }

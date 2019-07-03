@@ -5,15 +5,17 @@ mod state;
 pub(crate) use self::blocking::{Blocking, CanBlock};
 use self::blocking_state::BlockingState;
 use self::state::State;
-use crate::notifier::Notifier;
 use crate::pool::Pool;
-use futures::executor::{self, Spawn};
-use futures::{self, Async, Future};
+use crate::waker::Waker;
+
 use log::trace;
 use std::cell::{Cell, UnsafeCell};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::{fmt, panic, ptr};
 
 /// Harness around a future.
@@ -48,7 +50,7 @@ pub(crate) struct Task {
     /// Store the future at the head of the struct
     ///
     /// The future is dropped immediately when it transitions to Complete
-    future: UnsafeCell<Option<Spawn<BoxFuture>>>,
+    future: UnsafeCell<Option<BoxFuture>>,
 }
 
 #[derive(Debug)]
@@ -58,31 +60,27 @@ pub(crate) enum Run {
     Complete,
 }
 
-type BoxFuture = Box<dyn Future<Item = (), Error = ()> + Send + 'static>;
+type BoxFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 // ===== impl Task =====
 
 impl Task {
     /// Create a new `Task` as a harness for `future`.
     pub fn new(future: BoxFuture) -> Task {
-        // Wrap the future with an execution context.
-        let task_fut = executor::spawn(future);
-
         Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
-            future: UnsafeCell::new(Some(task_fut)),
+            future: UnsafeCell::new(Some(future)),
         }
     }
 
     /// Create a fake `Task` to be used as part of the intrusive mpsc channel
     /// algorithm.
     fn stub() -> Task {
-        let future = Box::new(futures::empty()) as BoxFuture;
-        let task_fut = executor::spawn(future);
+        let future = Box::pin(Empty) as BoxFuture;
 
         Task {
             state: AtomicUsize::new(State::stub().into()),
@@ -90,18 +88,18 @@ impl Task {
             next_blocking: AtomicPtr::new(ptr::null_mut()),
             reg_worker: Cell::new(None),
             reg_index: Cell::new(0),
-            future: UnsafeCell::new(Some(task_fut)),
+            future: UnsafeCell::new(Some(future)),
         }
     }
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
-    pub fn run(&self, unpark: &Arc<Notifier>) -> Run {
+    pub fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
         use self::State::*;
 
         // Transition task to running state. At this point, the task must be
         // scheduled.
-        let actual: State = self
+        let actual: State = me
             .state
             .compare_and_swap(Scheduled.into(), Running.into(), AcqRel)
             .into();
@@ -111,14 +109,11 @@ impl Task {
             _ => panic!("unexpected task state; {:?}", actual),
         }
 
-        trace!(
-            "Task::run; state={:?}",
-            State::from(self.state.load(Relaxed))
-        );
+        trace!("Task::run; state={:?}", State::from(me.state.load(Relaxed)));
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained.
-        let fut = unsafe { &mut (*self.future.get()) };
+        let fut = unsafe { &mut (*me.future.get()) };
 
         // This block deals with the future panicking while being polled.
         //
@@ -126,7 +121,7 @@ impl Task {
         // `thread::panicking() -> true`. To do this, the future is dropped from
         // within the catch_unwind block.
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a>(&'a mut Option<Spawn<BoxFuture>>, bool);
+            struct Guard<'a>(&'a mut Option<BoxFuture>, bool);
 
             impl<'a> Drop for Guard<'a> {
                 fn drop(&mut self) {
@@ -139,10 +134,14 @@ impl Task {
 
             let mut g = Guard(fut, true);
 
-            let ret =
-                g.0.as_mut()
-                    .unwrap()
-                    .poll_future_notify(unpark, self as *const _ as usize);
+            let mut waker = arc_waker::waker(Arc::new(Waker {
+                task: me.clone(),
+                pool: pool.clone(),
+            }));
+
+            let mut cx = Context::from_waker(&mut waker);
+
+            let ret = g.0.as_mut().unwrap().as_mut().poll(&mut cx);
 
             g.1 = false;
 
@@ -150,7 +149,7 @@ impl Task {
         }));
 
         match res {
-            Ok(Ok(Async::Ready(_))) | Ok(Err(_)) | Err(_) => {
+            Ok(Poll::Ready(_)) | Err(_) => {
                 trace!("    -> task complete");
 
                 // The future has completed. Drop it immediately to free
@@ -158,20 +157,20 @@ impl Task {
                 //
                 // The `Task` harness will stay around longer if it is contained
                 // by any of the various queues.
-                self.drop_future();
+                me.drop_future();
 
                 // Transition to the completed state
-                self.state.store(State::Complete.into(), Release);
+                me.state.store(State::Complete.into(), Release);
 
                 if let Err(panic_err) = res {
-                    if let Some(ref f) = unpark.pool.config.panic_handler {
+                    if let Some(ref f) = pool.config.panic_handler {
                         f(panic_err);
                     }
                 }
 
                 Run::Complete
             }
-            Ok(Ok(Async::NotReady)) => {
+            Ok(Poll::Pending) => {
                 trace!("    -> not ready");
 
                 // Attempt to transition from Running -> Idle, if successful,
@@ -179,7 +178,7 @@ impl Task {
                 // fails, then the task has been unparked concurrent to running,
                 // in which case it transitions immediately back to scheduled
                 // and we return `true`.
-                let prev: State = self
+                let prev: State = me
                     .state
                     .compare_and_swap(Running.into(), Idle.into(), AcqRel)
                     .into();
@@ -187,7 +186,7 @@ impl Task {
                 match prev {
                     Running => Run::Idle,
                     Notified => {
-                        self.state.store(Scheduled.into(), Release);
+                        me.state.store(Scheduled.into(), Release);
                         Run::Schedule
                     }
                     _ => unreachable!(),
@@ -231,23 +230,23 @@ impl Task {
         }
     }
 
-    /// Notify the task
-    pub fn notify(me: Arc<Task>, pool: &Arc<Pool>) {
-        if me.schedule() {
-            let _ = pool.submit(me, pool);
-        }
-    }
-
     /// Notify the task it has been allocated blocking capacity
     pub fn notify_blocking(me: Arc<Task>, pool: &Arc<Pool>) {
         BlockingState::notify_blocking(&me.blocking, AcqRel);
-        Task::notify(me, pool);
+        Task::schedule(&me, pool);
+    }
+
+    pub fn schedule(me: &Arc<Self>, pool: &Arc<Pool>) {
+        if me.schedule2() {
+            let task = me.clone();
+            let _ = pool.submit(task, &pool);
+        }
     }
 
     /// Transition the task state to scheduled.
     ///
     /// Returns `true` if the caller is permitted to schedule the task.
-    pub fn schedule(&self) -> bool {
+    fn schedule2(&self) -> bool {
         use self::State::*;
 
         loop {
@@ -300,7 +299,18 @@ impl fmt::Debug for Task {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Task")
             .field("state", &self.state)
-            .field("future", &"Spawn<BoxFuture>")
+            .field("future", &"BoxFuture")
             .finish()
+    }
+}
+
+struct Empty;
+
+impl Future for Empty {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+        // Never used
+        unreachable!();
     }
 }

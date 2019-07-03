@@ -4,7 +4,6 @@ use std::cell::Cell;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio_executor::Enter;
 
 /// A handle to a source of time.
 ///
@@ -108,9 +107,9 @@ impl fmt::Debug for Clock {
 /// # Panics
 ///
 /// This function panics if there already is a default clock set.
-pub fn with_default<F, R>(clock: &Clock, enter: &mut Enter, f: F) -> R
+pub fn with_default<F, R>(clock: &Clock, f: F) -> R
 where
-    F: FnOnce(&mut Enter) -> R,
+    F: FnOnce() -> R,
 {
     CLOCK.with(|cell| {
         assert!(
@@ -132,6 +131,6 @@ where
 
         cell.set(Some(clock as *const Clock));
 
-        f(enter)
+        f()
     })
 }

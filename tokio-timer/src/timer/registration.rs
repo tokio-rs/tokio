@@ -43,7 +43,7 @@ impl Registration {
     }
 
     // Used by `Timeout<Stream>`
-    #[cfg(feature = "timeout-stream")]
+    #[cfg(feature = "async-traits")]
     pub fn reset_timeout(&mut self) {
         let deadline = crate::clock::now() + self.entry.time_ref().duration;
         self.entry.time_mut().deadline = deadline;

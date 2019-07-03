@@ -3,8 +3,8 @@ use tokio_current_thread::Handle as ExecutorHandle;
 use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_executor;
 use tokio_reactor::{self, Reactor};
-//use tokio_timer::clock::{self, Clock};
-//use tokio_timer::timer::{self, Timer};
+use tokio_timer::clock::{self, Clock};
+use tokio_timer::timer::{self, Timer};
 use std::error::Error;
 use std::fmt;
 use std::future::Future;
@@ -19,13 +19,12 @@ use std::io;
 #[derive(Debug)]
 pub struct Runtime {
     reactor_handle: tokio_reactor::Handle,
-    //timer_handle: timer::Handle,
-    //clock: Clock,
+    timer_handle: timer::Handle,
+    clock: Clock,
     executor: CurrentThread<Parker>,
 }
 
-//pub(super) type Parker = Timer<Reactor>;
-pub(super) type Parker = Reactor;
+pub(super) type Parker = Timer<Reactor>;
 
 /// Handle to spawn a future on the corresponding `CurrentThread` runtime instance
 #[derive(Debug, Clone)]
@@ -101,14 +100,14 @@ impl Runtime {
 
     pub(super) fn new2(
         reactor_handle: tokio_reactor::Handle,
-        //timer_handle: timer::Handle,
-        //clock: Clock,
+        timer_handle: timer::Handle,
+        clock: Clock,
         executor: CurrentThread<Parker>,
     ) -> Runtime {
         Runtime {
             reactor_handle,
-            //timer_handle,
-            //clock,
+            timer_handle,
+            clock,
             executor,
         }
     }
@@ -197,8 +196,8 @@ impl Runtime {
     {
         let Runtime {
             ref reactor_handle,
-            //ref timer_handle,
-            //ref clock,
+            ref timer_handle,
+            ref clock,
             ref mut executor,
             ..
         } = *self;
@@ -209,20 +208,20 @@ impl Runtime {
         // This will set the default handle and timer to use inside the closure
         // and run the future.
         tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
-            //clock::with_default(clock, enter, |enter| {
-            //    timer::with_default(&timer_handle, enter, |enter| {
-            // The TaskExecutor is a fake executor that looks into the
-            // current single-threaded executor when used. This is a trick,
-            // because we need two mutable references to the executor (one
-            // to run the provided future, another to install as the default
-            // one). We use the fake one here as the default one.
-            let mut default_executor = current_thread::TaskExecutor::current();
-            tokio_executor::with_default(&mut default_executor, enter, |enter| {
-                let mut executor = executor.enter(enter);
-                f(&mut executor)
+            clock::with_default(clock, || {
+                timer::with_default(&timer_handle, || {
+                    // The TaskExecutor is a fake executor that looks into the
+                    // current single-threaded executor when used. This is a trick,
+                    // because we need two mutable references to the executor (one
+                    // to run the provided future, another to install as the default
+                    // one). We use the fake one here as the default one.
+                    let mut default_executor = current_thread::TaskExecutor::current();
+                    tokio_executor::with_default(&mut default_executor, enter, |enter| {
+                        let mut executor = executor.enter(enter);
+                        f(&mut executor)
+                    })
+                })
             })
-            //    })
-            //})
         })
     }
 }

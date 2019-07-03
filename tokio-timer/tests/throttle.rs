@@ -1,49 +1,68 @@
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
+#![cfg(feature = "async-traits")]
 
-mod support;
-use crate::support::*;
-
-use futures::{prelude::*, sync::mpsc};
+use tokio_sync::mpsc;
+use tokio_test::task::MockTask;
+use tokio_test::{assert_pending, assert_ready_eq, clock};
 use tokio_timer::throttle::Throttle;
+
+use futures_core::Stream;
+use std::time::Duration;
+
+macro_rules! poll {
+    ($task:ident, $stream:ident) => {{
+        use std::pin::Pin;
+        $task.enter(|cx| Pin::new(&mut $stream).poll_next(cx))
+    }};
+}
 
 #[test]
 fn throttle() {
-    mocked(|timer, _| {
-        let (tx, rx) = mpsc::unbounded();
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
+        let (mut tx, rx) = mpsc::unbounded_channel();
         let mut stream = Throttle::new(rx, ms(1));
 
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
 
         for i in 0..3 {
-            tx.unbounded_send(i).unwrap();
+            tx.try_send(i).unwrap();
         }
+
         for i in 0..3 {
-            assert_ready_eq!(stream, Some(i));
-            assert_not_ready!(stream);
+            assert_ready_eq!(poll!(t, stream), Some(i));
+            assert_pending!(poll!(t, stream));
 
-            advance(timer, ms(1));
+            clock.advance(ms(1));
         }
 
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
     });
 }
 
 #[test]
 fn throttle_dur_0() {
-    mocked(|_, _| {
-        let (tx, rx) = mpsc::unbounded();
+    let mut t = MockTask::new();
+
+    clock::mock(|_| {
+        let (mut tx, rx) = mpsc::unbounded_channel();
         let mut stream = Throttle::new(rx, ms(0));
 
-        assert_not_ready!(stream);
+        assert_pending!(poll!(t, stream));
 
         for i in 0..3 {
-            tx.unbounded_send(i).unwrap();
-        }
-        for i in 0..3 {
-            assert_ready_eq!(stream, Some(i));
+            tx.try_send(i).unwrap();
         }
 
-        assert_not_ready!(stream);
+        for i in 0..3 {
+            assert_ready_eq!(poll!(t, stream), Some(i));
+        }
+
+        assert_pending!(poll!(t, stream));
     });
+}
+
+fn ms(n: u64) -> Duration {
+    Duration::from_millis(n)
 }

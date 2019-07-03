@@ -74,41 +74,16 @@ macro_rules! assert_pending {
     }};
 }
 
-/*
 /// Assert if a poll is ready and check for equality on the value
 #[macro_export]
 macro_rules! assert_ready_eq {
     ($e:expr, $expect:expr) => {
-        use $crate::codegen::futures::Async::Ready;
-        match $e {
-            Ok(e) => assert_eq!(e, Ready($expect)),
-            Err(e) => panic!("error = {:?}", e),
-        }
+        let val = $crate::assert_ready!($e);
+        assert_eq!(val, $expect)
     };
 
     ($e:expr, $expect:expr, $($msg:tt),+) => {
-        use $crate::codegen::futures::Async::Ready;
-        match $e {
-            Ok(e) => assert_eq!(e, Ready($expect), $($msg)+),
-            Err(e) => {
-                let msg = format_args!($($msg),+);
-                panic!("error = {:?}; {}", e, msg)
-            }
-        }
+        let val = $crate::assert_ready!($e);
+        assert_eq!(val, $expect, $($msg),*)
     };
 }
-*/
-
-/*
-/// Assert if the deadline has passed
-#[macro_export]
-macro_rules! assert_elapsed {
-    ($e:expr) => {
-        assert!($e.unwrap_err().is_elapsed());
-    };
-
-    ($e:expr, $($msg:expr),+) => {
-        assert!($e.unwrap_err().is_elapsed(), $msg);
-    };
-}
-*/

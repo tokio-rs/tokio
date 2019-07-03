@@ -40,7 +40,7 @@ pub mod tcp {
     //! [`TcpListener`]: struct.TcpListener.html
     //! [incoming_method]: struct.TcpListener.html#method.incoming
     //! [`Incoming`]: struct.Incoming.html
-    pub use tokio_tcp::{TcpListener, TcpStream};
+    pub use tokio_tcp::{split, TcpListener, TcpStream};
 }
 #[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
@@ -58,7 +58,7 @@ pub mod udp {
     //! [`Send`]: struct.Send.html
     //! [`RecvFrom`]: struct.RecvFrom.html
     //! [`SendTo`]: struct.SendTo.html
-    pub use tokio_udp::{UdpSocket, Recv, Send, RecvFrom, SendTo};
+    pub use tokio_udp::{Recv, RecvFrom, Send, SendTo, UdpSocket};
 }
 #[cfg(feature = "udp")]
 pub use self::udp::UdpSocket;

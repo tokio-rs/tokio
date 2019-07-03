@@ -35,6 +35,7 @@ macro_rules! ready {
 #[cfg(feature = "incoming")]
 mod incoming;
 mod listener;
+pub mod split;
 mod stream;
 
 pub use self::listener::TcpListener;

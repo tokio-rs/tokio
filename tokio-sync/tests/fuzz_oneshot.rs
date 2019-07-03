@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 /// Unwrap a ready value or propagate `Async::Pending`.
 #[macro_export]
@@ -89,7 +90,7 @@ impl<'a> Future for OnClose<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        self.get_mut().tx.poll_close(cx)
+        self.get_mut().tx.poll_closed(cx)
     }
 }
 

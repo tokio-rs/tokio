@@ -88,8 +88,15 @@ impl<T> UnboundedReceiver<T> {
     }
 
     /// TODO: dox
-    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
+    }
+
+    /// TODO: Dox
+    pub async fn recv(&mut self) -> Option<T> {
+        use async_util::future::poll_fn;
+
+        poll_fn(|cx| self.poll_recv(cx)).await
     }
 
     /// Closes the receiving half of a channel, without dropping it.

@@ -1,44 +1,61 @@
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
 
-mod support;
-use crate::support::*;
-
-use futures::Stream;
-use tokio_mock_task::MockTask;
+use tokio_test::task::MockTask;
+use tokio_test::{assert_ok, assert_pending, assert_ready, clock};
 use tokio_timer::*;
+
+use std::time::Duration;
+
+macro_rules! poll {
+    ($task:ident, $queue:ident) => {
+        $task.enter(|cx| $queue.poll_next(cx))
+    };
+}
+
+macro_rules! assert_ready_ok {
+    ($e:expr) => {{
+        assert_ok!(match assert_ready!($e) {
+            Some(v) => v,
+            None => panic!("None"),
+        })
+    }};
+}
 
 #[test]
 fn single_immediate_delay() {
-    mocked(|_timer, time| {
-        let mut queue = DelayQueue::new();
-        let _key = queue.insert_at("foo", time.now());
+    let mut t = MockTask::new();
 
-        let entry = assert_ready!(queue).unwrap();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+        let _key = queue.insert_at("foo", clock.now());
+
+        let entry = assert_ready_ok!(poll!(t, queue));
         assert_eq!(*entry.get_ref(), "foo");
 
-        let entry = assert_ready!(queue);
+        let entry = assert_ready!(poll!(t, queue));
         assert!(entry.is_none())
     });
 }
 
 #[test]
 fn multi_immediate_delays() {
-    mocked(|_timer, time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
 
-        let _k = queue.insert_at("1", time.now());
-        let _k = queue.insert_at("2", time.now());
-        let _k = queue.insert_at("3", time.now());
+        let _k = queue.insert_at("1", clock.now());
+        let _k = queue.insert_at("2", clock.now());
+        let _k = queue.insert_at("3", clock.now());
 
         let mut res = vec![];
 
         while res.len() < 3 {
-            let entry = assert_ready!(queue).unwrap();
+            let entry = assert_ready_ok!(poll!(t, queue));
             res.push(entry.into_inner());
         }
 
-        let entry = assert_ready!(queue);
+        let entry = assert_ready!(poll!(t, queue));
         assert!(entry.is_none());
 
         res.sort();
@@ -51,28 +68,26 @@ fn multi_immediate_delays() {
 
 #[test]
 fn single_short_delay() {
-    mocked(|timer, time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
-        let _key = queue.insert_at("foo", time.now() + ms(5));
+        let _key = queue.insert_at("foo", clock.now() + ms(5));
 
-        let mut task = MockTask::new();
+        assert_pending!(poll!(t, queue));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        clock.turn_for(ms(1));
 
-        turn(timer, ms(1));
+        assert!(!t.is_woken());
 
-        assert!(!task.is_notified());
+        clock.turn_for(ms(5));
 
-        turn(timer, ms(5));
+        assert!(t.is_woken());
 
-        assert!(task.is_notified());
-
-        let entry = assert_ready!(queue).unwrap();
+        let entry = assert_ready_ok!(poll!(t, queue));
         assert_eq!(*entry.get_ref(), "foo");
 
-        let entry = assert_ready!(queue);
+        let entry = assert_ready!(poll!(t, queue));
         assert!(entry.is_none());
     });
 }
@@ -82,40 +97,33 @@ fn multi_delay_at_start() {
     let long = 262_144 + 9 * 4096;
     let delays = &[1000, 2, 234, long, 60, 10];
 
-    mocked(|timer, time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
 
         // Setup the delays
         for &i in delays {
-            let _key = queue.insert_at(i, time.now() + ms(i));
+            let _key = queue.insert_at(i, clock.now() + ms(i));
         }
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
-
-        assert!(!task.is_notified());
+        assert_pending!(poll!(t, queue));
+        assert!(!t.is_woken());
 
         for elapsed in 0..1200 {
-            turn(timer, ms(1));
+            clock.turn_for(ms(1));
             let elapsed = elapsed + 1;
 
             if delays.contains(&elapsed) {
-                assert!(task.is_notified());
-
-                task.enter(|| {
-                    assert_ready!(queue);
-                    assert_not_ready!(queue);
-                });
+                assert!(t.is_woken());
+                assert_ready!(poll!(t, queue));
+                assert_pending!(poll!(t, queue));
             } else {
-                if task.is_notified() {
+                if t.is_woken() {
                     let cascade = &[192, 960];
                     assert!(cascade.contains(&elapsed), "elapsed={}", elapsed);
 
-                    task.enter(|| {
-                        assert_not_ready!(queue, "elapsed={}", elapsed);
-                    });
+                    assert_pending!(poll!(t, queue));
                 }
             }
         }
@@ -124,150 +132,141 @@ fn multi_delay_at_start() {
 
 #[test]
 fn insert_in_past_fires_immediately() {
-    mocked(|timer, time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
 
-        let now = time.now();
+        let now = clock.now();
 
-        turn(timer, ms(10));
+        clock.turn_for(ms(10));
 
         queue.insert_at("foo", now);
 
-        assert_ready!(queue);
+        assert_ready!(poll!(t, queue));
     });
 }
 
 #[test]
 fn remove_entry() {
-    mocked(|timer, time| {
+    let mut t = MockTask::new();
+
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
 
-        let key = queue.insert_at("foo", time.now() + ms(5));
+        let key = queue.insert_at("foo", clock.now() + ms(5));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
         let entry = queue.remove(&key);
         assert_eq!(entry.into_inner(), "foo");
 
-        turn(timer, ms(10));
+        clock.turn_for(ms(10));
 
-        task.enter(|| {
-            let entry = assert_ready!(queue);
-            assert!(entry.is_none());
-        });
+        let entry = assert_ready!(poll!(t, queue));
+        assert!(entry.is_none());
     });
 }
 
 #[test]
 fn reset_entry() {
-    mocked(|timer, time| {
-        let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
+    let mut t = MockTask::new();
 
-        let now = time.now();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+
+        let now = clock.now();
         let key = queue.insert_at("foo", now + ms(5));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
-
-        turn(timer, ms(1));
+        assert_pending!(poll!(t, queue));
+        clock.turn_for(ms(1));
 
         queue.reset_at(&key, now + ms(10));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
-        turn(timer, ms(7));
+        clock.turn_for(ms(7));
 
-        assert!(!task.is_notified());
+        assert!(!t.is_woken());
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
-        turn(timer, ms(3));
+        clock.turn_for(ms(3));
 
-        assert!(task.is_notified());
+        assert!(t.is_woken());
 
-        let entry = assert_ready!(queue).unwrap();
+        let entry = assert_ready_ok!(poll!(t, queue));
         assert_eq!(*entry.get_ref(), "foo");
 
-        let entry = assert_ready!(queue);
+        let entry = assert_ready!(poll!(t, queue));
         assert!(entry.is_none())
     });
 }
 
 #[test]
 fn reset_much_later() {
+    let mut t = MockTask::new();
+
     // Reproduces tokio-rs/tokio#849.
-    mocked(|timer, time| {
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
 
-        let epoch = time.now();
+        let epoch = clock.now();
 
-        turn(timer, ms(1));
+        clock.turn_for(ms(1));
 
         let key = queue.insert_at("foo", epoch + ms(200));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
-        turn(timer, ms(3));
+        clock.turn_for(ms(3));
 
         queue.reset_at(&key, epoch + ms(5));
 
-        turn(timer, ms(20));
+        clock.turn_for(ms(20));
 
-        assert!(task.is_notified());
+        assert!(t.is_woken());
     });
 }
 
 #[test]
 fn reset_twice() {
+    let mut t = MockTask::new();
+
     // Reproduces tokio-rs/tokio#849.
-    mocked(|timer, time| {
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
 
-        let epoch = time.now();
+        let epoch = clock.now();
 
-        turn(timer, ms(1));
+        clock.turn_for(ms(1));
 
         let key = queue.insert_at("foo", epoch + ms(200));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
-        turn(timer, ms(3));
+        clock.turn_for(ms(3));
 
         queue.reset_at(&key, epoch + ms(50));
 
-        turn(timer, ms(20));
+        clock.turn_for(ms(20));
 
         queue.reset_at(&key, epoch + ms(40));
 
-        turn(timer, ms(20));
+        clock.turn_for(ms(20));
 
-        assert!(task.is_notified());
+        assert!(t.is_woken());
     });
 }
 
 #[test]
 fn remove_expired_item() {
-    mocked(|timer, time| {
+    clock::mock(|clock| {
         let mut queue = DelayQueue::new();
 
-        let now = time.now();
+        let now = clock.now();
 
-        turn(timer, ms(10));
+        clock.turn_for(ms(10));
 
         let key = queue.insert_at("foo", now);
 
@@ -278,48 +277,45 @@ fn remove_expired_item() {
 
 #[test]
 fn expires_before_last_insert() {
-    mocked(|timer, time| {
-        let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
+    let mut t = MockTask::new();
 
-        let epoch = time.now();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+
+        let epoch = clock.now();
 
         queue.insert_at("foo", epoch + ms(10_000));
 
         // Delay should be set to 8.192s here.
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
         // Delay should be set to the delay of the new item here
         queue.insert_at("bar", epoch + ms(600));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
-        advance(timer, ms(600));
+        clock.advance(ms(600));
 
-        assert!(task.is_notified());
-        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert!(t.is_woken());
+
+        let entry = assert_ready_ok!(poll!(t, queue)).into_inner();
         assert_eq!(entry, "bar");
     })
 }
 
 #[test]
 fn multi_reset() {
-    mocked(|_, time| {
-        let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
+    let mut t = MockTask::new();
 
-        let epoch = time.now();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+
+        let epoch = clock.now();
 
         let foo = queue.insert_at("foo", epoch + ms(200));
         let bar = queue.insert_at("bar", epoch + ms(250));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
         queue.reset_at(&foo, epoch + ms(300));
         queue.reset_at(&bar, epoch + ms(350));
@@ -329,74 +325,77 @@ fn multi_reset() {
 
 #[test]
 fn expire_first_key_when_reset_to_expire_earlier() {
-    mocked(|timer, time| {
-        let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
+    let mut t = MockTask::new();
 
-        let epoch = time.now();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+
+        let epoch = clock.now();
 
         let foo = queue.insert_at("foo", epoch + ms(200));
         queue.insert_at("bar", epoch + ms(250));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
         queue.reset_at(&foo, epoch + ms(100));
 
-        advance(timer, ms(100));
+        clock.advance(ms(100));
 
-        assert!(task.is_notified());
-        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert!(t.is_woken());
+
+        let entry = assert_ready_ok!(poll!(t, queue)).into_inner();
         assert_eq!(entry, "foo");
     })
 }
 
 #[test]
 fn expire_second_key_when_reset_to_expire_earlier() {
-    mocked(|timer, time| {
-        let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
+    let mut t = MockTask::new();
 
-        let epoch = time.now();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+
+        let epoch = clock.now();
 
         queue.insert_at("foo", epoch + ms(200));
         let bar = queue.insert_at("bar", epoch + ms(250));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
         queue.reset_at(&bar, epoch + ms(100));
 
-        advance(timer, ms(100));
+        clock.advance(ms(100));
 
-        assert!(task.is_notified());
-        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert!(t.is_woken());
+        let entry = assert_ready_ok!(poll!(t, queue)).into_inner();
         assert_eq!(entry, "bar");
     })
 }
 
 #[test]
 fn reset_first_expiring_item_to_expire_later() {
-    mocked(|timer, time| {
-        let mut queue = DelayQueue::new();
-        let mut task = MockTask::new();
+    let mut t = MockTask::new();
 
-        let epoch = time.now();
+    clock::mock(|clock| {
+        let mut queue = DelayQueue::new();
+
+        let epoch = clock.now();
 
         let foo = queue.insert_at("foo", epoch + ms(200));
         let _bar = queue.insert_at("bar", epoch + ms(250));
 
-        task.enter(|| {
-            assert_not_ready!(queue);
-        });
+        assert_pending!(poll!(t, queue));
 
         queue.reset_at(&foo, epoch + ms(300));
-        advance(timer, ms(250));
+        clock.advance(ms(250));
 
-        assert!(task.is_notified());
-        let entry = assert_ready!(queue).unwrap().into_inner();
+        assert!(t.is_woken());
+
+        let entry = assert_ready_ok!(poll!(t, queue)).into_inner();
         assert_eq!(entry, "bar");
     })
+}
+
+fn ms(n: u64) -> Duration {
+    Duration::from_millis(n)
 }
