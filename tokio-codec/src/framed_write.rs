@@ -88,21 +88,21 @@ where
     E: Encoder<Item = I> + Unpin,
     E::Error: From<io::Error>,
 {
-    type Error = E::Error;
+    type SinkError = E::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         pin!(Pin::get_mut(self).inner).poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::SinkError> {
         pin!(Pin::get_mut(self).inner).start_send(item)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         pin!(Pin::get_mut(self).inner).poll_flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         pin!(Pin::get_mut(self).inner).poll_close(cx)
     }
 }
@@ -175,9 +175,9 @@ impl<I, T> Sink<I> for FramedWrite2<T>
 where
     T: AsyncWrite + Encoder<Item = I> + Unpin,
 {
-    type Error = T::Error;
+    type SinkError = T::Error;
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
         // *still* over 8KiB, then apply backpressure (reject the send).
         if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
@@ -194,13 +194,13 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::SinkError> {
         let pinned = Pin::get_mut(self);
         pinned.inner.encode(item, &mut pinned.buffer)?;
         Ok(())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         trace!("flushing framed transport");
         let pinned = Pin::get_mut(self);
 
@@ -230,7 +230,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         let () = try_ready!(pin!(self).poll_flush(cx));
         let () = try_ready!(pin!(self.inner).poll_shutdown(cx));
         Poll::Ready(Ok(()))

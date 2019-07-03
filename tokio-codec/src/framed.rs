@@ -168,21 +168,21 @@ where
     U: Encoder<Item = I> + Unpin,
     U::Error: From<io::Error>,
 {
-    type Error = U::Error;
+    type SinkError = U::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Pin::new(Pin::get_mut(self).inner.get_mut()).poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::SinkError> {
         Pin::new(Pin::get_mut(self).inner.get_mut()).start_send(item)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Pin::new(Pin::get_mut(self).inner.get_mut()).poll_flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Pin::new(Pin::get_mut(self).inner.get_mut()).poll_close(cx)
     }
 }
