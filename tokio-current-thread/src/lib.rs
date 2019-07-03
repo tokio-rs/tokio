@@ -702,7 +702,7 @@ impl Handle {
 
     fn is_shut_down(&self) -> bool {
         // LSB of "num_futures" is the shutdown bit
-        let num_futures = self.num_futures.fetch_add(2, atomic::Ordering::SeqCst);
+        let num_futures = self.num_futures.load(atomic::Ordering::SeqCst);
         num_futures % 2 == 1
     }
 }
