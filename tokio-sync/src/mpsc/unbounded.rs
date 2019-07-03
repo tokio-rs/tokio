@@ -130,22 +130,22 @@ impl<T> UnboundedSender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> async_sink::Sink<T> for UnboundedSender<T> {
-    type Error = UnboundedSendError;
+impl<T> tokio_futures::Sink<T> for UnboundedSender<T> {
+    type SinkError = UnboundedSendError;
 
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::SinkError> {
         self.try_send(msg).map_err(|_| UnboundedSendError(()))
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Poll::Ready(Ok(()))
     }
 }

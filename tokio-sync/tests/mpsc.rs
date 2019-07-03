@@ -56,7 +56,7 @@ async fn async_send_recv_with_buffer() {
 #[test]
 #[cfg(feature = "async-traits")]
 fn send_sink_recv_with_buffer() {
-    use async_sink::Sink;
+    use tokio_futures::Sink;
     use futures_core::Stream;
     use pin_utils::pin_mut;
 
@@ -169,7 +169,7 @@ async fn async_send_recv_unbounded() {
 #[test]
 #[cfg(feature = "async-traits")]
 fn sink_send_recv_unbounded() {
-    use async_sink::Sink;
+    use tokio_futures::Sink;
     use futures_core::Stream;
     use pin_utils::pin_mut;
 

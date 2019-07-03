@@ -22,11 +22,11 @@ categories = ["asynchronous"]
 publish = false
 
 [features]
-async-traits = ["async-sink", "futures-core-preview"]
+async-traits = ["tokio-futures", "futures-core-preview"]
 
 [dependencies]
 async-util = { git = "https://github.com/tokio-rs/async" }
-async-sink = { git = "https://github.com/tokio-rs/async", optional = true }
+tokio-futures = { path = "../tokio-futures", optional = true }
 fnv = "1.0.6"
 futures-core-preview = { version = "0.3.0-alpha.17", optional = true }
 

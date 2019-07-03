@@ -367,23 +367,23 @@ impl<T> Sender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> async_sink::Sink<T> for Sender<T> {
-    type Error = error::SendError<T>;
+impl<T> tokio_futures::Sink<T> for Sender<T> {
+    type SinkError = error::SendError<T>;
 
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::SinkError> {
         let _ = self.as_ref().get_ref().broadcast(item)?;
         Ok(())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
         Ready(Ok(()))
     }
 }
