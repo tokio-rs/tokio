@@ -31,14 +31,12 @@ jobs:
     rust: $(nightly)
     crates:
 #       - tokio-fs
-      tokio-reactor:
-        - default
+      tokio-reactor: []
 #       - tokio-signal
       tokio-tcp:
-        - default
+        - incoming
 #       - tokio-tls
-      tokio-udp:
-        - default
+      tokio-udp: []
 #       - tokio-uds
 
 # Test crates that are NOT platform specific
@@ -49,24 +47,17 @@ jobs:
     rust: $(nightly)
     crates:
       # - tokio-buf
-      tokio-codec:
-        - default
-      tokio-current-thread:
-        - default
-      tokio-executor:
-        - default
-      tokio-io:
-        - default
+      tokio-codec: []
+      tokio-current-thread: []
+      tokio-executor: []
+      tokio-io: []
       tokio-sync:
-        - default
-      tokio-macros:
-        - default
+        - async-traits
+      tokio-macros: []
       # - tokio-threadpool
       tokio-timer:
-        - default
         - async-traits
-      tokio-test:
-        - default
+      tokio-test: []
 
 # - template: ci/azure-cargo-check.yml
 #   parameters:

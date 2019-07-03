@@ -34,12 +34,26 @@ jobs:
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
+    # Run with default crate features
+    - script: cargo test --tests
+      env:
+        LOOM_MAX_DURATION: 10
+        CI: 'True'
+      displayName: cargo test --tests
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+    - script: cargo test --examples
+      displayName: cargo test --examples
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+
+    # Run with each specified feature
     - ${{ each feature in crate.value }}:
       - script: cargo test --tests --no-default-features --features ${{ feature }}
         env:
           LOOM_MAX_DURATION: 10
           CI: 'True'
         displayName: cargo test --tests --features ${{ feature }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
       - script: cargo test --examples --no-default-features --features ${{ feature }}
         displayName: cargo test --examples --features ${{ feature }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
