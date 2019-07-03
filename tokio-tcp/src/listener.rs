@@ -110,6 +110,24 @@ impl TcpListener {
         Poll::Ready(Ok((io, addr)))
     }
 
+    /// Accept a new incoming connection from this listener.
+    ///
+    /// This function will yield once a new TCP connection is established. When
+    /// established, the corresponding [`TcpStream`] and the remote peer's
+    /// address will be returned.
+    ///
+    /// [`TcpStream`]: ../struct.TcpStream.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
+        use async_util::future::poll_fn;
+        poll_fn(|cx| self.poll_accept(cx)).await
+    }
+
     /// Attempt to accept a connection and create a new connected `TcpStream` if
     /// successful.
     ///

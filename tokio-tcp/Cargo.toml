@@ -25,6 +25,7 @@ publish = false
 incoming = ["futures-core-preview"]
 
 [dependencies]
+async-util = { git = "https://github.com/tokio-rs/async" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 bytes = "0.4"
@@ -38,3 +39,4 @@ futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
 #env_logger = { version = "0.5", default-features = false }
 #net2 = "*"
 tokio = { version = "0.2.0", path = "../tokio" }
+tokio-test = { version = "0.2.0", path = "../tokio-test" }
