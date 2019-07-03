@@ -31,7 +31,7 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --lib && cargo test --all --tests
-    - cargo doc --all
+    - cargo doc --all --no-deps
   # TODO: Re-enable
   # i686_test_script:
   #   - . $HOME/.cargo/env
