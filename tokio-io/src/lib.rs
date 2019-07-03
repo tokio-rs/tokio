@@ -9,7 +9,7 @@
 //! A description of the high-level I/O combinators can be [found online] in
 //! addition to a description of the [low level details].
 //!
-//! [found online]: https://tokio.rs/docs/getting-started/core/
+//! [found online]: https://tokio.rs/docs/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
 macro_rules! ready {

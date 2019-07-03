@@ -27,8 +27,8 @@ the Rust programming language. It is:
 [gitter-url]: https://gitter.im/tokio-rs/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/getting-started/hello-world/) |
-[API Docs](https://docs.rs/tokio/0.1.21/tokio) |
+[Guides](https://tokio.rs/docs/) |
+[API Docs](https://docs.rs/tokio/0.1.22/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
 ## Overview
@@ -45,9 +45,9 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.1.21/tokio/net/index.html
-[reactor]: https://docs.rs/tokio/0.1.21/tokio/reactor/index.html
-[scheduler]: https://docs.rs/tokio/0.1.21/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/0.1.22/tokio/net/index.html
+[reactor]: https://docs.rs/tokio/0.1.22/tokio/reactor/index.html
+[scheduler]: https://docs.rs/tokio/0.1.22/tokio/runtime/index.html
 
 ## Example
 

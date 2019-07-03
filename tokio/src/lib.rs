@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.20")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.22")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
@@ -21,7 +21,7 @@
 //!
 //! Guide level documentation is found on the [website].
 //!
-//! [website]: https://tokio.rs/docs/getting-started/hello-world/
+//! [website]: https://tokio.rs/docs/
 //! [futures]: http://docs.rs/futures/0.1
 //!
 //! # Examples
