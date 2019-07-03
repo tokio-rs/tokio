@@ -1,15 +1,20 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
+
+use std::error::Error;
 
 // A trick to not fail build on non-unix platforms when using unix-specific features.
 #[cfg(unix)]
 mod platform {
 
-    use futures::{Future, Stream};
+    use futures_util::future;
+    use futures_util::stream::StreamExt;
+    use std::error::Error;
     use tokio_signal::unix::{Signal, SIGHUP};
 
-    pub fn main() -> Result<(), Box<dyn (::std::error::Error)>> {
+    pub async fn main() -> Result<(), Box<dyn Error>> {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
-        let stream = Signal::new(SIGHUP).flatten_stream();
+        let stream = Signal::new(SIGHUP).await?;
 
         println!("Waiting for SIGHUPS (Ctrl+C to quit)");
         println!(
@@ -27,25 +32,27 @@ mod platform {
                  or something",
                 the_signal
             );
-            Ok(())
+
+            future::ready(())
         });
 
         // Up until now, we haven't really DONE anything, just prepared
-        // now it's time to actually schedule, and thus execute, the stream
-        // on our event loop, and loop forever
-        ::tokio::runtime::current_thread::block_on_all(future)?;
+        // now it's time to actually the results!
+        future.await;
+
         Ok(())
     }
-
 }
 
 #[cfg(not(unix))]
 mod platform {
-    pub fn main() -> Result<(), Box<dyn ::std::error::Error>> {
+    use std::error::Error;
+    pub async fn main() -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    platform::main()
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    platform::main().await
 }

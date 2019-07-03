@@ -26,11 +26,13 @@ travis-ci = { repository = "tokio-rs/tokio" }
 appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
-futures = "0.1.11"
+futures-core-preview = "0.3.0-alpha.16"
+futures-util-preview = "0.3.0-alpha.16"
 lazy_static = "1"
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
+tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -41,6 +43,7 @@ signal-hook-registry = "~1"
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio" }
 tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
+tokio-sync = { version = "0.2.0", path = "../tokio-sync", features = ["async-traits"]}
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"

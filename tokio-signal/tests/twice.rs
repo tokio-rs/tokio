@@ -1,24 +1,24 @@
 #![cfg(unix)]
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 pub mod support;
 use crate::support::*;
 
 use libc;
 
-#[test]
-fn twice() {
-    let mut rt = CurrentThreadRuntime::new().unwrap();
-    let signal = run_with_timeout(&mut rt, Signal::new(libc::SIGUSR1)).unwrap();
+#[tokio::test]
+async fn twice() {
+    let mut signal = with_timeout(Signal::new(libc::SIGUSR1))
+        .await
+        .expect("failed to get signal");
 
-    send_signal(libc::SIGUSR1);
-    let (num, signal) = run_with_timeout(&mut rt, signal.into_future())
-        .ok()
-        .unwrap();
-    assert_eq!(num, Some(libc::SIGUSR1));
+    for _ in 0..2 {
+        send_signal(libc::SIGUSR1);
 
-    send_signal(libc::SIGUSR1);
-    run_with_timeout(&mut rt, signal.into_future())
-        .ok()
-        .unwrap();
+        let (num, sig) = with_timeout(signal.into_future()).await;
+        assert_eq!(num, Some(libc::SIGUSR1));
+
+        signal = sig;
+    }
 }

@@ -8,13 +8,16 @@
 #![cfg(windows)]
 
 use std::convert::TryFrom;
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
 use std::sync::{Once, ONCE_INIT};
+use std::task::{Context, Poll};
 
-use futures::future;
-use futures::sync::mpsc::{channel, Receiver, Sender};
-use futures::{Async, Future, Poll, Stream};
+use futures_core::stream::Stream;
+use futures_util::future::{self, FutureExt};
 use tokio_reactor::Handle;
+use tokio_sync::mpsc::{channel, Receiver, Sender};
 use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
@@ -62,9 +65,9 @@ pub(crate) struct OsExtraData {
 
 impl Init for OsExtraData {
     fn init() -> Self {
-        let (driver_waker, driver_rx) = channel(0);
+        let (driver_waker, driver_rx) = channel(1);
 
-        ::tokio_executor::spawn(DriverTask { rx: driver_rx });
+        tokio_executor::spawn(DriverTask { rx: driver_rx });
 
         Self { driver_waker }
     }
@@ -129,7 +132,7 @@ impl Event {
     }
 
     fn new(signum: DWORD, _handle: &Handle) -> IoFuture<Event> {
-        let new_signal = future::poll_fn(move || {
+        future::lazy(move |_| {
             let mut init = None;
             INIT.call_once(|| {
                 init = Some(global_init());
@@ -139,25 +142,20 @@ impl Event {
                 return Err(e);
             }
 
-            let (tx, rx) = channel(0);
+            let (tx, rx) = channel(1);
             globals().register_listener(signum as EventId, tx);
 
-            Ok(Async::Ready(Event { rx }))
-        });
-
-        Box::new(new_signal)
+            Ok(Event { rx })
+        })
+        .boxed()
     }
 }
 
 impl Stream for Event {
     type Item = ();
-    type Error = io::Error;
 
-    fn poll(&mut self) -> Poll<Option<()>, io::Error> {
-        self.rx
-            .poll()
-            // receivers don't generate errors
-            .map_err(|_| unreachable!())
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.rx.poll_recv(cx)
     }
 }
 
@@ -173,26 +171,23 @@ fn global_init() -> io::Result<()> {
 }
 
 impl Future for DriverTask {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<(), ()> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             // Ensure we keep polling our waker until we know there are no more
             // events (and therefore we've registered interest to be woken again).
-            match self.rx.poll() {
-                Ok(Async::Ready(Some(()))) => continue,
-                Ok(Async::Ready(None)) => panic!("driver got disconnected?"),
-                Ok(Async::NotReady) => break,
-                // receivers don't generate errors
-                Err(()) => unreachable!(),
+            match self.rx.poll_recv(cx) {
+                Poll::Ready(Some(())) => continue,
+                Poll::Ready(None) => panic!("driver got disconnected?"),
+                Poll::Pending => break,
             }
         }
 
         globals().broadcast();
 
         // TODO(1000): when to finish this task?
-        Ok(Async::NotReady)
+        Poll::Pending
     }
 }
 
@@ -213,20 +208,14 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::future::FutureExt;
+    use futures_util::stream::StreamExt;
     use std::time::Duration;
     use tokio::runtime::current_thread;
-    use tokio::timer::Timeout;
+    use tokio_timer::Timeout;
 
-    fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
-        Timeout::new(future, Duration::from_secs(1)).map_err(|e| {
-            if e.is_timer() {
-                panic!("failed to register timer");
-            } else if e.is_elapsed() {
-                panic!("timed out")
-            } else {
-                e.into_inner().expect("missing inner error")
-            }
-        })
+    fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
+        Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
     }
 
     #[test]
@@ -245,19 +234,16 @@ mod tests {
             super::handler(CTRL_C_EVENT);
         }
 
-        rt.block_on(with_timeout(event_ctrl_c.into_future()))
-            .ok()
-            .expect("failed to run event");
+        rt.block_on(with_timeout(event_ctrl_c.into_future()));
 
         let event_ctrl_break = rt
             .block_on(with_timeout(Event::ctrl_break()))
             .expect("failed to run future");
+
         unsafe {
             super::handler(CTRL_BREAK_EVENT);
         }
 
-        rt.block_on(with_timeout(event_ctrl_break.into_future()))
-            .ok()
-            .expect("failed to run event");
+        rt.block_on(with_timeout(event_ctrl_break.into_future()));
     }
 }
