@@ -154,20 +154,19 @@ where
 
 impl fmt::Display for BlockingError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.description())
+        write!(
+            fmt,
+            "`blocking` annotation used from outside the context of a thread pool"
+        )
     }
 }
 
 impl fmt::Debug for BlockingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BlockingError")
-            .field("reason", &self.description())
+            .field("reason", &format!("{}", self))
             .finish()
     }
 }
 
-impl Error for BlockingError {
-    fn description(&self) -> &str {
-        "`blocking` annotation used from outside the context of a thread pool"
-    }
-}
+impl Error for BlockingError {}

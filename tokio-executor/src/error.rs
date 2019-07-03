@@ -39,12 +39,11 @@ impl SpawnError {
 
 impl fmt::Display for SpawnError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.description())
+        write!(
+            fmt,
+            "attempted to spawn task while the executor is at capacity or shut down"
+        )
     }
 }
 
-impl Error for SpawnError {
-    fn description(&self) -> &str {
-        "attempted to spawn task while the executor is at capacity or shut down"
-    }
-}
+impl Error for SpawnError {}

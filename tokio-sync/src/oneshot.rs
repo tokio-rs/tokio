@@ -44,31 +44,21 @@ pub mod error {
 
     impl fmt::Display for RecvError {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            use std::error::Error;
-            write!(fmt, "{}", self.description())
+            write!(fmt, "channel closed")
         }
     }
 
-    impl ::std::error::Error for RecvError {
-        fn description(&self) -> &str {
-            "channel closed"
-        }
-    }
+    impl ::std::error::Error for RecvError {}
 
     // ===== impl TryRecvError =====
 
     impl fmt::Display for TryRecvError {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            use std::error::Error;
-            write!(fmt, "{}", self.description())
+            write!(fmt, "channel closed")
         }
     }
 
-    impl ::std::error::Error for TryRecvError {
-        fn description(&self) -> &str {
-            "channel closed"
-        }
-    }
+    impl ::std::error::Error for TryRecvError {}
 }
 
 use self::error::*;

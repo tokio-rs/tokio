@@ -15,8 +15,4 @@ impl fmt::Display for Never {
     }
 }
 
-impl error::Error for Never {
-    fn description(&self) -> &str {
-        match *self {}
-    }
-}
+impl error::Error for Never {}

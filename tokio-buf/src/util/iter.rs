@@ -47,8 +47,4 @@ impl fmt::Display for Never {
     }
 }
 
-impl Error for Never {
-    fn description(&self) -> &str {
-        unreachable!();
-    }
-}
+impl Error for Never {}

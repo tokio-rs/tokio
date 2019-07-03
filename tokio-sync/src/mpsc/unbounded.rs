@@ -154,16 +154,11 @@ impl<T> async_sink::Sink<T> for UnboundedSender<T> {
 
 impl fmt::Display for UnboundedSendError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        write!(fmt, "channel closed")
     }
 }
 
-impl ::std::error::Error for UnboundedSendError {
-    fn description(&self) -> &str {
-        "channel closed"
-    }
-}
+impl ::std::error::Error for UnboundedSendError {}
 
 // ===== impl TrySendError =====
 
@@ -176,16 +171,11 @@ impl<T> UnboundedTrySendError<T> {
 
 impl<T: fmt::Debug> fmt::Display for UnboundedTrySendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        write!(fmt, "channel closed")
     }
 }
 
-impl<T: fmt::Debug> ::std::error::Error for UnboundedTrySendError<T> {
-    fn description(&self) -> &str {
-        "channel closed"
-    }
-}
+impl<T: fmt::Debug> ::std::error::Error for UnboundedTrySendError<T> {}
 
 impl<T> From<(T, chan::TrySendError)> for UnboundedTrySendError<T> {
     fn from((value, err): (T, chan::TrySendError)) -> UnboundedTrySendError<T> {
@@ -198,13 +188,8 @@ impl<T> From<(T, chan::TrySendError)> for UnboundedTrySendError<T> {
 
 impl fmt::Display for UnboundedRecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        write!(fmt, "channel closed")
     }
 }
 
-impl ::std::error::Error for UnboundedRecvError {
-    fn description(&self) -> &str {
-        "channel closed"
-    }
-}
+impl ::std::error::Error for UnboundedRecvError {}

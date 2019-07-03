@@ -940,12 +940,8 @@ impl fmt::Debug for FrameTooBig {
 
 impl fmt::Display for FrameTooBig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.description())
+        f.write_str("frame size too big")
     }
 }
 
-impl StdError for FrameTooBig {
-    fn description(&self) -> &str {
-        "frame size too big"
-    }
-}
+impl StdError for FrameTooBig {}
