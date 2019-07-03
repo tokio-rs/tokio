@@ -7,7 +7,7 @@ use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
 use std::future::Future;
-use std::io;
+use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
@@ -136,15 +136,78 @@ impl AsyncRead for UnixStream {
     }
 
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.io).poll_read(cx, buf)
+        self.poll_read_priv(cx, buf)
     }
 
     fn poll_read_buf<B: BufMut>(
         self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        self.poll_read_buf_priv(cx, buf)
+    }
+}
+
+impl AsyncWrite for UnixStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_priv(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_buf_priv(cx, buf)
+    }
+}
+
+impl UnixStream {
+    // == Poll IO functions that takes `&self` ==
+    //
+    // They are not public because (taken from the doc of `PollEvented`):
+    //
+    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
+    // caller must ensure that there are at most two tasks that use a
+    // `PollEvented` instance concurrently. One for reading and one for writing.
+    // While violating this requirement is "safe" from a Rust memory model point
+    // of view, it will result in unexpected behavior in the form of lost
+    // notifications and tasks hanging.
+
+    pub(crate) fn poll_read_priv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+
+        match self.io.get_ref().read(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
+            }
+            x => Poll::Ready(x),
+        }
+    }
+
+    pub(crate) fn poll_read_buf_priv<B: BufMut>(
+        &self,
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
@@ -206,27 +269,25 @@ impl AsyncRead for UnixStream {
             Err(e) => Poll::Ready(Err(e)),
         }
     }
-}
 
-impl AsyncWrite for UnixStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
+    pub(crate) fn poll_write_priv(
+        &self,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.io).poll_write(cx, buf)
+        ready!(self.io.poll_write_ready(cx))?;
+
+        match self.io.get_ref().write(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io.clear_write_ready(cx)?;
+                Poll::Pending
+            }
+            x => Poll::Ready(x),
+        }
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
+    pub(crate) fn poll_write_buf_priv<B: Buf>(
+        &self,
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
