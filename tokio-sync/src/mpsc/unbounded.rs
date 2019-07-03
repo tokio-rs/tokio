@@ -133,7 +133,10 @@ impl<T> UnboundedSender<T> {
 impl<T> tokio_futures::Sink<T> for UnboundedSender<T> {
     type SinkError = UnboundedSendError;
 
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::SinkError>> {
         Poll::Ready(Ok(()))
     }
 
@@ -141,11 +144,17 @@ impl<T> tokio_futures::Sink<T> for UnboundedSender<T> {
         self.try_send(msg).map_err(|_| UnboundedSendError(()))
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::SinkError>> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_close(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::SinkError>> {
         Poll::Ready(Ok(()))
     }
 }

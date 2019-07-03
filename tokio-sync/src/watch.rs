@@ -370,7 +370,10 @@ impl<T> Sender<T> {
 impl<T> tokio_futures::Sink<T> for Sender<T> {
     type SinkError = error::SendError<T>;
 
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::SinkError>> {
         Ready(Ok(()))
     }
 
@@ -379,11 +382,17 @@ impl<T> tokio_futures::Sink<T> for Sender<T> {
         Ok(())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::SinkError>> {
         Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_close(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::SinkError>> {
         Ready(Ok(()))
     }
 }
