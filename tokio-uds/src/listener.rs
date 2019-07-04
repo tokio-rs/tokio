@@ -1,4 +1,4 @@
-use crate::{Incoming, UnixStream};
+use crate::UnixStream;
 use mio::Ready;
 use mio_uds;
 use std::convert::TryFrom;
@@ -136,8 +136,9 @@ impl UnixListener {
     ///
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
-    pub fn incoming(self) -> Incoming {
-        Incoming::new(self)
+    #[cfg(feature = "async-traits")]
+    pub fn incoming(self) -> crate::Incoming {
+        crate::Incoming::new(self)
     }
 }
 

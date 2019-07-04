@@ -34,6 +34,7 @@ pub use crate::recv_from::RecvFrom;
 pub use crate::send::Send;
 pub use crate::send_to::SendTo;
 // pub use crate::frame::UnixDatagramFramed;
+#[cfg(feature = "async-traits")]
 pub use crate::incoming::Incoming;
 pub use crate::listener::{Accept, UnixListener};
 pub use crate::stream::{ConnectFuture, UnixStream};

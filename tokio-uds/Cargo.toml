@@ -21,9 +21,12 @@ Unix Domain sockets for Tokio
 categories = ["asynchronous"]
 publish = false
 
+[features]
+async-traits = ["futures-core-preview"]
+
 [dependencies]
 bytes = "0.4.8"
-futures-core-preview = "0.3.0-alpha.16"
+futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
 iovec = "0.1.2"
 libc = "0.2.42"
 log = "0.4.2"
