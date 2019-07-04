@@ -1,6 +1,5 @@
 use crate::ucred::{self, UCred};
 use bytes::{Buf, BufMut};
-use futures_core::future::FusedFuture;
 use iovec::IoVec;
 use mio::Ready;
 use mio_uds;
@@ -352,11 +351,5 @@ impl Future for ConnectFuture {
         }
 
         Ok(stream).into()
-    }
-}
-
-impl FusedFuture for ConnectFuture {
-    fn is_terminated(&self) -> bool {
-        self.stream.is_none()
     }
 }
