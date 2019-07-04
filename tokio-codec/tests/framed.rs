@@ -9,7 +9,8 @@ use tokio_current_thread::block_on_all;
 use tokio_io::AsyncRead;
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
-use futures::prelude::{FutureExt, StreamExt};
+use futures::future::FutureExt;
+use futures::stream::StreamExt;
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
 
