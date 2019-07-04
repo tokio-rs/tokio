@@ -23,4 +23,4 @@ default = [
 ]
 
 [dependencies]
-futures-core-preview = "0.3.0-alpha.16"
+futures-core-preview = "0.3.0-alpha.17"
