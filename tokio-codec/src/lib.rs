@@ -16,6 +16,9 @@
 //! [transports]: #
 
 #[macro_use]
+extern crate tokio_futures;
+
+#[macro_use]
 mod macros;
 
 mod bytes_codec;
