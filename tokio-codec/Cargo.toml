@@ -28,6 +28,6 @@ tokio-futures = { version = "0.2.0", path = "../tokio-futures" }
 log = "0.4"
 
 [dev-dependencies]
-futures-preview = "0.3.0-alpha.16"
+futures-preview = "0.3.0-alpha.17"
 tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
