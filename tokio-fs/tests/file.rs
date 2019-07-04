@@ -1,7 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use futures::future::poll_fn;
-use futures::Future;
+use std::future::Future;
+use std::task::Poll;
 use rand::{distributions, thread_rng, Rng};
 use std::fs;
 use std::io::SeekFrom;

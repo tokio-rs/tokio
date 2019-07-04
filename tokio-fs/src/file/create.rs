@@ -1,8 +1,11 @@
 use super::File;
-use futures::{try_ready, Future, Poll};
+use std::future::Future;
+use std::task::Poll;
+use std::task::Context;
 use std::fs::File as StdFile;
 use std::io;
 use std::path::Path;
+use std::pin::Pin;
 
 /// Future returned by `File::create` and resolves to a `File` instance.
 #[derive(Debug)]
@@ -19,17 +22,18 @@ where
     }
 }
 
+impl<P> Unpin for CreateFuture<P> {} 
+
 impl<P> Future for CreateFuture<P>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    type Item = File;
-    type Error = io::Error;
+    type Output = io::Result<File>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let std = try_ready!(crate::blocking_io(|| StdFile::create(&self.path)));
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let std = ready!(crate::blocking_io(|| StdFile::create(&self.path)))?;
 
         let file = File::from_std(std);
-        Ok(file.into())
+        Poll::Ready(Ok(file.into()))
     }
 }

@@ -5,7 +5,7 @@ use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio_fs::{stderr, stdin, stdout};
 use tokio_threadpool::Builder;
 
-use futures::{Future, Sink, Stream};
+use std::future::Future;
 
 use std::io;
 

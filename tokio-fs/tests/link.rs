@@ -35,7 +35,7 @@ fn test_hard_link() {
 #[cfg(unix)]
 #[test]
 fn test_symlink() {
-    use futures::Future;
+    use std::future::Future;
 
     let dir = TempDir::new("base").unwrap();
     let src = dir.path().join("src.txt");

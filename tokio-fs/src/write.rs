@@ -1,7 +1,11 @@
 use crate::{file, File};
-use futures::{try_ready, Async, Future, Poll};
+use std::future::Future;
+use std::task::Poll;
+use std::task::Context;
 use std::{fmt, io, mem, path::Path};
+use std::pin::Pin;
 use tokio_io;
+use tokio_io::AsyncWrite;
 
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.
@@ -25,7 +29,7 @@ use tokio_io;
 ///
 /// tokio::run(task);
 /// ```
-pub fn write<P, C: AsRef<[u8]>>(path: P, contents: C) -> WriteFile<P, C>
+pub fn write<P, C: AsRef<[u8]> + Unpin>(path: P, contents: C) -> WriteFile<P, C>
 where
     P: AsRef<Path> + Send + 'static,
 {
@@ -37,35 +41,35 @@ where
 /// A future used to open a file for writing and write the entire contents
 /// of some data to it.
 #[derive(Debug)]
-pub struct WriteFile<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]>> {
+pub struct WriteFile<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + Unpin> {
     state: State<P, C>,
 }
 
 #[derive(Debug)]
-enum State<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]>> {
+enum State<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + Unpin> {
     Create(file::CreateFuture<P>, Option<C>),
-    Write(tokio_io::io::WriteAll<File, C>),
+    Write(Option<C>, File),
 }
 
-impl<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + fmt::Debug> Future for WriteFile<P, C> {
-    type Item = C;
-    type Error = io::Error;
+impl<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + Unpin + fmt::Debug> Future for WriteFile<P, C> {
+    type Output = io::Result<C>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let new_state = match &mut self.state {
-            State::Create(ref mut create_file, contents) => {
-                let file = try_ready!(create_file.poll());
-                let write = tokio_io::io::write_all(file, contents.take().unwrap());
-                State::Write(write)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
+        let new_state = match &mut inner.state {
+            State::Create(create_file, contents) => {
+                let file = ready!(Pin::new(create_file).poll(cx))?;
+                State::Write(contents.take(), file)
             }
-            State::Write(ref mut write) => {
-                let (_, contents) = try_ready!(write.poll());
-                return Ok(Async::Ready(contents));
+            State::Write(buf, file) => {
+                let buf = buf.take().unwrap();
+                ready!(Pin::new(file).poll_write(cx, buf.as_ref()))?;
+                return Poll::Ready(Ok(buf.into()));
             }
         };
 
-        mem::replace(&mut self.state, new_state);
+        mem::replace(&mut inner.state, new_state);
         // We just entered the Write state, need to poll it before returning.
-        self.poll()
+        Pin::new(inner).poll(cx)
     }
 }

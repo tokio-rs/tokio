@@ -1,6 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use futures::{Future, Stream};
+use std::future::Future;
+use std::task::Poll;
 use std::fs;
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;

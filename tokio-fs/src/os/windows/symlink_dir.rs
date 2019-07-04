@@ -1,4 +1,5 @@
-use futures::{Future, Poll};
+use std::future::Future;
+use std::task::Poll;
 use std::io;
 use std::os::windows::fs;
 use std::path::Path;

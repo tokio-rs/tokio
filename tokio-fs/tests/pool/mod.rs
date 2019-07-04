@@ -3,7 +3,7 @@ use tokio_threadpool;
 
 use self::tokio_threadpool::Builder;
 use futures::sync::oneshot;
-use futures::Future;
+use std::future::Future;
 use std::io;
 
 pub fn run<F>(f: F)
