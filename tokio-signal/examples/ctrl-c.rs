@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
     // Up until now, we haven't really DONE anything, just prepared
-    // now it's time to actually the results!
+    // now it's time to actually wait for the results!
     future.await;
 
     println!("Stream ended, quiting the program.");
