@@ -29,8 +29,8 @@ the Rust programming language. It is:
 [gitter-url]: https://gitter.im/tokio-rs/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/getting-started/hello-world/) |
-[API Docs](https://docs.rs/tokio/0.1.20/tokio) |
+[Guides](https://tokio.rs/docs/) |
+[API Docs](https://docs.rs/tokio/0.1.22/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
 The API docs for the master branch are published [here][master-dox].
@@ -51,9 +51,9 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.1.20/tokio/net/index.html
-[reactor]: https://docs.rs/tokio/0.1.20/tokio/reactor/index.html
-[scheduler]: https://docs.rs/tokio/0.1.20/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/0.1.22/tokio/net/index.html
+[reactor]: https://docs.rs/tokio/0.1.22/tokio/reactor/index.html
+[scheduler]: https://docs.rs/tokio/0.1.22/tokio/runtime/index.html
 
 ## Example
 
@@ -107,6 +107,8 @@ First, see if the answer to your question can be found in the [Guides] or the
 the [Tokio Gitter channel][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
+[Guides]: https://tokio.rs/docs/
+[API documentation]: https://docs.rs/tokio/0.1.22/tokio
 [chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
