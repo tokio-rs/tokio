@@ -685,16 +685,11 @@ fn to_try_acquire(_: AcquireError) -> TryAcquireError {
 
 impl fmt::Display for AcquireError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        write!(fmt, "semaphore closed")
     }
 }
 
-impl ::std::error::Error for AcquireError {
-    fn description(&self) -> &str {
-        "semaphore closed"
-    }
-}
+impl ::std::error::Error for AcquireError {}
 
 // ===== impl TryAcquireError =====
 
@@ -731,19 +726,15 @@ impl TryAcquireError {
 
 impl fmt::Display for TryAcquireError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        let descr = match self.kind {
+            ErrorKind::Closed => "semaphore closed",
+            ErrorKind::NoPermits => "no permits available",
+        };
+        write!(fmt, "{}", descr)
     }
 }
 
-impl ::std::error::Error for TryAcquireError {
-    fn description(&self) -> &str {
-        match self.kind {
-            ErrorKind::Closed => "semaphore closed",
-            ErrorKind::NoPermits => "no permits available",
-        }
-    }
-}
+impl ::std::error::Error for TryAcquireError {}
 
 // ===== impl WaiterNode =====
 

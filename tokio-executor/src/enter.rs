@@ -22,7 +22,7 @@ pub struct EnterError {
 impl fmt::Debug for EnterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EnterError")
-            .field("reason", &self.description())
+            .field("reason", &format!("{}", self))
             .finish()
     }
 }

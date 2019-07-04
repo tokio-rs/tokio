@@ -143,11 +143,7 @@ impl fmt::Display for CollectVecError {
     }
 }
 
-impl Error for CollectVecError {
-    fn description(&self) -> &str {
-        "BufStream too big"
-    }
-}
+impl Error for CollectVecError {}
 
 impl fmt::Display for CollectBytesError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -155,8 +151,4 @@ impl fmt::Display for CollectBytesError {
     }
 }
 
-impl Error for CollectBytesError {
-    fn description(&self) -> &str {
-        "BufStream too big"
-    }
-}
+impl Error for CollectBytesError {}

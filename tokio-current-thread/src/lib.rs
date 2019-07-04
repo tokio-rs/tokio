@@ -107,15 +107,11 @@ pub struct RunError {
 
 impl fmt::Display for RunError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.description())
+        write!(fmt, "Run error")
     }
 }
 
-impl Error for RunError {
-    fn description(&self) -> &str {
-        "Run error"
-    }
-}
+impl Error for RunError {}
 
 /// Error returned by the `run_timeout` function.
 #[derive(Debug)]
@@ -125,19 +121,16 @@ pub struct RunTimeoutError {
 
 impl fmt::Display for RunTimeoutError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.description())
-    }
-}
-
-impl Error for RunTimeoutError {
-    fn description(&self) -> &str {
-        if self.timeout {
+        let descr = if self.timeout {
             "Run timeout error (timeout)"
         } else {
             "Run timeout error (not timeout)"
-        }
+        };
+        write!(fmt, "{}", descr)
     }
 }
+
+impl Error for RunTimeoutError {}
 
 /// Error returned by the `turn` function.
 #[derive(Debug)]
@@ -147,15 +140,11 @@ pub struct TurnError {
 
 impl fmt::Display for TurnError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.description())
+        write!(fmt, "Turn error")
     }
 }
 
-impl Error for TurnError {
-    fn description(&self) -> &str {
-        "Turn error"
-    }
-}
+impl Error for TurnError {}
 
 /// Error returned by the `block_on` function.
 #[derive(Debug)]
@@ -169,11 +158,7 @@ impl<T> fmt::Display for BlockError<T> {
     }
 }
 
-impl<T: fmt::Debug> Error for BlockError<T> {
-    fn description(&self) -> &str {
-        "Block error"
-    }
-}
+impl<T: fmt::Debug> Error for BlockError<T> {}
 
 /// This is mostly split out to make the borrow checker happy.
 struct Borrow<'a, U> {

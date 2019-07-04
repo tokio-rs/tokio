@@ -117,16 +117,11 @@ pub mod error {
 
     impl<T: fmt::Debug> fmt::Display for SendError<T> {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            use std::error::Error;
-            write!(fmt, "{}", self.description())
+            write!(fmt, "channel closed")
         }
     }
 
-    impl<T: fmt::Debug> ::std::error::Error for SendError<T> {
-        fn description(&self) -> &str {
-            "channel closed"
-        }
-    }
+    impl<T: fmt::Debug> ::std::error::Error for SendError<T> {}
 }
 
 #[derive(Debug)]

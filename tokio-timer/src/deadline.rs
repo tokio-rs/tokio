@@ -147,17 +147,7 @@ impl<T> DeadlineError<T> {
     }
 }
 
-impl<T: error::Error> error::Error for DeadlineError<T> {
-    fn description(&self) -> &str {
-        use self::Kind::*;
-
-        match self.0 {
-            Inner(ref e) => e.description(),
-            Elapsed => "deadline has elapsed",
-            Timer(ref e) => e.description(),
-        }
-    }
-}
+impl<T: error::Error> error::Error for DeadlineError<T> {}
 
 impl<T: fmt::Display> fmt::Display for DeadlineError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

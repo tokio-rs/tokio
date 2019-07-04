@@ -241,16 +241,11 @@ impl<T> async_sink::Sink<T> for Sender<T> {
 
 impl fmt::Display for SendError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        write!(fmt, "channel closed")
     }
 }
 
-impl ::std::error::Error for SendError {
-    fn description(&self) -> &str {
-        "channel closed"
-    }
-}
+impl ::std::error::Error for SendError {}
 
 // ===== impl TrySendError =====
 
@@ -281,19 +276,15 @@ impl<T> TrySendError<T> {
 
 impl<T: fmt::Debug> fmt::Display for TrySendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        let descr = match self.kind {
+            ErrorKind::Closed => "channel closed",
+            ErrorKind::NoCapacity => "no available capacity",
+        };
+        write!(fmt, "{}", descr)
     }
 }
 
-impl<T: fmt::Debug> ::std::error::Error for TrySendError<T> {
-    fn description(&self) -> &str {
-        match self.kind {
-            ErrorKind::Closed => "channel closed",
-            ErrorKind::NoCapacity => "no available capacity",
-        }
-    }
-}
+impl<T: fmt::Debug> ::std::error::Error for TrySendError<T> {}
 
 impl<T> From<(T, chan::TrySendError)> for TrySendError<T> {
     fn from((value, err): (T, chan::TrySendError)) -> TrySendError<T> {
@@ -311,13 +302,8 @@ impl<T> From<(T, chan::TrySendError)> for TrySendError<T> {
 
 impl fmt::Display for RecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
+        write!(fmt, "channel closed")
     }
 }
 
-impl ::std::error::Error for RecvError {
-    fn description(&self) -> &str {
-        "channel closed"
-    }
-}
+impl ::std::error::Error for RecvError {}
