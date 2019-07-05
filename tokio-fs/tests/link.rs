@@ -1,5 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 
+
+use futures_util::future;
 use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -35,7 +37,7 @@ fn test_hard_link() {
 #[cfg(unix)]
 #[test]
 fn test_symlink() {
-    use std::future::Future;
+    use futures_util::future::FutureExt;
 
     let dir = TempDir::new("base").unwrap();
     let src = dir.path().join("src.txt");
@@ -58,6 +60,14 @@ fn test_symlink() {
 
     assert!(content == "hello");
 
-    pool::run({ read_link(dst.clone()).map(move |x| assert!(x == src)) });
-    pool::run({ symlink_metadata(dst.clone()).map(move |x| assert!(x.file_type().is_symlink())) });
+    pool::run(read_link(dst.clone())
+        .and_then(move |x| {
+            assert!(x == src);
+            future::ok(())
+        }).boxed());
+    pool::run(symlink_metadata(dst.clone())
+        .and_then(move |x| {
+            assert!(x.file_type().is_symlink());
+            future::ok(())
+        }).boxed());
 }

@@ -1,3 +1,4 @@
+use futures_core::stream::Stream;
 use std::future::Future;
 use std::task::Poll;
 use std::task::Context;
@@ -8,7 +9,6 @@ use std::io;
 use std::os::unix::fs::DirEntryExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use tokio_futures::stream::Stream;
 
 /// Returns a stream over the entries within a directory.
 ///

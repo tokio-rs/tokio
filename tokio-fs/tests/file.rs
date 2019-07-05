@@ -1,14 +1,16 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use futures::future::poll_fn;
+use futures_util::future::poll_fn;
+use futures_util::future::FutureExt;
+use futures_util::io::AsyncReadExt;
+use futures_util::io::AsyncWriteExt;
 use std::future::Future;
-use std::task::Poll;
 use rand::{distributions, thread_rng, Rng};
 use std::fs;
 use std::io::SeekFrom;
+use std::pin::Pin;
 use tempfile::Builder as TmpBuilder;
 use tokio_fs::*;
-use tokio_io::io;
 
 mod pool;
 
@@ -34,9 +36,12 @@ fn read_write() {
 
         File::create(file_path)
             .and_then(|file| file.metadata())
-            .inspect(|&(_, ref metadata)| assert!(metadata.is_file()))
+            .inspect(|result| {
+                assert!(result.is_ok());
+                assert!(result.unwrap().1.is_file())
+            })
             .and_then(move |(file, _)| io::write_all(file, contents))
-            .and_then(|(mut file, _)| poll_fn(move || file.poll_sync_all()))
+            .and_then(|(mut file, _)| poll_fn(move |cx| file.poll_sync_all()))
             .then(|res| {
                 let _ = res.unwrap();
                 Ok(())
@@ -75,7 +80,7 @@ fn read_write_helpers() {
 
     pool::run(write(file_path.clone(), contents.clone()).then(|res| {
         let _ = res.unwrap();
-        Ok(())
+        futures::future::ok(())
     }));
 
     let dst = fs::read(&file_path).unwrap();
@@ -85,7 +90,7 @@ fn read_write_helpers() {
         read(file_path).then(move |res| {
             let buf = res.unwrap();
             assert_eq!(buf, contents);
-            Ok(())
+            futures::future::ok(())
         })
     });
 }
@@ -106,13 +111,13 @@ fn metadata() {
         tokio_fs::metadata(file_path)
             .then(|r| {
                 let _ = r.err().unwrap();
-                Ok(())
+                futures::future::ok(())
             })
             .and_then(|_| File::create(file_path2))
             .and_then(|_| tokio_fs::metadata(file_path3))
             .then(|r| {
                 assert!(r.unwrap().is_file());
-                Ok(())
+                futures::future::ok(())
             })
     });
 }
@@ -131,17 +136,18 @@ fn seek() {
             .read(true)
             .write(true)
             .open(file_path)
-            .and_then(|file| io::write_all(file, "Hello, world!"))
+            .and_then(|file| file.write(cx, b"Hello, world!"))
             .and_then(|(file, _)| file.seek(SeekFrom::End(-6)))
-            .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
+            .and_then(|(file, _)| {
+                let mut buf = vec![0; 5];
+                file.read(&buf).then(move |_| assert_eq!(buf, b"world"))
+            })
             .and_then(|(file, buf)| {
-                assert_eq!(buf, b"world");
                 file.seek(SeekFrom::Start(0))
             })
-            .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
-            .and_then(|(_, buf)| {
-                assert_eq!(buf, b"Hello");
-                Ok(())
+            .and_then(|(file, _)| {
+                let mut buf = vec![0; 5];
+                file.read(buf).then(move |_| assert_eq!(buf, b"Hello"))
             })
             .then(|r| {
                 let _ = r.unwrap();
@@ -172,7 +178,7 @@ fn clone() {
             })
             .then(|res| {
                 let _ = res.unwrap();
-                Ok(())
+                futures::future::ok(())
             }),
     );
 

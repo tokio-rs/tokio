@@ -1,15 +1,19 @@
 //! Echo everything received on STDIN to STDOUT.
 #![deny(deprecated, warnings)]
+#![feature(async_await)]
 
 use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio_fs::{stderr, stdin, stdout};
 use tokio_threadpool::Builder;
 
-use std::future::Future;
+use futures_util::stream::StreamExt;
+use futures_util::future::FutureExt;
+use futures_util::sink::SinkExt;
 
 use std::io;
 
-pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = Builder::new().pool_size(1).build();
 
     pool.spawn({

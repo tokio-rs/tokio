@@ -1,7 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use std::future::Future;
-use std::task::Poll;
+use futures_util::future;
+use futures_util::stream::StreamExt;
+use futures_util::stream::TryStreamExt;
 use std::fs;
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
@@ -54,13 +55,12 @@ fn read() {
 
     let f = files.clone();
     let p = p.to_path_buf();
-    pool::run({
-        read_dir(p).flatten_stream().for_each(move |e| {
+    pool::run(read_dir(p)
+        .for_each(move |e| {
             let s = e.file_name().to_str().unwrap().to_string();
             f.lock().unwrap().push(s);
-            Ok(())
-        })
-    });
+            future::ready(())
+        }));
 
     let mut files = files.lock().unwrap();
     files.sort(); // because the order is not guaranteed
