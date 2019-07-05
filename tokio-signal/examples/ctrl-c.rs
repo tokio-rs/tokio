@@ -22,12 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut counter = 0;
 
     println!(
-        "This program is now waiting for you to press Ctrl+C {0} times.
-  * If running via `cargo run --example ctrl-c`, Ctrl+C also kills it, \
-    due to https://github.com/rust-lang-nursery/rustup.rs/issues/806
-  * If running the binary directly, the Ctrl+C is properly trapped.
-    Terminate by repeating Ctrl+C {0} times, or ahead of time by \
-    opening a second terminal and issuing `pkill -sigkil ctrl-c`",
+        "This program is now waiting for you to press Ctrl+C {0} times. \
+         Terminate by repeating Ctrl+C {0} times, or ahead of time by opening \
+         a second terminal and issuing `pkill -sigkil ctrl-c`.",
         STOP_AFTER
     );
 
