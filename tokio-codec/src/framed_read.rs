@@ -98,21 +98,21 @@ where
     T: Sink<I> + Unpin,
     D: Unpin,
 {
-    type SinkError = T::SinkError;
+    type Error = T::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         pin!(Pin::get_mut(self).inner.inner.0).poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::SinkError> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         pin!(Pin::get_mut(self).inner.inner.0).start_send(item)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         pin!(Pin::get_mut(self).inner.inner.0).poll_flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::SinkError>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         pin!(Pin::get_mut(self).inner.inner.0).poll_close(cx)
     }
 }
