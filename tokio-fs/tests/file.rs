@@ -1,21 +1,16 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use futures_util::future::poll_fn;
-use futures_util::future::FutureExt;
-use futures_util::io::AsyncReadExt;
-use futures_util::io::AsyncWriteExt;
 use rand::{distributions, thread_rng, Rng};
 use std::fs;
-use std::future::Future;
 use std::io::SeekFrom;
-use std::pin::Pin;
 use tempfile::Builder as TmpBuilder;
 use tokio_fs::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-mod pool;
-
-#[test]
-fn read_write() {
+#[tokio::test]
+async fn read_write() {
     const NUM_CHARS: usize = 16 * 1_024;
 
     let dir = TmpBuilder::new()
@@ -30,40 +25,24 @@ fn read_write() {
         .collect::<String>()
         .into();
 
-    pool::run({
-        let file_path = file_path.clone();
-        let contents = contents.clone();
+    let file_path = file_path.clone();
+    let contents = contents.clone();
 
-        File::create(file_path)
-            .and_then(|file| file.metadata())
-            .inspect(|result| {
-                assert!(result.is_ok());
-                assert!(result.unwrap().1.is_file())
-            })
-            .and_then(move |(file, _)| io::write_all(file, contents))
-            .and_then(|(mut file, _)| poll_fn(move |cx| file.poll_sync_all()))
-            .then(|res| {
-                let _ = res.unwrap();
-                Ok(())
-            })
-    });
+    let file = File::create(file_path.clone()).await.unwrap();
+    let (mut file, metadata) = file.metadata().await.unwrap();
+    assert!(metadata.is_file());
+    assert!(file.write(&contents).await.is_ok());
+    assert!(poll_fn(move |_cx| file.poll_sync_all()).await.is_ok());
 
     let dst = fs::read(&file_path).unwrap();
     assert_eq!(dst, contents);
 
-    pool::run({
-        File::open(file_path)
-            .and_then(|file| io::read_to_end(file, vec![]))
-            .then(move |res| {
-                let (_, buf) = res.unwrap();
-                assert_eq!(buf, contents);
-                Ok(())
-            })
-    });
+    let buf = read(file_path).await.unwrap();
+    assert_eq!(buf, contents);
 }
 
-#[test]
-fn read_write_helpers() {
+#[tokio::test]
+async fn read_write_helpers() {
     const NUM_CHARS: usize = 16 * 1_024;
 
     let dir = TmpBuilder::new()
@@ -78,84 +57,55 @@ fn read_write_helpers() {
         .collect::<String>()
         .into();
 
-    pool::run(write(file_path.clone(), contents.clone()).then(|res| {
-        let _ = res.unwrap();
-        futures::future::ok(())
-    }));
+    assert!(write(file_path.clone(), contents.clone()).await.is_ok());
 
     let dst = fs::read(&file_path).unwrap();
     assert_eq!(dst, contents);
 
-    pool::run({
-        read(file_path).then(move |res| {
-            let buf = res.unwrap();
-            assert_eq!(buf, contents);
-            futures::future::ok(())
-        })
-    });
+    let buf = read(file_path).await.unwrap();
+    assert_eq!(buf, contents);
 }
 
-#[test]
-fn metadata() {
+#[tokio::test]
+async fn metadata() {
     let dir = TmpBuilder::new()
         .prefix("tokio-fs-tests")
         .tempdir()
         .unwrap();
     let file_path = dir.path().join("metadata.txt");
 
-    pool::run({
-        let file_path = file_path.clone();
-        let file_path2 = file_path.clone();
-        let file_path3 = file_path.clone();
-
-        tokio_fs::metadata(file_path)
-            .then(|r| {
-                let _ = r.err().unwrap();
-                futures::future::ok(())
-            })
-            .and_then(|_| File::create(file_path2))
-            .and_then(|_| tokio_fs::metadata(file_path3))
-            .then(|r| {
-                assert!(r.unwrap().is_file());
-                futures::future::ok(())
-            })
-    });
+    assert!(tokio_fs::metadata(file_path.clone()).await.is_err());
+    assert!(File::create(file_path.clone()).await.is_ok());
+    let metadata = tokio_fs::metadata(file_path.clone()).await.unwrap();
+    assert!(metadata.is_file());
 }
 
-#[test]
-fn seek() {
+#[tokio::test]
+async fn seek() {
     let dir = TmpBuilder::new()
         .prefix("tokio-fs-tests")
         .tempdir()
         .unwrap();
     let file_path = dir.path().join("seek.txt");
 
-    pool::run({
-        OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(file_path)
-            .and_then(|file| file.write(cx, b"Hello, world!"))
-            .and_then(|(file, _)| file.seek(SeekFrom::End(-6)))
-            .and_then(|(file, _)| {
-                let mut buf = vec![0; 5];
-                file.read(&buf).then(move |_| assert_eq!(buf, b"world"))
-            })
-            .and_then(|(file, buf)| file.seek(SeekFrom::Start(0)))
-            .and_then(|(file, _)| {
-                let mut buf = vec![0; 5];
-                file.read(buf).then(move |_| assert_eq!(buf, b"Hello"))
-            })
-            .then(|r| {
-                let _ = r.unwrap();
-                Ok(())
-            })
-    });
+    let mut file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(file_path).await.unwrap();
+    assert!(file.write(b"Hello, world!").await.is_ok());
+    let mut file = file.seek(SeekFrom::End(-6)).await.unwrap().0;
+    let mut buf = vec![0; 5];
+    assert!(file.read(buf.as_mut()).await.is_ok());
+    assert_eq!(buf, b"world");
+    let mut file = file.seek(SeekFrom::Start(0)).await.unwrap().0;
+    let mut buf = vec![0; 5];
+    assert!(file.read(buf.as_mut()).await.is_ok());
+    assert_eq!(buf, b"Hello");
 }
 
-#[test]
-fn clone() {
+#[tokio::test]
+async fn clone() {
     use std::io::prelude::*;
 
     let dir = TmpBuilder::new()
@@ -164,21 +114,10 @@ fn clone() {
         .unwrap();
     let file_path = dir.path().join("clone.txt");
 
-    pool::run(
-        File::create(file_path.clone())
-            .and_then(|file| {
-                file.try_clone()
-                    .map_err(|(_file, err)| err)
-                    .and_then(|(file, clone)| {
-                        io::write_all(file, "clone ")
-                            .and_then(|_| io::write_all(clone, "successful"))
-                    })
-            })
-            .then(|res| {
-                let _ = res.unwrap();
-                futures::future::ok(())
-            }),
-    );
+    let file = File::create(file_path.clone()).await.unwrap();
+    let (mut file, mut clone) = file.try_clone().await.unwrap();
+    assert!(AsyncWriteExt::write(&mut file, b"clone ").await.is_ok());
+    assert!(AsyncWriteExt::write(&mut clone, b"successful").await.is_ok());
 
     let mut file = std::fs::File::open(&file_path).unwrap();
 

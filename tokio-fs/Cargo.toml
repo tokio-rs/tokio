@@ -36,4 +36,5 @@ tempdir = "0.3"
 tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
 tokio = { version = "0.2.0", path = "../tokio" }
 futures-channel-preview = "0.3.0-alpha.17"
-futures-util-preview = { version = "0.3.0-alpha.17", futures = ["sink"] }
+futures-preview = { version = "0.3.0-alpha.17" }
+futures-util-preview = { version = "0.3.0-alpha.17", futures = ["default", "sinks"] }
