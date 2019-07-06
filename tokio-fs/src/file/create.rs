@@ -1,11 +1,11 @@
 use super::File;
-use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::fs::File as StdFile;
+use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Future returned by `File::create` and resolves to a `File` instance.
 #[derive(Debug)]
@@ -15,18 +15,16 @@ pub struct CreateFuture<P> {
 
 impl<P> CreateFuture<P>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     pub(crate) fn new(path: P) -> Self {
         CreateFuture { path }
     }
 }
 
-impl<P> Unpin for CreateFuture<P> {} 
-
 impl<P> Future for CreateFuture<P>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     type Output = io::Result<File>;
 

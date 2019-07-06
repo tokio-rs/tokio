@@ -55,12 +55,11 @@ fn read() {
 
     let f = files.clone();
     let p = p.to_path_buf();
-    pool::run(read_dir(p)
-        .for_each(move |e| {
-            let s = e.file_name().to_str().unwrap().to_string();
-            f.lock().unwrap().push(s);
-            future::ready(())
-        }));
+    pool::run(read_dir(p).for_each(move |e| {
+        let s = e.file_name().to_str().unwrap().to_string();
+        f.lock().unwrap().push(s);
+        future::ready(())
+    }));
 
     let mut files = files.lock().unwrap();
     files.sort(); // because the order is not guaranteed

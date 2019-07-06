@@ -1,9 +1,9 @@
 use crate::{file, File};
 use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
-use std::{io, mem, path::Path};
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+use std::{io, mem, path::Path};
 use tokio_io;
 use tokio_io::AsyncRead;
 
@@ -29,7 +29,7 @@ use tokio_io::AsyncRead;
 /// ```
 pub fn read<P>(path: P) -> ReadFile<P>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     ReadFile {
         state: State::Open(File::open(path)),
@@ -38,18 +38,18 @@ where
 
 /// A future used to open a file and read its entire contents into a buffer.
 #[derive(Debug)]
-pub struct ReadFile<P: AsRef<Path> + Send + 'static> {
+pub struct ReadFile<P: AsRef<Path> + Send + Unpin + 'static> {
     state: State<P>,
 }
 
 #[derive(Debug)]
-enum State<P: AsRef<Path> + Send + 'static> {
+enum State<P: AsRef<Path> + Send + Unpin + 'static> {
     Open(file::OpenFuture<P>),
     Metadata(file::MetadataFuture),
     Read(Vec<u8>, File),
 }
 
-impl<P: AsRef<Path> + Send + 'static> Future for ReadFile<P> {
+impl<P: AsRef<Path> + Send + Unpin + 'static> Future for ReadFile<P> {
     type Output = io::Result<Vec<u8>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

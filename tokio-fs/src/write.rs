@@ -1,9 +1,9 @@
 use crate::{file, File};
 use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
-use std::{fmt, io, mem, path::Path};
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+use std::{fmt, io, mem, path::Path};
 use tokio_io;
 use tokio_io::AsyncWrite;
 
@@ -31,7 +31,7 @@ use tokio_io::AsyncWrite;
 /// ```
 pub fn write<P, C: AsRef<[u8]> + Unpin>(path: P, contents: C) -> WriteFile<P, C>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     WriteFile {
         state: State::Create(File::create(path), Some(contents)),
@@ -41,17 +41,19 @@ where
 /// A future used to open a file for writing and write the entire contents
 /// of some data to it.
 #[derive(Debug)]
-pub struct WriteFile<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + Unpin> {
+pub struct WriteFile<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + Unpin> {
     state: State<P, C>,
 }
 
 #[derive(Debug)]
-enum State<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + Unpin> {
+enum State<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + Unpin> {
     Create(file::CreateFuture<P>, Option<C>),
     Write(Option<C>, File),
 }
 
-impl<P: AsRef<Path> + Send + 'static, C: AsRef<[u8]> + Unpin + fmt::Debug> Future for WriteFile<P, C> {
+impl<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + Unpin + fmt::Debug> Future
+    for WriteFile<P, C>
+{
     type Output = io::Result<C>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

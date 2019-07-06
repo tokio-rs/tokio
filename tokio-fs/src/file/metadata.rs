@@ -1,11 +1,11 @@
 use super::File;
-use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::fs::File as StdFile;
 use std::fs::Metadata;
+use std::future::Future;
 use std::io;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 const POLL_AFTER_RESOLVE: &str = "Cannot poll MetadataFuture after it resolves";
 

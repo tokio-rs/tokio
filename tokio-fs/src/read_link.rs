@@ -1,10 +1,10 @@
-use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::fs;
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Reads a symbolic link, returning the file that the link points to.
 ///

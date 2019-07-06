@@ -1,33 +1,31 @@
 use super::File;
-use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::fs::OpenOptions as StdOpenOptions;
+use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Future returned by `File::open` and resolves to a `File` instance.
 #[derive(Debug)]
-pub struct OpenFuture<P> {
+pub struct OpenFuture<P: Unpin> {
     options: StdOpenOptions,
     path: P,
 }
 
 impl<P> OpenFuture<P>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     pub(crate) fn new(options: StdOpenOptions, path: P) -> Self {
         OpenFuture { options, path }
     }
 }
 
-impl<P> Unpin for OpenFuture<P> {} 
-
 impl<P> Future for OpenFuture<P>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     type Output = io::Result<File>;
 

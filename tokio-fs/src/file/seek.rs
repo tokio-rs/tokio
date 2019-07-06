@@ -1,9 +1,9 @@
 use super::File;
 use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::io;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Future returned by `File::seek`.
 #[derive(Debug)]

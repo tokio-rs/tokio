@@ -1,6 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
 
-
 use futures_util::future;
 use std::fs;
 use std::io::prelude::*;
@@ -60,14 +59,20 @@ fn test_symlink() {
 
     assert!(content == "hello");
 
-    pool::run(read_link(dst.clone())
-        .and_then(move |x| {
-            assert!(x == src);
-            future::ok(())
-        }).boxed());
-    pool::run(symlink_metadata(dst.clone())
-        .and_then(move |x| {
-            assert!(x.file_type().is_symlink());
-            future::ok(())
-        }).boxed());
+    pool::run(
+        read_link(dst.clone())
+            .and_then(move |x| {
+                assert!(x == src);
+                future::ok(())
+            })
+            .boxed(),
+    );
+    pool::run(
+        symlink_metadata(dst.clone())
+            .and_then(move |x| {
+                assert!(x.file_type().is_symlink());
+                future::ok(())
+            })
+            .boxed(),
+    );
 }

@@ -1,7 +1,7 @@
-use std::task::Poll;
-use std::task::Context;
 use std::io::{self, Read, Stdin as StdStdin};
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 use tokio_io::AsyncRead;
 
 /// A handle to the standard input stream of a process.
@@ -43,7 +43,7 @@ impl AsyncRead for Stdin {
     fn poll_read(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &mut [u8]
+        buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         match Pin::get_mut(self).read(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,

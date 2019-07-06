@@ -6,9 +6,9 @@ use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio_fs::{stderr, stdin, stdout};
 use tokio_threadpool::Builder;
 
-use futures_util::stream::StreamExt;
 use futures_util::future::FutureExt;
 use futures_util::sink::SinkExt;
+use futures_util::stream::StreamExt;
 
 use std::io;
 

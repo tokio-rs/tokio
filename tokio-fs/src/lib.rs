@@ -71,10 +71,10 @@ pub use crate::stdout::{stdout, Stdout};
 pub use crate::symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
 pub use crate::write::{write, WriteFile};
 
-use std::task::Poll;
-use std::task::Poll::*;
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
+use std::task::Poll;
+use std::task::Poll::*;
 
 fn blocking_io<F, T>(f: F) -> Poll<io::Result<T>>
 where

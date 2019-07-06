@@ -4,9 +4,9 @@ use futures_util::future::poll_fn;
 use futures_util::future::FutureExt;
 use futures_util::io::AsyncReadExt;
 use futures_util::io::AsyncWriteExt;
-use std::future::Future;
 use rand::{distributions, thread_rng, Rng};
 use std::fs;
+use std::future::Future;
 use std::io::SeekFrom;
 use std::pin::Pin;
 use tempfile::Builder as TmpBuilder;
@@ -142,9 +142,7 @@ fn seek() {
                 let mut buf = vec![0; 5];
                 file.read(&buf).then(move |_| assert_eq!(buf, b"world"))
             })
-            .and_then(|(file, buf)| {
-                file.seek(SeekFrom::Start(0))
-            })
+            .and_then(|(file, buf)| file.seek(SeekFrom::Start(0)))
             .and_then(|(file, _)| {
                 let mut buf = vec![0; 5];
                 file.read(buf).then(move |_| assert_eq!(buf, b"Hello"))

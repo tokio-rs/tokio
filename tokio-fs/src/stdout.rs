@@ -1,8 +1,8 @@
-use std::task::Poll;
-use std::task::Context;
 use std::io::{self, Stdout as StdStdout, Write};
-use tokio_io::AsyncWrite;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+use tokio_io::AsyncWrite;
 
 /// A handle to the standard output stream of a process.
 ///
@@ -41,7 +41,7 @@ impl AsyncWrite for Stdout {
     fn poll_write(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &[u8]
+        buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         match Pin::get_mut(self).write(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,

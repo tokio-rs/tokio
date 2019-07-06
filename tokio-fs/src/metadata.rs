@@ -1,11 +1,11 @@
 use super::blocking_io;
-use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::fs::{self, Metadata};
+use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Queries the file system metadata for a path.
 pub fn metadata<P>(path: P) -> MetadataFuture<P>

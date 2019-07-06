@@ -1,8 +1,8 @@
 use std::future::Future;
-use std::task::Poll;
 use std::io;
 use std::os::windows::fs;
 use std::path::Path;
+use std::task::Poll;
 
 /// Creates a new file symbolic link on the filesystem.
 ///

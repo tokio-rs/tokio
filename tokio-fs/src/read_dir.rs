@@ -1,14 +1,14 @@
 use futures_core::stream::Stream;
-use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::ffi::OsString;
 use std::fs::{self, DirEntry as StdDirEntry, FileType, Metadata, ReadDir as StdReadDir};
+use std::future::Future;
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::DirEntryExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Returns a stream over the entries within a directory.
 ///
@@ -73,10 +73,7 @@ pub struct ReadDir(StdReadDir);
 impl Stream for ReadDir {
     type Item = io::Result<DirEntry>;
 
-    fn poll_next(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let inner = Pin::get_mut(self);
         match crate::blocking_io(|| match inner.0.next() {
             Some(Err(err)) => Err(err),

@@ -1,12 +1,12 @@
 //! Unix-specific extensions to primitives in the `tokio_fs` module.
 
 use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::io;
 use std::os::unix::fs;
 use std::path::Path;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Creates a new symbolic link on the filesystem.
 ///

@@ -1,9 +1,9 @@
 use super::File;
 use std::future::Future;
-use std::task::Poll;
-use std::task::Context;
 use std::io;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Future returned by `File::try_clone`.
 ///
@@ -28,7 +28,8 @@ impl Future for CloneFuture {
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner_self = Pin::get_mut(self);
-        inner_self.file
+        inner_self
+            .file
             .as_mut()
             .expect("Cannot poll `CloneFuture` after it resolves")
             .poll_try_clone()

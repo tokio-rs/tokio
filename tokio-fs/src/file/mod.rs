@@ -16,12 +16,12 @@ pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
 pub use self::seek::SeekFuture;
 
-use std::task::Poll;
-use std::task::Context;
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A reference to an open file on the filesystem.
@@ -105,7 +105,7 @@ impl File {
     /// ```
     pub fn open<P>(path: P) -> OpenFuture<P>
     where
-        P: AsRef<Path> + Send + 'static,
+        P: AsRef<Path> + Send + Unpin + 'static,
     {
         OpenOptions::new().read(true).open(path)
     }
@@ -144,7 +144,7 @@ impl File {
     /// ```
     pub fn create<P>(path: P) -> CreateFuture<P>
     where
-        P: AsRef<Path> + Send + 'static,
+        P: AsRef<Path> + Send + Unpin + 'static,
     {
         CreateFuture::new(path)
     }
@@ -484,7 +484,7 @@ impl AsyncRead for File {
     fn poll_read(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &mut [u8]
+        buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         match Pin::get_mut(self).read(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
@@ -507,7 +507,7 @@ impl AsyncWrite for File {
     fn poll_write(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &[u8]
+        buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         match Pin::get_mut(self).write(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
