@@ -228,7 +228,7 @@ mod tests {
             super::handler(CTRL_C_EVENT);
         }
 
-        rt.block_on(with_timeout(event_ctrl_c.into_future()));
+        let _ = rt.block_on(with_timeout(event_ctrl_c.into_future()));
 
         let event_ctrl_break = rt
             .block_on(with_timeout(Event::ctrl_break()))
@@ -238,6 +238,6 @@ mod tests {
             super::handler(CTRL_BREAK_EVENT);
         }
 
-        rt.block_on(with_timeout(event_ctrl_break.into_future()));
+        let _ = rt.block_on(with_timeout(event_ctrl_break.into_future()));
     }
 }
