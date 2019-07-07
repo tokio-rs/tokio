@@ -105,7 +105,7 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub(crate) fn ctrl_c_handle(handle: &Handle) -> IoFuture<Event> {
+    pub(crate) fn ctrl_c(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_C_EVENT, handle)
     }
 
