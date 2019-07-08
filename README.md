@@ -98,7 +98,11 @@ fn main() {
 }
 ```
 
-More examples can be found [here](tokio/examples).
+More examples can be found [here](tokio/examples). Note that the `master` branch
+is currently being updated to use `async` / `await`.  The examples are
+not fully ported. Examples for stable Tokio can be found
+[here](https://github.com/tokio-rs/tokio/tree/v0.1.x/tokio/examples).
+
 
 ## Getting Help
 
