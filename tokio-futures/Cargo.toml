@@ -24,3 +24,4 @@ default = [
 
 [dependencies]
 futures-core-preview = "0.3.0-alpha.17"
+futures-sink-preview = "0.3.0-alpha.17"
