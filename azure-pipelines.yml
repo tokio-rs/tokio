@@ -37,7 +37,8 @@ jobs:
         - incoming
 #       - tokio-tls
       tokio-udp: []
-#       - tokio-uds
+      tokio-uds:
+        - async-traits
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml

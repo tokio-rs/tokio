@@ -8,20 +8,34 @@
 //!
 //! This crate provides APIs for using Unix Domain Sockets with Tokio.
 
+macro_rules! ready {
+    ($e:expr) => {
+        match $e {
+            ::std::task::Poll::Ready(t) => t,
+            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
+        }
+    };
+}
+
 mod datagram;
-mod frame;
+// mod frame;
 mod incoming;
 mod listener;
-mod recv_dgram;
-mod send_dgram;
+mod recv;
+mod recv_from;
+mod send;
+mod send_to;
 mod stream;
 mod ucred;
 
 pub use crate::datagram::UnixDatagram;
-pub use crate::frame::UnixDatagramFramed;
+pub use crate::recv::Recv;
+pub use crate::recv_from::RecvFrom;
+pub use crate::send::Send;
+pub use crate::send_to::SendTo;
+// pub use crate::frame::UnixDatagramFramed;
+#[cfg(feature = "async-traits")]
 pub use crate::incoming::Incoming;
-pub use crate::listener::UnixListener;
-pub use crate::recv_dgram::RecvDgram;
-pub use crate::send_dgram::SendDgram;
+pub use crate::listener::{Accept, UnixListener};
 pub use crate::stream::{ConnectFuture, UnixStream};
 pub use crate::ucred::UCred;
