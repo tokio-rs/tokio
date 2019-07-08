@@ -43,8 +43,12 @@ impl Delay {
         Delay { registration }
     }
 
-    pub(crate) fn new_with_handle(deadline: Instant, handle: HandlePriv) -> Delay {
-        let mut registration = Registration::new(deadline, Duration::from_millis(0));
+    pub(crate) fn new_with_handle(
+        deadline: Instant,
+        duration: Duration,
+        handle: HandlePriv,
+    ) -> Delay {
+        let mut registration = Registration::new(deadline, duration);
         registration.register_with(handle);
 
         Delay { registration }

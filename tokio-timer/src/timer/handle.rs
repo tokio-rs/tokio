@@ -1,3 +1,4 @@
+use crate::clock::now;
 use crate::timer::Inner;
 use crate::{Delay, Error, /*Interval,*/ Timeout};
 use std::cell::RefCell;
@@ -130,15 +131,21 @@ impl Handle {
 
     /// Create a `Delay` driven by this handle's associated `Timer`.
     pub fn delay(&self, deadline: Instant) -> Delay {
+        self.delay_timeout(deadline, Duration::from_secs(0))
+    }
+
+    fn delay_timeout(&self, deadline: Instant, duration: Duration) -> Delay {
         match self.inner {
-            Some(ref handle_priv) => Delay::new_with_handle(deadline, handle_priv.clone()),
-            None => Delay::new(deadline),
+            Some(ref handle_priv) => {
+                Delay::new_with_handle(deadline, Duration::from_secs(0), handle_priv.clone())
+            }
+            None => Delay::new_timeout(deadline, duration),
         }
     }
 
     /// Create a `Timeout` driven by this handle's associated `Timer`.
-    pub fn timeout<T>(&self, value: T, deadline: Instant) -> Timeout<T> {
-        Timeout::new_with_delay(value, self.delay(deadline))
+    pub fn timeout<T>(&self, value: T, timeout: Duration) -> Timeout<T> {
+        Timeout::new_with_delay(value, self.delay_timeout(now() + timeout, timeout))
     }
 
     /*
