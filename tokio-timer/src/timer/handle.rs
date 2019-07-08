@@ -4,7 +4,7 @@ use crate::{Delay, Error, /*Interval,*/ Timeout};
 use std::cell::RefCell;
 use std::fmt;
 use std::sync::{Arc, Weak};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Handle to timer instance.
 ///
