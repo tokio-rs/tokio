@@ -10,12 +10,12 @@ use std::task::{Context, Poll};
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Recv<'a, 'b> {
-    socket: &'a mut UdpSocket,
+    socket: &'a UdpSocket,
     buf: &'b mut [u8],
 }
 
 impl<'a, 'b> Recv<'a, 'b> {
-    pub(super) fn new(socket: &'a mut UdpSocket, buf: &'b mut [u8]) -> Self {
+    pub(super) fn new(socket: &'a UdpSocket, buf: &'b mut [u8]) -> Self {
         Self { socket, buf }
     }
 }
@@ -25,6 +25,6 @@ impl<'a, 'b> Future for Recv<'a, 'b> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let Recv { socket, buf } = self.get_mut();
-        Pin::new(&mut **socket).poll_recv(cx, buf)
+        socket.poll_recv_priv(cx, buf)
     }
 }
