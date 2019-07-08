@@ -109,16 +109,13 @@ fn hammer_cancel() {
                 barrier.wait();
 
                 for _ in 0..PER_THREAD {
-                    let deadline1 =
-                        Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let timeout1 = Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let timeout2 = Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
 
-                    let deadline2 =
-                        Instant::now() + Duration::from_millis(rng.gen_range(MIN_DELAY, MAX_DELAY));
+                    let deadline = Instant::now() + cmp::min(timeout1, timeout2);
 
-                    let deadline = cmp::min(deadline1, deadline2);
-
-                    let delay = handle.delay(deadline1);
-                    let join = handle.timeout(delay, deadline2);
+                    let delay = handle.delay(Instant::now() + timeout1);
+                    let join = handle.timeout(delay, timeout2);
 
                     exec.spawn(async move {
                         let _ = join.await;
