@@ -61,6 +61,10 @@ while [[ $# -gt 0 ]]
 do
 
 case "$1" in
+    -h|--help)
+    echo "$USAGE"
+    exit 0
+    ;;
     -v|--verbose)
     VERBOSE="--verbose"
     set +x
