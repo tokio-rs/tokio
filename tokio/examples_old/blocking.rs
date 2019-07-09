@@ -9,8 +9,10 @@
 //! Note how non-blocking threads are executed before blocking threads finish
 //! their task.
 
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
+use std::pin::Pin;
 use std::thread;
 use std::time::Duration;
 use tokio;
@@ -24,18 +26,19 @@ struct BlockingFuture {
 }
 
 impl Future for BlockingFuture {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _ctx: &mut task::Context<'_>) -> Poll<Self::Output> {
         println!("Blocking begin: {}!", self.value);
         // Try replacing this part with commnted code
         blocking(|| {
             println!("Blocking part annotated: {}!", self.value);
             thread::sleep(Duration::from_millis(1000));
             println!("Blocking done annotated: {}!", self.value);
+        }).map(|result| match result {
+            Ok(result) => result,
+            Err(err) => panic!("Error in blocing block: {:?}", err),
         })
-        .map_err(|err| panic!("Error in blocing block: {:?}", err))
         // println!("Blocking part annotated: {}!", self.value);
         // thread::sleep(Duration::from_millis(1000));
         // println!("Blocking done annotated: {}!", self.value);
@@ -49,12 +52,11 @@ struct NonBlockingFuture {
 }
 
 impl Future for NonBlockingFuture {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _ctx: &mut task::Context<'_>) -> Poll<Self::Output> {
         println!("Non-blocking done: {}!", self.value);
-        Ok(Async::Ready(()))
+        Poll::Ready(())
     }
 }
 
@@ -62,10 +64,9 @@ impl Future for NonBlockingFuture {
 struct SpawningFuture;
 
 impl Future for SpawningFuture {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _ctx: &mut task::Context<'_>) -> Poll<Self::Output> {
         for i in 0..8 {
             let blocking_future = BlockingFuture { value: i };
 
@@ -75,13 +76,15 @@ impl Future for SpawningFuture {
             let non_blocking_future = NonBlockingFuture { value: i };
             tokio::spawn(non_blocking_future);
         }
-        Ok(Async::Ready(()))
+        Poll::Ready(())
     }
 }
 
 fn main() {
     let spawning_future = SpawningFuture;
 
-    let runtime = Builder::new().core_threads(4).build().unwrap();
-    runtime.block_on_all(spawning_future).unwrap();
+    let mut runtime = Builder::new()
+        .core_threads(4)
+        .build().unwrap();
+    runtime.block_on_all(spawning_future);
 }
