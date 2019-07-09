@@ -33,7 +33,7 @@ crossbeam-utils = "0.6.0"
 # Backs `DelayQueue`
 slab = "0.4.1"
 # optionals
-futures-core-preview = { version = "0.3.0-alpha.16", optional = true }
+futures-core-preview = { version = "0.3.0-alpha.17", optional = true }
 
 [dev-dependencies]
 rand = "0.6"

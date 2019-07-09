@@ -1,4 +1,4 @@
-use super::UdpSocket;
+use crate::UnixDatagram;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -6,16 +6,16 @@ use std::task::{Context, Poll};
 
 /// A future that sends a datagram to the connected address.
 ///
-/// This `struct` is created by [`send`](super::UdpSocket::send).
+/// This `struct` is created by [`send`](crate::UnixDatagram::send).
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Send<'a, 'b> {
-    socket: &'a UdpSocket,
+    socket: &'a UnixDatagram,
     buf: &'b [u8],
 }
 
 impl<'a, 'b> Send<'a, 'b> {
-    pub(super) fn new(socket: &'a UdpSocket, buf: &'b [u8]) -> Self {
+    pub(crate) fn new(socket: &'a UnixDatagram, buf: &'b [u8]) -> Self {
         Self { socket, buf }
     }
 }

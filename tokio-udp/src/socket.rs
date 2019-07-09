@@ -1,3 +1,4 @@
+use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
 use super::{Recv, RecvFrom, Send, SendTo};
 use mio;
 use std::convert::TryFrom;
@@ -42,6 +43,16 @@ impl UdpSocket {
         Ok(UdpSocket { io })
     }
 
+    /// Split the `UdpSocket` into a receive half and a send half. The two parts
+    /// can be used to receive and send datagrams concurrently, even from two
+    /// different tasks.
+    ///
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split(self) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
+        split(self)
+    }
+
     /// Returns the local address that this socket is bound to.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
@@ -81,6 +92,24 @@ impl UdpSocket {
     /// notification when the socket becomes writable.
     pub fn poll_send(
         self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_send_priv(cx, buf)
+    }
+
+    // Poll IO functions that takes `&self` are provided for the split API.
+    //
+    // They are not public because (taken from the doc of `PollEvented`):
+    //
+    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
+    // caller must ensure that there are at most two tasks that use a
+    // `PollEvented` instance concurrently. One for reading and one for writing.
+    // While violating this requirement is "safe" from a Rust memory model point
+    // of view, it will result in unexpected behavior in the form of lost
+    // notifications and tasks hanging.
+    pub(crate) fn poll_send_priv(
+        &self,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
@@ -135,6 +164,14 @@ impl UdpSocket {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
+        self.poll_recv_priv(cx, buf)
+    }
+
+    pub(crate) fn poll_recv_priv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().recv(buf) {
@@ -174,6 +211,15 @@ impl UdpSocket {
         buf: &[u8],
         target: &SocketAddr,
     ) -> Poll<io::Result<usize>> {
+        self.poll_send_to_priv(cx, buf, target)
+    }
+
+    pub(crate) fn poll_send_to_priv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        target: &SocketAddr,
+    ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_write_ready(cx))?;
 
         match self.io.get_ref().send_to(buf, target) {
@@ -199,6 +245,14 @@ impl UdpSocket {
     /// read and the address from whence the data came.
     pub fn poll_recv_from(
         self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<(usize, SocketAddr), io::Error>> {
+        self.poll_recv_from_priv(cx, buf)
+    }
+
+    pub(crate) fn poll_recv_from_priv(
+        &self,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<(usize, SocketAddr), io::Error>> {

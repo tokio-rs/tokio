@@ -21,9 +21,12 @@ Unix Domain sockets for Tokio
 categories = ["asynchronous"]
 publish = false
 
+[features]
+async-traits = ["futures-core-preview"]
+
 [dependencies]
 bytes = "0.4.8"
-futures = "0.1.21"
+futures-core-preview = { version = "0.3.0-alpha.17", optional = true }
 iovec = "0.1.2"
 libc = "0.2.42"
 log = "0.4.2"
@@ -36,3 +39,4 @@ tokio-io = { version = "0.2.0", path = "../tokio-io" }
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio" }
 tempfile = "3"
+futures-preview = "0.3.0-alpha.17"

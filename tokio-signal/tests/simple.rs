@@ -15,5 +15,5 @@ async fn simple() {
 
     send_signal(libc::SIGUSR1);
 
-    with_timeout(signal.into_future()).await;
+    let _ = with_timeout(signal.into_future()).await;
 }

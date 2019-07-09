@@ -130,7 +130,7 @@ impl<T> UnboundedSender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> async_sink::Sink<T> for UnboundedSender<T> {
+impl<T> tokio_futures::Sink<T> for UnboundedSender<T> {
     type Error = UnboundedSendError;
 
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

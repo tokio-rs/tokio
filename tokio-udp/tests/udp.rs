@@ -38,6 +38,40 @@ async fn send_to_recv_from() -> std::io::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn split() -> std::io::Result<()> {
+    let socket = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let (mut r, mut s) = socket.split();
+
+    let msg = b"hello";
+    let addr = s.as_ref().local_addr()?;
+    tokio::spawn(async move {
+        s.send_to(msg, &addr).await.unwrap();
+    });
+    let mut recv_buf = [0u8; 32];
+    let (len, _) = r.recv_from(&mut recv_buf[..]).await?;
+    assert_eq!(&recv_buf[..len], msg);
+    Ok(())
+}
+
+#[tokio::test]
+async fn reunite() -> std::io::Result<()> {
+    let socket = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let (s, r) = socket.split();
+    assert!(s.reunite(r).is_ok());
+    Ok(())
+}
+
+#[tokio::test]
+async fn reunite_error() -> std::io::Result<()> {
+    let socket = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let socket1 = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let (s, _) = socket.split();
+    let (_, r1) = socket1.split();
+    assert!(s.reunite(r1).is_err());
+    Ok(())
+}
+
 // pub struct ByteCodec;
 
 // impl Decoder for ByteCodec {
