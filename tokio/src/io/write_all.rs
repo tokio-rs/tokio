@@ -1,7 +1,7 @@
 use tokio_io::AsyncWrite;
 
-use std::io;
 use std::future::Future;
+use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -37,7 +37,7 @@ where
                 me.buf = rest;
             }
             if n == 0 {
-                return Poll::Ready(Err(io::ErrorKind::WriteZero.into()))
+                return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
             }
         }
 
