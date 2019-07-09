@@ -8,8 +8,9 @@ use tokio::runtime::Runtime;
 use tokio_test::assert_ok;
 
 use env_logger;
+use std::sync::mpsc;
 
-async fn create_client_server_future() {
+async fn client_server(tx: mpsc::Sender<()>) {
     let addr = assert_ok!("127.0.0.1:0".parse());
     let mut server = assert_ok!(TcpListener::bind(&addr));
 
@@ -32,25 +33,25 @@ async fn create_client_server_future() {
     client.read_to_end(&mut buf).await.unwrap();
 
     assert_eq!(buf, b"hello");
+    tx.send(()).unwrap();
 }
 
 #[test]
-fn runtime_tokio_run() {
+fn spawn_shutdown() {
     let _ = env_logger::try_init();
 
     let rt = Runtime::new().unwrap();
-    rt.block_on_all(create_client_server_future());
+    let (tx, rx) = mpsc::channel();
+
+    rt.spawn(client_server(tx));
+
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rt.shutdown_on_idle());
+
+    rx.try_recv().unwrap();
 }
 
 /*
-#[test]
-fn runtime_single_threaded() {
-    let _ = env_logger::try_init();
-
-    let mut runtime = tokio::runtime::current_thread::Runtime::new().unwrap();
-    runtime.block_on(create_client_server_future()).unwrap();
-    runtime.run().unwrap();
-}
 
 #[test]
 fn runtime_single_threaded_block_on() {
