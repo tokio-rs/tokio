@@ -4,9 +4,9 @@
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio_test::assert_ok;
 
-use std::{cmp, io};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{cmp, io};
 
 #[tokio::test]
 async fn read_to_end() {
