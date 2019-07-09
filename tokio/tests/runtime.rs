@@ -1,49 +1,38 @@
-#![cfg(feature = "broken")]
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use env_logger;
-use futures;
-use futures::sync::oneshot;
-use std::sync::{atomic, Arc, Mutex};
-use std::thread;
 use tokio;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::future::lazy;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
+use tokio_test::assert_ok;
 
-// this import is used in all child modules that have it in scope
-// from importing super::*, but the compiler doesn't realise that
-// and warns about it.
-pub use futures::future::Executor;
+use env_logger;
+use std::sync::{atomic, Arc, Mutex};
+use std::thread;
 
-macro_rules! t {
-    ($e:expr) => {
-        match $e {
-            Ok(e) => e,
-            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-        }
-    };
-}
+async fn create_client_server_future() {
+    let addr = assert_ok!("127.0.0.1:0".parse());
+    let server = assert_ok!(TcpListener::bind(&addr));
 
-fn create_client_server_future() -> Box<dyn Future<Item = (), Error = ()> + Send> {
-    let server = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
-    let addr = t!(server.local_addr());
+    // Get the assigned address
+    let addr = assert_ok!(server.local_addr());
+
+    // Spawn the server
+    tokio::spawn(async move {
+        // Accept a socket
+        let (socket, _) = server.accept().await.unwrap();
+
+        // Write some data
+        socket.write_all(b"hello").await.unwrap();
+    });
+
+
     let client = TcpStream::connect(&addr);
 
-    let server = server
-        .incoming()
-        .take(1)
-        .map_err(|e| panic!("accept err = {:?}", e))
-        .for_each(|socket| {
-            tokio::spawn({
-                io::write_all(socket, b"hello")
-                    .map(|_| ())
-                    .map_err(|e| panic!("write err = {:?}", e))
-            })
-        })
-        .map(|_| ());
+
 
     let client = client
         .map_err(|e| panic!("connect err = {:?}", e))
@@ -65,6 +54,7 @@ fn runtime_tokio_run() {
     tokio::run(create_client_server_future());
 }
 
+/*
 #[test]
 fn runtime_single_threaded() {
     let _ = env_logger::try_init();
@@ -535,3 +525,4 @@ fn after_start_and_before_stop_is_called() {
     assert!(after_start.load(atomic::Ordering::Relaxed) > 0);
     assert!(before_stop.load(atomic::Ordering::Relaxed) > 0);
 }
+*/
