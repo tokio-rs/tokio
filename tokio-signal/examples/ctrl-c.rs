@@ -1,7 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use futures_util::future;
 use futures_util::stream::StreamExt;
 
 /// how many signals to handle before exiting
@@ -16,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // so first we await until the signal is ready.
     let endless_stream = tokio_signal::CtrlC::new().await?;
     // don't keep going forever: convert the endless stream to a bounded one.
-    let limited_stream = endless_stream.take(STOP_AFTER);
+    let mut limited_stream = endless_stream.take(STOP_AFTER);
 
     // how many Ctrl+C have we received so far?
     let mut counter = 0;
@@ -28,10 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         STOP_AFTER
     );
 
-    // Stream::for_each is a powerful primitive provided by the Futures crate.
-    // It turns a Stream into a Future that completes after all stream-items
-    // have been completed, or the first time the closure returns an error
-    let future = limited_stream.for_each(|()| {
+    // Up until now, we haven't really DONE anything, just prepared
+    // our futures, now it's time to actually await the results!
+    while let Some(_) = limited_stream.next().await {
         // Note how we manipulate the counter without any fancy synchronisation.
         // The borrowchecker realises there can't be any conflicts, so the closure
         // can just capture it.
@@ -41,14 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             counter,
             STOP_AFTER - counter
         );
-
-        // return a result to continue handling the stream
-        future::ready(())
-    });
-
-    // Up until now, we haven't really DONE anything, just prepared
-    // now it's time to actually the results!
-    future.await;
+    }
 
     println!("Stream ended, quiting the program.");
     Ok(())
