@@ -2,20 +2,16 @@
 #![feature(async_await)]
 
 use tokio;
-use tokio::io;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::future::lazy;
-use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use tokio_test::assert_ok;
 
 use env_logger;
-use std::sync::{atomic, Arc, Mutex};
-use std::thread;
 
 async fn create_client_server_future() {
     let addr = assert_ok!("127.0.0.1:0".parse());
-    let server = assert_ok!(TcpListener::bind(&addr));
+    let mut server = assert_ok!(TcpListener::bind(&addr));
 
     // Get the assigned address
     let addr = assert_ok!(server.local_addr());
@@ -23,35 +19,27 @@ async fn create_client_server_future() {
     // Spawn the server
     tokio::spawn(async move {
         // Accept a socket
-        let (socket, _) = server.accept().await.unwrap();
+        let (mut socket, _) = server.accept().await.unwrap();
 
         // Write some data
         socket.write_all(b"hello").await.unwrap();
     });
 
 
-    let client = TcpStream::connect(&addr);
+    let mut client = TcpStream::connect(&addr).await.unwrap();
 
+    let mut buf = vec![];
+    client.read_to_end(&mut buf).await.unwrap();
 
-
-    let client = client
-        .map_err(|e| panic!("connect err = {:?}", e))
-        .and_then(|client| {
-            // Read all
-            io::read_to_end(client, vec![])
-                .map(|_| ())
-                .map_err(|e| panic!("read err = {:?}", e))
-        });
-
-    let future = server.join(client).map(|_| ());
-    Box::new(future)
+    assert_eq!(buf, b"hello");
 }
 
 #[test]
 fn runtime_tokio_run() {
     let _ = env_logger::try_init();
 
-    tokio::run(create_client_server_future());
+    let rt = Runtime::new().unwrap();
+    rt.block_on_all(create_client_server_future());
 }
 
 /*
