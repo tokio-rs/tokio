@@ -89,6 +89,8 @@ static INIT: Once = ONCE_INIT;
 ///   received back-to-back, then the stream may only receive one item about the
 ///   two notifications.
 // FIXME: refactor and combine with unix::Signal
+#[must_use = "streams do nothing unless polled"]
+#[derive(Debug)]
 pub struct Event {
     rx: Receiver<()>,
 }
@@ -103,15 +105,7 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub fn ctrl_c() -> IoFuture<Event> {
-        Event::ctrl_c_handle(&Handle::default())
-    }
-
-    /// Creates a new stream listening for the `CTRL_C_EVENT` events.
-    ///
-    /// This function will register a handler via `SetConsoleCtrlHandler` and
-    /// deliver notifications to the returned stream.
-    pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<Event> {
+    pub(crate) fn ctrl_c(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_C_EVENT, handle)
     }
 
@@ -224,7 +218,7 @@ mod tests {
         // first event loop cannot go away
         let mut rt = current_thread::Runtime::new().unwrap();
         let event_ctrl_c = rt
-            .block_on(with_timeout(Event::ctrl_c()))
+            .block_on(with_timeout(crate::CtrlC::new()))
             .expect("failed to run future");
 
         // Windows doesn't have a good programmatic way of sending events
@@ -234,7 +228,7 @@ mod tests {
             super::handler(CTRL_C_EVENT);
         }
 
-        rt.block_on(with_timeout(event_ctrl_c.into_future()));
+        let _ = rt.block_on(with_timeout(event_ctrl_c.into_future()));
 
         let event_ctrl_break = rt
             .block_on(with_timeout(Event::ctrl_break()))
@@ -244,6 +238,6 @@ mod tests {
             super::handler(CTRL_BREAK_EVENT);
         }
 
-        rt.block_on(with_timeout(event_ctrl_break.into_future()));
+        let _ = rt.block_on(with_timeout(event_ctrl_break.into_future()));
     }
 }

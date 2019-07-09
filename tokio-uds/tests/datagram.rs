@@ -1,78 +1,70 @@
 #![cfg(unix)]
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use bytes::BytesMut;
-use futures::{Future, Sink, Stream};
-use std::str;
+use std::io;
 use tempfile;
-use tokio::io;
-use tokio::runtime::current_thread::Runtime;
-use tokio_codec::{Decoder, Encoder};
 use tokio_uds::*;
 
-struct StringDatagramCodec;
+// struct StringDatagramCodec;
 
-/// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
-impl Encoder for StringDatagramCodec {
-    type Item = String;
-    type Error = io::Error;
+// /// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
+// impl Encoder for StringDatagramCodec {
+//     type Item = String;
+//     type Error = io::Error;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        dst.extend_from_slice(&item.into_bytes());
-        Ok(())
+//     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+//         dst.extend_from_slice(&item.into_bytes());
+//         Ok(())
+//     }
+// }
+
+// /// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
+// impl Decoder for StringDatagramCodec {
+//     type Item = String;
+//     type Error = io::Error;
+
+//     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+//         let decoded = str::from_utf8(buf)
+//             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+//             .to_string();
+
+//         Ok(Some(decoded))
+//     }
+// }
+
+async fn echo_server(mut socket: UnixDatagram) -> io::Result<()> {
+    let mut recv_buf = vec![0u8; 1024];
+    loop {
+        let (len, peer_addr) = socket.recv_from(&mut recv_buf[..]).await?;
+        if let Some(path) = peer_addr.as_pathname() {
+            socket.send_to(&recv_buf[..len], path).await?;
+        }
     }
 }
 
-/// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
-impl Decoder for StringDatagramCodec {
-    type Item = String;
-    type Error = io::Error;
-
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let decoded = str::from_utf8(buf)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-            .to_string();
-
-        Ok(Some(decoded))
-    }
-}
-
-#[test]
-fn framed_echo() {
+#[tokio::test]
+async fn echo() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
     let client_path = dir.path().join("client.sock");
 
-    let mut rt = Runtime::new().unwrap();
+    let server_socket = UnixDatagram::bind(server_path.clone())?;
+
+    tokio::spawn(async move {
+        if let Err(e) = echo_server(server_socket).await {
+            eprintln!("Error in echo server: {}", e);
+        }
+    });
 
     {
-        let socket = UnixDatagram::bind(&server_path).unwrap();
-        let server = UnixDatagramFramed::new(socket, StringDatagramCodec);
-
-        let (sink, stream) = server.split();
-
-        let echo_stream =
-            stream.map(|(msg, addr)| (msg, addr.as_pathname().unwrap().to_path_buf()));
-
-        // spawn echo server
-        rt.spawn(
-            echo_stream
-                .forward(sink)
-                .map_err(|e| panic!("err={:?}", e))
-                .map(|_| ()),
-        );
+        let mut socket = UnixDatagram::bind(&client_path).unwrap();
+        socket.connect(server_path)?;
+        socket.send(b"ECHO").await?;
+        let mut recv_buf = [0u8; 16];
+        let len = socket.recv(&mut recv_buf[..]).await?;
+        assert_eq!(&recv_buf[..len], b"ECHO");
     }
 
-    {
-        let socket = UnixDatagram::bind(&client_path).unwrap();
-        let client = UnixDatagramFramed::new(socket, StringDatagramCodec);
-
-        let (sink, stream) = client.split();
-
-        rt.block_on(sink.send(("ECHO".to_string(), server_path)))
-            .unwrap();
-
-        let response = rt.block_on(stream.take(1).collect()).unwrap();
-        assert_eq!(response[0].0, "ECHO");
-    }
+    Ok(())
 }

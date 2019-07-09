@@ -6,15 +6,13 @@ use std::error::Error;
 // A trick to not fail build on non-unix platforms when using unix-specific features.
 #[cfg(unix)]
 mod platform {
-
-    use futures_util::future;
     use futures_util::stream::StreamExt;
     use std::error::Error;
     use tokio_signal::unix::{Signal, SIGHUP};
 
     pub async fn main() -> Result<(), Box<dyn Error>> {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
-        let stream = Signal::new(SIGHUP).await?;
+        let mut stream = Signal::new(SIGHUP).await?;
 
         println!("Waiting for SIGHUPS (Ctrl+C to quit)");
         println!(
@@ -23,22 +21,15 @@ mod platform {
              (i.e. this binary)"
         );
 
-        // for_each is a powerful primitive provided by the Futures crate
-        // it turns a Stream into a Future that completes after all stream-items
-        // have been completed.
-        let future = stream.for_each(|the_signal| {
+        // Up until now, we haven't really DONE anything, just prepared
+        // our futures, now it's time to actually await the results!
+        while let Some(the_signal) = stream.next().await {
             println!(
                 "*Got signal {:#x}* I should probably reload my config \
                  or something",
                 the_signal
             );
-
-            future::ready(())
-        });
-
-        // Up until now, we haven't really DONE anything, just prepared
-        // now it's time to actually the results!
-        future.await;
+        }
 
         Ok(())
     }

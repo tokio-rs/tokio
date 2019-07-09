@@ -27,6 +27,7 @@ mod recv_from;
 mod send;
 mod send_to;
 mod socket;
+pub mod split;
 
 // pub use self::frame::UdpFramed;
 pub use self::recv::Recv;

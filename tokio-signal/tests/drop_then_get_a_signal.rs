@@ -19,5 +19,5 @@ async fn drop_then_get_a_signal() {
         .await
         .expect("failed to create second signal");
 
-    with_timeout(signal.into_future()).await;
+    let _ = with_timeout(signal.into_future()).await;
 }

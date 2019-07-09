@@ -159,6 +159,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     }
 }
 
+#[derive(Debug)]
 struct Driver {
     wakeup: PollEvented<UnixStream>,
 }
@@ -249,6 +250,8 @@ impl Driver {
 /// If you've got any questions about this feel free to open an issue on the
 /// repo, though, as I'd love to chat about this! In other words, I'd love to
 /// alleviate some of these limitations if possible!
+#[must_use = "streams do nothing unless polled"]
+#[derive(Debug)]
 pub struct Signal {
     driver: Driver,
     signal: c_int,
@@ -326,6 +329,10 @@ impl Signal {
         })
         .boxed()
     }
+
+    pub(crate) fn ctrl_c(handle: &Handle) -> IoFuture<Signal> {
+        Self::with_handle(libc::SIGINT, handle)
+    }
 }
 
 impl Stream for Signal {
@@ -341,6 +348,11 @@ impl Stream for Signal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::future::FutureExt;
+    use futures_util::StreamExt;
+    use std::time::Duration;
+    use tokio_sync::oneshot;
+    use tokio_timer::Timeout;
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
@@ -350,5 +362,28 @@ mod tests {
     #[test]
     fn signal_enable_error_on_forbidden_input() {
         signal_enable(signal_hook_registry::FORBIDDEN[0]).unwrap_err();
+    }
+
+    fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
+        Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
+    }
+
+    #[tokio::test]
+    async fn ctrl_c() {
+        let ctrl_c = with_timeout(crate::CtrlC::new())
+            .await
+            .expect("failed to init ctrl_c");
+
+        let (fire, wait) = oneshot::channel();
+
+        // NB: simulate a signal coming in by exercising our signal handler
+        // to avoid complications with sending SIGINT to the test process
+        tokio::spawn(async {
+            wait.await.expect("wait failed");
+            action(globals(), libc::SIGINT);
+        });
+
+        let _ = fire.send(());
+        let _ = with_timeout(ctrl_c.into_future()).await;
     }
 }
