@@ -53,13 +53,16 @@ async fn read() {
 
     let f = files.clone();
     let p = p.to_path_buf();
-    
+
     let read_dir_fut = read_dir(p).await.unwrap();
-    assert!(read_dir_fut.try_for_each(move |e| {
-        let s = e.file_name().to_str().unwrap().to_string();
-        f.lock().unwrap().push(s);
-        future::ok(())
-    }).await.is_ok());
+    assert!(read_dir_fut
+        .try_for_each(move |e| {
+            let s = e.file_name().to_str().unwrap().to_string();
+            f.lock().unwrap().push(s);
+            future::ok(())
+        })
+        .await
+        .is_ok());
 
     let mut files = files.lock().unwrap();
     files.sort(); // because the order is not guaranteed

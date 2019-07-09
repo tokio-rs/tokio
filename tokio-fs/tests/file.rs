@@ -6,8 +6,8 @@ use rand::{distributions, thread_rng, Rng};
 use std::fs;
 use std::io::SeekFrom;
 use tempfile::Builder as TmpBuilder;
-use tokio_fs::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_fs::*;
 
 #[tokio::test]
 async fn read_write() {
@@ -92,7 +92,9 @@ async fn seek() {
         .create(true)
         .read(true)
         .write(true)
-        .open(file_path).await.unwrap();
+        .open(file_path)
+        .await
+        .unwrap();
     assert!(file.write(b"Hello, world!").await.is_ok());
     let mut file = file.seek(SeekFrom::End(-6)).await.unwrap().0;
     let mut buf = vec![0; 5];
@@ -117,7 +119,9 @@ async fn clone() {
     let file = File::create(file_path.clone()).await.unwrap();
     let (mut file, mut clone) = file.try_clone().await.unwrap();
     assert!(AsyncWriteExt::write(&mut file, b"clone ").await.is_ok());
-    assert!(AsyncWriteExt::write(&mut clone, b"successful").await.is_ok());
+    assert!(AsyncWriteExt::write(&mut clone, b"successful")
+        .await
+        .is_ok());
 
     let mut file = std::fs::File::open(&file_path).unwrap();
 

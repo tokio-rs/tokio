@@ -57,7 +57,7 @@ async fn test_symlink() {
 
     let read = read_link(dst.clone()).await.unwrap();
     assert!(read == src);
-    
+
     let symlink_meta = symlink_metadata(dst.clone()).await.unwrap();
     assert!(symlink_meta.file_type().is_symlink());
 }
