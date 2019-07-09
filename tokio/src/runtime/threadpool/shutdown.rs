@@ -1,11 +1,11 @@
-use futures::{try_ready, Future, Poll};
-use tokio_threadpool as threadpool;
-use std::fmt;
 use super::Inner;
+
+use futures::{try_ready, Future, Poll};
+use std::fmt;
 
 /// A future that resolves when the Tokio `Runtime` is shut down.
 pub struct Shutdown {
-    pub(super) inner: threadpool::Shutdown,
+    pub(super) inner: tokio_threadpool::Shutdown,
 }
 
 impl Shutdown {

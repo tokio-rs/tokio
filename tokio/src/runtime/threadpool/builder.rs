@@ -84,18 +84,6 @@ impl Builder {
         self
     }
 
-    /// Set builder to set up the thread pool instance.
-    #[deprecated(
-        since = "0.1.9",
-        note = "use the `core_threads`, `blocking_threads`, `name_prefix`, \
-                `keep_alive`, and `stack_size` functions on `runtime::Builder`, \
-                instead")]
-    #[doc(hidden)]
-    pub fn threadpool_builder(&mut self, val: ThreadPoolBuilder) -> &mut Self {
-        self.threadpool_builder = val;
-        self
-    }
-
     /// Sets a callback to handle panics in futures.
     ///
     /// The callback is triggered when a panic during a future bubbles up to
@@ -351,9 +339,9 @@ impl Builder {
             .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
 
-                tokio_reactor::with_default(&reactor_handles[index], enter, |enter| {
-                    clock::with_default(&clock, enter, |enter| {
-                        timer::with_default(&timer_handles[index], enter, |_| {
+                tokio_reactor::with_default(&reactor_handles[index], enter, |_| {
+                    clock::with_default(&clock, || {
+                        timer::with_default(&timer_handles[index], || {
                             trace::dispatcher::with_default(&dispatch, || {
                                 w.run();
                             })
@@ -372,14 +360,8 @@ impl Builder {
             })
             .build();
 
-        // To support deprecated `reactor()` function
-        let reactor = Reactor::new()?;
-        let reactor_handle = reactor.handle();
-
         Ok(Runtime {
             inner: Some(Inner {
-                reactor_handle,
-                reactor: Mutex::new(Some(reactor)),
                 pool,
             }),
         })
