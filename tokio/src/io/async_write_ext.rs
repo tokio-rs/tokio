@@ -1,13 +1,11 @@
 use crate::io::write::{write, Write};
+use crate::io::write_all::{write_all, WriteAll};
 
 use tokio_io::AsyncWrite;
 
 /// An extension trait which adds utility methods to `AsyncWrite` types.
 pub trait AsyncWriteExt: AsyncWrite {
-    /// Write the provided data into `self`.
-    ///
-    /// The returned future will resolve to the number of bytes written once the
-    /// write operation is completed.
+    /// Write a buffer into this writter, returning how many bytes were written.
     ///
     /// # Examples
     ///
@@ -19,6 +17,20 @@ pub trait AsyncWriteExt: AsyncWrite {
         Self: Unpin,
     {
         write(self, src)
+    }
+
+    /// Attempt to write an entire buffer into this writter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
+    where
+        Self: Unpin,
+    {
+        write_all(self, src)
     }
 }
 
