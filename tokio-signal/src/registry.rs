@@ -252,7 +252,6 @@ mod tests {
         drop(second_rx);
 
         let (fire, wait) = oneshot::channel();
-        //let mut rt = Runtime::new().unwrap();
 
         tokio::spawn(async {
             wait.await.expect("wait failed");

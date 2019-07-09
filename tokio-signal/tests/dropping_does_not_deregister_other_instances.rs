@@ -26,5 +26,5 @@ async fn dropping_signal_does_not_deregister_any_other_instances() {
     drop(second_duplicate_signal);
 
     send_signal(TEST_SIGNAL);
-    with_timeout(signal.into_future()).await;
+    let _ = with_timeout(signal.into_future()).await;
 }

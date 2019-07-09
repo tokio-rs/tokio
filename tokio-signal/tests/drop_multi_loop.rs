@@ -29,5 +29,5 @@ fn dropping_loops_does_not_cause_starvation() {
 
     send_signal(TEST_SIGNAL);
 
-    run_with_timeout(&mut rt, signal.into_future());
+    let _ = run_with_timeout(&mut rt, signal.into_future());
 }

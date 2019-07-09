@@ -18,5 +18,5 @@ async fn notify_both() {
         .expect("failed to create signal2");
 
     send_signal(libc::SIGUSR2);
-    with_timeout(future::join(signal1.into_future(), signal2.into_future())).await;
+    let _ = with_timeout(future::join(signal1.into_future(), signal2.into_future())).await;
 }
