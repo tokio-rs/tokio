@@ -35,7 +35,7 @@ default = [
   "tcp",
   "timer",
   "udp",
-#  "uds",
+  "uds",
 ]
 
 codec = ["io", "tokio-codec"]
@@ -57,7 +57,7 @@ sync = ["tokio-sync"]
 tcp = ["tokio-tcp"]
 timer = ["tokio-timer"]
 udp = ["tokio-udp"]
-#uds = ["tokio-uds"]
+uds = ["tokio-uds"]
 
 [dependencies]
 # Only non-optional dependency...
