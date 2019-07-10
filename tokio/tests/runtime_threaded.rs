@@ -125,71 +125,13 @@ fn spawn_many() {
     assert_eq!(ITER, *cnt.lock().unwrap());
 }
 
-/*
-mod from_block_on_all {
-    use super::*;
-
-    fn test<F>(spawn: F)
-    where
-        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + Send + 'static,
-    {
-        let cnt = Arc::new(Mutex::new(0));
-        let c = cnt.clone();
-
-        let runtime = Runtime::new().unwrap();
-        let msg = runtime
-            .block_on_all(lazy(move || {
-                {
-                    let mut x = c.lock().unwrap();
-                    *x = 1 + *x;
-                }
-
-                // Spawn!
-                spawn(Box::new(lazy(move || {
-                    {
-                        let mut x = c.lock().unwrap();
-                        *x = 1 + *x;
-                    }
-                    Ok::<(), ()>(())
-                })));
-
-                Ok::<_, ()>("hello")
-            }))
-            .unwrap();
-
-        assert_eq!(2, *cnt.lock().unwrap());
-        assert_eq!(msg, "hello");
-    }
-
-    #[test]
-    fn execute() {
-        test(|f| {
-            tokio::executor::DefaultExecutor::current()
-                .execute(f)
-                .unwrap();
-        })
-    }
-
-    #[test]
-    fn spawn() {
-        test(|f| {
-            tokio::spawn(f);
-        })
-    }
-}
-
-mod nested_enter {
-    use super::*;
+#[test]
+fn nested_enter() {
     use std::panic;
-    use tokio::runtime::current_thread;
 
-    fn test<F1, F2>(first: F1, nested: F2)
-    where
-        F1: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + Send + 'static,
-        F2: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + panic::UnwindSafe + Send + 'static,
-    {
-        let panicked = Arc::new(Mutex::new(false));
-        let panicked2 = panicked.clone();
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async {
+        assert_err!(tokio_executor::enter());
 
         // Since this is testing panics in other threads, printing about panics
         // is noisy and can give the impression that the test is ignoring panics.
@@ -207,54 +149,19 @@ mod nested_enter {
             }
         }));
 
-        first(Box::new(lazy(move || {
-            panic::catch_unwind(move || nested(Box::new(lazy(|| Ok::<(), ()>(())))))
-                .expect_err("nested should panic");
-            *panicked2.lock().unwrap() = true;
-            Ok::<(), ()>(())
-        })));
+        let res = panic::catch_unwind(move || {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async { });
+        });
+
+        assert_err!(res);
 
         panic::set_hook(prev_hook);
 
-        assert!(
-            *panicked.lock().unwrap(),
-            "nested call should have panicked"
-        );
-    }
-
-    fn threadpool_new() -> Runtime {
-        Runtime::new().expect("rt new")
-    }
-
-    #[test]
-    fn run_in_run() {
-        test(tokio::run, tokio::run);
-    }
-
-    #[test]
-    fn threadpool_block_on_in_run() {
-        test(tokio::run, |fut| {
-            let rt = threadpool_new();
-            rt.block_on(fut).unwrap();
-        });
-    }
-
-    #[test]
-    fn threadpool_block_on_all_in_run() {
-        test(tokio::run, |fut| {
-            let rt = threadpool_new();
-            rt.block_on_all(fut).unwrap();
-        });
-    }
-
-    #[test]
-    fn current_thread_block_on_all_in_run() {
-        test(tokio::run, |fut| {
-            current_thread::block_on_all(fut).unwrap();
-        });
-    }
+    });
 }
 
+/*
 #[test]
 fn runtime_reactor_handle() {
     #![allow(deprecated)]

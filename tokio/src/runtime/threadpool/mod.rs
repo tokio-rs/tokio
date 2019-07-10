@@ -160,39 +160,6 @@ impl Runtime {
         entered.block_on(rx).expect("blocked on future paniced")
     }
 
-    /// Run a future to completion on the Tokio runtime, then wait for all
-    /// background futures to complete too.
-    ///
-    /// This runs the given future on the runtime, blocking until it is
-    /// complete, waiting for background futures to complete, and yielding
-    /// its resolved result. Any tasks or timers which the future spawns
-    /// internally will be executed on the runtime and waited for completion.
-    ///
-    /// This method should not be called from an asynchronous context.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the executor is at capacity, if the provided
-    /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on_all<F>(self, future: F) -> F::Output
-    where
-        F: Send + 'static + Future,
-        F::Output: Send + 'static,
-    {
-        let mut entered = enter().expect("nested block_on_all");
-        let (tx, rx) = crate::sync::oneshot::channel();
-
-        self.spawn(async move {
-            let res = future.await;
-            let _ = tx.send(res);
-        });
-
-        let ret = entered.block_on(rx).unwrap();
-        entered.block_on(self.shutdown_on_idle());
-
-        ret
-    }
-
     /// Signals the runtime to shutdown once it becomes idle.
     ///
     /// Returns a future that completes once the shutdown operation has
@@ -274,13 +241,5 @@ impl Runtime {
 
     fn inner(&self) -> &Inner {
         self.inner.as_ref().unwrap()
-    }
-}
-
-impl Drop for Runtime {
-    fn drop(&mut self) {
-        if let Some(inner) = self.inner.take() {
-            inner.pool.shutdown_now().wait();
-        }
     }
 }
