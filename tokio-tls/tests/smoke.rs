@@ -32,7 +32,7 @@ struct Keys {
 
 #[allow(dead_code)]
 fn openssl_keys() -> &'static Keys {
-    static INIT: Once = ONCE_INIT;
+    static INIT: Once = Once::new();
     static mut KEYS: *mut Keys = 0 as *mut _;
 
     INIT.call_once(|| {
@@ -130,7 +130,7 @@ cfg_if! {
         use std::env;
         use std::fs::File;
         use std::process::Command;
-        use std::sync::{ONCE_INIT, Once};
+        use std::sync::Once;
 
         use untrusted::Input;
         use webpki::trust_anchor_util;
@@ -159,7 +159,7 @@ cfg_if! {
         // Right now I don't know of a way to programmatically create a
         // self-signed certificate, so we just fork out to the `openssl` binary.
         fn keys() -> (&'static [u8], &'static [u8]) {
-            static INIT: Once = ONCE_INIT;
+            static INIT: Once = Once::new();
             static mut KEYS: *mut (Vec<u8>, Vec<u8>) = 0 as *mut _;
 
             INIT.call_once(|| {
@@ -226,7 +226,7 @@ cfg_if! {
                             not(target_os = "ios"))))] {
         use std::fs::File;
         use std::env;
-        use std::sync::{Once, ONCE_INIT};
+        use std::sync::Once;
 
         fn contexts() -> (tokio_tls::TlsAcceptor, tokio_tls::TlsConnector) {
             let keys = openssl_keys();
@@ -244,7 +244,7 @@ cfg_if! {
     } else if #[cfg(any(target_os = "macos", target_os = "ios"))] {
         use std::env;
         use std::fs::File;
-        use std::sync::{Once, ONCE_INIT};
+        use std::sync::Once;
 
         fn contexts() -> (tokio_tls::TlsAcceptor, tokio_tls::TlsConnector) {
             let keys = openssl_keys();
@@ -267,7 +267,7 @@ cfg_if! {
         use std::io::Error;
         use std::mem;
         use std::ptr;
-        use std::sync::{Once, ONCE_INIT};
+        use std::sync::Once;
 
         use schannel::cert_context::CertContext;
         use schannel::cert_store::{CertStore, CertAdd, Memory};
@@ -312,7 +312,7 @@ cfg_if! {
         // for a small period of time (e.g. 1 day).
 
         fn localhost_cert() -> CertContext {
-            static INIT: Once = ONCE_INIT;
+            static INIT: Once = Once::new();
             INIT.call_once(|| {
                 for cert in local_root_store().certs() {
                     let name = match cert.friendly_name() {
