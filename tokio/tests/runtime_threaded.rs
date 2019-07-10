@@ -10,7 +10,7 @@ use tokio::timer::Delay;
 use tokio_test::{assert_ok, assert_err};
 
 use env_logger;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::thread;
 
@@ -101,51 +101,31 @@ fn block_waits() {
     e.block_on(rt.shutdown_on_idle());
 }
 
-/*
-mod many {
-    use super::*;
-
+#[test]
+fn spawn_many() {
     const ITER: usize = 200;
-    fn test<F>(spawn: F)
-    where
-        F: Fn(&mut Runtime, Box<dyn Future<Item = (), Error = ()> + Send>),
-    {
-        let cnt = Arc::new(Mutex::new(0));
-        let mut runtime = Runtime::new().unwrap();
 
+    let cnt = Arc::new(Mutex::new(0));
+    let rt = Runtime::new().unwrap();
+
+    let c = cnt.clone();
+    rt.block_on(async move {
         for _ in 0..ITER {
-            let c = cnt.clone();
-            spawn(
-                &mut runtime,
-                Box::new(lazy(move || {
-                    {
-                        let mut x = c.lock().unwrap();
-                        *x = 1 + *x;
-                    }
-                    Ok::<(), ()>(())
-                })),
-            );
+            let c = c.clone();
+            tokio::spawn(async move {
+                let mut x = c.lock().unwrap();
+                *x = 1 + *x;
+            });
         }
+    });
 
-        runtime.shutdown_on_idle().wait().unwrap();
-        assert_eq!(ITER, *cnt.lock().unwrap());
-    }
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rt.shutdown_on_idle());
 
-    #[test]
-    fn spawn() {
-        test(|rt, f| {
-            rt.spawn(f);
-        })
-    }
-
-    #[test]
-    fn execute() {
-        test(|rt, f| {
-            rt.executor().execute(f).unwrap();
-        })
-    }
+    assert_eq!(ITER, *cnt.lock().unwrap());
 }
 
+/*
 mod from_block_on_all {
     use super::*;
 
