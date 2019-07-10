@@ -45,11 +45,11 @@ reactor = ["io", "tokio-reactor"]
 rt-full = [
   "num_cpus",
   "reactor",
+  "sync",
   "timer",
   "tokio-current-thread",
   "tokio-executor",
   "tokio-macros",
-  "tokio-sync",
   "tokio-threadpool",
   "tracing-core",
 ]
