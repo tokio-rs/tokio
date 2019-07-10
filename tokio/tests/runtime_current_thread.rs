@@ -4,6 +4,7 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::current_thread::Runtime;
+use tokio::sync::oneshot;
 use tokio::timer::Delay;
 use tokio_test::{assert_ok, assert_err};
 
@@ -96,4 +97,42 @@ fn block_on() {
 
     assert_ok!(rx.try_recv());
     assert_err!(rx.try_recv());
+}
+
+#[test]
+fn racy() {
+    use std::sync::mpsc;
+    use std::thread;
+
+    let (trigger, exit) = oneshot::channel();
+    let (handle_tx, handle_rx) = mpsc::channel();
+
+    let jh = thread::spawn(move || {
+        let mut rt = Runtime::new().unwrap();
+        handle_tx.send(rt.handle()).unwrap();
+
+        // don't exit until we are told to
+        rt.block_on(async {
+            exit.await.unwrap();
+        });
+
+        // run until all spawned futures (incl. the "exit" signal future) have completed.
+        rt.run().unwrap();
+    });
+
+    let (tx, rx) = oneshot::channel();
+
+    let handle = handle_rx.recv().unwrap();
+    handle.spawn(async {
+        tx.send(()).unwrap();
+    }).unwrap();
+
+    // signal runtime thread to exit
+    trigger.send(()).unwrap();
+
+    // wait for runtime thread to exit
+    jh.join().unwrap();
+
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rx).unwrap();
 }

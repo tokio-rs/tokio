@@ -5,10 +5,14 @@ use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
-use tokio_test::assert_ok;
+use tokio::sync::oneshot;
+use tokio::timer::Delay;
+use tokio_test::{assert_ok, assert_err};
 
 use env_logger;
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
+use std::thread;
 
 async fn client_server(tx: mpsc::Sender<()>) {
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -43,258 +47,61 @@ fn spawn_shutdown() {
     let rt = Runtime::new().unwrap();
     let (tx, rx) = mpsc::channel();
 
-    rt.spawn(client_server(tx));
+    rt.spawn(client_server(tx.clone()));
+
+    // Use executor trait
+    let f = Box::pin(client_server(tx));
+    tokio_executor::Executor::spawn(&mut rt.executor(), f).unwrap();
 
     let mut e = tokio_executor::enter().unwrap();
     e.block_on(rt.shutdown_on_idle());
 
-    rx.try_recv().unwrap();
-}
-
-/*
-
-#[test]
-fn runtime_single_threaded_block_on() {
-    let _ = env_logger::try_init();
-
-    tokio::runtime::current_thread::block_on_all(create_client_server_future()).unwrap();
-}
-
-mod runtime_single_threaded_block_on_all {
-    use super::*;
-
-    fn test<F>(spawn: F)
-    where
-        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>),
-    {
-        let cnt = Arc::new(Mutex::new(0));
-        let c = cnt.clone();
-
-        let msg = tokio::runtime::current_thread::block_on_all(lazy(move || {
-            {
-                let mut x = c.lock().unwrap();
-                *x = 1 + *x;
-            }
-
-            // Spawn!
-            spawn(Box::new(lazy(move || {
-                {
-                    let mut x = c.lock().unwrap();
-                    *x = 1 + *x;
-                }
-                Ok::<(), ()>(())
-            })));
-
-            Ok::<_, ()>("hello")
-        }))
-        .unwrap();
-
-        assert_eq!(2, *cnt.lock().unwrap());
-        assert_eq!(msg, "hello");
-    }
-
-    #[test]
-    fn spawn() {
-        test(|f| {
-            tokio::spawn(f);
-        })
-    }
-
-    #[test]
-    fn execute() {
-        test(|f| {
-            tokio::executor::DefaultExecutor::current()
-                .execute(f)
-                .unwrap();
-        })
-    }
-}
-
-mod runtime_single_threaded_racy {
-    use super::*;
-    fn test<F>(spawn: F)
-    where
-        F: Fn(
-            tokio::runtime::current_thread::Handle,
-            Box<dyn Future<Item = (), Error = ()> + Send>,
-        ),
-    {
-        let (trigger, exit) = futures::sync::oneshot::channel();
-        let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
-        let jh = ::std::thread::spawn(move || {
-            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-            handle_tx.send(rt.handle()).unwrap();
-
-            // don't exit until we are told to
-            rt.block_on(exit.map_err(|_| ())).unwrap();
-
-            // run until all spawned futures (incl. the "exit" signal future) have completed.
-            rt.run().unwrap();
-        });
-
-        let (tx, rx) = futures::sync::oneshot::channel();
-
-        let handle = handle_rx.recv().unwrap();
-        spawn(
-            handle,
-            Box::new(futures::future::lazy(move || {
-                tx.send(()).unwrap();
-                Ok(())
-            })),
-        );
-
-        // signal runtime thread to exit
-        trigger.send(()).unwrap();
-
-        // wait for runtime thread to exit
-        jh.join().unwrap();
-
-        assert_eq!(rx.wait().unwrap(), ());
-    }
-
-    #[test]
-    fn spawn() {
-        test(|handle, f| {
-            handle.spawn(f).unwrap();
-        })
-    }
-
-    #[test]
-    fn execute() {
-        test(|handle, f| {
-            handle.execute(f).unwrap();
-        })
-    }
-}
-
-mod runtime_multi_threaded {
-    use super::*;
-    fn test<F>(spawn: F)
-    where
-        F: Fn(&mut Runtime) + Send + 'static,
-    {
-        let _ = env_logger::try_init();
-
-        let mut runtime = tokio::runtime::Builder::new().build().unwrap();
-        spawn(&mut runtime);
-        runtime.shutdown_on_idle().wait().unwrap();
-    }
-
-    #[test]
-    fn spawn() {
-        test(|rt| {
-            rt.spawn(create_client_server_future());
-        });
-    }
-
-    #[test]
-    fn execute() {
-        test(|rt| {
-            rt.executor()
-                .execute(create_client_server_future())
-                .unwrap();
-        });
-    }
+    assert_ok!(rx.try_recv());
+    assert_ok!(rx.try_recv());
+    assert_err!(rx.try_recv());
 }
 
 #[test]
 fn block_on_timer() {
-    use std::time::{Duration, Instant};
-    use tokio::timer::{Delay, Error};
+    let rt = Runtime::new().unwrap();
 
-    fn after_1s<T>(x: T) -> Box<dyn Future<Item = T, Error = Error> + Send>
-    where
-        T: Send + 'static,
-    {
-        Box::new(Delay::new(Instant::now() + Duration::from_millis(100)).map(move |_| x))
-    }
+    let v = rt.block_on(async move {
+        let delay = Delay::new(Instant::now() + Duration::from_millis(100));
+        delay.await;
+        42
+    });
 
-    let runtime = Runtime::new().unwrap();
-    assert_eq!(runtime.block_on(after_1s(42)).unwrap(), 42);
-    runtime.shutdown_on_idle().wait().unwrap();
-}
+    assert_eq!(v, 42);
 
-mod from_block_on {
-    use super::*;
-
-    fn test<F>(spawn: F)
-    where
-        F: Fn(Box<dyn Future<Item = (), Error = ()> + Send>) + Send + 'static,
-    {
-        let cnt = Arc::new(Mutex::new(0));
-        let c = cnt.clone();
-
-        let runtime = Runtime::new().unwrap();
-        let msg = runtime
-            .block_on(lazy(move || {
-                {
-                    let mut x = c.lock().unwrap();
-                    *x = 1 + *x;
-                }
-
-                // Spawn!
-                spawn(Box::new(lazy(move || {
-                    {
-                        let mut x = c.lock().unwrap();
-                        *x = 1 + *x;
-                    }
-                    Ok::<(), ()>(())
-                })));
-
-                Ok::<_, ()>("hello")
-            }))
-            .unwrap();
-
-        runtime.shutdown_on_idle().wait().unwrap();
-        assert_eq!(2, *cnt.lock().unwrap());
-        assert_eq!(msg, "hello");
-    }
-
-    #[test]
-    fn execute() {
-        test(|f| {
-            tokio::executor::DefaultExecutor::current()
-                .execute(f)
-                .unwrap();
-        })
-    }
-
-    #[test]
-    fn spawn() {
-        test(|f| {
-            tokio::spawn(f);
-        })
-    }
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rt.shutdown_on_idle());
 }
 
 #[test]
 fn block_waits() {
-    let (tx, rx) = oneshot::channel();
+    let (a_tx, a_rx) = oneshot::channel();
+    let (b_tx, b_rx) = mpsc::channel();
 
     thread::spawn(|| {
         use std::time::Duration;
+
         thread::sleep(Duration::from_millis(1000));
-        tx.send(()).unwrap();
+        a_tx.send(()).unwrap();
     });
 
-    let cnt = Arc::new(Mutex::new(0));
-    let c = cnt.clone();
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async move {
+        a_rx.await.unwrap();
+        b_tx.send(()).unwrap();
+    });
 
-    let runtime = Runtime::new().unwrap();
-    runtime
-        .block_on(rx.then(move |_| {
-            {
-                let mut x = c.lock().unwrap();
-                *x = 1 + *x;
-            }
-            Ok::<_, ()>(())
-        }))
-        .unwrap();
+    assert_ok!(b_rx.try_recv());
 
-    assert_eq!(1, *cnt.lock().unwrap());
-    runtime.shutdown_on_idle().wait().unwrap();
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rt.shutdown_on_idle());
 }
 
+/*
 mod many {
     use super::*;
 
