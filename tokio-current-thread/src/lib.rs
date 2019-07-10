@@ -725,6 +725,15 @@ impl TaskExecutor {
             None => Err(SpawnError::shutdown()),
         })
     }
+
+    fn status_local(&self) -> Result<(), SpawnError> {
+        CURRENT.with(|current| match current.spawn.get() {
+            Some(_spawn) => {
+                Ok(())
+            }
+            None => Err(SpawnError::shutdown()),
+        })
+    }
 }
 
 impl tokio_executor::Executor for TaskExecutor {
@@ -734,6 +743,10 @@ impl tokio_executor::Executor for TaskExecutor {
     ) -> Result<(), SpawnError> {
         self.spawn_local(future)
     }
+
+    fn status(&self) -> Result<(), SpawnError> {
+        self.status_local()
+    }
 }
 
 impl<F> tokio_executor::TypedExecutor<F> for TaskExecutor
@@ -742,6 +755,10 @@ where
 {
     fn spawn(&mut self, future: F) -> Result<(), SpawnError> {
         self.spawn_local(Box::pin(future))
+    }
+
+    fn status(&self) -> Result<(), SpawnError> {
+        self.status_local()
     }
 }
 
