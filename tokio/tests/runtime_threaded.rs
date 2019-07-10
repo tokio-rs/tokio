@@ -161,51 +161,36 @@ fn nested_enter() {
     });
 }
 
-/*
-#[test]
-fn runtime_reactor_handle() {
-    #![allow(deprecated)]
-
-    use futures::Stream;
-    use std::net::{TcpListener as StdListener, TcpStream as StdStream};
-
-    let rt = Runtime::new().unwrap();
-
-    let std_listener = StdListener::bind("127.0.0.1:0").unwrap();
-    let tk_listener = TcpListener::from_std(std_listener, rt.handle()).unwrap();
-
-    let addr = tk_listener.local_addr().unwrap();
-
-    // Spawn a thread since we are avoiding the runtime
-    let th = thread::spawn(|| for _ in tk_listener.incoming().take(1).wait() {});
-
-    let _ = StdStream::connect(&addr).unwrap();
-
-    th.join().unwrap();
-}
-
 #[test]
 fn after_start_and_before_stop_is_called() {
+    use std::sync::atomic::{Ordering, AtomicUsize};
+
     let _ = env_logger::try_init();
 
-    let after_start = Arc::new(atomic::AtomicUsize::new(0));
-    let before_stop = Arc::new(atomic::AtomicUsize::new(0));
+    let after_start = Arc::new(AtomicUsize::new(0));
+    let before_stop = Arc::new(AtomicUsize::new(0));
 
     let after_inner = after_start.clone();
     let before_inner = before_stop.clone();
-    let runtime = tokio::runtime::Builder::new()
+    let rt = tokio::runtime::Builder::new()
         .after_start(move || {
-            after_inner.clone().fetch_add(1, atomic::Ordering::Relaxed);
+            after_inner.clone().fetch_add(1, Ordering::Relaxed);
         })
         .before_stop(move || {
-            before_inner.clone().fetch_add(1, atomic::Ordering::Relaxed);
+            before_inner.clone().fetch_add(1, Ordering::Relaxed);
         })
         .build()
         .unwrap();
 
-    runtime.block_on_all(create_client_server_future()).unwrap();
+    let (tx, rx) = mpsc::channel();
 
-    assert!(after_start.load(atomic::Ordering::Relaxed) > 0);
-    assert!(before_stop.load(atomic::Ordering::Relaxed) > 0);
+    rt.block_on(client_server(tx));
+
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rt.shutdown_on_idle());
+
+    assert_ok!(rx.try_recv());
+
+    assert!(after_start.load(Ordering::Relaxed) > 0);
+    assert!(before_stop.load(Ordering::Relaxed) > 0);
 }
-*/
