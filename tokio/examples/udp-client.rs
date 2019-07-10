@@ -54,7 +54,8 @@ async fn main() {
     } else {
         "[::]:0"
     }
-    .parse().unwrap();
+    .parse()
+    .unwrap();
 
     let mut socket = UdpSocket::bind(&local_addr).unwrap();
     const MAX_DATAGRAM_SIZE: usize = 65_507;

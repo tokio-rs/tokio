@@ -6,7 +6,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::oneshot;
 use tokio::timer::Delay;
-use tokio_test::{assert_ok, assert_err};
+use tokio_test::{assert_err, assert_ok};
 
 use env_logger;
 use std::sync::mpsc;
@@ -27,7 +27,6 @@ async fn client_server(tx: mpsc::Sender<()>) {
         // Write some data
         socket.write_all(b"hello").await.unwrap();
     });
-
 
     let mut client = TcpStream::connect(&addr).await.unwrap();
 
@@ -123,9 +122,11 @@ fn racy() {
     let (tx, rx) = oneshot::channel();
 
     let handle = handle_rx.recv().unwrap();
-    handle.spawn(async {
-        tx.send(()).unwrap();
-    }).unwrap();
+    handle
+        .spawn(async {
+            tx.send(()).unwrap();
+        })
+        .unwrap();
 
     // signal runtime thread to exit
     trigger.send(()).unwrap();

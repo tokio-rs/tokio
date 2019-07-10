@@ -7,12 +7,12 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tokio::timer::Delay;
-use tokio_test::{assert_ok, assert_err};
+use tokio_test::{assert_err, assert_ok};
 
 use env_logger;
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 
 async fn client_server(tx: mpsc::Sender<()>) {
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -29,7 +29,6 @@ async fn client_server(tx: mpsc::Sender<()>) {
         // Write some data
         socket.write_all(b"hello").await.unwrap();
     });
-
 
     let mut client = TcpStream::connect(&addr).await.unwrap();
 
@@ -151,19 +150,18 @@ fn nested_enter() {
 
         let res = panic::catch_unwind(move || {
             let rt = Runtime::new().unwrap();
-            rt.block_on(async { });
+            rt.block_on(async {});
         });
 
         assert_err!(res);
 
         panic::set_hook(prev_hook);
-
     });
 }
 
 #[test]
 fn after_start_and_before_stop_is_called() {
-    use std::sync::atomic::{Ordering, AtomicUsize};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     let _ = env_logger::try_init();
 
