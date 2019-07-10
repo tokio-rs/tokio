@@ -39,7 +39,7 @@ jobs:
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
-      displayName: cargo test --tests
+      displayName: ${{ crate.key }} - cargo test --tests
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
     - script: cargo test --examples
       displayName: ${{ crate.key }} - cargo test --examples
