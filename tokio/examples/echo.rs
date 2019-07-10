@@ -39,13 +39,12 @@ async fn main() {
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
-    // above and must be associated with an event loop, so we pass in a handle
-    // to our event loop. After the socket's created we inform that we're ready
-    // to go and start accepting connections.
+    // above and must be associated with an event loop.
     let mut listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     loop {
+        // Asynchronously wait for an inbound socket.
         let (mut socket, _) = listener.accept().await.unwrap();
 
         // And this is where much of the magic of this server happens. We
