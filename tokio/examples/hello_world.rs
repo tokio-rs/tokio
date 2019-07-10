@@ -27,6 +27,7 @@ pub async fn main() {
     // Note that this is the Tokio TcpStream, which is fully async.
     let mut stream = TcpStream::connect(&addr).await.unwrap();
     println!("created stream");
+
     let result = stream.write(b"hello world\n").await;
     println!("wrote to stream; success={:?}", result.is_ok());
 }
