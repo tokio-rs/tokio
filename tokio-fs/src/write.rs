@@ -48,7 +48,12 @@ pub struct WriteFile<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + U
 #[derive(Debug)]
 enum State<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + Unpin> {
     Create(file::CreateFuture<P>, Option<C>),
-    Write(Option<C>, File),
+    Writing { f: File, buf: C, pos: usize },
+    Empty,
+}
+
+fn zero_write() -> io::Error {
+    io::Error::new(io::ErrorKind::WriteZero, "zero-length write")
 }
 
 impl<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + Unpin + fmt::Debug> Future
@@ -58,20 +63,40 @@ impl<P: AsRef<Path> + Send + Unpin + 'static, C: AsRef<[u8]> + Unpin + fmt::Debu
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = Pin::get_mut(self);
-        let new_state = match &mut inner.state {
+        match &mut inner.state {
             State::Create(create_file, contents) => {
                 let file = ready!(Pin::new(create_file).poll(cx))?;
-                State::Write(contents.take(), file)
+                let contents = contents.take().unwrap();
+                let new_state = State::Writing {
+                    f: file,
+                    buf: contents,
+                    pos: 0,
+                };
+                mem::replace(&mut inner.state, new_state);
+                // We just entered the Write state, need to poll it before returning.
+                return Pin::new(inner).poll(cx);
             }
-            State::Write(buf, file) => {
-                let buf = buf.take().unwrap();
-                ready!(Pin::new(file).poll_write(cx, buf.as_ref()))?;
-                return Poll::Ready(Ok(buf.into()));
-            }
-        };
+            State::Empty => panic!("poll a WriteFile after it's done"),
+            _ => {}
+        }
 
-        mem::replace(&mut inner.state, new_state);
-        // We just entered the Write state, need to poll it before returning.
-        Pin::new(inner).poll(cx)
+        match mem::replace(&mut inner.state, State::Empty) {
+            State::Writing {
+                mut f,
+                buf,
+                mut pos,
+            } => {
+                let buf_ref = buf.as_ref();
+                while pos < buf_ref.len() {
+                    let n = ready!(Pin::new(&mut f).poll_write(cx, &buf_ref[pos..]))?;
+                    pos += n;
+                    if n == 0 {
+                        return Poll::Ready(Err(zero_write()));
+                    }
+                }
+                Poll::Ready(Ok(buf))
+            }
+            _ => panic!(),
+        }
     }
 }

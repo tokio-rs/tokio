@@ -8,40 +8,54 @@ use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
 use tokio_fs::*;
 
-#[tokio::test]
-async fn create() {
+mod pool;
+
+#[test]
+fn create() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
+    let new_dir_2 = new_dir.clone();
 
-    assert!(create_dir(new_dir.clone()).await.is_ok());
+    pool::run(async move {
+        create_dir(new_dir).await?;
+        Ok(())
+    });
 
-    assert!(new_dir.is_dir());
+    assert!(new_dir_2.is_dir());
 }
 
-#[tokio::test]
-async fn create_all() {
+#[test]
+fn create_all() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo").join("bar");
+    let new_dir_2 = new_dir.clone();
 
-    assert!(create_dir_all(new_dir.clone()).await.is_ok());
+    pool::run(async move {
+        create_dir_all(new_dir).await?;
+        Ok(())
+    });
 
-    assert!(new_dir.is_dir());
+    assert!(new_dir_2.is_dir());
 }
 
-#[tokio::test]
-async fn remove() {
+#[test]
+fn remove() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
+    let new_dir_2 = new_dir.clone();
 
     fs::create_dir(new_dir.clone()).unwrap();
 
-    assert!(remove_dir(new_dir.clone()).await.is_ok());
+    pool::run(async move {
+        remove_dir(new_dir).await?;
+        Ok(())
+    });
 
-    assert!(!new_dir.exists());
+    assert!(!new_dir_2.exists());
 }
 
-#[tokio::test]
-async fn read() {
+#[test]
+fn read() {
     let base_dir = TempDir::new("base").unwrap();
 
     let p = base_dir.path();
@@ -54,15 +68,17 @@ async fn read() {
     let f = files.clone();
     let p = p.to_path_buf();
 
-    let read_dir_fut = read_dir(p).await.unwrap();
-    assert!(read_dir_fut
-        .try_for_each(move |e| {
-            let s = e.file_name().to_str().unwrap().to_string();
-            f.lock().unwrap().push(s);
-            future::ok(())
-        })
-        .await
-        .is_ok());
+    pool::run(async move {
+        let read_dir_fut = read_dir(p).await?;
+        read_dir_fut
+            .try_for_each(move |e| {
+                let s = e.file_name().to_str().unwrap().to_string();
+                f.lock().unwrap().push(s);
+                future::ok(())
+            })
+            .await?;
+        Ok(())
+    });
 
     let mut files = files.lock().unwrap();
     files.sort(); // because the order is not guaranteed

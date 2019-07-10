@@ -46,7 +46,8 @@ pub struct ReadFile<P: AsRef<Path> + Send + Unpin + 'static> {
 enum State<P: AsRef<Path> + Send + Unpin + 'static> {
     Open(file::OpenFuture<P>),
     Metadata(file::MetadataFuture),
-    Read(Vec<u8>, File),
+    Reading(Vec<u8>, usize, File),
+    Empty,
 }
 
 impl<P: AsRef<Path> + Send + Unpin + 'static> Future for ReadFile<P> {
@@ -54,24 +55,33 @@ impl<P: AsRef<Path> + Send + Unpin + 'static> Future for ReadFile<P> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = Pin::get_mut(self);
-        let new_state = match &mut inner.state {
+        match &mut inner.state {
             State::Open(ref mut open_file) => {
                 let file = ready!(Pin::new(open_file).poll(cx))?;
-                State::Metadata(file.metadata())
+                let new_state = State::Metadata(file.metadata());
+                mem::replace(&mut inner.state, new_state);
+                Pin::new(inner).poll(cx)
             }
             State::Metadata(read_metadata) => {
                 let (file, metadata) = ready!(Pin::new(read_metadata).poll(cx))?;
                 let buf = Vec::with_capacity(metadata.len() as usize + 1);
-                State::Read(buf, file)
+                let new_state = State::Reading(buf, 0, file);
+                mem::replace(&mut inner.state, new_state);
+                Pin::new(inner).poll(cx)
             }
-            State::Read(buf, file) => {
-                ready!(Pin::new(file).poll_read(cx, buf))?;
-                return Poll::Ready(Ok(buf.to_vec()));
+            State::Reading(buf, ref mut pos, file) => {
+                let n = ready!(Pin::new(file).poll_read_buf(cx, buf))?;
+                *pos += n;
+                if *pos >= buf.len() {
+                    match mem::replace(&mut inner.state, State::Empty) {
+                        State::Reading(buf, _, _) => Poll::Ready(Ok(buf)),
+                        _ => panic!(),
+                    }
+                } else {
+                    Poll::Pending
+                }
             }
-        };
-
-        mem::replace(&mut inner.state, new_state);
-        // Getting here means we transitionsed state. Must poll the new state.
-        Pin::new(inner).poll(cx)
+            State::Empty => panic!("poll a WriteFile after it's done"),
+        }
     }
 }
