@@ -26,13 +26,13 @@
 //! Please mind that since the UDP protocol doesn't have any capabilities to detect a broken
 //! connection the server needs to be run first, otherwise the client will block forever.
 
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
 use std::env;
-use std::io::stdin;
+use std::io::{stdin, Read};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
-use tokio::prelude::*;
 
 fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut buf = Vec::new();
@@ -40,30 +40,33 @@ fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     Ok(buf)
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() {
     let remote_addr: SocketAddr = env::args()
         .nth(1)
         .unwrap_or("127.0.0.1:8080".into())
-        .parse()?;
+        .parse()
+        .unwrap();
+
     // We use port 0 to let the operating system allocate an available port for us.
     let local_addr: SocketAddr = if remote_addr.is_ipv4() {
         "0.0.0.0:0"
     } else {
         "[::]:0"
     }
-    .parse()?;
-    let socket = UdpSocket::bind(&local_addr)?;
+    .parse()
+    .unwrap();
+
+    let mut socket = UdpSocket::bind(&local_addr).unwrap();
     const MAX_DATAGRAM_SIZE: usize = 65_507;
-    socket
-        .send_dgram(get_stdin_data()?, &remote_addr)
-        .and_then(|(socket, _)| socket.recv_dgram(vec![0u8; MAX_DATAGRAM_SIZE]))
-        .map(|(_, data, len, _)| {
-            println!(
-                "Received {} bytes:\n{}",
-                len,
-                String::from_utf8_lossy(&data[..len])
-            )
-        })
-        .wait()?;
-    Ok(())
+    socket.connect(&remote_addr).unwrap();
+    let data = get_stdin_data().unwrap();
+    socket.send(&data).await.unwrap();
+    let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
+    let len = socket.recv(&mut data).await.unwrap();
+    println!(
+        "Received {} bytes:\n{}",
+        len,
+        String::from_utf8_lossy(&data[..len])
+    );
 }

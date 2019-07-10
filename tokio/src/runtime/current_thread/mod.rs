@@ -71,34 +71,3 @@ pub use self::builder::Builder;
 pub use self::runtime::{Handle, Runtime};
 pub use tokio_current_thread::spawn;
 pub use tokio_current_thread::TaskExecutor;
-
-use std::future::Future;
-
-/// Run the provided future to completion using a runtime running on the current thread.
-///
-/// This first creates a new [`Runtime`], and calls [`Runtime::block_on`] with the provided future,
-/// which blocks the current thread until the provided future completes. It then calls
-/// [`Runtime::run`] to wait for any other spawned futures to resolve.
-pub fn block_on_all<F>(future: F) -> F::Output
-where
-    F: Future,
-{
-    let mut r = Runtime::new().expect("failed to start runtime on current thread");
-    let v = r.block_on(future);
-    r.run().expect("failed to resolve remaining futures");
-    v
-}
-
-/// Start a current-thread runtime using the supplied future to bootstrap execution.
-///
-/// # Panics
-///
-/// This function panics if called from the context of an executor.
-pub fn run<F>(future: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    let mut r = Runtime::new().expect("failed to start runtime on current thread");
-    r.spawn(future);
-    r.run().expect("failed to resolve remaining futures");
-}

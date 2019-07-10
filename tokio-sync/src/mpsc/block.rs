@@ -362,6 +362,7 @@ fn is_tx_closed(bits: usize) -> bool {
 
 impl<T> Values<T> {
     unsafe fn uninitialized() -> Values<T> {
+        #[allow(deprecated)]
         let mut vals = mem::uninitialized();
 
         // When fuzzing, `CausalCell` needs to be initialized.

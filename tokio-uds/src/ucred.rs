@@ -90,6 +90,7 @@ pub mod impl_macos {
         unsafe {
             let raw_fd = sock.as_raw_fd();
 
+            #[allow(deprecated)]
             let mut cred: super::UCred = mem::uninitialized();
 
             let ret = getpeereid(raw_fd, &mut cred.uid, &mut cred.gid);

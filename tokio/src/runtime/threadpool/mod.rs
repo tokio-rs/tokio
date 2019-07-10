@@ -1,18 +1,13 @@
 mod builder;
-mod shutdown;
 mod task_executor;
 
 pub use self::builder::Builder;
-pub use self::shutdown::Shutdown;
 pub use self::task_executor::TaskExecutor;
 
-use crate::reactor::{Handle, Reactor};
-use futures;
-use futures::future::Future;
 use tokio_executor::enter;
-use tokio_threadpool as threadpool;
+
+use std::future::Future;
 use std::io;
-use std::sync::Mutex;
 
 /// Handle to the Tokio runtime.
 ///
@@ -35,72 +30,11 @@ pub struct Runtime {
 
 #[derive(Debug)]
 struct Inner {
-    /// A handle to the reactor in the background thread.
-    reactor_handle: Handle,
-
-    // TODO: This should go away in 0.2
-    reactor: Mutex<Option<Reactor>>,
-
     /// Task execution pool.
-    pool: threadpool::ThreadPool,
+    pool: tokio_threadpool::ThreadPool,
 }
 
 // ===== impl Runtime =====
-
-/// Start the Tokio runtime using the supplied future to bootstrap execution.
-///
-/// This function is used to bootstrap the execution of a Tokio application. It
-/// does the following:
-///
-/// * Start the Tokio runtime using a default configuration.
-/// * Spawn the given future onto the thread pool.
-/// * Block the current thread until the runtime shuts down.
-///
-/// Note that the function will not return immediately once `future` has
-/// completed. Instead it waits for the entire runtime to become idle.
-///
-/// See the [module level][mod] documentation for more details.
-///
-/// # Examples
-///
-/// ```rust
-/// # use futures::{Future, Stream};
-/// use tokio::net::TcpListener;
-///
-/// # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
-/// # unimplemented!();
-/// # }
-/// # fn dox() {
-/// # let addr = "127.0.0.1:8080".parse().unwrap();
-/// let listener = TcpListener::bind(&addr).unwrap();
-///
-/// let server = listener.incoming()
-///     .map_err(|e| println!("error = {:?}", e))
-///     .for_each(|socket| {
-///         tokio::spawn(process(socket))
-///     });
-///
-/// tokio::run(server);
-/// # }
-/// # pub fn main() {}
-/// ```
-///
-/// # Panics
-///
-/// This function panics if called from the context of an executor.
-///
-/// [mod]: ../index.html
-pub fn run<F>(future: F)
-where F: Future<Item = (), Error = ()> + Send + 'static,
-{
-    // Check enter before creating a new Runtime...
-    let mut entered = enter().expect("nested tokio::run");
-    let runtime = Runtime::new().expect("failed to start new Runtime");
-    runtime.spawn(future);
-    entered
-        .block_on(runtime.shutdown_on_idle())
-        .expect("shutdown cannot error")
-}
 
 impl Runtime {
     /// Create a new runtime instance with default configuration values.
@@ -135,43 +69,6 @@ impl Runtime {
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         Builder::new().build()
-    }
-
-    #[deprecated(since = "0.1.5", note = "use `reactor` instead")]
-    #[doc(hidden)]
-    pub fn handle(&self) -> &Handle {
-        #[allow(deprecated)]
-        self.reactor()
-    }
-
-    /// Return a reference to the reactor handle for this runtime instance.
-    ///
-    /// The returned handle reference can be cloned in order to get an owned
-    /// value of the handle. This handle can be used to initialize I/O resources
-    /// (like TCP or UDP sockets) that will not be used on the runtime.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    ///
-    /// let rt = Runtime::new()
-    ///     .unwrap();
-    ///
-    /// let reactor_handle = rt.reactor().clone();
-    ///
-    /// // use `reactor_handle`
-    /// ```
-    #[deprecated(since = "0.1.11", note = "there is now a reactor per worker thread")]
-    pub fn reactor(&self) -> &Handle {
-        let mut reactor = self.inner().reactor.lock().unwrap();
-        if let Some(reactor) = reactor.take() {
-            if let Ok(background) = reactor.background() {
-                background.forget();
-            }
-        }
-
-        &self.inner().reactor_handle
     }
 
     /// Return a handle to the runtime's executor.
@@ -229,7 +126,7 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&self, future: F) -> &Self
-    where F: Future<Item = (), Error = ()> + Send + 'static,
+    where F: Future<Output = ()> + Send + 'static,
     {
         self.inner().pool.spawn(future);
         self
@@ -247,48 +144,20 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on<F, R, E>(&self, future: F) -> Result<R, E>
+    pub fn block_on<F>(&self, future: F) -> F::Output
     where
-        F: Send + 'static + Future<Item = R, Error = E>,
-        R: Send + 'static,
-        E: Send + 'static,
+        F: Send + 'static + Future,
+        F::Output: Send + 'static,
     {
         let mut entered = enter().expect("nested block_on");
-        let (tx, rx) = futures::sync::oneshot::channel();
-        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        entered.block_on(rx).expect("blocked on future paniced")
-    }
+        let (tx, rx) = crate::sync::oneshot::channel();
 
-    /// Run a future to completion on the Tokio runtime, then wait for all
-    /// background futures to complete too.
-    ///
-    /// This runs the given future on the runtime, blocking until it is
-    /// complete, waiting for background futures to complete, and yielding
-    /// its resolved result. Any tasks or timers which the future spawns
-    /// internally will be executed on the runtime and waited for completion.
-    ///
-    /// This method should not be called from an asynchronous context.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the executor is at capacity, if the provided
-    /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on_all<F, R, E>(self, future: F) -> Result<R, E>
-    where
-        F: Send + 'static + Future<Item = R, Error = E>,
-        R: Send + 'static,
-        E: Send + 'static,
-    {
-        let mut entered = enter().expect("nested block_on_all");
-        let (tx, rx) = futures::sync::oneshot::channel();
-        self.spawn(future.then(move |r| tx.send(r).map_err(|_| unreachable!())));
-        let block = rx
-            .map_err(|_| panic!("blocked on future paniced"))
-            .and_then(move |r| {
-                self.shutdown_on_idle()
-                    .map(move |()| r)
-            });
-        entered.block_on(block).unwrap()
+        self.spawn(async move {
+            let res = future.await;
+            let _ = tx.send(res);
+        });
+
+        entered.block_on(rx).expect("blocked on future paniced")
     }
 
     /// Signals the runtime to shutdown once it becomes idle.
@@ -323,10 +192,11 @@ impl Runtime {
     /// ```
     ///
     /// [mod]: index.html
-    pub fn shutdown_on_idle(mut self) -> Shutdown {
+    pub async fn shutdown_on_idle(mut self) {
         let inner = self.inner.take().unwrap();
         let inner = inner.pool.shutdown_on_idle();
-        Shutdown { inner }
+
+        inner.await;
     }
 
     /// Signals the runtime to shutdown immediately.
@@ -364,21 +234,12 @@ impl Runtime {
     /// ```
     ///
     /// [mod]: index.html
-    pub fn shutdown_now(mut self) -> Shutdown {
+    pub async fn shutdown_now(mut self) {
         let inner = self.inner.take().unwrap();
-        Shutdown::shutdown_now(inner)
+        inner.pool.shutdown_now().await;
     }
 
     fn inner(&self) -> &Inner {
         self.inner.as_ref().unwrap()
-    }
-}
-
-impl Drop for Runtime {
-    fn drop(&mut self) {
-        if let Some(inner) = self.inner.take() {
-            let shutdown = Shutdown::shutdown_now(inner);
-            let _ = shutdown.wait();
-        }
     }
 }

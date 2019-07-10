@@ -188,7 +188,11 @@ impl Drop for ThreadPool {
             drop(inner);
 
             // Wait until all worker threads terminate and the threadpool's resources clean up.
-            let mut enter = tokio_executor::enter().unwrap();
+            let mut enter = match tokio_executor::enter() {
+                Ok(e) => e,
+                Err(_) => return,
+            };
+
             enter.block_on(shutdown);
         }
     }
