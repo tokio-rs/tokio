@@ -40,8 +40,7 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    pub async fn main() {
-    }
+    pub async fn main() {}
 }
 
 #[tokio::main]
