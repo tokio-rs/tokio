@@ -1,5 +1,8 @@
-use futures::future::{self, Future};
+use tokio_executor::SpawnError;
 use tokio_threadpool::Sender;
+
+use std::future::Future;
+use std::pin::Pin;
 
 /// Executes futures on the runtime
 ///
@@ -48,33 +51,26 @@ impl TaskExecutor {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&self, future: F)
-    where F: Future<Item = (), Error = ()> + Send + 'static,
+    where F: Future<Output = ()> + Send + 'static,
     {
         self.inner.spawn(future).unwrap();
     }
 }
 
-impl<T> future::Executor<T> for TaskExecutor
-where T: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: T) -> Result<(), future::ExecuteError<T>> {
-        self.inner.execute(future)
-    }
-}
-
-impl crate::executor::Executor for TaskExecutor {
-    fn spawn(&mut self, future: Box<dyn Future<Item = (), Error = ()> + Send>)
-        -> Result<(), crate::executor::SpawnError>
-    {
+impl tokio_executor::Executor for TaskExecutor {
+    fn spawn(
+        &mut self,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
+    ) -> Result<(), SpawnError> {
         self.inner.spawn(future)
     }
 }
 
-impl<T> crate::executor::TypedExecutor<T> for TaskExecutor
+impl<T> tokio_executor::TypedExecutor<T> for TaskExecutor
 where
-    T: Future<Item = (), Error = ()> + Send + 'static,
+    T: Future<Output = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), crate::executor::SpawnError> {
-        crate::executor::Executor::spawn(self, Box::new(future))
+        crate::executor::Executor::spawn(self, Box::pin(future))
     }
 }

@@ -41,29 +41,32 @@ fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     let remote_addr: SocketAddr = env::args()
         .nth(1)
         .unwrap_or("127.0.0.1:8080".into())
-        .parse()?;
+        .parse()
+        .unwrap();
+
     // We use port 0 to let the operating system allocate an available port for us.
     let local_addr: SocketAddr = if remote_addr.is_ipv4() {
         "0.0.0.0:0"
     } else {
         "[::]:0"
     }
-    .parse()?;
-    let mut socket = UdpSocket::bind(&local_addr)?;
+    .parse()
+    .unwrap();
+
+    let mut socket = UdpSocket::bind(&local_addr).unwrap();
     const MAX_DATAGRAM_SIZE: usize = 65_507;
-    socket.connect(&remote_addr)?;
-    let data = get_stdin_data()?;
-    socket.send(&data).await?;
+    socket.connect(&remote_addr).unwrap();
+    let data = get_stdin_data().unwrap();
+    socket.send(&data).await.unwrap();
     let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
-    let len = socket.recv(&mut data).await?;
+    let len = socket.recv(&mut data).await.unwrap();
     println!(
         "Received {} bytes:\n{}",
         len,
         String::from_utf8_lossy(&data[..len])
     );
-    Ok(())
 }

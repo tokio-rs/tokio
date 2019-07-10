@@ -7,13 +7,13 @@ use futures_util::stream::StreamExt;
 const STOP_AFTER: u64 = 10;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     // tokio_signal provides a convenience builder for Ctrl+C
     // this even works cross-platform: linux and windows!
     //
     // `CtrlC::new()` produces a `Future` of the actual stream-initialisation
     // so first we await until the signal is ready.
-    let endless_stream = tokio_signal::CtrlC::new().await?;
+    let endless_stream = tokio_signal::CtrlC::new().await.unwrap();
     // don't keep going forever: convert the endless stream to a bounded one.
     let mut limited_stream = endless_stream.take(STOP_AFTER);
 
@@ -42,5 +42,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Stream ended, quiting the program.");
-    Ok(())
 }

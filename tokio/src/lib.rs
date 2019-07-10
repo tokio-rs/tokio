@@ -2,6 +2,7 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -107,7 +108,6 @@ if_runtime! {
     pub mod runtime;
 
     pub use crate::executor::spawn;
-    pub use crate::runtime::run;
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
     pub use tokio_macros::main;

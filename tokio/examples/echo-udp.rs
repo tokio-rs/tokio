@@ -50,12 +50,12 @@ impl Server {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
+    let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let socket = UdpSocket::bind(&addr)?;
-    println!("Listening on: {}", socket.local_addr()?);
+    let socket = UdpSocket::bind(&addr).unwrap();
+    println!("Listening on: {}", socket.local_addr().unwrap());
 
     let server = Server {
         socket: socket,
@@ -64,6 +64,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // This starts the server task.
-    server.run().await?;
-    Ok(())
+    server.run().await.unwrap();
 }

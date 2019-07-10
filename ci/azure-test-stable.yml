@@ -39,10 +39,10 @@ jobs:
       env:
         LOOM_MAX_DURATION: 10
         CI: 'True'
-      displayName: cargo test --tests
+      displayName: ${{ crate.key }} - cargo test --tests
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
     - script: cargo test --examples
-      displayName: cargo test --examples
+      displayName: ${{ crate.key }} - cargo test --examples
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
     # Run with each specified feature
@@ -51,9 +51,9 @@ jobs:
         env:
           LOOM_MAX_DURATION: 10
           CI: 'True'
-        displayName: cargo test --tests --features ${{ feature }}
+        displayName: ${{ crate.key }} - cargo test --tests --features ${{ feature }}
         workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
       - script: cargo test --examples --no-default-features --features ${{ feature }}
-        displayName: cargo test --examples --features ${{ feature }}
+        displayName: ${{ crate.key }} - cargo test --examples --features ${{ feature }}
         workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}

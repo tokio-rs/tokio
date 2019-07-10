@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 fn timer_with_threaded_runtime() {
     use tokio::runtime::Runtime;
 
-    let mut rt = Runtime::new().unwrap();
+    let rt = Runtime::new().unwrap();
     let (tx, rx) = mpsc::channel();
 
     rt.spawn(async move {
@@ -25,7 +25,9 @@ fn timer_with_threaded_runtime() {
         tx.send(()).unwrap();
     });
 
-    rt.run().unwrap();
+    let mut e = tokio_executor::enter().unwrap();
+    e.block_on(rt.shutdown_on_idle());
+
     rx.recv().unwrap();
 }
 

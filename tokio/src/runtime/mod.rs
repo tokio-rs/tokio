@@ -109,15 +109,10 @@
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 
 pub mod current_thread;
-//mod threadpool;
+mod threadpool;
 
-pub use self::current_thread::{run, Builder, Runtime};
-/*
 pub use self::threadpool::{
     Builder,
     Runtime,
-    Shutdown,
     TaskExecutor,
-    run,
 };
-*/
