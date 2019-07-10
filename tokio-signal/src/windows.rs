@@ -11,7 +11,7 @@ use std::convert::TryFrom;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 use std::task::{Context, Poll};
 
 use futures_core::stream::Stream;
@@ -73,7 +73,7 @@ impl Init for OsExtraData {
     }
 }
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 
 /// Stream of events discovered via `SetConsoleCtrlHandler`.
 ///

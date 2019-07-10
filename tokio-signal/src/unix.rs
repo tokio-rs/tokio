@@ -10,7 +10,7 @@ pub use libc;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 
 use crate::IoFuture;
 use futures_core::stream::Stream;
@@ -96,7 +96,7 @@ impl Default for SignalInfo {
     fn default() -> SignalInfo {
         SignalInfo {
             event_info: Default::default(),
-            init: ONCE_INIT,
+            init: Once::new(),
             initialized: AtomicBool::new(false),
         }
     }
