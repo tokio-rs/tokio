@@ -13,10 +13,13 @@ task:
     - pkg install -y curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     # TODO: switch back to nightly
-    - sh rustup.sh -y --default-toolchain nightly-2019-06-10
+    - sh rustup.sh -y --default-toolchain nightly-2019-07-09
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
     - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version
+
       # Remove any existing patch statements
       mv Cargo.toml Cargo.toml.bck
       sed -n '/\[patch.crates-io\]/q;p' Cargo.toml.bck > Cargo.toml
