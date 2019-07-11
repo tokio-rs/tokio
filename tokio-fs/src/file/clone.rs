@@ -1,6 +1,9 @@
 use super::File;
-use futures::{Future, Poll};
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Future returned by `File::try_clone`.
 ///
@@ -21,15 +24,16 @@ impl CloneFuture {
 }
 
 impl Future for CloneFuture {
-    type Item = (File, File);
-    type Error = (File, io::Error);
+    type Output = Result<(File, File), (File, io::Error)>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.file
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner_self = Pin::get_mut(self);
+        inner_self
+            .file
             .as_mut()
             .expect("Cannot poll `CloneFuture` after it resolves")
             .poll_try_clone()
-            .map(|inner| inner.map(|cloned| (self.file.take().unwrap(), cloned)))
-            .map_err(|err| (self.file.take().unwrap(), err))
+            .map(|inner| inner.map(|cloned| (inner_self.file.take().unwrap(), cloned)))
+            .map_err(|err| (inner_self.file.take().unwrap(), err))
     }
 }

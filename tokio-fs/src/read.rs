@@ -1,7 +1,11 @@
 use crate::{file, File};
-use futures::{try_ready, Async, Future, Poll};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 use std::{io, mem, path::Path};
 use tokio_io;
+use tokio_io::AsyncRead;
 
 /// Creates a future which will open a file for reading and read the entire
 /// contents into a buffer and return said buffer.
@@ -25,7 +29,7 @@ use tokio_io;
 /// ```
 pub fn read<P>(path: P) -> ReadFile<P>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path> + Send + Unpin + 'static,
 {
     ReadFile {
         state: State::Open(File::open(path)),
@@ -34,41 +38,50 @@ where
 
 /// A future used to open a file and read its entire contents into a buffer.
 #[derive(Debug)]
-pub struct ReadFile<P: AsRef<Path> + Send + 'static> {
+pub struct ReadFile<P: AsRef<Path> + Send + Unpin + 'static> {
     state: State<P>,
 }
 
 #[derive(Debug)]
-enum State<P: AsRef<Path> + Send + 'static> {
+enum State<P: AsRef<Path> + Send + Unpin + 'static> {
     Open(file::OpenFuture<P>),
     Metadata(file::MetadataFuture),
-    Read(tokio_io::io::ReadToEnd<File>),
+    Reading(Vec<u8>, usize, File),
+    Empty,
 }
 
-impl<P: AsRef<Path> + Send + 'static> Future for ReadFile<P> {
-    type Item = Vec<u8>;
-    type Error = io::Error;
+impl<P: AsRef<Path> + Send + Unpin + 'static> Future for ReadFile<P> {
+    type Output = io::Result<Vec<u8>>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let new_state = match &mut self.state {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
+        match &mut inner.state {
             State::Open(ref mut open_file) => {
-                let file = try_ready!(open_file.poll());
-                State::Metadata(file.metadata())
+                let file = ready!(Pin::new(open_file).poll(cx))?;
+                let new_state = State::Metadata(file.metadata());
+                mem::replace(&mut inner.state, new_state);
+                Pin::new(inner).poll(cx)
             }
             State::Metadata(read_metadata) => {
-                let (file, metadata) = try_ready!(read_metadata.poll());
+                let (file, metadata) = ready!(Pin::new(read_metadata).poll(cx))?;
                 let buf = Vec::with_capacity(metadata.len() as usize + 1);
-                let read = tokio_io::io::read_to_end(file, buf);
-                State::Read(read)
+                let new_state = State::Reading(buf, 0, file);
+                mem::replace(&mut inner.state, new_state);
+                Pin::new(inner).poll(cx)
             }
-            State::Read(ref mut read) => {
-                let (_, buf) = try_ready!(read.poll());
-                return Ok(Async::Ready(buf));
+            State::Reading(buf, ref mut pos, file) => {
+                let n = ready!(Pin::new(file).poll_read_buf(cx, buf))?;
+                *pos += n;
+                if *pos >= buf.len() {
+                    match mem::replace(&mut inner.state, State::Empty) {
+                        State::Reading(buf, _, _) => Poll::Ready(Ok(buf)),
+                        _ => panic!(),
+                    }
+                } else {
+                    Poll::Pending
+                }
             }
-        };
-
-        mem::replace(&mut self.state, new_state);
-        // Getting here means we transitionsed state. Must poll the new state.
-        self.poll()
+            State::Empty => panic!("poll a WriteFile after it's done"),
+        }
     }
 }

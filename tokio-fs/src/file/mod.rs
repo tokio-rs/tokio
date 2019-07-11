@@ -16,10 +16,12 @@ pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
 pub use self::seek::SeekFuture;
 
-use futures::Poll;
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A reference to an open file on the filesystem.
@@ -103,7 +105,7 @@ impl File {
     /// ```
     pub fn open<P>(path: P) -> OpenFuture<P>
     where
-        P: AsRef<Path> + Send + 'static,
+        P: AsRef<Path> + Send + Unpin + 'static,
     {
         OpenOptions::new().read(true).open(path)
     }
@@ -142,7 +144,7 @@ impl File {
     /// ```
     pub fn create<P>(path: P) -> CreateFuture<P>
     where
-        P: AsRef<Path> + Send + 'static,
+        P: AsRef<Path> + Send + Unpin + 'static,
     {
         CreateFuture::new(path)
     }
@@ -191,7 +193,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<u64, io::Error> {
+    pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<io::Result<u64>> {
         crate::blocking_io(|| self.std().seek(pos))
     }
 
@@ -243,7 +245,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_sync_all(&mut self) -> Poll<(), io::Error> {
+    pub fn poll_sync_all(&mut self) -> Poll<io::Result<()>> {
         crate::blocking_io(|| self.std().sync_all())
     }
 
@@ -273,7 +275,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_sync_data(&mut self) -> Poll<(), io::Error> {
+    pub fn poll_sync_data(&mut self) -> Poll<io::Result<()>> {
         crate::blocking_io(|| self.std().sync_data())
     }
 
@@ -305,7 +307,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_set_len(&mut self, size: u64) -> Poll<(), io::Error> {
+    pub fn poll_set_len(&mut self, size: u64) -> Poll<io::Result<()>> {
         crate::blocking_io(|| self.std().set_len(size))
     }
 
@@ -344,7 +346,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_metadata(&mut self) -> Poll<Metadata, io::Error> {
+    pub fn poll_metadata(&mut self) -> Poll<io::Result<Metadata>> {
         crate::blocking_io(|| self.std().metadata())
     }
 
@@ -366,7 +368,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_try_clone(&mut self) -> Poll<File, io::Error> {
+    pub fn poll_try_clone(&mut self) -> Poll<io::Result<File>> {
         crate::blocking_io(|| {
             let std = self.std().try_clone()?;
             Ok(File::from_std(std))
@@ -437,7 +439,7 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn poll_set_permissions(&mut self, perm: Permissions) -> Poll<(), io::Error> {
+    pub fn poll_set_permissions(&mut self, perm: Permissions) -> Poll<io::Result<()>> {
         crate::blocking_io(|| self.std().set_permissions(perm))
     }
 
@@ -479,8 +481,15 @@ impl Read for File {
 }
 
 impl AsyncRead for File {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        match Pin::get_mut(self).read(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
+            other => Poll::Ready(other),
+        }
     }
 }
 
@@ -495,11 +504,26 @@ impl Write for File {
 }
 
 impl AsyncWrite for File {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        crate::blocking_io(|| {
-            self.std = None;
-            Ok(())
-        })
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        match Pin::get_mut(self).write(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
+            other => Poll::Ready(other),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        match Pin::get_mut(self).flush() {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
+            other => Poll::Ready(other),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        Poll::Ready(Ok(()))
     }
 }
 

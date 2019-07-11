@@ -1,5 +1,7 @@
-use futures::Poll;
 use std::io::{self, Stdout as StdStdout, Write};
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 use tokio_io::AsyncWrite;
 
 /// A handle to the standard output stream of a process.
@@ -36,7 +38,25 @@ impl Write for Stdout {
 }
 
 impl AsyncWrite for Stdout {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        Ok(().into())
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        match Pin::get_mut(self).write(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
+            other => Poll::Ready(other),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        match Pin::get_mut(self).flush() {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
+            other => Poll::Ready(other),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        Poll::Ready(Ok(()))
     }
 }

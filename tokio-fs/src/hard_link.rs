@@ -1,7 +1,10 @@
-use futures::{Future, Poll};
 use std::fs;
+use std::future::Future;
 use std::io;
 use std::path::Path;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Creates a new hard link on the filesystem.
 ///
@@ -41,10 +44,9 @@ where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    type Item = ();
-    type Error = io::Error;
+    type Output = io::Result<()>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         crate::blocking_io(|| fs::hard_link(&self.src, &self.dst))
     }
 }

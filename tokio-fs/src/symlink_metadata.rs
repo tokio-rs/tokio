@@ -1,8 +1,11 @@
 use super::blocking_io;
-use futures::{Future, Poll};
 use std::fs::{self, Metadata};
+use std::future::Future;
 use std::io;
 use std::path::Path;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Queries the file system metadata for a path.
 ///
@@ -38,10 +41,9 @@ impl<P> Future for SymlinkMetadataFuture<P>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    type Item = Metadata;
-    type Error = io::Error;
+    type Output = io::Result<Metadata>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         blocking_io(|| fs::symlink_metadata(&self.path))
     }
 }

@@ -1,6 +1,9 @@
 use super::File;
-use futures::{try_ready, Future, Poll};
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Future returned by `File::seek`.
 #[derive(Debug)]
@@ -19,16 +22,16 @@ impl SeekFuture {
 }
 
 impl Future for SeekFuture {
-    type Item = (File, u64);
-    type Error = io::Error;
+    type Output = io::Result<(File, u64)>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let pos = try_ready!(self
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner_self = Pin::get_mut(self);
+        let pos = ready!(inner_self
             .inner
             .as_mut()
             .expect("Cannot poll `SeekFuture` after it resolves")
-            .poll_seek(self.pos));
-        let inner = self.inner.take().unwrap();
-        Ok((inner, pos).into())
+            .poll_seek(inner_self.pos))?;
+        let inner = inner_self.inner.take().unwrap();
+        Poll::Ready(Ok((inner, pos).into()))
     }
 }

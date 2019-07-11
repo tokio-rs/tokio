@@ -1,10 +1,14 @@
-use futures::{Future, Poll, Stream};
+use futures_core::stream::Stream;
 use std::ffi::OsString;
 use std::fs::{self, DirEntry as StdDirEntry, FileType, Metadata, ReadDir as StdReadDir};
+use std::future::Future;
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::DirEntryExt;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Returns a stream over the entries within a directory.
 ///
@@ -40,10 +44,9 @@ impl<P> Future for ReadDirFuture<P>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    type Item = ReadDir;
-    type Error = io::Error;
+    type Output = io::Result<ReadDir>;
 
-    fn poll(&mut self) -> Poll<Self::Item, io::Error> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         crate::blocking_io(|| Ok(ReadDir(fs::read_dir(&self.path)?)))
     }
 }
@@ -68,15 +71,19 @@ where
 pub struct ReadDir(StdReadDir);
 
 impl Stream for ReadDir {
-    type Item = DirEntry;
-    type Error = io::Error;
+    type Item = io::Result<DirEntry>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        crate::blocking_io(|| match self.0.next() {
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let inner = Pin::get_mut(self);
+        match crate::blocking_io(|| match inner.0.next() {
             Some(Err(err)) => Err(err),
-            Some(Ok(item)) => Ok(Some(DirEntry(item))),
+            Some(Ok(item)) => Ok(Some(Ok(DirEntry(item)))),
             None => Ok(None),
-        })
+        }) {
+            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
+            Poll::Ready(Ok(v)) => Poll::Ready(v),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
@@ -181,7 +188,7 @@ impl DirEntry {
     ///
     /// tokio::run(fut);
     /// ```
-    pub fn poll_metadata(&self) -> Poll<Metadata, io::Error> {
+    pub fn poll_metadata(&self) -> Poll<io::Result<Metadata>> {
         crate::blocking_io(|| self.0.metadata())
     }
 
@@ -213,7 +220,7 @@ impl DirEntry {
     ///
     /// tokio::run(fut);
     /// ```
-    pub fn poll_file_type(&self) -> Poll<FileType, io::Error> {
+    pub fn poll_file_type(&self) -> Poll<io::Result<FileType>> {
         crate::blocking_io(|| self.0.file_type())
     }
 }

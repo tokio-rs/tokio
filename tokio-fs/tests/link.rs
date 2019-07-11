@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use std::fs;
 use std::io::prelude::*;
@@ -19,7 +20,12 @@ fn test_hard_link() {
         file.write_all(b"hello").unwrap();
     }
 
-    pool::run({ hard_link(src, dst.clone()) });
+    let dst_2 = dst.clone();
+
+    pool::run(async move {
+        assert!(hard_link(src, dst_2.clone()).await.is_ok());
+        Ok(())
+    });
 
     let mut content = String::new();
 
@@ -35,8 +41,6 @@ fn test_hard_link() {
 #[cfg(unix)]
 #[test]
 fn test_symlink() {
-    use futures::Future;
-
     let dir = TempDir::new("base").unwrap();
     let src = dir.path().join("src.txt");
     let dst = dir.path().join("dst.txt");
@@ -46,7 +50,15 @@ fn test_symlink() {
         file.write_all(b"hello").unwrap();
     }
 
-    pool::run({ os::unix::symlink(src.clone(), dst.clone()) });
+    let src_2 = src.clone();
+    let dst_2 = dst.clone();
+
+    pool::run(async move {
+        assert!(os::unix::symlink(src_2.clone(), dst_2.clone())
+            .await
+            .is_ok());
+        Ok(())
+    });
 
     let mut content = String::new();
 
@@ -58,6 +70,12 @@ fn test_symlink() {
 
     assert!(content == "hello");
 
-    pool::run({ read_link(dst.clone()).map(move |x| assert!(x == src)) });
-    pool::run({ symlink_metadata(dst.clone()).map(move |x| assert!(x.file_type().is_symlink())) });
+    pool::run(async move {
+        let read = read_link(dst.clone()).await.unwrap();
+        assert!(read == src);
+
+        let symlink_meta = symlink_metadata(dst.clone()).await.unwrap();
+        assert!(symlink_meta.file_type().is_symlink());
+        Ok(())
+    });
 }

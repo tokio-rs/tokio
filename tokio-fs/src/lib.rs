@@ -30,6 +30,9 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
+#[macro_use]
+extern crate tokio_futures;
+
 mod create_dir;
 mod create_dir_all;
 pub mod file;
@@ -68,20 +71,19 @@ pub use crate::stdout::{stdout, Stdout};
 pub use crate::symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
 pub use crate::write::{write, WriteFile};
 
-use futures::Async::*;
-use futures::Poll;
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
+use std::task::Poll;
+use std::task::Poll::*;
 
-fn blocking_io<F, T>(f: F) -> Poll<T, io::Error>
+fn blocking_io<F, T>(f: F) -> Poll<io::Result<T>>
 where
     F: FnOnce() -> io::Result<T>,
 {
     match tokio_threadpool::blocking(f) {
-        Ok(Ready(Ok(v))) => Ok(v.into()),
-        Ok(Ready(Err(err))) => Err(err),
-        Ok(NotReady) => Ok(NotReady),
-        Err(_) => Err(blocking_err()),
+        Ready(Ok(v)) => Ready(v),
+        Ready(Err(_)) => Ready(Err(blocking_err())),
+        Pending => Pending,
     }
 }
 
@@ -90,13 +92,13 @@ where
     F: FnOnce() -> io::Result<T>,
 {
     match tokio_threadpool::blocking(f) {
-        Ok(Ready(Ok(v))) => Ok(v),
-        Ok(Ready(Err(err))) => {
+        Ready(Ok(Ok(v))) => Ok(v),
+        Ready(Ok(Err(err))) => {
             debug_assert_ne!(err.kind(), WouldBlock);
             Err(err)
         }
-        Ok(NotReady) => Err(WouldBlock.into()),
-        Err(_) => Err(blocking_err()),
+        Ready(Err(_)) => Err(blocking_err()),
+        Pending => Err(blocking_err()),
     }
 }
 

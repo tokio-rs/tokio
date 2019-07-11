@@ -6,7 +6,7 @@ members = [
   "tokio-codec",
   "tokio-current-thread",
   "tokio-executor",
-  # "tokio-fs",
+  "tokio-fs",
   "tokio-futures",
   "tokio-io",
   "tokio-macros",

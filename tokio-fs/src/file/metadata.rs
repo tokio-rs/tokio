@@ -1,8 +1,11 @@
 use super::File;
-use futures::{try_ready, Future, Poll};
 use std::fs::File as StdFile;
 use std::fs::Metadata;
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 const POLL_AFTER_RESOLVE: &str = "Cannot poll MetadataFuture after it resolves";
 
@@ -23,13 +26,13 @@ impl MetadataFuture {
 }
 
 impl Future for MetadataFuture {
-    type Item = (File, Metadata);
-    type Error = io::Error;
+    type Output = io::Result<(File, Metadata)>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let metadata = try_ready!(crate::blocking_io(|| StdFile::metadata(self.std())));
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
+        let metadata = ready!(crate::blocking_io(|| StdFile::metadata(inner.std())))?;
 
-        let file = self.file.take().expect(POLL_AFTER_RESOLVE);
-        Ok((file, metadata).into())
+        let file = inner.file.take().expect(POLL_AFTER_RESOLVE);
+        Poll::Ready(Ok((file, metadata).into()))
     }
 }

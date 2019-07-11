@@ -1,13 +1,13 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use futures::future::poll_fn;
-use futures::Future;
+use futures_util::future::poll_fn;
 use rand::{distributions, thread_rng, Rng};
 use std::fs;
 use std::io::SeekFrom;
 use tempfile::Builder as TmpBuilder;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_fs::*;
-use tokio_io::io;
 
 mod pool;
 
@@ -27,32 +27,25 @@ fn read_write() {
         .collect::<String>()
         .into();
 
-    pool::run({
-        let file_path = file_path.clone();
-        let contents = contents.clone();
+    let file_path_2 = file_path.clone();
+    let contents_2 = contents.clone();
 
-        File::create(file_path)
-            .and_then(|file| file.metadata())
-            .inspect(|&(_, ref metadata)| assert!(metadata.is_file()))
-            .and_then(move |(file, _)| io::write_all(file, contents))
-            .and_then(|(mut file, _)| poll_fn(move || file.poll_sync_all()))
-            .then(|res| {
-                let _ = res.unwrap();
-                Ok(())
-            })
+    pool::run(async move {
+        let file = File::create(file_path).await?;
+        let (mut file, metadata) = file.metadata().await?;
+        assert!(metadata.is_file());
+        file.write(&contents).await?;
+        poll_fn(move |_cx| file.poll_sync_all()).await?;
+        Ok(())
     });
 
-    let dst = fs::read(&file_path).unwrap();
-    assert_eq!(dst, contents);
+    let dst = fs::read(&file_path_2).unwrap();
+    assert_eq!(dst, contents_2);
 
-    pool::run({
-        File::open(file_path)
-            .and_then(|file| io::read_to_end(file, vec![]))
-            .then(move |res| {
-                let (_, buf) = res.unwrap();
-                assert_eq!(buf, contents);
-                Ok(())
-            })
+    pool::run(async move {
+        let buf = read(file_path_2).await?;
+        assert_eq!(buf, contents_2);
+        Ok(())
     });
 }
 
@@ -72,20 +65,21 @@ fn read_write_helpers() {
         .collect::<String>()
         .into();
 
-    pool::run(write(file_path.clone(), contents.clone()).then(|res| {
-        let _ = res.unwrap();
+    let file_path_2 = file_path.clone();
+    let contents_2 = contents.clone();
+
+    pool::run(async move {
+        write(file_path, contents).await?;
         Ok(())
-    }));
+    });
 
-    let dst = fs::read(&file_path).unwrap();
-    assert_eq!(dst, contents);
+    let dst = fs::read(&file_path_2).unwrap();
+    assert_eq!(dst, contents_2);
 
-    pool::run({
-        read(file_path).then(move |res| {
-            let buf = res.unwrap();
-            assert_eq!(buf, contents);
-            Ok(())
-        })
+    pool::run(async move {
+        let buf = read(file_path_2).await?;
+        assert_eq!(buf, contents_2);
+        Ok(())
     });
 }
 
@@ -97,22 +91,12 @@ fn metadata() {
         .unwrap();
     let file_path = dir.path().join("metadata.txt");
 
-    pool::run({
-        let file_path = file_path.clone();
-        let file_path2 = file_path.clone();
-        let file_path3 = file_path.clone();
-
-        tokio_fs::metadata(file_path)
-            .then(|r| {
-                let _ = r.err().unwrap();
-                Ok(())
-            })
-            .and_then(|_| File::create(file_path2))
-            .and_then(|_| tokio_fs::metadata(file_path3))
-            .then(|r| {
-                assert!(r.unwrap().is_file());
-                Ok(())
-            })
+    pool::run(async move {
+        assert!(tokio_fs::metadata(file_path.clone()).await.is_err());
+        File::create(file_path.clone()).await?;
+        let metadata = tokio_fs::metadata(file_path.clone()).await?;
+        assert!(metadata.is_file());
+        Ok(())
     });
 }
 
@@ -124,28 +108,24 @@ fn seek() {
         .unwrap();
     let file_path = dir.path().join("seek.txt");
 
-    pool::run({
-        OpenOptions::new()
+    pool::run(async move {
+        let mut file = OpenOptions::new()
             .create(true)
             .read(true)
             .write(true)
             .open(file_path)
-            .and_then(|file| io::write_all(file, "Hello, world!"))
-            .and_then(|(file, _)| file.seek(SeekFrom::End(-6)))
-            .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
-            .and_then(|(file, buf)| {
-                assert_eq!(buf, b"world");
-                file.seek(SeekFrom::Start(0))
-            })
-            .and_then(|(file, _)| io::read_exact(file, vec![0; 5]))
-            .and_then(|(_, buf)| {
-                assert_eq!(buf, b"Hello");
-                Ok(())
-            })
-            .then(|r| {
-                let _ = r.unwrap();
-                Ok(())
-            })
+            .await
+            .unwrap();
+        assert!(file.write(b"Hello, world!").await.is_ok());
+        let mut file = file.seek(SeekFrom::End(-6)).await.unwrap().0;
+        let mut buf = vec![0; 5];
+        assert!(file.read(buf.as_mut()).await.is_ok());
+        assert_eq!(buf, b"world");
+        let mut file = file.seek(SeekFrom::Start(0)).await.unwrap().0;
+        let mut buf = vec![0; 5];
+        assert!(file.read(buf.as_mut()).await.is_ok());
+        assert_eq!(buf, b"Hello");
+        Ok(())
     });
 }
 
@@ -158,24 +138,19 @@ fn clone() {
         .tempdir()
         .unwrap();
     let file_path = dir.path().join("clone.txt");
+    let file_path_2 = file_path.clone();
 
-    pool::run(
-        File::create(file_path.clone())
-            .and_then(|file| {
-                file.try_clone()
-                    .map_err(|(_file, err)| err)
-                    .and_then(|(file, clone)| {
-                        io::write_all(file, "clone ")
-                            .and_then(|_| io::write_all(clone, "successful"))
-                    })
-            })
-            .then(|res| {
-                let _ = res.unwrap();
-                Ok(())
-            }),
-    );
+    pool::run(async move {
+        let file = File::create(file_path.clone()).await.unwrap();
+        let (mut file, mut clone) = file.try_clone().await.unwrap();
+        assert!(AsyncWriteExt::write(&mut file, b"clone ").await.is_ok());
+        assert!(AsyncWriteExt::write(&mut clone, b"successful")
+            .await
+            .is_ok());
+        Ok(())
+    });
 
-    let mut file = std::fs::File::open(&file_path).unwrap();
+    let mut file = std::fs::File::open(&file_path_2).unwrap();
 
     let mut dst = vec![];
     file.read_to_end(&mut dst).unwrap();

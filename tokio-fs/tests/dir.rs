@@ -1,6 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
-use futures::{Future, Stream};
+use futures_util::future;
+use futures_util::try_stream::TryStreamExt;
 use std::fs;
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
@@ -12,32 +14,44 @@ mod pool;
 fn create() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
+    let new_dir_2 = new_dir.clone();
 
-    pool::run({ create_dir(new_dir.clone()) });
+    pool::run(async move {
+        create_dir(new_dir).await?;
+        Ok(())
+    });
 
-    assert!(new_dir.is_dir());
+    assert!(new_dir_2.is_dir());
 }
 
 #[test]
 fn create_all() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo").join("bar");
+    let new_dir_2 = new_dir.clone();
 
-    pool::run({ create_dir_all(new_dir.clone()) });
+    pool::run(async move {
+        create_dir_all(new_dir).await?;
+        Ok(())
+    });
 
-    assert!(new_dir.is_dir());
+    assert!(new_dir_2.is_dir());
 }
 
 #[test]
 fn remove() {
     let base_dir = TempDir::new("base").unwrap();
     let new_dir = base_dir.path().join("foo");
+    let new_dir_2 = new_dir.clone();
 
     fs::create_dir(new_dir.clone()).unwrap();
 
-    pool::run({ remove_dir(new_dir.clone()) });
+    pool::run(async move {
+        remove_dir(new_dir).await?;
+        Ok(())
+    });
 
-    assert!(!new_dir.exists());
+    assert!(!new_dir_2.exists());
 }
 
 #[test]
@@ -53,12 +67,17 @@ fn read() {
 
     let f = files.clone();
     let p = p.to_path_buf();
-    pool::run({
-        read_dir(p).flatten_stream().for_each(move |e| {
-            let s = e.file_name().to_str().unwrap().to_string();
-            f.lock().unwrap().push(s);
-            Ok(())
-        })
+
+    pool::run(async move {
+        let read_dir_fut = read_dir(p).await?;
+        read_dir_fut
+            .try_for_each(move |e| {
+                let s = e.file_name().to_str().unwrap().to_string();
+                f.lock().unwrap().push(s);
+                future::ok(())
+            })
+            .await?;
+        Ok(())
     });
 
     let mut files = files.lock().unwrap();

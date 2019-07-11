@@ -30,7 +30,7 @@ jobs:
     cross: true
     rust: $(nightly)
     crates:
-#       - tokio-fs
+      tokio-fs: []
       tokio-reactor: []
       tokio-signal: []
       tokio-tcp:

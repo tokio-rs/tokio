@@ -1,7 +1,10 @@
-use futures::{Future, Poll};
 use std::fs;
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
 /// Reads a symbolic link, returning the file that the link points to.
 ///
@@ -34,10 +37,9 @@ impl<P> Future for ReadLinkFuture<P>
 where
     P: AsRef<Path>,
 {
-    type Item = PathBuf;
-    type Error = io::Error;
+    type Output = io::Result<PathBuf>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         crate::blocking_io(|| fs::read_link(&self.path))
     }
 }
