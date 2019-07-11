@@ -84,7 +84,7 @@ tracing-core = { version = "0.1", optional = true }
 #tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.2.1", optional = true }
+tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds" }
 
 [dev-dependencies]
 tokio-test = { path = "../tokio-test" }
