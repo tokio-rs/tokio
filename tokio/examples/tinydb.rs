@@ -109,8 +109,13 @@ async fn main() {
     loop {
         match listener.accept().await {
             Ok((socket, _)) => {
-                // Clone our reference counted handle to db so we can pass it into the async closure.
+                // Here's where the meat of the processing in this server happens. First
+                // we see a clone of the database being created, which is creating a
+                // new reference for this connected client to use. Also note the `move`
+                // keyword on the closure here which moves ownership of the reference
+                // into the closure, which we'll need for spawning the client below.
                 let db = db.clone();
+
                 // Like with other small servers, we'll `spawn` this client to ensure it
                 // runs concurrently with all other clients.
                 tokio::spawn(async move {
@@ -119,17 +124,9 @@ async fn main() {
                     // as well as convert our line based responses into a stream of bytes.
                     let mut lines = Framed::new(socket, LinesCodec::new());
 
-                    // Here's where the meat of the processing in this server happens. First
-                    // we see a clone of the database being created, which is creating a
-                    // new reference for this connected client to use. Also note the `move`
-                    // keyword on the closure here which moves ownership of the reference
-                    // into the closure, which we'll need for spawning the client below.
-                    //
-                    // The `map` function here means that we'll run some code for all
-                    // requests (lines) we receive from the client. The actual handling here
-                    // is pretty simple, first we parse the request and if it's valid we
-                    // generate a response based on the values in the database.
-                    //let db = db.clone();
+                    // Here for every line we get back from the `Framed` decoder,
+                    // we parse the request, and if it's valid we generate a response 
+                    // based on the values in the database.
                     while let Some(result) = lines.next().await {
                         match result {
                             Ok(line) => {
