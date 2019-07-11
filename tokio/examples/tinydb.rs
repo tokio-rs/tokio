@@ -40,7 +40,8 @@
 //!   returning the previous value, if any.
 
 #![feature(async_await)]
-//#![deny(warnings, rust_2018_idioms)]
+#![feature(async_closure)]
+#![deny(warnings, rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::env;
@@ -48,14 +49,12 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use tokio;
-//use tokio::io::{lines, write_all};
 use tokio::codec::Framed;
 use tokio::codec::LinesCodec;
 use tokio::net::TcpListener;
-use tokio::prelude::*;
-use tokio::prelude::{AsyncRead, AsyncWrite};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use futures::SinkExt;
+use futures::StreamExt;
 
 /// The in-memory database shared amongst all clients.
 ///
@@ -87,23 +86,15 @@ enum Response {
     },
 }
 
-use tokio::codec::Decoder;
-
-fn test<T, U>(framed: Framed<T, U>)
-where
-    T: AsyncRead + Unpin,
-    U: Decoder + Unpin,
-{
-
-}
-
 #[tokio::main]
-async fn main() -> Result<(), &'static str> {
+async fn main() {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut listener = TcpListener::bind(&addr).map_err(|_| "failed to bind")?;
+    let mut listener = TcpListener::bind(&addr)
+        .map_err(|_| "failed to bind")
+        .unwrap();
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all
@@ -117,71 +108,79 @@ async fn main() -> Result<(), &'static str> {
         map: Mutex::new(initial_db),
     });
 
-    while let next = listener.accept().await {
-        match next {
-            Ok((socket, addr)) => {
-                // As with many other small examples, the first thing we'll do is
-                // *split* this TCP stream into two separately owned halves. This'll
-                // allow us to work with the read and write halves independently.
-                // let (reader, writer) = socket.split();
-
-                // Since our protocol is line-based we use `tokio_io`'s `lines` utility
-                // to convert our stream of bytes, `reader`, into a `Stream` of lines.
-                let mut lines = Box::pin(Framed::new(socket, LinesCodec::new()));
-
-                // Here's where the meat of the processing in this server happens. First
-                // we see a clone of the database being created, which is creating a
-                // new reference for this connected client to use. Also note the `move`
-                // keyword on the closure here which moves ownership of the reference
-                // into the closure, which we'll need for spawning the client below.
-                //
-                // The `map` function here means that we'll run some code for all
-                // requests (lines) we receive from the client. The actual handling here
-                // is pretty simple, first we parse the request and if it's valid we
-                // generate a response based on the values in the database.
+    loop {
+        match listener.accept().await {
+            Ok((socket, _)) => {
+                // Clone our reference counted handle to db so we can pass it into the async closure.
                 let db = db.clone();
+                // Like with other small servers, we'll `spawn` this client to ensure it
+                // runs concurrently with all other clients.
+                tokio::spawn(async move {
+                    // Since our protocol is line-based we use `tokio_codecs`'s `LineCodec`
+                    // to convert our stream of bytes, `socket`, into a `Stream` of lines
+                    // as well as convert our line based responses into a stream of bytes.
+                    let mut lines = Framed::new(socket, LinesCodec::new());
 
-                use futures_util::stream::{self, StreamExt};
+                    // Here's where the meat of the processing in this server happens. First
+                    // we see a clone of the database being created, which is creating a
+                    // new reference for this connected client to use. Also note the `move`
+                    // keyword on the closure here which moves ownership of the reference
+                    // into the closure, which we'll need for spawning the client below.
+                    //
+                    // The `map` function here means that we'll run some code for all
+                    // requests (lines) we receive from the client. The actual handling here
+                    // is pretty simple, first we parse the request and if it's valid we
+                    // generate a response based on the values in the database.
+                    //let db = db.clone();
+                    while let Some(result) = lines.next().await {
+                        match result {
+                            Ok(line) => {
+                                let response = handle_request(&line, &db);
 
-                println!("{:?}", lines);
+                                let response = response.serialize();
 
-                lines.next()
-
-                //test(lines);
-
-                //let line = lines.next().await;
-
-                /*let request = match Request::parse(&line) {
-                    Ok(req) => req,
-                    Err(e) => return Response::Error { msg: e },
-                };
-
-                let mut db = db.map.lock().unwrap();
-                let response = match request {
-                    Request::Get { key } => match db.get(&key) {
-                        Some(value) => Response::Value {
-                            key,
-                            value: value.clone(),
-                        },
-                        None => Response::Error {
-                            msg: format!("no key {}", key),
-                        },
-                    },
-                    Request::Set { key, value } => {
-                        let previous = db.insert(key.clone(), value.clone());
-                        Response::Set {
-                            key,
-                            value,
-                            previous,
+                                lines.send(response).await.unwrap();
+                            }
+                            Err(e) => {
+                                println!("error on decoding from socket; error = {:?}", e);
+                            }
                         }
                     }
-                };*/
+
+                    // The connection will be closed at this point as the stream has returned None.
+                });
             }
             Err(e) => println!("error accepting socket; error = {:?}", e),
         }
     }
+}
 
-    Ok(())
+fn handle_request(line: &str, db: &Arc<Database>) -> Response {
+    let request = match Request::parse(&line) {
+        Ok(req) => req,
+        Err(e) => return Response::Error { msg: e },
+    };
+
+    let mut db = db.map.lock().unwrap();
+    match request {
+        Request::Get { key } => match db.get(&key) {
+            Some(value) => Response::Value {
+                key,
+                value: value.clone(),
+            },
+            None => Response::Error {
+                msg: format!("no key {}", key),
+            },
+        },
+        Request::Set { key, value } => {
+            let previous = db.insert(key.clone(), value.clone());
+            Response::Set {
+                key,
+                value,
+                previous,
+            }
+        }
+    }
 }
 
 impl Request {
