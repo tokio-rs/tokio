@@ -1,0 +1,94 @@
+//! This example leverages `BytesCodec` to create a UDP client and server which
+//! speak a custom protocol.
+//!
+//! Here we're using the codec from tokio-io to convert a UDP socket to a stream of
+//! client messages. These messages are then processed and returned back as a
+//! new message with a new destination. Overall, we then use this to construct a
+//! "ping pong" pair where two sockets are sending messages back and forth.
+
+#![feature(async_await)]
+#![deny(warnings, rust_2018_idioms)]
+
+use env_logger;
+
+use std::net::SocketAddr;
+use std::time::Duration;
+
+use tokio;
+use tokio::io::Error;
+use tokio::net::UdpSocket;
+use tokio::util::FutureExt;
+use tokio::net::udp::split::{UdpSocketRecvHalf, UdpSocketSendHalf};
+
+#[tokio::main]
+async fn main() {
+    let _ = env_logger::init();
+
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+
+    // Bind both our sockets and then figure out what ports we got.
+    let a = UdpSocket::bind(&addr).expect("Failed to bind to address");
+    let b = UdpSocket::bind(&addr).expect("Failed to bind to address");
+    let b_addr = b.local_addr().expect("Failed to get address of socket B");
+
+    // We're parsing each socket with the `BytesCodec` included in `tokio_io`, and then we
+    // `split` each codec into the sink/stream halves.
+    let (a_recv, a_send) = a.split();
+    let (b_recv, b_send) = b.split();
+
+    // Start off by sending a ping from a to b, afterwards we just print out
+    // what they send us and continually send pings
+    let a = pinger(a_recv, a_send, b_addr);
+
+    // The second client we have will receive the pings from `a` and then send
+    // back pongs.
+    let b = ponger(b_recv, b_send);
+
+    match futures::future::join(a, b).await {
+        (Err(e), _) | (_, Err(e)) => println!("an error occured; error = {:?}", e),
+        _ => println!("done!"),
+    }
+}
+
+// I moved the ping and pong routines into functions so I could use `?` for error handling.
+async fn pinger(
+    mut a_recv: UdpSocketRecvHalf,
+    mut a_send: UdpSocketSendHalf,
+    b_addr: SocketAddr,
+) -> Result<(), Error> {
+    a_send.send_to(b"PING", &b_addr).await?;
+
+    for _ in 0..4usize {
+        let mut buffer = [0u8; 255];
+
+        let (bytes_read, addr) = a_recv.recv_from(&mut buffer).await?;
+
+        println!(
+            "[a] recv: {}",
+            String::from_utf8_lossy(&buffer[..bytes_read])
+        );
+
+        a_send.send_to(b"PING", &addr).await?;
+    }
+
+    Ok(())
+}
+
+async fn ponger(mut b_recv: UdpSocketRecvHalf, mut b_send: UdpSocketSendHalf) -> Result<(), Error> {
+    let mut buffer = [0u8; 255];
+
+    while let Ok(Ok((bytes_read, addr))) = b_recv
+        .recv_from(&mut buffer)
+        .timeout(Duration::from_millis(200))
+        .await
+    {
+        println!(
+            "[b] recv: {}",
+            String::from_utf8_lossy(&buffer[..bytes_read])
+        );
+
+        b_send.send_to(b"PONG", &addr).await?;
+    }
+
+    Ok(())
+}
