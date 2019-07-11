@@ -27,7 +27,7 @@ publish = false
 [features]
 default = [
   "codec",
-#  "fs",
+  "fs",
   "io",
   "reactor",
   "rt-full",
@@ -39,7 +39,7 @@ default = [
 ]
 
 codec = ["io", "tokio-codec"]
-#fs = ["tokio-fs"]
+fs = ["tokio-fs"]
 io = ["bytes", "tokio-io"]
 reactor = ["io", "tokio-reactor"]
 rt-full = [
