@@ -107,15 +107,14 @@ async fn main() {
     loop {
         match listener.accept().await {
             Ok((socket, _)) => {
-                // Here's where the meat of the processing in this server happens. First
-                // we see a clone of the database being created, which is creating a
-                // new reference for this connected client to use. Also note the `move`
-                // keyword on the closure here which moves ownership of the reference
-                // into the closure, which we'll need for spawning the client below.
+                // After getting a new connection first we see a clone of the database
+                // being created, which is creating a new reference for this connected
+                // client to use.
                 let db = db.clone();
 
                 // Like with other small servers, we'll `spawn` this client to ensure it
-                // runs concurrently with all other clients.
+                // runs concurrently with all other clients. The `move` keyword is used
+                // here to move ownership of our db handle into the async closure.
                 tokio::spawn(async move {
                     // Since our protocol is line-based we use `tokio_codecs`'s `LineCodec`
                     // to convert our stream of bytes, `socket`, into a `Stream` of lines
@@ -142,7 +141,7 @@ async fn main() {
                         }
                     }
 
-                    // The connection will be closed at this point as the TcpStream has returned None.
+                    // The connection will be closed at this point as `lines.next()` has returned `None`.
                 });
             }
             Err(e) => println!("error accepting socket; error = {:?}", e),
