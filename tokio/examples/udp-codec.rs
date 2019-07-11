@@ -45,10 +45,7 @@ async fn main() {
 }
 
 // I moved the ping and pong routines into functions so I could use `?` for error handling.
-async fn pinger(
-    mut socket: UdpSocket,
-    b_addr: SocketAddr,
-) -> Result<(), Error> {
+async fn pinger(mut socket: UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
     socket.send_to(b"PING", &b_addr).await?;
 
     for _ in 0..4usize {
