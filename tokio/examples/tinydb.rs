@@ -49,12 +49,10 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use tokio;
-use tokio::codec::Framed;
-use tokio::codec::LinesCodec;
+use tokio::codec::{Framed, LinesCodec};
 use tokio::net::TcpListener;
 
-use futures::SinkExt;
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 
 /// The in-memory database shared amongst all clients.
 ///
