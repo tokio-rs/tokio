@@ -2,7 +2,9 @@ use std::future::Future;
 use std::io;
 use std::os::windows::fs;
 use std::path::Path;
+use std::pin::Pin;
 use std::task::Poll;
+use std::task::Context;
 
 /// Creates a new file symbolic link on the filesystem.
 ///
@@ -42,10 +44,9 @@ where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    type Item = ();
-    type Error = io::Error;
+    type Output = io::Result<()>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         crate::blocking_io(|| fs::symlink_file(&self.src, &self.dst))
     }
 }
