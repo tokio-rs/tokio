@@ -125,7 +125,7 @@ async fn main() {
                     let mut lines = Framed::new(socket, LinesCodec::new());
 
                     // Here for every line we get back from the `Framed` decoder,
-                    // we parse the request, and if it's valid we generate a response 
+                    // we parse the request, and if it's valid we generate a response
                     // based on the values in the database.
                     while let Some(result) = lines.next().await {
                         match result {
