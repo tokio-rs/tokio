@@ -67,10 +67,7 @@ pub use self::udp::UdpSocket;
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
 
-    pub use tokio_uds::{
-        ConnectFuture, Incoming, RecvDgram, SendDgram, UCred, UnixDatagram, UnixDatagramFramed,
-        UnixListener, UnixStream,
-    };
+    pub use tokio_uds::{UCred, UnixDatagram, UnixListener, UnixStream};
 }
 #[cfg(all(unix, feature = "uds"))]
-pub use self::unix::{UnixDatagram, UnixDatagramFramed, UnixListener, UnixStream};
+pub use self::unix::{UnixDatagram, UnixListener, UnixStream};
