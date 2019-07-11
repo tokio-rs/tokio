@@ -91,10 +91,8 @@ async fn main() {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
-    let mut listener = TcpListener::bind(&addr)
-        .map_err(|_| "failed to bind")
-        .unwrap();
+    let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
+    let mut listener = TcpListener::bind(&addr).expect("Failed to bind");
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all
@@ -139,7 +137,9 @@ async fn main() {
 
                                 let response = response.serialize();
 
-                                lines.send(response).await.unwrap();
+                                if let Err(e) = lines.send(response).await {
+                                    println!("error on sending response; error = {:?}", e);
+                                }
                             }
                             Err(e) => {
                                 println!("error on decoding from socket; error = {:?}", e);
@@ -147,7 +147,7 @@ async fn main() {
                         }
                     }
 
-                    // The connection will be closed at this point as the stream has returned None.
+                    // The connection will be closed at this point as the TcpStream has returned None.
                 });
             }
             Err(e) => println!("error accepting socket; error = {:?}", e),
