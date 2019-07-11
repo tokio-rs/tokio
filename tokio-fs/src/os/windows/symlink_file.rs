@@ -3,8 +3,8 @@ use std::io;
 use std::os::windows::fs;
 use std::path::Path;
 use std::pin::Pin;
-use std::task::Poll;
 use std::task::Context;
+use std::task::Poll;
 
 /// Creates a new file symbolic link on the filesystem.
 ///
