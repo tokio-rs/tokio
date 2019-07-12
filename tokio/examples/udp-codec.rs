@@ -1,7 +1,7 @@
 //! This example leverages `BytesCodec` to create a UDP client and server which
 //! speak a custom protocol.
 //!
-//! Here we're using the codec from tokio-io to convert a UDP socket to a stream of
+//! Here we're using the codec from `tokio-codec` to convert a UDP socket to a stream of
 //! client messages. These messages are then processed and returned back as a
 //! new message with a new destination. Overall, we then use this to construct a
 //! "ping pong" pair where two sockets are sending messages back and forth.
@@ -9,12 +9,9 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use env_logger;
-
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use tokio;
 use tokio::io::Error;
 use tokio::net::UdpSocket;
 use tokio::util::FutureExt;
@@ -26,26 +23,28 @@ async fn main() {
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     // Bind both our sockets and then figure out what ports we got.
-    let a = UdpSocket::bind(&addr).expect("Failed to bind to address");
-    let b = UdpSocket::bind(&addr).expect("Failed to bind to address");
+    let mut a = UdpSocket::bind(&addr).expect("Failed to bind to address");
+    let mut b = UdpSocket::bind(&addr).expect("Failed to bind to address");
     let b_addr = b.local_addr().expect("Failed to get address of socket B");
 
     // Start off by sending a ping from a to b, afterwards we just print out
     // what they send us and continually send pings
-    let a = pinger(a, b_addr);
+    let a = ping(&mut a, b_addr);
 
     // The second client we have will receive the pings from `a` and then send
     // back pongs.
-    let b = ponger(b);
+    let b = pong(&mut b);
 
-    match futures::future::join(a, b).await {
-        (Err(e), _) | (_, Err(e)) => println!("an error occured; error = {:?}", e),
+    // Run both futures simultaneously of `a` and `b` sending messages back and forth.
+    match futures::future::try_join(a, b).await {
+        Err(e) => println!("an error occured; error = {:?}", e),
         _ => println!("done!"),
     }
 }
 
-// I moved the ping and pong routines into functions so I could use `?` for error handling.
-async fn pinger(mut socket: UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
+// `ping` and `pong` were originally inline but were moved into functions so that
+// `?` could be used for error handling.
+async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
     socket.send_to(b"PING", &b_addr).await?;
 
     for _ in 0..4usize {
@@ -64,7 +63,7 @@ async fn pinger(mut socket: UdpSocket, b_addr: SocketAddr) -> Result<(), Error> 
     Ok(())
 }
 
-async fn ponger(mut socket: UdpSocket) -> Result<(), Error> {
+async fn pong(socket: &mut UdpSocket) -> Result<(), Error> {
     let mut buffer = [0u8; 255];
 
     while let Ok(Ok((bytes_read, addr))) = socket
