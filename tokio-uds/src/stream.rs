@@ -95,9 +95,19 @@ impl UnixStream {
         self.io.poll_read_ready(ready)
     }
 
+    /// Clear read ready state.
+    pub fn clear_read_ready(&self, ready: Ready) -> io::Result<()> {
+        self.io.clear_read_ready(ready)
+    }
+
     /// Test whether this socket is ready to be written to or not.
     pub fn poll_write_ready(&self) -> Poll<Ready, io::Error> {
         self.io.poll_write_ready()
+    }
+
+    /// Clear read ready state.
+    pub fn clear_write_ready(&self) -> io::Result<()> {
+        self.io.clear_write_ready()
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -195,7 +205,7 @@ impl<'a> AsyncRead for &'a UnixStream {
             if r == -1 {
                 let e = io::Error::last_os_error();
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.clear_read_ready(Ready::readable())?;
+                    <UnixStream>::clear_read_ready(self, Ready::readable())?;
                     Ok(Async::NotReady)
                 } else {
                     Err(e)
@@ -223,7 +233,7 @@ impl<'a> AsyncWrite for &'a UnixStream {
             if r == -1 {
                 let e = io::Error::last_os_error();
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.clear_write_ready()?;
+                    <UnixStream>::clear_write_ready(self)?;
                     Ok(Async::NotReady)
                 } else {
                     Err(e)
