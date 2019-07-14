@@ -28,7 +28,7 @@ lazy_static = "1.0.2"
 log = "0.4.6"
 mio = "0.6.14"
 num_cpus = "1.8.0"
-parking_lot = "0.8"
+parking_lot = "0.9"
 slab = "0.4.0"
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
