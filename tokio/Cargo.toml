@@ -40,7 +40,7 @@ default = [
 
 codec = ["io", "tokio-codec"]
 fs = ["tokio-fs"]
-io = ["bytes", "tokio-io", "memchr"]
+io = ["bytes", "tokio-io", "tokio-futures", "memchr"]
 reactor = ["io", "tokio-reactor"]
 rt-full = [
   "num_cpus",
@@ -83,7 +83,7 @@ tracing-core = { version = "0.1", optional = true }
 memchr = { version = "2.2", optional = true }
 
 # Needed for async/await preview support
-#tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }
+tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }
 
 [target.'cfg(unix)'.dependencies]
 tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds" }
@@ -102,3 +102,4 @@ num_cpus = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = "0.1"
+futures-util-preview = "0.3.0-alpha.17"
