@@ -30,9 +30,9 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use std::env;
+use std::error::Error;
 use std::io::{stdin, Read};
 use std::net::SocketAddr;
-use std::error::Error;
 use tokio::net::UdpSocket;
 
 fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {

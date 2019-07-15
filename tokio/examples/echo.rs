@@ -27,8 +27,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use std::env;
-use std::net::SocketAddr;
 use std::error::Error;
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -61,13 +61,19 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
             // In a loop, read data from the socket and write the data back.
             loop {
-                let n = socket.read(&mut buf).await.expect("failed to read data from socket");
+                let n = socket
+                    .read(&mut buf)
+                    .await
+                    .expect("failed to read data from socket");
 
                 if n == 0 {
                     return;
                 }
 
-                socket.write_all(&buf[0..n]).await.expect("failed to write data to socket");
+                socket
+                    .write_all(&buf[0..n])
+                    .await
+                    .expect("failed to write data to socket");
             }
         });
     }

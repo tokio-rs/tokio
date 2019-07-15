@@ -13,9 +13,9 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
+use std::error::Error;
 use std::net::SocketAddr;
 use std::{env, io};
-use std::error::Error;
 use tokio;
 use tokio::net::UdpSocket;
 
