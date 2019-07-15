@@ -20,6 +20,7 @@ use std::task::{self, Poll, Waker};
 use std::time::{Duration, Instant};
 use std::{cmp, io};
 
+use futures_core::ready;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_sync::mpsc;
 use tokio_timer::{clock, timer, Delay};

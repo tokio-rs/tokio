@@ -1,5 +1,6 @@
 use super::TcpListener;
 use super::TcpStream;
+use futures_core::ready;
 use futures_core::stream::Stream;
 use std::io;
 use std::pin::Pin;

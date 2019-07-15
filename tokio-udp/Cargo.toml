@@ -28,6 +28,7 @@ tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 # bytes = "0.4"
 mio = "0.6.14"
 log = "0.4"
+futures-core-preview = "0.3.0-alpha.17"
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }

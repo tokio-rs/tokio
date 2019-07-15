@@ -22,11 +22,11 @@ categories = ["asynchronous"]
 publish = false
 
 [features]
-async-traits = ["futures-core-preview"]
+async-traits = []
 
 [dependencies]
 bytes = "0.4.8"
-futures-core-preview = { version = "0.3.0-alpha.17", optional = true }
+futures-core-preview = { version = "0.3.0-alpha.17" }
 iovec = "0.1.2"
 libc = "0.2.42"
 log = "0.4.2"

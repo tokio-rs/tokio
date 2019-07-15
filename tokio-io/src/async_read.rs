@@ -1,6 +1,7 @@
 //use crate::split::{ReadHalf, WriteHalf};
 //use crate::{framed, split, AsyncWrite};
 use bytes::BufMut;
+use futures_core::ready;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;

@@ -42,6 +42,7 @@
 
 use crate::semaphore;
 
+use futures_core::ready;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::future::Future;

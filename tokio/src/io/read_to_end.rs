@@ -1,5 +1,6 @@
 use tokio_io::AsyncRead;
 
+use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;

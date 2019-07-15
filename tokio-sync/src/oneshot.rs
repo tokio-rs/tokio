@@ -2,6 +2,7 @@
 
 use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell};
 
+use futures_core::ready;
 use std::fmt;
 use std::future::Future;
 use std::mem::{self, ManuallyDrop};

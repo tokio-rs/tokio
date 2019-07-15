@@ -23,15 +23,6 @@
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(t) => t,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
-
 #[cfg(feature = "incoming")]
 mod incoming;
 mod listener;

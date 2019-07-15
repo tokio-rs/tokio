@@ -32,15 +32,6 @@
 //! [`Interval`]: struct.Interval.html
 //! [`Timer`]: timer/struct.Timer.html
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(v) => v,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
-
 pub mod clock;
 pub mod delay_queue;
 #[cfg(feature = "async-traits")]

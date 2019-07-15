@@ -1,4 +1,5 @@
 use crate::{Handle, Registration};
+use futures_core::ready;
 use mio;
 use mio::event::Evented;
 use std::fmt;

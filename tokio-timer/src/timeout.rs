@@ -6,6 +6,8 @@
 
 use crate::clock::now;
 use crate::Delay;
+#[cfg(feature = "async-traits")]
+use futures_core::ready;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
