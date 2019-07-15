@@ -40,7 +40,7 @@ default = [
 
 codec = ["io", "tokio-codec"]
 fs = ["tokio-fs"]
-io = ["bytes", "tokio-io"]
+io = ["bytes", "tokio-io", "memchr"]
 reactor = ["io", "tokio-reactor"]
 rt-full = [
   "num_cpus",
@@ -80,6 +80,7 @@ tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp" }
 tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
 tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer" }
 tracing-core = { version = "0.1", optional = true }
+memchr = { version = "2.2", optional = true }
 
 # Needed for async/await preview support
 #tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }

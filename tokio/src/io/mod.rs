@@ -43,6 +43,7 @@ mod copy;
 mod read;
 mod read_exact;
 mod read_to_end;
+mod read_until;
 mod write;
 mod write_all;
 
