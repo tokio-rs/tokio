@@ -54,6 +54,8 @@ use tokio::net::TcpListener;
 
 use futures::{SinkExt, StreamExt};
 
+use std::error::Error as StdError;
+
 /// The in-memory database shared amongst all clients.
 ///
 /// This database will be shared via `Arc`, so to mutate the internal map we're
@@ -85,12 +87,12 @@ enum Response {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn StdError + Send + Sync>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
-    let mut listener = TcpListener::bind(&addr).expect("Failed to bind");
+    let addr = addr.parse::<SocketAddr>()?;
+    let mut listener = TcpListener::bind(&addr)?;
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all
