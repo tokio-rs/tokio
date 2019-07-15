@@ -33,9 +33,9 @@ the Rust programming language. It is:
 [API Docs](https://docs.rs/tokio/0.1.22/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
-The API docs for the master branch are published [here][master-dox].
-
-[master-dox]: https://tokio-rs.github.io/tokio/doc/tokio/
+The API docs for the master branch are currently out of date as master is
+undergoing significant churn as it is updated to use `std::future`. The docs
+will be udpated once the branch stabilizes.
 
 ## Overview
 
