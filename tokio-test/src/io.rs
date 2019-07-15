@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 use std::{cmp, io};
 
 use futures_core::ready;
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::{AsyncRead, AsyncWrite, Buf};
 use tokio_sync::mpsc;
 use tokio_timer::{clock, timer, Delay};
 
@@ -407,6 +407,16 @@ impl AsyncWrite for Mock {
                 }
             }
         }
+    }
+
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        let n = ready!(self.poll_write(cx, buf.bytes()))?;
+        buf.advance(n);
+        Poll::Ready(Ok(n))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
