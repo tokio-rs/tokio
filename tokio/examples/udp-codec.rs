@@ -42,8 +42,6 @@ async fn main() {
     }
 }
 
-// `ping` and `pong` were originally inline but were moved into functions so that
-// `?` could be used for error handling.
 async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
     socket.send_to(b"PING", &b_addr).await?;
 
