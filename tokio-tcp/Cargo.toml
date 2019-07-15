@@ -22,7 +22,7 @@ categories = ["asynchronous"]
 publish = false
 
 [features]
-incoming = []
+async-traits = []
 
 [dependencies]
 async-util = { git = "https://github.com/tokio-rs/async" }
