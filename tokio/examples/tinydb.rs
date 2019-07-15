@@ -40,7 +40,6 @@
 //!   returning the previous value, if any.
 
 #![feature(async_await)]
-#![feature(async_closure)]
 #![deny(warnings, rust_2018_idioms)]
 
 use std::collections::HashMap;
