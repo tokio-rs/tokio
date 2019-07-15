@@ -1,4 +1,7 @@
-use crate::split::{split, split_mut, TcpStreamReadHalf, TcpStreamWriteHalf, TcpStreamReadHalfMut, TcpStreamWriteHalfMut};
+use crate::split::{
+    split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
+    TcpStreamWriteHalfMut,
+};
 use bytes::{Buf, BufMut};
 use iovec::IoVec;
 use mio;
