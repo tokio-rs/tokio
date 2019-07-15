@@ -45,6 +45,7 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
@@ -53,8 +54,6 @@ use tokio::codec::{Framed, LinesCodec};
 use tokio::net::TcpListener;
 
 use futures::{SinkExt, StreamExt};
-
-use std::error::Error as StdError;
 
 /// The in-memory database shared amongst all clients.
 ///
@@ -87,7 +86,7 @@ enum Response {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn StdError + Send + Sync>> {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
