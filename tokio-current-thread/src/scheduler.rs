@@ -12,6 +12,7 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::thread;
 use std::usize;
 use tokio_executor::park::Unpark;
+use tokio_executor::Enter;
 
 /// A generic task-aware scheduler.
 ///
@@ -198,7 +199,7 @@ where
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick(&mut self, eid: u64, num_futures: &AtomicUsize) -> bool {
+    pub fn tick(&mut self, eid: u64, enter: &mut Enter, num_futures: &AtomicUsize) -> bool {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst).wrapping_add(1);
 
@@ -250,13 +251,14 @@ where
                 //
                 struct Bomb<'a, U: Unpark> {
                     borrow: &'a mut Borrow<'a, U>,
+                    enter: &'a mut Enter,
                     node: Option<Arc<Node<U>>>,
                 }
 
                 impl<'a, U: Unpark> Drop for Bomb<'a, U> {
                     fn drop(&mut self) {
                         if let Some(node) = self.node.take() {
-                            self.borrow.enter(|| release_node(node))
+                            self.borrow.enter(self.enter, || release_node(node))
                         }
                     }
                 }
@@ -271,6 +273,7 @@ where
 
                 let mut bomb = Bomb {
                     node: Some(node),
+                    enter: enter,
                     borrow: &mut borrow,
                 };
 
@@ -305,6 +308,7 @@ where
                     // the internal allocation, appropriately accessing fields and
                     // deallocating the node if need be.
                     let borrow = &mut *bomb.borrow;
+                    let enter = &mut *bomb.enter;
 
                     let mut scheduled = Scheduled {
                         task: item,
@@ -312,7 +316,7 @@ where
                         done: &mut done,
                     };
 
-                    if borrow.enter(|| scheduled.tick()) {
+                    if borrow.enter(enter, || scheduled.tick()) {
                         // we have a borrow of the Runtime, so we know it's not shut down
                         borrow.num_futures.fetch_sub(2, SeqCst);
                     }

@@ -1,15 +1,15 @@
-use super::{Inner, Runtime};
 use crate::reactor::Reactor;
 use num_cpus;
-use std::any::Any;
-use std::io;
-use std::sync::Mutex;
-use std::time::Duration;
 use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 use tracing_core as trace;
+use std::io;
+use std::sync::Mutex;
+use std::time::Duration;
+use std::any::Any;
+use super::{Inner, Runtime};
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -111,6 +111,7 @@ impl Builder {
         self.threadpool_builder.panic_handler(f);
         self
     }
+
 
     /// Set the maximum number of worker threads for the `Runtime`'s thread pool.
     ///
@@ -261,8 +262,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
-    where
-        F: Fn() + Send + Sync + 'static,
+        where F: Fn() + Send + Sync + 'static
     {
         self.threadpool_builder.after_start(f);
         self
@@ -286,8 +286,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
-    where
-        F: Fn() + Send + Sync + 'static,
+        where F: Fn() + Send + Sync + 'static
     {
         self.threadpool_builder.before_stop(f);
         self
@@ -337,10 +336,10 @@ impl Builder {
 
         let pool = self
             .threadpool_builder
-            .around_worker(move |w| {
+            .around_worker(move |w, enter| {
                 let index = w.id().to_usize();
 
-                tokio_reactor::with_default(&reactor_handles[index], || {
+                tokio_reactor::with_default(&reactor_handles[index], enter, |_| {
                     clock::with_default(&clock, || {
                         timer::with_default(&timer_handles[index], || {
                             trace::dispatcher::with_default(&dispatch, || {
@@ -353,12 +352,18 @@ impl Builder {
             .custom_park(move |worker_id| {
                 let index = worker_id.to_usize();
 
-                timers[index].lock().unwrap().take().unwrap()
+                timers[index]
+                    .lock()
+                    .unwrap()
+                    .take()
+                    .unwrap()
             })
             .build();
 
         Ok(Runtime {
-            inner: Some(Inner { pool }),
+            inner: Some(Inner {
+                pool,
+            }),
         })
     }
 }

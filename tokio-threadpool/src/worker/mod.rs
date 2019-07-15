@@ -118,9 +118,12 @@ impl Worker {
             let pool = self.pool.clone();
             let mut sender = Sender { pool };
 
-            tokio_executor::with_default(&mut sender, || {
+            // Enter an execution context
+            let mut enter = tokio_executor::enter().unwrap();
+
+            tokio_executor::with_default(&mut sender, &mut enter, |enter| {
                 if let Some(ref callback) = self.pool.config.around_worker {
-                    callback.call(self);
+                    callback.call(self, enter);
                 } else {
                     self.run();
                 }

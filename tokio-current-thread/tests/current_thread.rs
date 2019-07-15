@@ -210,6 +210,40 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 }
 
 #[test]
+#[should_panic]
+fn nesting_run() {
+    block_on_all(async {
+        block_on_all(async {});
+    });
+}
+
+mod run_in_future {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn spawn() {
+        block_on_all(async {
+            tokio_current_thread::spawn(async {
+                block_on_all(async {});
+            });
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn execute() {
+        block_on_all(async {
+            tokio_current_thread::TaskExecutor::current()
+                .spawn(async {
+                    block_on_all(async {});
+                })
+                .unwrap();
+        });
+    }
+}
+
+#[test]
 fn tick_on_infini_future() {
     let num = Rc::new(Cell::new(0));
 

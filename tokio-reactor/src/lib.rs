@@ -58,6 +58,7 @@ use std::task::Waker;
 use std::time::{Duration, Instant};
 use std::{fmt, usize};
 use tokio_executor::park::{Park, Unpark};
+use tokio_executor::Enter;
 use tokio_sync::task::AtomicWaker;
 
 /// The core reactor, or event loop.
@@ -161,9 +162,9 @@ fn _assert_kinds() {
 /// # Panics
 ///
 /// This function panics if there already is a default reactor set.
-pub fn with_default<F, R>(handle: &Handle, f: F) -> R
+pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where
-    F: FnOnce() -> R,
+    F: FnOnce(&mut Enter) -> R,
 {
     // Ensure that the executor is removed from the thread-local context
     // when leaving the scope. This handles cases that involve panicking.
@@ -202,7 +203,7 @@ where
             *current = Some(handle.clone());
         }
 
-        f()
+        f(enter)
     })
 }
 
