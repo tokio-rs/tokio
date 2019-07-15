@@ -436,6 +436,15 @@ impl UdpSocket {
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }
+
+    /// Creates a new independently owned handle to the underlying socket.
+    ///
+    /// The returned `UdpSocket` is a reference to the same socket that this
+    /// object references. Both handles will read and write the same port, and
+    /// options set on one socket will be propagated to the other.
+    pub fn try_clone(&self) -> io::Result<UdpSocket> {
+        self.io.get_ref().try_clone().map(UdpSocket::new)
+    }
 }
 
 impl TryFrom<UdpSocket> for mio::net::UdpSocket {
