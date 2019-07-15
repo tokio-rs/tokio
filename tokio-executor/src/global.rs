@@ -141,33 +141,27 @@ where
 
 /// Set the default executor for the duration of the closure
 ///
-/// # Panics
-///
-/// This function panics if there already is a default executor set.
+/// If a default executor is already set, it will be restored when the closure returns or if it
+/// panics.
 pub fn with_default<T, F, R>(executor: &mut T, f: F) -> R
 where
     T: Executor,
     F: FnOnce() -> R,
 {
     EXECUTOR.with(|cell| {
-        match cell.get() {
-            State::Ready(_) | State::Active => {
-                panic!("default executor already set for execution context")
-            }
-            _ => {}
-        }
+        let was = cell.get();
 
         // Ensure that the executor is removed from the thread-local context
         // when leaving the scope. This handles cases that involve panicking.
-        struct Reset<'a>(&'a Cell<State>);
+        struct Reset<'a>(&'a Cell<State>, State);
 
         impl<'a> Drop for Reset<'a> {
             fn drop(&mut self) {
-                self.0.set(State::Empty);
+                self.0.set(self.1);
             }
         }
 
-        let _reset = Reset(cell);
+        let _reset = Reset(cell, was);
 
         // While scary, this is safe. The function takes a
         // `&mut Executor`, which guarantees that the reference lives for the
