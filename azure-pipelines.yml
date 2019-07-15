@@ -34,7 +34,7 @@ jobs:
       tokio-reactor: []
       tokio-signal: []
       tokio-tcp:
-        - incoming
+        - async-traits
 #       - tokio-tls
       tokio-udp: []
       tokio-uds:
