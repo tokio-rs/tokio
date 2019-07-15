@@ -8,6 +8,7 @@ use std::task::Context;
 use std::task::Poll;
 
 /// Future returned by `File::create` and resolves to a `File` instance.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct CreateFuture<P> {
     path: P,

@@ -29,7 +29,7 @@ pub struct UnixStream {
 /// Future returned by `UnixStream::connect` which will resolve to a
 /// `UnixStream` when the stream is connected.
 #[derive(Debug)]
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ConnectFuture {
     stream: Option<io::Result<UnixStream>>,
 }

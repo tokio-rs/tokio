@@ -17,6 +17,7 @@ pub fn create_dir<P: AsRef<Path>>(path: P) -> CreateDirFuture<P> {
 
 /// Future returned by `create_dir`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct CreateDirFuture<P>
 where
     P: AsRef<Path>,

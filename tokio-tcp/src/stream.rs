@@ -46,7 +46,7 @@ pub struct TcpStream {
 
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 struct ConnectFuture {
     inner: ConnectFutureState,
 }

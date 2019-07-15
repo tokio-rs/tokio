@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 /// A future that receives a datagram from the connected address.
 ///
 /// This `struct` is created by [`recv`](crate::UnixDatagram::recv).
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct Recv<'a, 'b> {
     socket: &'a mut UnixDatagram,

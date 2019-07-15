@@ -13,6 +13,7 @@ use std::task::Poll;
 ///
 /// Will panic if polled after returning an item or error.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct CloneFuture {
     file: Option<File>,
 }

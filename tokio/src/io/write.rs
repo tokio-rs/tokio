@@ -7,6 +7,7 @@ use tokio_io::AsyncWrite;
 
 /// A future to write some of the buffer to an `AsyncWrite`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Write<'a, W: ?Sized> {
     writer: &'a mut W,
     buf: &'a [u8],

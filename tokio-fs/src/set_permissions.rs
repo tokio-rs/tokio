@@ -17,6 +17,7 @@ pub fn set_permissions<P: AsRef<Path>>(path: P, perm: fs::Permissions) -> SetPer
 
 /// Future returned by `set_permissions`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct SetPermissionsFuture<P>
 where
     P: AsRef<Path>,
