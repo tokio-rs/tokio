@@ -16,16 +16,18 @@ use tokio::io::Error;
 use tokio::net::UdpSocket;
 use tokio::util::FutureExt;
 
+use std::error::Error as StdError;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn StdError + Send + Sync>> {
     let _ = env_logger::init();
 
-    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+    let addr: SocketAddr = "127.0.0.1:0".parse()?;
 
     // Bind both our sockets and then figure out what ports we got.
-    let mut a = UdpSocket::bind(&addr).expect("Failed to bind to address");
-    let mut b = UdpSocket::bind(&addr).expect("Failed to bind to address");
-    let b_addr = b.local_addr().expect("Failed to get address of socket B");
+    let mut a = UdpSocket::bind(&addr)?;
+    let mut b = UdpSocket::bind(&addr)?;
+    let b_addr = b.local_addr()?;
 
     // Start off by sending a ping from a to b, afterwards we just print out
     // what they send us and continually send pings
@@ -40,6 +42,8 @@ async fn main() {
         Err(e) => println!("an error occured; error = {:?}", e),
         _ => println!("done!"),
     }
+
+    Ok(())
 }
 
 async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
