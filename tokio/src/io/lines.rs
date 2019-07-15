@@ -1,4 +1,5 @@
 use super::read_line::read_line_internal;
+use futures_core::ready;
 use std::io;
 use std::mem;
 use std::pin::Pin;
