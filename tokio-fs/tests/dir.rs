@@ -5,14 +5,14 @@ use futures_util::future;
 use futures_util::try_stream::TryStreamExt;
 use std::fs;
 use std::sync::{Arc, Mutex};
-use tempdir::TempDir;
+use tempfile::tempdir;
 use tokio_fs::*;
 
 mod pool;
 
 #[test]
 fn create() {
-    let base_dir = TempDir::new("base").unwrap();
+    let base_dir = tempdir().unwrap();
     let new_dir = base_dir.path().join("foo");
     let new_dir_2 = new_dir.clone();
 
@@ -26,7 +26,7 @@ fn create() {
 
 #[test]
 fn create_all() {
-    let base_dir = TempDir::new("base").unwrap();
+    let base_dir = tempdir().unwrap();
     let new_dir = base_dir.path().join("foo").join("bar");
     let new_dir_2 = new_dir.clone();
 
@@ -40,7 +40,7 @@ fn create_all() {
 
 #[test]
 fn remove() {
-    let base_dir = TempDir::new("base").unwrap();
+    let base_dir = tempdir().unwrap();
     let new_dir = base_dir.path().join("foo");
     let new_dir_2 = new_dir.clone();
 
@@ -56,7 +56,7 @@ fn remove() {
 
 #[test]
 fn read() {
-    let base_dir = TempDir::new("base").unwrap();
+    let base_dir = tempdir().unwrap();
 
     let p = base_dir.path();
     fs::create_dir(p.join("aa")).unwrap();
