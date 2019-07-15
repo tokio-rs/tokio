@@ -36,7 +36,7 @@ slab = "0.4.1"
 futures-core-preview = { version = "0.3.0-alpha.17", optional = true }
 
 [dev-dependencies]
-rand = "0.6"
+rand = "0.7"
 tokio = { version = "0.2.0", path = "../tokio" }
 tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync", features = ["async-traits"] }

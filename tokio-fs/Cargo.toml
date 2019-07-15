@@ -30,7 +30,7 @@ tokio-io = { version = "0.2.0", path = "../tokio-io" }
 tokio-futures = { version = "0.2.0", path = "../tokio-futures" }
 
 [dev-dependencies]
-rand = "0.6"
+rand = "0.7"
 tempfile = "3"
 tempdir = "0.3"
 tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
