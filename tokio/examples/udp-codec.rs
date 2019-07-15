@@ -9,6 +9,8 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
+use std::env;
+use std::error::Error as StdError;
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -16,13 +18,12 @@ use tokio::io::Error;
 use tokio::net::UdpSocket;
 use tokio::util::FutureExt;
 
-use std::error::Error as StdError;
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn StdError + Send + Sync>> {
     let _ = env_logger::init();
 
-    let addr: SocketAddr = "127.0.0.1:0".parse()?;
+    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = addr.parse::<SocketAddr>()?;
 
     // Bind both our sockets and then figure out what ports we got.
     let mut a = UdpSocket::bind(&addr)?;
