@@ -336,10 +336,10 @@ impl Builder {
 
         let pool = self
             .threadpool_builder
-            .around_worker(move |w, enter| {
+            .around_worker(move |w| {
                 let index = w.id().to_usize();
 
-                tokio_reactor::with_default(&reactor_handles[index], enter, |_| {
+                tokio_reactor::with_default(&reactor_handles[index], || {
                     clock::with_default(&clock, || {
                         timer::with_default(&timer_handles[index], || {
                             trace::dispatcher::with_default(&dispatch, || {

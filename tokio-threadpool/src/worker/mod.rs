@@ -119,11 +119,11 @@ impl Worker {
             let mut sender = Sender { pool };
 
             // Enter an execution context
-            let mut enter = tokio_executor::enter().unwrap();
+            let _enter = tokio_executor::enter().unwrap();
 
-            tokio_executor::with_default(&mut sender, &mut enter, |enter| {
+            tokio_executor::with_default(&mut sender, || {
                 if let Some(ref callback) = self.pool.config.around_worker {
-                    callback.call(self, enter);
+                    callback.call(self);
                 } else {
                     self.run();
                 }
