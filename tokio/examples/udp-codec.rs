@@ -10,19 +10,19 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use std::env;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use tokio::io::Error;
+use tokio::io;
 use tokio::net::UdpSocket;
 use tokio::util::FutureExt;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn StdError + Send + Sync>> {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let _ = env_logger::init();
 
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = env::args().nth(1).unwrap_or("127.0.0.1:0".to_string());
     let addr = addr.parse::<SocketAddr>()?;
 
     // Bind both our sockets and then figure out what ports we got.
@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn StdError + Send + Sync>> {
     Ok(())
 }
 
-async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
+async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), io::Error> {
     socket.send_to(b"PING", &b_addr).await?;
 
     for _ in 0..4usize {
@@ -66,7 +66,7 @@ async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), Error> {
     Ok(())
 }
 
-async fn pong(socket: &mut UdpSocket) -> Result<(), Error> {
+async fn pong(socket: &mut UdpSocket) -> Result<(), io::Error> {
     let mut buffer = [0u8; 255];
 
     while let Ok(Ok((bytes_read, addr))) = socket
