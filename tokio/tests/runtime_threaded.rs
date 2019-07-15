@@ -125,41 +125,6 @@ fn spawn_many() {
 }
 
 #[test]
-fn nested_enter() {
-    use std::panic;
-
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async {
-        assert_err!(tokio_executor::enter());
-
-        // Since this is testing panics in other threads, printing about panics
-        // is noisy and can give the impression that the test is ignoring panics.
-        //
-        // It *is* ignoring them, but on purpose.
-        let prev_hook = panic::take_hook();
-        panic::set_hook(Box::new(|info| {
-            let s = info.to_string();
-            if s.starts_with("panicked at 'nested ")
-                || s.starts_with("panicked at 'Multiple executors at once")
-            {
-                // expected, noop
-            } else {
-                println!("{}", s);
-            }
-        }));
-
-        let res = panic::catch_unwind(move || {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async {});
-        });
-
-        assert_err!(res);
-
-        panic::set_hook(prev_hook);
-    });
-}
-
-#[test]
 fn after_start_and_before_stop_is_called() {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
