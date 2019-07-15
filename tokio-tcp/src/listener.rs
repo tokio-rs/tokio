@@ -1,6 +1,7 @@
 #[cfg(feature = "incoming")]
 use super::incoming::Incoming;
 use super::TcpStream;
+use futures_core::ready;
 use mio;
 use std::convert::TryFrom;
 use std::fmt;

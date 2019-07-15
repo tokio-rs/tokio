@@ -22,7 +22,7 @@ categories = ["asynchronous"]
 publish = false
 
 [features]
-incoming = ["futures-core-preview"]
+incoming = []
 
 [dependencies]
 async-util = { git = "https://github.com/tokio-rs/async" }
@@ -33,7 +33,7 @@ mio = "0.6.14"
 iovec = "0.1"
 
 # optionals
-futures-core-preview = { version = "0.3.0-alpha.17", optional = true }
+futures-core-preview = { version = "0.3.0-alpha.17" }
 
 [dev-dependencies]
 #env_logger = { version = "0.5", default-features = false }

@@ -12,15 +12,6 @@
 //! [found online]: https://tokio.rs/docs/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(t) => t,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
-
 mod async_read;
 mod async_write;
 

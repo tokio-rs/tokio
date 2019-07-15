@@ -1,4 +1,5 @@
 use crate::UnixStream;
+use futures_core::ready;
 use mio::Ready;
 use mio_uds;
 use std::convert::TryFrom;

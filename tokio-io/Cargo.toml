@@ -24,6 +24,7 @@ publish = false
 [dependencies]
 bytes = "0.4.7"
 log = "0.4"
+futures-core-preview = "0.3.0-alpha.17"
 
 [dev-dependencies]
 pin-utils = "0.1.0-alpha.4"

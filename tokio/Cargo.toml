@@ -62,6 +62,7 @@ uds = ["tokio-uds"]
 [dependencies]
 # Only non-optional dependency...
 #futures = "0.1.20"
+futures-core-preview = "0.3.0-alpha.17"
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }

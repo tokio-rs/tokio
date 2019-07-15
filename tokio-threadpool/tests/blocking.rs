@@ -5,6 +5,7 @@ use tokio_test::*;
 use tokio_threadpool::*;
 
 use async_util::future::poll_fn;
+use futures_core::ready;
 use rand::*;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::*;
@@ -12,15 +13,6 @@ use std::sync::*;
 use std::task::{Poll, Waker};
 use std::thread;
 use std::time::Duration;
-
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(t) => t,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
 
 #[test]
 fn basic() {
