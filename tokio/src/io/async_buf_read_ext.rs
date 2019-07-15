@@ -1,3 +1,4 @@
+use crate::io::lines::{lines, Lines};
 use crate::io::read_line::{read_line, ReadLine};
 use crate::io::read_until::{read_until, ReadUntil};
 
@@ -65,6 +66,34 @@ pub trait AsyncBufReadExt: AsyncBufRead {
         Self: Unpin,
     {
         read_line(self, buf)
+    }
+
+    /// Returns a stream over the lines of this reader.
+    /// This method is the async equivalent to [`BufRead::lines`](std::io::BufRead::lines).
+    ///
+    /// The stream returned from this function will yield instances of
+    /// [`io::Result`]`<`[`String`]`>`. Each string returned will *not* have a newline
+    /// byte (the 0xA byte) or CRLF (0xD, 0xA bytes) at the end.
+    ///
+    /// [`io::Result`]: std::io::Result
+    /// [`String`]: String
+    ///
+    /// # Errors
+    ///
+    /// Each line of the stream has the same error semantics as [`AsyncBufReadExt::read_line`].
+    ///
+    /// [`AsyncBufReadExt::read_line`]: AsyncBufReadExt::read_line
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    fn lines(self) -> Lines<Self>
+    where
+        Self: Sized,
+    {
+        lines(self)
     }
 }
 
