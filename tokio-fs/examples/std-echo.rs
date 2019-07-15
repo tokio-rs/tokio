@@ -14,7 +14,7 @@ use futures::{Future, Sink, Stream};
 
 use std::io;
 
-pub fn main() -> Result<(), Box<std::error::Error>> {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = Builder::new().pool_size(1).build();
 
     pool.spawn({
