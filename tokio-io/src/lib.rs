@@ -12,8 +12,10 @@
 //! [found online]: https://tokio.rs/docs/
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
+mod async_buf_read;
 mod async_read;
 mod async_write;
 
+pub use self::async_buf_read::AsyncBufRead;
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
