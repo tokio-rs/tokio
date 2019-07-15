@@ -36,6 +36,7 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
+mod async_buf_read_ext;
 mod async_read_ext;
 mod async_write_ext;
 mod copy;
@@ -45,13 +46,14 @@ mod read_to_end;
 mod write;
 mod write_all;
 
+pub use self::async_buf_read_ext::AsyncBufReadExt;
 pub use self::async_read_ext::AsyncReadExt;
 pub use self::async_write_ext::AsyncWriteExt;
 
 // standard input, output, and error
 #[cfg(feature = "fs")]
 pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
-pub use tokio_io::{AsyncRead, AsyncWrite};
+pub use tokio_io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 // Re-export io::Error so that users don't have to deal
 // with conflicts when `use`ing `tokio::io` and `std::io`.
