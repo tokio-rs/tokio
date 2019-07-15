@@ -17,6 +17,7 @@ pub fn read_link<P: AsRef<Path>>(path: P) -> ReadLinkFuture<P> {
 
 /// Future returned by `read_link`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ReadLinkFuture<P>
 where
     P: AsRef<Path>,

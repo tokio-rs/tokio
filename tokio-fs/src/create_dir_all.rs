@@ -18,6 +18,7 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> CreateDirAllFuture<P> {
 
 /// Future returned by `create_dir_all`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct CreateDirAllFuture<P>
 where
     P: AsRef<Path>,

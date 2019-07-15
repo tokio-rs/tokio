@@ -38,6 +38,7 @@ where
 
 /// A future used to open a file and read its entire contents into a buffer.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ReadFile<P: AsRef<Path> + Send + Unpin + 'static> {
     state: State<P>,
 }

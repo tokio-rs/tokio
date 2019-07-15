@@ -65,7 +65,7 @@ use std::time::{Duration, Instant};
 ///
 /// [`Error`]: struct.Error.html
 /// [`Timeout::into_inner`]: struct.Timeout.html#method.into_iter
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct Timeout<T> {
     value: T,

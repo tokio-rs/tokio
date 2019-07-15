@@ -9,6 +9,7 @@ use std::task::Poll;
 
 /// Future returned by `File::open` and resolves to a `File` instance.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct OpenFuture<P: Unpin> {
     options: StdOpenOptions,
     path: P,

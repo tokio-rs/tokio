@@ -17,6 +17,7 @@ pub fn remove_dir<P: AsRef<Path>>(path: P) -> RemoveDirFuture<P> {
 
 /// Future returned by `remove_dir`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct RemoveDirFuture<P>
 where
     P: AsRef<Path>,

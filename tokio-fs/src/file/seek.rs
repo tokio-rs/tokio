@@ -7,6 +7,7 @@ use std::task::Poll;
 
 /// Future returned by `File::seek`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct SeekFuture {
     inner: Option<File>,
     pos: io::SeekFrom,

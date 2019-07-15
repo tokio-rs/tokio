@@ -11,6 +11,7 @@ const POLL_AFTER_RESOLVE: &str = "Cannot poll MetadataFuture after it resolves";
 
 /// Future returned by `File::metadata` and resolves to a `(File, Metadata)` instance.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct MetadataFuture {
     file: Option<File>,
 }
