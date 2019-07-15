@@ -42,6 +42,7 @@ mod async_write_ext;
 mod copy;
 mod read;
 mod read_exact;
+mod read_line;
 mod read_to_end;
 mod read_until;
 mod write;
