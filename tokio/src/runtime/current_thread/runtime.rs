@@ -1,14 +1,14 @@
 use crate::runtime::current_thread::Builder;
+use std::error::Error;
+use std::fmt;
+use std::future::Future;
+use std::io;
 use tokio_current_thread::Handle as ExecutorHandle;
 use tokio_current_thread::{self as current_thread, CurrentThread};
 use tokio_executor;
 use tokio_reactor::{self, Reactor};
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
-use std::error::Error;
-use std::fmt;
-use std::future::Future;
-use std::io;
 
 /// Single-threaded runtime provides a way to start reactor
 /// and executor on the current thread.
@@ -195,12 +195,9 @@ impl Runtime {
             ..
         } = *self;
 
-        // Binds an executor to this thread
-        let mut enter = tokio_executor::enter().expect("Multiple executors at once");
-
         // This will set the default handle and timer to use inside the closure
         // and run the future.
-        tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
+        tokio_reactor::with_default(&reactor_handle, || {
             clock::with_default(clock, || {
                 timer::with_default(&timer_handle, || {
                     // The TaskExecutor is a fake executor that looks into the
@@ -209,8 +206,8 @@ impl Runtime {
                     // to run the provided future, another to install as the default
                     // one). We use the fake one here as the default one.
                     let mut default_executor = current_thread::TaskExecutor::current();
-                    tokio_executor::with_default(&mut default_executor, enter, |enter| {
-                        let mut executor = executor.enter(enter);
+                    tokio_executor::with_default(&mut default_executor, || {
+                        let mut executor = executor.enter();
                         f(&mut executor)
                     })
                 })

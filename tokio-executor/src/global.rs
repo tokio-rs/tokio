@@ -1,4 +1,4 @@
-use super::{Enter, Executor, SpawnError};
+use super::{Executor, SpawnError};
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
@@ -144,10 +144,10 @@ where
 /// # Panics
 ///
 /// This function panics if there already is a default executor set.
-pub fn with_default<T, F, R>(executor: &mut T, enter: &mut Enter, f: F) -> R
+pub fn with_default<T, F, R>(executor: &mut T, f: F) -> R
 where
     T: Executor,
-    F: FnOnce(&mut Enter) -> R,
+    F: FnOnce() -> R,
 {
     EXECUTOR.with(|cell| {
         match cell.get() {
@@ -180,7 +180,7 @@ where
 
         cell.set(State::Ready(executor));
 
-        f(enter)
+        f()
     })
 }
 
@@ -202,12 +202,9 @@ mod tests {
 
     #[test]
     fn nested_default_executor_status() {
-        let mut enter = super::super::enter().unwrap();
         let mut executor = DefaultExecutor::current();
 
-        let result = with_default(&mut executor, &mut enter, |_| {
-            DefaultExecutor::current().status()
-        });
+        let result = with_default(&mut executor, || DefaultExecutor::current().status());
 
         assert!(result.err().unwrap().is_shutdown())
     }

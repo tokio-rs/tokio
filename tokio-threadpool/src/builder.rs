@@ -15,7 +15,6 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_executor::park::Park;
-use tokio_executor::Enter;
 
 /// Builds a thread pool with custom configuration values.
 ///
@@ -272,7 +271,7 @@ impl Builder {
     /// [`Worker::run`]: struct.Worker.html#method.run
     pub fn around_worker<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&Worker, &mut Enter) + Send + Sync + 'static,
+        F: Fn(&Worker) + Send + Sync + 'static,
     {
         self.config.around_worker = Some(Callback::new(f));
         self
