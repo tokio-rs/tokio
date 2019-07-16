@@ -18,7 +18,9 @@ use std::time::Duration;
 
 thread_local!(static FOO: Cell<u32> = Cell::new(0));
 
-fn ignore_results<F: Future + Send + 'static>(f: F) -> Box<Future<Item = (), Error = ()> + Send> {
+fn ignore_results<F: Future + Send + 'static>(
+    f: F,
+) -> Box<dyn Future<Item = (), Error = ()> + Send> {
     Box::new(f.map(|_| ()).map_err(|_| ()))
 }
 

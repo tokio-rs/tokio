@@ -86,9 +86,9 @@ pub mod unix;
 pub mod windows;
 
 /// A future whose error is `io::Error`
-pub type IoFuture<T> = Box<Future<Item = T, Error = io::Error> + Send>;
+pub type IoFuture<T> = Box<dyn Future<Item = T, Error = io::Error> + Send>;
 /// A stream whose error is `io::Error`
-pub type IoStream<T> = Box<Stream<Item = T, Error = io::Error> + Send>;
+pub type IoStream<T> = Box<dyn Stream<Item = T, Error = io::Error> + Send>;
 
 /// Creates a stream which receives "ctrl-c" notifications sent to a process.
 ///
@@ -125,7 +125,7 @@ pub fn ctrl_c_handle(handle: &Handle) -> IoFuture<IoStream<()>> {
         let handle = handle.clone();
         Box::new(future::lazy(move || {
             unix::Signal::with_handle(unix::libc::SIGINT, &handle)
-                .map(|x| Box::new(x.map(|_| ())) as Box<Stream<Item = _, Error = _> + Send>)
+                .map(|x| Box::new(x.map(|_| ())) as Box<dyn Stream<Item = _, Error = _> + Send>)
         }))
     }
 

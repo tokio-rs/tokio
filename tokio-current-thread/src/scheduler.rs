@@ -125,7 +125,7 @@ enum Dequeue<U> {
 }
 
 /// Wraps a spawned boxed future
-struct Task(Spawn<Box<Future<Item = (), Error = ()>>>);
+struct Task(Spawn<Box<dyn Future<Item = (), Error = ()>>>);
 
 /// A task that is scheduled. `turn` must be called
 pub struct Scheduled<'a, U: 'a> {
@@ -171,7 +171,7 @@ where
         self.inner.clone().into()
     }
 
-    pub fn schedule(&mut self, item: Box<Future<Item = (), Error = ()>>) {
+    pub fn schedule(&mut self, item: Box<dyn Future<Item = (), Error = ()>>) {
         // Get the current scheduler tick
         let tick_num = self.inner.tick_num.load(SeqCst);
 
@@ -359,7 +359,7 @@ impl<'a, U: Unpark> Scheduled<'a, U> {
 }
 
 impl Task {
-    pub fn new(future: Box<Future<Item = (), Error = ()> + 'static>) -> Self {
+    pub fn new(future: Box<dyn Future<Item = (), Error = ()> + 'static>) -> Self {
         Task(executor::spawn(future))
     }
 }
@@ -687,8 +687,8 @@ unsafe impl<U: Unpark> UnsafeNotify for ArcNode<U> {
     }
 }
 
-unsafe fn hide_lt<U: Unpark>(p: *mut ArcNode<U>) -> *mut UnsafeNotify {
-    mem::transmute(p as *mut UnsafeNotify)
+unsafe fn hide_lt<U: Unpark>(p: *mut ArcNode<U>) -> *mut dyn UnsafeNotify {
+    mem::transmute(p as *mut dyn UnsafeNotify)
 }
 
 impl<U: Unpark> Node<U> {
