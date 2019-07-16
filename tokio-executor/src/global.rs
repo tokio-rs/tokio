@@ -1,4 +1,4 @@
-use super::{Enter, Executor, SpawnError};
+use super::{Executor, SpawnError};
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
@@ -141,33 +141,27 @@ where
 
 /// Set the default executor for the duration of the closure
 ///
-/// # Panics
-///
-/// This function panics if there already is a default executor set.
-pub fn with_default<T, F, R>(executor: &mut T, enter: &mut Enter, f: F) -> R
+/// If a default executor is already set, it will be restored when the closure returns or if it
+/// panics.
+pub fn with_default<T, F, R>(executor: &mut T, f: F) -> R
 where
     T: Executor,
-    F: FnOnce(&mut Enter) -> R,
+    F: FnOnce() -> R,
 {
     EXECUTOR.with(|cell| {
-        match cell.get() {
-            State::Ready(_) | State::Active => {
-                panic!("default executor already set for execution context")
-            }
-            _ => {}
-        }
+        let was = cell.get();
 
         // Ensure that the executor is removed from the thread-local context
         // when leaving the scope. This handles cases that involve panicking.
-        struct Reset<'a>(&'a Cell<State>);
+        struct Reset<'a>(&'a Cell<State>, State);
 
         impl<'a> Drop for Reset<'a> {
             fn drop(&mut self) {
-                self.0.set(State::Empty);
+                self.0.set(self.1);
             }
         }
 
-        let _reset = Reset(cell);
+        let _reset = Reset(cell, was);
 
         // While scary, this is safe. The function takes a
         // `&mut Executor`, which guarantees that the reference lives for the
@@ -180,7 +174,7 @@ where
 
         cell.set(State::Ready(executor));
 
-        f(enter)
+        f()
     })
 }
 
@@ -202,12 +196,10 @@ mod tests {
 
     #[test]
     fn nested_default_executor_status() {
-        let mut enter = super::super::enter().unwrap();
+        let _enter = super::super::enter().unwrap();
         let mut executor = DefaultExecutor::current();
 
-        let result = with_default(&mut executor, &mut enter, |_| {
-            DefaultExecutor::current().status()
-        });
+        let result = with_default(&mut executor, || DefaultExecutor::current().status());
 
         assert!(result.err().unwrap().is_shutdown())
     }

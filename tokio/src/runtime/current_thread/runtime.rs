@@ -185,7 +185,7 @@ impl Runtime {
 
     fn enter<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut current_thread::Entered<'_, Parker>) -> R,
+        F: FnOnce(&mut current_thread::CurrentThread<Parker>) -> R,
     {
         let Runtime {
             ref reactor_handle,
@@ -195,12 +195,9 @@ impl Runtime {
             ..
         } = *self;
 
-        // Binds an executor to this thread
-        let mut enter = tokio_executor::enter().expect("Multiple executors at once");
-
         // This will set the default handle and timer to use inside the closure
         // and run the future.
-        tokio_reactor::with_default(&reactor_handle, &mut enter, |enter| {
+        tokio_reactor::with_default(&reactor_handle, || {
             clock::with_default(clock, || {
                 timer::with_default(&timer_handle, || {
                     // The TaskExecutor is a fake executor that looks into the
@@ -209,10 +206,7 @@ impl Runtime {
                     // to run the provided future, another to install as the default
                     // one). We use the fake one here as the default one.
                     let mut default_executor = current_thread::TaskExecutor::current();
-                    tokio_executor::with_default(&mut default_executor, enter, |enter| {
-                        let mut executor = executor.enter(enter);
-                        f(&mut executor)
-                    })
+                    tokio_executor::with_default(&mut default_executor, || f(executor))
                 })
             })
         })

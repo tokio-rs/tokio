@@ -33,7 +33,7 @@ fn natural_shutdown_simple_futures() {
                 let num_dec = num_dec.clone();
 
                 Builder::new()
-                    .around_worker(move |w, _| {
+                    .around_worker(move |w| {
                         num_inc.fetch_add(1, Relaxed);
                         w.run();
                         num_dec.fetch_add(1, Relaxed);
@@ -115,7 +115,7 @@ fn force_shutdown_drops_futures() {
         let b = num_dec.clone();
 
         let pool = Builder::new()
-            .around_worker(move |w, _| {
+            .around_worker(move |w| {
                 a.fetch_add(1, Relaxed);
                 w.run();
                 b.fetch_add(1, Relaxed);
@@ -173,7 +173,7 @@ fn drop_threadpool_drops_futures() {
         let pool = Builder::new()
             .max_blocking(2)
             .pool_size(20)
-            .around_worker(move |w, _| {
+            .around_worker(move |w| {
                 a.fetch_add(1, Relaxed);
                 w.run();
                 b.fetch_add(1, Relaxed);

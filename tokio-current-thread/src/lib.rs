@@ -41,7 +41,7 @@ use std::task::{Context, Poll, Waker};
 use std::thread;
 use std::time::{Duration, Instant};
 use tokio_executor::park::{Park, ParkThread, Unpark};
-use tokio_executor::{Enter, SpawnError};
+use tokio_executor::SpawnError;
 
 /// Executes tasks on the current thread
 pub struct CurrentThread<P: Park = ParkThread> {
@@ -96,7 +96,6 @@ impl Turn {
 /// A `CurrentThread` instance bound to a supplied execution context.
 pub struct Entered<'a, P: Park> {
     executor: &'a mut CurrentThread<P>,
-    enter: &'a mut Enter,
 }
 
 /// Error returned by the `run` function.
@@ -322,38 +321,35 @@ impl<P: Park> CurrentThread<P> {
     where
         F: Future,
     {
-        let mut enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
-        self.enter(&mut enter).block_on(future)
+        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        self.enter().block_on(future)
     }
 
     /// Run the executor to completion, blocking the thread until **all**
     /// spawned futures have completed.
     pub fn run(&mut self) -> Result<(), RunError> {
-        let mut enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
-        self.enter(&mut enter).run()
+        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        self.enter().run()
     }
 
     /// Run the executor to completion, blocking the thread until all
     /// spawned futures have completed **or** `duration` time has elapsed.
     pub fn run_timeout(&mut self, duration: Duration) -> Result<(), RunTimeoutError> {
-        let mut enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
-        self.enter(&mut enter).run_timeout(duration)
+        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        self.enter().run_timeout(duration)
     }
 
     /// Perform a single iteration of the event loop.
     ///
     /// This function blocks the current thread even if the executor is idle.
     pub fn turn(&mut self, duration: Option<Duration>) -> Result<Turn, TurnError> {
-        let mut enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
-        self.enter(&mut enter).turn(duration)
+        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        self.enter().turn(duration)
     }
 
     /// Bind `CurrentThread` instance with an execution context.
-    pub fn enter<'a>(&'a mut self, enter: &'a mut Enter) -> Entered<'a, P> {
-        Entered {
-            executor: self,
-            enter,
-        }
+    fn enter<'a>(&'a mut self) -> Entered<'a, P> {
+        Entered { executor: self }
     }
 
     /// Returns a reference to the underlying `Park` instance.
@@ -478,7 +474,7 @@ impl<'a, P: Park> Entered<'a, P> {
             let res = self
                 .executor
                 .borrow()
-                .enter(self.enter, || future.as_mut().poll(&mut cx));
+                .enter(|| future.as_mut().poll(&mut cx));
 
             match res {
                 Poll::Ready(e) => return e,
@@ -595,9 +591,7 @@ impl<'a, P: Park> Entered<'a, P> {
         }
 
         // After any pending futures were scheduled, do the actual tick
-        borrow
-            .scheduler
-            .tick(borrow.id, &mut *self.enter, borrow.num_futures)
+        borrow.scheduler.tick(borrow.id, borrow.num_futures)
     }
 }
 
@@ -605,7 +599,6 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Entered")
             .field("executor", &self.executor)
-            .field("enter", &self.enter)
             .finish()
     }
 }
@@ -748,7 +741,7 @@ where
 // ===== impl Borrow =====
 
 impl<'a, U: Unpark> Borrow<'a, U> {
-    fn enter<F, R>(&mut self, _: &mut Enter, f: F) -> R
+    fn enter<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
     {
