@@ -186,7 +186,11 @@ struct Borrow<'a, U: 'a> {
 }
 
 trait SpawnLocal {
-    fn spawn_local(&mut self, future: Box<dyn Future<Item = (), Error = ()>>, already_counted: bool);
+    fn spawn_local(
+        &mut self,
+        future: Box<dyn Future<Item = (), Error = ()>>,
+        already_counted: bool,
+    );
 }
 
 struct CurrentRunner {
@@ -791,7 +795,11 @@ impl<'a, U: Unpark> Borrow<'a, U> {
 }
 
 impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
-    fn spawn_local(&mut self, future: Box<dyn Future<Item = (), Error = ()>>, already_counted: bool) {
+    fn spawn_local(
+        &mut self,
+        future: Box<dyn Future<Item = (), Error = ()>>,
+        already_counted: bool,
+    ) {
         if !already_counted {
             // NOTE: we have a borrow of the Runtime, so we know that it isn't shut down.
             // NOTE: += 2 since LSB is the shutdown bit

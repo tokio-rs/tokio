@@ -133,7 +133,10 @@ mod runtime_single_threaded_racy {
     use super::*;
     fn test<F>(spawn: F)
     where
-        F: Fn(tokio::runtime::current_thread::Handle, Box<dyn Future<Item = (), Error = ()> + Send>),
+        F: Fn(
+            tokio::runtime::current_thread::Handle,
+            Box<dyn Future<Item = (), Error = ()> + Send>,
+        ),
     {
         let (trigger, exit) = futures::sync::oneshot::channel();
         let (handle_tx, handle_rx) = ::std::sync::mpsc::channel();
