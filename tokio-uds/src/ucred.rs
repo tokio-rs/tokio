@@ -83,20 +83,24 @@ pub mod impl_linux {
 pub mod impl_macos {
     use crate::UnixStream;
     use libc::getpeereid;
+    use std::io;
+    use std::mem::MaybeUninit;
     use std::os::unix::io::AsRawFd;
-    use std::{io, mem};
 
     pub fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
             let raw_fd = sock.as_raw_fd();
 
-            #[allow(deprecated)]
-            let mut cred: super::UCred = mem::uninitialized();
+            let mut uid = MaybeUninit::uninit();
+            let mut gid = MaybeUninit::uninit();
 
-            let ret = getpeereid(raw_fd, &mut cred.uid, &mut cred.gid);
+            let ret = getpeereid(raw_fd, uid.as_mut_ptr(), gid.as_mut_ptr());
 
             if ret == 0 {
-                Ok(cred)
+                Ok(super::UCred {
+                    uid: uid.assume_init(),
+                    gid: gid.assume_init(),
+                })
             } else {
                 Err(io::Error::last_os_error())
             }

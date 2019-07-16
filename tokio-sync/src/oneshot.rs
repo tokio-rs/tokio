@@ -5,7 +5,7 @@ use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell};
 use futures_core::ready;
 use std::fmt;
 use std::future::Future;
-use std::mem::{self, ManuallyDrop};
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
 use std::sync::Arc;
@@ -73,10 +73,10 @@ struct Inner<T> {
     value: CausalCell<Option<T>>,
 
     /// The task to notify when the receiver drops without consuming the value.
-    tx_task: CausalCell<ManuallyDrop<Waker>>,
+    tx_task: CausalCell<MaybeUninit<Waker>>,
 
     /// The task to notify when the value is sent.
-    rx_task: CausalCell<ManuallyDrop<Waker>>,
+    rx_task: CausalCell<MaybeUninit<Waker>>,
 }
 
 #[derive(Clone, Copy)]
@@ -117,8 +117,8 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: CausalCell::new(None),
-        tx_task: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
-        rx_task: CausalCell::new(ManuallyDrop::new(unsafe { mem::uninitialized() })),
+        tx_task: CausalCell::new(MaybeUninit::uninit()),
+        rx_task: CausalCell::new(MaybeUninit::uninit()),
     });
 
     let tx = Sender {
@@ -177,9 +177,7 @@ impl<T> Sender<T> {
         }
 
         if state.is_tx_task_set() {
-            let will_notify = inner
-                .tx_task
-                .with(|ptr| unsafe { (&*ptr).will_wake(cx.waker()) });
+            let will_notify = unsafe { inner.with_tx_task(|w| w.will_wake(cx.waker())) };
 
             if !will_notify {
                 state = State::unset_tx_task(&inner.state);
@@ -333,7 +331,9 @@ impl<T> Inner<T> {
 
         if prev.is_rx_task_set() {
             // TODO: Consume waker?
-            self.rx_task.with(|ptr| unsafe { (&*ptr).wake_by_ref() });
+            unsafe {
+                self.with_rx_task(Waker::wake_by_ref);
+            }
         }
 
         true
@@ -352,9 +352,7 @@ impl<T> Inner<T> {
             Ready(Err(RecvError(())))
         } else {
             if state.is_rx_task_set() {
-                let will_notify = self
-                    .rx_task
-                    .with(|ptr| unsafe { (&*ptr).will_wake(cx.waker()) });
+                let will_notify = unsafe { self.with_rx_task(|w| w.will_wake(cx.waker())) };
 
                 // Check if the task is still the same
                 if !will_notify {
@@ -399,7 +397,9 @@ impl<T> Inner<T> {
         let prev = State::set_closed(&self.state);
 
         if prev.is_tx_task_set() && !prev.is_complete() {
-            self.tx_task.with(|ptr| unsafe { (&*ptr).wake_by_ref() });
+            unsafe {
+                self.with_tx_task(Waker::wake_by_ref);
+            }
         }
     }
 
@@ -408,22 +408,52 @@ impl<T> Inner<T> {
         self.value.with_mut(|ptr| (*ptr).take())
     }
 
+    unsafe fn with_rx_task<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Waker) -> R,
+    {
+        self.rx_task.with(|ptr| {
+            let waker: *const Waker = (&*ptr).as_ptr();
+            f(&*waker)
+        })
+    }
+
+    unsafe fn with_tx_task<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Waker) -> R,
+    {
+        self.tx_task.with(|ptr| {
+            let waker: *const Waker = (&*ptr).as_ptr();
+            f(&*waker)
+        })
+    }
+
     unsafe fn drop_rx_task(&self) {
-        self.rx_task.with_mut(|ptr| ManuallyDrop::drop(&mut *ptr))
+        self.rx_task.with_mut(|ptr| {
+            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            ptr.drop_in_place();
+        });
     }
 
     unsafe fn drop_tx_task(&self) {
-        self.tx_task.with_mut(|ptr| ManuallyDrop::drop(&mut *ptr))
+        self.tx_task.with_mut(|ptr| {
+            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            ptr.drop_in_place();
+        });
     }
 
     unsafe fn set_rx_task(&self, cx: &mut Context<'_>) {
-        self.rx_task
-            .with_mut(|ptr| *ptr = ManuallyDrop::new(cx.waker().clone()));
+        self.rx_task.with_mut(|ptr| {
+            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            ptr.write(cx.waker().clone());
+        });
     }
 
     unsafe fn set_tx_task(&self, cx: &mut Context<'_>) {
-        self.tx_task
-            .with_mut(|ptr| *ptr = ManuallyDrop::new(cx.waker().clone()));
+        self.tx_task.with_mut(|ptr| {
+            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            ptr.write(cx.waker().clone());
+        });
     }
 }
 
@@ -435,15 +465,15 @@ impl<T> Drop for Inner<T> {
         let state = State(*self.state.get_mut());
 
         if state.is_rx_task_set() {
-            self.rx_task.with_mut(|ptr| unsafe {
-                ManuallyDrop::drop(&mut *ptr);
-            });
+            unsafe {
+                self.drop_rx_task();
+            }
         }
 
         if state.is_tx_task_set() {
-            self.tx_task.with_mut(|ptr| unsafe {
-                ManuallyDrop::drop(&mut *ptr);
-            });
+            unsafe {
+                self.drop_tx_task();
+            }
         }
     }
 }
