@@ -185,7 +185,7 @@ impl Runtime {
 
     fn enter<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut current_thread::Entered<'_, Parker>) -> R,
+        F: FnOnce(&mut current_thread::CurrentThread<Parker>) -> R,
     {
         let Runtime {
             ref reactor_handle,
@@ -209,10 +209,7 @@ impl Runtime {
                     // to run the provided future, another to install as the default
                     // one). We use the fake one here as the default one.
                     let mut default_executor = current_thread::TaskExecutor::current();
-                    tokio_executor::with_default(&mut default_executor, || {
-                        let mut executor = executor.enter();
-                        f(&mut executor)
-                    })
+                    tokio_executor::with_default(&mut default_executor, || f(executor))
                 })
             })
         })

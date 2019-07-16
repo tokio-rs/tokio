@@ -348,7 +348,7 @@ impl<P: Park> CurrentThread<P> {
     }
 
     /// Bind `CurrentThread` instance with an execution context.
-    pub fn enter<'a>(&'a mut self) -> Entered<'a, P> {
+    fn enter<'a>(&'a mut self) -> Entered<'a, P> {
         Entered { executor: self }
     }
 
