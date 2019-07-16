@@ -1,4 +1,7 @@
-use crate::split::{split, TcpStreamReadHalf, TcpStreamWriteHalf};
+use crate::split::{
+    split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
+    TcpStreamWriteHalfMut,
+};
 use bytes::{Buf, BufMut};
 use futures_core::ready;
 use iovec::IoVec;
@@ -722,6 +725,15 @@ impl TcpStream {
     /// details.
     pub fn split(self) -> (TcpStreamReadHalf, TcpStreamWriteHalf) {
         split(self)
+    }
+
+    /// Split a `TcpStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split_mut<'a>(&'a mut self) -> (TcpStreamReadHalfMut<'a>, TcpStreamWriteHalfMut<'a>) {
+        split_mut(self)
     }
 
     // == Poll IO functions that takes `&self` ==
