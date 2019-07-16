@@ -195,9 +195,6 @@ impl Runtime {
             ..
         } = *self;
 
-        // Binds an executor to this thread
-        let _enter = tokio_executor::enter().expect("Multiple executors at once");
-
         // This will set the default handle and timer to use inside the closure
         // and run the future.
         tokio_reactor::with_default(&reactor_handle, || {
