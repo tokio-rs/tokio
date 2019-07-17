@@ -221,8 +221,8 @@ impl fmt::Display for Elapsed {
 
 impl std::error::Error for Elapsed {}
 
-impl Into<std::io::Error> for Elapsed {
-    fn into(self) -> std::io::Error {
+impl From<Elapsed> for std::io::Error {
+    fn from(_err: Elapsed) -> std::io::Error {
         std::io::ErrorKind::TimedOut.into()
     }
 }
