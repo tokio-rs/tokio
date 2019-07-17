@@ -16,6 +16,7 @@ use crate::worker::{self, Worker, WorkerId};
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 
+use lazy_static::lazy_static;
 use log::{debug, error, trace};
 use std::cell::Cell;
 use std::collections::hash_map::RandomState;
@@ -448,17 +449,30 @@ impl PartialEq for Pool {
 unsafe impl Send for Pool {}
 unsafe impl Sync for Pool {}
 
-// Piggyback on libstd's mechanism for obtaining system randomness for default
-// hasher, and hash on current thread id for a seed value.
+// Return a thread-specific, 32-bit, non-zero seed value suitable for a 32-bit
+// PRNG. This uses one libstd RandomState for a default hasher and hashes on
+// the current thread ID to obtain an unpredictable, collistion resitant seed.
 fn prng_seed() -> u32 {
-    let mut hasher = RandomState::new().build_hasher();
+
+    // This obtains a small number of random bytes from the host system (for
+    // example, on unix via getrandom(2)) in order to seed an unpredictable and
+    // HashDoS resistant 64-bit hash function (currently: `SipHasher13` with
+    // 128-bit state). We only need one of these, to make the seeds for all
+    // process threads different via hashed IDs, collision resistant, and
+    // unpredictable.
+    lazy_static! {
+        static ref RND_STATE: RandomState = RandomState::new();
+    }
+
+    // Hash the current thread ID to produce a u32 value
+    let mut hasher = RND_STATE.build_hasher();
     thread::current().id().hash(&mut hasher);
     let hash: u64 = hasher.finish();
     let seed = (hash as u32) ^ ((hash >> 32) as u32);
 
-    // ensure non-zero
+    // Ensure non-zero seed (Xorshift yields only zero's for that seed)
     if seed == 0 {
-        0x9b4e_6d25 // misc bits
+        0x9b4e_6d25 // misc bits, could be any non-zero
     } else {
         seed
     }

@@ -34,6 +34,7 @@ crossbeam-utils = "0.6.4"
 num_cpus = "1.2"
 slab = "0.4.1"
 log = "0.4"
+lazy_static = "1"
 
 [dev-dependencies]
 rand = "0.7"
