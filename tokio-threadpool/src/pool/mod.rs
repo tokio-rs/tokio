@@ -17,8 +17,9 @@ use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 
 use log::{debug, error, trace};
-use rand;
 use std::cell::Cell;
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::num::Wrapping;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
@@ -422,11 +423,7 @@ impl Pool {
     /// Uses a thread-local random number generator based on XorShift.
     pub fn rand_usize(&self) -> usize {
         thread_local! {
-            static RNG: Cell<Wrapping<u32>> = {
-                // The initial seed must be non-zero.
-                let init = rand::random::<u32>() | 1;
-                Cell::new(Wrapping(init))
-            }
+            static RNG: Cell<Wrapping<u32>> = Cell::new(Wrapping(prng_seed()));
         }
 
         RNG.with(|rng| {
@@ -450,3 +447,19 @@ impl PartialEq for Pool {
 
 unsafe impl Send for Pool {}
 unsafe impl Sync for Pool {}
+
+// Piggyback on libstd's mechanism for obtaining system randomness for default
+// hasher, and hash on current thread id for a seed value.
+fn prng_seed() -> u32 {
+    let mut hasher = RandomState::new().build_hasher();
+    thread::current().id().hash(&mut hasher);
+    let hash: u64 = hasher.finish();
+    let seed = (hash as u32) ^ ((hash >> 32) as u32);
+
+    // ensure non-zero
+    if seed == 0 {
+        0x9b4e_6d25 // misc bits
+    } else {
+        seed
+    }
+}
