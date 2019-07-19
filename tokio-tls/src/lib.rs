@@ -26,6 +26,7 @@ use std::future::Future;
 use std::io::{self, Read, Write};
 use std::marker::Unpin;
 use std::pin::Pin;
+use std::ptr::null_mut;
 use std::task::{Context, Poll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -77,9 +78,13 @@ where
     AllowStd<S>: Read + Write,
 {
     fn drop(&mut self) {
-        (self.0).0.get_mut().context = 0 as *mut ();
+        (self.0).0.get_mut().context = null_mut();
     }
 }
+
+// *mut () context is neither Send nor Sync
+unsafe impl<S: Send> Send for AllowStd<S> {}
+unsafe impl<S: Sync> Sync for AllowStd<S> {}
 
 impl<S> AllowStd<S>
 where
@@ -234,11 +239,11 @@ where
 
         match (inner.f)(stream) {
             Ok(mut s) => {
-                s.get_mut().context = 0 as *mut ();
+                s.get_mut().context = null_mut();
                 Poll::Ready(Ok(StartedHandshake::Done(TlsStream(s))))
             }
             Err(HandshakeError::WouldBlock(mut s)) => {
-                s.get_mut().context = 0 as *mut ();
+                s.get_mut().context = null_mut();
                 Poll::Ready(Ok(StartedHandshake::Mid(s)))
             }
             Err(HandshakeError::Failure(e)) => Poll::Ready(Err(e)),
@@ -310,7 +315,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Future for MidHandshake<S> {
             Ok(stream) => Poll::Ready(Ok(TlsStream(stream))),
             Err(HandshakeError::Failure(e)) => Poll::Ready(Err(e)),
             Err(HandshakeError::WouldBlock(mut s)) => {
-                s.get_mut().context = 0 as *mut ();
+                s.get_mut().context = null_mut();
                 mut_self.0 = Some(s);
                 Poll::Pending
             }
