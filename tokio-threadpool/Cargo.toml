@@ -32,11 +32,12 @@ crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"
 crossbeam-utils = "0.6.4"
 num_cpus = "1.2"
-rand = "0.7"
 slab = "0.4.1"
 log = "0.4"
+lazy_static = "1"
 
 [dev-dependencies]
+rand = "0.7"
 env_logger = "0.5"
 async-util = { git = "https://github.com/tokio-rs/async" }
 tokio = { version = "0.2.0", path = "../tokio" }
