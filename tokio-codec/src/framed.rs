@@ -7,9 +7,9 @@ use crate::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
+use bytes::BytesMut;
 use futures_core::Stream;
 use futures_sink::Sink;
-use bytes::BytesMut;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::pin::Pin;

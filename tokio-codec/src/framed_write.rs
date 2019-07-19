@@ -6,14 +6,14 @@ use crate::encoder::Encoder;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
+use bytes::BytesMut;
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
-use bytes::BytesMut;
 use log::trace;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::fmt;
 use std::io::{self, Read};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
 pub struct FramedWrite<T, E> {

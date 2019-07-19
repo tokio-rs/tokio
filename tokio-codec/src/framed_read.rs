@@ -3,9 +3,9 @@ use super::Decoder;
 
 use tokio_io::AsyncRead;
 
+use bytes::BytesMut;
 use futures_core::Stream;
 use futures_sink::Sink;
-use bytes::BytesMut;
 use log::trace;
 use std::fmt;
 use std::pin::Pin;
