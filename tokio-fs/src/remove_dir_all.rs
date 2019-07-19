@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// Removes an existing, empty directory.
+/// Removes a directory at this path, after removing all its contents. Use carefully!
 ///
 /// This is an async version of [`std::fs::remove_dir_all`][std]
 ///
