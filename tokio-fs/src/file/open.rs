@@ -1,4 +1,6 @@
 use super::File;
+
+use futures_core::ready;
 use std::fs::OpenOptions as StdOpenOptions;
 use std::future::Future;
 use std::io;

@@ -1,11 +1,13 @@
 use crate::{file, File};
+
+use tokio_io::AsyncRead;
+
+use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 use std::{io, mem, path::Path};
-use tokio_io;
-use tokio_io::AsyncRead;
 
 /// Creates a future which will open a file for reading and read the entire
 /// contents into a buffer and return said buffer.

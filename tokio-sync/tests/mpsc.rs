@@ -57,8 +57,8 @@ async fn async_send_recv_with_buffer() {
 #[cfg(feature = "async-traits")]
 fn send_sink_recv_with_buffer() {
     use futures_core::Stream;
+    use futures_sink::Sink;
     use pin_utils::pin_mut;
-    use tokio_futures::Sink;
 
     let mut t1 = MockTask::new();
 
@@ -170,8 +170,8 @@ async fn async_send_recv_unbounded() {
 #[cfg(feature = "async-traits")]
 fn sink_send_recv_unbounded() {
     use futures_core::Stream;
+    use futures_sink::Sink;
     use pin_utils::pin_mut;
-    use tokio_futures::Sink;
 
     let mut t1 = MockTask::new();
 
