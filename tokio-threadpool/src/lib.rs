@@ -84,8 +84,9 @@ extern crate crossbeam_queue;
 extern crate crossbeam_utils;
 #[macro_use]
 extern crate futures;
+#[macro_use]
+extern crate lazy_static;
 extern crate num_cpus;
-extern crate rand;
 extern crate slab;
 
 #[macro_use]
