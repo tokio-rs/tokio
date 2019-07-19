@@ -1,16 +1,17 @@
 #![allow(deprecated)]
 
-use log::trace;
-use std::fmt;
-use std::io::{self, Read};
-
 use super::framed::Fuse;
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
-use tokio_futures::{Sink, Stream};
+
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
+use futures_core::{ready, Stream};
+use futures_sink::Sink;
+use log::trace;
+use std::fmt;
+use std::io::{self, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -208,7 +209,7 @@ where
             trace!("writing; remaining={}", pinned.buffer.len());
 
             let buf = &pinned.buffer;
-            let n = try_ready!(pin!(pinned.inner).poll_write(cx, &buf));
+            let n = ready!(pin!(pinned.inner).poll_write(cx, &buf))?;
 
             if n == 0 {
                 return Poll::Ready(Err(io::Error::new(
@@ -224,15 +225,16 @@ where
         }
 
         // Try flushing the underlying IO
-        try_ready!(pin!(pinned.inner).poll_flush(cx));
+        ready!(pin!(pinned.inner).poll_flush(cx))?;
 
         trace!("framed transport flushed");
         Poll::Ready(Ok(()))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let () = try_ready!(pin!(self).poll_flush(cx));
-        let () = try_ready!(pin!(self.inner).poll_shutdown(cx));
+        ready!(pin!(self).poll_flush(cx))?;
+        ready!(pin!(self.inner).poll_shutdown(cx))?;
+
         Poll::Ready(Ok(()))
     }
 }

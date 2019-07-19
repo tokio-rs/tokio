@@ -30,9 +30,6 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
-#[macro_use]
-extern crate tokio_futures;
-
 mod create_dir;
 mod create_dir_all;
 pub mod file;

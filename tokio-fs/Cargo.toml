@@ -27,7 +27,6 @@ publish = false
 futures-core-preview = "0.3.0-alpha.17"
 tokio-threadpool = { version = "0.2.0", path = "../tokio-threadpool" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
-tokio-futures = { version = "0.2.0", path = "../tokio-futures" }
 
 [dev-dependencies]
 rand = "0.7"

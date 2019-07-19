@@ -1,4 +1,5 @@
 use super::OpenFuture;
+
 use std::convert::From;
 use std::fs::OpenOptions as StdOpenOptions;
 use std::path::Path;

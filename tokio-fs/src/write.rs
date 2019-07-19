@@ -1,11 +1,13 @@
 use crate::{file, File};
+
+use tokio_io::AsyncWrite;
+
+use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 use std::{fmt, io, mem, path::Path};
-use tokio_io;
-use tokio_io::AsyncWrite;
 
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.

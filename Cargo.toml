@@ -7,7 +7,6 @@ members = [
   "tokio-current-thread",
   "tokio-executor",
   "tokio-fs",
-  "tokio-futures",
   "tokio-io",
   "tokio-macros",
   "tokio-reactor",

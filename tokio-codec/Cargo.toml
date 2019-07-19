@@ -24,7 +24,8 @@ publish = false
 [dependencies]
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
 bytes = "0.4.7"
-tokio-futures = { version = "0.2.0", path = "../tokio-futures" }
+futures-core-preview = "0.3.0-alpha.17"
+futures-sink-preview = "0.3.0-alpha.17"
 log = "0.4"
 
 [dev-dependencies]

@@ -368,7 +368,7 @@ impl<T> Sender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> tokio_futures::Sink<T> for Sender<T> {
+impl<T> futures_sink::Sink<T> for Sender<T> {
     type Error = error::SendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

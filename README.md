@@ -139,8 +139,6 @@ The crates included as part of Tokio are:
 
 * [`tokio-fs`]: Filesystem (and standard in / out) APIs.
 
-* [`tokio-futures`]: Experimental `std::future::Future` and `async` / `await` support.
-
 * [`tokio-codec`]: Utilities for encoding and decoding protocol frames.
 
 * [`tokio-io`]: Asynchronous I/O related traits and utilities.
@@ -166,7 +164,6 @@ The crates included as part of Tokio are:
 [`tokio-current-thread`]: tokio-current-thread
 [`tokio-executor`]: tokio-executor
 [`tokio-fs`]: tokio-fs
-[`tokio-futures`]: tokio-futures
 [`tokio-io`]: tokio-io
 [`tokio-macros`]: tokio-macros
 [`tokio-reactor`]: tokio-reactor

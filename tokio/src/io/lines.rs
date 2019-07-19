@@ -1,11 +1,12 @@
 use super::read_line::read_line_internal;
-use futures_core::ready;
+
+use tokio_io::AsyncBufRead;
+
+use futures_core::{ready, Stream};
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_futures::Stream;
-use tokio_io::AsyncBufRead;
 
 /// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
 #[derive(Debug)]

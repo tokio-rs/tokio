@@ -1,4 +1,6 @@
 use super::File;
+
+use futures_core::ready;
 use std::fs::File as StdFile;
 use std::fs::Metadata;
 use std::future::Future;

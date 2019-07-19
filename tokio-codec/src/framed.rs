@@ -1,18 +1,19 @@
 #![allow(deprecated)]
 
-use std::fmt;
-use std::io::{self, Read, Write};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
 use crate::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
 use crate::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
-use tokio_futures::{Sink, Stream};
+
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
+use futures_core::Stream;
+use futures_sink::Sink;
+use std::fmt;
+use std::io::{self, Read, Write};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
