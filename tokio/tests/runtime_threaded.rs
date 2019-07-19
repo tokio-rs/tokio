@@ -81,7 +81,7 @@ fn block_on_socket() {
     let rt = Runtime::new().unwrap();
 
     rt.block_on(async move {
-        let addr = "0.0.0.0:0".parse().unwrap();
+        let addr = "127.0.0.1:0".parse().unwrap();
 
         let (tx, rx) = oneshot::channel();
 
