@@ -2,6 +2,7 @@ use crate::io::copy::{copy, Copy};
 use crate::io::read::{read, Read};
 use crate::io::read_exact::{read_exact, ReadExact};
 use crate::io::read_to_end::{read_to_end, ReadToEnd};
+use crate::io::read_to_string::{read_to_string, ReadToString};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -63,11 +64,35 @@ pub trait AsyncReadExt: AsyncRead {
     }
 
     /// Read all bytes until EOF in this source, placing them into `dst`.
+    ///
+    /// On success the total number of bytes read is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
     fn read_to_end<'a>(&'a mut self, dst: &'a mut Vec<u8>) -> ReadToEnd<'a, Self>
     where
         Self: Unpin,
     {
         read_to_end(self, dst)
+    }
+
+    /// Read all bytes until EOF in this source, placing them into `dst`.
+    ///
+    /// On success the total number of bytes read is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    fn read_to_string<'a>(&'a mut self, dst: &'a mut String) -> ReadToString<'a, Self>
+    where
+        Self: Unpin,
+    {
+        read_to_string(self, dst)
     }
 }
 
