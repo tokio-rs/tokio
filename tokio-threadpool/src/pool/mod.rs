@@ -451,7 +451,7 @@ unsafe impl Sync for Pool {}
 
 // Return a thread-specific, 32-bit, non-zero seed value suitable for a 32-bit
 // PRNG. This uses one libstd RandomState for a default hasher and hashes on
-// the current thread ID to obtain an unpredictable, collistion resitant seed.
+// the current thread ID to obtain an unpredictable, collision resistant seed.
 fn prng_seed() -> u32 {
     // This obtains a small number of random bytes from the host system (for
     // example, on unix via getrandom(2)) in order to seed an unpredictable and
