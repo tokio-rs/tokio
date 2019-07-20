@@ -58,7 +58,7 @@ pub(crate) enum Handoff {
 }
 
 /// Tracks thread state.
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Default)]
 struct State(usize);
 
 /// Set when the worker is pushed onto the scheduler's stack of sleeping

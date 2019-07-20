@@ -66,15 +66,12 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut runtime = RuntimeType::Multi;
 
     for arg in args {
-        match arg {
-            syn::NestedMeta::Meta(syn::Meta::Word(ident)) => {
-                match ident.to_string().to_lowercase().as_str() {
-                    "multi_thread" => runtime = RuntimeType::Multi,
-                    "single_thread" => runtime = RuntimeType::Single,
-                    name => panic!("Unknown attribute {} is specified", name),
-                }
+        if let syn::NestedMeta::Meta(syn::Meta::Word(ident)) = arg {
+            match ident.to_string().to_lowercase().as_str() {
+                "multi_thread" => runtime = RuntimeType::Multi,
+                "single_thread" => runtime = RuntimeType::Single,
+                name => panic!("Unknown attribute {} is specified", name),
             }
-            _ => (),
         }
     }
 

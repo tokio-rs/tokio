@@ -55,3 +55,9 @@ impl From<State> for usize {
         src as usize
     }
 }
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}

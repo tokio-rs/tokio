@@ -149,8 +149,7 @@ impl<S> TlsStream<S> {
     {
         self.0.get_mut().context = ctx as *mut _ as *mut ();
         let g = Guard(self);
-        let r = f(&mut (g.0).0);
-        r
+        f(&mut (g.0).0)
     }
 }
 
@@ -193,8 +192,8 @@ where
     fn poll_shutdown(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.with_context(ctx, |s| s.shutdown()) {
             Ok(()) => Poll::Ready(Ok(())),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Poll::Pending,
-            Err(e) => return Poll::Ready(Err(e)),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
@@ -289,6 +288,7 @@ impl TlsAcceptor {
     /// This is typically used after a new socket has been accepted from a
     /// `TcpListener`. That socket is then passed to this function to perform
     /// the server half of accepting a client connection.
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn accept<S>(&self, stream: S) -> Result<TlsStream<S>, Error>
     where
         S: AsyncRead + AsyncWrite + Unpin,

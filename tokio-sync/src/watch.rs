@@ -378,7 +378,7 @@ impl<T> futures_sink::Sink<T> for Sender<T> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let _ = self.as_ref().get_ref().broadcast(item)?;
+        self.as_ref().get_ref().broadcast(item)?;
         Ok(())
     }
 

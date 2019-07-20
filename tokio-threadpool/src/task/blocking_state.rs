@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 ///    double queuing (which would break the linked list).
 ///
 /// b) If the task has been allocated capacity to block.
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Default)]
 pub(crate) struct BlockingState(usize);
 
 const QUEUED: usize = 0b01;

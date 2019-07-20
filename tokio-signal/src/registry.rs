@@ -76,9 +76,9 @@ impl<S: Storage> Registry<S> {
     /// Mark `event_id` as having been delivered, without broadcasting it to
     /// any listeners.
     fn record_event(&self, event_id: EventId) {
-        self.storage
-            .event_info(event_id)
-            .map(|event_info| event_info.pending.store(true, Ordering::SeqCst));
+        if let Some(event_info) = self.storage.event_info(event_id) {
+            event_info.pending.store(true, Ordering::SeqCst)
+        }
     }
 
     /// Broadcast all previously recorded events to their respective listeners.

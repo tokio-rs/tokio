@@ -323,7 +323,7 @@ impl Reactor {
                 "loop process - {} events, {}.{:03}s",
                 events,
                 dur.as_secs(),
-                dur.subsec_nanos() / 1_000_000
+                dur.subsec_millis()
             );
         }
 

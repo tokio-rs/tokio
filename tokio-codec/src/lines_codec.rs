@@ -190,6 +190,12 @@ impl Encoder for LinesCodec {
     }
 }
 
+impl Default for LinesCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub enum LinesCodecError {
     MaxLineLengthExceeded,

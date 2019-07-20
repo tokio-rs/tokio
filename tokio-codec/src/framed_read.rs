@@ -153,7 +153,7 @@ pub fn framed_read2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedRead2<T
     FramedRead2 {
         inner,
         eof: false,
-        is_readable: buf.len() > 0,
+        is_readable: !buf.is_empty(),
         buffer: buf,
     }
 }

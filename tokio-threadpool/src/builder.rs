@@ -420,3 +420,9 @@ impl fmt::Debug for Builder {
             .finish()
     }
 }
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}

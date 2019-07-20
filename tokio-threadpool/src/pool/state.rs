@@ -5,7 +5,7 @@ use std::{fmt, usize};
 /// The two least significant bits are the shutdown flags.  (0 for active, 1 for
 /// shutdown on idle, 2 for shutting down). The remaining bits represent the
 /// number of futures that still need to complete.
-#[derive(Eq, PartialEq, Clone, Copy)]
+#[derive(Eq, PartialEq, Clone, Copy, Default)]
 pub(crate) struct State(usize);
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
@@ -70,7 +70,7 @@ impl State {
 
     /// Set the number of futures pending completion to zero
     pub fn clear_num_futures(&mut self) {
-        self.0 = self.0 & LIFECYCLE_MASK;
+        self.0 &= LIFECYCLE_MASK;
     }
 
     pub fn lifecycle(&self) -> Lifecycle {

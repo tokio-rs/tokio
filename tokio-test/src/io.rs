@@ -187,11 +187,8 @@ impl Inner {
             return Err(io::ErrorKind::BrokenPipe.into());
         }
 
-        match self.action() {
-            Some(&mut Action::Wait(..)) => {
-                return Err(io::ErrorKind::WouldBlock.into());
-            }
-            _ => {}
+        if let Some(&mut Action::Wait(..)) = self.action() {
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         for i in 0..self.actions.len() {

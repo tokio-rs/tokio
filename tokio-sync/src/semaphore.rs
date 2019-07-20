@@ -597,9 +597,9 @@ impl Permit {
         }
 
         match semaphore.poll_permit(Some((cx, self)))? {
-            Ready(v) => {
+            Ready(()) => {
                 self.state = PermitState::Acquired;
-                Ready(Ok(v))
+                Ready(Ok(()))
             }
             Pending => {
                 self.state = PermitState::Waiting;
@@ -668,6 +668,12 @@ impl Permit {
                 true
             }
         }
+    }
+}
+
+impl Default for Permit {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
