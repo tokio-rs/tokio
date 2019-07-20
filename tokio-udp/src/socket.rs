@@ -24,7 +24,7 @@ impl UdpSocket {
 
     fn new(socket: mio::net::UdpSocket) -> UdpSocket {
         let io = PollEvented::new(socket);
-        UdpSocket { io: io }
+        UdpSocket { io }
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.

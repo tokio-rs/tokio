@@ -37,7 +37,7 @@ where
     P: AsRef<Path> + Send + 'static,
 {
     fn new(path: P) -> ReadDirFuture<P> {
-        ReadDirFuture { path: path }
+        ReadDirFuture { path }
     }
 }
 

@@ -58,7 +58,7 @@ async fn main() {
     println!("Listening on: {}", socket.local_addr().unwrap());
 
     let server = Server {
-        socket: socket,
+        socket,
         buf: vec![0; 1024],
         to_send: None,
     };

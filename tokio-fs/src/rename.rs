@@ -36,7 +36,7 @@ where
     Q: AsRef<Path>,
 {
     fn new(from: P, to: Q) -> RenameFuture<P, Q> {
-        RenameFuture { from: from, to: to }
+        RenameFuture { from, to }
     }
 }
 

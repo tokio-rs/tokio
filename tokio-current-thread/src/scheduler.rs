@@ -147,11 +147,11 @@ where
             tick_num: AtomicUsize::new(0),
             head_readiness: AtomicPtr::new(stub_ptr as *mut _),
             tail_readiness: UnsafeCell::new(stub_ptr),
-            stub: stub,
+            stub,
         });
 
         Scheduler {
-            inner: inner,
+            inner,
             nodes: List::new(),
         }
     }

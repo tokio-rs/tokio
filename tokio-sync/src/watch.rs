@@ -304,7 +304,7 @@ impl<T> Clone for Receiver<T> {
         let ver = self.ver;
 
         Receiver {
-            shared: shared,
+            shared,
             inner,
             id,
             ver,

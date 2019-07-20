@@ -27,7 +27,7 @@ impl<T> Throttle<T> {
         Self {
             delay: Delay::new_timeout(clock::now() + duration, duration),
             has_delayed: true,
-            stream: stream,
+            stream,
         }
     }
 }

@@ -154,7 +154,7 @@ impl TcpStream {
             Err(e) => Error(e),
         };
 
-        ConnectFuture { inner: inner }
+        ConnectFuture { inner }
     }
 
     /// Check the TCP stream's read readiness state.

@@ -268,7 +268,7 @@ impl<P: Park> CurrentThread<P> {
         let num_futures = Arc::new(atomic::AtomicUsize::new(0));
 
         CurrentThread {
-            scheduler: scheduler,
+            scheduler,
             num_futures: num_futures.clone(),
             park,
             id,
@@ -279,7 +279,7 @@ impl<P: Park> CurrentThread<P> {
                 thread,
                 id,
             },
-            spawn_receiver: spawn_receiver,
+            spawn_receiver,
         }
     }
 

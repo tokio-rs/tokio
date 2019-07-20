@@ -34,7 +34,7 @@ where
     P: AsRef<Path>,
 {
     fn new(path: P) -> RemoveFileFuture<P> {
-        RemoveFileFuture { path: path }
+        RemoveFileFuture { path }
     }
 }
 
