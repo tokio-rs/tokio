@@ -10,6 +10,7 @@ use native_tls::{Identity, TlsAcceptor, TlsConnector};
 use std::io::Write;
 use std::marker::Unpin;
 use std::process::Command;
+use std::ptr;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, Error, ErrorKind};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tls;
@@ -33,7 +34,7 @@ struct Keys {
 #[allow(dead_code)]
 fn openssl_keys() -> &'static Keys {
     static INIT: Once = Once::new();
-    static mut KEYS: *mut Keys = 0 as *mut _;
+    static mut KEYS: *mut Keys = ptr::null_mut();
 
     INIT.call_once(|| {
         let path = t!(env::current_exe());
@@ -160,7 +161,7 @@ cfg_if! {
         // self-signed certificate, so we just fork out to the `openssl` binary.
         fn keys() -> (&'static [u8], &'static [u8]) {
             static INIT: Once = Once::new();
-            static mut KEYS: *mut (Vec<u8>, Vec<u8>) = 0 as *mut _;
+            static mut KEYS: *mut (Vec<u8>, Vec<u8>) = ptr::null_mut();
 
             INIT.call_once(|| {
                 let (key, cert) = openssl_keys();
@@ -266,7 +267,6 @@ cfg_if! {
         use std::fs::File;
         use std::io::Error;
         use std::mem;
-        use std::ptr;
         use std::sync::Once;
 
         use schannel::cert_context::CertContext;
