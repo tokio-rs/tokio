@@ -30,7 +30,7 @@ where
     P: AsRef<Path>,
 {
     fn new(path: P) -> ReadLinkFuture<P> {
-        ReadLinkFuture { path: path }
+        ReadLinkFuture { path }
     }
 }
 

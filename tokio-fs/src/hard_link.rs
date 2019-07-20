@@ -36,7 +36,7 @@ where
     Q: AsRef<Path>,
 {
     fn new(src: P, dst: Q) -> HardLinkFuture<P, Q> {
-        HardLinkFuture { src: src, dst: dst }
+        HardLinkFuture { src, dst }
     }
 }
 

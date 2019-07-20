@@ -138,7 +138,7 @@ where
 
 pub fn framed_read2<T>(inner: T) -> FramedRead2<T> {
     FramedRead2 {
-        inner: inner,
+        inner,
         eof: false,
         is_readable: false,
         buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
@@ -151,7 +151,7 @@ pub fn framed_read2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedRead2<T
         buf.reserve(bytes_to_reserve);
     }
     FramedRead2 {
-        inner: inner,
+        inner,
         eof: false,
         is_readable: buf.len() > 0,
         buffer: buf,

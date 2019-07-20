@@ -30,7 +30,7 @@ where
     P: AsRef<Path>,
 {
     fn new(path: P) -> RemoveDirFuture<P> {
-        RemoveDirFuture { path: path }
+        RemoveDirFuture { path }
     }
 }
 

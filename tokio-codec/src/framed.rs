@@ -144,8 +144,8 @@ impl<T, U> Framed<T, U> {
         FramedParts {
             io: inner.0,
             codec: inner.1,
-            read_buf: read_buf,
-            write_buf: write_buf,
+            read_buf,
+            write_buf,
             _priv: (),
         }
     }

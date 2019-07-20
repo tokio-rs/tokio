@@ -224,7 +224,7 @@ impl Reactor {
             events: mio::Events::with_capacity(1024),
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
-                io: io,
+                io,
                 next_aba_guard: AtomicUsize::new(0),
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
                 wakeup: wakeup_pair.1,

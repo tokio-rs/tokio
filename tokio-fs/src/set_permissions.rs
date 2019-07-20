@@ -31,10 +31,7 @@ where
     P: AsRef<Path>,
 {
     fn new(path: P, perm: fs::Permissions) -> SetPermissionsFuture<P> {
-        SetPermissionsFuture {
-            path: path,
-            perm: perm,
-        }
+        SetPermissionsFuture { path, perm }
     }
 }
 

@@ -195,7 +195,7 @@ impl Driver {
         let stream = globals().receiver.try_clone()?;
         let wakeup = PollEvented::new_with_handle(stream, handle)?;
 
-        Ok(Driver { wakeup: wakeup })
+        Ok(Driver { wakeup })
     }
 
     /// Drain all data in the global receiver, ensuring we'll get woken up when
@@ -321,11 +321,7 @@ impl Signal {
             let (tx, rx) = channel(1);
             globals().register_listener(signal as EventId, tx);
 
-            Ok(Signal {
-                driver: driver,
-                rx: rx,
-                signal: signal,
-            })
+            Ok(Signal { driver, rx, signal })
         })
         .boxed()
     }

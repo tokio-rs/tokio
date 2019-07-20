@@ -30,7 +30,7 @@ where
     P: AsRef<Path>,
 {
     fn new(path: P) -> CreateDirFuture<P> {
-        CreateDirFuture { path: path }
+        CreateDirFuture { path }
     }
 }
 

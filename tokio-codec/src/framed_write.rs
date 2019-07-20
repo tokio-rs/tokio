@@ -138,7 +138,7 @@ where
 
 pub fn framed_write2<T>(inner: T) -> FramedWrite2<T> {
     FramedWrite2 {
-        inner: inner,
+        inner,
         buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
     }
 }
@@ -148,10 +148,7 @@ pub fn framed_write2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedWrite2
         let bytes_to_reserve = INITIAL_CAPACITY - buf.capacity();
         buf.reserve(bytes_to_reserve);
     }
-    FramedWrite2 {
-        inner: inner,
-        buffer: buf,
-    }
+    FramedWrite2 { inner, buffer: buf }
 }
 
 impl<T> FramedWrite2<T> {
