@@ -16,6 +16,7 @@ use tokio_executor;
 use log::trace;
 use std::cell::Cell;
 use std::marker::PhantomData;
+use std::ptr;
 use std::rc::Rc;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
@@ -81,7 +82,7 @@ struct CurrentTask {
 pub struct WorkerId(pub(crate) usize);
 
 // Pointer to the current worker info
-thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
+thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(ptr::null()));
 
 impl Worker {
     pub(crate) fn new(
