@@ -35,6 +35,6 @@ where
         let std = ready!(crate::blocking_io(|| StdFile::create(&self.path)))?;
 
         let file = File::from_std(std);
-        Poll::Ready(Ok(file.into()))
+        Poll::Ready(Ok(file))
     }
 }

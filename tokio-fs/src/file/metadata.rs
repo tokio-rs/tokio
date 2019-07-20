@@ -36,6 +36,6 @@ impl Future for MetadataFuture {
         let metadata = ready!(crate::blocking_io(|| StdFile::metadata(inner.std())))?;
 
         let file = inner.file.take().expect(POLL_AFTER_RESOLVE);
-        Poll::Ready(Ok((file, metadata).into()))
+        Poll::Ready(Ok((file, metadata)))
     }
 }
