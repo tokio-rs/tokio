@@ -11,6 +11,12 @@ jobs:
     rust: $(nightly)
     name: rustfmt
 
+# Apply clippy lints to all crates
+- template: ci/azure-clippy.yml
+  parameters:
+    rust: $(nightly)
+    name: clippy
+
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
