@@ -16,8 +16,8 @@ async fn twice() {
     for _ in 0..2 {
         send_signal(libc::SIGUSR1);
 
-        let (num, sig) = with_timeout(signal.into_future()).await;
-        assert_eq!(num, Some(libc::SIGUSR1));
+        let (item, sig) = with_timeout(signal.into_future()).await;
+        assert_eq!(item, Some(()));
 
         signal = sig;
     }

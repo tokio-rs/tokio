@@ -20,12 +20,8 @@ mod platform {
 
         // Up until now, we haven't really DONE anything, just prepared
         // our futures, now it's time to actually await the results!
-        while let Some(the_signal) = stream.next().await {
-            println!(
-                "*Got signal {:#x}* I should probably reload my config \
-                 or something",
-                the_signal
-            );
+        while let Some(_) = stream.next().await {
+            println!("*Got signal* I should probably reload my config or something");
         }
     }
 }
