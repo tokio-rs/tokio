@@ -35,6 +35,6 @@ impl Future for SeekFuture {
             .expect("Cannot poll `SeekFuture` after it resolves")
             .poll_seek(inner_self.pos))?;
         let inner = inner_self.inner.take().unwrap();
-        Poll::Ready(Ok((inner, pos).into()))
+        Poll::Ready(Ok((inner, pos)))
     }
 }

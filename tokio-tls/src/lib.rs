@@ -194,7 +194,7 @@ where
         match self.with_context(ctx, |s| s.shutdown()) {
             Ok(()) => Poll::Ready(Ok(())),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Poll::Pending,
-            Err(e) => return Poll::Ready(Err(e.into())),
+            Err(e) => return Poll::Ready(Err(e)),
         }
     }
 }
