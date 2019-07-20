@@ -16,6 +16,7 @@ use std::task::{Context, Poll};
 
 use futures_core::stream::Stream;
 use futures_util::future::{self, FutureExt};
+use futures_util::try_future::TryFutureExt;
 use tokio_reactor::Handle;
 use tokio_sync::mpsc::{channel, Receiver, Sender};
 use winapi::shared::minwindef::*;
@@ -91,7 +92,7 @@ static INIT: Once = Once::new();
 // FIXME: refactor and combine with unix::Signal
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
-pub struct Event {
+pub(crate) struct Event {
     rx: Receiver<()>,
 }
 
@@ -113,15 +114,7 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub fn ctrl_break() -> IoFuture<Event> {
-        Event::ctrl_break_handle(&Handle::default())
-    }
-
-    /// Creates a new stream listening for the `CTRL_BREAK_EVENT` events.
-    ///
-    /// This function will register a handler via `SetConsoleCtrlHandler` and
-    /// deliver notifications to the returned stream.
-    pub fn ctrl_break_handle(handle: &Handle) -> IoFuture<Event> {
+    fn ctrl_break_handle(handle: &Handle) -> IoFuture<Event> {
         Event::new(CTRL_BREAK_EVENT, handle)
     }
 
@@ -199,6 +192,49 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
     TRUE
 }
 
+/// Represents a stream which receives "ctrl-break" notifications sent to the process
+/// via `SetConsoleCtrlHandler`.
+///
+/// A notification to this process notifies *all* streams listening to
+/// this event. Moreover, the notifications **are coalesced** if they aren't processed
+/// quickly enough. This means that if two notifications are received back-to-back,
+/// then the stream may only receive one item about the two notifications.
+#[must_use = "streams do nothing unless polled"]
+#[derive(Debug)]
+pub struct CtrlBreak {
+    inner: Event,
+}
+
+impl CtrlBreak {
+    /// Creates a new stream which receives "ctrl-break" notifications sent to the
+    /// process.
+    ///
+    /// This function binds to the default reactor.
+    pub fn new() -> IoFuture<Self> {
+        Self::with_handle(&Handle::default())
+    }
+
+    /// Creates a new stream which receives "ctrl-break" notifications sent to the
+    /// process.
+    ///
+    /// This function binds to reactor specified by `handle`.
+    pub fn with_handle(handle: &Handle) -> IoFuture<Self> {
+        Event::ctrl_break_handle(handle)
+            .map_ok(|inner| Self { inner })
+            .boxed()
+    }
+}
+
+impl Stream for CtrlBreak {
+    type Item = ();
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.inner)
+            .poll_next(cx)
+            .map(|item| item.map(|_| ()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,7 +267,7 @@ mod tests {
         let _ = rt.block_on(with_timeout(event_ctrl_c.into_future()));
 
         let event_ctrl_break = rt
-            .block_on(with_timeout(Event::ctrl_break()))
+            .block_on(with_timeout(CtrlBreak::new()))
             .expect("failed to run future");
 
         unsafe {

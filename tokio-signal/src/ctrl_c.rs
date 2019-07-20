@@ -20,6 +20,11 @@ use tokio_reactor::Handle;
 /// Note that there are a number of caveats listening for signals, and you may
 /// wish to read up on the documentation in the `unix` or `windows` module to
 /// take a peek.
+///
+/// Notably, a notification to this process notifies *all* streams listening to
+/// this event. Moreover, the notifications **are coalesced** if they aren't processed
+/// quickly enough. This means that if two notifications are received back-to-back,
+/// then the stream may only receive one item about the two notifications.
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlC {
@@ -39,7 +44,7 @@ impl CtrlC {
     /// process.
     ///
     /// This function binds to reactor specified by `handle`.
-    pub fn with_handle(handle: &Handle) -> IoFuture<CtrlC> {
+    pub fn with_handle(handle: &Handle) -> IoFuture<Self> {
         Inner::ctrl_c(handle).map_ok(|inner| Self { inner }).boxed()
     }
 }

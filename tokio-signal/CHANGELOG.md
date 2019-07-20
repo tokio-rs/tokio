@@ -1,3 +1,9 @@
+# 0.3.0
+
+### Changed
+- **Breaking:** `windows::Event` has been removed in favor of `CtrlC` and
+a separate `windows::CtrlBreak` struct.
+
 # 0.2.9
 
 ### Fixed
