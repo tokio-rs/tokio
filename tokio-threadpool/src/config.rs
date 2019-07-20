@@ -14,6 +14,7 @@ pub(crate) struct Config {
     pub around_worker: Option<Callback>,
     pub after_start: Option<Arc<dyn Fn() + Send + Sync>>,
     pub before_stop: Option<Arc<dyn Fn() + Send + Sync>>,
+    #[allow(clippy::type_complexity)]
     pub panic_handler: Option<Arc<dyn Fn(Box<dyn Any + Send>) + Send + Sync>>,
 }
 

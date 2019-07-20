@@ -17,6 +17,8 @@
 //! assert_ready_eq!(task.enter(|| rx.poll()), Some(()));
 //! ```
 
+#![allow(clippy::mutex_atomic)]
+
 use tokio_executor::enter;
 
 use pin_convert::AsPinMut;

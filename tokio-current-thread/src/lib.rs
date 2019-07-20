@@ -790,6 +790,7 @@ impl CurrentRunner {
 
 unsafe fn hide_lt<'a>(p: *mut (dyn SpawnLocal + 'a)) -> *mut (dyn SpawnLocal + 'static) {
     use std::mem;
+    #[allow(clippy::transmute_ptr_to_ptr)] // false positive: https://github.com/rust-lang/rust-clippy/issues/2906
     mem::transmute(p)
 }
 

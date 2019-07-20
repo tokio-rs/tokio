@@ -16,6 +16,7 @@
 //! [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 //! [`with_default`]: fn.with_default.html
 
+#[allow(clippy::module_inception)]
 mod clock;
 mod now;
 

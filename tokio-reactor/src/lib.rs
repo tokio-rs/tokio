@@ -2,6 +2,7 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![allow(clippy::trivially_copy_pass_by_ref)]
 
 //! Event loop that drives Tokio I/O resources.
 //!

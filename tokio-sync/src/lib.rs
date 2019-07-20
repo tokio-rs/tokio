@@ -8,6 +8,7 @@
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
 
 //! Asynchronous synchronization primitives.
 //!
