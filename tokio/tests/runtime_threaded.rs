@@ -77,6 +77,28 @@ fn block_on_timer() {
 }
 
 #[test]
+fn block_on_socket() {
+    let rt = Runtime::new().unwrap();
+
+    rt.block_on(async move {
+        let addr = "127.0.0.1:0".parse().unwrap();
+
+        let (tx, rx) = oneshot::channel();
+
+        let mut listener = TcpListener::bind(&addr).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let _ = listener.accept().await;
+            tx.send(()).unwrap();
+        });
+
+        TcpStream::connect(&addr).await.unwrap();
+        rx.await.unwrap();
+    });
+}
+
+#[test]
 fn block_waits() {
     let (a_tx, a_rx) = oneshot::channel();
     let (b_tx, b_rx) = mpsc::channel();
