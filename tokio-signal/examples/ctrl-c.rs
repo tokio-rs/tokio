@@ -10,10 +10,7 @@ const STOP_AFTER: u64 = 10;
 async fn main() {
     // tokio_signal provides a convenience builder for Ctrl+C
     // this even works cross-platform: linux and windows!
-    //
-    // `CtrlC::new()` produces a `Future` of the actual stream-initialisation
-    // so first we await until the signal is ready.
-    let endless_stream = tokio_signal::CtrlC::new().await.unwrap();
+    let endless_stream = tokio_signal::CtrlC::new().expect("failed to create CtrlC");
     // don't keep going forever: convert the endless stream to a bounded one.
     let mut limited_stream = endless_stream.take(STOP_AFTER);
 

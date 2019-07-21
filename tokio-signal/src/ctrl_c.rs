@@ -2,10 +2,8 @@
 use crate::unix::Signal as Inner;
 #[cfg(windows)]
 use crate::windows::Event as Inner;
-use crate::IoFuture;
 use futures_core::stream::Stream;
-use futures_util::future::FutureExt;
-use futures_util::try_future::TryFutureExt;
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio_reactor::Handle;
@@ -36,7 +34,7 @@ impl CtrlC {
     /// process.
     ///
     /// This function binds to the default reactor.
-    pub fn new() -> IoFuture<Self> {
+    pub fn new() -> io::Result<Self> {
         Self::with_handle(&Handle::default())
     }
 
@@ -44,8 +42,8 @@ impl CtrlC {
     /// process.
     ///
     /// This function binds to reactor specified by `handle`.
-    pub fn with_handle(handle: &Handle) -> IoFuture<Self> {
-        Inner::ctrl_c(handle).map_ok(|inner| Self { inner }).boxed()
+    pub fn with_handle(handle: &Handle) -> io::Result<Self> {
+        Inner::ctrl_c(handle).map(|inner| Self { inner })
     }
 }
 
@@ -53,8 +51,6 @@ impl Stream for CtrlC {
     type Item = ();
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner)
-            .poll_next(cx)
-            .map(|item| item.map(|_| ()))
+        Pin::new(&mut self.inner).poll_next(cx)
     }
 }

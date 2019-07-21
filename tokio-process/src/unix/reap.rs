@@ -1,7 +1,6 @@
 use super::orphan::{OrphanQueue, Wait};
 use crate::kill::Kill;
-use futures_core::stream::TryStream;
-use futures_util::try_stream::TryStreamExt;
+use futures_core::stream::Stream;
 use std::future::Future;
 use std::io;
 use std::ops::Deref;
@@ -61,12 +60,11 @@ impl<W, Q, S> Future for Reaper<W, Q, S>
 where
     W: Wait + Unpin,
     Q: OrphanQueue<W> + Unpin,
-    S: TryStream<Error = io::Error> + Unpin,
+    S: Stream + Unpin,
 {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        let inner = Pin::get_mut(self);
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         loop {
             // If the child hasn't exited yet, then it's our responsibility to
             // ensure the current task gets notified when it might be able to
@@ -87,14 +85,10 @@ where
             // this future's task will be notified/woken up again. Since the
             // futures model allows for spurious wake ups this extra wakeup
             // should not cause significant issues with parent futures.
-            let signal_poll = inner.signal.try_poll_next_unpin(cx);
-            if let Poll::Ready(Some(Err(err))) = signal_poll {
-                return Poll::Ready(Err(err));
-            }
-            let registered_interest = signal_poll.is_pending();
+            let registered_interest = Pin::new(&mut self.signal).poll_next(cx).is_pending();
 
-            inner.orphan_queue.reap_orphans();
-            if let Some(status) = inner.inner_mut().try_wait()? {
+            self.orphan_queue.reap_orphans();
+            if let Some(status) = self.inner_mut().try_wait()? {
                 return Poll::Ready(Ok(status));
             }
 

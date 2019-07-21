@@ -15,8 +15,6 @@ use std::sync::Once;
 use std::task::{Context, Poll};
 
 use futures_core::stream::Stream;
-use futures_util::future::{self, FutureExt};
-use futures_util::try_future::TryFutureExt;
 use tokio_reactor::Handle;
 use tokio_sync::mpsc::{channel, Receiver, Sender};
 use winapi::shared::minwindef::*;
@@ -24,7 +22,6 @@ use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
 
 use crate::registry::{globals, EventId, EventInfo, Init, Storage};
-use crate::IoFuture;
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {
@@ -74,8 +71,6 @@ impl Init for OsExtraData {
     }
 }
 
-static INIT: Once = Once::new();
-
 /// Stream of events discovered via `SetConsoleCtrlHandler`.
 ///
 /// This structure can be used to listen for events of the type `CTRL_C_EVENT`
@@ -106,7 +101,7 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    pub(crate) fn ctrl_c(handle: &Handle) -> IoFuture<Event> {
+    pub(crate) fn ctrl_c(handle: &Handle) -> io::Result<Self> {
         Event::new(CTRL_C_EVENT, handle)
     }
 
@@ -114,27 +109,17 @@ impl Event {
     ///
     /// This function will register a handler via `SetConsoleCtrlHandler` and
     /// deliver notifications to the returned stream.
-    fn ctrl_break_handle(handle: &Handle) -> IoFuture<Event> {
+    fn ctrl_break_handle(handle: &Handle) -> io::Result<Self> {
         Event::new(CTRL_BREAK_EVENT, handle)
     }
 
-    fn new(signum: DWORD, _handle: &Handle) -> IoFuture<Event> {
-        future::lazy(move |_| {
-            let mut init = None;
-            INIT.call_once(|| {
-                init = Some(global_init());
-            });
+    fn new(signum: DWORD, _handle: &Handle) -> io::Result<Self> {
+        global_init()?;
 
-            if let Some(Err(e)) = init {
-                return Err(e);
-            }
+        let (tx, rx) = channel(1);
+        globals().register_listener(signum as EventId, tx);
 
-            let (tx, rx) = channel(1);
-            globals().register_listener(signum as EventId, tx);
-
-            Ok(Event { rx })
-        })
-        .boxed()
+        Ok(Event { rx })
     }
 }
 
@@ -147,14 +132,21 @@ impl Stream for Event {
 }
 
 fn global_init() -> io::Result<()> {
-    unsafe {
-        let rc = SetConsoleCtrlHandler(Some(handler), TRUE);
-        if rc == 0 {
-            return Err(io::Error::last_os_error());
-        }
+    static INIT: Once = Once::new();
 
-        Ok(())
-    }
+    let mut init = None;
+    INIT.call_once(|| unsafe {
+        let rc = SetConsoleCtrlHandler(Some(handler), TRUE);
+        let ret = if rc == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        };
+
+        init = Some(ret);
+    });
+
+    init.unwrap_or_else(|| Ok(()))
 }
 
 impl Future for DriverTask {
@@ -210,7 +202,7 @@ impl CtrlBreak {
     /// process.
     ///
     /// This function binds to the default reactor.
-    pub fn new() -> IoFuture<Self> {
+    pub fn new() -> io::Result<Self> {
         Self::with_handle(&Handle::default())
     }
 
@@ -218,10 +210,8 @@ impl CtrlBreak {
     /// process.
     ///
     /// This function binds to reactor specified by `handle`.
-    pub fn with_handle(handle: &Handle) -> IoFuture<Self> {
-        Event::ctrl_break_handle(handle)
-            .map_ok(|inner| Self { inner })
-            .boxed()
+    pub fn with_handle(handle: &Handle) -> io::Result<Self> {
+        Event::ctrl_break_handle(handle).map(|inner| Self { inner })
     }
 }
 
@@ -238,7 +228,7 @@ impl Stream for CtrlBreak {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::future::FutureExt;
+    use futures_util::future::{self, FutureExt};
     use futures_util::stream::StreamExt;
     use std::time::Duration;
     use tokio::runtime::current_thread;
@@ -254,7 +244,7 @@ mod tests {
         // first event loop cannot go away
         let mut rt = current_thread::Runtime::new().unwrap();
         let event_ctrl_c = rt
-            .block_on(with_timeout(crate::CtrlC::new()))
+            .block_on(with_timeout(future::lazy(|_| crate::CtrlC::new())))
             .expect("failed to run future");
 
         // Windows doesn't have a good programmatic way of sending events
@@ -267,7 +257,7 @@ mod tests {
         let _ = rt.block_on(with_timeout(event_ctrl_c.into_future()));
 
         let event_ctrl_break = rt
-            .block_on(with_timeout(CtrlBreak::new()))
+            .block_on(with_timeout(future::lazy(|_| CtrlBreak::new())))
             .expect("failed to run future");
 
         unsafe {

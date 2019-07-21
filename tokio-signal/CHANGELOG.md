@@ -6,6 +6,7 @@ a separate `windows::CtrlBreak` struct.
 - **Breaking:** `ctrl_c{,_with_handle}` has been replaced with a `CtrlC` struct
 (which can be constructed via `CtrlC::{new, with_handle}`.
 - **Breaking:** `unix::Signal` returns `()` instead of the signal number used in registration
+- **Breaking:** `unis::Signal` constructors now return a simple result rather than a lazy future
 
 # 0.2.9
 

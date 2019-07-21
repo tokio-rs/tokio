@@ -35,11 +35,7 @@ use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
-use futures_core::stream::Stream;
-use futures_util::future;
 use futures_util::future::FutureExt;
-use futures_util::stream::StreamExt;
-use futures_util::try_future::TryFutureExt;
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -89,11 +85,9 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
     }
 }
 
-type ChildReaperFuture = Pin<Box<dyn Stream<Item = io::Result<()>> + Send>>;
-
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
-    inner: Reaper<process::Child, GlobalOrphanQueue, ChildReaperFuture>,
+    inner: Reaper<process::Child, GlobalOrphanQueue, Signal>,
 }
 
 impl fmt::Debug for Child {
@@ -110,10 +104,8 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stdout = stdio(child.stdout.take(), handle)?;
     let stderr = stdio(child.stderr.take(), handle)?;
 
-    let signal = Signal::with_handle(libc::SIGCHLD, handle)
-        .and_then(|stream| future::ok(stream.map(Ok)))
-        .try_flatten_stream()
-        .boxed();
+    let signal = Signal::with_handle(libc::SIGCHLD, handle)?;
+
     Ok(SpawnedChild {
         child: Child {
             inner: Reaper::new(child, GlobalOrphanQueue, signal),
