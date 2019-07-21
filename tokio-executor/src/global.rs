@@ -180,7 +180,8 @@ where
 
 unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
     use std::mem;
-    #[allow(clippy::transmute_ptr_to_ptr)] // false positive: https://github.com/rust-lang/rust-clippy/issues/2906
+    // false positive: https://github.com/rust-lang/rust-clippy/issues/2906
+    #[allow(clippy::transmute_ptr_to_ptr)]
     mem::transmute(p)
 }
 
