@@ -1,5 +1,3 @@
-#![allow(clippy::cast_ptr_alignment)]
-
 use crate::Borrow;
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};

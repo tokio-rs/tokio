@@ -157,7 +157,6 @@ unsafe fn to_raw(waker: Arc<ThreadWaker>) -> RawWaker {
     RawWaker::new(Arc::into_raw(waker) as *const (), &VTABLE)
 }
 
-#[allow(clippy::cast_ptr_alignment)]
 unsafe fn from_raw(raw: *const ()) -> Arc<ThreadWaker> {
     Arc::from_raw(raw as *const ThreadWaker)
 }
