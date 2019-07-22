@@ -161,6 +161,7 @@ impl State {
         State(EMPTY.0)
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn head(&self) -> BackupId {
         BackupId(self.0 & STACK_MASK)
     }

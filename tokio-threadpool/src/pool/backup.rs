@@ -240,6 +240,7 @@ impl State {
     }
 
     /// Returns true if the thread entry is pushed in the sleeper stack
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn is_pushed(&self) -> bool {
         self.0 & PUSHED == PUSHED
     }
@@ -248,6 +249,7 @@ impl State {
         self.0 &= !PUSHED;
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn is_running(&self) -> bool {
         self.0 & RUNNING == RUNNING
     }
@@ -260,6 +262,7 @@ impl State {
         self.0 &= !RUNNING;
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn is_terminated(&self) -> bool {
         self.0 & TERMINATED == TERMINATED
     }

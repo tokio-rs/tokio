@@ -928,6 +928,7 @@ impl SemState {
     }
 
     /// Returns the amount of remaining capacity
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn available_permits(&self) -> usize {
         if !self.has_available_permits() {
             return 0;
@@ -937,10 +938,12 @@ impl SemState {
     }
 
     /// Returns true if the state has permits that can be claimed by a waiter.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn has_available_permits(&self) -> bool {
         self.0 & NUM_FLAG == NUM_FLAG
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn has_waiter(&self, stub: &WaiterNode) -> bool {
         !self.has_available_permits() && !self.is_stub(stub)
     }
@@ -985,11 +988,13 @@ impl SemState {
         self.0 += permits << NUM_SHIFT;
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_waiter(&self) -> bool {
         self.0 & NUM_FLAG == 0
     }
 
     /// Returns the waiter, if one is set.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn waiter(&self) -> Option<NonNull<WaiterNode>> {
         if self.is_waiter() {
             let waiter = NonNull::new(self.as_ptr()).expect("null pointer stored");
@@ -1001,6 +1006,7 @@ impl SemState {
     }
 
     /// Assumes `self` represents a pointer
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn as_ptr(&self) -> *mut WaiterNode {
         (self.0 & !CLOSED_FLAG) as *mut WaiterNode
     }
@@ -1016,6 +1022,7 @@ impl SemState {
         self.0 = waiter;
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_stub(&self, stub: &WaiterNode) -> bool {
         self.as_ptr() as usize == stub as *const _ as usize
     }
@@ -1028,6 +1035,7 @@ impl SemState {
     }
 
     /// Swap the values
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn swap(&self, cell: &AtomicUsize, ordering: Ordering) -> SemState {
         let prev = SemState(cell.swap(self.to_usize(), ordering));
         debug_assert_eq!(prev.is_closed(), self.is_closed());
@@ -1035,6 +1043,7 @@ impl SemState {
     }
 
     /// Compare and exchange the current value into the provided cell
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn compare_exchange(
         &self,
         cell: &AtomicUsize,
@@ -1061,11 +1070,13 @@ impl SemState {
         SemState(value)
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_closed(&self) -> bool {
         self.0 & CLOSED_FLAG == CLOSED_FLAG
     }
 
     /// Converts the state into a `usize` representation.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn to_usize(&self) -> usize {
         self.0
     }
@@ -1114,6 +1125,7 @@ impl NodeState {
         cell.store(value.to_usize(), ordering);
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn compare_exchange(
         &self,
         cell: &AtomicUsize,
@@ -1127,6 +1139,7 @@ impl NodeState {
     }
 
     /// Returns `true` if `self` represents a queued state.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_queued(&self) -> bool {
         use self::NodeState::*;
 
@@ -1136,6 +1149,7 @@ impl NodeState {
         }
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn to_usize(&self) -> usize {
         *self as usize
     }

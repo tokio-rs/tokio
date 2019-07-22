@@ -2,7 +2,6 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-#![allow(clippy::trivially_copy_pass_by_ref)]
 
 //! Event loop that drives Tokio I/O resources.
 //!
@@ -571,6 +570,7 @@ impl Drop for Inner {
 }
 
 impl Direction {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn mask(&self) -> mio::Ready {
         match *self {
             Direction::Read => {
@@ -591,6 +591,7 @@ mod platform {
         UnixReady::hup().into()
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_hup(ready: &Ready) -> bool {
         UnixReady::from(*ready).is_hup()
     }
@@ -604,6 +605,7 @@ mod platform {
         Ready::empty()
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_hup(_: &Ready) -> bool {
         false
     }

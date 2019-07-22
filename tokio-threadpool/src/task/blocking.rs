@@ -393,6 +393,7 @@ impl State {
         State((capacity << NUM_SHIFT) | NUM_FLAG)
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn remaining_capacity(&self) -> usize {
         if !self.has_remaining_capacity() {
             return 0;
@@ -401,14 +402,17 @@ impl State {
         self.0 >> 1
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn has_remaining_capacity(&self) -> bool {
         self.0 & NUM_FLAG == NUM_FLAG
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn has_task(&self, stub: &Task) -> bool {
         !(self.has_remaining_capacity() || self.is_stub(stub))
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_stub(&self, stub: &Task) -> bool {
         self.0 == stub as *const _ as usize
     }
@@ -452,10 +456,12 @@ impl State {
         }
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_ptr(&self) -> bool {
         self.0 & NUM_FLAG == 0
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn ptr(&self) -> Option<*const Task> {
         if self.is_ptr() {
             Some(self.0 as *const Task)
