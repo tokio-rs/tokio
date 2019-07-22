@@ -21,7 +21,7 @@ use tokio::net::TcpStream;
 use std::error::Error;
 
 #[tokio::main]
-pub async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+pub async fn main() -> Result<(), Box<dyn Error>> {
     let addr = "127.0.0.1:6142".parse()?;
 
     // Open a TCP stream to the socket address.
