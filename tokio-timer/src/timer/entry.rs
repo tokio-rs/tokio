@@ -125,6 +125,7 @@ impl Entry {
     }
 
     /// Only called by `Registration`
+    #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
     pub unsafe fn time_mut(&self) -> &mut Time {
         &mut *self.time.get()
     }
