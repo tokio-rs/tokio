@@ -125,9 +125,8 @@ impl Entry {
     }
 
     /// Only called by `Registration`
-    #[allow(clippy::mut_from_ref)]
-    pub fn time_mut(&self) -> &mut Time {
-        unsafe { &mut *self.time.get() }
+    pub unsafe fn time_mut(&self) -> &mut Time {
+        &mut *self.time.get()
     }
 
     /// Returns `true` if the `Entry` is currently associated with a timer

@@ -38,7 +38,9 @@ impl Registration {
     }
 
     pub fn reset(&mut self, deadline: Instant) {
-        self.entry.time_mut().deadline = deadline;
+        unsafe {
+            self.entry.time_mut().deadline = deadline;
+        }
         Entry::reset(&mut self.entry);
     }
 
@@ -46,7 +48,9 @@ impl Registration {
     #[cfg(feature = "async-traits")]
     pub fn reset_timeout(&mut self) {
         let deadline = crate::clock::now() + self.entry.time_ref().duration;
-        self.entry.time_mut().deadline = deadline;
+        unsafe {
+            self.entry.time_mut().deadline = deadline;
+        }
         Entry::reset(&mut self.entry);
     }
 
