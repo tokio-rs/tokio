@@ -157,8 +157,10 @@
 #![warn(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.2")]
+#![feature(async_await)]
 
 extern crate futures;
+extern crate tokio;
 extern crate tokio_io;
 extern crate tokio_reactor;
 
@@ -172,12 +174,21 @@ extern crate log;
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
-use crate::kill::Kill;
-use futures::future::{ok, Either};
-use futures::{Async, Future, IntoFuture, Poll};
+use futures::future::FutureExt;
+use futures::future::TryFutureExt;
+use futures::future::TryFuture;
+use futures::future::Either;
+use futures::io::{AsyncRead, AsyncWrite};
+
+use kill::Kill;
 use std::fmt;
-use tokio_io::io::read_to_end;
-use tokio_io::{AsyncRead, AsyncWrite, IoFuture};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::Poll;
+use std::task::Context;
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::io::AsyncWrite as TokioAsyncWrite;
+use tokio::io::AsyncRead as TokioAsyncRead;
 use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
@@ -337,12 +348,13 @@ struct SpawnedChild {
 
 impl CommandExt for Command {
     fn spawn_async_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
-        imp::spawn_child(self, handle).map(|spawned_child| Child {
-            child: ChildDropGuard::new(spawned_child.child),
-            stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
-            stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
-            stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
-        })
+        imp::spawn_child(self, handle)
+            .map(|spawned_child| Child {
+                child: ChildDropGuard::new(spawned_child.child),
+                stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
+                stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
+                stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
+            })
     }
 
     fn status_async_with_handle(&mut self, handle: &Handle) -> io::Result<StatusAsync> {
@@ -354,7 +366,9 @@ impl CommandExt for Command {
             child.stdout.take();
             child.stderr.take();
 
-            StatusAsync { inner: child }
+            StatusAsync {
+                inner: child,
+            }
         })
     }
 
@@ -362,13 +376,11 @@ impl CommandExt for Command {
         self.stdout(Stdio::piped());
         self.stderr(Stdio::piped());
 
-        let inner = self
-            .spawn_async_with_handle(handle)
-            .into_future()
+        let inner = futures::future::ready(self.spawn_async_with_handle(handle))
             .and_then(Child::wait_with_output);
 
         OutputAsync {
-            inner: Box::new(inner),
+            inner: inner.boxed(),
         }
     }
 }
@@ -376,12 +388,16 @@ impl CommandExt for Command {
 /// A drop guard which ensures the child process is killed on drop to maintain
 /// the contract of dropping a Future leads to "cancellation".
 #[derive(Debug)]
-struct ChildDropGuard<T: Kill> {
+struct ChildDropGuard<T: Kill>
+    where T: Unpin
+{
     inner: T,
     kill_on_drop: bool,
 }
 
-impl<T: Kill> ChildDropGuard<T> {
+impl<T: Kill> ChildDropGuard<T> 
+    where T: Unpin
+{
     fn new(inner: T) -> Self {
         Self {
             inner,
@@ -394,7 +410,9 @@ impl<T: Kill> ChildDropGuard<T> {
     }
 }
 
-impl<T: Kill> Kill for ChildDropGuard<T> {
+impl<T: Kill> Kill for ChildDropGuard<T> 
+    where T: Unpin
+{
     fn kill(&mut self) -> io::Result<()> {
         let ret = self.inner.kill();
 
@@ -406,7 +424,9 @@ impl<T: Kill> Kill for ChildDropGuard<T> {
     }
 }
 
-impl<T: Kill> Drop for ChildDropGuard<T> {
+impl<T: Kill> Drop for ChildDropGuard<T> 
+    where T: Unpin
+{
     fn drop(&mut self) {
         if self.kill_on_drop {
             drop(self.kill());
@@ -414,16 +434,19 @@ impl<T: Kill> Drop for ChildDropGuard<T> {
     }
 }
 
-impl<T: Future + Kill> Future for ChildDropGuard<T> {
-    type Item = T::Item;
-    type Error = T::Error;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let ret = self.inner.poll();
+impl<T: TryFuture + Kill> Future for ChildDropGuard<T> 
+    where T: Unpin
+{
+    type Output = Result<T::Ok, T::Error>;
 
-        if let Ok(Async::Ready(_)) = ret {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
+        let ret = inner.inner.try_poll_unpin(cx);
+
+        if let Poll::Ready(Ok(_)) = ret {
             // Avoid the overhead of trying to kill a reaped process
-            self.kill_on_drop = false;
+            inner.kill_on_drop = false;
         }
 
         ret
@@ -483,6 +506,28 @@ impl Child {
         &mut self.stderr
     }
 
+    async fn read_stdout_to_end(&mut self) -> io::Result<Vec<u8>> {
+        match self.stdout().take() {
+            Some(mut io) => {
+                let mut vec = Vec::new();
+                futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                Ok(vec)
+            },
+            None => Ok(Vec::new()),
+        }
+    }
+
+    async fn read_stderr_to_end(&mut self) -> io::Result<Vec<u8>> {
+        match self.stderr().take() {
+            Some(mut io) => {
+                let mut vec = Vec::new();
+                futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                Ok(vec)
+            },
+            None => Ok(Vec::new()),
+        }
+    }
+
     /// Returns a future that will resolve to an `Output`, containing the exit
     /// status, stdout, and stderr of the child process.
     ///
@@ -501,25 +546,49 @@ impl Child {
     /// `stderr(Stdio::piped())`, respectively, when creating a `Command`.
     pub fn wait_with_output(mut self) -> WaitWithOutput {
         drop(self.stdin().take());
-        let stdout = match self.stdout().take() {
-            Some(io) => Either::A(read_to_end(io, Vec::new()).map(|p| p.1)),
-            None => Either::B(ok(Vec::new())),
+        let stdout_val = self.stdout.take();
+        let stderr_val = self.stderr.take();
+        let stdout_fut = async {
+            match stdout_val {
+                Some(mut io) => {
+                    let mut vec = Vec::new();
+                    dbg!("READ TO END START");
+                    futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                    dbg!("READ TO END COMPLETE");
+                    Ok(vec)
+                },
+                None => {
+                    dbg!("STDOUT EMPTY");
+                    Ok(Vec::new())
+                },
+            }
         };
-        let stderr = match self.stderr().take() {
-            Some(io) => Either::A(read_to_end(io, Vec::new()).map(|p| p.1)),
-            None => Either::B(ok(Vec::new())),
+        let stderr_fut = async {
+            match stderr_val {
+                Some(mut io) => {
+                    let mut vec = Vec::new();
+                    dbg!("READ TO END START");
+                    futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                    dbg!("READ TO END COMPLETE");
+                    Ok(vec)
+                },
+                None => {
+                    dbg!("STDERR EMPTY");
+                    Ok(Vec::new())
+                },
+            }
         };
 
+
         WaitWithOutput {
-            inner: Box::new(
-                self.join3(stdout, stderr)
-                    .map(|(status, stdout, stderr)| Output {
-                        status,
-                        stdout,
-                        stderr,
-                    }),
-            ),
-        }
+            inner: futures::future::try_join3(stdout_fut, stderr_fut, self).and_then(|(stdout, stderr, status)| {
+                futures::future::ok(Output {
+                    status,
+                    stdout,
+                    stderr,
+                })
+            }).boxed()
+        } 
     }
 
     /// Drop this `Child` without killing the underlying process.
@@ -559,11 +628,11 @@ impl Child {
 }
 
 impl Future for Child {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
-        self.child.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        dbg!("CHILD POLL");
+        Pin::get_mut(self).child.poll_unpin(cx)
     }
 }
 
@@ -573,7 +642,7 @@ impl Future for Child {
 /// contains the exit status, stdout, and stderr of a child process.
 #[must_use = "futures do nothing unless polled"]
 pub struct WaitWithOutput {
-    inner: IoFuture<Output>,
+    inner: Pin<Box<dyn Future<Output = io::Result<Output>> + Send>>,
 }
 
 impl fmt::Debug for WaitWithOutput {
@@ -585,11 +654,11 @@ impl fmt::Debug for WaitWithOutput {
 }
 
 impl Future for WaitWithOutput {
-    type Item = Output;
-    type Error = io::Error;
+    type Output = io::Result<Output>;
 
-    fn poll(&mut self) -> Poll<Output, io::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        dbg!("WaitWithOutput POLL");
+        Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
 
@@ -609,11 +678,10 @@ pub struct StatusAsync {
 }
 
 impl Future for StatusAsync {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
 
@@ -624,7 +692,7 @@ impl Future for StatusAsync {
 /// process, collecting all of its output and its exit status.
 #[must_use = "futures do nothing unless polled"]
 pub struct OutputAsync {
-    inner: IoFuture<Output>,
+    inner: Pin<Box<dyn Future<Output = io::Result<Output>> + Send>>,
 }
 
 impl fmt::Debug for OutputAsync {
@@ -636,11 +704,10 @@ impl fmt::Debug for OutputAsync {
 }
 
 impl Future for OutputAsync {
-    type Item = Output;
-    type Error = io::Error;
+    type Output = io::Result<Output>;
 
-    fn poll(&mut self) -> Poll<Output, io::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
 
@@ -678,40 +745,71 @@ pub struct ChildStderr {
 
 impl Write for ChildStdin {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.inner.write(bytes)
+        self.inner.get_mut().write(bytes)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        self.inner.get_mut().flush()
     }
 }
 
 impl AsyncWrite for ChildStdin {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        self.inner.shutdown()
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &[u8]
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_flush(cx)
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut Context
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_shutdown(cx)
     }
 }
 
 impl Read for ChildStdout {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(bytes)
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.get_mut().read(buf)
     }
 }
 
-impl AsyncRead for ChildStdout {}
+impl AsyncRead for ChildStdout {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut [u8]
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+    }
+}
 
 impl Read for ChildStderr {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(bytes)
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.get_mut().read(buf)
     }
 }
 
-impl AsyncRead for ChildStderr {}
+impl AsyncRead for ChildStderr {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut [u8]
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+    }
+}
 
 #[cfg(unix)]
 mod sys {
-    use super::{ChildStderr, ChildStdin, ChildStdout};
     use std::os::unix::io::{AsRawFd, RawFd};
+    use super::{ChildStdin, ChildStdout, ChildStderr};
 
     impl AsRawFd for ChildStdin {
         fn as_raw_fd(&self) -> RawFd {
@@ -734,8 +832,8 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
-    use super::{ChildStderr, ChildStdin, ChildStdout};
     use std::os::windows::io::{AsRawHandle, RawHandle};
+    use super::{ChildStdin, ChildStdout, ChildStderr};
 
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
@@ -758,10 +856,10 @@ mod sys {
 
 #[cfg(test)]
 mod test {
-    use super::ChildDropGuard;
-    use crate::kill::Kill;
     use futures::{Async, Future, Poll};
+    use kill::Kill;
     use std::io;
+    use super::ChildDropGuard;
 
     struct Mock {
         num_kills: usize,

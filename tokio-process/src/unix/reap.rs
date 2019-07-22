@@ -1,17 +1,22 @@
-use super::orphan::{OrphanQueue, Wait};
+use futures::stream::TryStream;
+use futures::stream::TryStreamExt;
 use crate::kill::Kill;
-use futures::{Async, Future, Poll, Stream};
+use std::future::Future;
 use std::io;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::process::ExitStatus;
+use std::task::Poll;
+use std::task::Context;
+use super::orphan::{OrphanQueue, Wait};
 
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.
 #[derive(Debug)]
 pub(crate) struct Reaper<W, Q, S>
-where
-    W: Wait,
-    Q: OrphanQueue<W>,
+    where W: Wait + Unpin,
+          Q: OrphanQueue<W> + Unpin,
+          S: Unpin,
 {
     inner: Option<W>,
     orphan_queue: Q,
@@ -19,9 +24,9 @@ where
 }
 
 impl<W, Q, S> Deref for Reaper<W, Q, S>
-where
-    W: Wait,
-    Q: OrphanQueue<W>,
+    where W: Wait + Unpin,
+          Q: OrphanQueue<W> + Unpin,
+          S: Unpin,
 {
     type Target = W;
 
@@ -31,9 +36,9 @@ where
 }
 
 impl<W, Q, S> Reaper<W, Q, S>
-where
-    W: Wait,
-    Q: OrphanQueue<W>,
+    where W: Wait + Unpin,
+          Q: OrphanQueue<W> + Unpin,
+          S: Unpin,
 {
     pub(crate) fn new(inner: W, orphan_queue: Q, signal: S) -> Self {
         Self {
@@ -53,15 +58,14 @@ where
 }
 
 impl<W, Q, S> Future for Reaper<W, Q, S>
-where
-    W: Wait,
-    Q: OrphanQueue<W>,
-    S: Stream<Error = io::Error>,
+    where W: Wait + Unpin,
+          Q: OrphanQueue<W> + Unpin,
+          S: TryStream<Error = io::Error> + Unpin,
 {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
         loop {
             // If the child hasn't exited yet, then it's our responsibility to
             // ensure the current task gets notified when it might be able to
@@ -82,17 +86,21 @@ where
             // this future's task will be notified/woken up again. Since the
             // futures model allows for spurious wake ups this extra wakeup
             // should not cause significant issues with parent futures.
-            let registered_interest = self.signal.poll()?.is_not_ready();
+            let signal_poll = inner.signal.try_poll_next_unpin(cx);
+            if let Poll::Ready(Some(Err(err))) = signal_poll {
+                return Poll::Ready(Err(err));
+            }
+            let registered_interest = signal_poll.is_pending();
 
-            self.orphan_queue.reap_orphans();
-            if let Some(status) = self.inner_mut().try_wait()? {
-                return Ok(Async::Ready(status));
+            inner.orphan_queue.reap_orphans();
+            if let Some(status) = inner.inner_mut().try_wait()? {
+                return Poll::Ready(Ok(status));
             }
 
             // If our attempt to poll for the next signal was not ready, then
             // we've arranged for our task to get notified and we can bail out.
             if registered_interest {
-                return Ok(Async::NotReady);
+                return Poll::Pending;
             } else {
                 // Otherwise, if the signal stream delivered a signal to us, we
                 // won't get notified at the next signal, so we'll loop and try
@@ -104,19 +112,20 @@ where
 }
 
 impl<W, Q, S> Kill for Reaper<W, Q, S>
-where
-    W: Kill + Wait,
-    Q: OrphanQueue<W>,
+    where W: Kill + Wait + Unpin,
+          Q: OrphanQueue<W> + Unpin,
+          S: Unpin,
 {
     fn kill(&mut self) -> io::Result<()> {
         self.inner_mut().kill()
     }
 }
 
+
 impl<W, Q, S> Drop for Reaper<W, Q, S>
-where
-    W: Wait,
-    Q: OrphanQueue<W>,
+    where W: Wait + Unpin,
+          Q: OrphanQueue<W> + Unpin,
+          S: Unpin,
 {
     fn drop(&mut self) {
         if let Ok(Some(_)) = self.inner_mut().try_wait() {
@@ -130,11 +139,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use futures::{Async, Poll, Stream};
     use std::cell::{Cell, RefCell};
-    use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
+    use std::os::unix::process::ExitStatusExt;
+    use super::*;
 
     #[derive(Debug)]
     struct MockWait {
@@ -150,7 +159,7 @@ mod test {
                 total_kills: 0,
                 total_waits: 0,
                 num_wait_until_status,
-                status,
+                status
             }
         }
     }
@@ -188,7 +197,7 @@ mod test {
         fn new(values: Vec<Option<()>>) -> Self {
             Self {
                 total_polls: 0,
-                values,
+                values
             }
         }
     }
@@ -222,7 +231,8 @@ mod test {
 
     impl<W: Wait> OrphanQueue<W> for MockQueue<W> {
         fn push_orphan(&self, orphan: W) {
-            self.all_enqueued.borrow_mut().push(orphan);
+            self.all_enqueued.borrow_mut()
+                .push(orphan);
         }
 
         fn reap_orphans(&self) {
@@ -234,11 +244,13 @@ mod test {
     fn reaper() {
         let exit = ExitStatus::from_raw(0);
         let mock = MockWait::new(exit, 3);
-        let mut grim = Reaper::new(
-            mock,
-            MockQueue::new(),
-            MockStream::new(vec![None, Some(()), None, None, None]),
-        );
+        let mut grim = Reaper::new(mock, MockQueue::new(), MockStream::new(vec!(
+            None,
+            Some(()),
+            None,
+            None,
+            None,
+        )));
 
         // Not yet exited, interest registered
         assert_eq!(Async::NotReady, grim.poll().expect("failed to wait"));
@@ -269,7 +281,7 @@ mod test {
         let mut grim = Reaper::new(
             MockWait::new(exit, 0),
             MockQueue::new(),
-            MockStream::new(vec![None]),
+            MockStream::new(vec!(None))
         );
 
         grim.kill().unwrap();
@@ -286,7 +298,11 @@ mod test {
         {
             let queue = MockQueue::new();
 
-            let grim = Reaper::new(&mut mock, &queue, MockStream::new(vec![]));
+            let grim = Reaper::new(
+                &mut mock,
+                &queue,
+                MockStream::new(vec!())
+            );
 
             drop(grim);
 
@@ -305,7 +321,11 @@ mod test {
 
         {
             let queue = MockQueue::<&mut MockWait>::new();
-            let grim = Reaper::new(&mut mock, &queue, MockStream::new(vec![]));
+            let grim = Reaper::new(
+                &mut mock,
+                &queue,
+                MockStream::new(vec!())
+            );
             drop(grim);
 
             assert_eq!(0, queue.total_reaps.get());
