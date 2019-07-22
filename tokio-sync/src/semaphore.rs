@@ -880,9 +880,8 @@ impl WaiterNode {
         NodeState::store(&self.state, Idle, Relaxed);
     }
 
-    #[allow(clippy::wrong_self_convention)]
-    fn into_non_null(arc: Arc<WaiterNode>) -> NonNull<WaiterNode> {
-        let ptr = Arc::into_raw(arc);
+    fn into_non_null(self: Arc<WaiterNode>) -> NonNull<WaiterNode> {
+        let ptr = Arc::into_raw(self);
         unsafe { NonNull::new_unchecked(ptr as *mut _) }
     }
 }
