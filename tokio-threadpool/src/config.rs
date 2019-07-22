@@ -14,9 +14,10 @@ pub(crate) struct Config {
     pub around_worker: Option<Callback>,
     pub after_start: Option<Arc<dyn Fn() + Send + Sync>>,
     pub before_stop: Option<Arc<dyn Fn() + Send + Sync>>,
-    #[allow(clippy::type_complexity)]
-    pub panic_handler: Option<Arc<dyn Fn(Box<dyn Any + Send>) + Send + Sync>>,
+    pub panic_handler: Option<PanicHandler>,
 }
+
+type PanicHandler = Arc<dyn Fn(Box<dyn Any + Send>) + Send + Sync>;
 
 /// Max number of workers that can be part of a pool. This is the most that can
 /// fit in the scheduler state. Note, that this is the max number of **active**
