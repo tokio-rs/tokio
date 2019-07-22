@@ -17,6 +17,7 @@ pub(crate) struct Config {
     pub panic_handler: Option<PanicHandler>,
 }
 
+// Define type alias to avoid clippy::type_complexity.
 type PanicHandler = Arc<dyn Fn(Box<dyn Any + Send>) + Send + Sync>;
 
 /// Max number of workers that can be part of a pool. This is the most that can
