@@ -121,6 +121,16 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let body = &input.block;
     let attrs = &input.attrs;
 
+    for attr in attrs {
+        if attr.path.is_ident("test") {
+            let tokens = quote_spanned! { input.span() =>
+                compile_error!("second test attribute is supplied");
+            };
+
+            return TokenStream::from(tokens);
+        }
+    }
+
     if input.asyncness.is_none() {
         let tokens = quote_spanned! { input.span() =>
           compile_error!("the async keyword is missing from the function declaration");
