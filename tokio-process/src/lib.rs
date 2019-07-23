@@ -175,18 +175,18 @@ use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
 use futures::future::FutureExt;
-use futures::future::TryFutureExt;
 use futures::future::TryFuture;
+use futures::future::TryFutureExt;
 use futures::io::{AsyncRead, AsyncWrite};
 
 use kill::Kill;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::Poll;
 use std::task::Context;
-use tokio::io::AsyncWrite as TokioAsyncWrite;
+use std::task::Poll;
 use tokio::io::AsyncRead as TokioAsyncRead;
+use tokio::io::AsyncWrite as TokioAsyncWrite;
 use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
@@ -346,13 +346,12 @@ struct SpawnedChild {
 
 impl CommandExt for Command {
     fn spawn_async_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
-        imp::spawn_child(self, handle)
-            .map(|spawned_child| Child {
-                child: ChildDropGuard::new(spawned_child.child),
-                stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
-                stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
-                stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
-            })
+        imp::spawn_child(self, handle).map(|spawned_child| Child {
+            child: ChildDropGuard::new(spawned_child.child),
+            stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
+            stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
+            stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
+        })
     }
 
     fn status_async_with_handle(&mut self, handle: &Handle) -> io::Result<StatusAsync> {
@@ -364,9 +363,7 @@ impl CommandExt for Command {
             child.stdout.take();
             child.stderr.take();
 
-            StatusAsync {
-                inner: child,
-            }
+            StatusAsync { inner: child }
         })
     }
 
@@ -387,14 +384,16 @@ impl CommandExt for Command {
 /// the contract of dropping a Future leads to "cancellation".
 #[derive(Debug)]
 struct ChildDropGuard<T: Kill>
-    where T: Unpin
+where
+    T: Unpin,
 {
     inner: T,
     kill_on_drop: bool,
 }
 
-impl<T: Kill> ChildDropGuard<T> 
-    where T: Unpin
+impl<T: Kill> ChildDropGuard<T>
+where
+    T: Unpin,
 {
     fn new(inner: T) -> Self {
         Self {
@@ -408,8 +407,9 @@ impl<T: Kill> ChildDropGuard<T>
     }
 }
 
-impl<T: Kill> Kill for ChildDropGuard<T> 
-    where T: Unpin
+impl<T: Kill> Kill for ChildDropGuard<T>
+where
+    T: Unpin,
 {
     fn kill(&mut self) -> io::Result<()> {
         let ret = self.inner.kill();
@@ -422,8 +422,9 @@ impl<T: Kill> Kill for ChildDropGuard<T>
     }
 }
 
-impl<T: Kill> Drop for ChildDropGuard<T> 
-    where T: Unpin
+impl<T: Kill> Drop for ChildDropGuard<T>
+where
+    T: Unpin,
 {
     fn drop(&mut self) {
         if self.kill_on_drop {
@@ -432,9 +433,9 @@ impl<T: Kill> Drop for ChildDropGuard<T>
     }
 }
 
-
-impl<T: TryFuture + Kill> Future for ChildDropGuard<T> 
-    where T: Unpin
+impl<T: TryFuture + Kill> Future for ChildDropGuard<T>
+where
+    T: Unpin,
 {
     type Output = Result<T::Ok, T::Error>;
 
@@ -532,11 +533,11 @@ impl Child {
                     futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
                     dbg!("READ TO END COMPLETE");
                     Ok(vec)
-                },
+                }
                 None => {
                     dbg!("STDOUT EMPTY");
                     Ok(Vec::new())
-                },
+                }
             }
         };
         let stderr_fut = async {
@@ -547,24 +548,25 @@ impl Child {
                     futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
                     dbg!("READ TO END COMPLETE");
                     Ok(vec)
-                },
+                }
                 None => {
                     dbg!("STDERR EMPTY");
                     Ok(Vec::new())
-                },
+                }
             }
         };
 
-
         WaitWithOutput {
-            inner: futures::future::try_join3(stdout_fut, stderr_fut, self).and_then(|(stdout, stderr, status)| {
-                futures::future::ok(Output {
-                    status,
-                    stdout,
-                    stderr,
+            inner: futures::future::try_join3(stdout_fut, stderr_fut, self)
+                .and_then(|(stdout, stderr, status)| {
+                    futures::future::ok(Output {
+                        status,
+                        stdout,
+                        stderr,
+                    })
                 })
-            }).boxed()
-        } 
+                .boxed(),
+        }
     }
 
     /// Drop this `Child` without killing the underlying process.
@@ -730,11 +732,7 @@ impl Write for ChildStdin {
 }
 
 impl AsyncWrite for ChildStdin {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &[u8]
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
         Pin::new(&mut Pin::get_mut(self).inner).poll_write(cx, buf)
     }
 
@@ -742,10 +740,7 @@ impl AsyncWrite for ChildStdin {
         Pin::new(&mut Pin::get_mut(self).inner).poll_flush(cx)
     }
 
-    fn poll_close(
-        self: Pin<&mut Self>,
-        cx: &mut Context
-    ) -> Poll<io::Result<()>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
         Pin::new(&mut Pin::get_mut(self).inner).poll_shutdown(cx)
     }
 }
@@ -760,7 +755,7 @@ impl AsyncRead for ChildStdout {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context,
-        buf: &mut [u8]
+        buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
     }
@@ -776,7 +771,7 @@ impl AsyncRead for ChildStderr {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context,
-        buf: &mut [u8]
+        buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
     }
@@ -784,8 +779,8 @@ impl AsyncRead for ChildStderr {
 
 #[cfg(unix)]
 mod sys {
+    use super::{ChildStderr, ChildStdin, ChildStdout};
     use std::os::unix::io::{AsRawFd, RawFd};
-    use super::{ChildStdin, ChildStdout, ChildStderr};
 
     impl AsRawFd for ChildStdin {
         fn as_raw_fd(&self) -> RawFd {
@@ -808,8 +803,8 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
+    use super::{ChildStderr, ChildStdin, ChildStdout};
     use std::os::windows::io::{AsRawHandle, RawHandle};
-    use super::{ChildStdin, ChildStdout, ChildStderr};
 
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
@@ -832,6 +827,7 @@ mod sys {
 
 #[cfg(test)]
 mod test {
+    use super::ChildDropGuard;
     use crate::kill::Kill;
     use futures::future::FutureExt;
     use std::future::Future;
@@ -839,7 +835,6 @@ mod test {
     use std::pin::Pin;
     use std::task::Context;
     use std::task::Poll;
-    use super::ChildDropGuard;
 
     struct Mock {
         num_kills: usize,

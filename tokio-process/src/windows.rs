@@ -15,8 +15,8 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-extern crate winapi;
 extern crate mio_named_pipes;
+extern crate winapi;
 
 use crate::kill::Kill;
 
@@ -31,9 +31,9 @@ use std::ptr;
 use std::task::Context;
 use std::task::Poll;
 
+use futures::channel::oneshot;
 use futures::future::Fuse;
 use futures::future::FutureExt;
-use futures::channel::oneshot;
 
 use self::mio_named_pipes::NamedPipe;
 use self::winapi::shared::minwindef::*;
@@ -109,7 +109,7 @@ impl Future for Child {
         loop {
             if let Some(ref mut w) = inner.waiting {
                 match w.rx.poll_unpin(cx) {
-                    Poll::Ready(Ok(())) => {},
+                    Poll::Ready(Ok(())) => {}
                     Poll::Ready(Err(_)) => panic!("should not be canceled"),
                     Poll::Pending => return Poll::Pending,
                 }
@@ -124,18 +124,19 @@ impl Future for Child {
             let ptr = Box::into_raw(Box::new(Some(tx)));
             let mut wait_object = ptr::null_mut();
             let rc = unsafe {
-                RegisterWaitForSingleObject(&mut wait_object,
-                                            inner.child.as_raw_handle(),
-                                            Some(callback),
-                                            ptr as *mut _,
-                                            INFINITE,
-                                            WT_EXECUTEINWAITTHREAD |
-                                              WT_EXECUTEONLYONCE)
+                RegisterWaitForSingleObject(
+                    &mut wait_object,
+                    inner.child.as_raw_handle(),
+                    Some(callback),
+                    ptr as *mut _,
+                    INFINITE,
+                    WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE,
+                )
             };
             if rc == 0 {
                 let err = io::Error::last_os_error();
                 drop(unsafe { Box::from_raw(ptr) });
-                return Poll::Ready(Err(err))
+                return Poll::Ready(Err(err));
             }
             inner.waiting = Some(Waiting {
                 rx: rx.fuse(),
@@ -158,8 +159,7 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: PVOID,
-                                   _timer_fired: BOOLEAN) {
+unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     let _ = complete.take().unwrap().send(());
 }
@@ -185,9 +185,9 @@ pub type ChildStdin = PollEvented<NamedPipe>;
 pub type ChildStdout = PollEvented<NamedPipe>;
 pub type ChildStderr = PollEvented<NamedPipe>;
 
-fn stdio<T>(option: Option<T>, handle: &Handle)
-            -> io::Result<Option<PollEvented<NamedPipe>>>
-    where T: IntoRawHandle,
+fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<NamedPipe>>>
+where
+    T: IntoRawHandle,
 {
     let io = match option {
         Some(io) => io,

@@ -70,7 +70,7 @@ impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
         let mut orphans = Vec::with_capacity(len);
         while let Ok(mut orphan) = self.queue.pop() {
             match orphan.try_wait() {
-                Ok(Some(_)) => {},
+                Ok(Some(_)) => {}
                 Err(e) => error!(
                     "leaking orphaned process {} due to try_wait() error: {}",
                     orphan.id(),
@@ -92,13 +92,13 @@ impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
 
 #[cfg(test)]
 mod test {
+    use super::Wait;
+    use super::{AtomicOrphanQueue, OrphanQueue};
     use std::cell::Cell;
     use std::io;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::rc::Rc;
-    use super::{AtomicOrphanQueue, OrphanQueue};
-    use super::Wait;
 
     struct MockWait {
         total_waits: Rc<Cell<usize>>,
