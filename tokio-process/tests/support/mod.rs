@@ -2,11 +2,11 @@ extern crate futures;
 extern crate tokio;
 
 use futures::future::FutureExt;
-use tokio::timer::Timeout;
 use std::env;
+use std::future::Future;
 use std::process::Command;
 use std::time::Duration;
-use std::future::Future;
+use tokio::timer::Timeout;
 
 pub use self::tokio::runtime::current_thread::Runtime as CurrentThreadRuntime;
 

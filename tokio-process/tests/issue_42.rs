@@ -3,13 +3,10 @@
 extern crate futures;
 extern crate tokio_process;
 
-use futures::future::FutureExt;
-use futures::stream::StreamExt;
-use futures::stream::TryStreamExt;
 use futures::stream;
 use std::process::{Command, Stdio};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio_process::CommandExt;
@@ -21,12 +18,15 @@ fn run_test() {
     thread::spawn(move || {
         let mut futures = stream::FuturesOrdered::new();
         for i in 0..2 {
-            futures.push(Command::new("echo")
+            futures.push(
+                Command::new("echo")
                     .arg(format!("I am spawned process #{}", i))
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
-                    .spawn_async().unwrap())
+                    .spawn_async()
+                    .unwrap(),
+            )
         }
         futures::executor::block_on_stream(futures);
 
@@ -34,7 +34,10 @@ fn run_test() {
     });
 
     thread::sleep(Duration::from_millis(100));
-    assert!(finished.load(Ordering::SeqCst), "FINISHED flag not set, maybe we deadlocked?");
+    assert!(
+        finished.load(Ordering::SeqCst),
+        "FINISHED flag not set, maybe we deadlocked?"
+    );
 }
 
 #[test]

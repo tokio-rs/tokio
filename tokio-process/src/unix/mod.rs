@@ -38,7 +38,6 @@ use self::mio::unix::{EventedFd, UnixReady};
 use self::mio::event::Evented;
 use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
-use self::libc::c_int;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -91,7 +90,7 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
-    inner: Reaper<process::Child, GlobalOrphanQueue, Pin<Box<dyn Stream<Item = io::Result<c_int>> + Send >>>,
+    inner: Reaper<process::Child, GlobalOrphanQueue, Pin<Box<dyn Stream<Item = io::Result<()>> + Send >>>,
 }
 
 impl fmt::Debug for Child {

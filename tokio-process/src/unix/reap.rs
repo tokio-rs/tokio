@@ -139,9 +139,13 @@ impl<W, Q, S> Drop for Reaper<W, Q, S>
 
 #[cfg(test)]
 mod test {
-    use futures::{Async, Poll, Stream};
+    use futures::future::FutureExt;
+    use futures::stream::Stream;
     use std::cell::{Cell, RefCell};
+    use std::pin::Pin;
     use std::process::ExitStatus;
+    use std::task::Context;
+    use std::task::Poll;
     use std::os::unix::process::ExitStatusExt;
     use super::*;
 
@@ -203,14 +207,14 @@ mod test {
     }
 
     impl Stream for MockStream {
-        type Item = ();
-        type Error = io::Error;
+        type Item = io::Result<()>;
 
-        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-            self.total_polls += 1;
-            match self.values.remove(0) {
-                Some(()) => Ok(Async::Ready(Some(()))),
-                None => Ok(Async::NotReady),
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
+            let inner = Pin::get_mut(self);
+            inner.total_polls += 1;
+            match inner.values.remove(0) {
+                Some(()) => Poll::Ready(Some(Ok(()))),
+                None => Poll::Pending,
             }
         }
     }
@@ -252,8 +256,11 @@ mod test {
             None,
         )));
 
+        let waker = futures::task::noop_waker();
+        let mut context = Context::from_waker(&waker);
+
         // Not yet exited, interest registered
-        assert_eq!(Async::NotReady, grim.poll().expect("failed to wait"));
+        assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(1, grim.signal.total_polls);
         assert_eq!(1, grim.total_waits);
         assert_eq!(1, grim.orphan_queue.total_reaps.get());
@@ -261,14 +268,20 @@ mod test {
 
         // Not yet exited, couldn't register interest the first time
         // but managed to register interest the second time around
-        assert_eq!(Async::NotReady, grim.poll().expect("failed to wait"));
+        assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(3, grim.signal.total_polls);
         assert_eq!(3, grim.total_waits);
         assert_eq!(3, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
 
         // Exited
-        assert_eq!(Async::Ready(exit), grim.poll().expect("failed to wait"));
+        if let Poll::Ready(r) = grim.poll_unpin(&mut context) {
+            assert!(r.is_ok());
+            let exit_code = r.unwrap();
+            assert_eq!(exit_code, exit);
+        } else {
+            unreachable!();
+        }
         assert_eq!(4, grim.signal.total_polls);
         assert_eq!(4, grim.total_waits);
         assert_eq!(4, grim.orphan_queue.total_reaps.get());

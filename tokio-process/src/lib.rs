@@ -177,7 +177,6 @@ use std::process::{Command, ExitStatus, Output, Stdio};
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::future::TryFuture;
-use futures::future::Either;
 use futures::io::{AsyncRead, AsyncWrite};
 
 use kill::Kill;
@@ -186,7 +185,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::Poll;
 use std::task::Context;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use tokio::io::AsyncWrite as TokioAsyncWrite;
 use tokio::io::AsyncRead as TokioAsyncRead;
 use tokio_reactor::Handle;
@@ -504,28 +502,6 @@ impl Child {
     /// captured
     pub fn stderr(&mut self) -> &mut Option<ChildStderr> {
         &mut self.stderr
-    }
-
-    async fn read_stdout_to_end(&mut self) -> io::Result<Vec<u8>> {
-        match self.stdout().take() {
-            Some(mut io) => {
-                let mut vec = Vec::new();
-                futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
-                Ok(vec)
-            },
-            None => Ok(Vec::new()),
-        }
-    }
-
-    async fn read_stderr_to_end(&mut self) -> io::Result<Vec<u8>> {
-        match self.stderr().take() {
-            Some(mut io) => {
-                let mut vec = Vec::new();
-                futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
-                Ok(vec)
-            },
-            None => Ok(Vec::new()),
-        }
     }
 
     /// Returns a future that will resolve to an `Output`, containing the exit
@@ -856,23 +832,27 @@ mod sys {
 
 #[cfg(test)]
 mod test {
-    use futures::{Async, Future, Poll};
-    use kill::Kill;
+    use crate::kill::Kill;
+    use futures::future::FutureExt;
+    use std::future::Future;
     use std::io;
+    use std::pin::Pin;
+    use std::task::Context;
+    use std::task::Poll;
     use super::ChildDropGuard;
 
     struct Mock {
         num_kills: usize,
         num_polls: usize,
-        poll_result: Poll<(), ()>,
+        poll_result: Poll<Result<(), ()>>,
     }
 
     impl Mock {
         fn new() -> Self {
-            Self::with_result(Ok(Async::NotReady))
+            Self::with_result(Poll::Pending)
         }
 
-        fn with_result(result: Poll<(), ()>) -> Self {
+        fn with_result(result: Poll<Result<(), ()>>) -> Self {
             Self {
                 num_kills: 0,
                 num_polls: 0,
@@ -889,12 +869,12 @@ mod test {
     }
 
     impl Future for Mock {
-        type Item = ();
-        type Error = ();
+        type Output = Result<(), ()>;
 
-        fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-            self.num_polls += 1;
-            self.poll_result
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
+            let inner = Pin::get_mut(self);
+            inner.num_polls += 1;
+            inner.poll_result
         }
     }
 
@@ -927,19 +907,21 @@ mod test {
 
     #[test]
     fn no_kill_if_reaped() {
-        let mut mock_pending = Mock::with_result(Ok(Async::NotReady));
-        let mut mock_reaped = Mock::with_result(Ok(Async::Ready(())));
-        let mut mock_err = Mock::with_result(Err(()));
+        let mut mock_pending = Mock::with_result(Poll::Pending);
+        let mut mock_reaped = Mock::with_result(Poll::Ready(Ok(())));
+        let mut mock_err = Mock::with_result(Poll::Ready(Err(())));
 
+        let waker = futures::task::noop_waker();
+        let mut context = Context::from_waker(&waker);
         {
             let mut guard = ChildDropGuard::new(&mut mock_pending);
-            let _ = guard.poll();
+            let _ = guard.poll_unpin(&mut context);
 
             let mut guard = ChildDropGuard::new(&mut mock_reaped);
-            let _ = guard.poll();
+            let _ = guard.poll_unpin(&mut context);
 
             let mut guard = ChildDropGuard::new(&mut mock_err);
-            let _ = guard.poll();
+            let _ = guard.poll_unpin(&mut context);
         }
 
         assert_eq!(1, mock_pending.num_kills);

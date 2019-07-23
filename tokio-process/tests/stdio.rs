@@ -6,24 +6,23 @@ extern crate log;
 extern crate tokio_io;
 extern crate tokio_process;
 
-use std::io;
-use std::process::{Stdio, ExitStatus, Command};
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
+use std::process::{Command, ExitStatus, Stdio};
 
 use futures::future::FutureExt;
 use futures::io::AsyncBufReadExt;
 use futures::io::AsyncReadExt;
 use futures::io::AsyncWriteExt;
 use futures::stream::{self, StreamExt};
-use tokio_process::{CommandExt, Child};
+use tokio_process::{Child, CommandExt};
 
 mod support;
 
 fn cat() -> Command {
     let mut cmd = support::cmd("cat");
-    cmd.stdin(Stdio::piped())
-       .stdout(Stdio::piped());
+    cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
     cmd
 }
 
@@ -34,47 +33,59 @@ fn feed_cat(mut cat: Child, n: usize) -> Pin<Box<dyn Future<Output = io::Result<
     debug!("starting to feed");
     // Produce n lines on the child's stdout.
     let numbers = stream::iter(0..n);
-    let write = numbers.fold(stdin, async move |mut stdin, i| {
-        debug!("sending line {} to child", i);
-        let bytes = format!("line {}\n", i).into_bytes();
-        AsyncWriteExt::write_all(&mut stdin, &bytes).await.unwrap();
-        stdin
-    }).map(|_| ());
+    let write = numbers
+        .fold(stdin, move |mut stdin, i| {
+            let fut = async move {
+                debug!("sending line {} to child", i);
+                let bytes = format!("line {}\n", i).into_bytes();
+                AsyncWriteExt::write_all(&mut stdin, &bytes).await.unwrap();
+                stdin
+            };
+            fut
+        })
+        .map(|_| ());
 
     // Try to read `n + 1` lines, ensuring the last one is empty
     // (i.e. EOF is reached after `n` lines.
     let reader = futures::io::BufReader::new(stdout);
     let expected_numbers = stream::iter(0..=n);
-    let read = expected_numbers.fold((reader, 0), async move |(mut reader, i), _| {
-        let done = i >= n;
-        debug!("starting read from child");
-        let mut vec = Vec::new();
-        AsyncBufReadExt::read_until(&mut reader, b'\n', &mut vec).await.unwrap();
-        debug!("read line {} from child ({} bytes, done: {})",
-            i, vec.len(), done);
-        match (done, vec.len()) {
-            (false, 0) => {
-                 panic!("broken pipe");
-            },
-            (true, n) if n != 0 => {
-                 panic!("extraneous data");
-            },
-            _ => {
-                let s = std::str::from_utf8(&vec).unwrap();
-                let expected = format!("line {}\n", i);
-                if done || s == expected {
-                    (reader, i + 1)
-                } else {
-                    panic!("unexpected data");
+    let read = expected_numbers.fold((reader, 0), move |(mut reader, i), _| {
+        let fut = async move {
+            let done = i >= n;
+            debug!("starting read from child");
+            let mut vec = Vec::new();
+            AsyncBufReadExt::read_until(&mut reader, b'\n', &mut vec)
+                .await
+                .unwrap();
+            debug!(
+                "read line {} from child ({} bytes, done: {})",
+                i,
+                vec.len(),
+                done
+            );
+            match (done, vec.len()) {
+                (false, 0) => {
+                    panic!("broken pipe");
+                }
+                (true, n) if n != 0 => {
+                    panic!("extraneous data");
+                }
+                _ => {
+                    let s = std::str::from_utf8(&vec).unwrap();
+                    let expected = format!("line {}\n", i);
+                    if done || s == expected {
+                        (reader, i + 1)
+                    } else {
+                        panic!("unexpected data");
+                    }
                 }
             }
-        }
+        };
+        fut
     });
 
     // Compose reading and writing concurrently.
-    futures::future::join(write, read).then(|_| {
-        cat
-    }).boxed()
+    futures::future::join(write, read).then(|_| cat).boxed()
 }
 
 /// Check for the following properties when feeding stdin and
