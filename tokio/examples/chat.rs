@@ -102,10 +102,7 @@ impl Shared {
 
 impl Peer {
     /// Create a new instance of `Peer`.
-    async fn new(
-        state: Arc<Mutex<Shared>>,
-        lines: Framed<TcpStream, LinesCodec>,
-    ) -> Peer {
+    async fn new(state: Arc<Mutex<Shared>>, lines: Framed<TcpStream, LinesCodec>) -> Peer {
         // Get the client socket address
         let addr = lines.get_ref().peer_addr().unwrap();
 
@@ -115,10 +112,7 @@ impl Peer {
         // Add an entry for this `Peer` in the shared state map.
         state.lock().await.peers.insert(addr, tx);
 
-        Peer {
-            lines,
-            rx,
-        }
+        Peer { lines, rx }
     }
 }
 
@@ -138,7 +132,6 @@ impl Stream for Peer {
 
         match self.lines.poll_next_unpin(cx) {
             Poll::Ready(Some(v)) => {
-
                 // #TODO LinesCodecError
                 /*let res = match v {
                     Ok(msg) => Ok(Message::MessageToSend(msg)),
@@ -158,8 +151,11 @@ impl Stream for Peer {
     }
 }
 
-async fn process(state: Arc<Mutex<Shared>>, stream: TcpStream, addr: SocketAddr) -> Result<(), Box<dyn Error>> {
-    
+async fn process(
+    state: Arc<Mutex<Shared>>,
+    stream: TcpStream,
+    addr: SocketAddr,
+) -> Result<(), Box<dyn Error>> {
     let mut lines = Framed::new(stream, LinesCodec::new());
     let username = lines.next().await?.unwrap();
     let mut peer = Peer::new(state.clone(), lines).await;
