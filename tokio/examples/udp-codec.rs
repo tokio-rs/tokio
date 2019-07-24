@@ -19,7 +19,7 @@ use tokio::net::UdpSocket;
 use tokio::util::FutureExt;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     let _ = env_logger::init();
 
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:0".to_string());

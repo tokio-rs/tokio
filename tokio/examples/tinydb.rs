@@ -85,7 +85,7 @@ enum Response {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
