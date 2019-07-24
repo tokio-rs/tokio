@@ -1028,17 +1028,15 @@ impl SemState {
     }
 
     /// Swap the values
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn swap(&self, cell: &AtomicUsize, ordering: Ordering) -> SemState {
+    fn swap(self, cell: &AtomicUsize, ordering: Ordering) -> SemState {
         let prev = SemState(cell.swap(self.to_usize(), ordering));
         debug_assert_eq!(prev.is_closed(), self.is_closed());
         prev
     }
 
     /// Compare and exchange the current value into the provided cell
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn compare_exchange(
-        &self,
+        self,
         cell: &AtomicUsize,
         prev: SemState,
         success: Ordering,
@@ -1116,9 +1114,8 @@ impl NodeState {
         cell.store(value.to_usize(), ordering);
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn compare_exchange(
-        &self,
+        self,
         cell: &AtomicUsize,
         prev: NodeState,
         success: Ordering,
