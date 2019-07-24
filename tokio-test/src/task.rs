@@ -33,7 +33,6 @@ pub struct MockTask {
     waker: Arc<ThreadWaker>,
 }
 
-#[allow(clippy::mutex_atomic)]
 #[derive(Debug)]
 struct ThreadWaker {
     state: Mutex<usize>,
@@ -107,7 +106,6 @@ impl Default for MockTask {
 
 impl ThreadWaker {
     fn new() -> Self {
-        #[allow(clippy::mutex_atomic)]
         ThreadWaker {
             state: Mutex::new(IDLE),
             condvar: Condvar::new(),
@@ -117,13 +115,11 @@ impl ThreadWaker {
     /// Clears any previously received wakes, avoiding potential spurrious
     /// wake notifications. This should only be called immediately before running the
     /// task.
-    #[allow(clippy::mutex_atomic)]
     fn clear(&self) {
         *self.state.lock().unwrap() = IDLE;
     }
 
     fn is_woken(&self) -> bool {
-        #[allow(clippy::mutex_atomic)]
         match *self.state.lock().unwrap() {
             IDLE => false,
             WAKE => true,
@@ -134,7 +130,6 @@ impl ThreadWaker {
     fn wake(&self) {
         // First, try transitioning from IDLE -> NOTIFY, this does not require a
         // lock.
-        #[allow(clippy::mutex_atomic)]
         let mut state = self.state.lock().unwrap();
         let prev = *state;
 
