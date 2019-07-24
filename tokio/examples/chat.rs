@@ -36,10 +36,10 @@ use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
+use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::io;
 
 use tokio;
 use tokio::codec::{Framed, LinesCodec, LinesCodecError};
@@ -105,7 +105,10 @@ impl Shared {
 
 impl Peer {
     /// Create a new instance of `Peer`.
-    async fn new(state: Arc<Mutex<Shared>>, lines: Framed<TcpStream, LinesCodec>) -> io::Result<Peer> {
+    async fn new(
+        state: Arc<Mutex<Shared>>,
+        lines: Framed<TcpStream, LinesCodec>,
+    ) -> io::Result<Peer> {
         // Get the client socket address
         let addr = lines.get_ref().peer_addr()?;
 
@@ -128,16 +131,18 @@ enum Message {
     Recieved(String),
 }
 
-// Peer implements a stream that polls both the Rx, and Framed<_, LinesCodec> types.
+// Peer implements `Stream` in a way that polls both the `Rx`, and `Framed` types.
 // A message is produced whenever an event is ready until the `Framed` stream returns `None`.
 impl Stream for Peer {
     type Item = Result<Message, LinesCodecError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // First poll the `UnboundedReciever`.
         while let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
             return Poll::Ready(Some(Ok(Message::Recieved(v))));
         }
 
+        // Secondly poll the `Framed` stream.
         match self.lines.poll_next_unpin(cx) {
             Poll::Ready(Some(v)) => {
                 let res = match v {
@@ -152,6 +157,7 @@ impl Stream for Peer {
             _ => {}
         }
 
+        // Nothing was ready so we return `Poll::Pending`.
         Poll::Pending
     }
 }
@@ -174,6 +180,7 @@ async fn process(
     // Register our peer with state which internally sets up some channels.
     let mut peer = Peer::new(state.clone(), lines).await?;
 
+    // A client has connected, let's let everyone know.
     {
         let mut state = state.lock().await;
         let msg = format!("{} has joined the chat", username);
