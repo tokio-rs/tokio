@@ -1,4 +1,5 @@
 use crate::UnixStream;
+use futures_core::ready;
 use mio::Ready;
 use mio_uds;
 use std::convert::TryFrom;
@@ -167,7 +168,7 @@ impl AsRawFd for UnixListener {
 }
 
 /// Future type returned by [`UnixListener::accept`].
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct Accept<'a> {
     listener: &'a mut UnixListener,

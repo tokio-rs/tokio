@@ -70,7 +70,7 @@ impl Enter {
         use std::task::Context;
         use std::task::Poll::Ready;
 
-        let park = ParkThread::new();
+        let mut park = ParkThread::new();
         let waker = park.unpark().into_waker();
         let mut cx = Context::from_waker(&waker);
 
@@ -82,6 +82,7 @@ impl Enter {
             if let Ready(v) = f.as_mut().poll(&mut cx) {
                 return v;
             }
+            park.park().unwrap();
         }
     }
 }

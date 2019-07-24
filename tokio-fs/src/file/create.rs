@@ -1,4 +1,6 @@
 use super::File;
+
+use futures_core::ready;
 use std::fs::File as StdFile;
 use std::future::Future;
 use std::io;
@@ -8,6 +10,7 @@ use std::task::Context;
 use std::task::Poll;
 
 /// Future returned by `File::create` and resolves to a `File` instance.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct CreateFuture<P> {
     path: P,
@@ -32,6 +35,6 @@ where
         let std = ready!(crate::blocking_io(|| StdFile::create(&self.path)))?;
 
         let file = File::from_std(std);
-        Poll::Ready(Ok(file.into()))
+        Poll::Ready(Ok(file))
     }
 }

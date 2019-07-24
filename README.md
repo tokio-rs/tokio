@@ -33,9 +33,9 @@ the Rust programming language. It is:
 [API Docs](https://docs.rs/tokio/0.1.22/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
-The API docs for the master branch are published [here][master-dox].
-
-[master-dox]: https://tokio-rs.github.io/tokio/doc/tokio/
+The API docs for the master branch are currently out of date as master is
+undergoing significant churn as it is updated to use `std::future`. The docs
+will be udpated once the branch stabilizes.
 
 ## Overview
 
@@ -139,8 +139,6 @@ The crates included as part of Tokio are:
 
 * [`tokio-fs`]: Filesystem (and standard in / out) APIs.
 
-* [`tokio-futures`]: Experimental `std::future::Future` and `async` / `await` support.
-
 * [`tokio-codec`]: Utilities for encoding and decoding protocol frames.
 
 * [`tokio-io`]: Asynchronous I/O related traits and utilities.
@@ -166,7 +164,6 @@ The crates included as part of Tokio are:
 [`tokio-current-thread`]: tokio-current-thread
 [`tokio-executor`]: tokio-executor
 [`tokio-fs`]: tokio-fs
-[`tokio-futures`]: tokio-futures
 [`tokio-io`]: tokio-io
 [`tokio-macros`]: tokio-macros
 [`tokio-reactor`]: tokio-reactor

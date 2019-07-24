@@ -85,7 +85,6 @@
 extern crate lazy_static;
 
 use futures_core::future::Future;
-use futures_core::stream::Stream;
 use std::io;
 use std::pin::Pin;
 
@@ -104,7 +103,5 @@ pub mod windows;
 
 /// A future whose output is `io::Result<T>`
 pub type IoFuture<T> = Pin<Box<dyn Future<Output = io::Result<T>> + Send>>;
-/// A stream whose item is `io::Result<T>`
-pub type IoStream<T> = Pin<Box<dyn Stream<Item = io::Result<T>> + Send>>;
 
 pub use ctrl_c::CtrlC;

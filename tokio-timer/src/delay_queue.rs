@@ -9,6 +9,7 @@ use crate::timer::Handle;
 use crate::wheel::{self, Wheel};
 use crate::{Delay, Error};
 
+use futures_core::ready;
 use slab::Slab;
 use std::cmp;
 use std::future::Future;

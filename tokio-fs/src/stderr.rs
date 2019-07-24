@@ -1,8 +1,9 @@
+use tokio_io::AsyncWrite;
+
 use std::io::{self, Stderr as StdStderr, Write};
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
-use tokio_io::AsyncWrite;
 
 /// A handle to the standard error stream of a process.
 ///

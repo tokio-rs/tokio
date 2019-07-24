@@ -58,6 +58,7 @@ use crate::task::AtomicWaker;
 use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;
+use futures_core::ready;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -303,7 +304,7 @@ impl<T> Clone for Receiver<T> {
         let ver = self.ver;
 
         Receiver {
-            shared: shared,
+            shared,
             inner,
             id,
             ver,
@@ -367,7 +368,7 @@ impl<T> Sender<T> {
 }
 
 #[cfg(feature = "async-traits")]
-impl<T> tokio_futures::Sink<T> for Sender<T> {
+impl<T> futures_sink::Sink<T> for Sender<T> {
     type Error = error::SendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

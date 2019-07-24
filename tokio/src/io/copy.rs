@@ -1,3 +1,4 @@
+use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -5,6 +6,7 @@ use std::task::{Context, Poll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Copy<'a, R: ?Sized, W: ?Sized> {
     reader: &'a mut R,
     read_done: bool,

@@ -20,6 +20,7 @@ pub fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> HardLinkFutu
 
 /// Future returned by `hard_link`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct HardLinkFuture<P, Q>
 where
     P: AsRef<Path>,
@@ -35,7 +36,7 @@ where
     Q: AsRef<Path>,
 {
     fn new(src: P, dst: Q) -> HardLinkFuture<P, Q> {
-        HardLinkFuture { src: src, dst: dst }
+        HardLinkFuture { src, dst }
     }
 }
 

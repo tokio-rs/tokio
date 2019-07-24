@@ -1,4 +1,6 @@
 use super::File;
+
+use futures_core::ready;
 use std::fs::File as StdFile;
 use std::fs::Metadata;
 use std::future::Future;
@@ -11,6 +13,7 @@ const POLL_AFTER_RESOLVE: &str = "Cannot poll MetadataFuture after it resolves";
 
 /// Future returned by `File::metadata` and resolves to a `(File, Metadata)` instance.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct MetadataFuture {
     file: Option<File>,
 }
@@ -33,6 +36,6 @@ impl Future for MetadataFuture {
         let metadata = ready!(crate::blocking_io(|| StdFile::metadata(inner.std())))?;
 
         let file = inner.file.take().expect(POLL_AFTER_RESOLVE);
-        Poll::Ready(Ok((file, metadata).into()))
+        Poll::Ready(Ok((file, metadata)))
     }
 }

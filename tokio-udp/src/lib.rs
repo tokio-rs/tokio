@@ -12,15 +12,6 @@
 //! Reading and writing to it can be done using futures, which return the
 //! [`Recv`], [`Send`], [`RecvFrom`] and [`SendTo`] structs respectively.
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(t) => t,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
-
 // mod frame;
 mod recv;
 mod recv_from;

@@ -30,9 +30,6 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
 
-#[macro_use]
-extern crate tokio_futures;
-
 mod create_dir;
 mod create_dir_all;
 pub mod file;
@@ -43,6 +40,7 @@ mod read;
 mod read_dir;
 mod read_link;
 mod remove_dir;
+mod remove_dir_all;
 mod remove_file;
 mod rename;
 mod set_permissions;
@@ -62,6 +60,7 @@ pub use crate::read::{read, ReadFile};
 pub use crate::read_dir::{read_dir, DirEntry, ReadDir, ReadDirFuture};
 pub use crate::read_link::{read_link, ReadLinkFuture};
 pub use crate::remove_dir::{remove_dir, RemoveDirFuture};
+pub use crate::remove_dir_all::{remove_dir_all, RemoveDirAllFuture};
 pub use crate::remove_file::{remove_file, RemoveFileFuture};
 pub use crate::rename::{rename, RenameFuture};
 pub use crate::set_permissions::{set_permissions, SetPermissionsFuture};

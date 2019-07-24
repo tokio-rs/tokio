@@ -1,5 +1,6 @@
 use crate::worker::Worker;
 
+use futures_core::ready;
 use std::error::Error;
 use std::fmt;
 use std::task::Poll;

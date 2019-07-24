@@ -215,7 +215,7 @@ mod transfer {
                 .and_then(|sock| {
                     sock.set_linger(Some(Duration::from_secs(0))).unwrap();
                     let drain = Drain {
-                        sock: sock,
+                        sock,
                         chunk: read_size,
                     };
                     drain
@@ -226,7 +226,7 @@ mod transfer {
 
             let client = TcpStream::connect(&addr)
                 .and_then(move |sock| Transfer {
-                    sock: sock,
+                    sock,
                     rem: MB,
                     chunk: write_size,
                 })

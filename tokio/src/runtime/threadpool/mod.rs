@@ -1,11 +1,15 @@
+mod background;
 mod builder;
 mod task_executor;
 
 pub use self::builder::Builder;
 pub use self::task_executor::TaskExecutor;
+use background::Background;
 
 use tokio_executor::enter;
+use tokio_timer::timer;
 
+use tracing_core as trace;
 use std::future::Future;
 use std::io;
 
@@ -32,6 +36,19 @@ pub struct Runtime {
 struct Inner {
     /// Task execution pool.
     pool: tokio_threadpool::ThreadPool,
+
+    /// Tracing dispatcher
+    trace: trace::Dispatch,
+
+    /// Maintains a reactor and timer that are always running on a background
+    /// thread. This is to support `runtime.block_on` w/o requiring the future
+    /// to be `Send`.
+    ///
+    /// A dedicated background thread is required as the threadpool threads
+    /// might not be running. However, this is a temporary work around.
+    ///
+    /// TODO: Delete this
+    background: Background,
 }
 
 // ===== impl Runtime =====
@@ -146,18 +163,22 @@ impl Runtime {
     /// future panics, or if called within an asynchronous execution context.
     pub fn block_on<F>(&self, future: F) -> F::Output
     where
-        F: Send + 'static + Future,
-        F::Output: Send + 'static,
+        F: Future,
     {
         let mut entered = enter().expect("nested block_on");
-        let (tx, rx) = crate::sync::oneshot::channel();
 
-        self.spawn(async move {
-            let res = future.await;
-            let _ = tx.send(res);
-        });
+        let bg = &self.inner().background;
+        let trace = &self.inner().trace;
 
-        entered.block_on(rx).expect("blocked on future paniced")
+        tokio_executor::with_default(&mut self.inner().pool.sender(), || {
+            tokio_reactor::with_default(bg.reactor(), || {
+                timer::with_default(bg.timer(), || {
+                    trace::dispatcher::with_default(trace, || {
+                        entered.block_on(future)
+                    })
+                })
+            })
+        })
     }
 
     /// Signals the runtime to shutdown once it becomes idle.

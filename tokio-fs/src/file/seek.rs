@@ -1,4 +1,6 @@
 use super::File;
+
+use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -7,6 +9,7 @@ use std::task::Poll;
 
 /// Future returned by `File::seek`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct SeekFuture {
     inner: Option<File>,
     pos: io::SeekFrom,
@@ -32,6 +35,6 @@ impl Future for SeekFuture {
             .expect("Cannot poll `SeekFuture` after it resolves")
             .poll_seek(inner_self.pos))?;
         let inner = inner_self.inner.take().unwrap();
-        Poll::Ready(Ok((inner, pos).into()))
+        Poll::Ready(Ok((inner, pos)))
     }
 }

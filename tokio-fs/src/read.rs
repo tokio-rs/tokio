@@ -1,11 +1,13 @@
 use crate::{file, File};
+
+use tokio_io::AsyncRead;
+
+use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 use std::{io, mem, path::Path};
-use tokio_io;
-use tokio_io::AsyncRead;
 
 /// Creates a future which will open a file for reading and read the entire
 /// contents into a buffer and return said buffer.
@@ -38,6 +40,7 @@ where
 
 /// A future used to open a file and read its entire contents into a buffer.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ReadFile<P: AsRef<Path> + Send + Unpin + 'static> {
     state: State<P>,
 }

@@ -16,6 +16,7 @@ use tokio_executor;
 use log::trace;
 use std::cell::Cell;
 use std::marker::PhantomData;
+use std::ptr;
 use std::rc::Rc;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
@@ -81,7 +82,7 @@ struct CurrentTask {
 pub struct WorkerId(pub(crate) usize);
 
 // Pointer to the current worker info
-thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(0 as *const _));
+thread_local!(static CURRENT_WORKER: Cell<*const Worker> = Cell::new(ptr::null()));
 
 impl Worker {
     pub(crate) fn new(
@@ -119,11 +120,11 @@ impl Worker {
             let mut sender = Sender { pool };
 
             // Enter an execution context
-            let mut enter = tokio_executor::enter().unwrap();
+            let _enter = tokio_executor::enter().unwrap();
 
-            tokio_executor::with_default(&mut sender, &mut enter, |enter| {
+            tokio_executor::with_default(&mut sender, || {
                 if let Some(ref callback) = self.pool.config.around_worker {
-                    callback.call(self, enter);
+                    callback.call(self);
                 } else {
                     self.run();
                 }

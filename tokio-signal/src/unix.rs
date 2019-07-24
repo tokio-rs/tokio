@@ -195,7 +195,7 @@ impl Driver {
         let stream = globals().receiver.try_clone()?;
         let wakeup = PollEvented::new_with_handle(stream, handle)?;
 
-        Ok(Driver { wakeup: wakeup })
+        Ok(Driver { wakeup })
     }
 
     /// Drain all data in the global receiver, ensuring we'll get woken up when
@@ -254,7 +254,6 @@ impl Driver {
 #[derive(Debug)]
 pub struct Signal {
     driver: Driver,
-    signal: c_int,
     rx: Receiver<()>,
 }
 
@@ -321,11 +320,7 @@ impl Signal {
             let (tx, rx) = channel(1);
             globals().register_listener(signal as EventId, tx);
 
-            Ok(Signal {
-                driver: driver,
-                rx: rx,
-                signal: signal,
-            })
+            Ok(Signal { driver, rx })
         })
         .boxed()
     }
@@ -336,12 +331,12 @@ impl Signal {
 }
 
 impl Stream for Signal {
-    type Item = c_int;
+    type Item = ();
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let _ = Pin::new(&mut self.driver).poll(cx);
 
-        self.rx.poll_recv(cx).map(|item| item.map(|()| self.signal))
+        self.rx.poll_recv(cx)
     }
 }
 

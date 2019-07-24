@@ -35,7 +35,7 @@ where
     Q: AsRef<Path>,
 {
     fn new(src: P, dst: Q) -> SymlinkDirFuture<P, Q> {
-        SymlinkDirFuture { src: src, dst: dst }
+        SymlinkDirFuture { src, dst }
     }
 }
 

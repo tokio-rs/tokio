@@ -10,6 +10,7 @@ mod semaphore;
 use crate::semaphore::*;
 
 use async_util::future::poll_fn;
+use futures_core::ready;
 use loom::futures::block_on;
 use loom::thread;
 use std::future::Future;
@@ -19,19 +20,6 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::task::Poll::Ready;
 use std::task::{Context, Poll};
-
-/// Unwrap a ready value or propagate `Poll::Pending`.
-#[macro_export]
-macro_rules! ready {
-    ($e:expr) => {{
-        use std::task::Poll::{Pending, Ready};
-
-        match $e {
-            Ready(v) => v,
-            Pending => return Pending,
-        }
-    }};
-}
 
 #[test]
 fn basic_usage() {

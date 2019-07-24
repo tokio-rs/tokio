@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 /// A future that sends a datagram to the connected address.
 ///
 /// This `struct` is created by [`send`](crate::UnixDatagram::send).
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct Send<'a, 'b> {
     socket: &'a UnixDatagram,

@@ -32,15 +32,6 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            ::std::task::Poll::Ready(v) => v,
-            ::std::task::Poll::Pending => return ::std::task::Poll::Pending,
-        }
-    };
-}
-
 mod poll_evented;
 mod registration;
 mod sharded_rwlock;
@@ -67,7 +58,6 @@ use std::task::Waker;
 use std::time::{Duration, Instant};
 use std::{fmt, usize};
 use tokio_executor::park::{Park, Unpark};
-use tokio_executor::Enter;
 use tokio_sync::task::AtomicWaker;
 
 /// The core reactor, or event loop.
@@ -171,9 +161,9 @@ fn _assert_kinds() {
 /// # Panics
 ///
 /// This function panics if there already is a default reactor set.
-pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
+pub fn with_default<F, R>(handle: &Handle, f: F) -> R
 where
-    F: FnOnce(&mut Enter) -> R,
+    F: FnOnce() -> R,
 {
     // Ensure that the executor is removed from the thread-local context
     // when leaving the scope. This handles cases that involve panicking.
@@ -212,7 +202,7 @@ where
             *current = Some(handle.clone());
         }
 
-        f(enter)
+        f()
     })
 }
 
@@ -234,7 +224,7 @@ impl Reactor {
             events: mio::Events::with_capacity(1024),
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
-                io: io,
+                io,
                 next_aba_guard: AtomicUsize::new(0),
                 io_dispatch: RwLock::new(Slab::with_capacity(1)),
                 wakeup: wakeup_pair.1,

@@ -24,6 +24,7 @@ where
 
 /// Future returned by `read_dir`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ReadDirFuture<P>
 where
     P: AsRef<Path> + Send + 'static,
@@ -36,7 +37,7 @@ where
     P: AsRef<Path> + Send + 'static,
 {
     fn new(path: P) -> ReadDirFuture<P> {
-        ReadDirFuture { path: path }
+        ReadDirFuture { path }
     }
 }
 
@@ -68,6 +69,7 @@ where
 /// [`Stream`]: ../futures/stream/trait.Stream.html
 /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html#variant.Err
 #[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
 pub struct ReadDir(StdReadDir);
 
 impl Stream for ReadDir {

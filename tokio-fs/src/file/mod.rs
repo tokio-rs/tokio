@@ -16,13 +16,14 @@ pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
 pub use self::seek::SeekFuture;
 
+use tokio_io::{AsyncRead, AsyncWrite};
+
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
-use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A reference to an open file on the filesystem.
 ///

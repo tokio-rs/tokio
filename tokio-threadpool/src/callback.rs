@@ -1,23 +1,22 @@
 use crate::worker::Worker;
 use std::fmt;
 use std::sync::Arc;
-use tokio_executor::Enter;
 
 #[derive(Clone)]
 pub(crate) struct Callback {
-    f: Arc<dyn Fn(&Worker, &mut Enter) + Send + Sync>,
+    f: Arc<dyn Fn(&Worker) + Send + Sync>,
 }
 
 impl Callback {
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(&Worker, &mut Enter) + Send + Sync + 'static,
+        F: Fn(&Worker) + Send + Sync + 'static,
     {
         Callback { f: Arc::new(f) }
     }
 
-    pub fn call(&self, worker: &Worker, enter: &mut Enter) {
-        (self.f)(worker, enter)
+    pub fn call(&self, worker: &Worker) {
+        (self.f)(worker)
     }
 }
 

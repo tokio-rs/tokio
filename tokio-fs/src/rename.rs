@@ -20,6 +20,7 @@ pub fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> RenameFuture<P,
 
 /// Future returned by `rename`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct RenameFuture<P, Q>
 where
     P: AsRef<Path>,
@@ -35,7 +36,7 @@ where
     Q: AsRef<Path>,
 {
     fn new(from: P, to: Q) -> RenameFuture<P, Q> {
-        RenameFuture { from: from, to: to }
+        RenameFuture { from, to }
     }
 }
 

@@ -302,7 +302,7 @@ impl Entry {
 
         self.waker.register_by_ref(cx.waker());
 
-        curr = self.state.load(SeqCst).into();
+        curr = self.state.load(SeqCst);
 
         if is_elapsed(curr) {
             return Poll::Ready(if curr == ERROR {

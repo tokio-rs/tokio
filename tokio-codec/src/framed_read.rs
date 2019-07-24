@@ -1,14 +1,15 @@
-use std::fmt;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use super::framed::Fuse;
 use super::Decoder;
-use tokio_futures::{Sink, Stream};
+
 use tokio_io::AsyncRead;
 
 use bytes::BytesMut;
+use futures_core::Stream;
+use futures_sink::Sink;
 use log::trace;
+use std::fmt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 pub struct FramedRead<T, D> {
@@ -137,7 +138,7 @@ where
 
 pub fn framed_read2<T>(inner: T) -> FramedRead2<T> {
     FramedRead2 {
-        inner: inner,
+        inner,
         eof: false,
         is_readable: false,
         buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
@@ -150,7 +151,7 @@ pub fn framed_read2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedRead2<T
         buf.reserve(bytes_to_reserve);
     }
     FramedRead2 {
-        inner: inner,
+        inner,
         eof: false,
         is_readable: buf.len() > 0,
         buffer: buf,

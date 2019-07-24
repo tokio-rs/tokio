@@ -100,7 +100,7 @@ impl Blocking {
         Blocking {
             state: AtomicUsize::new(init.into()),
             tail: UnsafeCell::new(ptr),
-            stub: stub,
+            stub,
             lock: AtomicUsize::new(0),
         }
     }

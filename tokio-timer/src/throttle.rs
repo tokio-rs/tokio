@@ -1,6 +1,7 @@
 //! Slow down a stream by enforcing a delay between items.
 
 use crate::{clock, Delay};
+use futures_core::ready;
 use futures_core::Stream;
 use std::{
     future::Future,
@@ -26,7 +27,7 @@ impl<T> Throttle<T> {
         Self {
             delay: Delay::new_timeout(clock::now() + duration, duration),
             has_delayed: true,
-            stream: stream,
+            stream,
         }
     }
 }

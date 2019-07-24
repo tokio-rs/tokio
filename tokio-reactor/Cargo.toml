@@ -33,6 +33,7 @@ slab = "0.4.0"
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
+futures-core-preview = "0.3.0-alpha.17"
 
 [dev-dependencies]
 num_cpus = "1.8.0"

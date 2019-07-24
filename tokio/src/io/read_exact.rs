@@ -1,3 +1,4 @@
+use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::marker::Unpin;
@@ -27,6 +28,7 @@ where
 ///
 /// On success the number of bytes is returned
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ReadExact<'a, A: ?Sized> {
     reader: &'a mut A,
     buf: &'a mut [u8],

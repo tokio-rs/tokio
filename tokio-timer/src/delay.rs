@@ -1,4 +1,5 @@
 use crate::timer::{HandlePriv, Registration};
+use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};

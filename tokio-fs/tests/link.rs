@@ -4,14 +4,14 @@
 use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
-use tempdir::TempDir;
+use tempfile::tempdir;
 use tokio_fs::*;
 
 mod pool;
 
 #[test]
 fn test_hard_link() {
-    let dir = TempDir::new("base").unwrap();
+    let dir = tempdir().unwrap();
     let src = dir.path().join("src.txt");
     let dst = dir.path().join("dst.txt");
 
@@ -41,7 +41,7 @@ fn test_hard_link() {
 #[cfg(unix)]
 #[test]
 fn test_symlink() {
-    let dir = TempDir::new("base").unwrap();
+    let dir = tempdir().unwrap();
     let src = dir.path().join("src.txt");
     let dst = dir.path().join("dst.txt");
 

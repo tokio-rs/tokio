@@ -1,3 +1,12 @@
+# 0.3.0
+
+### Changed
+- **Breaking:** `windows::Event` has been removed in favor of `CtrlC` and
+a separate `windows::CtrlBreak` struct.
+- **Breaking:** `ctrl_c{,_with_handle}` has been replaced with a `CtrlC` struct
+(which can be constructed via `CtrlC::{new, with_handle}`.
+- **Breaking:** `unix::Signal` returns `()` instead of the signal number used in registration
+
 # 0.2.9
 
 ### Fixed

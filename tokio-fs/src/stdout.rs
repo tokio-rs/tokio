@@ -1,8 +1,9 @@
+use tokio_io::AsyncWrite;
+
 use std::io::{self, Stdout as StdStdout, Write};
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
-use tokio_io::AsyncWrite;
 
 /// A handle to the standard output stream of a process.
 ///

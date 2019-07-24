@@ -40,7 +40,7 @@ default = [
 
 codec = ["io", "tokio-codec"]
 fs = ["tokio-fs"]
-io = ["bytes", "tokio-io"]
+io = ["bytes", "tokio-io", "memchr"]
 reactor = ["io", "tokio-reactor"]
 rt-full = [
   "num_cpus",
@@ -62,6 +62,7 @@ uds = ["tokio-uds"]
 [dependencies]
 # Only non-optional dependency...
 #futures = "0.1.20"
+futures-core-preview = "0.3.0-alpha.17"
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
@@ -75,18 +76,17 @@ tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
 tokio-reactor = { version = "0.2.0", optional = true, path = "../tokio-reactor" }
 tokio-sync = { version = "0.2.0", optional = true, path = "../tokio-sync", features = ["async-traits"] }
 tokio-threadpool = { version = "0.2.0", optional = true, path = "../tokio-threadpool" }
-tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp" }
+tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp", features = ["async-traits"] }
 tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
 tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer" }
 tracing-core = { version = "0.1", optional = true }
-
-# Needed for async/await preview support
-#tokio-futures = { version = "0.2.0", optional = true, path = "../tokio-futures" }
+memchr = { version = "2.2", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds" }
 
 [dev-dependencies]
+futures-preview = "0.3.0-alpha.17"
 tokio-test = { path = "../tokio-test" }
 pin-utils = "0.1.0-alpha.4"
 env_logger = { version = "0.5", default-features = false }
@@ -99,3 +99,4 @@ num_cpus = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = "0.1"
+futures-util-preview = "0.3.0-alpha.17"

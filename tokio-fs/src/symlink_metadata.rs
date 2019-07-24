@@ -1,4 +1,5 @@
 use super::blocking_io;
+
 use std::fs::{self, Metadata};
 use std::future::Future;
 use std::io;
@@ -21,6 +22,7 @@ where
 
 /// Future returned by `symlink_metadata`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct SymlinkMetadataFuture<P>
 where
     P: AsRef<Path> + Send + 'static,

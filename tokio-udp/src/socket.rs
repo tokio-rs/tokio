@@ -1,5 +1,6 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
 use super::{Recv, RecvFrom, Send, SendTo};
+use futures_core::ready;
 use mio;
 use std::convert::TryFrom;
 use std::fmt;
@@ -23,7 +24,7 @@ impl UdpSocket {
 
     fn new(socket: mio::net::UdpSocket) -> UdpSocket {
         let io = PollEvented::new(socket);
-        UdpSocket { io: io }
+        UdpSocket { io }
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.

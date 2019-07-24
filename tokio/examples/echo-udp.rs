@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Listening on: {}", socket.local_addr()?);
 
     let server = Server {
-        socket: socket,
+        socket,
         buf: vec![0; 1024],
         to_send: None,
     };

@@ -1,5 +1,9 @@
-use crate::split::{split, TcpStreamReadHalf, TcpStreamWriteHalf};
+use crate::split::{
+    split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
+    TcpStreamWriteHalfMut,
+};
 use bytes::{Buf, BufMut};
+use futures_core::ready;
 use iovec::IoVec;
 use mio;
 use std::convert::TryFrom;
@@ -45,7 +49,7 @@ pub struct TcpStream {
 
 /// Future returned by `TcpStream::connect` which will resolve to a `TcpStream`
 /// when the stream is connected.
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 struct ConnectFuture {
     inner: ConnectFutureState,
 }
@@ -150,7 +154,7 @@ impl TcpStream {
             Err(e) => Error(e),
         };
 
-        ConnectFuture { inner: inner }
+        ConnectFuture { inner }
     }
 
     /// Check the TCP stream's read readiness state.
@@ -721,6 +725,15 @@ impl TcpStream {
     /// details.
     pub fn split(self) -> (TcpStreamReadHalf, TcpStreamWriteHalf) {
         split(self)
+    }
+
+    /// Split a `TcpStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split_mut<'a>(&'a mut self) -> (TcpStreamReadHalfMut<'a>, TcpStreamWriteHalfMut<'a>) {
+        split_mut(self)
     }
 
     // == Poll IO functions that takes `&self` ==

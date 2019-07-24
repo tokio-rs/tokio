@@ -7,7 +7,6 @@ members = [
   "tokio-current-thread",
   "tokio-executor",
   "tokio-fs",
-  "tokio-futures",
   "tokio-io",
   "tokio-macros",
   "tokio-reactor",
@@ -17,7 +16,7 @@ members = [
   "tokio-threadpool",
   "tokio-timer",
   "tokio-tcp",
-  # "tokio-tls",
+  "tokio-tls",
   "tokio-udp",
   "tokio-uds",
 ]

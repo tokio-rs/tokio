@@ -6,6 +6,8 @@
 
 use crate::clock::now;
 use crate::Delay;
+#[cfg(feature = "async-traits")]
+use futures_core::ready;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -63,7 +65,7 @@ use std::time::{Duration, Instant};
 ///
 /// [`Error`]: struct.Error.html
 /// [`Timeout::into_inner`]: struct.Timeout.html#method.into_iter
-#[must_use = "futures do nothing unless polled"]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 pub struct Timeout<T> {
     value: T,
@@ -218,3 +220,9 @@ impl fmt::Display for Elapsed {
 }
 
 impl std::error::Error for Elapsed {}
+
+impl From<Elapsed> for std::io::Error {
+    fn from(_err: Elapsed) -> std::io::Error {
+        std::io::ErrorKind::TimedOut.into()
+    }
+}

@@ -34,7 +34,7 @@ impl AtomicStack {
     /// on the stack, `Err` if the timer is shutdown.
     pub fn push(&self, entry: &Arc<Entry>) -> Result<bool, Error> {
         // First, set the queued bit on the entry
-        let queued = entry.queued.fetch_or(true, SeqCst).into();
+        let queued = entry.queued.fetch_or(true, SeqCst);
 
         if queued {
             // Already queued, nothing more to do

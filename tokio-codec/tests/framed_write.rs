@@ -1,13 +1,13 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use bytes::{BufMut, BytesMut};
-use std::collections::VecDeque;
 use tokio_codec::{Encoder, FramedWrite};
-use tokio_futures::Sink;
 use tokio_io::AsyncWrite;
 use tokio_test::assert_ready;
 use tokio_test::task::MockTask;
 
+use bytes::{BufMut, BytesMut};
+use futures_sink::Sink;
+use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::pin::Pin;
 use std::task::Poll::{Pending, Ready};

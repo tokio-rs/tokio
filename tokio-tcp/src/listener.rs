@@ -1,6 +1,7 @@
-#[cfg(feature = "incoming")]
+#[cfg(feature = "async-traits")]
 use super::incoming::Incoming;
 use super::TcpStream;
+use futures_core::ready;
 use mio;
 use std::convert::TryFrom;
 use std::fmt;
@@ -287,7 +288,7 @@ impl TcpListener {
     ///     });
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "incoming")]
+    #[cfg(feature = "async-traits")]
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
     }

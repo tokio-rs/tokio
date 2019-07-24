@@ -2,7 +2,7 @@ trigger: ["master", "std-future"]
 pr: ["master", "std-future"]
 
 variables:
-  nightly: nightly-2019-07-09
+  nightly: nightly-2019-07-17
 
 jobs:
 # Check formatting
@@ -34,7 +34,7 @@ jobs:
       tokio-reactor: []
       tokio-signal: []
       tokio-tcp:
-        - incoming
+        - async-traits
 #       - tokio-tls
       tokio-udp: []
       tokio-uds:
