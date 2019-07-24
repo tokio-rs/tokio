@@ -85,6 +85,8 @@ impl Shared {
         }
     }
 
+    /// Send a `LineCodec` encoded message to every peer, without
+    /// including the sender.
     async fn broadcast(
         &mut self,
         sender: SocketAddr,
@@ -118,22 +120,27 @@ impl Peer {
 
 #[derive(Debug)]
 enum Message {
-    MessageToSend(String),
-    MessageToReceieve(String),
+    /// A message that should be broadcasted to others.
+    Broadcast(String),
+
+    /// A message that should be recieved by a client
+    Recieved(String),
 }
 
+// Peer implements a stream that polls both the Rx, and Framed<_, LinesCodec> type.
+// A message is produced whenever an event is ready until the Framed stream returns `None`.
 impl Stream for Peer {
     type Item = Result<Message, LinesCodecError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         while let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
-            return Poll::Ready(Some(Ok(Message::MessageToReceieve(v))));
+            return Poll::Ready(Some(Ok(Message::Recieved(v))));
         }
 
         match self.lines.poll_next_unpin(cx) {
             Poll::Ready(Some(v)) => {
                 let res = match v {
-                    Ok(msg) => Ok(Message::MessageToSend(msg)),
+                    Ok(msg) => Ok(Message::Broadcast(msg)),
                     Err(e) => Err(e),
                 };
                 return Poll::Ready(Some(res));
@@ -148,6 +155,7 @@ impl Stream for Peer {
     }
 }
 
+/// Process an individual chat client
 async fn process(
     state: Arc<Mutex<Shared>>,
     stream: TcpStream,
@@ -155,8 +163,10 @@ async fn process(
 ) -> Result<(), Box<dyn Error>> {
     let mut lines = Framed::new(stream, LinesCodec::new());
 
+    // Read the first line from the `LineCodec` stream to get the username.
     let username = lines.next().await.unwrap()?;
 
+    // Register our peer with state which internally sets up some channels.
     let mut peer = Peer::new(state.clone(), lines).await;
 
     {
@@ -166,20 +176,27 @@ async fn process(
         state.broadcast(addr, &msg).await?;
     }
 
+    // Process incoming messages until our stream is exhausted by a disconnect.
     while let Some(Ok(msg)) = peer.next().await {
         match msg {
-            Message::MessageToSend(msg) => {
+            // A message was recieved from the current user, we should
+            // broadcast this message to the other users.
+            Message::Broadcast(msg) => {
                 let mut state = state.lock().await;
                 let msg = format!("{}: {}", username, msg);
 
                 state.broadcast(addr, &msg).await?;
             }
-            Message::MessageToReceieve(msg) => {
+            // A message was recieved from a peer. Send it to the
+            // current user.
+            Message::Recieved(msg) => {
                 peer.lines.send(msg).await?;
             }
         }
     }
 
+    // If this section is reached it means that the client was disconnected!
+    // Let's let everyone still connected know about it.
     {
         let mut state = state.lock().await;
         state.peers.remove(&addr);
@@ -215,8 +232,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // Asynchronously wait for an inbound TcpStream.
         let (stream, addr) = listener.accept().await?;
 
+        // Clone a handle to the `Shared` state for the new connection.
         let state = state.clone();
 
+        // Spawn our handler to be run asynchronously.
         tokio::spawn(async move {
             if let Err(e) = process(state, stream, addr).await {
                 println!("an error occured; error = {:?}", e);
