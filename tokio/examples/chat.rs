@@ -157,7 +157,9 @@ async fn process(
     addr: SocketAddr,
 ) -> Result<(), Box<dyn Error>> {
     let mut lines = Framed::new(stream, LinesCodec::new());
-    let username = lines.next().await?.unwrap();
+
+    let username = lines.next().await.unwrap()?;
+
     let mut peer = Peer::new(state.clone(), lines).await;
 
     {
