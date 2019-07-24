@@ -38,8 +38,7 @@ impl State {
     }
 
     /// Returns the number of futures still pending completion.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub(crate) fn num_futures(&self) -> usize {
+    pub(crate) fn num_futures(self) -> usize {
         self.0 >> NUM_FUTURES_OFFSET
     }
 
@@ -74,8 +73,7 @@ impl State {
         self.0 &= LIFECYCLE_MASK;
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub(crate) fn lifecycle(&self) -> Lifecycle {
+    pub(crate) fn lifecycle(self) -> Lifecycle {
         (self.0 & LIFECYCLE_MASK).into()
     }
 
@@ -83,8 +81,7 @@ impl State {
         self.0 = (self.0 & NUM_FUTURES_MASK) | (val as usize);
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub(crate) fn is_terminated(&self) -> bool {
+    pub(crate) fn is_terminated(self) -> bool {
         self.lifecycle() == Lifecycle::ShutdownNow && self.num_futures() == 0
     }
 }

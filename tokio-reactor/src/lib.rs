@@ -352,7 +352,7 @@ impl Reactor {
 
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
-            if ready.is_writable() || platform::is_hup(&ready) {
+            if ready.is_writable() || platform::is_hup(ready) {
                 wr = io.writer.take_waker();
             }
 
@@ -570,9 +570,8 @@ impl Drop for Inner {
 }
 
 impl Direction {
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn mask(&self) -> mio::Ready {
-        match *self {
+    fn mask(self) -> mio::Ready {
+        match self {
             Direction::Read => {
                 // Everything except writable is signaled through read.
                 mio::Ready::all() - mio::Ready::writable()
@@ -591,9 +590,8 @@ mod platform {
         UnixReady::hup().into()
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn is_hup(ready: &Ready) -> bool {
-        UnixReady::from(*ready).is_hup()
+    pub fn is_hup(ready: Ready) -> bool {
+        UnixReady::from(ready).is_hup()
     }
 }
 
@@ -605,8 +603,7 @@ mod platform {
         Ready::empty()
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn is_hup(_: &Ready) -> bool {
+    pub fn is_hup(_: Ready) -> bool {
         false
     }
 }

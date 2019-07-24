@@ -212,8 +212,7 @@ impl State {
     }
 
     #[inline]
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn head(&self) -> usize {
+    fn head(self) -> usize {
         self.0 & STACK_MASK
     }
 

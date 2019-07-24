@@ -499,8 +499,7 @@ impl State {
         State(0)
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_complete(&self) -> bool {
+    fn is_complete(self) -> bool {
         self.0 & VALUE_SENT == VALUE_SENT
     }
 
@@ -512,8 +511,7 @@ impl State {
         State(val)
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_rx_task_set(&self) -> bool {
+    fn is_rx_task_set(self) -> bool {
         self.0 & RX_TASK_SET == RX_TASK_SET
     }
 
@@ -527,8 +525,7 @@ impl State {
         State(val & !RX_TASK_SET)
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_closed(&self) -> bool {
+    fn is_closed(self) -> bool {
         self.0 & CLOSED == CLOSED
     }
 
@@ -549,8 +546,7 @@ impl State {
         State(val & !TX_TASK_SET)
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_tx_task_set(&self) -> bool {
+    fn is_tx_task_set(self) -> bool {
         self.0 & TX_TASK_SET == TX_TASK_SET
     }
 
