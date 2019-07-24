@@ -351,6 +351,18 @@ impl TryFrom<TcpListener> for mio::net::TcpListener {
     }
 }
 
+impl TryFrom<net::TcpListener> for TcpListener {
+    type Error = io::Error;
+
+    /// Consumes stream, returning the tokio I/O object.
+    ///
+    /// This is equivalent to
+    /// [`TcpListener::from_std(stream, &Handle::default())`](TcpListener::from_std).
+    fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
+        Self::from_std(stream, &Handle::default())
+    }
+}
+
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)

@@ -130,6 +130,18 @@ impl TryFrom<UnixStream> for mio_uds::UnixStream {
     }
 }
 
+impl TryFrom<net::UnixStream> for UnixStream {
+    type Error = io::Error;
+
+    /// Consumes stream, returning the tokio I/O object.
+    ///
+    /// This is equivalent to
+    /// [`UnixStream::from_std(stream, &Handle::default())`](UnixStream::from_std).
+    fn try_from(stream: net::UnixStream) -> io::Result<Self> {
+        Self::from_std(stream, &Handle::default())
+    }
+}
+
 impl AsyncRead for UnixStream {
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
         false
