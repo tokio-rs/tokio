@@ -89,7 +89,7 @@ impl Shared {
         &mut self,
         sender: SocketAddr,
         message: &str,
-    ) -> Result<(), futures::channel::mpsc::SendError> {
+    ) -> Result<(), mpsc::SendError> {
         for peer in self.peers.iter_mut() {
             if *peer.0 != sender {
                 peer.1.send(message.into()).await?;
@@ -162,10 +162,11 @@ async fn process(
     {
         let mut state = state.lock().await;
         let msg = format!("{} has joined the chat", username);
+        println!("{}", msg);
         state.broadcast(addr, &msg).await?;
     }
 
-    while let Ok(msg) = peer.next().await.unwrap() {
+    while let Some(Ok(msg)) = peer.next().await {
         match msg {
             Message::MessageToSend(msg) => {
                 let mut state = state.lock().await;
@@ -184,6 +185,7 @@ async fn process(
         state.peers.remove(&addr);
 
         let msg = format!("{} has left the chat", username);
+        println!("{}", msg);
         state.broadcast(addr, &msg).await?;
     }
 
