@@ -41,7 +41,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use tokio;
-use tokio::codec::{Framed, LinesCodec};
+use tokio::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
@@ -123,7 +123,7 @@ enum Message {
 }
 
 impl Stream for Peer {
-    type Item = Result<Message, ()>; // #TODO LinesCodecError
+    type Item = Result<Message, LinesCodecError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         while let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
@@ -132,14 +132,11 @@ impl Stream for Peer {
 
         match self.lines.poll_next_unpin(cx) {
             Poll::Ready(Some(v)) => {
-                // #TODO LinesCodecError
-                /*let res = match v {
+                let res = match v {
                     Ok(msg) => Ok(Message::MessageToSend(msg)),
                     Err(e) => Err(e),
                 };
-                return Poll::Ready(Some(res));*/
-
-                return Poll::Ready(Some(Ok(Message::MessageToSend(v.unwrap()))));
+                return Poll::Ready(Some(res));
             }
             Poll::Ready(None) => {
                 return Poll::Ready(None);
