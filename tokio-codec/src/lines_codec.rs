@@ -190,9 +190,12 @@ impl Encoder for LinesCodec {
     }
 }
 
+/// An error occured while encoding or decoding a line.
 #[derive(Debug)]
 pub enum LinesCodecError {
+    /// The maximum line length was exceeded.
     MaxLineLengthExceeded,
+    /// An IO error occured.
     Io(io::Error),
 }
 
