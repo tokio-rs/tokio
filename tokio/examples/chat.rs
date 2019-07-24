@@ -39,6 +39,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::io;
 
 use tokio;
 use tokio::codec::{Framed, LinesCodec, LinesCodecError};
@@ -104,9 +105,9 @@ impl Shared {
 
 impl Peer {
     /// Create a new instance of `Peer`.
-    async fn new(state: Arc<Mutex<Shared>>, lines: Framed<TcpStream, LinesCodec>) -> Peer {
+    async fn new(state: Arc<Mutex<Shared>>, lines: Framed<TcpStream, LinesCodec>) -> io::Result<Peer> {
         // Get the client socket address
-        let addr = lines.get_ref().peer_addr().unwrap();
+        let addr = lines.get_ref().peer_addr()?;
 
         // Create a channel for this peer
         let (tx, rx) = mpsc::unbounded();
@@ -114,7 +115,7 @@ impl Peer {
         // Add an entry for this `Peer` in the shared state map.
         state.lock().await.peers.insert(addr, tx);
 
-        Peer { lines, rx }
+        Ok(Peer { lines, rx })
     }
 }
 
@@ -127,8 +128,8 @@ enum Message {
     Recieved(String),
 }
 
-// Peer implements a stream that polls both the Rx, and Framed<_, LinesCodec> type.
-// A message is produced whenever an event is ready until the Framed stream returns `None`.
+// Peer implements a stream that polls both the Rx, and Framed<_, LinesCodec> types.
+// A message is produced whenever an event is ready until the `Framed` stream returns `None`.
 impl Stream for Peer {
     type Item = Result<Message, LinesCodecError>;
 
@@ -164,10 +165,14 @@ async fn process(
     let mut lines = Framed::new(stream, LinesCodec::new());
 
     // Read the first line from the `LineCodec` stream to get the username.
-    let username = lines.next().await.unwrap()?;
+    let username = match lines.next().await {
+        Some(Ok(line)) => line,
+        // We didn't get a line so we return here.
+        _ => return Ok(()),
+    };
 
     // Register our peer with state which internally sets up some channels.
-    let mut peer = Peer::new(state.clone(), lines).await;
+    let mut peer = Peer::new(state.clone(), lines).await?;
 
     {
         let mut state = state.lock().await;
