@@ -18,6 +18,7 @@ pub use self::seek::SeekFuture;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
+use std::convert::TryFrom;
 use std::fs::{File as StdFile, Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
@@ -534,5 +535,21 @@ impl Drop for File {
             // This is probably fine as closing a file *shouldn't* be a blocking
             // operation. That said, ideally `shutdown` is called first.
         }
+    }
+}
+
+impl From<StdFile> for File {
+    fn from(std: StdFile) -> Self {
+        Self::from_std(std)
+    }
+}
+
+impl TryFrom<File> for StdFile {
+    type Error = io::Error;
+
+    fn try_from(mut file: File) -> Result<Self, Self::Error> {
+        file.std
+            .take()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "`File` instance already shutdown"))
     }
 }
