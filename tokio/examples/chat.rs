@@ -111,8 +111,8 @@ impl Shared {
         }
     }
 
-    /// Send a `LineCodec` encoded message to every peer, without
-    /// including the sender.
+    /// Send a `LineCodec` encoded message to every peer, except
+    /// for the sender.
     async fn broadcast(
         &mut self,
         sender: SocketAddr,
