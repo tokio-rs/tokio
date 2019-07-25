@@ -15,20 +15,20 @@
 //! instead of yielding arbitrary values, it only yields types that implement
 //! `Buf` (i.e, byte collections).
 
-mod never;
+// mod never;
 mod size_hint;
-mod str;
-mod u8;
-#[cfg(feature = "util")]
-pub mod util;
+// mod str;
+// mod u8;
+// #[cfg(feature = "util")]
+// pub mod util;
 
 pub use self::size_hint::SizeHint;
-#[doc(inline)]
-#[cfg(feature = "util")]
-pub use crate::util::BufStreamExt;
+// #[doc(inline)]
+// #[cfg(feature = "util")]
+// pub use crate::util::BufStreamExt;
 
 use bytes::Buf;
-use futures::Poll;
+use std::task::{Context, Poll};
 
 /// An asynchronous stream of bytes.
 ///
@@ -68,7 +68,7 @@ pub trait BufStream {
     ///
     /// Once a stream is finished, i.e. `Ready(None)` has been returned, further
     /// calls to `poll_buf` may result in a panic or other "bad behavior".
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error>;
+    fn poll_buf(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Self::Item, Self::Error>>>;
 
     /// Returns the bounds on the remaining length of the stream.
     ///
