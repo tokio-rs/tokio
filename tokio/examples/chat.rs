@@ -27,22 +27,19 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use futures::lock::Mutex;
-use futures::{Poll, SinkExt, Stream, StreamExt};
+use futures::{lock::Mutex, Poll, SinkExt, Stream, StreamExt};
 
-use std::collections::HashMap;
-use std::env;
-use std::error::Error;
-use std::io;
-use std::net::SocketAddr;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::Context;
+use std::{
+    collections::HashMap, env, error::Error, io, net::SocketAddr, pin::Pin, sync::Arc,
+    task::Context,
+};
 
-use tokio;
-use tokio::codec::{Framed, LinesCodec, LinesCodecError};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::mpsc;
+use tokio::{
+    self,
+    codec::{Framed, LinesCodec, LinesCodecError},
+    net::{TcpListener, TcpStream},
+    sync::mpsc,
+};
 
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<String>;
