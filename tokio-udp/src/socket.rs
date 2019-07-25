@@ -451,6 +451,18 @@ impl TryFrom<UdpSocket> for mio::net::UdpSocket {
     }
 }
 
+impl TryFrom<net::UdpSocket> for UdpSocket {
+    type Error = io::Error;
+
+    /// Consumes stream, returning the tokio I/O object.
+    ///
+    /// This is equivalent to
+    /// [`UdpSocket::from_std(stream, &Handle::default())`](UdpSocket::from_std).
+    fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
+        Self::from_std(stream, &Handle::default())
+    }
+}
+
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)

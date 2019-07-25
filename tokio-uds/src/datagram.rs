@@ -2,6 +2,7 @@ use crate::{Recv, RecvFrom, Send, SendTo};
 use futures_core::ready;
 use mio::Ready;
 use mio_uds;
+use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
@@ -309,6 +310,30 @@ impl UnixDatagram {
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
+    }
+}
+
+impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {
+    type Error = io::Error;
+
+    /// Consumes value, returning the mio I/O object.
+    ///
+    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// resource deregistration that happens during the call.
+    fn try_from(value: UnixDatagram) -> Result<Self, Self::Error> {
+        value.io.into_inner()
+    }
+}
+
+impl TryFrom<net::UnixDatagram> for UnixDatagram {
+    type Error = io::Error;
+
+    /// Consumes stream, returning the tokio I/O object.
+    ///
+    /// This is equivalent to
+    /// [`UnixDatagram::from_std(stream, &Handle::default())`](UnixDatagram::from_std).
+    fn try_from(stream: net::UnixDatagram) -> Result<Self, Self::Error> {
+        Self::from_std(stream, &Handle::default())
     }
 }
 

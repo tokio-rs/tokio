@@ -83,7 +83,7 @@ tracing-core = { version = "0.1", optional = true }
 memchr = { version = "2.2", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds" }
+tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds", features = ["async-traits"] }
 
 [dev-dependencies]
 futures-preview = "0.3.0-alpha.17"

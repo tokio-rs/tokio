@@ -155,6 +155,18 @@ impl TryFrom<UnixListener> for mio_uds::UnixListener {
     }
 }
 
+impl TryFrom<net::UnixListener> for UnixListener {
+    type Error = io::Error;
+
+    /// Consumes stream, returning the tokio I/O object.
+    ///
+    /// This is equivalent to
+    /// [`UnixListener::from_std(stream, &Handle::default())`](UnixListener::from_std).
+    fn try_from(stream: net::UnixListener) -> io::Result<Self> {
+        Self::from_std(stream, &Handle::default())
+    }
+}
+
 impl fmt::Debug for UnixListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
