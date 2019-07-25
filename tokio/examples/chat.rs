@@ -29,16 +29,13 @@
 
 use futures::{Poll, SinkExt, Stream, StreamExt};
 
-use std::{
-    collections::HashMap, env, error::Error, io, net::SocketAddr, pin::Pin,
-    task::Context,
-};
+use std::{collections::HashMap, env, error::Error, io, net::SocketAddr, pin::Pin, task::Context};
 
 use tokio::{
     self,
     codec::{Framed, LinesCodec, LinesCodecError},
     net::{TcpListener, TcpStream},
-    sync::{mpsc, lock::Lock},
+    sync::{lock::Lock, mpsc},
 };
 
 /// Shorthand for the transmit half of the message channel.
