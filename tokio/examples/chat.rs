@@ -43,7 +43,6 @@ use tokio;
 use tokio::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
-//use tokio::sync::lock::Lock;
 
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<String>;
