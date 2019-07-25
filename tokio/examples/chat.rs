@@ -165,7 +165,7 @@ async fn process(
 ) -> Result<(), Box<dyn Error>> {
     let mut lines = Framed::new(stream, LinesCodec::new());
 
-    // Send a prompt to the client to let them know to enter their username.
+    // Send a prompt to the client to enter their username.
     lines
         .send(String::from("Please enter your username:"))
         .await?;
