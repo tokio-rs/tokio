@@ -188,21 +188,32 @@ async fn process(
     }
 
     // Process incoming messages until our stream is exhausted by a disconnect.
-    while let Some(Ok(msg)) = peer.next().await {
-        match msg {
-            // A message was recieved from the current user, we should
-            // broadcast this message to the other users.
-            Message::Broadcast(msg) => {
-                let mut state = state.lock().await;
-                let msg = format!("{}: {}", username, msg);
+    'processing: loop {
+        match peer.next().await {
+            Some(Ok(msg)) => {
+                match msg {
+                    // A message was recieved from the current user, we should
+                    // broadcast this message to the other users.
+                    Message::Broadcast(msg) => {
+                        let mut state = state.lock().await;
+                        let msg = format!("{}: {}", username, msg);
 
-                state.broadcast(addr, &msg).await?;
+                        state.broadcast(addr, &msg).await?;
+                    }
+                    // A message was recieved from a peer. Send it to the
+                    // current user.
+                    Message::Recieved(msg) => {
+                        peer.lines.send(msg).await?;
+                    }
+                }
             }
-            // A message was recieved from a peer. Send it to the
-            // current user.
-            Message::Recieved(msg) => {
-                peer.lines.send(msg).await?;
+            Some(Err(e)) => {
+                println!(
+                    "an error occured while processing messages for {}; error = {:?}",
+                    username, e
+                );
             }
+            None => break 'processing,
         }
     }
 
