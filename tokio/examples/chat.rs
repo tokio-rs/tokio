@@ -137,27 +137,24 @@ impl Stream for Peer {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // First poll the `UnboundedReciever`.
-        while let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
+
+        if let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
             return Poll::Ready(Some(Ok(Message::Recieved(v))));
         }
 
         // Secondly poll the `Framed` stream.
-        match self.lines.poll_next_unpin(cx) {
-            Poll::Ready(Some(v)) => {
-                let res = match v {
-                    Ok(msg) => Ok(Message::Broadcast(msg)),
-                    Err(e) => Err(e),
-                };
-                return Poll::Ready(Some(res));
-            }
-            Poll::Ready(None) => {
-                return Poll::Ready(None);
-            }
-            _ => {}
-        }
+        let result: Option<_> = futures::ready!(self.lines.poll_next_unpin(cx));
 
-        // Nothing was ready so we return `Poll::Pending`.
-        Poll::Pending
+        Poll::Ready(match result {
+            // We've recieved a message we should broadcast to others.
+            Some(Ok(message)) => Some(Ok(Message::Broadcast(message))),
+
+            // An error occured.
+            Some(Err(e)) => Some(Err(e)),
+
+            // The stream has been exhausted.
+            None => None,
+        })
     }
 }
 
@@ -174,10 +171,7 @@ async fn process(
         Some(Ok(line)) => line,
         // We didn't get a line so we return early here.
         _ => {
-            println!(
-                "Failed to get username from {}. Client disconnected.",
-                addr
-            );
+            println!("Failed to get username from {}. Client disconnected.", addr);
             return Ok(());
         }
     };
