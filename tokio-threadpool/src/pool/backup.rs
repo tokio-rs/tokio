@@ -235,12 +235,12 @@ impl Backup {
 
 impl State {
     /// Returns a new, default, thread `State`
-    pub fn new() -> State {
+    pub(crate) fn new() -> State {
         State(0)
     }
 
     /// Returns true if the thread entry is pushed in the sleeper stack
-    pub fn is_pushed(&self) -> bool {
+    pub(crate) fn is_pushed(self) -> bool {
         self.0 & PUSHED == PUSHED
     }
 
@@ -248,19 +248,19 @@ impl State {
         self.0 &= !PUSHED;
     }
 
-    pub fn is_running(&self) -> bool {
+    pub(crate) fn is_running(self) -> bool {
         self.0 & RUNNING == RUNNING
     }
 
-    pub fn set_running(&mut self) {
+    pub(crate) fn set_running(&mut self) {
         self.0 |= RUNNING;
     }
 
-    pub fn unset_running(&mut self) {
+    pub(crate) fn unset_running(&mut self) {
         self.0 &= !RUNNING;
     }
 
-    pub fn is_terminated(&self) -> bool {
+    pub(crate) fn is_terminated(self) -> bool {
         self.0 & TERMINATED == TERMINATED
     }
 

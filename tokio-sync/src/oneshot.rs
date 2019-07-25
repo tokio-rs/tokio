@@ -220,6 +220,7 @@ impl<T> Sender<T> {
     /// ```
     /// unimplemented!();
     /// ```
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn closed(&mut self) {
         use async_util::future::poll_fn;
 
@@ -384,10 +385,10 @@ impl<T> Inner<T> {
                         None => Ready(Err(RecvError(()))),
                     }
                 } else {
-                    return Pending;
+                    Pending
                 }
             } else {
-                return Pending;
+                Pending
             }
         }
     }
@@ -498,7 +499,7 @@ impl State {
         State(0)
     }
 
-    fn is_complete(&self) -> bool {
+    fn is_complete(self) -> bool {
         self.0 & VALUE_SENT == VALUE_SENT
     }
 
@@ -510,7 +511,7 @@ impl State {
         State(val)
     }
 
-    fn is_rx_task_set(&self) -> bool {
+    fn is_rx_task_set(self) -> bool {
         self.0 & RX_TASK_SET == RX_TASK_SET
     }
 
@@ -524,7 +525,7 @@ impl State {
         State(val & !RX_TASK_SET)
     }
 
-    fn is_closed(&self) -> bool {
+    fn is_closed(self) -> bool {
         self.0 & CLOSED == CLOSED
     }
 
@@ -545,7 +546,7 @@ impl State {
         State(val & !TX_TASK_SET)
     }
 
-    fn is_tx_task_set(&self) -> bool {
+    fn is_tx_task_set(self) -> bool {
         self.0 & TX_TASK_SET == TX_TASK_SET
     }
 

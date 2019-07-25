@@ -120,10 +120,7 @@ impl Stack {
         terminate: bool,
     ) -> Option<(usize, worker::State)> {
         // Figure out the empty value
-        let terminal = match terminate {
-            true => TERMINATED,
-            false => EMPTY,
-        };
+        let terminal = if terminate { TERMINATED } else { EMPTY };
 
         // If terminating, the max lifecycle *must* be `Signaled`, which is the
         // highest lifecycle. By passing the greatest possible lifecycle value,
@@ -215,7 +212,7 @@ impl State {
     }
 
     #[inline]
-    fn head(&self) -> usize {
+    fn head(self) -> usize {
         self.0 & STACK_MASK
     }
 

@@ -35,7 +35,7 @@ pub(crate) enum Lifecycle {
 
 impl State {
     /// Returns true if the worker entry is pushed in the sleeper stack
-    pub fn is_pushed(&self) -> bool {
+    pub fn is_pushed(self) -> bool {
         self.0 & PUSHED_MASK == PUSHED_MASK
     }
 
@@ -43,7 +43,7 @@ impl State {
         self.0 |= PUSHED_MASK
     }
 
-    pub fn is_notified(&self) -> bool {
+    pub fn is_notified(self) -> bool {
         use self::Lifecycle::*;
 
         match self.lifecycle() {
@@ -52,7 +52,7 @@ impl State {
         }
     }
 
-    pub fn lifecycle(&self) -> Lifecycle {
+    pub fn lifecycle(self) -> Lifecycle {
         Lifecycle::from(self.0 & LIFECYCLE_MASK)
     }
 
@@ -60,7 +60,7 @@ impl State {
         self.0 = (self.0 & !LIFECYCLE_MASK) | (val as usize)
     }
 
-    pub fn is_signaled(&self) -> bool {
+    pub fn is_signaled(self) -> bool {
         self.lifecycle() == Lifecycle::Signaled
     }
 

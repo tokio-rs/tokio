@@ -218,6 +218,12 @@ impl Park for ParkThread {
     }
 }
 
+impl Default for ParkThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ===== impl UnparkThread =====
 
 impl Unpark for UnparkThread {

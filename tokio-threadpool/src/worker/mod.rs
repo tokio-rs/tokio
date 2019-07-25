@@ -622,7 +622,7 @@ impl Worker {
 
                     // We obtained permission to push the worker into the
                     // sleeper queue.
-                    if let Err(_) = self.pool.push_sleeper(self.id.0) {
+                    if self.pool.push_sleeper(self.id.0).is_err() {
                         trace!("  sleeping -- push to stack failed; idx={}", self.id.0);
                         // The push failed due to the pool being terminated.
                         //

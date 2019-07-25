@@ -102,3 +102,9 @@ impl From<StdOpenOptions> for OpenOptions {
         OpenOptions(options)
     }
 }
+
+impl Default for OpenOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}

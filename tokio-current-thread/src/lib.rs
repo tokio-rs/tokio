@@ -348,7 +348,7 @@ impl<P: Park> CurrentThread<P> {
     }
 
     /// Bind `CurrentThread` instance with an execution context.
-    fn enter<'a>(&'a mut self) -> Entered<'a, P> {
+    fn enter(&mut self) -> Entered<'_, P> {
         Entered { executor: self }
     }
 
@@ -429,6 +429,12 @@ impl<P: Park> fmt::Debug for CurrentThread<P> {
     }
 }
 
+impl<P: Park + Default> Default for CurrentThread<P> {
+    fn default() -> Self {
+        CurrentThread::new_with_park(P::default())
+    }
+}
+
 // ===== impl Entered =====
 
 impl<'a, P: Park> Entered<'a, P> {
@@ -483,7 +489,7 @@ impl<'a, P: Park> Entered<'a, P> {
 
             self.tick();
 
-            if let Err(_) = self.executor.park.park() {
+            if self.executor.park.park().is_err() {
                 panic!("block_on park failed");
             }
         }
@@ -550,7 +556,7 @@ impl<'a, P: Park> Entered<'a, P> {
 
             match time {
                 Some((until, rem)) => {
-                    if let Err(_) = self.executor.park.park_timeout(rem) {
+                    if self.executor.park.park_timeout(rem).is_err() {
                         return Err(RunTimeoutError::new(false));
                     }
 
@@ -563,7 +569,7 @@ impl<'a, P: Park> Entered<'a, P> {
                     time = Some((until, until - now));
                 }
                 None => {
-                    if let Err(_) = self.executor.park.park() {
+                    if self.executor.park.park().is_err() {
                         return Err(RunTimeoutError::new(false));
                     }
                 }
@@ -790,6 +796,8 @@ impl CurrentRunner {
 
 unsafe fn hide_lt<'a>(p: *mut (dyn SpawnLocal + 'a)) -> *mut (dyn SpawnLocal + 'static) {
     use std::mem;
+    // false positive: https://github.com/rust-lang/rust-clippy/issues/2906
+    #[allow(clippy::transmute_ptr_to_ptr)]
     mem::transmute(p)
 }
 

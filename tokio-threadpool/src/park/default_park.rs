@@ -72,6 +72,12 @@ impl Park for DefaultPark {
     }
 }
 
+impl Default for DefaultPark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ===== impl DefaultUnpark =====
 
 impl Unpark for DefaultUnpark {

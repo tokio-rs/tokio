@@ -190,6 +190,12 @@ impl Encoder for LinesCodec {
     }
 }
 
+impl Default for LinesCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// An error occured while encoding or decoding a line.
 #[derive(Debug)]
 pub enum LinesCodecError {

@@ -115,7 +115,7 @@ impl Iterator for AtomicStackEntries {
 
 impl Drop for AtomicStackEntries {
     fn drop(&mut self) {
-        while let Some(entry) = self.next() {
+        for entry in self {
             // Flag the entry as errored
             entry.error();
         }

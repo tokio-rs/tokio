@@ -393,7 +393,7 @@ impl State {
         State((capacity << NUM_SHIFT) | NUM_FLAG)
     }
 
-    fn remaining_capacity(&self) -> usize {
+    fn remaining_capacity(self) -> usize {
         if !self.has_remaining_capacity() {
             return 0;
         }
@@ -401,15 +401,15 @@ impl State {
         self.0 >> 1
     }
 
-    fn has_remaining_capacity(&self) -> bool {
+    fn has_remaining_capacity(self) -> bool {
         self.0 & NUM_FLAG == NUM_FLAG
     }
 
-    fn has_task(&self, stub: &Task) -> bool {
+    fn has_task(self, stub: &Task) -> bool {
         !(self.has_remaining_capacity() || self.is_stub(stub))
     }
 
-    fn is_stub(&self, stub: &Task) -> bool {
+    fn is_stub(self, stub: &Task) -> bool {
         self.0 == stub as *const _ as usize
     }
 
@@ -452,11 +452,11 @@ impl State {
         }
     }
 
-    fn is_ptr(&self) -> bool {
+    fn is_ptr(self) -> bool {
         self.0 & NUM_FLAG == 0
     }
 
-    fn ptr(&self) -> Option<*const Task> {
+    fn ptr(self) -> Option<*const Task> {
         if self.is_ptr() {
             Some(self.0 as *const Task)
         } else {

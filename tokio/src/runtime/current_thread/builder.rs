@@ -82,3 +82,9 @@ impl Builder {
         Ok(runtime)
     }
 }
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}

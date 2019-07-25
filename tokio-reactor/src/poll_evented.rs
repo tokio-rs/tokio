@@ -257,7 +257,7 @@ where
         // Cannot clear write readiness
         assert!(!ready.is_writable(), "cannot clear write readiness");
         assert!(
-            !crate::platform::is_hup(&ready),
+            !crate::platform::is_hup(ready),
             "cannot clear HUP readiness"
         );
 

@@ -93,10 +93,7 @@ impl BackupStack {
     /// * `Err(_)` is returned if the pool has been shutdown.
     pub fn pop(&self, entries: &[Backup], terminate: bool) -> Result<Option<BackupId>, ()> {
         // Figure out the empty value
-        let terminal = match terminate {
-            true => TERMINATED,
-            false => EMPTY,
-        };
+        let terminal = if terminate { TERMINATED } else { EMPTY };
 
         let mut state: State = self.state.load(Acquire).into();
 
@@ -164,7 +161,7 @@ impl State {
         State(EMPTY.0)
     }
 
-    fn head(&self) -> BackupId {
+    fn head(self) -> BackupId {
         BackupId(self.0 & STACK_MASK)
     }
 

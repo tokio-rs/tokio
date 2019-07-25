@@ -138,6 +138,12 @@ impl MockClock {
     }
 }
 
+impl Default for MockClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Handle {
     pub(self) fn new(timer: Timer<MockPark>, time: MockTime) -> Self {
         Handle { timer, time }

@@ -443,10 +443,8 @@ impl<U> Inner<U> {
         let tail = *self.tail_readiness.get();
         let next = (*tail).next_readiness.load(Acquire);
 
-        if tail == self.stub() {
-            if next.is_null() {
-                return false;
-            }
+        if tail == self.stub() && next.is_null() {
+            return false;
         }
 
         true
@@ -566,7 +564,7 @@ impl<U> List<U> {
 
         self.len += 1;
 
-        return ptr;
+        ptr
     }
 
     /// Pop an element from the front of the list
@@ -618,7 +616,7 @@ impl<U> List<U> {
 
         self.len -= 1;
 
-        return node;
+        node
     }
 }
 
@@ -773,7 +771,7 @@ impl<U> Drop for Node<U> {
 fn arc2ptr<T>(ptr: Arc<T>) -> *const T {
     let addr = &*ptr as *const T;
     mem::forget(ptr);
-    return addr;
+    addr
 }
 
 unsafe fn ptr2arc<T>(ptr: *const T) -> Arc<T> {
