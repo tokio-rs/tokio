@@ -28,15 +28,48 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use futures::{Poll, SinkExt, Stream, StreamExt};
-
 use std::{collections::HashMap, env, error::Error, io, net::SocketAddr, pin::Pin, task::Context};
-
 use tokio::{
     self,
     codec::{Framed, LinesCodec, LinesCodecError},
     net::{TcpListener, TcpStream},
     sync::{lock::Lock, mpsc},
 };
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    // Create the shared state. This is how all the peers communicate.
+    //
+    // The server task will hold a handle to this. For every new client, the
+    // `state` handle is cloned and passed into the task that processes the
+    // client connection.
+    let state = Lock::new(Shared::new());
+
+    let addr = env::args().nth(1).unwrap_or("127.0.0.1:6142".to_string());
+    let addr = addr.parse::<SocketAddr>()?;
+
+    // Bind a TCP listener to the socket address.
+    //
+    // Note that this is the Tokio TcpListener, which is fully async.
+    let mut listener = TcpListener::bind(&addr)?;
+
+    println!("server running on {}", addr);
+
+    loop {
+        // Asynchronously wait for an inbound TcpStream.
+        let (stream, addr) = listener.accept().await?;
+
+        // Clone a handle to the `Shared` state for the new connection.
+        let state = state.clone();
+
+        // Spawn our handler to be run asynchronously.
+        tokio::spawn(async move {
+            if let Err(e) = process(state, stream, addr).await {
+                println!("an error occured; error = {:?}", e);
+            }
+        });
+    }
+}
 
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<String>;
@@ -222,39 +255,4 @@ async fn process(
     }
 
     Ok(())
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    // Create the shared state. This is how all the peers communicate.
-    //
-    // The server task will hold a handle to this. For every new client, the
-    // `state` handle is cloned and passed into the task that processes the
-    // client connection.
-    let state = Lock::new(Shared::new());
-
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:6142".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
-
-    // Bind a TCP listener to the socket address.
-    //
-    // Note that this is the Tokio TcpListener, which is fully async.
-    let mut listener = TcpListener::bind(&addr)?;
-
-    println!("server running on {}", addr);
-
-    loop {
-        // Asynchronously wait for an inbound TcpStream.
-        let (stream, addr) = listener.accept().await?;
-
-        // Clone a handle to the `Shared` state for the new connection.
-        let state = state.clone();
-
-        // Spawn our handler to be run asynchronously.
-        tokio::spawn(async move {
-            if let Err(e) = process(state, stream, addr).await {
-                println!("an error occured; error = {:?}", e);
-            }
-        });
-    }
 }
