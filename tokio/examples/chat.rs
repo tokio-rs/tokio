@@ -27,11 +27,8 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::task::Context;
-use futures::Stream;
-use futures::{SinkExt, StreamExt};
+use futures::{Poll, SinkExt, Stream, StreamExt};
 
 use std::collections::HashMap;
 use std::env;
@@ -40,11 +37,13 @@ use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Context;
 
 use tokio;
 use tokio::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
+use tokio::sync::mpsc;
+//use tokio::sync::lock::Lock;
 
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<String>;
@@ -92,7 +91,7 @@ impl Shared {
         &mut self,
         sender: SocketAddr,
         message: &str,
-    ) -> Result<(), mpsc::SendError> {
+    ) -> Result<(), mpsc::error::UnboundedSendError> {
         for peer in self.peers.iter_mut() {
             if *peer.0 != sender {
                 peer.1.send(message.into()).await?;
@@ -113,7 +112,7 @@ impl Peer {
         let addr = lines.get_ref().peer_addr()?;
 
         // Create a channel for this peer
-        let (tx, rx) = mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded_channel();
 
         // Add an entry for this `Peer` in the shared state map.
         state.lock().await.peers.insert(addr, tx);
