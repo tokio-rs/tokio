@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 use futures::sync::mpsc;
 use futures::Async::*;
 use std::io::Cursor;

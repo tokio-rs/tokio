@@ -24,11 +24,10 @@ publish = false
 [dependencies]
 bytes = "0.4.10"
 either = { version =  "1.5", optional = true}
-futures = "0.1.23"
 
 [features]
-default = ["util"]
-util = ["bytes/either", "either"]
+# default = ["util"]
+# util = ["bytes/either", "either"]
 
 [dev-dependencies]
 tokio-mock-task = "0.1.1"
