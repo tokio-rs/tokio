@@ -84,6 +84,30 @@ impl Sender {
         tokio_executor::Executor::spawn(&mut s, Box::pin(future))
     }
 
+    /// Like `spawn`, but in case of error the future is returned instead of
+    /// dropped
+    pub fn spawn_with_future_back_on_error(
+        &self,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
+    ) -> Result<(), (SpawnError, Pin<Box<dyn Future<Output = ()> + Send>>)> {
+        if let Err(err) = self.prepare_for_spawn() {
+            return Err((err, future));
+        }
+
+        // At this point, the pool has accepted the future, so schedule it for
+        // execution.
+
+        // Create a new task for the future
+        let task = Arc::new(Task::new(future));
+
+        // Call `submit_external()` in order to place the task into the global
+        // queue. This way all workers have equal chance of running this task,
+        // which means IO handles will be assigned to reactors more evenly.
+        self.pool.submit_external(task, &self.pool);
+
+        Ok(())
+    }
+
     /// Logic to prepare for spawning
     fn prepare_for_spawn(&self) -> Result<(), SpawnError> {
         let mut state: pool::State = self.pool.state.load(Acquire).into();
@@ -159,20 +183,9 @@ impl<'a> tokio_executor::Executor for &'a Sender {
         &mut self,
         future: Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), SpawnError> {
-        self.prepare_for_spawn()?;
-
-        // At this point, the pool has accepted the future, so schedule it for
-        // execution.
-
-        // Create a new task for the future
-        let task = Arc::new(Task::new(future));
-
-        // Call `submit_external()` in order to place the task into the global
-        // queue. This way all workers have equal chance of running this task,
-        // which means IO handles will be assigned to reactors more evenly.
-        self.pool.submit_external(task, &self.pool);
-
-        Ok(())
+        self.spawn_with_future_back_on_error(future)
+            // signature requires that the future be dropped
+            .map_err(|(err, _future)| err)
     }
 }
 
