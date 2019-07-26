@@ -1,14 +1,10 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use std::{
-    convert::TryInto,
-    net,
-    io::Write,
-};
 use std::thread;
-use tokio::net::TcpStream;
+use std::{convert::TryInto, io::Write, net};
 use tokio::io::AsyncReadExt;
+use tokio::net::TcpStream;
 use tokio_test::assert_ok;
 
 #[tokio::test]
@@ -29,4 +25,3 @@ async fn peek() {
     let n = assert_ok!(left.read(&mut buf).await);
     assert_eq!([1, 2, 3, 4], buf[..n]);
 }
-
