@@ -152,8 +152,8 @@ enum Message {
     /// A message that should be broadcasted to others.
     Broadcast(String),
 
-    /// A message that should be recieved by a client
-    Recieved(String),
+    /// A message that should be received by a client
+    Received(String),
 }
 
 // Peer implements `Stream` in a way that polls both the `Rx`, and `Framed` types.
@@ -162,17 +162,17 @@ impl Stream for Peer {
     type Item = Result<Message, LinesCodecError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // First poll the `UnboundedReciever`.
+        // First poll the `UnboundedReceiver`.
 
         if let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
-            return Poll::Ready(Some(Ok(Message::Recieved(v))));
+            return Poll::Ready(Some(Ok(Message::Received(v))));
         }
 
         // Secondly poll the `Framed` stream.
         let result: Option<_> = futures::ready!(self.lines.poll_next_unpin(cx));
 
         Poll::Ready(match result {
-            // We've recieved a message we should broadcast to others.
+            // We've received a message we should broadcast to others.
             Some(Ok(message)) => Some(Ok(Message::Broadcast(message))),
 
             // An error occured.
@@ -221,7 +221,7 @@ async fn process(
     // Process incoming messages until our stream is exhausted by a disconnect.
     while let Some(result) = peer.next().await {
         match result {
-            // A message was recieved from the current user, we should
+            // A message was received from the current user, we should
             // broadcast this message to the other users.
             Ok(Message::Broadcast(msg)) => {
                 let mut state = state.lock().await;
@@ -229,9 +229,9 @@ async fn process(
 
                 state.broadcast(addr, &msg).await?;
             }
-            // A message was recieved from a peer. Send it to the
+            // A message was received from a peer. Send it to the
             // current user.
-            Ok(Message::Recieved(msg)) => {
+            Ok(Message::Received(msg)) => {
                 peer.lines.send(msg).await?;
             }
             Err(e) => {
