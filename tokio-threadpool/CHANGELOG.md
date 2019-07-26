@@ -1,3 +1,11 @@
+# 0.1.16 (September 25, 2019)
+
+### Changed
+- Remove last non-dev dependency on rand crate by seeding PRNG via libstd
+  `RandomState` (#1324 backport)
+- Upgrade (dev-only dependency) rand to 0.7.0 (#1302 backport)
+- The minimum supported rust version (MSRV) is now 1.31.0 (#1358)
+
 # 0.1.15 (June 2, 2019)
 
 ### Changed
