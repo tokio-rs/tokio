@@ -1,10 +1,10 @@
-pub use crate::util::enumerate::Enumerate;
-
 #[cfg(feature = "timer")]
 use std::time::Duration;
 
 #[cfg(feature = "timer")]
 use tokio_timer::{throttle::Throttle, Timeout};
+
+use futures_core::Stream;
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
@@ -29,25 +29,6 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Throttle::new(self, duration)
-    }
-
-    /// Creates a new stream which gives the current iteration count as well
-    /// as the next value.
-    ///
-    /// The stream returned yields pairs `(i, val)`, where `i` is the
-    /// current index of iteration and `val` is the value returned by the
-    /// iterator.
-    ///
-    /// # Overflow Behavior
-    ///
-    /// The method does no guarding against overflows, so counting elements of
-    /// an iterator with more than [`std::usize::MAX`] elements either produces the
-    /// wrong result or panics.
-    fn enumerate(self) -> Enumerate<Self>
-    where
-        Self: Sized,
-    {
-        Enumerate::new(self)
     }
 
     /// Creates a new stream which allows `self` until `timeout`.
