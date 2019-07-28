@@ -27,6 +27,9 @@ pub mod task;
 
 pub use assertive::{assert_err, assert_ok};
 
+#[doc(no_inline)]
+pub use tokio_current_thread::block_on;
+
 /*
 #[doc(hidden)]
 pub mod codegen {
