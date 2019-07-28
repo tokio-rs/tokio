@@ -11,7 +11,7 @@
 //!
 //! * [`CurrentThread`] is the main type of this crate. It executes tasks on the current thread.
 //!   The easiest way to start a new [`CurrentThread`] executor is to call
-//!   [`block_on_all`] with an initial task to seed the executor.
+//!   [`block_on`] or [`block_on_all`] with an initial task to seed the executor.
 //!   All tasks that are being managed by a [`CurrentThread`] executor are able to
 //!   spawn additional tasks by calling [`spawn`].
 //!
@@ -24,6 +24,7 @@
 //!
 //! [`CurrentThread`]: struct.CurrentThread.html
 //! [`spawn`]: fn.spawn.html
+//! [`block_on`]: fn.block_on.html
 //! [`block_on_all`]: fn.block_on_all.html
 //! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
 
@@ -189,6 +190,21 @@ thread_local! {
     /// The unique ID is used to determine if the currently running executor matches the one
     /// referred to by a `Handle` so that direct task dispatch can be used.
     static EXECUTOR_ID: Cell<u64> = Cell::new(0)
+}
+
+/// Runs the provided future, blocking the current thread until the future
+/// completes.
+///
+/// See [`CurrentThread::block_on`] documentation for more details.
+///
+/// [`CurrentThread::block_on`]: struct.CurrentThread.html#method.block_on
+pub fn block_on<F>(future: F) -> F::Output
+where
+    F: Future,
+{
+    let mut current_thread = CurrentThread::new();
+
+    current_thread.block_on(future)
 }
 
 /// Run the executor bootstrapping the execution with the provided future.
