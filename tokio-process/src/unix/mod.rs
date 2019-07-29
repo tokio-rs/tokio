@@ -89,13 +89,11 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
     }
 }
 
+type ChildReaperFuture = Pin<Box<dyn Stream<Item = io::Result<()>> + Send>>;
+
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
-    inner: Reaper<
-        process::Child,
-        GlobalOrphanQueue,
-        Pin<Box<dyn Stream<Item = io::Result<()>> + Send>>,
-    >,
+    inner: Reaper<process::Child, GlobalOrphanQueue, ChildReaperFuture>,
 }
 
 impl fmt::Debug for Child {
@@ -113,7 +111,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stderr = stdio(child.stderr.take(), handle)?;
 
     let signal = Signal::with_handle(libc::SIGCHLD, handle)
-        .and_then(|stream| future::ok(stream.map(|res| Ok(res))))
+        .and_then(|stream| future::ok(stream.map(Ok)))
         .try_flatten_stream()
         .boxed();
     Ok(SpawnedChild {
