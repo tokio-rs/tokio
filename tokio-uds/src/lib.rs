@@ -1,6 +1,6 @@
 #![cfg(unix)]
 #![doc(html_root_url = "https://docs.rs/tokio-uds/0.2.5")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations)]
 
 //! Unix Domain Sockets for Tokio.
 //!

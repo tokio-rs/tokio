@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 extern crate tokio_sync;
 
 fn is_error<T: ::std::error::Error + Send + Sync>() {}

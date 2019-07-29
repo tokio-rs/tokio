@@ -1,5 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.3")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations)]
 
 //! UDP bindings for `tokio`.
 //!

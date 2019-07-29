@@ -11,8 +11,6 @@
 //! respectively. By default this will run I/O on all the cores your system has
 //! available, and it doesn't support HTTP request bodies.
 
-#![deny(warnings)]
-
 extern crate bytes;
 extern crate http;
 extern crate httparse;

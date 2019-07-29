@@ -39,8 +39,6 @@
 //! * `SET $key $value` - this will set the value of `$key` to `$value`,
 //!   returning the previous value, if any.
 
-#![deny(warnings)]
-
 extern crate tokio;
 
 use std::collections::HashMap;

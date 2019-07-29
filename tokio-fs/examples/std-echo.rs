@@ -1,5 +1,5 @@
 //! Echo everything received on STDIN to STDOUT.
-#![deny(deprecated, warnings)]
+#![deny(deprecated)]
 
 extern crate futures;
 extern crate tokio_codec;

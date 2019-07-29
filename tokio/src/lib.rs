@@ -1,5 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio/0.1.22")]
-#![deny(missing_docs, warnings, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations)]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
