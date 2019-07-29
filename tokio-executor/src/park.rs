@@ -128,13 +128,13 @@ pub trait Unpark: Sync + Send + 'static {
     fn unpark(&self);
 }
 
-impl Unpark for Box<Unpark> {
+impl Unpark for Box<dyn Unpark> {
     fn unpark(&self) {
         (**self).unpark()
     }
 }
 
-impl Unpark for Arc<Unpark> {
+impl Unpark for Arc<dyn Unpark> {
     fn unpark(&self) {
         (**self).unpark()
     }
