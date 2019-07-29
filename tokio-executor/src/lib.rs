@@ -1,7 +1,5 @@
 #![deny(missing_docs, missing_debug_implementations, warnings)]
 #![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.8")]
-// Our MSRV doesn't allow us to fix these warnings yet
-#![allow(rust_2018_idioms)]
 
 //! Task execution related traits and utilities.
 //!
