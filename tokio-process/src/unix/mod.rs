@@ -35,10 +35,11 @@ use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
-use futures::future::FutureExt;
-use futures::future::TryFutureExt;
-use futures::stream::Stream;
-use futures::stream::StreamExt;
+use futures_core::stream::Stream;
+use futures_util::future;
+use futures_util::future::FutureExt;
+use futures_util::stream::StreamExt;
+use futures_util::try_future::TryFutureExt;
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -112,7 +113,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stderr = stdio(child.stderr.take(), handle)?;
 
     let signal = Signal::with_handle(libc::SIGCHLD, handle)
-        .and_then(|stream| futures::future::ok(stream.map(|res| Ok(res))))
+        .and_then(|stream| future::ok(stream.map(|res| Ok(res))))
         .try_flatten_stream()
         .boxed();
     Ok(SpawnedChild {
@@ -146,16 +147,13 @@ impl Future for Child {
 }
 
 #[derive(Debug)]
-pub struct Fd<T>
-where
-    T: AsRawFd + Unpin,
-{
+pub struct Fd<T> {
     inner: T,
 }
 
 impl<T> io::Read for Fd<T>
 where
-    T: AsRawFd + io::Read + Unpin,
+    T: io::Read,
 {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         self.inner.read(bytes)
@@ -164,7 +162,7 @@ where
 
 impl<T> io::Write for Fd<T>
 where
-    T: AsRawFd + io::Write + Unpin,
+    T: io::Write,
 {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         self.inner.write(bytes)
@@ -177,7 +175,7 @@ where
 
 impl<T> AsRawFd for Fd<T>
 where
-    T: AsRawFd + Unpin,
+    T: AsRawFd,
 {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -186,7 +184,7 @@ where
 
 impl<T> Evented for Fd<T>
 where
-    T: AsRawFd + Unpin,
+    T: AsRawFd,
 {
     fn register(
         &self,
@@ -219,7 +217,7 @@ pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
 
 fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<Fd<T>>>>
 where
-    T: AsRawFd + Unpin,
+    T: AsRawFd,
 {
     let io = match option {
         Some(io) => io,

@@ -1,7 +1,7 @@
 use super::orphan::{OrphanQueue, Wait};
 use crate::kill::Kill;
-use futures::stream::TryStream;
-use futures::stream::TryStreamExt;
+use futures_core::stream::TryStream;
+use futures_util::try_stream::TryStreamExt;
 use std::future::Future;
 use std::io;
 use std::ops::Deref;
@@ -16,8 +16,7 @@ use std::task::Poll;
 pub(crate) struct Reaper<W, Q, S>
 where
     W: Wait + Unpin,
-    Q: OrphanQueue<W> + Unpin,
-    S: Unpin,
+    Q: OrphanQueue<W>,
 {
     inner: Option<W>,
     orphan_queue: Q,
@@ -27,8 +26,7 @@ where
 impl<W, Q, S> Deref for Reaper<W, Q, S>
 where
     W: Wait + Unpin,
-    Q: OrphanQueue<W> + Unpin,
-    S: Unpin,
+    Q: OrphanQueue<W>,
 {
     type Target = W;
 
@@ -40,8 +38,7 @@ where
 impl<W, Q, S> Reaper<W, Q, S>
 where
     W: Wait + Unpin,
-    Q: OrphanQueue<W> + Unpin,
-    S: Unpin,
+    Q: OrphanQueue<W>,
 {
     pub(crate) fn new(inner: W, orphan_queue: Q, signal: S) -> Self {
         Self {
@@ -118,8 +115,7 @@ where
 impl<W, Q, S> Kill for Reaper<W, Q, S>
 where
     W: Kill + Wait + Unpin,
-    Q: OrphanQueue<W> + Unpin,
-    S: Unpin,
+    Q: OrphanQueue<W>,
 {
     fn kill(&mut self) -> io::Result<()> {
         self.inner_mut().kill()
@@ -129,8 +125,7 @@ where
 impl<W, Q, S> Drop for Reaper<W, Q, S>
 where
     W: Wait + Unpin,
-    Q: OrphanQueue<W> + Unpin,
-    S: Unpin,
+    Q: OrphanQueue<W>,
 {
     fn drop(&mut self) {
         if let Ok(Some(_)) = self.inner_mut().try_wait() {
@@ -145,8 +140,8 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::future::FutureExt;
-    use futures::stream::Stream;
+    use futures_core::stream::Stream;
+    use futures_util::future::FutureExt;
     use std::cell::{Cell, RefCell};
     use std::os::unix::process::ExitStatusExt;
     use std::pin::Pin;
@@ -258,7 +253,7 @@ mod test {
             MockStream::new(vec![None, Some(()), None, None, None]),
         );
 
-        let waker = futures::task::noop_waker();
+        let waker = futures_util::task::noop_waker();
         let mut context = Context::from_waker(&waker);
 
         // Not yet exited, interest registered

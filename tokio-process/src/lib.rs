@@ -13,13 +13,12 @@
 //! for it using an event loop.
 //!
 //! ```no_run
-//! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //!
 //! use std::process::Command;
 //!
-//! use futures::Future;
+//! use futures_util::future::FutureExt;
 //! use tokio_process::CommandExt;
 //!
 //! fn main() {
@@ -42,13 +41,12 @@
 //! world` but we also capture its output.
 //!
 //! ```no_run
-//! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //!
 //! use std::process::Command;
 //!
-//! use futures::Future;
+//! use futures_util::future::FutureExt;
 //! use tokio_process::CommandExt;
 //!
 //! fn main() {
@@ -71,13 +69,13 @@
 //!
 //! ```no_run
 //! extern crate failure;
-//! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //! extern crate tokio_io;
 //!
 //! use failure::Error;
-//! use futures::{Future, Stream};
+//! use futures_util::future::FutureExt;
+//! use futures_util::stream::StreamExt;
 //! use std::io::BufReader;
 //! use std::process::{Command, Stdio};
 //! use tokio_process::{Child, ChildStdout, CommandExt};
@@ -159,8 +157,6 @@
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.2")]
 #![feature(async_await)]
 
-extern crate futures;
-extern crate tokio;
 extern crate tokio_io;
 extern crate tokio_reactor;
 
@@ -174,10 +170,11 @@ extern crate log;
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
-use futures::future::FutureExt;
-use futures::future::TryFuture;
-use futures::future::TryFutureExt;
-use futures::io::{AsyncRead, AsyncWrite};
+use futures_core::future::TryFuture;
+use futures_util::future;
+use futures_util::future::FutureExt;
+use futures_util::io::{AsyncRead, AsyncWrite};
+use futures_util::try_future::TryFutureExt;
 
 use kill::Kill;
 use std::fmt;
@@ -185,8 +182,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
-use tokio::io::AsyncRead as TokioAsyncRead;
-use tokio::io::AsyncWrite as TokioAsyncWrite;
+use tokio_io::AsyncRead as TokioAsyncRead;
+use tokio_io::AsyncWrite as TokioAsyncWrite;
 use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
@@ -371,8 +368,8 @@ impl CommandExt for Command {
         self.stdout(Stdio::piped());
         self.stderr(Stdio::piped());
 
-        let inner = futures::future::ready(self.spawn_async_with_handle(handle))
-            .and_then(Child::wait_with_output);
+        let inner =
+            future::ready(self.spawn_async_with_handle(handle)).and_then(Child::wait_with_output);
 
         OutputAsync {
             inner: inner.boxed(),
@@ -383,18 +380,12 @@ impl CommandExt for Command {
 /// A drop guard which ensures the child process is killed on drop to maintain
 /// the contract of dropping a Future leads to "cancellation".
 #[derive(Debug)]
-struct ChildDropGuard<T: Kill>
-where
-    T: Unpin,
-{
+struct ChildDropGuard<T: Kill> {
     inner: T,
     kill_on_drop: bool,
 }
 
-impl<T: Kill> ChildDropGuard<T>
-where
-    T: Unpin,
-{
+impl<T: Kill> ChildDropGuard<T> {
     fn new(inner: T) -> Self {
         Self {
             inner,
@@ -407,10 +398,7 @@ where
     }
 }
 
-impl<T: Kill> Kill for ChildDropGuard<T>
-where
-    T: Unpin,
-{
+impl<T: Kill> Kill for ChildDropGuard<T> {
     fn kill(&mut self) -> io::Result<()> {
         let ret = self.inner.kill();
 
@@ -422,10 +410,7 @@ where
     }
 }
 
-impl<T: Kill> Drop for ChildDropGuard<T>
-where
-    T: Unpin,
-{
+impl<T: Kill> Drop for ChildDropGuard<T> {
     fn drop(&mut self) {
         if self.kill_on_drop {
             drop(self.kill());
@@ -433,10 +418,7 @@ where
     }
 }
 
-impl<T: TryFuture + Kill> Future for ChildDropGuard<T>
-where
-    T: Unpin,
-{
+impl<T: TryFuture + Kill + Unpin> Future for ChildDropGuard<T> {
     type Output = Result<T::Ok, T::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
@@ -529,37 +511,27 @@ impl Child {
             match stdout_val {
                 Some(mut io) => {
                     let mut vec = Vec::new();
-                    dbg!("READ TO END START");
-                    futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
-                    dbg!("READ TO END COMPLETE");
+                    futures_util::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
                     Ok(vec)
                 }
-                None => {
-                    dbg!("STDOUT EMPTY");
-                    Ok(Vec::new())
-                }
+                None => Ok(Vec::new()),
             }
         };
         let stderr_fut = async {
             match stderr_val {
                 Some(mut io) => {
                     let mut vec = Vec::new();
-                    dbg!("READ TO END START");
-                    futures::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
-                    dbg!("READ TO END COMPLETE");
+                    futures_util::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
                     Ok(vec)
                 }
-                None => {
-                    dbg!("STDERR EMPTY");
-                    Ok(Vec::new())
-                }
+                None => Ok(Vec::new()),
             }
         };
 
         WaitWithOutput {
-            inner: futures::future::try_join3(stdout_fut, stderr_fut, self)
+            inner: futures_util::try_future::try_join3(stdout_fut, stderr_fut, self)
                 .and_then(|(stdout, stderr, status)| {
-                    futures::future::ok(Output {
+                    future::ok(Output {
                         status,
                         stdout,
                         stderr,
@@ -580,13 +552,12 @@ impl Child {
     /// > `Child` instance into an event loop as an alternative to this method.
     ///
     /// ```no_run
-    /// # extern crate futures;
     /// # extern crate tokio;
     /// # extern crate tokio_process;
     /// #
     /// # use std::process::Command;
     /// #
-    /// # use futures::Future;
+    /// # use futures_util::future::FutureExt;
     /// # use tokio_process::CommandExt;
     /// #
     /// # fn main() {
@@ -609,7 +580,6 @@ impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        dbg!("CHILD POLL");
         Pin::get_mut(self).child.poll_unpin(cx)
     }
 }
@@ -635,7 +605,6 @@ impl Future for WaitWithOutput {
     type Output = io::Result<Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        dbg!("WaitWithOutput POLL");
         Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
@@ -829,7 +798,7 @@ mod sys {
 mod test {
     use super::ChildDropGuard;
     use crate::kill::Kill;
-    use futures::future::FutureExt;
+    use futures_util::future::FutureExt;
     use std::future::Future;
     use std::io;
     use std::pin::Pin;
@@ -906,7 +875,7 @@ mod test {
         let mut mock_reaped = Mock::with_result(Poll::Ready(Ok(())));
         let mut mock_err = Mock::with_result(Poll::Ready(Err(())));
 
-        let waker = futures::task::noop_waker();
+        let waker = futures_util::task::noop_waker();
         let mut context = Context::from_waker(&waker);
         {
             let mut guard = ChildDropGuard::new(&mut mock_pending);

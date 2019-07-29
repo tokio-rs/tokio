@@ -1,7 +1,7 @@
-extern crate futures;
 extern crate tokio;
 
-use futures::future::FutureExt;
+use futures_util::future;
+use futures_util::future::FutureExt;
 use std::env;
 use std::future::Future;
 use std::process::Command;
@@ -10,6 +10,7 @@ use tokio::timer::Timeout;
 
 pub use self::tokio::runtime::current_thread::Runtime as CurrentThreadRuntime;
 
+#[allow(dead_code)]
 pub fn cmd(s: &str) -> Command {
     let mut me = env::current_exe().unwrap();
     me.pop();
@@ -21,11 +22,11 @@ pub fn cmd(s: &str) -> Command {
 }
 
 pub fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
-    Timeout::new(future, Duration::from_secs(10)).then(|r| {
+    Timeout::new(future, Duration::from_secs(3)).then(|r| {
         if r.is_err() {
             panic!("timed out {:?}", r.err());
         }
-        futures::future::ready(r.unwrap())
+        future::ready(r.unwrap())
     })
 }
 

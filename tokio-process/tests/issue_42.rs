@@ -1,22 +1,29 @@
 #![cfg(unix)]
 
-extern crate futures;
 extern crate tokio_process;
 
-use futures::stream;
-use std::process::{Command, Stdio};
+use futures_util::future::FutureExt;
+use futures_util::stream::FuturesOrdered;
+use futures_util::stream::StreamExt;
+use std::future::Future;
+use std::io;
+use std::pin::Pin;
+use std::process::{Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio_process::CommandExt;
 
+mod support;
+
 fn run_test() {
     let finished = Arc::new(AtomicBool::new(false));
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut futures = stream::FuturesOrdered::new();
+        let mut futures: FuturesOrdered<Pin<Box<dyn Future<Output = io::Result<ExitStatus>>>>> =
+            FuturesOrdered::new();
         for i in 0..2 {
             futures.push(
                 Command::new("echo")
@@ -25,10 +32,11 @@ fn run_test() {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .spawn_async()
-                    .unwrap(),
+                    .unwrap()
+                    .boxed(),
             )
         }
-        futures::executor::block_on_stream(futures);
+        support::run_with_timeout(futures.collect::<Vec<io::Result<ExitStatus>>>());
 
         finished_clone.store(true, Ordering::SeqCst);
     });

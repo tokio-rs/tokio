@@ -1,6 +1,5 @@
 #![feature(async_await)]
 
-extern crate futures;
 #[macro_use]
 extern crate log;
 extern crate tokio_io;
@@ -11,11 +10,13 @@ use std::io;
 use std::pin::Pin;
 use std::process::{Command, ExitStatus, Stdio};
 
-use futures::future::FutureExt;
-use futures::io::AsyncBufReadExt;
-use futures::io::AsyncReadExt;
-use futures::io::AsyncWriteExt;
-use futures::stream::{self, StreamExt};
+use futures_util::future;
+use futures_util::future::FutureExt;
+use futures_util::io::AsyncBufReadExt;
+use futures_util::io::AsyncReadExt;
+use futures_util::io::AsyncWriteExt;
+use futures_util::io::BufReader;
+use futures_util::stream::{self, StreamExt};
 use tokio_process::{Child, CommandExt};
 
 mod support;
@@ -47,7 +48,7 @@ fn feed_cat(mut cat: Child, n: usize) -> Pin<Box<dyn Future<Output = io::Result<
 
     // Try to read `n + 1` lines, ensuring the last one is empty
     // (i.e. EOF is reached after `n` lines.
-    let reader = futures::io::BufReader::new(stdout);
+    let reader = BufReader::new(stdout);
     let expected_numbers = stream::iter(0..=n);
     let read = expected_numbers.fold((reader, 0), move |(mut reader, i), _| {
         let fut = async move {
@@ -85,7 +86,7 @@ fn feed_cat(mut cat: Child, n: usize) -> Pin<Box<dyn Future<Output = io::Result<
     });
 
     // Compose reading and writing concurrently.
-    futures::future::join(write, read).then(|_| cat).boxed()
+    future::join(write, read).then(|_| cat).boxed()
 }
 
 /// Check for the following properties when feeding stdin and
@@ -151,7 +152,6 @@ fn wait_with_output_captures() {
 
     let future = async {
         AsyncWriteExt::write_all(&mut stdin, write_bytes).await?;
-        dbg!("WRITE COMPLETE", write_bytes);
         drop(stdin);
         let out = child.wait_with_output();
         out.await

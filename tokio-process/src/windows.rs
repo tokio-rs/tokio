@@ -31,9 +31,8 @@ use std::ptr;
 use std::task::Context;
 use std::task::Poll;
 
-use futures::channel::oneshot;
-use futures::future::Fuse;
-use futures::future::FutureExt;
+use futures_util::future::Fuse;
+use futures_util::future::FutureExt;
 
 use self::mio_named_pipes::NamedPipe;
 use self::winapi::shared::minwindef::*;
@@ -46,6 +45,7 @@ use self::winapi::um::winbase::*;
 use self::winapi::um::winnt::*;
 use super::SpawnedChild;
 use tokio_reactor::{Handle, PollEvented};
+use tokio_sync::oneshot;
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
