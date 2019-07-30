@@ -12,7 +12,7 @@
 //! Reading and writing to it can be done using futures, which return the
 //! [`Recv`], [`Send`], [`RecvFrom`] and [`SendTo`] structs respectively.
 
-// mod frame;
+mod frame;
 mod recv;
 mod recv_from;
 mod send;
@@ -20,7 +20,7 @@ mod send_to;
 mod socket;
 pub mod split;
 
-// pub use self::frame::UdpFramed;
+pub use self::frame::UdpFramed;
 pub use self::recv::Recv;
 pub use self::recv_from::RecvFrom;
 pub use self::send::Send;

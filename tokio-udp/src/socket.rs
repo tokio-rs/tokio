@@ -6,7 +6,6 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio_reactor::{Handle, PollEvented};
 
@@ -91,11 +90,7 @@ impl UdpSocket {
     /// If the socket is not ready for writing, the method returns
     /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes writable.
-    pub fn poll_send(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    pub fn poll_send(&mut self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.poll_send_priv(cx, buf)
     }
 
@@ -160,11 +155,7 @@ impl UdpSocket {
     /// If no data is available for reading, the method returns
     /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes receivable or is closed.
-    pub fn poll_recv(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.poll_recv_priv(cx, buf)
     }
 
@@ -207,7 +198,7 @@ impl UdpSocket {
     /// `Poll::Pending` and arranges for the current task to receive a
     /// notification when the socket becomes writable.
     pub fn poll_send_to(
-        self: Pin<&mut Self>,
+        &mut self,
         cx: &mut Context<'_>,
         buf: &[u8],
         target: &SocketAddr,
@@ -245,7 +236,7 @@ impl UdpSocket {
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
     pub fn poll_recv_from(
-        self: Pin<&mut Self>,
+        &mut self,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<(usize, SocketAddr), io::Error>> {

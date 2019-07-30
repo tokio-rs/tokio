@@ -1,9 +1,11 @@
 use super::UdpSocket;
 use bytes::{BufMut, BytesMut};
-use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use core::task::{Context, Poll};
+use futures::Sink;
+use futures_core::{ready, Stream};
 use log::trace;
-use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::pin::Pin;
 use tokio_codec::{Decoder, Encoder};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
@@ -33,34 +35,101 @@ pub struct UdpFramed<C> {
     flushed: bool,
 }
 
-impl<C: Decoder> Stream for UdpFramed<C> {
-    type Item = (C::Item, SocketAddr);
-    type Error = C::Error;
+impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
+    type Item = Result<(C::Item, SocketAddr), C::Error>;
 
-    fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
-        self.rd.reserve(INITIAL_RD_CAPACITY);
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let pin = self.get_mut(); // <- this is kinda ugly
+
+        pin.rd.reserve(INITIAL_RD_CAPACITY);
 
         let (n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
-            let (n, addr) = try_ready!(self.socket.poll_recv_from(self.rd.bytes_mut()));
-            self.rd.advance_mut(n);
+            let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, pin.rd.bytes_mut()));
+            let (n, addr) = res.unwrap();
+            pin.rd.advance_mut(n);
             (n, addr)
         };
         trace!("received {} bytes, decoding", n);
-        let frame_res = self.codec.decode(&mut self.rd);
-        self.rd.clear();
+        let frame_res = pin.codec.decode(&mut pin.rd);
+        pin.rd.clear();
         let frame = frame_res?;
         let result = frame.map(|frame| (frame, addr)); // frame -> (frame, addr)
+        let result = result.unwrap();
         trace!("frame decoded from buffer");
-        Ok(Async::Ready(result))
+        Poll::Ready(Some(Ok(result)))
     }
 }
 
-impl<C: Encoder> Sink for UdpFramed<C> {
-    type SinkItem = (C::Item, SocketAddr);
-    type SinkError = C::Error;
+impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
+    type Error = C::Error;
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if !self.flushed {
+            match self.poll_flush(cx)? {
+                Poll::Ready(()) => {}
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: (C::Item, SocketAddr)) -> Result<(), Self::Error> {
+        trace!("sending frame");
+
+        let (frame, out_addr) = item;
+
+        let mutable = self.get_mut();
+
+        mutable.codec.encode(frame, &mut mutable.wr)?;
+        mutable.out_addr = out_addr;
+        mutable.flushed = false;
+        trace!("frame encoded; length={}", mutable.wr.len());
+
+        Ok(())
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.flushed {
+            return Poll::Ready(Ok(()));
+        }
+
+        trace!("flushing frame; length={}", self.wr.len());
+
+        let Self {
+            ref mut socket,
+            ref mut out_addr,
+            ref mut wr,
+            ..
+        } = *self;
+
+        let n = ready!(socket.poll_send_to(cx, &wr, &out_addr))?;
+        trace!("written {}", n);
+
+        let wrote_all = n == self.wr.len();
+        self.wr.clear();
+        self.flushed = true;
+
+        let res = if wrote_all {
+            Ok(())
+        } else {
+            /*Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to write entire datagram to socket",
+            )).into()*/
+            unimplemented!();
+        };
+
+        Poll::Ready(res)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        ready!(self.poll_flush(cx))?;
+        Poll::Ready(Ok(()))
+    }
+
+    /*fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         trace!("sending frame");
 
         if !self.flushed {
@@ -81,11 +150,11 @@ impl<C: Encoder> Sink for UdpFramed<C> {
 
     fn poll_complete(&mut self) -> Poll<(), C::Error> {
         if self.flushed {
-            return Ok(Async::Ready(()));
+            return Ok(Poll::Ready(()));
         }
 
         trace!("flushing frame; length={}", self.wr.len());
-        let n = try_ready!(self.socket.poll_send_to(&self.wr, &self.out_addr));
+        let n = ready!(self.socket.poll_send_to(&self.wr, &self.out_addr));
         trace!("written {}", n);
 
         let wrote_all = n == self.wr.len();
@@ -93,7 +162,7 @@ impl<C: Encoder> Sink for UdpFramed<C> {
         self.flushed = true;
 
         if wrote_all {
-            Ok(Async::Ready(()))
+            Ok(Poll::Ready(()))
         } else {
             Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -104,9 +173,9 @@ impl<C: Encoder> Sink for UdpFramed<C> {
     }
 
     fn close(&mut self) -> Poll<(), C::Error> {
-        try_ready!(self.poll_complete());
+        ready!(self.poll_complete());
         Ok(().into())
-    }
+    }*/
 }
 
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
