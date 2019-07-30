@@ -14,7 +14,7 @@ use std::task::Poll::{Pending, Ready};
 
 #[test]
 fn smoke() {
-    loom::fuzz(|| {
+    loom::model(|| {
         let (tx, rx) = oneshot::channel();
 
         thread::spawn(move || {
@@ -28,7 +28,7 @@ fn smoke() {
 
 #[test]
 fn changing_rx_task() {
-    loom::fuzz(|| {
+    loom::model(|| {
         let (tx, mut rx) = oneshot::channel();
 
         thread::spawn(move || {
@@ -83,7 +83,7 @@ impl<'a> Future for OnClose<'a> {
 
 #[test]
 fn changing_tx_task() {
-    loom::fuzz(|| {
+    loom::model(|| {
         let (mut tx, rx) = oneshot::channel::<i32>();
 
         thread::spawn(move || {

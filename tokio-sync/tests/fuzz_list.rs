@@ -29,7 +29,7 @@ fn smoke() {
     const NUM_TX: usize = 2;
     const NUM_MSG: usize = 2;
 
-    loom::fuzz(|| {
+    loom::model(|| {
         let (tx, mut rx) = list::channel();
         let tx = Arc::new(tx);
 

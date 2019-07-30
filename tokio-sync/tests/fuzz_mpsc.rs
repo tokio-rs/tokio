@@ -25,7 +25,7 @@ use loom::thread;
 
 #[test]
 fn closing_tx() {
-    loom::fuzz(|| {
+    loom::model(|| {
         let (mut tx, mut rx) = mpsc::channel(16);
 
         thread::spawn(move || {
