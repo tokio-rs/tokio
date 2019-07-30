@@ -55,7 +55,7 @@ fn basic_usage() {
         }
     }
 
-    loom::fuzz(|| {
+    loom::model(|| {
         let shared = Arc::new(Shared {
             semaphore: Semaphore::new(NUM),
             active: AtomicUsize::new(0),
@@ -81,7 +81,7 @@ fn basic_usage() {
 
 #[test]
 fn release() {
-    loom::fuzz(|| {
+    loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(1));
 
         {
@@ -107,7 +107,7 @@ fn release() {
 fn basic_closing() {
     const NUM: usize = 2;
 
-    loom::fuzz(|| {
+    loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(1));
 
         for _ in 0..NUM {
@@ -136,7 +136,7 @@ fn basic_closing() {
 fn concurrent_close() {
     const NUM: usize = 3;
 
-    loom::fuzz(|| {
+    loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(1));
 
         for _ in 0..NUM {
