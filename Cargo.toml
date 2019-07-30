@@ -9,6 +9,7 @@ members = [
   "tokio-fs",
   "tokio-io",
   "tokio-macros",
+  "tokio-process",
   "tokio-reactor",
   "tokio-signal",
   "tokio-sync",

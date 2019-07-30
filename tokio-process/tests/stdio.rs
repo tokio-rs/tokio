@@ -1,15 +1,22 @@
-extern crate futures;
+#![feature(async_await)]
+
 #[macro_use]
 extern crate log;
 extern crate tokio_io;
 extern crate tokio_process;
 
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
 use std::process::{Command, ExitStatus, Stdio};
 
-use futures::future::Future;
-use futures::stream::{self, Stream};
-use tokio_io::io::{read_until, write_all};
+use futures_util::future;
+use futures_util::future::FutureExt;
+use futures_util::io::AsyncBufReadExt;
+use futures_util::io::AsyncReadExt;
+use futures_util::io::AsyncWriteExt;
+use futures_util::io::BufReader;
+use futures_util::stream::{self, StreamExt};
 use tokio_process::{Child, CommandExt};
 
 mod support;
@@ -20,28 +27,37 @@ fn cat() -> Command {
     cmd
 }
 
-fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = io::Error>> {
+fn feed_cat(mut cat: Child, n: usize) -> Pin<Box<dyn Future<Output = io::Result<ExitStatus>>>> {
     let stdin = cat.stdin().take().unwrap();
     let stdout = cat.stdout().take().unwrap();
 
     debug!("starting to feed");
     // Produce n lines on the child's stdout.
-    let numbers = stream::iter_ok(0..n);
+    let numbers = stream::iter(0..n);
     let write = numbers
-        .fold(stdin, |stdin, i| {
-            debug!("sending line {} to child", i);
-            write_all(stdin, format!("line {}\n", i).into_bytes()).map(|p| p.0)
+        .fold(stdin, move |mut stdin, i| {
+            let fut = async move {
+                debug!("sending line {} to child", i);
+                let bytes = format!("line {}\n", i).into_bytes();
+                AsyncWriteExt::write_all(&mut stdin, &bytes).await.unwrap();
+                stdin
+            };
+            fut
         })
         .map(|_| ());
 
     // Try to read `n + 1` lines, ensuring the last one is empty
     // (i.e. EOF is reached after `n` lines.
-    let reader = io::BufReader::new(stdout);
-    let expected_numbers = stream::iter_ok(0..=n);
-    let read = expected_numbers.fold((reader, 0), move |(reader, i), _| {
-        let done = i >= n;
-        debug!("starting read from child");
-        read_until(reader, b'\n', Vec::new()).and_then(move |(reader, vec)| {
+    let reader = BufReader::new(stdout);
+    let expected_numbers = stream::iter(0..=n);
+    let read = expected_numbers.fold((reader, 0), move |(mut reader, i), _| {
+        let fut = async move {
+            let done = i >= n;
+            debug!("starting read from child");
+            let mut vec = Vec::new();
+            AsyncBufReadExt::read_until(&mut reader, b'\n', &mut vec)
+                .await
+                .unwrap();
             debug!(
                 "read line {} from child ({} bytes, done: {})",
                 i,
@@ -49,23 +65,28 @@ fn feed_cat(mut cat: Child, n: usize) -> Box<Future<Item = ExitStatus, Error = i
                 done
             );
             match (done, vec.len()) {
-                (false, 0) => Err(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe")),
-                (true, n) if n != 0 => Err(io::Error::new(io::ErrorKind::Other, "extraneous data")),
+                (false, 0) => {
+                    panic!("broken pipe");
+                }
+                (true, n) if n != 0 => {
+                    panic!("extraneous data");
+                }
                 _ => {
                     let s = std::str::from_utf8(&vec).unwrap();
                     let expected = format!("line {}\n", i);
                     if done || s == expected {
-                        Ok((reader, i + 1))
+                        (reader, i + 1)
                     } else {
-                        Err(io::Error::new(io::ErrorKind::Other, "unexpected data"))
+                        panic!("unexpected data");
                     }
                 }
             }
-        })
+        };
+        fut
     });
 
     // Compose reading and writing concurrently.
-    Box::new(write.join(read).and_then(|_| cat))
+    future::join(write, read).then(|_| cat).boxed()
 }
 
 /// Check for the following properties when feeding stdin and
@@ -89,15 +110,22 @@ fn feed_a_lot() {
 #[test]
 fn wait_with_output_captures() {
     let mut child = cat().spawn_async().unwrap();
-    let stdin = child.stdin().take().unwrap();
-    let out = child.wait_with_output();
+    let mut stdin = child.stdin().take().unwrap();
 
-    let future = write_all(stdin, b"1234").map(|p| p.1).join(out);
+    let write_bytes = b"1234";
+
+    let future = async {
+        AsyncWriteExt::write_all(&mut stdin, write_bytes).await?;
+        drop(stdin);
+        let out = child.wait_with_output();
+        out.await
+    };
+
     let ret = support::run_with_timeout(future).unwrap();
-    let (written, output) = ret;
+    let output = ret;
 
     assert!(output.status.success());
-    assert_eq!(output.stdout, written);
+    assert_eq!(output.stdout, write_bytes);
     assert_eq!(output.stderr.len(), 0);
 }
 

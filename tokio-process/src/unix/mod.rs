@@ -33,17 +33,23 @@ use self::mio::unix::{EventedFd, UnixReady};
 use self::mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
-use self::tokio_signal::unix::Signal;
 use super::SpawnedChild;
 use crate::kill::Kill;
-use futures::future::FlattenStream;
-use futures::{Future, Poll};
+use futures_core::stream::Stream;
+use futures_util::future;
+use futures_util::future::FutureExt;
+use futures_util::stream::StreamExt;
+use futures_util::try_future::TryFutureExt;
 use std::fmt;
+use std::future::Future;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::pin::Pin;
 use std::process::{self, ExitStatus};
-use tokio_io::IoFuture;
+use std::task::Context;
+use std::task::Poll;
 use tokio_reactor::{Handle, PollEvented};
+use tokio_signal::unix::Signal;
 
 impl Wait for process::Child {
     fn id(&self) -> u32 {
@@ -83,9 +89,11 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
     }
 }
 
+type ChildReaperFuture = Pin<Box<dyn Stream<Item = io::Result<()>> + Send>>;
+
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
-    inner: Reaper<process::Child, GlobalOrphanQueue, FlattenStream<IoFuture<Signal>>>,
+    inner: Reaper<process::Child, GlobalOrphanQueue, ChildReaperFuture>,
 }
 
 impl fmt::Debug for Child {
@@ -102,7 +110,10 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stdout = stdio(child.stdout.take(), handle)?;
     let stderr = stdio(child.stderr.take(), handle)?;
 
-    let signal = Signal::with_handle(libc::SIGCHLD, handle).flatten_stream();
+    let signal = Signal::with_handle(libc::SIGCHLD, handle)
+        .and_then(|stream| future::ok(stream.map(Ok)))
+        .try_flatten_stream()
+        .boxed();
     Ok(SpawnedChild {
         child: Child {
             inner: Reaper::new(child, GlobalOrphanQueue, signal),
@@ -126,30 +137,37 @@ impl Kill for Child {
 }
 
 impl Future for Child {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        (&mut Pin::get_mut(self).inner).poll_unpin(cx)
     }
 }
 
 #[derive(Debug)]
-pub struct Fd<T>(T);
+pub struct Fd<T> {
+    inner: T,
+}
 
-impl<T: io::Read> io::Read for Fd<T> {
+impl<T> io::Read for Fd<T>
+where
+    T: io::Read,
+{
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        self.0.read(bytes)
+        self.inner.read(bytes)
     }
 }
 
-impl<T: io::Write> io::Write for Fd<T> {
+impl<T> io::Write for Fd<T>
+where
+    T: io::Write,
+{
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0.write(bytes)
+        self.inner.write(bytes)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
+        self.inner.flush()
     }
 }
 
@@ -158,13 +176,9 @@ where
     T: AsRawFd,
 {
     fn as_raw_fd(&self) -> RawFd {
-        self.0.as_raw_fd()
+        self.inner.as_raw_fd()
     }
 }
-
-pub type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
-pub type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
-pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
 
 impl<T> Evented for Fd<T>
 where
@@ -195,6 +209,10 @@ where
     }
 }
 
+pub type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
+pub type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
+pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
+
 fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<Fd<T>>>>
 where
     T: AsRawFd,
@@ -216,6 +234,6 @@ where
             return Err(io::Error::last_os_error());
         }
     }
-    let io = PollEvented::new_with_handle(Fd(io), handle)?;
+    let io = PollEvented::new_with_handle(Fd { inner: io }, handle)?;
     Ok(Some(io))
 }

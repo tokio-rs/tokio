@@ -1,16 +1,21 @@
 use super::orphan::{OrphanQueue, Wait};
 use crate::kill::Kill;
-use futures::{Async, Future, Poll, Stream};
+use futures_core::stream::TryStream;
+use futures_util::try_stream::TryStreamExt;
+use std::future::Future;
 use std::io;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::process::ExitStatus;
+use std::task::Context;
+use std::task::Poll;
 
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.
 #[derive(Debug)]
 pub(crate) struct Reaper<W, Q, S>
 where
-    W: Wait,
+    W: Wait + Unpin,
     Q: OrphanQueue<W>,
 {
     inner: Option<W>,
@@ -20,7 +25,7 @@ where
 
 impl<W, Q, S> Deref for Reaper<W, Q, S>
 where
-    W: Wait,
+    W: Wait + Unpin,
     Q: OrphanQueue<W>,
 {
     type Target = W;
@@ -32,7 +37,7 @@ where
 
 impl<W, Q, S> Reaper<W, Q, S>
 where
-    W: Wait,
+    W: Wait + Unpin,
     Q: OrphanQueue<W>,
 {
     pub(crate) fn new(inner: W, orphan_queue: Q, signal: S) -> Self {
@@ -54,14 +59,14 @@ where
 
 impl<W, Q, S> Future for Reaper<W, Q, S>
 where
-    W: Wait,
-    Q: OrphanQueue<W>,
-    S: Stream<Error = io::Error>,
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
+    S: TryStream<Error = io::Error> + Unpin,
 {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
         loop {
             // If the child hasn't exited yet, then it's our responsibility to
             // ensure the current task gets notified when it might be able to
@@ -82,17 +87,21 @@ where
             // this future's task will be notified/woken up again. Since the
             // futures model allows for spurious wake ups this extra wakeup
             // should not cause significant issues with parent futures.
-            let registered_interest = self.signal.poll()?.is_not_ready();
+            let signal_poll = inner.signal.try_poll_next_unpin(cx);
+            if let Poll::Ready(Some(Err(err))) = signal_poll {
+                return Poll::Ready(Err(err));
+            }
+            let registered_interest = signal_poll.is_pending();
 
-            self.orphan_queue.reap_orphans();
-            if let Some(status) = self.inner_mut().try_wait()? {
-                return Ok(Async::Ready(status));
+            inner.orphan_queue.reap_orphans();
+            if let Some(status) = inner.inner_mut().try_wait()? {
+                return Poll::Ready(Ok(status));
             }
 
             // If our attempt to poll for the next signal was not ready, then
             // we've arranged for our task to get notified and we can bail out.
             if registered_interest {
-                return Ok(Async::NotReady);
+                return Poll::Pending;
             } else {
                 // Otherwise, if the signal stream delivered a signal to us, we
                 // won't get notified at the next signal, so we'll loop and try
@@ -105,7 +114,7 @@ where
 
 impl<W, Q, S> Kill for Reaper<W, Q, S>
 where
-    W: Kill + Wait,
+    W: Kill + Wait + Unpin,
     Q: OrphanQueue<W>,
 {
     fn kill(&mut self) -> io::Result<()> {
@@ -115,7 +124,7 @@ where
 
 impl<W, Q, S> Drop for Reaper<W, Q, S>
 where
-    W: Wait,
+    W: Wait + Unpin,
     Q: OrphanQueue<W>,
 {
     fn drop(&mut self) {
@@ -131,10 +140,14 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::{Async, Poll, Stream};
+    use futures_core::stream::Stream;
+    use futures_util::future::FutureExt;
     use std::cell::{Cell, RefCell};
     use std::os::unix::process::ExitStatusExt;
+    use std::pin::Pin;
     use std::process::ExitStatus;
+    use std::task::Context;
+    use std::task::Poll;
 
     #[derive(Debug)]
     struct MockWait {
@@ -194,14 +207,14 @@ mod test {
     }
 
     impl Stream for MockStream {
-        type Item = ();
-        type Error = io::Error;
+        type Item = io::Result<()>;
 
-        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-            self.total_polls += 1;
-            match self.values.remove(0) {
-                Some(()) => Ok(Async::Ready(Some(()))),
-                None => Ok(Async::NotReady),
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
+            let inner = Pin::get_mut(self);
+            inner.total_polls += 1;
+            match inner.values.remove(0) {
+                Some(()) => Poll::Ready(Some(Ok(()))),
+                None => Poll::Pending,
             }
         }
     }
@@ -240,8 +253,11 @@ mod test {
             MockStream::new(vec![None, Some(()), None, None, None]),
         );
 
+        let waker = futures_util::task::noop_waker();
+        let mut context = Context::from_waker(&waker);
+
         // Not yet exited, interest registered
-        assert_eq!(Async::NotReady, grim.poll().expect("failed to wait"));
+        assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(1, grim.signal.total_polls);
         assert_eq!(1, grim.total_waits);
         assert_eq!(1, grim.orphan_queue.total_reaps.get());
@@ -249,14 +265,20 @@ mod test {
 
         // Not yet exited, couldn't register interest the first time
         // but managed to register interest the second time around
-        assert_eq!(Async::NotReady, grim.poll().expect("failed to wait"));
+        assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(3, grim.signal.total_polls);
         assert_eq!(3, grim.total_waits);
         assert_eq!(3, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
 
         // Exited
-        assert_eq!(Async::Ready(exit), grim.poll().expect("failed to wait"));
+        if let Poll::Ready(r) = grim.poll_unpin(&mut context) {
+            assert!(r.is_ok());
+            let exit_code = r.unwrap();
+            assert_eq!(exit_code, exit);
+        } else {
+            unreachable!();
+        }
         assert_eq!(4, grim.signal.total_polls);
         assert_eq!(4, grim.total_waits);
         assert_eq!(4, grim.orphan_queue.total_reaps.get());
