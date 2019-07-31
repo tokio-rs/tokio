@@ -10,30 +10,28 @@
 //! # Examples
 //!
 //! Here's an example program which will spawn `echo hello world` and then wait
-//! for it using an event loop.
+//! for it complete.
 //!
 //! ```no_run
-//! extern crate tokio;
-//! extern crate tokio_process;
+//! #![feature(async_await)]
 //!
 //! use std::process::Command;
-//!
-//! use futures_util::future::FutureExt;
 //! use tokio_process::CommandExt;
 //!
-//! fn main() {
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Use the standard library's `Command` type to build a process and
 //!     // then execute it via the `CommandExt` trait.
 //!     let child = Command::new("echo").arg("hello").arg("world")
 //!                         .spawn_async();
 //!
 //!     // Make sure our child succeeded in spawning and process the result
-//!     let future = child.expect("failed to spawn")
-//!         .map(|status| println!("exit status: {}", status))
-//!         .map_err(|e| panic!("failed to wait for exit: {}", e));
+//!     let future = child.expect("failed to spawn");
 //!
-//!     // Send the future to the tokio runtime for execution
-//!     tokio::run(future)
+//!     // Await until the future (and the command) completes
+//!     let status = future.await?;
+//!     println!("the command exited with: {}", status);
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -41,104 +39,69 @@
 //! world` but we also capture its output.
 //!
 //! ```no_run
-//! extern crate tokio;
-//! extern crate tokio_process;
+//! #![feature(async_await)]
 //!
 //! use std::process::Command;
-//!
-//! use futures_util::future::FutureExt;
 //! use tokio_process::CommandExt;
 //!
-//! fn main() {
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Like above, but use `output_async` which returns a future instead of
 //!     // immediately returning the `Child`.
 //!     let output = Command::new("echo").arg("hello").arg("world")
 //!                         .output_async();
 //!
-//!     let future = output.map_err(|e| panic!("failed to collect output: {}", e))
-//!         .map(|output| {
-//!             assert!(output.status.success());
-//!             assert_eq!(output.stdout, b"hello world\n");
-//!         });
+//!     let output = output.await?;
 //!
-//!     tokio::run(future);
+//!     assert!(output.status.success());
+//!     assert_eq!(output.stdout, b"hello world\n");
+//!     Ok(())
 //! }
 //! ```
 //!
 //! We can also read input line by line.
 //!
 //! ```no_run
-//! extern crate failure;
-//! extern crate tokio;
-//! extern crate tokio_process;
-//! extern crate tokio_io;
+//! #![feature(async_await)]
 //!
-//! use failure::Error;
-//! use futures_util::future::FutureExt;
 //! use futures_util::stream::StreamExt;
-//! use std::io::BufReader;
 //! use std::process::{Command, Stdio};
-//! use tokio_process::{Child, ChildStdout, CommandExt};
+//! use tokio::codec::{FramedRead, LinesCodec};
+//! use tokio_process::CommandExt;
 //!
-//! fn lines_stream(child: &mut Child) -> impl Stream<Item = String, Error = Error> + Send + 'static {
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let mut cmd = Command::new("cat");
+//!
+//!     // Specify that we want the command's standard output piped back to us.
+//!     // By default, standard input/output/error will be inherited from the
+//!     // current process (for example, this means that standard input will
+//!     // come from the keyboard and standard output/error will go directly to
+//!     // the terminal if this process is invoked from the command line).
+//!     cmd.stdout(Stdio::piped());
+//!
+//!     let mut child = cmd.spawn_async()
+//!         .expect("failed to spawn command");
+//!
 //!     let stdout = child.stdout().take()
 //!         .expect("child did not have a handle to stdout");
 //!
-//!     tokio_io::io::lines(BufReader::new(stdout))
-//!         // Convert any io::Error into a failure::Error for better flexibility
-//!         .map_err(|e| Error::from(e))
-//!         // We print each line we've received here as an example of a way we can
-//!         // do something with the data. This can be changed to map the data to
-//!         // something else, or to consume it differently.
-//!         .inspect(|line| println!("Line: {}", line))
-//! }
+//!     let mut reader = FramedRead::new(stdout, LinesCodec::new());
 //!
-//! fn main() {
-//!     // Lazily invoke any code so it can run directly within the tokio runtime
-//!     tokio::run(futures::lazy(|| {
-//!         let mut cmd = Command::new("cat");
+//!     // Ensure the child process is spawned in the runtime so it can
+//!     // make progress on its own while we await for any output.
+//!     tokio::spawn(async {
+//!         let status = child.await
+//!             .expect("child process encountered an error");
 //!
-//!         // Specify that we want the command's standard output piped back to us.
-//!         // By default, standard input/output/error will be inherited from the
-//!         // current process (for example, this means that standard input will
-//!         // come from the keyboard and standard output/error will go directly to
-//!         // the terminal if this process is invoked from the command line).
-//!         cmd.stdout(Stdio::piped());
+//!         println!("child status was: {}", status);
+//!     });
 //!
-//!         let mut child = cmd.spawn_async()
-//!             .expect("failed to spawn command");
+//!     while let Some(line) = reader.next().await {
+//!         println!("Line: {}", line?);
+//!     }
 //!
-//!         let lines = lines_stream(&mut child);
-//!
-//!         // Spawning into the tokio runtime requires that the future's Item and
-//!         // Error are both `()`. This is because tokio doesn't know what to do
-//!         // with any results or errors, so it requires that we've handled them!
-//!         //
-//!         // We can replace these sample usages of the child's exit status (or
-//!         // an encountered error) perform some different actions if needed!
-//!         // For example, log the error, or send a message on a channel, etc.
-//!         let child_future = child
-//!                 .map(|status| println!("child status was: {}", status))
-//!                 .map_err(|e| panic!("error while running child: {}", e));
-//!
-//!         // Ensure the child process can live on within the runtime, otherwise
-//!         // the process will get killed if this handle is dropped
-//!         tokio::spawn(child_future);
-//!
-//!         // Return a future to tokio. This is the same as calling using
-//!         // `tokio::spawn` above, but without having to return a dummy future
-//!         // here.
-//!         lines
-//!             // Convert the stream of values into a future which will resolve
-//!             // once the entire stream has been consumed. In this example we
-//!             // don't need to do anything with the data within the `for_each`
-//!             // call, but you can extend this to do something else (keep in mind
-//!             // that the stream will not produce items until the future returned
-//!             // from the closure resolves).
-//!             .for_each(|_| Ok(()))
-//!             // Similarly we "handle" any errors that arise, as required by tokio.
-//!             .map_err(|e| panic!("error while processing lines: {}", e))
-//!     }));
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -152,13 +115,11 @@
 //! `tokio_process::Child` is dropped. The behavior of the standard library can
 //! be regained with the `Child::forget` method.
 
-#![warn(missing_debug_implementations)]
-#![deny(missing_docs)]
-#![doc(html_root_url = "https://docs.rs/tokio-process/0.2")]
+#![doc(html_root_url = "https://docs.rs/tokio-process/0.3.0")]
+#![deny(missing_debug_implementations, missing_docs, rust_2018_idioms)]
+#![cfg_attr(test, deny(warnings))]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]
-
-extern crate tokio_io;
-extern crate tokio_reactor;
 
 #[cfg(unix)]
 #[macro_use]
@@ -173,7 +134,6 @@ use std::process::{Command, ExitStatus, Output, Stdio};
 use futures_core::future::TryFuture;
 use futures_util::future;
 use futures_util::future::FutureExt;
-use futures_util::io::{AsyncRead, AsyncWrite};
 use futures_util::try_future::TryFutureExt;
 
 use kill::Kill;
@@ -182,8 +142,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
-use tokio_io::AsyncRead as TokioAsyncRead;
-use tokio_io::AsyncWrite as TokioAsyncWrite;
+use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
@@ -421,13 +380,12 @@ impl<T: Kill> Drop for ChildDropGuard<T> {
 impl<T: TryFuture + Kill + Unpin> Future for ChildDropGuard<T> {
     type Output = Result<T::Ok, T::Error>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        let inner = Pin::get_mut(self);
-        let ret = inner.inner.try_poll_unpin(cx);
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let ret = Pin::new(&mut self.inner).try_poll(cx);
 
         if let Poll::Ready(Ok(_)) = ret {
             // Avoid the overhead of trying to kill a reaped process
-            inner.kill_on_drop = false;
+            self.kill_on_drop = false;
         }
 
         ret
@@ -511,7 +469,7 @@ impl Child {
             match stdout_val {
                 Some(mut io) => {
                     let mut vec = Vec::new();
-                    futures_util::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                    AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
                     Ok(vec)
                 }
                 None => Ok(Vec::new()),
@@ -521,7 +479,7 @@ impl Child {
             match stderr_val {
                 Some(mut io) => {
                     let mut vec = Vec::new();
-                    futures_util::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                    AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
                     Ok(vec)
                 }
                 None => Ok(Vec::new()),
@@ -552,25 +510,20 @@ impl Child {
     /// > `Child` instance into an event loop as an alternative to this method.
     ///
     /// ```no_run
-    /// # extern crate tokio;
-    /// # extern crate tokio_process;
-    /// #
+    /// # #![feature(async_await)]
     /// # use std::process::Command;
-    /// #
-    /// # use futures_util::future::FutureExt;
     /// # use tokio_process::CommandExt;
-    /// #
-    /// # fn main() {
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
     /// let child = Command::new("echo").arg("hello").arg("world")
     ///                     .spawn_async()
     ///                     .expect("failed to spawn");
     ///
-    /// let do_cleanup = child.map(|_| ()) // Ignore result
-    ///                       .map_err(|_| ()); // Ignore errors
-    ///
-    /// tokio::spawn(do_cleanup);
+    /// tokio::spawn(async {
+    ///   let _ = child.await;
+    /// });
     /// # }
-    /// ```
     pub fn forget(mut self) {
         self.child.forget();
     }
@@ -579,8 +532,8 @@ impl Child {
 impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        Pin::get_mut(self).child.poll_unpin(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.child).poll(cx)
     }
 }
 
@@ -594,7 +547,7 @@ pub struct WaitWithOutput {
 }
 
 impl fmt::Debug for WaitWithOutput {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("WaitWithOutput")
             .field("inner", &"..")
             .finish()
@@ -604,14 +557,10 @@ impl fmt::Debug for WaitWithOutput {
 impl Future for WaitWithOutput {
     type Output = io::Result<Output>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        Pin::get_mut(self).inner.poll_unpin(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.inner).poll(cx)
     }
 }
-
-#[doc(hidden)]
-#[deprecated(note = "renamed to `StatusAsync`", since = "0.2.1")]
-pub type StatusAsync2 = StatusAsync;
 
 /// Future returned by the `CommandExt::status_async` method.
 ///
@@ -627,8 +576,8 @@ pub struct StatusAsync {
 impl Future for StatusAsync {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        Pin::get_mut(self).inner.poll_unpin(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.inner).poll(cx)
     }
 }
 
@@ -643,7 +592,7 @@ pub struct OutputAsync {
 }
 
 impl fmt::Debug for OutputAsync {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("OutputAsync")
             .field("inner", &"..")
             .finish()
@@ -653,8 +602,8 @@ impl fmt::Debug for OutputAsync {
 impl Future for OutputAsync {
     type Output = io::Result<Output>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        Pin::get_mut(self).inner.poll_unpin(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.inner).poll(cx)
     }
 }
 
@@ -701,16 +650,20 @@ impl Write for ChildStdin {
 }
 
 impl AsyncWrite for ChildStdin {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_write(cx, buf)
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_flush(cx)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_shutdown(cx)
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
@@ -722,11 +675,11 @@ impl Read for ChildStdout {
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
@@ -738,11 +691,11 @@ impl Read for ChildStderr {
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
@@ -835,7 +788,7 @@ mod test {
     impl Future for Mock {
         type Output = Result<(), ()>;
 
-        fn poll(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
             let inner = Pin::get_mut(self);
             inner.num_polls += 1;
             inner.poll_result

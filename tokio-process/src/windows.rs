@@ -54,7 +54,7 @@ pub struct Child {
 }
 
 impl fmt::Debug for Child {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Child")
             .field("pid", &self.id())
             .field("child", &self.child)
@@ -104,7 +104,7 @@ impl Kill for Child {
 impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = Pin::get_mut(self);
         loop {
             if let Some(ref mut w) = inner.waiting {
