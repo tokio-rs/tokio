@@ -11,8 +11,8 @@ mod platform {
 
     pub async fn main() {
         // Create a stream for each of the signals we'd like to handle.
-        let sigint = Signal::new(SIGINT).await.unwrap().map(|_| SIGINT);
-        let sigterm = Signal::new(SIGTERM).await.unwrap().map(|_| SIGTERM);
+        let sigint = Signal::new(SIGINT).unwrap().map(|_| SIGINT);
+        let sigterm = Signal::new(SIGTERM).unwrap().map(|_| SIGTERM);
 
         // Use the `select` combinator to merge these two streams into one
         let stream = stream::select(sigint, sigterm);

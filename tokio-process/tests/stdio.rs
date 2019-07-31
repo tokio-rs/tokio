@@ -13,7 +13,6 @@ use std::process::{Command, ExitStatus, Stdio};
 use futures_util::future;
 use futures_util::future::FutureExt;
 use futures_util::io::AsyncBufReadExt;
-use futures_util::io::AsyncReadExt;
 use futures_util::io::AsyncWriteExt;
 use futures_util::io::BufReader;
 use futures_util::stream::{self, StreamExt};
