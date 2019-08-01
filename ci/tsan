@@ -39,6 +39,6 @@ race:pthread_cond_destroy
 # Recent rand dependency updates and seeding changes have introduced
 # lazy_static's and other racy code. See:
 # https://github.com/tokio-rs/tokio/pull/1358#issuecomment-516172383
-race:std::collections::hash::map::RandomState*::build_hasher
-race:lazy_static::lazy::Lazy<T>::get
+race:RandomState*::build_hasher
+race:lazy_static::
 race:c2_chacha::guts
