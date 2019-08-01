@@ -41,18 +41,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
-    proxy(listen_addr, server_addr).await?;
 
-    Ok(())
-}
-
-async fn proxy(addr: SocketAddr, proxy_addr: SocketAddr) -> Result<(), Box<dyn Error>> {
-    let mut incoming = TcpListener::bind(&addr).unwrap().incoming();
+    let mut incoming = TcpListener::bind(&listen_addr)?.incoming();
 
     while let Some(Ok(inbound)) = incoming.next().await {
-        let transfer = transfer(inbound, proxy_addr).map(|r| {
+        let transfer = transfer(inbound, server_addr).map(|r| {
             if let Err(e) = r {
-                println!("Error: {}", e);
+                println!("Failed to transfer; error={}", e);
             }
         });
 
