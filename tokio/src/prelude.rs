@@ -12,6 +12,9 @@
 
 pub use crate::util::FutureExt;
 pub use std::future::Future;
-pub use std::task::{self, Poll};
+
 #[cfg(feature = "io")]
-pub use tokio_io::{AsyncRead, AsyncWrite};
+pub use tokio_io::{
+    AsyncBufRead, AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite,
+    AsyncWriteExt as _,
+};
