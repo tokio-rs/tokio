@@ -14,15 +14,15 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use futures::{StreamExt, SinkExt};
-use std::{env, error::Error, net::SocketAddr, io, fmt};
+use bytes::BytesMut;
+use futures::{SinkExt, StreamExt};
+use http::{header::HeaderValue, Request, Response, StatusCode};
+use serde::Serialize;
+use std::{env, error::Error, fmt, io, net::SocketAddr};
 use tokio::{
     codec::{Decoder, Encoder, Framed},
     net::{TcpListener, TcpStream},
 };
-use http::{Request, Response, StatusCode, header::HeaderValue};
-use serde::Serialize;
-use bytes::BytesMut;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     while let Some(Ok(stream)) = incoming.next().await {
         tokio::spawn(async move {
             if let Err(e) = process(stream).await {
-                 println!("failed to process connection; error = {}", e);
+                println!("failed to process connection; error = {}", e);
             }
         });
     }
@@ -53,11 +53,11 @@ async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
             Ok(request) => {
                 let response = respond(request).await?;
                 transport.send(response).await?;
-            },
+            }
             Err(e) => return Err(e.into()),
         }
     }
-    
+
     Ok(())
 }
 
@@ -87,7 +87,7 @@ async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
     let response = response
         .body(body)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-    
+
     Ok(response)
 }
 
