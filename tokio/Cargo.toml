@@ -70,7 +70,7 @@ num_cpus = { version = "1.8.0", optional = true }
 tokio-codec = { version = "0.2.0", optional = true, path = "../tokio-codec" }
 tokio-current-thread = { version = "0.2.0", optional = true, path = "../tokio-current-thread" }
 tokio-fs = { version = "0.2.0", optional = true, path = "../tokio-fs" }
-tokio-io = { version = "0.2.0", optional = true, path = "../tokio-io" }
+tokio-io = { version = "0.2.0", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "0.2.0", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
 tokio-reactor = { version = "0.2.0", optional = true, path = "../tokio-reactor" }
