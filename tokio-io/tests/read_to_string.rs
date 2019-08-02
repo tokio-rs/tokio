@@ -1,7 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_io::{AsyncRead, AsyncReadExt};
 use tokio_test::assert_ok;
 
 use std::pin::Pin;
@@ -9,7 +9,7 @@ use std::task::{Context, Poll};
 use std::{cmp, io};
 
 #[tokio::test]
-async fn read_to_end() {
+async fn read_to_string() {
     struct Rd {
         val: &'static [u8],
     }
@@ -29,12 +29,12 @@ async fn read_to_end() {
         }
     }
 
-    let mut buf = vec![];
+    let mut buf = String::new();
     let mut rd = Rd {
         val: b"hello world",
     };
 
-    let n = assert_ok!(rd.read_to_end(&mut buf).await);
+    let n = assert_ok!(rd.read_to_string(&mut buf).await);
     assert_eq!(n, 11);
-    assert_eq!(buf[..], b"hello world"[..]);
+    assert_eq!(buf[..], "hello world"[..]);
 }

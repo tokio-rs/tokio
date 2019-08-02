@@ -1,17 +1,17 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_io::{AsyncRead, AsyncReadExt};
 use tokio_test::assert_ok;
 
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{cmp, io};
 
 #[tokio::test]
-async fn read_to_string() {
+async fn read_exact() {
     struct Rd {
-        val: &'static [u8],
+        val: &'static [u8; 11],
     }
 
     impl AsyncRead for Rd {
@@ -21,20 +21,19 @@ async fn read_to_string() {
             buf: &mut [u8],
         ) -> Poll<io::Result<usize>> {
             let me = &mut *self;
-            let len = cmp::min(buf.len(), me.val.len());
+            let len = buf.len();
 
-            buf[..len].copy_from_slice(&me.val[..len]);
-            me.val = &me.val[len..];
-            Poll::Ready(Ok(len))
+            buf[..].copy_from_slice(&me.val[..len]);
+            Poll::Ready(Ok(buf.len()))
         }
     }
 
-    let mut buf = String::new();
+    let mut buf = Box::new([0; 8]);
     let mut rd = Rd {
         val: b"hello world",
     };
 
-    let n = assert_ok!(rd.read_to_string(&mut buf).await);
-    assert_eq!(n, 11);
-    assert_eq!(buf[..], "hello world"[..]);
+    let n = assert_ok!(rd.read_exact(&mut buf[..]).await);
+    assert_eq!(n, 8);
+    assert_eq!(buf[..], b"hello wo"[..]);
 }
