@@ -2,24 +2,16 @@
 //!
 //! [`File`]: file/struct.File.html
 
-mod clone;
-mod create;
-mod metadata;
-mod open;
 mod open_options;
-mod seek;
 
-pub use self::clone::CloneFuture;
-pub use self::create::CreateFuture;
-pub use self::metadata::MetadataFuture;
-pub use self::open::OpenFuture;
 pub use self::open_options::OpenOptions;
-pub use self::seek::SeekFuture;
+
+use crate::asyncify;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::convert::TryFrom;
-use std::fs::{File as StdFile, Metadata, Permissions};
+use std::fs::{Metadata, Permissions};
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 use std::pin::Pin;
@@ -76,7 +68,7 @@ use std::task::Poll;
 /// ```
 #[derive(Debug)]
 pub struct File {
-    std: Option<StdFile>,
+    std: std::fs::File,
 }
 
 impl File {
@@ -88,10 +80,9 @@ impl File {
     ///
     /// # Errors
     ///
-    /// `OpenFuture` results in an error if called from outside of the Tokio
-    /// runtime or if the underlying [`open`] call results in an error.
-    ///
-    /// [`open`]: https://doc.rust-lang.org/std/fs/struct.File.html#method.open
+    /// This function will return an error if called from outside of the Tokio
+    /// runtime or if path does not already exist. Other errors may also be
+    /// returned according to OpenOptions::open.
     ///
     /// # Examples
     ///
@@ -111,11 +102,14 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn open<P>(path: P) -> OpenFuture<P>
+    pub async fn open<P>(path: P) -> io::Result<File>
     where
         P: AsRef<Path> + Send + Unpin + 'static,
     {
-        OpenOptions::new().read(true).open(path)
+        let mut open_options = OpenOptions::new();
+        open_options.read(true);
+
+        open_options.open(path).await
     }
 
     /// Opens a file in write-only mode.
@@ -148,11 +142,12 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn create<P>(path: P) -> CreateFuture<P>
+    pub async fn create<P>(path: P) -> io::Result<File>
     where
         P: AsRef<Path> + Send + Unpin + 'static,
     {
-        CreateFuture::new(path)
+        let std_file = asyncify(|| std::fs::File::create(&path)).await?;
+        Ok(File::from_std(std_file))
     }
 
     /// Convert a [`std::fs::File`][std] to a [`tokio_fs::File`][file].
@@ -168,24 +163,8 @@ impl File {
     /// let std_file = std::fs::File::open("foo.txt").unwrap();
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
-    pub fn from_std(std: StdFile) -> File {
-        File { std: Some(std) }
-    }
-
-    /// Seek to an offset, in bytes, in a stream.
-    ///
-    /// A seek beyond the end of a stream is allowed, but implementation
-    /// defined.
-    ///
-    /// If the seek operation completed successfully, this method returns the
-    /// new position from the start of the stream. That position can be used
-    /// later with `SeekFrom::Start`.
-    ///
-    /// # Errors
-    ///
-    /// Seeking to a negative offset is considered an error.
-    pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<io::Result<u64>> {
-        crate::blocking_io(|| self.std().seek(pos))
+    pub fn from_std(std: std::fs::File) -> File {
+        File { std }
     }
 
     /// Seek to an offset, in bytes, in a stream.
@@ -214,8 +193,8 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn seek(self, pos: io::SeekFrom) -> SeekFuture {
-        SeekFuture::new(self, pos)
+    pub async fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        asyncify(|| self.std.seek(pos)).await
     }
 
     /// Attempts to sync all OS-internal metadata to disk.
@@ -226,22 +205,20 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::{AsyncWrite, Future};
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|mut file| {
-    ///         file.poll_write(b"hello, world!")?;
-    ///         file.poll_sync_all()
-    ///     })
-    ///     .map(|res| {
-    ///         // handle returned result ..
-    ///         # println!("{:?}", res);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::create("foo.txt").await?;
+    /// file.write_all(b"hello, world!").await?;
+    /// file.sync_all().await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_sync_all(&mut self) -> Poll<io::Result<()>> {
-        crate::blocking_io(|| self.std().sync_all())
+    pub async fn sync_all(&mut self) -> io::Result<()> {
+        asyncify(|| self.std.sync_all()).await
     }
 
     /// This function is similar to `poll_sync_all`, except that it may not
@@ -256,22 +233,20 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::{AsyncWrite, Future};
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|mut file| {
-    ///         file.poll_write(b"hello, world!")?;
-    ///         file.poll_sync_data()
-    ///     })
-    ///     .map(|res| {
-    ///         // handle returned result ..
-    ///         # println!("{:?}", res);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::create("foo.txt").await?;
+    /// file.write_all(b"hello, world!").await?;
+    /// file.sync_data().await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_sync_data(&mut self) -> Poll<io::Result<()>> {
-        crate::blocking_io(|| self.std().sync_data())
+    pub async fn sync_data(&mut self) -> io::Result<()> {
+        asyncify(|| self.std.sync_data()).await
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -289,21 +264,20 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::Future;
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|mut file| {
-    ///         file.poll_set_len(10)
-    ///     })
-    ///     .map(|res| {
-    ///         // handle returned result ..
-    ///         # println!("{:?}", res);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::create("foo.txt").await?;
+    /// file.write_all(b"hello, world!").await?;
+    /// file.set_len(10).await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_set_len(&mut self, size: u64) -> Poll<io::Result<()>> {
-        crate::blocking_io(|| self.std().set_len(size))
+    pub async fn set_len(&mut self, size: u64) -> io::Result<()> {
+        asyncify(|| self.std.set_len(size)).await
     }
 
     /// Queries metadata about the underlying file.
@@ -311,38 +285,20 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::Future;
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|file| file.metadata())
-    ///     .map(|metadata| {
-    ///         println!("{:?}", metadata);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let metadata = file.metadata().await?;
+    ///
+    /// println!("{:?}", metadata);
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn metadata(self) -> MetadataFuture {
-        MetadataFuture::new(self)
-    }
-
-    /// Queries metadata about the underlying file.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::prelude::Future;
-    ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|mut file| file.poll_metadata())
-    ///     .map(|metadata| {
-    ///         // metadata is of type Async::Ready<Metadata>
-    ///         println!("{:?}", metadata);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
-    ///
-    /// tokio::run(task);
-    /// ```
-    pub fn poll_metadata(&mut self) -> Poll<io::Result<Metadata>> {
-        crate::blocking_io(|| self.std().metadata())
+    pub async fn metadata(&self) -> io::Result<Metadata> {
+        asyncify(|| self.std.metadata()).await
     }
 
     /// Create a new `File` instance that shares the same underlying file handle
@@ -352,52 +308,19 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::Future;
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|mut file| file.poll_try_clone())
-    ///     .map(|clone| {
-    ///         // do something with the clone
-    ///         # println!("{:?}", clone);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let file_clone = file.try_clone().await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_try_clone(&mut self) -> Poll<io::Result<File>> {
-        crate::blocking_io(|| {
-            let std = self.std().try_clone()?;
-            Ok(File::from_std(std))
-        })
-    }
-
-    /// Create a new `File` instance that shares the same underlying file handle
-    /// as the existing `File` instance. Reads, writes, and seeks will affect both
-    /// File instances simultaneously.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::prelude::Future;
-    ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|file| {
-    ///         file.try_clone()
-    ///             .map(|(file, clone)| {
-    ///                 // do something with the file and the clone
-    ///                 # println!("{:?} {:?}", file, clone);
-    ///             })
-    ///             .map_err(|(file, err)| {
-    ///                 // you get the original file back if there's an error
-    ///                 # println!("{:?}", file);
-    ///                 err
-    ///             })
-    ///     })
-    ///     .map_err(|err| eprintln!("IO error: {:?}", err));
-    ///
-    /// tokio::run(task);
-    /// ```
-    pub fn try_clone(self) -> CloneFuture {
-        CloneFuture::new(self)
+    pub async fn try_clone(&self) -> io::Result<File> {
+        let std_file = asyncify(|| self.std.try_clone()).await?;
+        Ok(File::from_std(std_file))
     }
 
     /// Changes the permissions on the underlying file.
@@ -419,23 +342,20 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::Future;
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .and_then(|file| file.metadata())
-    ///     .map(|(mut file, metadata)| {
-    ///         let mut perms = metadata.permissions();
-    ///         perms.set_readonly(true);
-    ///         match file.poll_set_permissions(perms) {
-    ///             Err(e) => eprintln!("{}", e),
-    ///             _ => println!("permissions set!"),
-    ///         }
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let mut perms = file.metadata().await?.permissions();
+    /// perms.set_readonly(true);
+    /// file.set_permissions(perms).await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_set_permissions(&mut self, perm: Permissions) -> Poll<io::Result<()>> {
-        crate::blocking_io(|| self.std().set_permissions(perm))
+    pub async fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
+        asyncify(|| self.std.set_permissions(perm)).await
     }
 
     /// Destructures the `tokio_fs::File` into a [`std::fs::File`][std].
@@ -460,18 +380,8 @@ impl File {
     ///
     /// tokio::run(task);
     /// ```
-    pub fn into_std(mut self) -> StdFile {
-        self.std.take().expect("`File` instance already shutdown")
-    }
-
-    fn std(&mut self) -> &mut StdFile {
-        self.std.as_mut().expect("`File` instance already shutdown")
-    }
-}
-
-impl Read for File {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        crate::would_block(|| self.std().read(buf))
+    pub fn into_std(self) -> std::fs::File {
+        self.std
     }
 }
 
@@ -481,20 +391,7 @@ impl AsyncRead for File {
         _cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        match Pin::get_mut(self).read(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
-            other => Poll::Ready(other),
-        }
-    }
-}
-
-impl Write for File {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        crate::would_block(|| self.std().write(buf))
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        crate::would_block(|| self.std().flush())
+        crate::blocking_io(|| (&self.std).read(buf))
     }
 }
 
@@ -504,17 +401,11 @@ impl AsyncWrite for File {
         _cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        match Pin::get_mut(self).write(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
-            other => Poll::Ready(other),
-        }
+        crate::blocking_io(|| (&self.std).write(buf))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        match Pin::get_mut(self).flush() {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
-            other => Poll::Ready(other),
-        }
+        crate::blocking_io(|| (&self.std).flush())
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
@@ -522,27 +413,16 @@ impl AsyncWrite for File {
     }
 }
 
-impl Drop for File {
-    fn drop(&mut self) {
-        if let Some(_std) = self.std.take() {
-            // This is probably fine as closing a file *shouldn't* be a blocking
-            // operation. That said, ideally `shutdown` is called first.
-        }
-    }
-}
-
-impl From<StdFile> for File {
-    fn from(std: StdFile) -> Self {
+impl From<std::fs::File> for File {
+    fn from(std: std::fs::File) -> Self {
         Self::from_std(std)
     }
 }
 
-impl TryFrom<File> for StdFile {
+impl TryFrom<File> for std::fs::File {
     type Error = io::Error;
 
-    fn try_from(mut file: File) -> Result<Self, Self::Error> {
-        file.std
-            .take()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "`File` instance already shutdown"))
+    fn try_from(file: File) -> Result<Self, Self::Error> {
+        Ok(file.std)
     }
 }

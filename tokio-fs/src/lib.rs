@@ -2,6 +2,7 @@
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! Asynchronous file and standard stream adaptation.
 //!
@@ -56,7 +57,7 @@ pub use crate::file::File;
 pub use crate::file::OpenOptions;
 pub use crate::hard_link::{hard_link, HardLinkFuture};
 pub use crate::metadata::{metadata, MetadataFuture};
-pub use crate::read::{read, ReadFile};
+pub use crate::read::read;
 pub use crate::read_dir::{read_dir, DirEntry, ReadDir, ReadDirFuture};
 pub use crate::read_link::{read_link, ReadLinkFuture};
 pub use crate::remove_dir::{remove_dir, RemoveDirFuture};
@@ -68,7 +69,7 @@ pub use crate::stderr::{stderr, Stderr};
 pub use crate::stdin::{stdin, Stdin};
 pub use crate::stdout::{stdout, Stdout};
 pub use crate::symlink_metadata::{symlink_metadata, SymlinkMetadataFuture};
-pub use crate::write::{write, WriteFile};
+pub use crate::write::write;
 
 use std::io;
 use std::io::ErrorKind::{Other, WouldBlock};
@@ -84,6 +85,20 @@ where
         Ready(Err(_)) => Ready(Err(blocking_err())),
         Pending => Pending,
     }
+}
+
+async fn asyncify<F, T>(f: F) -> io::Result<T>
+where
+    F: FnOnce() -> io::Result<T>,
+{
+    use futures_util::future::poll_fn;
+
+    let mut f = Some(f);
+    poll_fn(move |_| {
+        blocking_io(|| {
+            f.take().unwrap()()
+        })
+    }).await
 }
 
 fn would_block<F, T>(f: F) -> io::Result<T>
