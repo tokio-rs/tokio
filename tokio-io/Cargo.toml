@@ -34,5 +34,4 @@ futures-util-preview = "0.3.0-alpha.17"
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
 
 [features]
-default = ["util"]
 util = ["memchr"]
