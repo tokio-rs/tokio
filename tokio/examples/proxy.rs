@@ -24,7 +24,7 @@
 #![feature(async_await)]
 
 use futures::{future::try_join, FutureExt, StreamExt};
-use std::{error::Error, net::SocketAddr, env};
+use std::{env, error::Error, net::SocketAddr};
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
@@ -40,7 +40,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
-
 
     let mut incoming = TcpListener::bind(&listen_addr)?.incoming();
 
