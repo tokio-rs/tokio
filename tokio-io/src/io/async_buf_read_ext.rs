@@ -18,12 +18,6 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     ///
     /// In the case of an error the buffer and the object will be discarded, with
     /// the error yielded.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// unimplemented!();
-    /// ```
     fn read_until<'a>(&'a mut self, byte: u8, buf: &'a mut Vec<u8>) -> ReadUntil<'a, Self>
     where
         Self: Unpin,
@@ -54,12 +48,6 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     /// the event that all data read so far was valid UTF-8.
     ///
     /// [`read_until`]: AsyncBufReadExt::read_until
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// unimplemented!();
-    /// ```
     fn read_line<'a>(&'a mut self, buf: &'a mut String) -> ReadLine<'a, Self>
     where
         Self: Unpin,
@@ -82,12 +70,6 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     /// Each line of the stream has the same error semantics as [`AsyncBufReadExt::read_line`].
     ///
     /// [`AsyncBufReadExt::read_line`]: AsyncBufReadExt::read_line
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// unimplemented!();
-    /// ```
     fn lines(self) -> Lines<Self>
     where
         Self: Sized,
