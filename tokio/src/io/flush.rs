@@ -16,7 +16,7 @@ pub struct Flush<'a, A: ?Sized> {
 }
 
 /// Creates a future which will entirely flush an I/O object.
-pub(super) fn flush<'a, A>(a: &'a mut A) -> Flush<'a, A>
+pub(super) fn flush<A>(a: &mut A) -> Flush<'_, A>
 where
     A: AsyncWrite + Unpin + ?Sized,
 {

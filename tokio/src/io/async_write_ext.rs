@@ -41,7 +41,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     /// ```
     /// unimplemented!();
     /// ```
-    fn flush<'a>(&'a mut self) -> Flush<'a, Self>
+    fn flush(&mut self) -> Flush<'_, Self>
     where
         Self: Unpin,
     {
