@@ -44,15 +44,15 @@ use std::task::Poll;
 /// Create a new file and asynchronously write bytes to it:
 ///
 /// ```no_run
-/// use tokio::prelude::{AsyncWrite, Future};
+/// #![feature(async_await)]
 ///
-/// let task = tokio::fs::File::create("foo.txt")
-///     .and_then(|mut file| file.poll_write(b"hello, world!"))
-///     .map(|res| {
-///         println!("{:?}", res);
-///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+/// use tokio::fs::File;
 ///
-/// tokio::run(task);
+/// # async fn dox() -> std::io::Result<()> {
+/// let file = File::create("foo.txt").await?;
+/// file.write_all(b"hello, world!").await?;
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// Read the contents of a file into a buffer
@@ -93,17 +93,17 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::Future;
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::open("foo.txt").and_then(|file| {
-    ///     // do something with the file ...
-    ///     file.metadata().map(|md| println!("{:?}", md))
-    /// }).map_err(|e| {
-    ///     // handle errors
-    ///     eprintln!("IO error: {:?}", e);
-    /// });
+    /// use tokio::fs::File;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let metadata = file.metadata().await?;
+    ///
+    /// println!("metadata = {:?}", metadata);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn open<P>(path: P) -> OpenFuture<P>
     where
