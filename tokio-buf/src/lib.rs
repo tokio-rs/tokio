@@ -53,21 +53,22 @@ pub trait BufStream {
     /// There are several possible return values, each indicating a distinct
     /// stream state:
     ///
-    /// - `Ok(Async::NotReady)` means that this stream's next value is not ready
-    /// yet. Implementations will ensure that the current task will be notified
-    /// when the next value may be ready.
+    /// - `Poll::Pending` means that this stream's next value is not ready yet.
+    ///    Implementations will ensure that the current task will be notified
+    ///    when the next value may be ready.
     ///
-    /// - `Ok(Async::Ready(Some(buf)))` means that the stream has successfully
-    /// produced a value, `buf`, and may produce further values on subsequent
-    /// `poll_buf` calls.
+    /// - `Poll::Ready(Some(Ok(buf)))` means that the stream has successfully
+    ///    produced a value, `buf`, and may produce further values on subsequent
+    ///    `poll_buf` calls.
     ///
-    /// - `Ok(Async::Ready(None))` means that the stream has terminated, and
-    /// `poll_buf` should not be invoked again.
+    /// - `Poll::Ready(None)` means that the stream has terminated, and
+    ///   `poll_buf` should not be invoked again.
     ///
     /// # Panics
     ///
-    /// Once a stream is finished, i.e. `Ready(None)` has been returned, further
-    /// calls to `poll_buf` may result in a panic or other "bad behavior".
+    /// Once a stream is finished, i.e. `Poll::Ready(None)` has been returned,
+    /// further calls to `poll_buf` may result in a panic or other "bad
+    /// behavior".
     fn poll_buf(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Self::Item, Self::Error>>>;
 
     /// Returns the bounds on the remaining length of the stream.
