@@ -6,26 +6,19 @@
 //! A single-threaded executor which executes tasks on the same thread from which
 //! they are spawned.
 //!
+//! [`CurrentThread`] is the main type of this crate. It executes tasks on the
+//! current thread.  The easiest way to start a new [`CurrentThread`] executor
+//! is to call [`block_on_all`] with an initial task to seed the executor.  All
+//! tasks that are being managed by a [`CurrentThread`] executor are able to
+//! spawn additional tasks by calling [`spawn`].
 //!
-//! The crate provides:
-//!
-//! * [`CurrentThread`] is the main type of this crate. It executes tasks on the current thread.
-//!   The easiest way to start a new [`CurrentThread`] executor is to call
-//!   [`block_on_all`] with an initial task to seed the executor.
-//!   All tasks that are being managed by a [`CurrentThread`] executor are able to
-//!   spawn additional tasks by calling [`spawn`].
-//!
-//!
-//! Application authors will not use this crate directly. Instead, they will use the
-//! `tokio` crate. Library authors should only depend on `tokio-current-thread` if they
-//! are building a custom task executor.
-//!
-//! For more details, see [executor module] documentation in the Tokio crate.
+//! Application authors will not use this crate directly. Instead, they will use
+//! the `tokio` crate. Library authors should only depend on
+//! `tokio-current-thread` if they are building a custom task executor.
 //!
 //! [`CurrentThread`]: struct.CurrentThread.html
 //! [`spawn`]: fn.spawn.html
 //! [`block_on_all`]: fn.block_on_all.html
-//! [executor module]: https://docs.rs/tokio/0.1/tokio/executor/index.html
 
 mod scheduler;
 

@@ -124,13 +124,11 @@ where
 /// # Examples
 ///
 /// ```no_run
-/// use tokio_executor::spawn;
-/// use futures::future::lazy;
+/// #![feature(async_await)]
 ///
-/// spawn(lazy(|| {
+/// tokio::spawn(async {
 ///     println!("running on the default executor");
-///     Ok(())
-/// }));
+/// });
 /// ```
 pub fn spawn<T>(future: T)
 where
