@@ -40,6 +40,7 @@ mod async_buf_read_ext;
 mod async_read_ext;
 mod async_write_ext;
 mod copy;
+mod flush;
 mod lines;
 mod read;
 mod read_exact;
@@ -49,7 +50,6 @@ mod read_to_string;
 mod read_until;
 mod write;
 mod write_all;
-mod flush;
 
 pub use self::async_buf_read_ext::AsyncBufReadExt;
 pub use self::async_read_ext::AsyncReadExt;
