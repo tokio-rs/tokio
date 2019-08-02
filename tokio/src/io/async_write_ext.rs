@@ -1,3 +1,4 @@
+use crate::io::flush::{flush, Flush};
 use crate::io::write::{write, Write};
 use crate::io::write_all::{write_all, WriteAll};
 
@@ -31,6 +32,20 @@ pub trait AsyncWriteExt: AsyncWrite {
         Self: Unpin,
     {
         write_all(self, src)
+    }
+
+    /// Flush the contents of this writer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    fn flush(&mut self) -> Flush<'_, Self>
+    where
+        Self: Unpin,
+    {
+        flush(self)
     }
 }
 
