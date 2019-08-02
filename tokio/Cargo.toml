@@ -38,9 +38,9 @@ default = [
   "uds",
 ]
 
-codec = ["io", "tokio-codec"]
+codec = ["io", "tokio-codec", "bytes"]
 fs = ["tokio-fs"]
-io = ["bytes", "tokio-io", "memchr"]
+io = ["tokio-io"]
 reactor = ["io", "tokio-reactor"]
 rt-full = [
   "num_cpus",
@@ -80,7 +80,6 @@ tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp", feature
 tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
 tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
-memchr = { version = "2.2", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds", features = ["async-traits"] }

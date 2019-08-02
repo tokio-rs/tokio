@@ -1,7 +1,8 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead};
+use futures_util::StreamExt;
+use tokio_io::{AsyncBufRead, AsyncBufReadExt, AsyncRead};
 use tokio_test::assert_ok;
 
 use std::io;
@@ -9,7 +10,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[tokio::test]
-async fn read_until() {
+async fn lines() {
     struct Rd {
         val: &'static [u8],
     }
@@ -37,20 +38,16 @@ async fn read_until() {
         }
     }
 
-    let mut buf = vec![];
-    let mut rd = Rd {
-        val: b"hello world",
+    let rd = Rd {
+        val: b"hello\r\nworld\n\n",
     };
+    let mut st = rd.lines();
 
-    let n = assert_ok!(rd.read_until(b' ', &mut buf).await);
-    assert_eq!(n, 6);
-    assert_eq!(buf, b"hello ");
-    buf.clear();
-    let n = assert_ok!(rd.read_until(b' ', &mut buf).await);
-    assert_eq!(n, 5);
-    assert_eq!(buf, b"world");
-    buf.clear();
-    let n = assert_ok!(rd.read_until(b' ', &mut buf).await);
-    assert_eq!(n, 0);
-    assert_eq!(buf, []);
+    let b = assert_ok!(st.next().await.unwrap());
+    assert_eq!(b, "hello");
+    let b = assert_ok!(st.next().await.unwrap());
+    assert_eq!(b, "world");
+    let b = assert_ok!(st.next().await.unwrap());
+    assert_eq!(b, "");
+    assert!(st.next().await.is_none());
 }

@@ -14,10 +14,12 @@
 mod async_buf_read;
 mod async_read;
 mod async_write;
+mod io;
 
 pub use self::async_buf_read::AsyncBufRead;
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
+pub use self::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 
 // Re-export `Buf` and `BufMut` since they are part of the API
 pub use bytes::{Buf, BufMut};

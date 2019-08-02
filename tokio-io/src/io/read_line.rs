@@ -1,44 +1,45 @@
-use super::read_to_end::read_to_end_internal;
+use super::read_until::read_until_internal;
+use crate::AsyncBufRead;
 use futures_core::ready;
 use std::future::Future;
+use std::io;
+use std::mem;
 use std::pin::Pin;
+use std::str;
 use std::task::{Context, Poll};
-use std::{io, mem, str};
-use tokio_io::AsyncRead;
 
-/// Future for the [`read_to_string`](super::AsyncReadExt::read_to_string) method.
+/// Future for the [`read_line`](crate::io::AsyncBufReadExt::read_line) method.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadToString<'a, R: ?Sized + Unpin> {
+pub struct ReadLine<'a, R: ?Sized + Unpin> {
     reader: &'a mut R,
     buf: &'a mut String,
     bytes: Vec<u8>,
-    start_len: usize,
+    read: usize,
 }
 
-impl<R: ?Sized + Unpin> Unpin for ReadToString<'_, R> {}
+impl<R: ?Sized + Unpin> Unpin for ReadLine<'_, R> {}
 
-pub(crate) fn read_to_string<'a, R>(reader: &'a mut R, buf: &'a mut String) -> ReadToString<'a, R>
+pub(crate) fn read_line<'a, R>(reader: &'a mut R, buf: &'a mut String) -> ReadLine<'a, R>
 where
-    R: AsyncRead + ?Sized + Unpin,
+    R: AsyncBufRead + ?Sized + Unpin,
 {
-    let start_len = buf.len();
-    ReadToString {
+    ReadLine {
         reader,
         bytes: unsafe { mem::replace(buf.as_mut_vec(), Vec::new()) },
         buf,
-        start_len,
+        read: 0,
     }
 }
 
-fn read_to_string_internal<R: AsyncRead + ?Sized>(
+pub(super) fn read_line_internal<R: AsyncBufRead + ?Sized>(
     reader: Pin<&mut R>,
     cx: &mut Context<'_>,
     buf: &mut String,
     bytes: &mut Vec<u8>,
-    start_len: usize,
+    read: &mut usize,
 ) -> Poll<io::Result<usize>> {
-    let ret = ready!(read_to_end_internal(reader, cx, bytes, start_len));
+    let ret = ready!(read_until_internal(reader, cx, b'\n', bytes, read));
     if str::from_utf8(&bytes).is_err() {
         Poll::Ready(ret.and_then(|_| {
             Err(io::Error::new(
@@ -48,16 +49,14 @@ fn read_to_string_internal<R: AsyncRead + ?Sized>(
         }))
     } else {
         debug_assert!(buf.is_empty());
+        debug_assert_eq!(*read, 0);
         // Safety: `bytes` is a valid UTF-8 because `str::from_utf8` returned `Ok`.
         mem::swap(unsafe { buf.as_mut_vec() }, bytes);
         Poll::Ready(ret)
     }
 }
 
-impl<A> Future for ReadToString<'_, A>
-where
-    A: AsyncRead + ?Sized + Unpin,
-{
+impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadLine<'_, R> {
     type Output = io::Result<usize>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -65,8 +64,8 @@ where
             reader,
             buf,
             bytes,
-            start_len,
+            read,
         } = &mut *self;
-        read_to_string_internal(Pin::new(reader), cx, buf, bytes, *start_len)
+        read_line_internal(Pin::new(reader), cx, buf, bytes, read)
     }
 }

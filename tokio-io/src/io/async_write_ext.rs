@@ -1,8 +1,7 @@
 use crate::io::flush::{flush, Flush};
 use crate::io::write::{write, Write};
 use crate::io::write_all::{write_all, WriteAll};
-
-use tokio_io::AsyncWrite;
+use crate::AsyncWrite;
 
 /// An extension trait which adds utility methods to `AsyncWrite` types.
 pub trait AsyncWriteExt: AsyncWrite {

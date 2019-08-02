@@ -3,8 +3,7 @@ use crate::io::read::{read, Read};
 use crate::io::read_exact::{read_exact, ReadExact};
 use crate::io::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::read_to_string::{read_to_string, ReadToString};
-
-use tokio_io::{AsyncRead, AsyncWrite};
+use crate::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.
 pub trait AsyncReadExt: AsyncRead {

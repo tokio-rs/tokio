@@ -1,8 +1,7 @@
 use crate::io::lines::{lines, Lines};
 use crate::io::read_line::{read_line, ReadLine};
 use crate::io::read_until::{read_until, ReadUntil};
-
-use tokio_io::AsyncBufRead;
+use crate::AsyncBufRead;
 
 /// An extension trait which adds utility methods to `AsyncBufRead` types.
 pub trait AsyncBufReadExt: AsyncBufRead {

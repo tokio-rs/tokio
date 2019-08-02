@@ -1,10 +1,10 @@
+use crate::AsyncBufRead;
 use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_io::AsyncBufRead;
 
 /// Future for the [`read_until`](crate::io::AsyncBufReadExt::read_until) method.
 #[derive(Debug)]

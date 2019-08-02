@@ -1,10 +1,10 @@
+use crate::AsyncRead;
 use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_io::AsyncRead;
 
 /// A future which can be used to easily read exactly enough bytes to fill
 /// a buffer.
