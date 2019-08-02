@@ -12,100 +12,83 @@
 //! available, and it doesn't support HTTP request bodies.
 
 #![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use bytes::BytesMut;
-use http;
-use http::header::HeaderValue;
-use http::{Request, Response, StatusCode};
-use httparse;
+use futures::{SinkExt, StreamExt};
+use http::{header::HeaderValue, Request, Response, StatusCode};
 use serde::Serialize;
-use serde_json;
-use std::net::SocketAddr;
-use std::{env, fmt, io};
-use tokio;
-use tokio::codec::{Decoder, Encoder};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
+use std::{env, error::Error, fmt, io, net::SocketAddr};
+use tokio::{
+    codec::{Decoder, Encoder, Framed},
+    net::{TcpListener, TcpStream},
+};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>()?;
 
-    let listener = TcpListener::bind(&addr)?;
+    let mut incoming = TcpListener::bind(&addr)?.incoming();
     println!("Listening on: {}", addr);
 
-    tokio::run({
-        listener
-            .incoming()
-            .map_err(|e| println!("failed to accept socket; error = {:?}", e))
-            .for_each(|socket| {
-                process(socket);
-                Ok(())
-            })
-    });
+    while let Some(Ok(stream)) = incoming.next().await {
+        tokio::spawn(async move {
+            if let Err(e) = process(stream).await {
+                println!("failed to process connection; error = {}", e);
+            }
+        });
+    }
+
     Ok(())
 }
 
-fn process(socket: TcpStream) {
-    let (tx, rx) =
-        // Frame the socket using the `Http` protocol. This maps the TCP socket
-        // to a Stream + Sink of HTTP frames.
-        Http.framed(socket)
-        // This splits a single `Stream + Sink` value into two separate handles
-        // that can be used independently (even on different tasks or threads).
-        .split();
+async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
+    let mut transport = Framed::new(stream, Http);
 
-    // Map all requests into responses and send them back to the client.
-    let task = tx.send_all(rx.and_then(respond)).then(|res| {
-        if let Err(e) = res {
-            println!("failed to process connection; error = {:?}", e);
+    while let Some(request) = transport.next().await {
+        match request {
+            Ok(request) => {
+                let response = respond(request).await?;
+                transport.send(response).await?;
+            }
+            Err(e) => return Err(e.into()),
         }
+    }
 
-        Ok(())
-    });
-
-    // Spawn the task that handles the connection.
-    tokio::spawn(task);
+    Ok(())
 }
 
-/// "Server logic" is implemented in this function.
-///
-/// This function is a map from and HTTP request to a future of a response and
-/// represents the various handling a server might do. Currently the contents
-/// here are pretty uninteresting.
-fn respond(req: Request<()>) -> Box<dyn Future<Item = Response<String>, Error = io::Error> + Send> {
-    let f = future::lazy(move || {
-        let mut response = Response::builder();
-        let body = match req.uri().path() {
-            "/plaintext" => {
-                response.header("Content-Type", "text/plain");
-                "Hello, World!".to_string()
-            }
-            "/json" => {
-                response.header("Content-Type", "application/json");
+async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
+    let mut response = Response::builder();
+    let body = match req.uri().path() {
+        "/plaintext" => {
+            response.header("Content-Type", "text/plain");
+            "Hello, World!".to_string()
+        }
+        "/json" => {
+            response.header("Content-Type", "application/json");
 
-                #[derive(Serialize)]
-                struct Message {
-                    message: &'static str,
-                }
-                serde_json::to_string(&Message {
-                    message: "Hello, World!",
-                })?
+            #[derive(Serialize)]
+            struct Message {
+                message: &'static str,
             }
-            _ => {
-                response.status(StatusCode::NOT_FOUND);
-                String::new()
-            }
-        };
-        let response = response
-            .body(body)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-        Ok(response)
-    });
+            serde_json::to_string(&Message {
+                message: "Hello, World!",
+            })?
+        }
+        _ => {
+            response.status(StatusCode::NOT_FOUND);
+            String::new()
+        }
+    };
+    let response = response
+        .body(body)
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
-    Box::new(f)
+    Ok(response)
 }
 
 struct Http;
