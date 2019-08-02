@@ -1,5 +1,4 @@
-use tokio_io::AsyncWrite;
-
+use crate::AsyncWrite;
 use futures_core::ready;
 use std::future::Future;
 use std::io;

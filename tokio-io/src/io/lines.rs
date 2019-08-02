@@ -1,6 +1,5 @@
 use super::read_line::read_line_internal;
-
-use tokio_io::AsyncBufRead;
+use crate::AsyncBufRead;
 
 use futures_core::{ready, Stream};
 use std::io;

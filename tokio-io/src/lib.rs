@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-io/0.1.12")]
+#![doc(html_root_url = "https://docs.rs/tokio-io/0.2.0")]
 #![deny(missing_debug_implementations, missing_docs, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
@@ -15,9 +15,15 @@ mod async_buf_read;
 mod async_read;
 mod async_write;
 
+#[cfg(feature = "util")]
+mod io;
+
 pub use self::async_buf_read::AsyncBufRead;
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
+
+#[cfg(feature = "util")]
+pub use self::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 
 // Re-export `Buf` and `BufMut` since they are part of the API
 pub use bytes::{Buf, BufMut};

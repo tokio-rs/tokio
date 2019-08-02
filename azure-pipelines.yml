@@ -58,7 +58,8 @@ jobs:
       tokio-codec: []
       tokio-current-thread: []
       tokio-executor: []
-      tokio-io: []
+      tokio-io:
+        - util
       tokio-sync:
         - async-traits
       tokio-macros: []

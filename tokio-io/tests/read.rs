@@ -1,7 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_io::{AsyncRead, AsyncReadExt};
 use tokio_test::assert_ok;
 
 use std::io;

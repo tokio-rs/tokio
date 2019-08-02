@@ -1,9 +1,8 @@
+use crate::AsyncWrite;
 use std::future::Future;
 use std::io;
-use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_io::AsyncWrite;
 
 /// A future to write some of the buffer to an `AsyncWrite`.
 #[derive(Debug)]
@@ -23,7 +22,7 @@ where
 }
 
 // forward Unpin
-impl<'a, W: Unpin + ?Sized> Unpin for Write<'_, W> {}
+impl<'a, W: Unpin + ?Sized> Unpin for Write<'a, W> {}
 
 impl<W> Future for Write<'_, W>
 where
