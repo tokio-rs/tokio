@@ -44,35 +44,32 @@ use std::task::Poll;
 /// Create a new file and asynchronously write bytes to it:
 ///
 /// ```no_run
-/// #![feature(async_await)]
+/// use tokio::prelude::{AsyncWrite, Future};
 ///
-/// use tokio::fs::File;
-/// use tokio::prelude::*;
+/// let task = tokio::fs::File::create("foo.txt")
+///     .and_then(|mut file| file.poll_write(b"hello, world!"))
+///     .map(|res| {
+///         println!("{:?}", res);
+///     }).map_err(|err| eprintln!("IO error: {:?}", err));
 ///
-/// # async fn dox() -> std::io::Result<()> {
-/// let mut file = File::create("foo.txt").await?;
-/// file.write_all(b"hello, world!").await?;
-/// # Ok(())
-/// # }
+/// tokio::run(task);
 /// ```
 ///
 /// Read the contents of a file into a buffer
 ///
 /// ```no_run
-/// #![feature(async_await)]
+/// use tokio::prelude::{AsyncRead, Future};
 ///
-/// use tokio::fs::File;
-/// use tokio::prelude::*;
+/// let task = tokio::fs::File::open("foo.txt")
+///     .and_then(|mut file| {
+///         let mut contents = vec![];
+///         file.read_buf(&mut contents)
+///             .map(|res| {
+///                 println!("{:?}", res);
+///             })
+///     }).map_err(|err| eprintln!("IO error: {:?}", err));
 ///
-/// # async fn dox() -> std::io::Result<()> {
-/// let mut file = File::open("foo.txt").await?;
-///
-/// let mut contents = vec![];
-/// file.read_to_end(&mut contents).await?;
-///
-/// println!("len = {}", contents.len());
-/// # Ok(())
-/// # }
+/// tokio::run(task);
 /// ```
 #[derive(Debug)]
 pub struct File {
@@ -96,20 +93,17 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
+    /// use tokio::prelude::Future;
     ///
-    /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// let task = tokio::fs::File::open("foo.txt").and_then(|file| {
+    ///     // do something with the file ...
+    ///     file.metadata().map(|md| println!("{:?}", md))
+    /// }).map_err(|e| {
+    ///     // handle errors
+    ///     eprintln!("IO error: {:?}", e);
+    /// });
     ///
-    /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
-    ///
-    /// let mut contents = vec![];
-    /// file.read_to_end(&mut contents).await?;
-    ///
-    /// println!("len = {}", contents.len());
-    /// # Ok(())
-    /// # }
+    /// tokio::run(task);
     /// ```
     pub fn open<P>(path: P) -> OpenFuture<P>
     where
@@ -137,16 +131,18 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
+    /// use tokio::prelude::Future;
     ///
-    /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// let task = tokio::fs::File::create("foo.txt")
+    ///     .and_then(|file| {
+    ///         // do something with the created file ...
+    ///         file.metadata().map(|md| println!("{:?}", md))
+    ///     }).map_err(|e| {
+    ///         // handle errors
+    ///         eprintln!("IO error: {:?}", e);
+    /// });
     ///
-    /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::create("foo.txt").await?;
-    /// file.write_all(b"hello, world!").await?;
-    /// # Ok(())
-    /// # }
+    /// tokio::run(task);
     /// ```
     pub fn create<P>(path: P) -> CreateFuture<P>
     where
@@ -160,12 +156,11 @@ impl File {
     /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
     /// [file]: struct.File.html
     ///
-    /// # Examples
-    ///
+    /// Examples
     /// ```no_run
-    /// // This line could block. It is not recommended to do this on the Tokio
-    /// // runtime.
-    /// let std_file = std::fs::File::open("foo.txt").unwrap();
+    /// use std::fs::File;
+    ///
+    /// let std_file = File::open("foo.txt").unwrap();
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
     pub fn from_std(std: StdFile) -> File {
@@ -184,6 +179,22 @@ impl File {
     /// # Errors
     ///
     /// Seeking to a negative offset is considered an error.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::prelude::Future;
+    /// use std::io::SeekFrom;
+    ///
+    /// let task = tokio::fs::File::open("foo.txt")
+    ///     // move cursor 6 bytes from the start of the file
+    ///     .and_then(|mut file| file.poll_seek(SeekFrom::Start(6)))
+    ///     .map(|res| {
+    ///         println!("{:?}", res);
+    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    ///
+    /// tokio::run(task);
+    /// ```
     pub fn poll_seek(&mut self, pos: io::SeekFrom) -> Poll<io::Result<u64>> {
         crate::blocking_io(|| self.std().seek(pos))
     }
@@ -198,21 +209,17 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
-    /// use tokio::fs::File;
-    /// use tokio::prelude::*;
-    ///
+    /// use tokio::prelude::Future;
     /// use std::io::SeekFrom;
     ///
-    /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
-    /// file.seek(SeekFrom::Start(6)).await?;
+    /// let task = tokio::fs::File::create("foo.txt")
+    ///     .and_then(|file| file.seek(SeekFrom::Start(6)))
+    ///     .map(|file| {
+    ///         // handle returned file ..
+    ///         # println!("{:?}", file);
+    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
     ///
-    /// let mut contents = vec![0u8; 10];
-    /// file.read_exact(&mut contents).await?;
-    /// # Ok(())
-    /// # }
+    /// tokio::run(task);
     /// ```
     pub fn seek(self, pos: io::SeekFrom) -> SeekFuture {
         SeekFuture::new(self, pos)
