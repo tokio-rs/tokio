@@ -1,10 +1,7 @@
-use std::fs;
-use std::future::Future;
+use crate::asyncify;
+
 use std::io;
 use std::path::Path;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
 
 /// Recursively create a directory and all of its parent components if they
 /// are missing.
@@ -12,36 +9,6 @@ use std::task::Poll;
 /// This is an async version of [`std::fs::create_dir_all`][std]
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.create_dir_all.html
-pub fn create_dir_all<P: AsRef<Path>>(path: P) -> CreateDirAllFuture<P> {
-    CreateDirAllFuture::new(path)
-}
-
-/// Future returned by `create_dir_all`.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct CreateDirAllFuture<P>
-where
-    P: AsRef<Path>,
-{
-    path: P,
-}
-
-impl<P> CreateDirAllFuture<P>
-where
-    P: AsRef<Path>,
-{
-    fn new(path: P) -> CreateDirAllFuture<P> {
-        CreateDirAllFuture { path }
-    }
-}
-
-impl<P> Future for CreateDirAllFuture<P>
-where
-    P: AsRef<Path>,
-{
-    type Output = io::Result<()>;
-
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        crate::blocking_io(|| fs::create_dir_all(&self.path))
-    }
+pub async fn create_dir_all<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    asyncify(|| std::fs::create_dir_all(&path)).await
 }
