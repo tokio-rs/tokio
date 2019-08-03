@@ -1,4 +1,5 @@
 use crate::io::flush::{flush, Flush};
+use crate::io::shutdown::{shutdown, Shutdown};
 use crate::io::write::{write, Write};
 use crate::io::write_all::{write_all, WriteAll};
 use crate::AsyncWrite;
@@ -27,6 +28,14 @@ pub trait AsyncWriteExt: AsyncWrite {
         Self: Unpin,
     {
         flush(self)
+    }
+
+    /// Shutdown this writer.
+    fn shutdown(&mut self) -> Shutdown<'_, Self>
+    where
+        Self: Unpin,
+    {
+        shutdown(self)
     }
 }
 
