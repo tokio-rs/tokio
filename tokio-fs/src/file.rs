@@ -2,11 +2,7 @@
 //!
 //! [`File`]: file/struct.File.html
 
-mod open_options;
-
-pub use self::open_options::OpenOptions;
-
-use crate::{asyncify, blocking_io};
+use crate::{asyncify, blocking_io, OpenOptions};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 

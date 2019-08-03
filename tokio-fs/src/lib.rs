@@ -33,9 +33,10 @@
 
 mod create_dir;
 mod create_dir_all;
-pub mod file;
+mod file;
 mod hard_link;
 mod metadata;
+mod open_options;
 pub mod os;
 mod read;
 mod read_dir;
@@ -54,9 +55,9 @@ mod write;
 pub use crate::create_dir::create_dir;
 pub use crate::create_dir_all::create_dir_all;
 pub use crate::file::File;
-pub use crate::file::OpenOptions;
 pub use crate::hard_link::hard_link;
 pub use crate::metadata::metadata;
+pub use crate::open_options::OpenOptions;
 pub use crate::read::read;
 pub use crate::read_dir::{read_dir, DirEntry, ReadDir};
 pub use crate::read_link::read_link;

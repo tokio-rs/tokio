@@ -1,5 +1,3 @@
-//! Unix-specific extensions to primitives in the `tokio_fs` module.
-
 use crate::asyncify;
 
 use std::io;
