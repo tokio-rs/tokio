@@ -72,7 +72,7 @@ pub use crate::symlink_metadata::symlink_metadata;
 pub use crate::write::write;
 
 use std::io;
-use std::io::ErrorKind::{Other, WouldBlock};
+use std::io::ErrorKind::Other;
 use std::task::Poll;
 use std::task::Poll::*;
 
@@ -99,21 +99,6 @@ where
             f.take().unwrap()()
         })
     }).await
-}
-
-fn would_block<F, T>(f: F) -> io::Result<T>
-where
-    F: FnOnce() -> io::Result<T>,
-{
-    match tokio_threadpool::blocking(f) {
-        Ready(Ok(Ok(v))) => Ok(v),
-        Ready(Ok(Err(err))) => {
-            debug_assert_ne!(err.kind(), WouldBlock);
-            Err(err)
-        }
-        Ready(Err(_)) => Err(blocking_err()),
-        Pending => Err(blocking_err()),
-    }
 }
 
 fn blocking_err() -> io::Error {

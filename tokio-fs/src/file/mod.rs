@@ -6,7 +6,7 @@ mod open_options;
 
 pub use self::open_options::OpenOptions;
 
-use crate::asyncify;
+use crate::{asyncify, blocking_io};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -391,7 +391,7 @@ impl AsyncRead for File {
         _cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        crate::blocking_io(|| (&self.std).read(buf))
+        blocking_io(|| (&self.std).read(buf))
     }
 }
 
@@ -401,11 +401,11 @@ impl AsyncWrite for File {
         _cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        crate::blocking_io(|| (&self.std).write(buf))
+        blocking_io(|| (&self.std).write(buf))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        crate::blocking_io(|| (&self.std).flush())
+        blocking_io(|| (&self.std).flush())
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
