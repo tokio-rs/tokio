@@ -132,7 +132,6 @@ impl<T> Receiver<T> {
     }
 
     /// TODO: Dox
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv(&mut self) -> Option<T> {
         use async_util::future::poll_fn;
 
@@ -205,7 +204,6 @@ impl<T> Sender<T> {
     /// ```
     /// unimplemented!();
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn send(&mut self, value: T) -> Result<(), SendError> {
         use async_util::future::poll_fn;
 

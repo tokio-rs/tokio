@@ -220,7 +220,6 @@ impl<T> Sender<T> {
     /// ```
     /// unimplemented!();
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn closed(&mut self) {
         use async_util::future::poll_fn;
 
