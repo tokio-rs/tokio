@@ -253,7 +253,7 @@ where
                     node: Option<Arc<Node<U>>>,
                 }
 
-                impl<'a, U: Unpark> Drop for Bomb<'a, U> {
+                impl<U: Unpark> Drop for Bomb<'_, U> {
                     fn drop(&mut self) {
                         if let Some(node) = self.node.take() {
                             self.borrow.enter(|| release_node(node))
@@ -329,7 +329,7 @@ where
     }
 }
 
-impl<'a, U: Unpark> Scheduled<'a, U> {
+impl<U: Unpark> Scheduled<'_, U> {
     /// Polls the task, returns `true` if the task has completed.
     pub fn tick(&mut self) -> bool {
         let waker = unsafe {

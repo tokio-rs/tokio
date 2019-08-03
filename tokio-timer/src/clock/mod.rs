@@ -142,7 +142,7 @@ where
         // when leaving the scope. This handles cases that involve panicking.
         struct Reset<'a>(&'a Cell<Option<*const Clock>>);
 
-        impl<'a> Drop for Reset<'a> {
+        impl Drop for Reset<'_> {
             fn drop(&mut self) {
                 self.0.set(None);
             }

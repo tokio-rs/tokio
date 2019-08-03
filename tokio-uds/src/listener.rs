@@ -52,7 +52,7 @@ impl UnixListener {
     }
 
     /// Accepts a new incoming connection to this listener.
-     // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn accept(&mut self) -> io::Result<(UnixStream, SocketAddr)> {
         poll_fn(|cx| self.poll_accept(cx)).await
     }

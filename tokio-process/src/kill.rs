@@ -6,7 +6,7 @@ pub(crate) trait Kill {
     fn kill(&mut self) -> io::Result<()>;
 }
 
-impl<'a, T: 'a + Kill> Kill for &'a mut T {
+impl<T: Kill> Kill for &mut T {
     fn kill(&mut self) -> io::Result<()> {
         (**self).kill()
     }

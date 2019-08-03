@@ -249,7 +249,7 @@ impl<T> Receiver<T> {
     ///
     /// Only the **most recent** value is returned. If the receiver is falling
     /// behind the sender, intermediate values are dropped.
-    pub async fn recv_ref<'a>(&'a mut self) -> Option<Ref<'a, T>> {
+    pub async fn recv_ref(&mut self) -> Option<Ref<'_, T>> {
         let shared = &self.shared;
         let inner = &self.inner;
         let version = self.ver;
@@ -445,7 +445,7 @@ impl<T> Drop for Sender<T> {
 
 // ===== impl Ref =====
 
-impl<'a, T: 'a> ops::Deref for Ref<'a, T> {
+impl<T> ops::Deref for Ref<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {

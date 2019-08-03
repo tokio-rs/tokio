@@ -72,7 +72,7 @@ struct Guard<'a, S>(&'a mut TlsStream<S>)
 where
     AllowStd<S>: Read + Write;
 
-impl<'a, S> Drop for Guard<'a, S>
+impl<S> Drop for Guard<'_, S>
 where
     AllowStd<S>: Read + Write,
 {

@@ -136,7 +136,7 @@ impl tokio_executor::Executor for Sender {
     }
 }
 
-impl<'a> tokio_executor::Executor for &'a Sender {
+impl tokio_executor::Executor for &Sender {
     fn status(&self) -> Result<(), tokio_executor::SpawnError> {
         let state: pool::State = self.pool.state.load(Acquire).into();
 
