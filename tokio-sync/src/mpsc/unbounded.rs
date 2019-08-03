@@ -135,7 +135,6 @@ impl<T> UnboundedReceiver<T> {
     ///     assert_eq!(Some("world"), rx.recv().await);
     /// }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv(&mut self) -> Option<T> {
         use futures_util::future::poll_fn;
 

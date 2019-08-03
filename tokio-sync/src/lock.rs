@@ -111,7 +111,6 @@ impl<T> Lock<T> {
     }
 
     /// A future that resolves on acquiring the lock and returns the `LockGuard`.
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn lock(&mut self) -> LockGuard<T> {
         poll_fn(|cx| self.poll_lock(cx)).await
     }

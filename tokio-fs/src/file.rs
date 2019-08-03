@@ -184,7 +184,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         asyncify(|| self.std.seek(pos)).await
     }
@@ -209,7 +208,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn sync_all(&mut self) -> io::Result<()> {
         asyncify(|| self.std.sync_all()).await
     }
@@ -238,7 +236,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn sync_data(&mut self) -> io::Result<()> {
         asyncify(|| self.std.sync_data()).await
     }
@@ -270,7 +267,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn set_len(&mut self, size: u64) -> io::Result<()> {
         asyncify(|| self.std.set_len(size)).await
     }
@@ -292,7 +288,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn metadata(&self) -> io::Result<Metadata> {
         asyncify(|| self.std.metadata()).await
     }
@@ -314,7 +309,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn try_clone(&self) -> io::Result<File> {
         let std_file = asyncify(|| self.std.try_clone()).await?;
         Ok(File::from_std(std_file))
@@ -351,7 +345,6 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
         asyncify(|| self.std.set_permissions(perm)).await
     }

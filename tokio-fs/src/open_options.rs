@@ -89,7 +89,6 @@ impl OpenOptions {
     /// Tokio runtime or if the underlying [`open`] call results in an error.
     ///
     /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn open<P>(&self, path: P) -> io::Result<File>
     where
         P: AsRef<Path> + Send + Unpin + 'static,

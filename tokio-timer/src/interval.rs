@@ -94,7 +94,6 @@ impl Interval {
     ///     // approximately 30ms have elapsed.
     /// }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     #[allow(clippy::should_implement_trait)] // TODO: rename (tokio-rs/tokio#1261)
     pub async fn next(&mut self) -> Option<Instant> {
         poll_fn(|cx| self.poll_next(cx)).await
