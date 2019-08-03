@@ -291,7 +291,7 @@ impl AsyncRead for Mock {
 // TODO this newtype is necessary because `&[u8]` does not currently implement `AsyncRead`
 struct Slice<'a>(&'a [u8]);
 
-impl<'a> AsyncRead for Slice<'a> {
+impl AsyncRead for Slice<'_> {
     fn poll_read(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,

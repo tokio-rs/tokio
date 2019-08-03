@@ -306,7 +306,7 @@ impl WakerRef for Waker {
     }
 }
 
-impl<'a> WakerRef for &'a Waker {
+impl WakerRef for &Waker {
     fn wake(self) {
         self.wake_by_ref()
     }

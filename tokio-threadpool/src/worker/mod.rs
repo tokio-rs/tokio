@@ -530,7 +530,7 @@ impl Worker {
             worker: &'a Worker,
         }
 
-        impl<'a> Drop for Guard<'a> {
+        impl Drop for Guard<'_> {
             fn drop(&mut self) {
                 // A task is allocated at run when it was explicitly notified
                 // that the task has capacity to block. When this happens, that

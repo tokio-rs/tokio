@@ -20,7 +20,7 @@ impl<'a, 'b> Send<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Future for Send<'a, 'b> {
+impl Future for Send<'_, '_> {
     type Output = io::Result<usize>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

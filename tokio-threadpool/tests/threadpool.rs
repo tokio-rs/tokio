@@ -350,7 +350,7 @@ fn busy_threadpool_is_not_idle() {
 
     struct IdleFut<'a>(&'a mut Shutdown);
 
-    impl<'a> Future for IdleFut<'a> {
+    impl Future for IdleFut<'_> {
         type Output = ();
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {

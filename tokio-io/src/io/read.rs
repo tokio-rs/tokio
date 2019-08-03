@@ -29,7 +29,7 @@ pub struct Read<'a, R: ?Sized> {
 }
 
 // forward Unpin
-impl<'a, R: Unpin + ?Sized> Unpin for Read<'_, R> {}
+impl<R: Unpin + ?Sized> Unpin for Read<'_, R> {}
 
 impl<R> Future for Read<'_, R>
 where

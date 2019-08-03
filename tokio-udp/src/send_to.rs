@@ -26,7 +26,7 @@ impl<'a, 'b> SendTo<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Future for SendTo<'a, 'b> {
+impl Future for SendTo<'_, '_> {
     type Output = io::Result<usize>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

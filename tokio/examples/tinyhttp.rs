@@ -133,7 +133,7 @@ impl Encoder for Http {
         // doesn't go through io::Error.
         struct BytesWrite<'a>(&'a mut BytesMut);
 
-        impl<'a> fmt::Write for BytesWrite<'a> {
+        impl fmt::Write for BytesWrite<'_> {
             fn write_str(&mut self, s: &str) -> fmt::Result {
                 self.0.extend_from_slice(s.as_bytes());
                 Ok(())
@@ -289,7 +289,7 @@ mod date {
 
     struct LocalBuffer<'a>(&'a mut LastRenderedNow);
 
-    impl<'a> fmt::Write for LocalBuffer<'a> {
+    impl fmt::Write for LocalBuffer<'_> {
         fn write_str(&mut self, s: &str) -> fmt::Result {
             let start = self.0.amt;
             let end = start + s.len();

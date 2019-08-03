@@ -186,7 +186,7 @@ pub struct Accept<'a> {
     listener: &'a mut UnixListener,
 }
 
-impl<'a> Future for Accept<'a> {
+impl Future for Accept<'_> {
     type Output = io::Result<(UnixStream, SocketAddr)>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

@@ -26,7 +26,7 @@ impl<'a, 'b, P> SendTo<'a, 'b, P> {
     }
 }
 
-impl<'a, 'b, P> Future for SendTo<'a, 'b, P>
+impl<P> Future for SendTo<'_, '_, P>
 where
     P: AsRef<Path> + Unpin,
 {

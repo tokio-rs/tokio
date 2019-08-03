@@ -21,7 +21,7 @@ impl<'a, 'b> RecvFrom<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Future for RecvFrom<'a, 'b> {
+impl Future for RecvFrom<'_, '_> {
     type Output = io::Result<(usize, SocketAddr)>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

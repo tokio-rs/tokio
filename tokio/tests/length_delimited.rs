@@ -611,8 +611,8 @@ impl AsyncWrite for Mock {
     }
 }
 
-impl<'a> From<&'a [u8]> for Op {
-    fn from(src: &'a [u8]) -> Op {
+impl From<&[u8]> for Op {
+    fn from(src: &[u8]) -> Op {
         Op::Data(src.into())
     }
 }

@@ -73,7 +73,7 @@ impl<'a> OnClose<'a> {
     }
 }
 
-impl<'a> Future for OnClose<'a> {
+impl Future for OnClose<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {

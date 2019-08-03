@@ -412,7 +412,7 @@ impl<T> Drop for Sender<T> {
 
 // ===== impl Ref =====
 
-impl<'a, T: 'a> ops::Deref for Ref<'a, T> {
+impl<T> ops::Deref for Ref<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
