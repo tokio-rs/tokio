@@ -256,9 +256,7 @@ impl<T: Read> Read for FramedWrite2<T> {
 }
 
 impl<T: BufRead> BufRead for FramedWrite2<T> {
-    fn fill_buf(
-        &mut self,
-    ) -> io::Result<&[u8]> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner.fill_buf()
     }
 

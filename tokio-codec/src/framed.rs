@@ -210,9 +210,7 @@ impl<T: Read, U> Read for Fuse<T, U> {
 }
 
 impl<T: BufRead, U> BufRead for Fuse<T, U> {
-    fn fill_buf(
-        &mut self,
-    ) -> io::Result<&[u8]> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.0.fill_buf()
     }
 
