@@ -9,7 +9,7 @@ jobs:
       parameters:
         rust_version: ${{ parameters.rust }}
     - script: |
-        rustup component add rustfmt
+        rustup component add rustfmt --toolchain ${{ parameters.rust }}
         cargo +${{ parameters.rust }} fmt --version
       displayName: Install rustfmt
     - script: |
