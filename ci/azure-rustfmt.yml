@@ -10,8 +10,8 @@ jobs:
         rust_version: ${{ parameters.rust }}
     - script: |
         rustup component add rustfmt
-        cargo fmt --version
+        cargo +${{ parameters.rust }} fmt --version
       displayName: Install rustfmt
     - script: |
-        cargo fmt --all -- --check
+        cargo +${{ parameters.rust }} fmt --all -- --check
       displayName: Check formatting
