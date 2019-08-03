@@ -8,7 +8,7 @@ jobs:
 # Check formatting
 - template: ci/azure-rustfmt.yml
   parameters:
-    rust: $(nightly)
+    rust: stable
     name: rustfmt
 
 # Apply clippy lints to all crates
