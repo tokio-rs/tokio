@@ -94,15 +94,21 @@ impl DirEntry {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use futures::{Future, Stream};
+    /// ```no_run
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(entry) = entries.next().await {
+    ///     let dir = entry?;
     ///     println!("{:?}", dir.path());
-    ///     Ok(())
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///
-    /// tokio::run(fut);
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// This prints output like:

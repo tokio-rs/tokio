@@ -365,16 +365,15 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::prelude::Future;
+    /// #![feature(async_await)]
     ///
-    /// let task = tokio::fs::File::create("foo.txt")
-    ///     .map(|file| {
-    ///         let std_file = file.into_std();
-    ///         // do something with the std::fs::File
-    ///         # println!("{:?}", std_file);
-    ///     }).map_err(|err| eprintln!("IO error: {:?}", err));
+    /// use tokio::fs::File;
     ///
-    /// tokio::run(task);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::create("foo.txt").await?;
+    /// let std_file = file.into_std();
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn into_std(self) -> std::fs::File {
         self.std
