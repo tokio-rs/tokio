@@ -103,9 +103,9 @@ impl DirEntry {
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut entries = fs::read_dir(".").await?;
     ///
-    /// while let Some(entry) = entries.next().await {
-    ///     let dir = entry?;
-    ///     println!("{:?}", dir.path());
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///     println!("{:?}", entry.path());
     /// }
     /// # Ok(())
     /// # }
@@ -130,15 +130,20 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// use futures::{Future, Stream};
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     // Here, `dir` is a `DirEntry`.
-    ///     println!("{:?}", dir.file_name());
-    ///     Ok(())
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(fut);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///     println!("{:?}", entry.file_name());
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn file_name(&self) -> OsString {
         self.0.file_name()
@@ -158,18 +163,26 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// use futures::{Future, Stream};
-    /// use futures::future::poll_fn;
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     // Here, `dir` is a `DirEntry`.
-    ///     let path = dir.path();
-    ///     poll_fn(move || dir.poll_metadata()).map(move |metadata| {
-    ///         println!("{:?}: {:?}", path, metadata.permissions());
-    ///     })
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(fut);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///
+    ///     if let Ok(metadata) = entry.metadata().await {
+    ///         // Now let's show our entry's permissions!
+    ///         println!("{:?}: {:?}", entry.path(), metadata.permissions());
+    ///     } else {
+    ///         println!("Couldn't get file type for {:?}", entry.path());
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn metadata(&self) -> io::Result<Metadata> {
         asyncify(|| self.0.metadata()).await
@@ -189,19 +202,26 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// use futures::{Future, Stream};
-    /// use futures::future::poll_fn;
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     // Here, `dir` is a `DirEntry`.
-    ///     let path = dir.path();
-    ///     poll_fn(move || dir.poll_file_type()).map(move |file_type| {
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///
+    ///     if let Ok(file_type) = entry.file_type().await {
     ///         // Now let's show our entry's file type!
-    ///         println!("{:?}: {:?}", path, file_type);
-    ///     })
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///
-    /// tokio::run(fut);
+    ///         println!("{:?}: {:?}", entry.path(), file_type);
+    ///     } else {
+    ///         println!("Couldn't get file type for {:?}", entry.path());
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn file_type(&self) -> io::Result<FileType> {
         asyncify(|| self.0.file_type()).await
