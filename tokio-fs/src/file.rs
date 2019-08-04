@@ -119,8 +119,8 @@ impl File {
     ///
     /// # Errors
     ///
-    /// `CreateFuture` results in an error if called from outside of the Tokio
-    /// runtime or if the underlying [`create`] call results in an error.
+    /// Results in an error if called from outside of the Tokio runtime or if
+    /// the underlying [`create`] call results in an error.
     ///
     /// [`create`]: https://doc.rust-lang.org/std/fs/struct.File.html#method.create
     ///
@@ -164,11 +164,6 @@ impl File {
     }
 
     /// Seek to an offset, in bytes, in a stream.
-    ///
-    /// Similar to `poll_seek`, but returning a `Future`.
-    ///
-    /// This method consumes the `File` and returns it back when the future
-    /// completes.
     ///
     /// # Examples
     ///
