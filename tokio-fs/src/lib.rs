@@ -95,11 +95,7 @@ where
     use futures_util::future::poll_fn;
 
     let mut f = Some(f);
-    poll_fn(move |_| {
-        blocking_io(|| {
-            f.take().unwrap()()
-        })
-    }).await
+    poll_fn(move |_| blocking_io(|| f.take().unwrap()())).await
 }
 
 fn blocking_err() -> io::Error {

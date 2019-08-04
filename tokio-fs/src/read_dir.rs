@@ -48,12 +48,10 @@ impl Stream for ReadDir {
     type Item = io::Result<DirEntry>;
 
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let res = blocking_io(|| {
-            match self.0.next() {
-                Some(Err(err)) => Err(err),
-                Some(Ok(item)) => Ok(Some(Ok(DirEntry(item)))),
-                None => Ok(None),
-            }
+        let res = blocking_io(|| match self.0.next() {
+            Some(Err(err)) => Err(err),
+            Some(Ok(item)) => Ok(Some(Ok(DirEntry(item)))),
+            None => Ok(None),
         });
 
         match res {
