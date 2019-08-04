@@ -124,13 +124,11 @@ where
 /// # Examples
 ///
 /// ```no_run
-/// use tokio_executor::spawn;
-/// use futures::future::lazy;
+/// #![feature(async_await)]
 ///
-/// spawn(lazy(|| {
+/// tokio::spawn(async {
 ///     println!("running on the default executor");
-///     Ok(())
-/// }));
+/// });
 /// ```
 pub fn spawn<T>(future: T)
 where
@@ -180,6 +178,8 @@ where
 
 unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
     use std::mem;
+    // false positive: https://github.com/rust-lang/rust-clippy/issues/2906
+    #[allow(clippy::transmute_ptr_to_ptr)]
     mem::transmute(p)
 }
 

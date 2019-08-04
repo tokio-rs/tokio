@@ -114,7 +114,7 @@ impl Registration {
     where
         T: Evented,
     {
-        self.register2(io, || HandlePriv::try_current())
+        self.register2(io, HandlePriv::try_current)
     }
 
     /// Deregister the I/O resource from the reactor it is associated with.
@@ -413,6 +413,12 @@ impl Registration {
                 _ => unreachable!(),
             }
         }
+    }
+}
+
+impl Default for Registration {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

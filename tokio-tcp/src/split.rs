@@ -53,9 +53,9 @@ pub struct TcpStreamReadHalfMut<'a>(&'a TcpStream);
 #[derive(Debug)]
 pub struct TcpStreamWriteHalfMut<'a>(&'a TcpStream);
 
-pub(crate) fn split_mut<'a>(
-    stream: &'a mut TcpStream,
-) -> (TcpStreamReadHalfMut<'a>, TcpStreamWriteHalfMut<'a>) {
+pub(crate) fn split_mut(
+    stream: &mut TcpStream,
+) -> (TcpStreamReadHalfMut<'_>, TcpStreamWriteHalfMut<'_>) {
     (
         TcpStreamReadHalfMut(&*stream),
         TcpStreamWriteHalfMut(&*stream),

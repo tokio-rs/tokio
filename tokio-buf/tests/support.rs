@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 #![allow(unused)]
 
 use bytes::Buf;

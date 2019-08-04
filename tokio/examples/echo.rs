@@ -27,25 +27,26 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use std::env;
+use std::error::Error;
 use std::net::SocketAddr;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     // Allow passing an address to listen on as the first argument of this
     // program, but otherwise we'll just set up our TCP listener on
     // 127.0.0.1:8080 for connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = addr.parse::<SocketAddr>()?;
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
     // above and must be associated with an event loop.
-    let mut listener = TcpListener::bind(&addr).unwrap();
+    let mut listener = TcpListener::bind(&addr)?;
     println!("Listening on: {}", addr);
 
     loop {
         // Asynchronously wait for an inbound socket.
-        let (mut socket, _) = listener.accept().await.unwrap();
+        let (mut socket, _) = listener.accept().await?;
 
         // And this is where much of the magic of this server happens. We
         // crucially want all clients to make progress concurrently, rather than
@@ -60,13 +61,19 @@ async fn main() {
 
             // In a loop, read data from the socket and write the data back.
             loop {
-                let n = socket.read(&mut buf).await.unwrap();
+                let n = socket
+                    .read(&mut buf)
+                    .await
+                    .expect("failed to read data from socket");
 
                 if n == 0 {
                     return;
                 }
 
-                socket.write_all(&buf[0..n]).await.unwrap();
+                socket
+                    .write_all(&buf[0..n])
+                    .await
+                    .expect("failed to write data to socket");
             }
         });
     }

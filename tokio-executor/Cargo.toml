@@ -23,8 +23,8 @@ categories = ["concurrency", "asynchronous"]
 publish = false
 
 [dependencies]
-# crossbeam-utils = "0.6.2"
 crossbeam-utils = { git = "https://github.com/stjepang/crossbeam", branch = "raw-parker" }
 
 [dev-dependencies]
-# tokio = { version = "0.2.0", path = "../tokio" }
+futures-core-preview = "=0.3.0-alpha.17"
+tokio = { version = "*", path = "../tokio" }

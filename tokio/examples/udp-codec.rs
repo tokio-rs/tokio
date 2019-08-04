@@ -7,7 +7,7 @@
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
 #![feature(async_await)]
-//#![deny(warnings, rust_2018_idioms)]
+#![deny(warnings, rust_2018_idioms)]
 
 use std::env;
 use std::error::Error;
@@ -20,10 +20,10 @@ use futures::{FutureExt, SinkExt, StreamExt};
 use tokio::codec::BytesCodec;
 use tokio::io;
 use tokio::net::{UdpFramed, UdpSocket};
-use tokio::util::FutureExt as TokioFutureExt;
+use tokio::future::FutureExt as TokioFutureExt;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     let _ = env_logger::init();
 
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:0".to_string());

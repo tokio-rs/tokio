@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 use futures::Async::*;
 use std::fmt;
 use tokio_buf::BufStream;

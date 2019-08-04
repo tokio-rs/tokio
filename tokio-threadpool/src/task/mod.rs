@@ -134,12 +134,12 @@ impl Task {
 
             let mut g = Guard(fut, true);
 
-            let mut waker = arc_waker::waker(Arc::new(Waker {
+            let waker = arc_waker::waker(Arc::new(Waker {
                 task: me.clone(),
                 pool: pool.clone(),
             }));
 
-            let mut cx = Context::from_waker(&mut waker);
+            let mut cx = Context::from_waker(&waker);
 
             let ret = g.0.as_mut().unwrap().as_mut().poll(&mut cx);
 
@@ -239,7 +239,7 @@ impl Task {
     pub fn schedule(me: &Arc<Self>, pool: &Arc<Pool>) {
         if me.schedule2() {
             let task = me.clone();
-            let _ = pool.submit(task, &pool);
+            pool.submit(task, &pool);
         }
     }
 

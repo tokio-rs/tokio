@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 #![cfg(feature = "util")]
 
 use futures::Async::*;

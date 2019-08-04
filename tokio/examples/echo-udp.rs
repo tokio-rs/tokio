@@ -13,6 +13,7 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
+use std::error::Error;
 use std::net::SocketAddr;
 use std::{env, io};
 use tokio;
@@ -50,12 +51,12 @@ impl Server {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = addr.parse::<SocketAddr>()?;
 
-    let socket = UdpSocket::bind(&addr).unwrap();
-    println!("Listening on: {}", socket.local_addr().unwrap());
+    let socket = UdpSocket::bind(&addr)?;
+    println!("Listening on: {}", socket.local_addr()?);
 
     let server = Server {
         socket,
@@ -64,5 +65,7 @@ async fn main() {
     };
 
     // This starts the server task.
-    server.run().await.unwrap();
+    server.run().await?;
+
+    Ok(())
 }

@@ -4,14 +4,14 @@ use super::framed::Fuse;
 use crate::decoder::Decoder;
 use crate::encoder::Encoder;
 
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
 use log::trace;
 use std::fmt;
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -255,6 +255,16 @@ impl<T: Read> Read for FramedWrite2<T> {
     }
 }
 
+impl<T: BufRead> BufRead for FramedWrite2<T> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt)
+    }
+}
+
 impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
@@ -265,6 +275,19 @@ impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        pin!(Pin::get_mut(self).inner).poll_read(cx, buf)
+        pin!(self.get_mut().inner).poll_read(cx, buf)
+    }
+}
+
+impl<T: AsyncBufRead + Unpin> AsyncBufRead for FramedWrite2<T> {
+    fn poll_fill_buf<'a>(
+        self: Pin<&'a mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<&'a [u8]>> {
+        pin!(self.get_mut().inner).poll_fill_buf(cx)
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        pin!(self.get_mut().inner).consume(amt)
     }
 }

@@ -370,6 +370,8 @@ impl<T> DelayQueue<T> {
     }
 
     /// TODO: Dox... also is the fn signature correct?
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    #[allow(clippy::should_implement_trait)] // false positive : https://github.com/rust-lang/rust-clippy/issues/4290
     pub async fn next(&mut self) -> Option<Result<Expired<T>, Error>> {
         use async_util::future::poll_fn;
 

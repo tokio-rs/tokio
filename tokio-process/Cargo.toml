@@ -17,18 +17,16 @@ An implementation of an asynchronous process management backed futures.
 categories = ["asynchronous"]
 
 [dependencies]
-futures = "0.1.11"
-tokio-io = "0.1"
-tokio-reactor = "0.1"
+futures-util-preview = { version = "0.3.0-alpha.17", features = ["io"] }
+futures-core-preview = { version = "0.3.0-alpha.17" }
+tokio-io = { version = "0.2.0", path = "../tokio-io" }
+tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
+tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
 
 [dev-dependencies]
 failure = "0.1"
 log = "0.4"
-
-[dev-dependencies.tokio]
-version = "0.1"
-default-features = false
-features = ["rt-full"]
+tokio = { version = "0.2.0", path = "../tokio" }
 
 [target.'cfg(windows)'.dependencies]
 mio-named-pipes = "0.1"
@@ -52,4 +50,4 @@ lazy_static = "1.3"
 libc = "0.2"
 log = "0.4"
 mio = "0.6.5"
-tokio-signal = "0.2.5"
+tokio-signal = { version = "0.3.0", path = "../tokio-signal" }

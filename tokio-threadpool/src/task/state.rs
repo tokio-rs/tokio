@@ -27,11 +27,11 @@ impl State {
     ///
     /// Tasks start in the scheduled state as they are immediately scheduled on
     /// creation.
-    pub fn new() -> State {
+    pub(crate) fn new() -> State {
         State::Scheduled
     }
 
-    pub fn stub() -> State {
+    pub(crate) fn stub() -> State {
         State::Idle
     }
 }

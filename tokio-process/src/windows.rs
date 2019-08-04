@@ -18,12 +18,21 @@
 extern crate mio_named_pipes;
 extern crate winapi;
 
+use crate::kill::Kill;
+
 use std::fmt;
+use std::future::Future;
 use std::io;
 use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
+use std::pin::Pin;
 use std::process::{self, ExitStatus};
 use std::ptr;
+use std::task::Context;
+use std::task::Poll;
+
+use futures_util::future::Fuse;
+use futures_util::future::FutureExt;
 
 use self::mio_named_pipes::NamedPipe;
 use self::winapi::shared::minwindef::*;
@@ -35,11 +44,8 @@ use self::winapi::um::threadpoollegacyapiset::*;
 use self::winapi::um::winbase::*;
 use self::winapi::um::winnt::*;
 use super::SpawnedChild;
-use futures::future::Fuse;
-use futures::sync::oneshot;
-use futures::{Async, Future, Poll};
-use kill::Kill;
 use tokio_reactor::{Handle, PollEvented};
+use tokio_sync::oneshot;
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
@@ -96,22 +102,23 @@ impl Kill for Child {
 }
 
 impl Future for Child {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
         loop {
-            if let Some(ref mut w) = self.waiting {
-                match w.rx.poll().expect("should not be canceled") {
-                    Async::Ready(()) => {}
-                    Async::NotReady => return Ok(Async::NotReady),
+            if let Some(ref mut w) = inner.waiting {
+                match w.rx.poll_unpin(cx) {
+                    Poll::Ready(Ok(())) => {}
+                    Poll::Ready(Err(_)) => panic!("should not be canceled"),
+                    Poll::Pending => return Poll::Pending,
                 }
-                let status = try_wait(&self.child)?.expect("not ready yet");
-                return Ok(status.into());
+                let status = try_wait(&inner.child)?.expect("not ready yet");
+                return Poll::Ready(Ok(status.into()));
             }
 
-            if let Some(e) = try_wait(&self.child)? {
-                return Ok(e.into());
+            if let Some(e) = try_wait(&inner.child)? {
+                return Poll::Ready(Ok(e.into()));
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
@@ -119,7 +126,7 @@ impl Future for Child {
             let rc = unsafe {
                 RegisterWaitForSingleObject(
                     &mut wait_object,
-                    self.child.as_raw_handle(),
+                    inner.child.as_raw_handle(),
                     Some(callback),
                     ptr as *mut _,
                     INFINITE,
@@ -129,9 +136,9 @@ impl Future for Child {
             if rc == 0 {
                 let err = io::Error::last_os_error();
                 drop(unsafe { Box::from_raw(ptr) });
-                return Err(err);
+                return Poll::Ready(Err(err));
             }
-            self.waiting = Some(Waiting {
+            inner.waiting = Some(Waiting {
                 rx: rx.fuse(),
                 wait_object,
                 tx: ptr,

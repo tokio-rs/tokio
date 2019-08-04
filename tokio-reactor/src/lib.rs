@@ -322,7 +322,7 @@ impl Reactor {
                 "loop process - {} events, {}.{:03}s",
                 events,
                 dur.as_secs(),
-                dur.subsec_nanos() / 1_000_000
+                dur.subsec_millis()
             );
         }
 
@@ -352,7 +352,7 @@ impl Reactor {
 
             io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
-            if ready.is_writable() || platform::is_hup(&ready) {
+            if ready.is_writable() || platform::is_hup(ready) {
                 wr = io.writer.take_waker();
             }
 
@@ -570,8 +570,8 @@ impl Drop for Inner {
 }
 
 impl Direction {
-    fn mask(&self) -> mio::Ready {
-        match *self {
+    fn mask(self) -> mio::Ready {
+        match self {
             Direction::Read => {
                 // Everything except writable is signaled through read.
                 mio::Ready::all() - mio::Ready::writable()
@@ -590,8 +590,8 @@ mod platform {
         UnixReady::hup().into()
     }
 
-    pub fn is_hup(ready: &Ready) -> bool {
-        UnixReady::from(*ready).is_hup()
+    pub fn is_hup(ready: Ready) -> bool {
+        UnixReady::from(ready).is_hup()
     }
 }
 
@@ -603,7 +603,7 @@ mod platform {
         Ready::empty()
     }
 
-    pub fn is_hup(_: &Ready) -> bool {
+    pub fn is_hup(_: Ready) -> bool {
         false
     }
 }

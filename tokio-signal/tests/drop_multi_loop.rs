@@ -12,14 +12,18 @@ const TEST_SIGNAL: libc::c_int = libc::SIGUSR1;
 fn dropping_loops_does_not_cause_starvation() {
     let (mut rt, signal) = {
         let mut first_rt = CurrentThreadRuntime::new().expect("failed to init first runtime");
-
-        let first_signal = run_with_timeout(&mut first_rt, Signal::new(TEST_SIGNAL))
-            .expect("failed to register first signal");
+        let mut first_signal = Signal::new(TEST_SIGNAL).expect("failed to register first signal");
 
         let mut second_rt = CurrentThreadRuntime::new().expect("failed to init second runtime");
+        let mut second_signal = Signal::new(TEST_SIGNAL).expect("failed to register second signal");
 
-        let second_signal = run_with_timeout(&mut second_rt, Signal::new(TEST_SIGNAL))
-            .expect("failed to register second signal");
+        send_signal(TEST_SIGNAL);
+
+        let _ = run_with_timeout(&mut first_rt, first_signal.next())
+            .expect("failed to await first signal");
+
+        let _ = run_with_timeout(&mut second_rt, second_signal.next())
+            .expect("failed to await second signal");
 
         drop(first_rt);
         drop(first_signal);

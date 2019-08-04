@@ -38,9 +38,9 @@ default = [
   "uds",
 ]
 
-codec = ["io", "tokio-codec"]
+codec = ["io", "tokio-codec", "bytes"]
 fs = ["tokio-fs"]
-io = ["bytes", "tokio-io", "memchr"]
+io = ["tokio-io"]
 reactor = ["io", "tokio-reactor"]
 rt-full = [
   "num_cpus",
@@ -62,7 +62,8 @@ uds = ["tokio-uds"]
 [dependencies]
 # Only non-optional dependency...
 #futures = "0.1.20"
-futures-core-preview = "0.3.0-alpha.17"
+futures-core-preview = "= 0.3.0-alpha.17"
+futures-util-preview = "= 0.3.0-alpha.17"
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
@@ -70,7 +71,7 @@ num_cpus = { version = "1.8.0", optional = true }
 tokio-codec = { version = "0.2.0", optional = true, path = "../tokio-codec" }
 tokio-current-thread = { version = "0.2.0", optional = true, path = "../tokio-current-thread" }
 tokio-fs = { version = "0.2.0", optional = true, path = "../tokio-fs" }
-tokio-io = { version = "0.2.0", optional = true, path = "../tokio-io" }
+tokio-io = { version = "0.2.0", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "0.2.0", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
 tokio-reactor = { version = "0.2.0", optional = true, path = "../tokio-reactor" }
@@ -78,12 +79,11 @@ tokio-sync = { version = "0.2.0", optional = true, path = "../tokio-sync", featu
 tokio-threadpool = { version = "0.2.0", optional = true, path = "../tokio-threadpool" }
 tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp", features = ["async-traits"] }
 tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
-tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer" }
+tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
-memchr = { version = "2.2", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds" }
+tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds", features = ["async-traits"] }
 
 [dev-dependencies]
 futures-preview = "0.3.0-alpha.17"

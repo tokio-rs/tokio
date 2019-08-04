@@ -25,7 +25,7 @@ struct Chan {
 fn basic_notification() {
     const NUM_NOTIFY: usize = 2;
 
-    loom::fuzz(|| {
+    loom::model(|| {
         let chan = Arc::new(Chan {
             num: AtomicUsize::new(0),
             task: AtomicWaker::new(),

@@ -98,6 +98,12 @@ impl MockTask {
     }
 }
 
+impl Default for MockTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ThreadWaker {
     fn new() -> Self {
         ThreadWaker {

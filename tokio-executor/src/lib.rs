@@ -51,7 +51,7 @@
 //! [`enter`]: fn.enter.html
 //! [`DefaultExecutor`]: struct.DefaultExecutor.html
 //! [`Park`]: park/index.html
-//! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
+//! [`Future::poll`]: https://doc.rust-lang.org/std/future/trait.Future.html#tymethod.poll
 
 mod enter;
 mod error;

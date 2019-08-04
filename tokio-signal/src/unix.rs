@@ -12,9 +12,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 
-use crate::IoFuture;
 use futures_core::stream::Stream;
-use futures_util::future::{self, FutureExt};
 use libc::c_int;
 use mio_uds::UnixStream;
 use std::future::Future;
@@ -283,7 +281,7 @@ impl Signal {
     /// * If the previous initialization of this specific signal failed.
     /// * If the signal is one of
     ///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
-    pub fn new(signal: c_int) -> IoFuture<Signal> {
+    pub fn new(signal: c_int) -> io::Result<Self> {
         Signal::with_handle(signal, &Handle::default())
     }
 
@@ -305,27 +303,23 @@ impl Signal {
     /// A `Signal` stream can be created for a particular signal number
     /// multiple times. When a signal is received then all the associated
     /// channels will receive the signal notification.
-    pub fn with_handle(signal: c_int, handle: &Handle) -> IoFuture<Signal> {
-        let handle = handle.clone();
-        future::lazy(move |_| {
-            // Turn the signal delivery on once we are ready for it
-            signal_enable(signal)?;
+    pub fn with_handle(signal: c_int, handle: &Handle) -> io::Result<Self> {
+        // Turn the signal delivery on once we are ready for it
+        signal_enable(signal)?;
 
-            // Ensure there's a driver for our associated event loop processing
-            // signals.
-            let driver = Driver::new(&handle)?;
+        // Ensure there's a driver for our associated event loop processing
+        // signals.
+        let driver = Driver::new(&handle)?;
 
-            // One wakeup in a queue is enough, no need for us to buffer up any
-            // more.
-            let (tx, rx) = channel(1);
-            globals().register_listener(signal as EventId, tx);
+        // One wakeup in a queue is enough, no need for us to buffer up any
+        // more.
+        let (tx, rx) = channel(1);
+        globals().register_listener(signal as EventId, tx);
 
-            Ok(Signal { driver, rx })
-        })
-        .boxed()
+        Ok(Signal { driver, rx })
     }
 
-    pub(crate) fn ctrl_c(handle: &Handle) -> IoFuture<Signal> {
+    pub(crate) fn ctrl_c(handle: &Handle) -> io::Result<Self> {
         Self::with_handle(libc::SIGINT, handle)
     }
 }
@@ -365,9 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn ctrl_c() {
-        let ctrl_c = with_timeout(crate::CtrlC::new())
-            .await
-            .expect("failed to init ctrl_c");
+        let ctrl_c = crate::CtrlC::new().expect("failed to init ctrl_c");
 
         let (fire, wait) = oneshot::channel();
 

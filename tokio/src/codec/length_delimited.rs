@@ -494,7 +494,7 @@ impl LengthDelimitedCodec {
         // payload
         src.reserve(n);
 
-        return Ok(Some(n));
+        Ok(Some(n))
     }
 
     fn decode_data(&self, n: usize, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
@@ -581,6 +581,12 @@ impl Encoder for LengthDelimitedCodec {
         dst.extend_from_slice(&data[..]);
 
         Ok(())
+    }
+}
+
+impl Default for LengthDelimitedCodec {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -927,6 +933,12 @@ impl Builder {
     fn get_num_skip(&self) -> usize {
         self.num_skip
             .unwrap_or(self.length_field_offset + self.length_field_len)
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

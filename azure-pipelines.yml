@@ -11,6 +11,12 @@ jobs:
     rust: $(nightly)
     name: rustfmt
 
+# Apply clippy lints to all crates
+- template: ci/azure-clippy.yml
+  parameters:
+    rust: $(nightly)
+    name: clippy
+
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
@@ -31,6 +37,7 @@ jobs:
     rust: $(nightly)
     crates:
       tokio-fs: []
+      tokio-process: []
       tokio-reactor: []
       tokio-signal: []
       tokio-tcp:
@@ -51,7 +58,8 @@ jobs:
       tokio-codec: []
       tokio-current-thread: []
       tokio-executor: []
-      tokio-io: []
+      tokio-io:
+        - util
       tokio-sync:
         - async-traits
       tokio-macros: []

@@ -4,7 +4,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub struct BytesCodec(());
 
 impl BytesCodec {
@@ -19,7 +19,7 @@ impl Decoder for BytesCodec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
-        if buf.len() > 0 {
+        if !buf.is_empty() {
             let len = buf.len();
             Ok(Some(buf.split_to(len)))
         } else {

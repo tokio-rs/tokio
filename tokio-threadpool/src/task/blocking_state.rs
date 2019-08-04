@@ -18,26 +18,26 @@ const ALLOCATED: usize = 0b10;
 
 impl BlockingState {
     /// Create a new, default, `BlockingState`.
-    pub fn new() -> BlockingState {
+    pub(crate) fn new() -> BlockingState {
         BlockingState(0)
     }
 
     /// Returns `true` if the state represents the associated task being queued
     /// in the pending blocking capacity channel
-    pub fn is_queued(&self) -> bool {
+    pub(crate) fn is_queued(&self) -> bool {
         self.0 & QUEUED == QUEUED
     }
 
     /// Toggle the queued flag
     ///
     /// Returns the state before the flag has been toggled.
-    pub fn toggle_queued(state: &AtomicUsize, ordering: Ordering) -> BlockingState {
+    pub(crate) fn toggle_queued(state: &AtomicUsize, ordering: Ordering) -> BlockingState {
         state.fetch_xor(QUEUED, ordering).into()
     }
 
     /// Returns `true` if the state represents the associated task having been
     /// allocated capacity to block.
-    pub fn is_allocated(&self) -> bool {
+    pub(crate) fn is_allocated(&self) -> bool {
         self.0 & ALLOCATED == ALLOCATED
     }
 
@@ -46,7 +46,7 @@ impl BlockingState {
     ///
     /// If this returns `true`, then the task has the ability to block for the
     /// duration of the `poll`.
-    pub fn consume_allocation(state: &AtomicUsize, ordering: Ordering) -> CanBlock {
+    pub(crate) fn consume_allocation(state: &AtomicUsize, ordering: Ordering) -> CanBlock {
         let state: Self = state.fetch_and(!ALLOCATED, ordering).into();
 
         if state.is_allocated() {
@@ -58,7 +58,7 @@ impl BlockingState {
         }
     }
 
-    pub fn notify_blocking(state: &AtomicUsize, ordering: Ordering) {
+    pub(crate) fn notify_blocking(state: &AtomicUsize, ordering: Ordering) {
         let prev: Self = state.fetch_xor(ALLOCATED | QUEUED, ordering).into();
 
         debug_assert!(prev.is_queued());

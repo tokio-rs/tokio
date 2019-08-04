@@ -2,6 +2,7 @@ use crate::split::{
     split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
     TcpStreamWriteHalfMut,
 };
+use async_util::future::poll_fn;
 use bytes::{Buf, BufMut};
 use futures_core::ready;
 use iovec::IoVec;
@@ -339,6 +340,22 @@ impl TcpStream {
             }
             Err(e) => Poll::Ready(Err(e)),
         }
+    }
+
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying recv system call.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// unimplemented!();
+    /// ```
+    pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.poll_peek(cx, buf)).await
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -732,7 +749,7 @@ impl TcpStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split_mut<'a>(&'a mut self) -> (TcpStreamReadHalfMut<'a>, TcpStreamWriteHalfMut<'a>) {
+    pub fn split_mut(&mut self) -> (TcpStreamReadHalfMut<'_>, TcpStreamWriteHalfMut<'_>) {
         split_mut(self)
     }
 

@@ -20,15 +20,20 @@ use crate::SpawnError;
 /// such, the function takes a stream and an executor on which the background
 /// task is spawned.
 ///
-/// ```rust
-/// use futures::{try_ready, Future, Stream, Poll};
+/// ```
+/// #![feature(async_await)]
+///
 /// use tokio::executor::TypedExecutor;
 /// use tokio::sync::oneshot;
 ///
-/// pub fn drain<T, E>(stream: T, executor: &mut E)
-///     -> impl Future<Item = (), Error = ()>
+/// use futures_core::{ready, Stream};
+/// use std::future::Future;
+/// use std::pin::Pin;
+/// use std::task::{Context, Poll};
+///
+/// async fn drain<T, E>(stream: T, executor: &mut E)
 /// where
-///     T: Stream,
+///     T: Stream + Unpin,
 ///     E: TypedExecutor<Drain<T>>
 /// {
 ///     let (tx, rx) = oneshot::channel();
@@ -38,31 +43,29 @@ use crate::SpawnError;
 ///         tx: Some(tx),
 ///     }).unwrap();
 ///
-///     rx.map_err(|_| ())
+///     rx.await.unwrap()
 /// }
 ///
 /// // The background task
-/// pub struct Drain<T: Stream> {
+/// pub struct Drain<T> {
 ///     stream: T,
 ///     tx: Option<oneshot::Sender<()>>,
 /// }
 ///
-/// impl<T: Stream> Future for Drain<T> {
-///     type Item = ();
-///     type Error = ();
+/// impl<T: Stream + Unpin> Future for Drain<T> {
+///     type Output = ();
 ///
-///     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
 ///         loop {
-///             let item = try_ready!(
-///                 self.stream.poll()
-///                     .map_err(|_| ())
+///             let item = ready!(
+///                 Pin::new(&mut self.stream).poll_next(cx)
 ///             );
 ///
 ///             if item.is_none() { break; }
 ///         }
 ///
 ///         self.tx.take().unwrap().send(()).map_err(|_| ());
-///         Ok(().into())
+///         Poll::Ready(())
 ///     }
 /// }
 /// ```
@@ -86,7 +89,11 @@ pub trait TypedExecutor<T> {
     ///
     /// ```rust
     /// use tokio_executor::TypedExecutor;
-    /// use futures::{Future, Poll};
+    ///
+    /// use std::future::Future;
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
+    ///
     /// fn example<T>(my_executor: &mut T)
     /// where
     ///     T: TypedExecutor<MyFuture>,
@@ -97,12 +104,11 @@ pub trait TypedExecutor<T> {
     /// struct MyFuture;
     ///
     /// impl Future for MyFuture {
-    ///     type Item = ();
-    ///     type Error = ();
+    ///     type Output = ();
     ///
-    ///     fn poll(&mut self) -> Poll<(), ()> {
+    ///     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
     ///         println!("running on the executor");
-    ///         Ok(().into())
+    ///         Poll::Ready(())
     ///     }
     /// }
     /// ```
@@ -127,7 +133,10 @@ pub trait TypedExecutor<T> {
     ///
     /// ```rust
     /// use tokio_executor::TypedExecutor;
-    /// use futures::{Future, Poll};
+    ///
+    /// use std::future::Future;
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
     ///
     /// fn example<T>(my_executor: &mut T)
     /// where
@@ -143,12 +152,11 @@ pub trait TypedExecutor<T> {
     /// struct MyFuture;
     ///
     /// impl Future for MyFuture {
-    ///     type Item = ();
-    ///     type Error = ();
+    ///     type Output = ();
     ///
-    ///     fn poll(&mut self) -> Poll<(), ()> {
+    ///     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
     ///         println!("running on the executor");
-    ///         Ok(().into())
+    ///         Poll::Ready(())
     ///     }
     /// }
     /// ```

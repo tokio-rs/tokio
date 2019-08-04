@@ -270,6 +270,7 @@ impl<T: Clone> Receiver<T> {
     /// Attempts to clone the latest value sent via the channel.
     ///
     /// This is equivalent to calling `Clone` on the value returned by `poll_ref`.
+    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         let item = ready!(self.poll_ref(cx));
         Ready(item.map(|v_ref| v_ref.clone()))
@@ -280,6 +281,7 @@ impl<T: Clone> Receiver<T> {
 impl<T: Clone> futures_core::Stream for Receiver<T> {
     type Item = T;
 
+    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
         let item = ready!(self.poll_ref(cx));
         Ready(item.map(|v_ref| v_ref.clone()))
@@ -376,7 +378,7 @@ impl<T> futures_sink::Sink<T> for Sender<T> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let _ = self.as_ref().get_ref().broadcast(item)?;
+        self.as_ref().get_ref().broadcast(item)?;
         Ok(())
     }
 

@@ -198,6 +198,12 @@ impl Drop for ThreadPool {
     }
 }
 
+impl Default for ThreadPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /*
  * TODO: Bring back
 

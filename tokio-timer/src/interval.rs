@@ -72,6 +72,8 @@ impl Interval {
     }
 
     /// TODO: dox
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    #[allow(clippy::should_implement_trait)] // false positive : https://github.com/rust-lang/rust-clippy/issues/4290
     pub async fn next(&mut self) -> Option<Instant> {
         use async_util::future::poll_fn;
 

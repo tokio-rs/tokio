@@ -9,9 +9,7 @@ use libc;
 
 #[tokio::test]
 async fn simple() {
-    let signal = with_timeout(Signal::new(libc::SIGUSR1))
-        .await
-        .expect("failed to create signal");
+    let signal = Signal::new(libc::SIGUSR1).expect("failed to create signal");
 
     send_signal(libc::SIGUSR1);
 

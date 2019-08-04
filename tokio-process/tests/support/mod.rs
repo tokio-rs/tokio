@@ -1,14 +1,16 @@
-extern crate futures;
 extern crate tokio;
 
-use self::futures::Future;
-use self::tokio::timer::Timeout;
+use futures_util::future;
+use futures_util::future::FutureExt;
 use std::env;
+use std::future::Future;
 use std::process::Command;
 use std::time::Duration;
+use tokio::timer::Timeout;
 
 pub use self::tokio::runtime::current_thread::Runtime as CurrentThreadRuntime;
 
+#[allow(dead_code)]
 pub fn cmd(s: &str) -> Command {
     let mut me = env::current_exe().unwrap();
     me.pop();
@@ -19,19 +21,16 @@ pub fn cmd(s: &str) -> Command {
     Command::new(me)
 }
 
-pub fn with_timeout<F: Future>(future: F) -> impl Future<Item = F::Item, Error = F::Error> {
-    Timeout::new(future, Duration::from_secs(3)).map_err(|e| {
-        if e.is_timer() {
-            panic!("failed to register timer");
-        } else if e.is_elapsed() {
-            panic!("timed out")
-        } else {
-            e.into_inner().expect("missing inner error")
+pub fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
+    Timeout::new(future, Duration::from_secs(3)).then(|r| {
+        if r.is_err() {
+            panic!("timed out {:?}", r.err());
         }
+        future::ready(r.unwrap())
     })
 }
 
-pub fn run_with_timeout<F>(future: F) -> Result<F::Item, F::Error>
+pub fn run_with_timeout<F>(future: F) -> F::Output
 where
     F: Future,
 {

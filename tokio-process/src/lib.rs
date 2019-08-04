@@ -13,13 +13,12 @@
 //! for it using an event loop.
 //!
 //! ```no_run
-//! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //!
 //! use std::process::Command;
 //!
-//! use futures::Future;
+//! use futures_util::future::FutureExt;
 //! use tokio_process::CommandExt;
 //!
 //! fn main() {
@@ -42,13 +41,12 @@
 //! world` but we also capture its output.
 //!
 //! ```no_run
-//! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //!
 //! use std::process::Command;
 //!
-//! use futures::Future;
+//! use futures_util::future::FutureExt;
 //! use tokio_process::CommandExt;
 //!
 //! fn main() {
@@ -71,13 +69,13 @@
 //!
 //! ```no_run
 //! extern crate failure;
-//! extern crate futures;
 //! extern crate tokio;
 //! extern crate tokio_process;
 //! extern crate tokio_io;
 //!
 //! use failure::Error;
-//! use futures::{Future, Stream};
+//! use futures_util::future::FutureExt;
+//! use futures_util::stream::StreamExt;
 //! use std::io::BufReader;
 //! use std::process::{Command, Stdio};
 //! use tokio_process::{Child, ChildStdout, CommandExt};
@@ -157,8 +155,8 @@
 #![warn(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.2")]
+#![feature(async_await)]
 
-extern crate futures;
 extern crate tokio_io;
 extern crate tokio_reactor;
 
@@ -172,12 +170,20 @@ extern crate log;
 use std::io::{self, Read, Write};
 use std::process::{Command, ExitStatus, Output, Stdio};
 
-use crate::kill::Kill;
-use futures::future::{ok, Either};
-use futures::{Async, Future, IntoFuture, Poll};
+use futures_core::future::TryFuture;
+use futures_util::future;
+use futures_util::future::FutureExt;
+use futures_util::io::{AsyncRead, AsyncWrite};
+use futures_util::try_future::TryFutureExt;
+
+use kill::Kill;
 use std::fmt;
-use tokio_io::io::read_to_end;
-use tokio_io::{AsyncRead, AsyncWrite, IoFuture};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+use tokio_io::AsyncRead as TokioAsyncRead;
+use tokio_io::AsyncWrite as TokioAsyncWrite;
 use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
@@ -362,13 +368,11 @@ impl CommandExt for Command {
         self.stdout(Stdio::piped());
         self.stderr(Stdio::piped());
 
-        let inner = self
-            .spawn_async_with_handle(handle)
-            .into_future()
-            .and_then(Child::wait_with_output);
+        let inner =
+            future::ready(self.spawn_async_with_handle(handle)).and_then(Child::wait_with_output);
 
         OutputAsync {
-            inner: Box::new(inner),
+            inner: inner.boxed(),
         }
     }
 }
@@ -414,16 +418,16 @@ impl<T: Kill> Drop for ChildDropGuard<T> {
     }
 }
 
-impl<T: Future + Kill> Future for ChildDropGuard<T> {
-    type Item = T::Item;
-    type Error = T::Error;
+impl<T: TryFuture + Kill + Unpin> Future for ChildDropGuard<T> {
+    type Output = Result<T::Ok, T::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let ret = self.inner.poll();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let inner = Pin::get_mut(self);
+        let ret = inner.inner.try_poll_unpin(cx);
 
-        if let Ok(Async::Ready(_)) = ret {
+        if let Poll::Ready(Ok(_)) = ret {
             // Avoid the overhead of trying to kill a reaped process
-            self.kill_on_drop = false;
+            inner.kill_on_drop = false;
         }
 
         ret
@@ -501,24 +505,39 @@ impl Child {
     /// `stderr(Stdio::piped())`, respectively, when creating a `Command`.
     pub fn wait_with_output(mut self) -> WaitWithOutput {
         drop(self.stdin().take());
-        let stdout = match self.stdout().take() {
-            Some(io) => Either::A(read_to_end(io, Vec::new()).map(|p| p.1)),
-            None => Either::B(ok(Vec::new())),
+        let stdout_val = self.stdout.take();
+        let stderr_val = self.stderr.take();
+        let stdout_fut = async {
+            match stdout_val {
+                Some(mut io) => {
+                    let mut vec = Vec::new();
+                    futures_util::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                    Ok(vec)
+                }
+                None => Ok(Vec::new()),
+            }
         };
-        let stderr = match self.stderr().take() {
-            Some(io) => Either::A(read_to_end(io, Vec::new()).map(|p| p.1)),
-            None => Either::B(ok(Vec::new())),
+        let stderr_fut = async {
+            match stderr_val {
+                Some(mut io) => {
+                    let mut vec = Vec::new();
+                    futures_util::io::AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                    Ok(vec)
+                }
+                None => Ok(Vec::new()),
+            }
         };
 
         WaitWithOutput {
-            inner: Box::new(
-                self.join3(stdout, stderr)
-                    .map(|(status, stdout, stderr)| Output {
+            inner: futures_util::try_future::try_join3(stdout_fut, stderr_fut, self)
+                .and_then(|(stdout, stderr, status)| {
+                    future::ok(Output {
                         status,
                         stdout,
                         stderr,
-                    }),
-            ),
+                    })
+                })
+                .boxed(),
         }
     }
 
@@ -533,13 +552,12 @@ impl Child {
     /// > `Child` instance into an event loop as an alternative to this method.
     ///
     /// ```no_run
-    /// # extern crate futures;
     /// # extern crate tokio;
     /// # extern crate tokio_process;
     /// #
     /// # use std::process::Command;
     /// #
-    /// # use futures::Future;
+    /// # use futures_util::future::FutureExt;
     /// # use tokio_process::CommandExt;
     /// #
     /// # fn main() {
@@ -559,11 +577,10 @@ impl Child {
 }
 
 impl Future for Child {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
-        self.child.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        Pin::get_mut(self).child.poll_unpin(cx)
     }
 }
 
@@ -573,7 +590,7 @@ impl Future for Child {
 /// contains the exit status, stdout, and stderr of a child process.
 #[must_use = "futures do nothing unless polled"]
 pub struct WaitWithOutput {
-    inner: IoFuture<Output>,
+    inner: Pin<Box<dyn Future<Output = io::Result<Output>> + Send>>,
 }
 
 impl fmt::Debug for WaitWithOutput {
@@ -585,11 +602,10 @@ impl fmt::Debug for WaitWithOutput {
 }
 
 impl Future for WaitWithOutput {
-    type Item = Output;
-    type Error = io::Error;
+    type Output = io::Result<Output>;
 
-    fn poll(&mut self) -> Poll<Output, io::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
 
@@ -609,11 +625,10 @@ pub struct StatusAsync {
 }
 
 impl Future for StatusAsync {
-    type Item = ExitStatus;
-    type Error = io::Error;
+    type Output = io::Result<ExitStatus>;
 
-    fn poll(&mut self) -> Poll<ExitStatus, io::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
 
@@ -624,7 +639,7 @@ impl Future for StatusAsync {
 /// process, collecting all of its output and its exit status.
 #[must_use = "futures do nothing unless polled"]
 pub struct OutputAsync {
-    inner: IoFuture<Output>,
+    inner: Pin<Box<dyn Future<Output = io::Result<Output>> + Send>>,
 }
 
 impl fmt::Debug for OutputAsync {
@@ -636,11 +651,10 @@ impl fmt::Debug for OutputAsync {
 }
 
 impl Future for OutputAsync {
-    type Item = Output;
-    type Error = io::Error;
+    type Output = io::Result<Output>;
 
-    fn poll(&mut self) -> Poll<Output, io::Error> {
-        self.inner.poll()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        Pin::get_mut(self).inner.poll_unpin(cx)
     }
 }
 
@@ -678,35 +692,59 @@ pub struct ChildStderr {
 
 impl Write for ChildStdin {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.inner.write(bytes)
+        self.inner.get_mut().write(bytes)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        self.inner.get_mut().flush()
     }
 }
 
 impl AsyncWrite for ChildStdin {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        self.inner.shutdown()
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_shutdown(cx)
     }
 }
 
 impl Read for ChildStdout {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(bytes)
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.get_mut().read(buf)
     }
 }
 
-impl AsyncRead for ChildStdout {}
+impl AsyncRead for ChildStdout {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+    }
+}
 
 impl Read for ChildStderr {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(bytes)
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.get_mut().read(buf)
     }
 }
 
-impl AsyncRead for ChildStderr {}
+impl AsyncRead for ChildStderr {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut Pin::get_mut(self).inner).poll_read(cx, buf)
+    }
+}
 
 #[cfg(unix)]
 mod sys {
@@ -760,21 +798,25 @@ mod sys {
 mod test {
     use super::ChildDropGuard;
     use crate::kill::Kill;
-    use futures::{Async, Future, Poll};
+    use futures_util::future::FutureExt;
+    use std::future::Future;
     use std::io;
+    use std::pin::Pin;
+    use std::task::Context;
+    use std::task::Poll;
 
     struct Mock {
         num_kills: usize,
         num_polls: usize,
-        poll_result: Poll<(), ()>,
+        poll_result: Poll<Result<(), ()>>,
     }
 
     impl Mock {
         fn new() -> Self {
-            Self::with_result(Ok(Async::NotReady))
+            Self::with_result(Poll::Pending)
         }
 
-        fn with_result(result: Poll<(), ()>) -> Self {
+        fn with_result(result: Poll<Result<(), ()>>) -> Self {
             Self {
                 num_kills: 0,
                 num_polls: 0,
@@ -791,12 +833,12 @@ mod test {
     }
 
     impl Future for Mock {
-        type Item = ();
-        type Error = ();
+        type Output = Result<(), ()>;
 
-        fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-            self.num_polls += 1;
-            self.poll_result
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
+            let inner = Pin::get_mut(self);
+            inner.num_polls += 1;
+            inner.poll_result
         }
     }
 
@@ -829,19 +871,21 @@ mod test {
 
     #[test]
     fn no_kill_if_reaped() {
-        let mut mock_pending = Mock::with_result(Ok(Async::NotReady));
-        let mut mock_reaped = Mock::with_result(Ok(Async::Ready(())));
-        let mut mock_err = Mock::with_result(Err(()));
+        let mut mock_pending = Mock::with_result(Poll::Pending);
+        let mut mock_reaped = Mock::with_result(Poll::Ready(Ok(())));
+        let mut mock_err = Mock::with_result(Poll::Ready(Err(())));
 
+        let waker = futures_util::task::noop_waker();
+        let mut context = Context::from_waker(&waker);
         {
             let mut guard = ChildDropGuard::new(&mut mock_pending);
-            let _ = guard.poll();
+            let _ = guard.poll_unpin(&mut context);
 
             let mut guard = ChildDropGuard::new(&mut mock_reaped);
-            let _ = guard.poll();
+            let _ = guard.poll_unpin(&mut context);
 
             let mut guard = ChildDropGuard::new(&mut mock_err);
-            let _ = guard.poll();
+            let _ = guard.poll_unpin(&mut context);
         }
 
         assert_eq!(1, mock_pending.num_kills);

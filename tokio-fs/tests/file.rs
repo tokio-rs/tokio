@@ -1,7 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use futures_util::future::poll_fn;
 use rand::{distributions, thread_rng, Rng};
 use std::fs;
 use std::io::SeekFrom;
@@ -31,11 +30,11 @@ fn read_write() {
     let contents_2 = contents.clone();
 
     pool::run(async move {
-        let file = File::create(file_path).await?;
-        let (mut file, metadata) = file.metadata().await?;
+        let mut file = File::create(file_path).await?;
+        let metadata = file.metadata().await?;
         assert!(metadata.is_file());
         file.write(&contents).await?;
-        poll_fn(move |_cx| file.poll_sync_all()).await?;
+        file.sync_all().await?;
         Ok(())
     });
 
@@ -109,19 +108,18 @@ fn seek() {
     let file_path = dir.path().join("seek.txt");
 
     pool::run(async move {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(file_path)
-            .await
-            .unwrap();
+        let mut options = OpenOptions::new();
+
+        options.create(true).read(true).write(true);
+
+        let mut file = options.open(file_path).await.unwrap();
+
         assert!(file.write(b"Hello, world!").await.is_ok());
-        let mut file = file.seek(SeekFrom::End(-6)).await.unwrap().0;
+        file.seek(SeekFrom::End(-6)).await.unwrap();
         let mut buf = vec![0; 5];
         assert!(file.read(buf.as_mut()).await.is_ok());
         assert_eq!(buf, b"world");
-        let mut file = file.seek(SeekFrom::Start(0)).await.unwrap().0;
+        file.seek(SeekFrom::Start(0)).await.unwrap();
         let mut buf = vec![0; 5];
         assert!(file.read(buf.as_mut()).await.is_ok());
         assert_eq!(buf, b"Hello");
@@ -141,8 +139,8 @@ fn clone() {
     let file_path_2 = file_path.clone();
 
     pool::run(async move {
-        let file = File::create(file_path.clone()).await.unwrap();
-        let (mut file, mut clone) = file.try_clone().await.unwrap();
+        let mut file = File::create(file_path.clone()).await.unwrap();
+        let mut clone = file.try_clone().await.unwrap();
         assert!(AsyncWriteExt::write(&mut file, b"clone ").await.is_ok());
         assert!(AsyncWriteExt::write(&mut clone, b"successful")
             .await

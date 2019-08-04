@@ -28,7 +28,7 @@
 //! Some things to note:
 //!
 //! * If [`unpark`] is called before [`park`], the next call to [`park`] will
-//! **not** block the thread.
+//!   **not** block the thread.
 //! * **Spurious** wakeups are permitted, i.e., the [`park`] method may unblock
 //!   even if [`unpark`] was not called.
 //! * [`park_timeout`] does the same as [`park`] but allows specifying a maximum
@@ -215,6 +215,12 @@ impl Park for ParkThread {
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
         self.with_current(|inner| inner.park_timeout(duration));
         Ok(())
+    }
+}
+
+impl Default for ParkThread {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

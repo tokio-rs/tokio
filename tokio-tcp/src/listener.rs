@@ -124,6 +124,7 @@ impl TcpListener {
     /// ```
     /// unimplemented!();
     /// ```
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
         use async_util::future::poll_fn;
         poll_fn(|cx| self.poll_accept(cx)).await
