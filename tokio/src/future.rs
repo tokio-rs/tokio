@@ -1,10 +1,15 @@
+//! Asynchronous values.
+
 #[cfg(feature = "timer")]
 use tokio_timer::Timeout;
 
 #[cfg(feature = "timer")]
 use std::time::Duration;
 
-use std::future::Future;
+#[doc(inline)]
+pub use futures_util::future::{err, ok, pending, poll_fn, ready};
+#[doc(inline)]
+pub use std::future::Future;
 
 /// An extension trait for `Future` that provides a variety of convenient
 /// combinator functions.

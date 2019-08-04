@@ -1,10 +1,15 @@
+//! A sequence of asynchronous values.
+
 #[cfg(feature = "timer")]
 use std::time::Duration;
 
 #[cfg(feature = "timer")]
 use tokio_timer::{throttle::Throttle, Timeout};
 
-use futures_core::Stream;
+#[doc(inline)]
+pub use futures_core::Stream;
+#[doc(inline)]
+pub use futures_util::stream::{empty, iter, once, pending, poll_fn, repeat, unfold};
 
 /// An extension trait for `Stream` that provides a variety of convenient
 /// combinator functions.
