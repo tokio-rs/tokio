@@ -81,6 +81,7 @@ pub mod clock;
 pub mod codec;
 #[cfg(feature = "fs")]
 pub mod fs;
+pub mod future;
 #[cfg(feature = "io")]
 pub mod io;
 #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
@@ -88,19 +89,22 @@ pub mod net;
 pub mod prelude;
 #[cfg(feature = "reactor")]
 pub mod reactor;
+pub mod stream;
 #[cfg(feature = "sync")]
 pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
-pub mod util;
 
 if_runtime! {
     pub mod executor;
     pub mod runtime;
 
+    #[doc(inline)]
     pub use crate::executor::spawn;
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
+    #[doc(inline)]
     pub use tokio_macros::main;
+    #[doc(inline)]
     pub use tokio_macros::test;
 }
