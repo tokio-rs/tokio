@@ -110,10 +110,7 @@ fn seek() {
     pool::run(async move {
         let mut options = OpenOptions::new();
 
-        options
-            .create(true)
-            .read(true)
-            .write(true);
+        options.create(true).read(true).write(true);
 
         let mut file = options.open(file_path).await.unwrap();
 
