@@ -7,9 +7,9 @@ use tokio_timer::Timeout;
 use std::time::Duration;
 
 #[doc(inline)]
-pub use std::future::Future;
-#[doc(inline)]
 pub use futures_util::future::{err, ok, pending, poll_fn, ready};
+#[doc(inline)]
+pub use std::future::Future;
 
 /// An extension trait for `Future` that provides a variety of convenient
 /// combinator functions.
