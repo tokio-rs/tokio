@@ -1,7 +1,8 @@
+use crate::{asyncify, blocking_io};
+
 use futures_core::stream::Stream;
 use std::ffi::OsString;
-use std::fs::{self, DirEntry as StdDirEntry, FileType, Metadata, ReadDir as StdReadDir};
-use std::future::Future;
+use std::fs::{DirEntry as StdDirEntry, FileType, Metadata};
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::DirEntryExt;
@@ -15,41 +16,12 @@ use std::task::Poll;
 /// This is an async version of [`std::fs::read_dir`][std]
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.read_dir.html
-pub fn read_dir<P>(path: P) -> ReadDirFuture<P>
+pub async fn read_dir<P>(path: P) -> io::Result<ReadDir>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    ReadDirFuture::new(path)
-}
-
-/// Future returned by `read_dir`.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadDirFuture<P>
-where
-    P: AsRef<Path> + Send + 'static,
-{
-    path: P,
-}
-
-impl<P> ReadDirFuture<P>
-where
-    P: AsRef<Path> + Send + 'static,
-{
-    fn new(path: P) -> ReadDirFuture<P> {
-        ReadDirFuture { path }
-    }
-}
-
-impl<P> Future for ReadDirFuture<P>
-where
-    P: AsRef<Path> + Send + 'static,
-{
-    type Output = io::Result<ReadDir>;
-
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        crate::blocking_io(|| Ok(ReadDir(fs::read_dir(&self.path)?)))
-    }
+    let std = asyncify(|| std::fs::read_dir(&path)).await?;
+    Ok(ReadDir(std))
 }
 
 /// Stream of the entries in a directory.
@@ -70,18 +42,19 @@ where
 /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html#variant.Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
-pub struct ReadDir(StdReadDir);
+pub struct ReadDir(std::fs::ReadDir);
 
 impl Stream for ReadDir {
     type Item = io::Result<DirEntry>;
 
-    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let inner = Pin::get_mut(self);
-        match crate::blocking_io(|| match inner.0.next() {
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let res = blocking_io(|| match self.0.next() {
             Some(Err(err)) => Err(err),
             Some(Ok(item)) => Ok(Some(Ok(DirEntry(item)))),
             None => Ok(None),
-        }) {
+        });
+
+        match res {
             Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
             Poll::Ready(Ok(v)) => Poll::Ready(v),
             Poll::Pending => Poll::Pending,
@@ -119,15 +92,21 @@ impl DirEntry {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use futures::{Future, Stream};
+    /// ```no_run
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     println!("{:?}", dir.path());
-    ///     Ok(())
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(fut);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///     println!("{:?}", entry.path());
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// This prints output like:
@@ -149,15 +128,20 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// use futures::{Future, Stream};
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     // Here, `dir` is a `DirEntry`.
-    ///     println!("{:?}", dir.file_name());
-    ///     Ok(())
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(fut);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///     println!("{:?}", entry.file_name());
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn file_name(&self) -> OsString {
         self.0.file_name()
@@ -177,21 +161,30 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// use futures::{Future, Stream};
-    /// use futures::future::poll_fn;
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     // Here, `dir` is a `DirEntry`.
-    ///     let path = dir.path();
-    ///     poll_fn(move || dir.poll_metadata()).map(move |metadata| {
-    ///         println!("{:?}: {:?}", path, metadata.permissions());
-    ///     })
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
     ///
-    /// tokio::run(fut);
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///
+    ///     if let Ok(metadata) = entry.metadata().await {
+    ///         // Now let's show our entry's permissions!
+    ///         println!("{:?}: {:?}", entry.path(), metadata.permissions());
+    ///     } else {
+    ///         println!("Couldn't get file type for {:?}", entry.path());
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_metadata(&self) -> Poll<io::Result<Metadata>> {
-        crate::blocking_io(|| self.0.metadata())
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    pub async fn metadata(&self) -> io::Result<Metadata> {
+        asyncify(|| self.0.metadata()).await
     }
 
     /// Return the file type for the file that this entry points at.
@@ -208,22 +201,30 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// use futures::{Future, Stream};
-    /// use futures::future::poll_fn;
+    /// #![feature(async_await)]
     ///
-    /// let fut = tokio_fs::read_dir(".").flatten_stream().for_each(|dir| {
-    ///     // Here, `dir` is a `DirEntry`.
-    ///     let path = dir.path();
-    ///     poll_fn(move || dir.poll_file_type()).map(move |file_type| {
+    /// use tokio::fs;
+    /// use tokio::prelude::*;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut entries = fs::read_dir(".").await?;
+    ///
+    /// while let Some(res) = entries.next().await {
+    ///     let entry = res?;
+    ///
+    ///     if let Ok(file_type) = entry.file_type().await {
     ///         // Now let's show our entry's file type!
-    ///         println!("{:?}: {:?}", path, file_type);
-    ///     })
-    /// }).map_err(|err| { eprintln!("Error: {:?}", err); () });
-    ///
-    /// tokio::run(fut);
+    ///         println!("{:?}: {:?}", entry.path(), file_type);
+    ///     } else {
+    ///         println!("Couldn't get file type for {:?}", entry.path());
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn poll_file_type(&self) -> Poll<io::Result<FileType>> {
-        crate::blocking_io(|| self.0.file_type())
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    pub async fn file_type(&self) -> io::Result<FileType> {
+        asyncify(|| self.0.file_type()).await
     }
 }
 

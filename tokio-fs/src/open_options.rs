@@ -1,7 +1,7 @@
-use super::OpenFuture;
+use super::File;
 
-use std::convert::From;
-use std::fs::OpenOptions as StdOpenOptions;
+use futures_util::future::poll_fn;
+use std::io;
 use std::path::Path;
 
 /// Options and flags which can be used to configure how a file is opened.
@@ -14,7 +14,7 @@ use std::path::Path;
 ///
 /// [`std::fs::OpenOptions`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html
 #[derive(Clone, Debug)]
-pub struct OpenOptions(StdOpenOptions);
+pub struct OpenOptions(std::fs::OpenOptions);
 
 impl OpenOptions {
     /// Creates a blank new set of options ready for configuration.
@@ -30,7 +30,7 @@ impl OpenOptions {
     /// let future = options.read(true).open("foo.txt");
     /// ```
     pub fn new() -> OpenOptions {
-        OpenOptions(StdOpenOptions::new())
+        OpenOptions(std::fs::OpenOptions::new())
     }
 
     /// See the underlying [`read`] call for details.
@@ -89,16 +89,18 @@ impl OpenOptions {
     /// Tokio runtime or if the underlying [`open`] call results in an error.
     ///
     /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
-    pub fn open<P>(&self, path: P) -> OpenFuture<P>
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    pub async fn open<P>(&self, path: P) -> io::Result<File>
     where
         P: AsRef<Path> + Send + Unpin + 'static,
     {
-        OpenFuture::new(self.0.clone(), path)
+        let std_file = poll_fn(|_| crate::blocking_io(|| self.0.open(&path))).await?;
+        Ok(File::from_std(std_file))
     }
 }
 
-impl From<StdOpenOptions> for OpenOptions {
-    fn from(options: StdOpenOptions) -> OpenOptions {
+impl From<std::fs::OpenOptions> for OpenOptions {
+    fn from(options: std::fs::OpenOptions) -> OpenOptions {
         OpenOptions(options)
     }
 }
