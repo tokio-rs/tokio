@@ -40,7 +40,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
     type Item = Result<(C::Item, SocketAddr), C::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let pin = self.get_mut(); // <- this is kinda ugly
+        let pin = self.get_mut();
 
         pin.rd.reserve(INITIAL_RD_CAPACITY);
 
@@ -81,12 +81,12 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
 
         let (frame, out_addr) = item;
 
-        let mutable = self.get_mut();
+        let pin = self.get_mut();
 
-        mutable.codec.encode(frame, &mut mutable.wr)?;
-        mutable.out_addr = out_addr;
-        mutable.flushed = false;
-        trace!("frame encoded; length={}", mutable.wr.len());
+        pin.codec.encode(frame, &mut pin.wr)?;
+        pin.out_addr = out_addr;
+        pin.flushed = false;
+        trace!("frame encoded; length={}", pin.wr.len());
 
         Ok(())
     }
