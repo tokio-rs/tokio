@@ -4,9 +4,9 @@ use core::task::{Context, Poll};
 use futures::Sink;
 use futures_core::{ready, Stream};
 use log::trace;
+use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
-use std::io;
 use tokio_codec::{Decoder, Encoder};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
@@ -118,7 +118,8 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
             Err(io::Error::new(
                 io::ErrorKind::Other,
                 "failed to write entire datagram to socket",
-            ).into())
+            )
+            .into())
         };
 
         Poll::Ready(res)

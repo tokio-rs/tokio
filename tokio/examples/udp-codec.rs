@@ -18,9 +18,9 @@ use bytes::Bytes;
 
 use futures::{FutureExt, SinkExt, StreamExt};
 use tokio::codec::BytesCodec;
+use tokio::future::FutureExt as TokioFutureExt;
 use tokio::io;
 use tokio::net::{UdpFramed, UdpSocket};
-use tokio::future::FutureExt as TokioFutureExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
