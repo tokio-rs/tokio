@@ -6,6 +6,7 @@ use futures_core::{ready, Stream};
 use log::trace;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
+use std::io;
 use tokio_codec::{Decoder, Encoder};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
@@ -114,11 +115,10 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
         let res = if wrote_all {
             Ok(())
         } else {
-            /*Err(io::Error::new(
+            Err(io::Error::new(
                 io::ErrorKind::Other,
                 "failed to write entire datagram to socket",
-            )).into()*/
-            unimplemented!();
+            ).into())
         };
 
         Poll::Ready(res)
@@ -128,54 +128,6 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
         ready!(self.poll_flush(cx))?;
         Poll::Ready(Ok(()))
     }
-
-    /*fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        trace!("sending frame");
-
-        if !self.flushed {
-            match self.poll_complete()? {
-                Async::Ready(()) => {}
-                Async::NotReady => return Ok(AsyncSink::NotReady(item)),
-            }
-        }
-
-        let (frame, out_addr) = item;
-        self.codec.encode(frame, &mut self.wr)?;
-        self.out_addr = out_addr;
-        self.flushed = false;
-        trace!("frame encoded; length={}", self.wr.len());
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), C::Error> {
-        if self.flushed {
-            return Ok(Poll::Ready(()));
-        }
-
-        trace!("flushing frame; length={}", self.wr.len());
-        let n = ready!(self.socket.poll_send_to(&self.wr, &self.out_addr));
-        trace!("written {}", n);
-
-        let wrote_all = n == self.wr.len();
-        self.wr.clear();
-        self.flushed = true;
-
-        if wrote_all {
-            Ok(Poll::Ready(()))
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to write entire datagram to socket",
-            )
-            .into())
-        }
-    }
-
-    fn close(&mut self) -> Poll<(), C::Error> {
-        ready!(self.poll_complete());
-        Ok(().into())
-    }*/
 }
 
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
