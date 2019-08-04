@@ -139,8 +139,8 @@ impl<C> UdpFramed<C> {
     /// See struct level documentation for more details.
     pub fn new(socket: UdpSocket, codec: C) -> UdpFramed<C> {
         UdpFramed {
-            socket: socket,
-            codec: codec,
+            socket,
+            codec,
             out_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
             rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
             wr: BytesMut::with_capacity(INITIAL_WR_CAPACITY),
