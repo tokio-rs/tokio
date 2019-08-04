@@ -1,11 +1,11 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use tokio_udp::{UdpSocket, UdpFramed};
-use tokio_codec::{Encoder, Decoder};
-use bytes::{BytesMut, BufMut};
-use futures::{future, SinkExt, StreamExt};
+use bytes::{BufMut, BytesMut};
+use futures::{future, FutureExt, SinkExt, StreamExt};
 use std::io;
+use tokio_codec::{Decoder, Encoder};
+use tokio_udp::{UdpFramed, UdpSocket};
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
@@ -103,45 +103,46 @@ impl Encoder for ByteCodec {
 async fn send_framed() -> std::io::Result<()> {
     drop(env_logger::try_init());
 
-    let a_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
-    let b_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let mut a_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let mut b_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
 
     let a_addr = a_soc.local_addr()?;
     let b_addr = b_soc.local_addr()?;
 
+    // test sending & receiving bytes
     {
-        let a = UdpFramed::new(a_soc, ByteCodec);
-        let b = UdpFramed::new(b_soc, ByteCodec);
+        let mut a = UdpFramed::new(a_soc, ByteCodec);
+        let mut b = UdpFramed::new(b_soc, ByteCodec);
 
         let msg = b"4567".to_vec();
 
-        let send = a.send((msg, b_addr));
-        let recv = b.next();
-        let (sendt, received) = future::join(send, recv).await;
+        let send = a.send((msg.clone(), b_addr));
+        let recv = b.next().map(|e| e.unwrap());
+        let (_, received) = future::try_join(send, recv).await.unwrap();
 
-        /*let (data, addr) = received.0.unwrap();
+        let (data, addr) = received;
         assert_eq!(msg, data);
         assert_eq!(a_addr, addr);
 
-        a_soc = sendt.into_inner();
-        b_soc = received.1.into_inner();*/
+        a_soc = a.into_inner();
+        b_soc = b.into_inner();
     }
 
-    /*
+    // test sending & receiving an empty message
     {
-        let a = UdpFramed::new(a_soc, ByteCodec);
-        let b = UdpFramed::new(b_soc, ByteCodec);
+        let mut a = UdpFramed::new(a_soc, ByteCodec);
+        let mut b = UdpFramed::new(b_soc, ByteCodec);
 
         let msg = b"".to_vec();
 
         let send = a.send((msg.clone(), b_addr));
-        let recv = b.into_future().map_err(|e| e.0);
-        let received = t!(send.join(recv).wait()).1;
+        let recv = b.next().map(|e| e.unwrap());
+        let (_, received) = future::try_join(send, recv).await.unwrap();
 
-        let (data, addr) = received.0.unwrap();
+        let (data, addr) = received;
         assert_eq!(msg, data);
         assert_eq!(a_addr, addr);
-    }*/
+    }
 
     Ok(())
 }
