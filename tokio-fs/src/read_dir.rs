@@ -182,6 +182,7 @@ impl DirEntry {
     /// # Ok(())
     /// # }
     /// ```
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn metadata(&self) -> io::Result<Metadata> {
         asyncify(|| self.0.metadata()).await
     }
@@ -221,6 +222,7 @@ impl DirEntry {
     /// # Ok(())
     /// # }
     /// ```
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn file_type(&self) -> io::Result<FileType> {
         asyncify(|| self.0.file_type()).await
     }
