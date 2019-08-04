@@ -28,7 +28,7 @@
 //! Some things to note:
 //!
 //! * If [`unpark`] is called before [`park`], the next call to [`park`] will
-//! **not** block the thread.
+//!   **not** block the thread.
 //! * **Spurious** wakeups are permitted, i.e., the [`park`] method may unblock
 //!   even if [`unpark`] was not called.
 //! * [`park_timeout`] does the same as [`park`] but allows specifying a maximum

@@ -48,20 +48,20 @@ use std::pin::Pin;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
+/// #![feature(async_await)]
+///
 /// use tokio_executor::Executor;
-/// use futures::future::lazy;
 ///
 /// # fn docs(my_executor: &mut dyn Executor) {
-/// my_executor.spawn(Box::new(lazy(|| {
+/// my_executor.spawn(Box::pin(async {
 ///     println!("running on the executor");
-///     Ok(())
-/// }))).unwrap();
+/// })).unwrap();
 /// # }
 /// ```
 ///
 /// [`spawn`]: #tymethod.spawn
-/// [`poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
+/// [`poll`]: https://doc.rust-lang.org/std/future/trait.Future.html#tymethod.poll
 /// [`TypedExecutor`]: ../trait.TypedExecutor.html
 pub trait Executor {
     /// Spawns a future object to run on this executor.
@@ -78,15 +78,15 @@ pub trait Executor {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
+    /// #![feature(async_await)]
+    ///
     /// use tokio_executor::Executor;
-    /// use futures::future::lazy;
     ///
     /// # fn docs(my_executor: &mut dyn Executor) {
-    /// my_executor.spawn(Box::pin(lazy(|| {
+    /// my_executor.spawn(Box::pin(async {
     ///     println!("running on the executor");
-    ///     Ok(())
-    /// }))).unwrap();
+    /// })).unwrap();
     /// # }
     /// ```
     fn spawn(&mut self, future: Pin<Box<dyn Future<Output = ()> + Send>>)
@@ -109,16 +109,16 @@ pub trait Executor {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
+    /// #![feature(async_await)]
+    ///
     /// use tokio_executor::Executor;
-    /// use futures::future::lazy;
     ///
     /// # fn docs(my_executor: &mut dyn Executor) {
     /// if my_executor.status().is_ok() {
-    ///     my_executor.spawn(Box::pin(lazy(|| {
+    ///     my_executor.spawn(Box::pin(async {
     ///         println!("running on the executor");
-    ///         Ok(())
-    ///     }))).unwrap();
+    ///     })).unwrap();
     /// } else {
     ///     println!("the executor is not in a good state");
     /// }

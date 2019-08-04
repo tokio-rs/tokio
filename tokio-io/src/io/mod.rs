@@ -48,6 +48,7 @@ mod read_line;
 mod read_to_end;
 mod read_to_string;
 mod read_until;
+mod shutdown;
 mod write;
 mod write_all;
 

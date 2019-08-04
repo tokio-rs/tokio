@@ -10,8 +10,12 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-pub use crate::util::FutureExt;
+pub use crate::future::FutureExt as _;
+pub use futures_util::future::FutureExt as _;
 pub use std::future::Future;
+
+pub use crate::stream::{Stream, StreamExt as _};
+pub use futures_util::stream::StreamExt as _;
 
 #[cfg(feature = "io")]
 pub use tokio_io::{
