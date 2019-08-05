@@ -263,15 +263,15 @@ impl Registration {
     ///
     /// There are several possible return values:
     ///
-    /// * `Ok(Async::Ready(readiness))` means that the I/O resource has received
+    /// * `Poll::Ready(Ok(readiness))` means that the I/O resource has received
     ///   a new readiness event. The readiness value is included.
     ///
-    /// * `Ok(NotReady)` means that no new readiness events have been received
+    /// * `Poll::Pending` means that no new readiness events have been received
     ///   since the last call to `poll_read_ready`.
     ///
-    /// * `Err(err)` means that the registration has encountered an error. This
-    ///   error either represents a permanent internal error **or** the fact
-    ///   that [`register`] was not called first.
+    /// * `Poll::Ready(Err(err))` means that the registration has encountered an
+    ///   error. This error either represents a permanent internal error **or**
+    ///   the fact that [`register`] was not called first.
     ///
     /// [`register`]: #method.register
     /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
@@ -314,15 +314,15 @@ impl Registration {
     ///
     /// There are several possible return values:
     ///
-    /// * `Ok(Async::Ready(readiness))` means that the I/O resource has received
+    /// * `Poll::Ready(Ok(readiness))` means that the I/O resource has received
     ///   a new readiness event. The readiness value is included.
     ///
-    /// * `Ok(NotReady)` means that no new readiness events have been received
+    /// * `Poll::Pending` means that no new readiness events have been received
     ///   since the last call to `poll_write_ready`.
     ///
-    /// * `Err(err)` means that the registration has encountered an error. This
-    ///   error either represents a permanent internal error **or** the fact
-    ///   that [`register`] was not called first.
+    /// * `Poll::Ready(Err(err))` means that the registration has encountered an
+    ///   error. This error either represents a permanent internal error **or**
+    ///   the fact that [`register`] was not called first.
     ///
     /// [`register`]: #method.register
     /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
