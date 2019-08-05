@@ -36,7 +36,5 @@ iovec = "0.1"
 futures-core-preview = { version = "0.3.0-alpha.17" }
 
 [dev-dependencies]
-#env_logger = { version = "0.5", default-features = false }
-#net2 = "*"
 tokio = { version = "0.2.0", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }

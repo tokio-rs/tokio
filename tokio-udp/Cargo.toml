@@ -31,5 +31,5 @@ log = "0.4"
 futures-core-preview = "0.3.0-alpha.17"
 
 [dev-dependencies]
-env_logger = { version = "0.5", default-features = false }
+env_logger = { version = "0.6", default-features = false }
 tokio = { version = "0.2.0", path = "../tokio", default-features = false, features = ["rt-full"] }
