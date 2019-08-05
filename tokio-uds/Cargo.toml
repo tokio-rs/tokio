@@ -26,15 +26,17 @@ async-traits = []
 
 [dependencies]
 bytes = "0.4.8"
-futures-core-preview = { version = "0.3.0-alpha.17" }
-iovec = "0.1.2"
-libc = "0.2.42"
-log = "0.4.2"
 mio = "0.6.14"
 mio-uds = "0.6.5"
 tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
+
+futures-core-preview = { version = "= 0.3.0-alpha.17" }
+futures-util-preview = { version = "= 0.3.0-alpha.17" }
+iovec = "0.1.2"
+libc = "0.2.42"
+log = "0.4.2"
 
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio" }
