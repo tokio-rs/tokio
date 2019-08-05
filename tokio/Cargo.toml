@@ -82,7 +82,7 @@ mio = { version = "0.6.14", optional = true }
 tokio-uds = { version = "0.2.1", optional = true }
 
 [dev-dependencies]
-env_logger = { version = "0.5", default-features = false }
+env_logger = { version = "0.6", default-features = false }
 flate2 = { version = ">=1.0.2, <1.0.10", features = ["tokio"] }
 futures-cpupool = "0.1"
 http = "0.1"
