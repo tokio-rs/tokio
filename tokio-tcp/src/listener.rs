@@ -18,26 +18,22 @@ use tokio_reactor::{Handle, PollEvented};
 /// # Examples
 ///
 /// ```no_run
-/// use futures::stream::Stream;
-/// use std::net::SocketAddr;
-/// use tokio::net::{TcpListener, TcpStream};
+/// #![feature(async_await)]
 ///
-/// fn process_socket(socket: TcpStream) {
-///     // ...
-/// }
+/// use tokio::net::TcpListener;
+/// use std::error::Error;
+/// # async fn process_socket<T>(socket: T) {}
 ///
-/// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-/// let listener = TcpListener::bind(&addr)?;
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn Error>> {
+///     let addr = "127.0.0.1:8080".parse()?;
+///     let mut listener = TcpListener::bind(&addr)?;
 ///
-/// // accept connections and process them
-/// tokio::run(listener.incoming()
-///     .map_err(|e| eprintln!("failed to accept socket; error = {:?}", e))
-///     .for_each(|socket| {
+///     loop {
+///         let (socket, _) = listener.accept().await?;
 ///         process_socket(socket);
-///         Ok(())
-///     })
-/// );
-/// # Ok::<_, Box<dyn std::error::Error>>(())
+///     }
+/// }
 /// ```
 pub struct TcpListener {
     io: PollEvented<mio::net::TcpListener>,
@@ -64,53 +60,6 @@ impl TcpListener {
         Ok(TcpListener::new(l))
     }
 
-    /// Attempt to accept a connection and create a new connected `TcpStream` if
-    /// successful.
-    ///
-    /// Note that typically for simple usage it's easier to treat incoming
-    /// connections as a `Stream` of `TcpStream`s with the `incoming` method
-    /// below.
-    ///
-    /// # Return
-    ///
-    /// On success, returns `Ok(Async::Ready((socket, addr)))`.
-    ///
-    /// If the listener is not ready to accept, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
-    /// notification when the listener becomes ready to accept.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called from outside of a task context.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::net::SocketAddr;
-    /// use tokio::net::TcpListener;
-    /// use futures::Async;
-    ///
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-    /// let mut listener = TcpListener::bind(&addr)?;
-    /// match listener.poll_accept() {
-    ///     Ok(Async::Ready((_socket, addr))) => println!("listener ready to accept: {:?}", addr),
-    ///     Ok(Async::NotReady) => println!("listener not ready to accept!"),
-    ///     Err(e) => eprintln!("got an error: {}", e),
-    /// }
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn poll_accept(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
-        let (io, addr) = ready!(self.poll_accept_std(cx))?;
-
-        let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io);
-
-        Poll::Ready(Ok((io, addr)))
-    }
-
     /// Accept a new incoming connection from this listener.
     ///
     /// This function will yield once a new TCP connection is established. When
@@ -122,7 +71,19 @@ impl TcpListener {
     /// # Examples
     ///
     /// ```
-    /// unimplemented!();
+    /// #![feature(async_await)]
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// use tokio::net::TcpListener;
+    ///
+    /// let addr = "127.0.0.1:8080".parse()?;
+    /// let mut listener = TcpListener::bind(&addr)?;
+    /// match listener.accept().await {
+    ///     Ok((_socket, addr)) => println!("new client: {:?}", addr),
+    ///     Err(e) => println!("couldn't get client: {:?}", e),
+    /// }
+    /// # Ok(())
+    /// # }
     /// ```
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
@@ -130,43 +91,19 @@ impl TcpListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    /// Attempt to accept a connection and create a new connected `TcpStream` if
-    /// successful.
-    ///
-    /// This function is the same as `accept` above except that it returns a
-    /// `std::net::TcpStream` instead of a `tokio::net::TcpStream`. This in turn
-    /// can then allow for the TCP stream to be associated with a different
-    /// reactor than the one this `TcpListener` is associated with.
-    ///
-    /// # Return
-    ///
-    /// On success, returns `Ok(Async::Ready((socket, addr)))`.
-    ///
-    /// If the listener is not ready to accept, the method returns
-    /// `Ok(Async::NotReady)` and arranges for the current task to receive a
-    /// notification when the listener becomes ready to accept.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if called from outside of a task context.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::net::SocketAddr;
-    /// use tokio::net::TcpListener;
-    /// use futures::Async;
-    ///
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-    /// let mut listener = TcpListener::bind(&addr)?;
-    /// match listener.poll_accept_std() {
-    ///     Ok(Async::Ready((_socket, addr))) => println!("listener ready to accept: {:?}", addr),
-    ///     Ok(Async::NotReady) => println!("listener not ready to accept!"),
-    ///     Err(e) => eprintln!("got an error: {}", e),
-    /// }
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn poll_accept_std(
+    pub(crate) fn poll_accept(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
+        let (io, addr) = ready!(self.poll_accept_std(cx))?;
+
+        let io = mio::net::TcpStream::from_stream(io)?;
+        let io = TcpStream::new(io);
+
+        Poll::Ready(Ok((io, addr)))
+    }
+
+    fn poll_accept_std(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
@@ -267,28 +204,6 @@ impl TcpListener {
     /// necessarily fatal ‒ for example having too many open file descriptors or the other side
     /// closing the connection while it waits in an accept queue. These would terminate the stream
     /// if not handled in any way.
-    ///
-    /// If aiming for production, decision what to do about them must be made. The
-    /// [`tk-listen`](https://crates.io/crates/tk-listen) crate might be of some help.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::net::TcpListener;
-    /// use futures::stream::Stream;
-    /// use std::net::SocketAddr;
-    ///
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-    /// let listener = TcpListener::bind(&addr)?;
-    ///
-    /// listener.incoming()
-    ///     .map_err(|e| eprintln!("failed to accept stream; error = {:?}", e))
-    ///     .for_each(|_socket| {
-    ///         println!("new socket!");
-    ///         Ok(())
-    ///     });
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
     #[cfg(feature = "async-traits")]
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
