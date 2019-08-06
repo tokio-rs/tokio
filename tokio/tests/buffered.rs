@@ -15,7 +15,6 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 use std::thread;
 
-
 #[tokio::test]
 async fn echo_server() {
     const N: usize = 1024;
