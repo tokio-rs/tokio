@@ -61,6 +61,7 @@ use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;
 use futures_core::ready;
+use futures_util::pin_mut;
 use futures_util::future::poll_fn;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
