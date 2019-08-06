@@ -94,23 +94,25 @@ struct State(usize);
 /// # Examples
 ///
 /// ```
+/// #![feature(async_await)]
+///
 /// use tokio::sync::oneshot;
-/// use futures::Future;
-/// use std::thread;
 ///
-/// let (sender, receiver) = oneshot::channel::<i32>();
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, rx) = oneshot::channel();
 ///
-/// # let t =
-/// thread::spawn(|| {
-///     let future = receiver.map(|i| {
-///         println!("got: {:?}", i);
+///     tokio::spawn(async move {
+///         if let Err(_) = tx.send(3) {
+///             println!("the receiver dropped");
+///         }
 ///     });
-///     // ...
-/// # return future;
-/// });
 ///
-/// sender.send(3).unwrap();
-/// # t.join().unwrap().wait().unwrap();
+///     match rx.await {
+///         Ok(v) => println!("got = {:?}", v),
+///         Err(_) => println!("the sender dropped"),
+///     }
+/// }
 /// ```
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     #[allow(deprecated)]
@@ -218,11 +220,25 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// unimplemented!();
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, rx) = oneshot::channel::<()>();
+    ///
+    ///     tokio::spawn(async move {
+    ///         drop(rx);
+    ///     });
+    ///
+    ///     tx.closed().await;
+    ///     println!("the receiver dropped");
+    /// }
     /// ```
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn closed(&mut self) {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_closed(cx)).await
     }

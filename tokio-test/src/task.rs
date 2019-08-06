@@ -22,6 +22,7 @@ use tokio_executor::enter;
 use pin_convert::AsPinMut;
 use std::future::Future;
 use std::mem;
+use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
@@ -33,6 +34,21 @@ pub struct MockTask {
     waker: Arc<ThreadWaker>,
 }
 
+/// Future spawned on a mock task
+#[derive(Debug)]
+pub struct Spawn<T> {
+    task: MockTask,
+    future: Pin<Box<T>>,
+}
+
+/// TOOD: dox
+pub fn spawn<T>(task: T) -> Spawn<T> {
+    Spawn {
+        task: MockTask::new(),
+        future: Box::pin(task),
+    }
+}
+
 #[derive(Debug)]
 struct ThreadWaker {
     state: Mutex<usize>,
@@ -42,6 +58,27 @@ struct ThreadWaker {
 const IDLE: usize = 0;
 const WAKE: usize = 1;
 const SLEEP: usize = 2;
+
+impl<T: Future> Spawn<T> {
+    /// Poll a future
+    pub fn poll(&mut self) -> Poll<T::Output> {
+        let fut = self.future.as_mut();
+        self.task.enter(|cx| fut.poll(cx))
+    }
+
+    /// Returns `true` if the inner future has received a wake notification
+    /// since the last call to `enter`.
+    pub fn is_woken(&self) -> bool {
+        self.task.is_woken()
+    }
+
+    /// Returns the number of references to the task waker
+    ///
+    /// The task itself holds a reference. The return value will never be zero.
+    pub fn waker_ref_count(&self) -> usize {
+        self.task.waker_ref_count()
+    }
+}
 
 impl MockTask {
     /// Create a new mock task

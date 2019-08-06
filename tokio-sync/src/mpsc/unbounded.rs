@@ -95,7 +95,7 @@ impl<T> UnboundedReceiver<T> {
     /// TODO: Dox
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv(&mut self) -> Option<T> {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }

@@ -25,10 +25,10 @@ publish = false
 async-traits = ["futures-sink-preview"]
 
 [dependencies]
-async-util = { git = "https://github.com/tokio-rs/async" }
 fnv = "1.0.6"
-futures-core-preview = { version = "0.3.0-alpha.17" }
-futures-sink-preview = { version = "0.3.0-alpha.17", optional = true }
+futures-core-preview = { version = "= 0.3.0-alpha.17" }
+futures-sink-preview = { version = "= 0.3.0-alpha.17", optional = true }
+futures-util-preview = { version = "= 0.3.0-alpha.17" }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
