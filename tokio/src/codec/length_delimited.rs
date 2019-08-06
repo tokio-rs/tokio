@@ -39,20 +39,24 @@
 //! Specifically, given the following:
 //!
 //! ```
+//! #![feature(async_await)]
+//!
 //! use tokio::io::{AsyncRead, AsyncWrite};
 //! use tokio::codec::*;
-//! use bytes::Bytes;
-//! use futures::{Sink, Future};
+//! use tokio::prelude::*;
 //!
-//! fn write_frame<T: AsyncRead + AsyncWrite>(io: T) -> Result<(), Box<dyn std::error::Error>> {
+//! use bytes::Bytes;
+//!
+//! async fn write_frame<T>(io: T) -> Result<(), Box<dyn std::error::Error>>
+//! where
+//!     T: AsyncRead + AsyncWrite + Unpin,
+//! {
 //!     let mut transport = Framed::new(io, LengthDelimitedCodec::new());
 //!     let frame = Bytes::from("hello world");
 //!
-//!     transport.send(frame).wait()?;
+//!     transport.send(frame).await?;
 //!     Ok(())
 //! }
-//! #
-//! # pub fn main() {}
 //! ```
 //!
 //! The encoded frame will look like this:

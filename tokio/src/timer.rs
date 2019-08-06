@@ -30,21 +30,20 @@
 //! Wait 100ms and print "Hello World!"
 //!
 //! ```
+//! #![feature(async_await)]
+//!
 //! use tokio::prelude::*;
 //! use tokio::timer::Delay;
 //!
 //! use std::time::{Duration, Instant};
 //!
-//! let when = Instant::now() + Duration::from_millis(100);
 //!
-//! tokio::run({
-//!     Delay::new(when)
-//!         .map_err(|e| panic!("timer failed; err={:?}", e))
-//!         .and_then(|_| {
-//!             println!("Hello world!");
-//!             Ok(())
-//!         })
-//! })
+//! #[tokio::main]
+//! async fn main() {
+//!     let when = tokio::clock::now() + Duration::from_millis(100);
+//!     Delay::new(when).await;
+//!     println!("100 ms have elapsed");
+//! }
 //! ```
 //!
 //! Require that an operation takes no more than 300ms. Note that this uses the
@@ -52,23 +51,23 @@
 //! included in the prelude.
 //!
 //! ```
-//! use tokio::prelude::*;
+//! #![feature(async_await)]
 //!
+//! use tokio::prelude::*;
 //! use std::time::Duration;
 //!
-//! fn long_op() -> Box<dyn Future<Item = (), Error = ()> + Send> {
-//!     // ...
-//! # Box::new(futures::future::ok(()))
+//! async fn long_future() {
+//!     // do work here
 //! }
 //!
-//! # fn main() {
-//! tokio::run({
-//!     long_op()
-//!         .timeout(Duration::from_millis(300))
-//!         .map_err(|e| {
-//!             println!("operation timed out");
-//!         })
-//! })
+//! # async fn dox() {
+//! let res = long_future()
+//!     .timeout(Duration::from_secs(1))
+//!     .await;
+//!
+//! if res.is_err() {
+//!     println!("operation timed out");
+//! }
 //! # }
 //! ```
 //!

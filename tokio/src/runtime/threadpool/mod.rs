@@ -79,8 +79,7 @@ impl Runtime {
     /// // Use the runtime...
     ///
     /// // Shutdown the runtime
-    /// rt.shutdown_now()
-    ///     .wait().unwrap();
+    /// rt.shutdown_now();
     /// ```
     ///
     /// [mod]: index.html
@@ -121,21 +120,22 @@ impl Runtime {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// # use futures::{future, Future, Stream};
+    /// ```
+    /// #![feature(async_await)]
+    ///
     /// use tokio::runtime::Runtime;
     ///
-    /// # fn dox() {
-    /// // Create the runtime
-    /// let rt = Runtime::new().unwrap();
+    /// fn main() {
+    ///    // Create the runtime
+    ///    let rt = Runtime::new().unwrap();
     ///
-    /// // Spawn a future onto the runtime
-    /// rt.spawn(future::lazy(|| {
-    ///     println!("now running on a worker thread");
-    ///     Ok(())
-    /// }));
-    /// # }
-    /// # pub fn main() {}
+    ///    // Spawn a future onto the runtime
+    ///    rt.spawn(async {
+    ///        println!("now running on a worker thread");
+    ///    });
+    ///
+    ///    rt.shutdown_on_idle();
+    /// }
     /// ```
     ///
     /// # Panics
@@ -183,9 +183,7 @@ impl Runtime {
 
     /// Signals the runtime to shutdown once it becomes idle.
     ///
-    /// Returns a future that completes once the shutdown operation has
-    /// completed.
-    ///
+    /// Blocks the current thread until the shutdown operation has completed.
     /// This function can be used to perform a graceful shutdown of the runtime.
     ///
     /// The runtime enters an idle state once **all** of the following occur.
@@ -208,25 +206,24 @@ impl Runtime {
     /// // Use the runtime...
     ///
     /// // Shutdown the runtime
-    /// rt.shutdown_on_idle()
-    ///     .wait().unwrap();
+    /// rt.shutdown_on_idle();
     /// ```
     ///
     /// [mod]: index.html
-    pub async fn shutdown_on_idle(mut self) {
-        let inner = self.inner.take().unwrap();
-        let inner = inner.pool.shutdown_on_idle();
+    pub fn shutdown_on_idle(mut self) {
+        let mut e = tokio_executor::enter().unwrap();
 
-        inner.await;
+        let inner = self.inner.take().unwrap();
+        e.block_on(inner.pool.shutdown_on_idle());
     }
 
     /// Signals the runtime to shutdown immediately.
     ///
-    /// Returns a future that completes once the shutdown operation has
-    /// completed.
-    ///
+    /// Blocks the current thread until the shutdown operation has completed.
     /// This function will forcibly shutdown the runtime, causing any
-    /// in-progress work to become canceled. The shutdown steps are:
+    /// in-progress work to become canceled.
+    ///
+    /// The shutdown steps are:
     ///
     /// * Drain any scheduled work queues.
     /// * Drop any futures that have not yet completed.
@@ -250,14 +247,15 @@ impl Runtime {
     /// // Use the runtime...
     ///
     /// // Shutdown the runtime
-    /// rt.shutdown_now()
-    ///     .wait().unwrap();
+    /// rt.shutdown_now();
     /// ```
     ///
     /// [mod]: index.html
-    pub async fn shutdown_now(mut self) {
+    pub fn shutdown_now(mut self) {
+        let mut e = tokio_executor::enter().unwrap();
         let inner = self.inner.take().unwrap();
-        inner.pool.shutdown_now().await;
+
+        e.block_on(inner.pool.shutdown_now());
     }
 
     fn inner(&self) -> &Inner {

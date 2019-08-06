@@ -63,7 +63,8 @@ uds = ["tokio-uds"]
 # Only non-optional dependency...
 #futures = "0.1.20"
 futures-core-preview = "= 0.3.0-alpha.17"
-futures-util-preview = "= 0.3.0-alpha.17"
+futures-sink-preview = "= 0.3.0-alpha.17"
+futures-util-preview = { version = "= 0.3.0-alpha.17", features = ["sink"] }
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }

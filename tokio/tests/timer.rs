@@ -25,8 +25,7 @@ fn timer_with_threaded_runtime() {
         tx.send(()).unwrap();
     });
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 
     rx.recv().unwrap();
 }

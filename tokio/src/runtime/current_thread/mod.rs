@@ -23,23 +23,21 @@
 //!
 //! For example:
 //!
-//! ```ignore
+//! ```
+//! #![feature(async_await)]
+//!
 //! use tokio::runtime::current_thread::Runtime;
 //! use tokio::prelude::*;
 //! use std::thread;
 //!
-//! # fn main() {
 //! let mut runtime = Runtime::new().unwrap();
 //! let handle = runtime.handle();
 //!
 //! thread::spawn(move || {
-//!     handle.spawn(future::ok(()));
+//!     handle.spawn(async {
+//!         println!("hello world");
+//!     });
 //! }).join().unwrap();
-//!
-//! # /*
-//! runtime.run().unwrap();
-//! # */
-//! # }
 //! ```
 //!
 //! # Examples

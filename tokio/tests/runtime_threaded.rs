@@ -52,8 +52,7 @@ fn spawn_shutdown() {
     let f = Box::pin(client_server(tx));
     tokio_executor::Executor::spawn(&mut rt.executor(), f).unwrap();
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 
     assert_ok!(rx.try_recv());
     assert_ok!(rx.try_recv());
@@ -72,8 +71,7 @@ fn block_on_timer() {
 
     assert_eq!(v, 42);
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 }
 
 #[test]
@@ -118,8 +116,7 @@ fn block_waits() {
 
     assert_ok!(b_rx.try_recv());
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 }
 
 #[test]
@@ -140,8 +137,7 @@ fn spawn_many() {
         }
     });
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 
     assert_eq!(ITER, *cnt.lock().unwrap());
 }
@@ -206,8 +202,7 @@ fn after_start_and_before_stop_is_called() {
 
     rt.block_on(client_server(tx));
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 
     assert_ok!(rx.try_recv());
 

@@ -40,20 +40,23 @@ pub trait FutureExt: Future {
     /// # Examples
     ///
     /// ```
+    /// #![feature(async_await)]
+    ///
     /// use tokio::prelude::*;
     /// use std::time::Duration;
-    /// # use futures::future::{self, FutureResult};
     ///
-    /// # fn long_future() -> FutureResult<(), ()> {
-    /// #   future::ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// let future = long_future()
+    /// async fn long_future() {
+    ///     // do work here
+    /// }
+    ///
+    /// # async fn dox() {
+    /// let res = long_future()
     ///     .timeout(Duration::from_secs(1))
-    ///     .map_err(|e| println!("error = {:?}", e));
+    ///     .await;
     ///
-    /// tokio::run(future);
+    /// if res.is_err() {
+    ///     println!("operation timed out");
+    /// }
     /// # }
     /// ```
     #[cfg(feature = "timer")]
