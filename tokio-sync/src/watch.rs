@@ -61,8 +61,8 @@ use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;
 use futures_core::ready;
-use futures_util::pin_mut;
 use futures_util::future::poll_fn;
+use futures_util::pin_mut;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -247,6 +247,7 @@ impl<T> Receiver<T> {
     ///
     /// Only the **most recent** value is returned. If the receiver is falling
     /// behind the sender, intermediate values are dropped.
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv_ref<'a>(&'a mut self) -> Option<Ref<'a, T>> {
         let shared = &self.shared;
         let inner = &self.inner;
@@ -293,6 +294,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// This is equivalent to calling `clone()` on the value returned by
     /// `recv()`.
+    #[allow(clippy::needless_lifetimes, clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv(&mut self) -> Option<T> {
         self.recv_ref().await.map(|v_ref| v_ref.clone())
     }
@@ -384,6 +386,7 @@ impl<T> Sender<T> {
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn closed(&mut self) {
         poll_fn(|cx| self.poll_close(cx)).await
     }

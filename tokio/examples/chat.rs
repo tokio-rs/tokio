@@ -33,7 +33,7 @@ use tokio::{
     self,
     codec::{Framed, LinesCodec, LinesCodecError},
     net::{TcpListener, TcpStream},
-    sync::{Lock, mpsc},
+    sync::{mpsc, Lock},
 };
 
 #[tokio::main]
