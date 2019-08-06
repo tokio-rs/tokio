@@ -219,7 +219,7 @@ impl Runtime {
 
     /// Signals the runtime to shutdown immediately.
     ///
-    /// Blocks the current thread until the sutdown operation has completed.
+    /// Blocks the current thread until the shutdown operation has completed.
     /// This function will forcibly shutdown the runtime, causing any
     /// in-progress work to become canceled.
     ///
