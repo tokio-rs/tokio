@@ -183,7 +183,7 @@ impl Runtime {
 
     /// Signals the runtime to shutdown once it becomes idle.
     ///
-    /// Blocks the current thread until the sutdown operation has completed.
+    /// Blocks the current thread until the shutdown operation has completed.
     /// This function can be used to perform a graceful shutdown of the runtime.
     ///
     /// The runtime enters an idle state once **all** of the following occur.
