@@ -9,8 +9,8 @@ mod semaphore;
 
 use crate::semaphore::*;
 
-use async_util::future::poll_fn;
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use loom::futures::block_on;
 use loom::thread;
 use std::future::Future;

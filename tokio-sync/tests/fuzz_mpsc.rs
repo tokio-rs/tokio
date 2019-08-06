@@ -18,8 +18,7 @@ mod mpsc;
 #[allow(warnings)]
 mod semaphore;
 
-// use futures::{future::poll_fn, Stream};
-use async_util::future::poll_fn;
+use futures_util::future::poll_fn;
 use loom::futures::block_on;
 use loom::thread;
 

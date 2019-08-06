@@ -58,7 +58,7 @@ use std::task::Waker;
 use std::time::{Duration, Instant};
 use std::{fmt, usize};
 use tokio_executor::park::{Park, Unpark};
-use tokio_sync::task::AtomicWaker;
+use tokio_sync::AtomicWaker;
 
 /// The core reactor, or event loop.
 ///

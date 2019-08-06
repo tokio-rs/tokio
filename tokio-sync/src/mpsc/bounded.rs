@@ -82,34 +82,27 @@ pub struct RecvError(());
 /// # Examples
 ///
 /// ```rust
-/// use tokio::sync::mpsc::channel;
-/// use tokio::prelude::*;
-/// use futures::future::lazy;
+/// #![feature(async_await)]
 ///
-/// # fn some_computation() -> impl Future<Item = (), Error = ()> + Send {
-/// # futures::future::ok::<(), ()>(())
-/// # }
+/// use tokio::sync::mpsc;
 ///
-/// tokio::run(lazy(|| {
-///     let (tx, rx) = channel(100);
+/// #[tokio::main]
+/// async fn main() {
+///     let (mut tx, mut rx) = mpsc::channel(100);
 ///
-///     tokio::spawn({
-///         some_computation()
-///             .and_then(|value| {
-///                 tx.send(value)
-///                     .map_err(|_| ())
-///             })
-///             .map(|_| ())
-///             .map_err(|_| ())
+///     tokio::spawn(async move {
+///         for i in 0..10 {
+///             if let Err(_) = tx.send(i).await {
+///                 println!("receiver dropped");
+///                 return;
+///             }
+///         }
 ///     });
 ///
-///     rx.for_each(|value| {
-///         println!("got value = {:?}", value);
-///         Ok(())
-///     })
-///     .map(|_| ())
-///     .map_err(|_| ())
-/// }));
+///     while let Some(i) = rx.recv().await {
+///         println!("got = {}", i);
+///     }
+/// }
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
@@ -134,7 +127,7 @@ impl<T> Receiver<T> {
     /// TODO: Dox
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv(&mut self) -> Option<T> {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }
@@ -202,12 +195,35 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
-    /// unimplemented!();
+    /// In the following example, each call to `send` will block until the
+    /// previously sent value was received.
+    ///
+    /// ```rust
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     tokio::spawn(async move {
+    ///         for i in 0..10 {
+    ///             if let Err(_) = tx.send(i).await {
+    ///                 println!("receiver dropped");
+    ///                 return;
+    ///             }
+    ///         }
+    ///     });
+    ///
+    ///     while let Some(i) = rx.recv().await {
+    ///         println!("got = {}", i);
+    ///     }
+    /// }
     /// ```
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn send(&mut self, value: T) -> Result<(), SendError> {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_ready(cx)).await?;
 

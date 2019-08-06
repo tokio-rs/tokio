@@ -8,7 +8,7 @@ extern crate loom;
 mod atomic_waker;
 use crate::atomic_waker::AtomicWaker;
 
-use async_util::future::poll_fn;
+use futures_util::future::poll_fn;
 use loom::futures::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;

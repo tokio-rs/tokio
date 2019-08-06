@@ -10,7 +10,7 @@ use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::time::{Duration, Instant};
 use std::u64;
-use tokio_sync::task::AtomicWaker;
+use tokio_sync::AtomicWaker;
 
 /// Internal state shared between a `Delay` instance and the timer.
 ///

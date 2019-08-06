@@ -1,7 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio_sync::watch;
-use tokio_test::task::MockTask;
+use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
 /*
@@ -27,110 +27,111 @@ macro_rules! assert_not_ready {
 */
 
 #[test]
-fn single_rx_poll_ref() {
+fn single_rx_recv_ref() {
     let (tx, mut rx) = watch::channel("one");
-    let mut task = MockTask::new();
 
-    task.enter(|cx| {
-        {
-            let v = assert_ready!(rx.poll_ref(cx)).unwrap();
-            assert_eq!(*v, "one");
-        }
-        assert_pending!(rx.poll_ref(cx));
-    });
+    {
+        let mut t = spawn(rx.recv_ref());
+        let v = assert_ready!(t.poll()).unwrap();
+        assert_eq!(*v, "one");
+    }
 
-    tx.broadcast("two").unwrap();
+    {
+        let mut t = spawn(rx.recv_ref());
 
-    assert!(task.is_woken());
+        assert_pending!(t.poll());
 
-    task.enter(|cx| {
-        {
-            let v = assert_ready!(rx.poll_ref(cx)).unwrap();
-            assert_eq!(*v, "two");
-        }
-        assert_pending!(rx.poll_ref(cx));
-    });
+        tx.broadcast("two").unwrap();
 
-    drop(tx);
+        assert!(t.is_woken());
 
-    assert!(task.is_woken());
+        let v = assert_ready!(t.poll()).unwrap();
+        assert_eq!(*v, "two");
+    }
 
-    task.enter(|cx| {
-        let res = assert_ready!(rx.poll_ref(cx));
+    {
+        let mut t = spawn(rx.recv_ref());
+
+        assert_pending!(t.poll());
+
+        drop(tx);
+
+        let res = assert_ready!(t.poll());
         assert!(res.is_none());
-    });
+    }
 }
 
 #[test]
-fn single_rx_poll_next() {
+fn single_rx_recv() {
     let (tx, mut rx) = watch::channel("one");
-    let mut task = MockTask::new();
 
-    task.enter(|cx| {
-        let v = assert_ready!(rx.poll_next(cx)).unwrap();
+    {
+        let mut t = spawn(rx.recv());
+        let v = assert_ready!(t.poll()).unwrap();
         assert_eq!(v, "one");
-        assert_pending!(rx.poll_ref(cx));
-    });
+    }
 
-    tx.broadcast("two").unwrap();
+    {
+        let mut t = spawn(rx.recv());
 
-    assert!(task.is_woken());
+        assert_pending!(t.poll());
 
-    task.enter(|cx| {
-        let v = assert_ready!(rx.poll_next(cx)).unwrap();
+        tx.broadcast("two").unwrap();
+
+        assert!(t.is_woken());
+
+        let v = assert_ready!(t.poll()).unwrap();
         assert_eq!(v, "two");
-        assert_pending!(rx.poll_ref(cx));
-    });
+    }
 
-    drop(tx);
+    {
+        let mut t = spawn(rx.recv());
 
-    assert!(task.is_woken());
+        assert_pending!(t.poll());
 
-    task.enter(|cx| {
-        let res = assert_ready!(rx.poll_next(cx));
+        drop(tx);
+
+        let res = assert_ready!(t.poll());
         assert!(res.is_none());
-    });
+    }
 }
 
 #[test]
 #[cfg(feature = "async-traits")]
 fn stream_impl() {
-    use futures_core::Stream;
-    use pin_utils::pin_mut;
+    use tokio::prelude::*;
 
-    let (tx, rx) = watch::channel("one");
-    let mut task = MockTask::new();
+    let (tx, mut rx) = watch::channel("one");
 
-    pin_mut!(rx);
+    {
+        let mut t = spawn(rx.next());
+        let v = assert_ready!(t.poll()).unwrap();
+        assert_eq!(v, "one");
+    }
 
-    task.enter(|cx| {
-        {
-            let v = assert_ready!(Stream::poll_next(rx.as_mut(), cx)).unwrap();
-            assert_eq!(v, "one");
-        }
-        assert_pending!(rx.poll_ref(cx));
-    });
+    {
+        let mut t = spawn(rx.next());
 
-    tx.broadcast("two").unwrap();
+        assert_pending!(t.poll());
 
-    assert!(task.is_woken());
+        tx.broadcast("two").unwrap();
 
-    task.enter(|cx| {
-        {
-            let v = assert_ready!(Stream::poll_next(rx.as_mut(), cx)).unwrap();
-            assert_eq!(v, "two");
-        }
-        assert_pending!(rx.poll_ref(cx));
-    });
+        assert!(t.is_woken());
 
-    drop(tx);
+        let v = assert_ready!(t.poll()).unwrap();
+        assert_eq!(v, "two");
+    }
 
-    assert!(task.is_woken());
+    {
+        let mut t = spawn(rx.next());
 
-    task.enter(|cx| {
-        let res = assert_ready!(Stream::poll_next(rx, cx));
+        assert_pending!(t.poll());
+
+        drop(tx);
+
+        let res = assert_ready!(t.poll());
         assert!(res.is_none());
-    });
+    }
 }
 
 #[test]
@@ -138,67 +139,83 @@ fn multi_rx() {
     let (tx, mut rx1) = watch::channel("one");
     let mut rx2 = rx1.clone();
 
-    let mut task1 = MockTask::new();
-    let mut task2 = MockTask::new();
+    {
+        let mut t1 = spawn(rx1.recv_ref());
+        let mut t2 = spawn(rx2.recv_ref());
 
-    task1.enter(|cx| {
-        let res = assert_ready!(rx1.poll_ref(cx));
+        let res = assert_ready!(t1.poll());
         assert_eq!(*res.unwrap(), "one");
-    });
 
-    task2.enter(|cx| {
-        let res = assert_ready!(rx2.poll_ref(cx));
+        let res = assert_ready!(t2.poll());
         assert_eq!(*res.unwrap(), "one");
-    });
+    }
 
-    tx.broadcast("two").unwrap();
+    let mut t2 = spawn(rx2.recv_ref());
 
-    assert!(task1.is_woken());
-    assert!(task2.is_woken());
+    {
+        let mut t1 = spawn(rx1.recv_ref());
 
-    task1.enter(|cx| {
-        let res = assert_ready!(rx1.poll_ref(cx));
+        assert_pending!(t1.poll());
+        assert_pending!(t2.poll());
+
+        tx.broadcast("two").unwrap();
+
+        assert!(t1.is_woken());
+        assert!(t2.is_woken());
+
+        let res = assert_ready!(t1.poll());
         assert_eq!(*res.unwrap(), "two");
-    });
+    }
 
-    tx.broadcast("three").unwrap();
+    {
+        let mut t1 = spawn(rx1.recv_ref());
 
-    assert!(task1.is_woken());
-    assert!(task2.is_woken());
+        assert_pending!(t1.poll());
 
-    task1.enter(|cx| {
-        let res = assert_ready!(rx1.poll_ref(cx));
+        tx.broadcast("three").unwrap();
+
+        assert!(t1.is_woken());
+        assert!(t2.is_woken());
+
+        let res = assert_ready!(t1.poll());
         assert_eq!(*res.unwrap(), "three");
-    });
 
-    task2.enter(|cx| {
-        let res = assert_ready!(rx2.poll_ref(cx));
+        let res = assert_ready!(t2.poll());
         assert_eq!(*res.unwrap(), "three");
-    });
+    }
 
-    tx.broadcast("four").unwrap();
+    drop(t2);
 
-    task1.enter(|cx| {
-        let res = assert_ready!(rx1.poll_ref(cx));
+    {
+        let mut t1 = spawn(rx1.recv_ref());
+        let mut t2 = spawn(rx2.recv_ref());
+
+        assert_pending!(t1.poll());
+        assert_pending!(t2.poll());
+
+        tx.broadcast("four").unwrap();
+
+        let res = assert_ready!(t1.poll());
         assert_eq!(*res.unwrap(), "four");
-    });
+        drop(t1);
 
-    drop(tx);
+        let mut t1 = spawn(rx1.recv_ref());
+        assert_pending!(t1.poll());
 
-    task1.enter(|cx| {
-        let res = assert_ready!(rx1.poll_ref(cx));
+        drop(tx);
+
+        assert!(t1.is_woken());
+        let res = assert_ready!(t1.poll());
         assert!(res.is_none());
-    });
 
-    task2.enter(|cx| {
-        let res = assert_ready!(rx2.poll_ref(cx));
+        let res = assert_ready!(t2.poll());
         assert_eq!(*res.unwrap(), "four");
-    });
 
-    task2.enter(|cx| {
-        let res = assert_ready!(rx2.poll_ref(cx));
+        drop(t2);
+        let mut t2 = spawn(rx2.recv_ref());
+        let res = assert_ready!(t2.poll());
         assert!(res.is_none());
-    });
+    }
 }
 
 #[test]
@@ -206,67 +223,65 @@ fn rx_observes_final_value() {
     // Initial value
 
     let (tx, mut rx) = watch::channel("one");
-    let mut task = MockTask::new();
-
     drop(tx);
 
-    task.enter(|cx| {
-        let res = assert_ready!(rx.poll_ref(cx));
-        assert!(res.is_some());
+    {
+        let mut t1 = spawn(rx.recv_ref());
+        let res = assert_ready!(t1.poll());
         assert_eq!(*res.unwrap(), "one");
-    });
+    }
 
-    task.enter(|cx| {
-        let res = assert_ready!(rx.poll_ref(cx));
+    {
+        let mut t1 = spawn(rx.recv_ref());
+        let res = assert_ready!(t1.poll());
         assert!(res.is_none());
-    });
+    }
 
     // Sending a value
 
     let (tx, mut rx) = watch::channel("one");
-    let mut task = MockTask::new();
 
     tx.broadcast("two").unwrap();
 
-    task.enter(|cx| {
-        {
-            let res = assert_ready!(rx.poll_ref(cx));
-            assert!(res.is_some());
-            assert_eq!(*res.unwrap(), "two");
-        }
+    {
+        let mut t1 = spawn(rx.recv_ref());
+        let res = assert_ready!(t1.poll());
+        assert_eq!(*res.unwrap(), "two");
+    }
 
-        assert_pending!(rx.poll_ref(cx));
-    });
+    {
+        let mut t1 = spawn(rx.recv_ref());
+        assert_pending!(t1.poll());
 
-    tx.broadcast("three").unwrap();
-    drop(tx);
+        tx.broadcast("three").unwrap();
+        drop(tx);
 
-    assert!(task.is_woken());
+        assert!(t1.is_woken());
 
-    task.enter(|cx| {
-        let res = assert_ready!(rx.poll_ref(cx));
-        assert!(res.is_some());
+        let res = assert_ready!(t1.poll());
         assert_eq!(*res.unwrap(), "three");
-    });
+    }
 
-    task.enter(|cx| {
-        let res = assert_ready!(rx.poll_ref(cx));
+    {
+        let mut t1 = spawn(rx.recv_ref());
+        let res = assert_ready!(t1.poll());
         assert!(res.is_none());
-    });
+    }
 }
 
 #[test]
 fn poll_close() {
     let (mut tx, rx) = watch::channel("one");
-    let mut task = MockTask::new();
 
-    assert_pending!(task.enter(|cx| tx.poll_close(cx)));
+    {
+        let mut t = spawn(tx.closed());
+        assert_pending!(t.poll());
 
-    drop(rx);
+        drop(rx);
 
-    assert!(task.is_woken());
-
-    assert_ready!(task.enter(|cx| tx.poll_close(cx)));
+        assert!(t.is_woken());
+        assert_ready!(t.poll());
+    }
 
     assert!(tx.broadcast("two").is_err());
 }

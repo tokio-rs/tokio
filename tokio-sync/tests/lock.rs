@@ -1,55 +1,57 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use pin_utils::pin_mut;
-use tokio_sync::lock::Lock;
-use tokio_test::task::MockTask;
+use tokio_sync::Lock;
+use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
 #[test]
 fn straight_execution() {
-    let mut task = MockTask::new();
     let mut l = Lock::new(100);
 
-    // We can immediately acquire the lock and take the value
-    task.enter(|cx| {
-        let mut g = assert_ready!(l.poll_lock(cx));
+    {
+        let mut t = spawn(l.lock());
+        let mut g = assert_ready!(t.poll());
         assert_eq!(&*g, &100);
         *g = 99;
-        drop(g);
-
-        let mut g = assert_ready!(l.poll_lock(cx));
+    }
+    {
+        let mut t = spawn(l.lock());
+        let mut g = assert_ready!(t.poll());
         assert_eq!(&*g, &99);
         *g = 98;
-        drop(g);
-
-        let mut g = assert_ready!(l.poll_lock(cx));
+    }
+    {
+        let mut t = spawn(l.lock());
+        let mut g = assert_ready!(t.poll());
         assert_eq!(&*g, &98);
 
         // We can continue to access the guard even if the lock is dropped
+        drop(t);
         drop(l);
         *g = 97;
         assert_eq!(&*g, &97);
-    });
+    }
 }
 
 #[test]
 fn readiness() {
-    let mut t1 = MockTask::new();
-    let mut t2 = MockTask::new();
+    let mut l1 = Lock::new(100);
+    let mut l2 = l1.clone();
+    let mut t1 = spawn(l1.lock());
+    let mut t2 = spawn(l2.lock());
 
-    let mut l = Lock::new(100);
-
-    let g = assert_ready!(t1.enter(|cx| l.poll_lock(cx)));
+    let g = assert_ready!(t1.poll());
 
     // We can't now acquire the lease since it's already held in g
-    assert_pending!(t2.enter(|cx| l.poll_lock(cx)));
+    assert_pending!(t2.poll());
 
     // But once g unlocks, we can acquire it
     drop(g);
     assert!(t2.is_woken());
-    assert_ready!(t2.enter(|cx| l.poll_lock(cx)));
+    assert_ready!(t2.poll());
 }
 
+/*
 #[test]
 #[ignore]
 fn lock() {
@@ -79,3 +81,4 @@ fn lock() {
     let result = assert_ready!(task.poll(&mut l));
     assert!(*result);
 }
+*/
