@@ -15,6 +15,8 @@ pub use futures_util::future::FutureExt as _;
 pub use std::future::Future;
 
 pub use crate::stream::{Stream, StreamExt as _};
+pub use futures_sink::Sink;
+pub use futures_util::sink::SinkExt as _;
 pub use futures_util::stream::StreamExt as _;
 
 #[cfg(feature = "io")]

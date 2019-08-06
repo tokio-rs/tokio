@@ -68,26 +68,26 @@ pub struct Spawn(());
 /// In this example, a server is started and `spawn` is used to start a new task
 /// that processes each received connection.
 ///
-/// ```rust,ignore
-/// # use futures::{Future, Stream};
+/// ```
+/// #![feature(async_await)]
+///
 /// use tokio::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
-/// # unimplemented!();
-/// # }
-/// # fn dox() {
-/// # let addr = "127.0.0.1:8080".parse().unwrap();
-/// let listener = TcpListener::bind(&addr).unwrap();
+/// # async fn process<T>(t: T) {}
+/// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+/// let addr = "127.0.0.1:8080".parse()?;
+/// let mut listener = TcpListener::bind(&addr).unwrap();
 ///
-/// let server = listener.incoming()
-///     .map_err(|e| println!("error = {:?}", e))
-///     .for_each(|socket| {
-///         tokio::spawn(process(socket))
+/// loop {
+///     let (socket, _) = listener.accept().await?;
+///
+///     tokio::spawn(async move {
+///         // Process each socket concurrently.
+///         process(socket).await
 ///     });
-///
-/// tokio::run(server);
+/// }
+/// # Ok(())
 /// # }
-/// # pub fn main() {}
 /// ```
 ///
 /// [default executor]: struct.DefaultExecutor.html

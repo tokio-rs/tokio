@@ -31,30 +31,46 @@
 //!
 //! # Usage
 //!
-//! Most applications will use the [`run`] function. This takes a future to
-//! "seed" the application, blocking the thread until the runtime becomes
-//! [idle].
+//! Most applications will use the [`tokio::main`] attribute macro.
 //!
-//! ```rust,ignore
-//! # use futures::{Future, Stream};
+//! ```no_run
+//! #![feature(async_await)]
+//!
 //! use tokio::net::TcpListener;
+//! use tokio::prelude::*;
 //!
-//! # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
-//! # unimplemented!();
-//! # }
-//! # fn dox() {
-//! # let addr = "127.0.0.1:8080".parse().unwrap();
-//! let listener = TcpListener::bind(&addr).unwrap();
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let addr = "127.0.0.1:8080".parse()?;
+//!     let mut listener = TcpListener::bind(&addr).unwrap();
 //!
-//! let server = listener.incoming()
-//!     .map_err(|e| println!("error = {:?}", e))
-//!     .for_each(|socket| {
-//!         tokio::spawn(process(socket))
-//!     });
+//!     loop {
+//!         let (mut socket, _) = listener.accept().await?;
 //!
-//! tokio::run(server);
-//! # }
-//! # pub fn main() {}
+//!         tokio::spawn(async move {
+//!             let mut buf = [0; 1024];
+//!
+//!             // In a loop, read data from the socket and write the data back.
+//!             loop {
+//!                 let n = match socket.read(&mut buf).await {
+//!                     // socket closed
+//!                     Ok(n) if n == 0 => return,
+//!                     Ok(n) => n,
+//!                     Err(e) => {
+//!                         println!("failed to read from socket; err = {:?}", e);
+//!                         return;
+//!                     }
+//!                 };
+//!
+//!                 // Write the data back
+//!                 if let Err(e) = socket.write_all(&buf[0..n]).await {
+//!                     println!("failed to write to socket; err = {:?}", e);
+//!                     return;
+//!                 }
+//!             }
+//!         });
+//!     }
+//! }
 //! ```
 //!
 //! In this function, the `run` function blocks until the runtime becomes idle.
@@ -66,35 +82,50 @@
 //!
 //! A [`Runtime`] instance can also be used directly.
 //!
-//! ```rust,ignore
-//! # use futures::{Future, Stream};
-//! use tokio::runtime::Runtime;
+//! ```no_run
+//! #![feature(async_await)]
+//!
 //! use tokio::net::TcpListener;
+//! use tokio::prelude::*;
+//! use tokio::runtime::Runtime;
 //!
-//! # fn process<T>(_: T) -> Box<dyn Future<Item = (), Error = ()> + Send> {
-//! # unimplemented!();
-//! # }
-//! # fn dox() {
-//! # let addr = "127.0.0.1:8080".parse().unwrap();
-//! let listener = TcpListener::bind(&addr).unwrap();
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create the runtime
+//!     let mut rt = Runtime::new().unwrap();
 //!
-//! let server = listener.incoming()
-//!     .map_err(|e| println!("error = {:?}", e))
-//!     .for_each(|socket| {
-//!         tokio::spawn(process(socket))
-//!     });
+//!     // Spawn the root task
+//!     rt.block_on(async {
+//!         let addr = "127.0.0.1:8080".parse()?;
+//!         let mut listener = TcpListener::bind(&addr).unwrap();
 //!
-//! // Create the runtime
-//! let mut rt = Runtime::new().unwrap();
+//!         loop {
+//!             let (mut socket, _) = listener.accept().await?;
 //!
-//! // Spawn the server task
-//! rt.spawn(server);
+//!             tokio::spawn(async move {
+//!                 let mut buf = [0; 1024];
 //!
-//! // Wait until the runtime becomes idle and shut it down.
-//! rt.shutdown_on_idle()
-//!     .wait().unwrap();
-//! # }
-//! # pub fn main() {}
+//!                 // In a loop, read data from the socket and write the data back.
+//!                 loop {
+//!                     let n = match socket.read(&mut buf).await {
+//!                         // socket closed
+//!                         Ok(n) if n == 0 => return,
+//!                         Ok(n) => n,
+//!                         Err(e) => {
+//!                             println!("failed to read from socket; err = {:?}", e);
+//!                             return;
+//!                         }
+//!                     };
+//!
+//!                     // Write the data back
+//!                     if let Err(e) = socket.write_all(&buf[0..n]).await {
+//!                         println!("failed to write to socket; err = {:?}", e);
+//!                         return;
+//!                     }
+//!                 }
+//!             });
+//!         }
+//!     })
+//! }
 //! ```
 //!
 //! [reactor]: ../reactor/struct.Reactor.html
