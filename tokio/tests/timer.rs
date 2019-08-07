@@ -1,9 +1,7 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio;
 use tokio::prelude::*;
-// use tokio::sync::mpsc;
 use tokio::timer::*;
 
 use std::sync::mpsc;
