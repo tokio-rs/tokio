@@ -16,7 +16,7 @@
 //!
 //! ```
 //! use tokio_io::{AsyncRead, AsyncWrite};
-//! use tokio_codec::*;
+//! use tokio_codec::{Framed, LengthDelimitedCodec};
 //!
 //! fn bind_transport<T: AsyncRead + AsyncWrite>(io: T)
 //!     -> Framed<T, LengthDelimitedCodec>
@@ -42,7 +42,7 @@
 //! #![feature(async_await)]
 //!
 //! use tokio_io::{AsyncRead, AsyncWrite};
-//! use tokio_codec::*;
+//! use tokio_codec::{Framed, LengthDelimitedCodec};
 //! use futures::SinkExt;
 //!
 //! use bytes::Bytes;
@@ -82,9 +82,9 @@
 //!
 //! ```
 //! # use tokio_io::AsyncRead;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # fn bind_read<T: AsyncRead>(io: T) {
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_length(2)
 //!     .length_adjustment(0)   // default value
@@ -116,9 +116,9 @@
 //!
 //! ```
 //! # use tokio_io::AsyncRead;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # fn bind_read<T: AsyncRead>(io: T) {
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_length(2)
 //!     .length_adjustment(0)   // default value
@@ -148,9 +148,9 @@
 //!
 //! ```
 //! # use tokio_io::AsyncRead;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # fn bind_read<T: AsyncRead>(io: T) {
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_length(2)
 //!     .length_adjustment(-2)  // size of head
@@ -182,9 +182,9 @@
 //!
 //! ```
 //! # use tokio_io::AsyncRead;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # fn bind_read<T: AsyncRead>(io: T) {
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_length(3)
 //!     .length_adjustment(2)  // remaining head
@@ -226,9 +226,9 @@
 //!
 //! ```
 //! # use tokio_io::AsyncRead;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # fn bind_read<T: AsyncRead>(io: T) {
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_offset(1) // length of hdr1
 //!     .length_field_length(2)
 //!     .length_adjustment(1)  // length of hdr2
@@ -272,9 +272,9 @@
 //!
 //! ```
 //! # use tokio_io::AsyncRead;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # fn bind_read<T: AsyncRead>(io: T) {
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_offset(1) // length of hdr1
 //!     .length_field_length(2)
 //!     .length_adjustment(-3)  // length of hdr1 + LEN, negative
@@ -317,11 +317,11 @@
 //!
 //! ```
 //! # use tokio_io::AsyncWrite;
-//! # use tokio_codec::length_delimited;
+//! # use tokio_codec::LengthDelimitedCodec;
 //! # use bytes::BytesMut;
 //! # fn write_frame<T: AsyncWrite>(io: T) {
 //! # let _ =
-//! length_delimited::Builder::new()
+//! LengthDelimitedCodec::builder()
 //!     .length_field_length(2)
 //!     .new_write(io);
 //! # }
@@ -379,7 +379,7 @@ pub struct Builder {
 }
 
 /// An error when the number of bytes read is more than max frame length.
-pub struct FrameTooBig {
+pub struct LengthDelimitedCodecError {
     _priv: (),
 }
 
@@ -466,7 +466,7 @@ impl LengthDelimitedCodec {
             if n > self.builder.max_frame_len as u64 {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    FrameTooBig { _priv: () },
+                    LengthDelimitedCodecError { _priv: () },
                 ));
             }
 
@@ -557,7 +557,7 @@ impl Encoder for LengthDelimitedCodec {
         if n > self.builder.max_frame_len {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                FrameTooBig { _priv: () },
+                LengthDelimitedCodecError { _priv: () },
             ));
         }
 
@@ -608,10 +608,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_length(2)
     ///     .length_adjustment(0)
@@ -652,10 +652,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .big_endian()
     ///     .new_read(io);
     /// # }
@@ -676,10 +676,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .little_endian()
     ///     .new_read(io);
     /// # }
@@ -700,10 +700,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .native_endian()
     ///     .new_read(io);
     /// # }
@@ -728,16 +728,16 @@ impl Builder {
     /// setting.
     ///
     /// When frames exceed the max length, an `io::Error` with the custom value
-    /// of the `FrameTooBig` type will be returned.
+    /// of the `LengthDelimitedCodecError` type will be returned.
     ///
     /// # Examples
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .max_frame_length(8 * 1024)
     ///     .new_read(io);
     /// # }
@@ -758,10 +758,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_length(4)
     ///     .new_read(io);
     /// # }
@@ -781,10 +781,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(1)
     ///     .new_read(io);
     /// # }
@@ -802,10 +802,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_adjustment(-2)
     ///     .new_read(io);
     /// # }
@@ -826,10 +826,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .num_skip(4)
     ///     .new_read(io);
     /// # }
@@ -846,9 +846,9 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     /// # pub fn main() {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_length(2)
     ///     .length_adjustment(0)
@@ -869,10 +869,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncRead;
-    /// use tokio_codec::length_delimited::Builder;
+    /// use tokio_codec::LengthDelimitedCodec;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_length(2)
     ///     .length_adjustment(0)
@@ -894,10 +894,10 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::AsyncWrite;
-    /// # use tokio_codec::length_delimited;
+    /// # use tokio_codec::LengthDelimitedCodec;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncWrite>(io: T) {
-    /// length_delimited::Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_length(2)
     ///     .new_write(io);
     /// # }
@@ -916,11 +916,11 @@ impl Builder {
     ///
     /// ```
     /// # use tokio_io::{AsyncRead, AsyncWrite};
-    /// # use tokio_codec::length_delimited;
+    /// # use tokio_codec::LengthDelimitedCodec;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
     /// # let _ =
-    /// length_delimited::Builder::new()
+    /// LengthDelimitedCodec::builder()
     ///     .length_field_length(2)
     ///     .new_framed(io);
     /// # }
@@ -950,18 +950,18 @@ impl Default for Builder {
     }
 }
 
-// ===== impl FrameTooBig =====
+// ===== impl LengthDelimitedCodecError =====
 
-impl fmt::Debug for FrameTooBig {
+impl fmt::Debug for LengthDelimitedCodecError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FrameTooBig").finish()
+        f.debug_struct("LengthDelimitedCodecError").finish()
     }
 }
 
-impl fmt::Display for FrameTooBig {
+impl fmt::Display for LengthDelimitedCodecError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("frame size too big")
     }
 }
 
-impl StdError for FrameTooBig {}
+impl StdError for LengthDelimitedCodecError {}

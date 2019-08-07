@@ -32,5 +32,5 @@ pub use crate::encoder::Encoder;
 pub use crate::framed::{Framed, FramedParts};
 pub use crate::framed_read::FramedRead;
 pub use crate::framed_write::FramedWrite;
-pub use crate::length_delimited::{FrameTooBig, LengthDelimitedCodec};
+pub use crate::length_delimited::{LengthDelimitedCodec, LengthDelimitedCodecError};
 pub use crate::lines_codec::{LinesCodec, LinesCodecError};

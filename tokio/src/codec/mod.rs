@@ -11,6 +11,6 @@
 //! [transports]: https://tokio.rs/docs/going-deeper/frames/
 
 pub use tokio_codec::{
-    length_delimited, BytesCodec, Decoder, Encoder, FrameTooBig, Framed, FramedParts, FramedRead,
-    FramedWrite, LengthDelimitedCodec, LinesCodec, LinesCodecError,
+    length_delimited, BytesCodec, Decoder, Encoder, Framed, FramedParts, FramedRead, FramedWrite,
+    LengthDelimitedCodec, LengthDelimitedCodecError, LinesCodec, LinesCodecError,
 };
