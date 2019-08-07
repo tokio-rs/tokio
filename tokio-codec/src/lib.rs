@@ -23,6 +23,7 @@ mod encoder;
 mod framed;
 mod framed_read;
 mod framed_write;
+pub mod length_delimited;
 mod lines_codec;
 
 pub use crate::bytes_codec::BytesCodec;
@@ -31,4 +32,5 @@ pub use crate::encoder::Encoder;
 pub use crate::framed::{Framed, FramedParts};
 pub use crate::framed_read::FramedRead;
 pub use crate::framed_write::FramedWrite;
+pub use crate::length_delimited::{LengthDelimitedCodec, LengthDelimitedCodecError};
 pub use crate::lines_codec::{LinesCodec, LinesCodecError};
