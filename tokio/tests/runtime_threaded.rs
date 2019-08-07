@@ -1,5 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 #![feature(async_await)]
+#![cfg(features = "default")]
 
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

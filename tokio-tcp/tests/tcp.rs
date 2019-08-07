@@ -2,7 +2,6 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
 use tokio::sync::oneshot;
 use tokio_test::assert_ok;
 

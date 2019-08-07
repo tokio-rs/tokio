@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(features = "default")]
 
 use tokio::codec::*;
 use tokio::io::{AsyncRead, AsyncWrite};

@@ -1,5 +1,6 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(features = "default")]
 
 use tokio::runtime::{self, current_thread};
 use tokio::timer::*;
