@@ -8,6 +8,7 @@
 //! use tokio::clock;
 //! use tokio_test::{assert_ready, assert_pending, task};
 //! use tokio_timer::Delay;
+//!
 //! use std::time::Duration;
 //!
 //! tokio_test::clock::mock(|handle| {

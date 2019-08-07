@@ -15,8 +15,6 @@ pub mod io;
 mod macros;
 pub mod task;
 
-pub use assertive::{assert_err, assert_ok};
-
 /*
 #[doc(hidden)]
 pub mod codegen {
