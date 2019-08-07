@@ -1,15 +1,9 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use tokio_test::assert_ok;
-
-/*
-use env_logger;
-use futures::stream::Stream;
-use futures::Future;
-*/
 use tokio::net::TcpListener;
 use tokio::prelude::*;
+use tokio_test::assert_ok;
 
 use std::io::prelude::*;
 use std::net::TcpStream;
