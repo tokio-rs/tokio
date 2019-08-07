@@ -60,21 +60,19 @@ impl Sender {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio_threadpool::ThreadPool;
-    /// use futures::future::{Future, lazy};
+    /// #![feature(async_await)]
     ///
-    /// # pub fn main() {
+    /// use tokio_threadpool::ThreadPool;
+    ///
     /// // Create a thread pool with default configuration values
     /// let thread_pool = ThreadPool::new();
     ///
-    /// thread_pool.sender().spawn(lazy(|| {
+    /// thread_pool.sender().spawn(async {
     ///     println!("called from a worker thread");
-    ///     Ok(())
-    /// })).unwrap();
+    /// }).unwrap();
     ///
     /// // Gracefully shutdown the threadpool
-    /// thread_pool.shutdown().wait().unwrap();
-    /// # }
+    /// thread_pool.shutdown().wait();
     /// ```
     pub fn spawn<F>(&self, future: F) -> Result<(), SpawnError>
     where

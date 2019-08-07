@@ -106,12 +106,12 @@ pub struct BlockingError {
 ///         // from the context of a `Future` implementation. Since we don't
 ///         // have a complicated requirement, we can use `poll_fn` in this
 ///         // case.
-///         poll_fn(move || {
+///         poll_fn(move |_| {
 ///             blocking(|| {
 ///                 let msg = rx.recv().unwrap();
 ///                 println!("message = {}", msg);
 ///             }).map_err(|_| panic!("the threadpool shut down"))
-///         }).await
+///         }).await;
 ///     });
 ///
 ///     // Wait for the task we just spawned to complete.
