@@ -15,9 +15,6 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-extern crate mio_named_pipes;
-extern crate winapi;
-
 use crate::kill::Kill;
 
 use std::fmt;
@@ -34,18 +31,18 @@ use std::task::Poll;
 use futures_util::future::Fuse;
 use futures_util::future::FutureExt;
 
-use self::mio_named_pipes::NamedPipe;
-use self::winapi::shared::minwindef::*;
-use self::winapi::shared::winerror::*;
-use self::winapi::um::handleapi::*;
-use self::winapi::um::processthreadsapi::*;
-use self::winapi::um::synchapi::*;
-use self::winapi::um::threadpoollegacyapiset::*;
-use self::winapi::um::winbase::*;
-use self::winapi::um::winnt::*;
 use super::SpawnedChild;
+use mio_named_pipes::NamedPipe;
 use tokio_reactor::{Handle, PollEvented};
 use tokio_sync::oneshot;
+use winapi::shared::minwindef::*;
+use winapi::shared::winerror::*;
+use winapi::um::handleapi::*;
+use winapi::um::processthreadsapi::*;
+use winapi::um::synchapi::*;
+use winapi::um::threadpoollegacyapiset::*;
+use winapi::um::winbase::*;
+use winapi::um::winnt::*;
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Child {
