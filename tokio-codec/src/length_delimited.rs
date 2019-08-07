@@ -15,8 +15,8 @@
 //! byte stream into a stream of frames.
 //!
 //! ```
-//! use tokio::io::{AsyncRead, AsyncWrite};
-//! use tokio::codec::*;
+//! use tokio_io::{AsyncRead, AsyncWrite};
+//! use tokio_codec::*;
 //!
 //! fn bind_transport<T: AsyncRead + AsyncWrite>(io: T)
 //!     -> Framed<T, LengthDelimitedCodec>
@@ -41,9 +41,9 @@
 //! ```
 //! #![feature(async_await)]
 //!
-//! use tokio::io::{AsyncRead, AsyncWrite};
-//! use tokio::codec::*;
-//! use tokio::prelude::*;
+//! use tokio_io::{AsyncRead, AsyncWrite};
+//! use tokio_codec::*;
+//! use futures::SinkExt;
 //!
 //! use bytes::Bytes;
 //!
@@ -81,8 +81,8 @@
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncRead;
+//! # use tokio_codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! length_delimited::Builder::new()
 //!     .length_field_offset(0) // default value
@@ -115,8 +115,8 @@
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncRead;
+//! # use tokio_codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! length_delimited::Builder::new()
 //!     .length_field_offset(0) // default value
@@ -147,8 +147,8 @@
 //! **includes** the frame head length.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncRead;
+//! # use tokio_codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! length_delimited::Builder::new()
 //!     .length_field_offset(0) // default value
@@ -181,8 +181,8 @@
 //! frame head, including the frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncRead;
+//! # use tokio_codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! length_delimited::Builder::new()
 //!     .length_field_offset(0) // default value
@@ -225,8 +225,8 @@
 //! included.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncRead;
+//! # use tokio_codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! length_delimited::Builder::new()
 //!     .length_field_offset(1) // length of hdr1
@@ -271,8 +271,8 @@
 //! length.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncRead;
+//! # use tokio_codec::length_delimited;
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! length_delimited::Builder::new()
 //!     .length_field_offset(1) // length of hdr1
@@ -316,8 +316,8 @@
 //! configuration:
 //!
 //! ```
-//! # use tokio::io::AsyncWrite;
-//! # use tokio::codec::length_delimited;
+//! # use tokio_io::AsyncWrite;
+//! # use tokio_codec::length_delimited;
 //! # use bytes::BytesMut;
 //! # fn write_frame<T: AsyncWrite>(io: T) {
 //! # let _ =
@@ -344,14 +344,12 @@
 //! [`Encoder`]: ../trait.Encoder.html
 //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
-use crate::{
-    codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite},
-    io::{AsyncRead, AsyncWrite},
-};
+use crate::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};
+use tokio_io::{AsyncRead, AsyncWrite};
 
 /// Configure length delimited `LengthDelimitedCodec`s.
 ///
@@ -417,6 +415,12 @@ impl LengthDelimitedCodec {
             builder: Builder::new(),
             state: DecodeState::Head,
         }
+    }
+
+    /// Creates a new length delimited codec builder with default configuration
+    /// values.
+    pub fn builder() -> Builder {
+        Builder::new()
     }
 
     /// Returns the current max frame setting
@@ -603,8 +607,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -647,8 +651,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -671,8 +675,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -695,8 +699,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -729,8 +733,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -753,8 +757,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -776,8 +780,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -797,8 +801,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -821,8 +825,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -841,8 +845,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     /// # pub fn main() {
     /// Builder::new()
     ///     .length_field_offset(0)
@@ -864,8 +868,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
-    /// use tokio::codec::length_delimited::Builder;
+    /// # use tokio_io::AsyncRead;
+    /// use tokio_codec::length_delimited::Builder;
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// Builder::new()
@@ -889,8 +893,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncWrite;
-    /// # use tokio::codec::length_delimited;
+    /// # use tokio_io::AsyncWrite;
+    /// # use tokio_codec::length_delimited;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// length_delimited::Builder::new()
@@ -911,8 +915,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::{AsyncRead, AsyncWrite};
-    /// # use tokio::codec::length_delimited;
+    /// # use tokio_io::{AsyncRead, AsyncWrite};
+    /// # use tokio_codec::length_delimited;
     /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
     /// # let _ =
