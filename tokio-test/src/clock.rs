@@ -2,7 +2,7 @@
 //!
 //! # Example
 //!
-//! ```
+//! ```ignore
 //! use tokio_test::clock;
 //! use tokio_test::{assert_ready, assert_not_ready};
 //! use tokio_timer::Delay;
