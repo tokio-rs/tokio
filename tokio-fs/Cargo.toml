@@ -24,7 +24,7 @@ categories = ["asynchronous", "network-programming", "filesystem"]
 publish = false
 
 [dependencies]
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
+tokio-io = { version = "0.2.0", features = ["util"], path = "../tokio-io" }
 tokio-threadpool = { version = "0.2.0", path = "../tokio-threadpool" }
 
 futures-core-preview = "= 0.3.0-alpha.17"
