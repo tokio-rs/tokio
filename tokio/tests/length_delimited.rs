@@ -1,13 +1,18 @@
-#![cfg(feature = "broken")]
-#![deny(warnings, rust_2018_idioms)]
+// #![deny(warnings, rust_2018_idioms)]
 
-use bytes::{BufMut, Bytes, BytesMut};
-use futures::Async::*;
-use futures::{Poll, Sink, Stream};
-use std::collections::VecDeque;
-use std::io;
 use tokio::codec::*;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::prelude::*;
+use tokio_test::assert_ready;
+use tokio_test::task::MockTask;
+
+use futures_util::pin_mut;
+use bytes::{BufMut, Bytes, BytesMut};
+use std::collections::VecDeque;
+use std::pin::Pin;
+use std::io;
+use std::task::{Context, Poll};
+use std::task::Poll::*;
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
@@ -17,315 +22,381 @@ macro_rules! mock {
     }};
 }
 
+macro_rules! assert_next_eq {
+    ($io:ident, $expect:expr) => {{
+        MockTask::new().enter(|cx| {
+            let res = assert_ready!($io.as_mut().poll_next(cx));
+            match res {
+                Some(Ok(v)) => assert_eq!(v, $expect.as_ref()),
+                Some(Err(e)) => panic!("error = {:?}", e),
+                None => panic!("none"),
+            }
+        });
+    }}
+}
+
+macro_rules! assert_pending {
+    ($io:ident) => {{
+        MockTask::new().enter(|cx| {
+            match $io.as_mut().poll_next(cx) {
+                Ready(Some(Ok(v))) => panic!("value = {:?}", v),
+                Ready(Some(Err(e))) => panic!("error = {:?}", e),
+                Ready(None) => panic!("done"),
+                Pending => {}
+            }
+        });
+    }}
+}
+
+macro_rules! assert_err {
+    ($io:ident) => {{
+        MockTask::new().enter(|cx| {
+            match $io.as_mut().poll_next(cx) {
+                Ready(Some(Ok(v))) => panic!("value = {:?}", v),
+                Ready(Some(Err(_))) => {}
+                Ready(None) => panic!("done"),
+                Pending => panic!("pending"),
+            }
+        });
+    }}
+}
+
+macro_rules! assert_done {
+    ($io:ident) => {{
+        MockTask::new().enter(|cx| {
+            let res = assert_ready!($io.as_mut().poll_next(cx));
+            match res {
+                Some(Ok(v)) => panic!("value = {:?}", v),
+                Some(Err(e)) => panic!("error = {:?}", e),
+                None => {}
+            }
+        });
+    }}
+}
+
 #[test]
 fn read_empty_io_yields_nothing() {
-    let mut io = FramedRead::new(mock!(), LengthDelimitedCodec::new());
+    let io = Box::pin(FramedRead::new(mock!(), LengthDelimitedCodec::new()));
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_frame_one_packet() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+            data(b"\x00\x00\x00\x09abcdefghi"),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_frame_one_packet_little_endian() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .little_endian()
         .new_read(mock! {
-            Ok(b"\x09\x00\x00\x00abcdefghi"[..].into()),
+            data(b"\x09\x00\x00\x00abcdefghi"),
         });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_frame_one_packet_native_endian() {
-    let data = if cfg!(target_endian = "big") {
+    let d = if cfg!(target_endian = "big") {
         b"\x00\x00\x00\x09abcdefghi"
     } else {
         b"\x09\x00\x00\x00abcdefghi"
     };
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .native_endian()
         .new_read(mock! {
-            Ok(data[..].into()),
+            data(d),
         });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_multi_frame_one_packet() {
-    let mut data: Vec<u8> = vec![];
-    data.extend_from_slice(b"\x00\x00\x00\x09abcdefghi");
-    data.extend_from_slice(b"\x00\x00\x00\x03123");
-    data.extend_from_slice(b"\x00\x00\x00\x0bhello world");
+    let mut d: Vec<u8> = vec![];
+    d.extend_from_slice(b"\x00\x00\x00\x09abcdefghi");
+    d.extend_from_slice(b"\x00\x00\x00\x03123");
+    d.extend_from_slice(b"\x00\x00\x00\x0bhello world");
 
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(data.into()),
+            data(&d),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_next_eq!(io, b"123");
+    assert_next_eq!(io, b"hello world");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_frame_multi_packet() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00"[..].into()),
-            Ok(b"\x00\x09abc"[..].into()),
-            Ok(b"defghi"[..].into()),
+            data(b"\x00\x00"),
+            data(b"\x00\x09abc"),
+            data(b"defghi"),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_done!(io);
 }
 
 #[test]
 fn read_multi_frame_multi_packet() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00"[..].into()),
-            Ok(b"\x00\x09abc"[..].into()),
-            Ok(b"defghi"[..].into()),
-            Ok(b"\x00\x00\x00\x0312"[..].into()),
-            Ok(b"3\x00\x00\x00\x0bhello world"[..].into()),
+            data(b"\x00\x00"),
+            data(b"\x00\x09abc"),
+            data(b"defghi"),
+            data(b"\x00\x00\x00\x0312"),
+            data(b"3\x00\x00\x00\x0bhello world"),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_next_eq!(io, b"123");
+    assert_next_eq!(io, b"hello world");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_frame_multi_packet_wait() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00"[..].into()),
-            Err(would_block()),
-            Ok(b"\x00\x09abc"[..].into()),
-            Err(would_block()),
-            Ok(b"defghi"[..].into()),
-            Err(would_block()),
+            data(b"\x00\x00"),
+            Pending,
+            data(b"\x00\x09abc"),
+            Pending,
+            data(b"defghi"),
+            Pending,
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_pending!(io);
+    assert_pending!(io);
+    assert_next_eq!(io, b"abcdefghi");
+    assert_pending!(io);
+    assert_done!(io);
 }
 
 #[test]
 fn read_multi_frame_multi_packet_wait() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00"[..].into()),
-            Err(would_block()),
-            Ok(b"\x00\x09abc"[..].into()),
-            Err(would_block()),
-            Ok(b"defghi"[..].into()),
-            Err(would_block()),
-            Ok(b"\x00\x00\x00\x0312"[..].into()),
-            Err(would_block()),
-            Ok(b"3\x00\x00\x00\x0bhello world"[..].into()),
-            Err(would_block()),
+            data(b"\x00\x00"),
+            Pending,
+            data(b"\x00\x09abc"),
+            Pending,
+            data(b"defghi"),
+            Pending,
+            data(b"\x00\x00\x00\x0312"),
+            Pending,
+            data(b"3\x00\x00\x00\x0bhello world"),
+            Pending,
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_pending!(io);
+    assert_pending!(io);
+    assert_next_eq!(io, b"abcdefghi");
+    assert_pending!(io);
+    assert_pending!(io);
+    assert_next_eq!(io, b"123");
+    assert_next_eq!(io, b"hello world");
+    assert_pending!(io);
+    assert_done!(io);
 }
 
 #[test]
 fn read_incomplete_head() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00"[..].into()),
+            data(b"\x00\x00"),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert!(io.poll().is_err());
+    assert_err!(io);
 }
 
 #[test]
 fn read_incomplete_head_multi() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Err(would_block()),
-            Ok(b"\x00"[..].into()),
-            Err(would_block()),
+            Pending,
+            data(b"\x00"),
+            Pending,
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert!(io.poll().is_err());
+    assert_pending!(io);
+    assert_pending!(io);
+    assert_err!(io);
 }
 
 #[test]
 fn read_incomplete_payload() {
-    let mut io = FramedRead::new(
+    let io = FramedRead::new(
         mock! {
-            Ok(b"\x00\x00\x00\x09ab"[..].into()),
-            Err(would_block()),
-            Ok(b"cd"[..].into()),
-            Err(would_block()),
+            data(b"\x00\x00\x00\x09ab"),
+            Pending,
+            data(b"cd"),
+            Pending,
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert_eq!(io.poll().unwrap(), NotReady);
-    assert!(io.poll().is_err());
+    assert_pending!(io);
+    assert_pending!(io);
+    assert_err!(io);
 }
 
 #[test]
 fn read_max_frame_len() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .max_frame_length(5)
         .new_read(mock! {
-            Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+            data(b"\x00\x00\x00\x09abcdefghi"),
         });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
+    assert_err!(io);
 }
 
 #[test]
 fn read_update_max_frame_len_at_rest() {
-    let mut io = length_delimited::Builder::new().new_read(mock! {
-        Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
-        Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+    let io = length_delimited::Builder::new().new_read(mock! {
+        data(b"\x00\x00\x00\x09abcdefghi"),
+        data(b"\x00\x00\x00\x09abcdefghi"),
     });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
+    assert_next_eq!(io, b"abcdefghi");
     io.decoder_mut().set_max_frame_length(5);
-    assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
+    assert_err!(io);
 }
 
 #[test]
 fn read_update_max_frame_len_in_flight() {
-    let mut io = length_delimited::Builder::new().new_read(mock! {
-        Ok(b"\x00\x00\x00\x09abcd"[..].into()),
-        Err(would_block()),
-        Ok(b"efghi"[..].into()),
-        Ok(b"\x00\x00\x00\x09abcdefghi"[..].into()),
+    let io = length_delimited::Builder::new().new_read(mock! {
+        data(b"\x00\x00\x00\x09abcd"),
+        Pending,
+        data(b"efghi"),
+        data(b"\x00\x00\x00\x09abcdefghi"),
     });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), NotReady);
+    assert_pending!(io);
     io.decoder_mut().set_max_frame_length(5);
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap_err().kind(), io::ErrorKind::InvalidData);
+    assert_next_eq!(io, b"abcdefghi");
+    assert_err!(io);
 }
 
 #[test]
 fn read_one_byte_length_field() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .length_field_length(1)
         .new_read(mock! {
-            Ok(b"\x09abcdefghi"[..].into()),
+            data(b"\x09abcdefghi"),
         });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_done!(io);
 }
 
 #[test]
 fn read_header_offset() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .length_field_length(2)
         .length_field_offset(4)
         .new_read(mock! {
-            Ok(b"zzzz\x00\x09abcdefghi"[..].into()),
+            data(b"zzzz\x00\x09abcdefghi"),
         });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_multi_frame_one_packet_skip_none_adjusted() {
-    let mut data: Vec<u8> = vec![];
-    data.extend_from_slice(b"xx\x00\x09abcdefghi");
-    data.extend_from_slice(b"yy\x00\x03123");
-    data.extend_from_slice(b"zz\x00\x0bhello world");
+    let mut d: Vec<u8> = vec![];
+    d.extend_from_slice(b"xx\x00\x09abcdefghi");
+    d.extend_from_slice(b"yy\x00\x03123");
+    d.extend_from_slice(b"zz\x00\x0bhello world");
 
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .length_field_length(2)
         .length_field_offset(2)
         .num_skip(0)
         .length_adjustment(4)
         .new_read(mock! {
-            Ok(data.into()),
+            data(&d),
         });
+    pin_mut!(io);
 
-    assert_eq!(
-        io.poll().unwrap(),
-        Ready(Some(b"xx\x00\x09abcdefghi"[..].into()))
-    );
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"yy\x00\x03123"[..].into())));
-    assert_eq!(
-        io.poll().unwrap(),
-        Ready(Some(b"zz\x00\x0bhello world"[..].into()))
-    );
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"xx\x00\x09abcdefghi");
+    assert_next_eq!(io, b"yy\x00\x03123");
+    assert_next_eq!(io, b"zz\x00\x0bhello world");
+    assert_done!(io);
 }
 
 #[test]
 fn read_single_multi_frame_one_packet_length_includes_head() {
-    let mut data: Vec<u8> = vec![];
-    data.extend_from_slice(b"\x00\x0babcdefghi");
-    data.extend_from_slice(b"\x00\x05123");
-    data.extend_from_slice(b"\x00\x0dhello world");
+    let mut d: Vec<u8> = vec![];
+    d.extend_from_slice(b"\x00\x0babcdefghi");
+    d.extend_from_slice(b"\x00\x05123");
+    d.extend_from_slice(b"\x00\x0dhello world");
 
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .length_field_length(2)
         .length_adjustment(-2)
         .new_read(mock! {
-            Ok(data.into()),
+            data(&d),
         });
+    pin_mut!(io);
 
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"abcdefghi"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"123"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(Some(b"hello world"[..].into())));
-    assert_eq!(io.poll().unwrap(), Ready(None));
+    assert_next_eq!(io, b"abcdefghi");
+    assert_next_eq!(io, b"123");
+    assert_next_eq!(io, b"hello world");
+    assert_done!(io);
 }
 
+/*
 #[test]
 fn write_single_frame_length_adjusted() {
     let mut io = length_delimited::Builder::new()
@@ -545,15 +616,12 @@ fn encode_overflow() {
     // Trying to encode the length header should resize the buffer if it won't fit.
     codec.encode(Bytes::from("hello"), &mut buf).unwrap();
 }
+*/
 
 // ===== Test utils =====
 
-fn would_block() -> io::Error {
-    io::Error::new(io::ErrorKind::WouldBlock, "would block")
-}
-
 struct Mock {
-    calls: VecDeque<io::Result<Op>>,
+    calls: VecDeque<Poll<io::Result<Op>>>,
 }
 
 enum Op {
@@ -563,51 +631,58 @@ enum Op {
 
 use self::Op::*;
 
-impl io::Read for Mock {
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
+impl AsyncRead for Mock {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        dst: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
         match self.calls.pop_front() {
-            Some(Ok(Op::Data(data))) => {
+            Some(Ready(Ok(Op::Data(data)))) => {
                 debug_assert!(dst.len() >= data.len());
                 dst[..data.len()].copy_from_slice(&data[..]);
-                Ok(data.len())
+                Ready(Ok(data.len()))
             }
-            Some(Ok(_)) => panic!(),
-            Some(Err(e)) => Err(e),
-            None => Ok(0),
-        }
-    }
-}
-
-impl AsyncRead for Mock {}
-
-impl io::Write for Mock {
-    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        match self.calls.pop_front() {
-            Some(Ok(Op::Data(data))) => {
-                let len = data.len();
-                assert!(src.len() >= len, "expect={:?}; actual={:?}", data, src);
-                assert_eq!(&data[..], &src[..len]);
-                Ok(len)
-            }
-            Some(Ok(_)) => panic!(),
-            Some(Err(e)) => Err(e),
-            None => Ok(0),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self.calls.pop_front() {
-            Some(Ok(Op::Flush)) => Ok(()),
-            Some(Ok(_)) => panic!(),
-            Some(Err(e)) => Err(e),
-            None => Ok(()),
+            Some(Ready(Ok(_))) => panic!(),
+            Some(Ready(Err(e))) => Ready(Err(e)),
+            Some(Pending) => Pending,
+            None => Ready(Ok(0)),
         }
     }
 }
 
 impl AsyncWrite for Mock {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        Ok(Ready(()))
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        src: &[u8],
+    ) -> Poll<Result<usize, io::Error>> {
+        match self.calls.pop_front() {
+            Some(Ready(Ok(Op::Data(data)))) => {
+                let len = data.len();
+                assert!(src.len() >= len, "expect={:?}; actual={:?}", data, src);
+                assert_eq!(&data[..], &src[..len]);
+                Ready(Ok(len))
+            }
+            Some(Ready(Ok(_))) => panic!(),
+            Some(Ready(Err(e))) => Ready(Err(e)),
+            Some(Pending) => Pending,
+            None => Ready(Ok(0)),
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        match self.calls.pop_front() {
+            Some(Ready(Ok(Op::Flush))) => Ready(Ok(())),
+            Some(Ready(Ok(_))) => panic!(),
+            Some(Ready(Err(e))) => Ready(Err(e)),
+            Some(Pending) => Pending,
+            None => Ready(Ok(())),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        Ready(Ok(()))
     }
 }
 
@@ -621,4 +696,8 @@ impl From<Vec<u8>> for Op {
     fn from(src: Vec<u8>) -> Op {
         Op::Data(src)
     }
+}
+
+fn data(bytes: &[u8]) -> Poll<io::Result<Op>> {
+    Ready(Ok(bytes.into()))
 }
