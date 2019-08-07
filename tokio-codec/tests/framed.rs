@@ -1,8 +1,8 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
-use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
 use tokio::prelude::*;
+use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
 use tokio_test::assert_ok;
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
