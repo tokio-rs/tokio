@@ -157,7 +157,6 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-
     #[doc(hidden)] // TODO: remove
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         let inner = self.inner.as_ref().unwrap();
