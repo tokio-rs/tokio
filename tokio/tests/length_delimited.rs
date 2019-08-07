@@ -3,7 +3,7 @@
 use tokio::codec::*;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::prelude::*;
-use tokio_test::assert_ready;
+use tokio_test::{assert_ok, assert_ready, assert_ready_ok};
 use tokio_test::task::MockTask;
 
 use futures_util::pin_mut;
@@ -396,134 +396,172 @@ fn read_single_multi_frame_one_packet_length_includes_head() {
     assert_done!(io);
 }
 
-/*
 #[test]
 fn write_single_frame_length_adjusted() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .length_adjustment(-2)
         .new_write(mock! {
-            Ok(b"\x00\x00\x00\x0b"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(Flush),
+            data(b"\x00\x00\x00\x0b"),
+            data(b"abcdefghi"),
+            flush(),
         });
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.get_ref().calls.is_empty());
+    pin_mut!(io);
+
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_nothing_yields_nothing() {
-    let mut io = FramedWrite::new(mock!(), LengthDelimitedCodec::new());
-    assert!(io.poll_complete().unwrap().is_ready());
+    let io = FramedWrite::new(mock!(), LengthDelimitedCodec::new());
+    pin_mut!(io);
+
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.poll_flush(cx));
+    });
 }
 
 #[test]
 fn write_single_frame_one_packet() {
-    let mut io = FramedWrite::new(
+    let io = FramedWrite::new(
         mock! {
-            Ok(b"\x00\x00\x00\x09"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(Flush),
+            data(b"\x00\x00\x00\x09"),
+            data(b"abcdefghi"),
+            flush(),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_single_multi_frame_one_packet() {
-    let mut io = FramedWrite::new(
+    let io = FramedWrite::new(
         mock! {
-            Ok(b"\x00\x00\x00\x09"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(b"\x00\x00\x00\x03"[..].into()),
-            Ok(b"123"[..].into()),
-            Ok(b"\x00\x00\x00\x0b"[..].into()),
-            Ok(b"hello world"[..].into()),
-            Ok(Flush),
+            data(b"\x00\x00\x00\x09"),
+            data(b"abcdefghi"),
+            data(b"\x00\x00\x00\x03"),
+            data(b"123"),
+            data(b"\x00\x00\x00\x0b"),
+            data(b"hello world"),
+            flush(),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(io.start_send(Bytes::from("123")).unwrap().is_ready());
-    assert!(io
-        .start_send(Bytes::from("hello world"))
-        .unwrap()
-        .is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("123")));
+
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut()
+            .start_send(Bytes::from("hello world")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_single_multi_frame_multi_packet() {
-    let mut io = FramedWrite::new(
+    let io = FramedWrite::new(
         mock! {
-            Ok(b"\x00\x00\x00\x09"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(Flush),
-            Ok(b"\x00\x00\x00\x03"[..].into()),
-            Ok(b"123"[..].into()),
-            Ok(Flush),
-            Ok(b"\x00\x00\x00\x0b"[..].into()),
-            Ok(b"hello world"[..].into()),
-            Ok(Flush),
+            data(b"\x00\x00\x00\x09"),
+            data(b"abcdefghi"),
+            flush(),
+            data(b"\x00\x00\x00\x03"),
+            data(b"123"),
+            flush(),
+            data(b"\x00\x00\x00\x0b"),
+            data(b"hello world"),
+            flush(),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.start_send(Bytes::from("123")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io
-        .start_send(Bytes::from("hello world"))
-        .unwrap()
-        .is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("123")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_single_frame_would_block() {
-    let mut io = FramedWrite::new(
+    let io = FramedWrite::new(
         mock! {
-            Err(would_block()),
-            Ok(b"\x00\x00"[..].into()),
-            Err(would_block()),
-            Ok(b"\x00\x09"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(Flush),
+            Pending,
+            data(b"\x00\x00"),
+            Pending,
+            data(b"\x00\x09"),
+            data(b"abcdefghi"),
+            flush(),
         },
         LengthDelimitedCodec::new(),
     );
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(!io.poll_complete().unwrap().is_ready());
-    assert!(!io.poll_complete().unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-    assert!(io.get_ref().calls.is_empty());
+        tokio_test::assert_pending!(io.as_mut().poll_flush(cx));
+        tokio_test::assert_pending!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_single_frame_little_endian() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .little_endian()
         .new_write(mock! {
-            Ok(b"\x09\x00\x00\x00"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(Flush),
+            data(b"\x09\x00\x00\x00"),
+            data(b"abcdefghi"),
+            flush(),
         });
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
+/*
 #[test]
 fn write_single_frame_with_short_length_field() {
     let mut io = length_delimited::Builder::new()
@@ -700,4 +738,8 @@ impl From<Vec<u8>> for Op {
 
 fn data(bytes: &[u8]) -> Poll<io::Result<Op>> {
     Ready(Ok(bytes.into()))
+}
+
+fn flush() -> Poll<io::Result<Op>> {
+    Ready(Ok(Flush))
 }
