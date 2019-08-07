@@ -1,6 +1,4 @@
-extern crate crossbeam_queue;
-
-use self::crossbeam_queue::SegQueue;
+use crossbeam_queue::SegQueue;
 use std::io;
 use std::process::ExitStatus;
 

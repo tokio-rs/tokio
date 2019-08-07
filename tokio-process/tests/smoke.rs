@@ -1,11 +1,12 @@
-extern crate tokio_process;
+#![deny(warnings, rust_2018_idioms)]
+#![feature(async_await)]
 
 use tokio_process::CommandExt;
 
 mod support;
 
-#[test]
-fn simple() {
+#[tokio::test]
+async fn simple() {
     let mut cmd = support::cmd("exit");
     cmd.arg("2");
 
@@ -14,7 +15,9 @@ fn simple() {
     let id = child.id();
     assert!(id > 0);
 
-    let status = support::run_with_timeout(&mut child).expect("failed to run future");
+    let status = support::with_timeout(&mut child)
+        .await
+        .expect("failed to run future");
     assert_eq!(status.code(), Some(2));
 
     assert_eq!(child.id(), id);

@@ -21,21 +21,16 @@
 //! processes in general aren't scalable (e.g. millions) so it shouldn't be that
 //! bad in theory...
 
-extern crate libc;
-extern crate mio;
-extern crate tokio_signal;
-
 mod orphan;
 mod reap;
 
-use self::mio::event::Evented;
-use self::mio::unix::{EventedFd, UnixReady};
-use self::mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
-use futures_util::future::FutureExt;
+use mio::event::Evented;
+use mio::unix::{EventedFd, UnixReady};
+use mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -70,7 +65,7 @@ lazy_static! {
 struct GlobalOrphanQueue;
 
 impl fmt::Debug for GlobalOrphanQueue {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         ORPHAN_QUEUE.fmt(fmt)
     }
 }
@@ -91,7 +86,7 @@ pub struct Child {
 }
 
 impl fmt::Debug for Child {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Child")
             .field("pid", &self.inner.id())
             .finish()
@@ -131,8 +126,8 @@ impl Kill for Child {
 impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        (&mut Pin::get_mut(self).inner).poll_unpin(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.inner).poll(cx)
     }
 }
 

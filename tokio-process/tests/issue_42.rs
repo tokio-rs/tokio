@@ -1,18 +1,15 @@
 #![cfg(unix)]
-
-extern crate tokio_process;
+#![deny(warnings, rust_2018_idioms)]
 
 use futures_util::future::FutureExt;
 use futures_util::stream::FuturesOrdered;
 use futures_util::stream::StreamExt;
-use std::future::Future;
-use std::io;
-use std::pin::Pin;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tokio::runtime::current_thread;
 use tokio_process::CommandExt;
 
 mod support;
@@ -22,8 +19,7 @@ fn run_test() {
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut futures: FuturesOrdered<Pin<Box<dyn Future<Output = io::Result<ExitStatus>>>>> =
-            FuturesOrdered::new();
+        let mut futures = FuturesOrdered::new();
         for i in 0..2 {
             futures.push(
                 Command::new("echo")
@@ -36,7 +32,10 @@ fn run_test() {
                     .boxed(),
             )
         }
-        support::run_with_timeout(futures.collect::<Vec<io::Result<ExitStatus>>>());
+
+        let mut rt = current_thread::Runtime::new().expect("failed to get runtime");
+        rt.block_on(support::with_timeout(futures.collect::<Vec<_>>()));
+        drop(rt);
 
         finished_clone.store(true, Ordering::SeqCst);
     });
