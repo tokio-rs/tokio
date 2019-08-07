@@ -24,11 +24,11 @@ publish = false
 [dependencies]
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
 bytes = "0.4.7"
-futures-core-preview = "0.3.0-alpha.17"
-futures-sink-preview = "0.3.0-alpha.17"
+futures-core-preview = "= 0.3.0-alpha.17"
+futures-sink-preview = "= 0.3.0-alpha.17"
 log = "0.4"
 
 [dev-dependencies]
-futures-preview = "0.3.0-alpha.17"
-tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
+futures-util-preview = "= 0.3.0-alpha.17"
+tokio = { version = "0.2.0", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }

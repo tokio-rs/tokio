@@ -1,6 +1,6 @@
 #![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(features = "default")]
+#![cfg(feature = "default")]
 
 use tokio::net::TcpListener;
 use tokio::prelude::*;
