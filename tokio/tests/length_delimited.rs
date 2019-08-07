@@ -1,9 +1,9 @@
-// #![deny(warnings, rust_2018_idioms)]
+#![deny(warnings, rust_2018_idioms)]
 
 use tokio::codec::*;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::prelude::*;
-use tokio_test::{assert_ok, assert_ready, assert_ready_ok};
+use tokio_test::{assert_ok, assert_err, assert_ready, assert_ready_ok, assert_ready_err, assert_pending};
 use tokio_test::task::MockTask;
 
 use futures_util::pin_mut;
@@ -35,7 +35,7 @@ macro_rules! assert_next_eq {
     }}
 }
 
-macro_rules! assert_pending {
+macro_rules! assert_next_pending {
     ($io:ident) => {{
         MockTask::new().enter(|cx| {
             match $io.as_mut().poll_next(cx) {
@@ -48,7 +48,7 @@ macro_rules! assert_pending {
     }}
 }
 
-macro_rules! assert_err {
+macro_rules! assert_next_err {
     ($io:ident) => {{
         MockTask::new().enter(|cx| {
             match $io.as_mut().poll_next(cx) {
@@ -199,10 +199,10 @@ fn read_single_frame_multi_packet_wait() {
     );
     pin_mut!(io);
 
-    assert_pending!(io);
-    assert_pending!(io);
+    assert_next_pending!(io);
+    assert_next_pending!(io);
     assert_next_eq!(io, b"abcdefghi");
-    assert_pending!(io);
+    assert_next_pending!(io);
     assert_done!(io);
 }
 
@@ -225,14 +225,14 @@ fn read_multi_frame_multi_packet_wait() {
     );
     pin_mut!(io);
 
-    assert_pending!(io);
-    assert_pending!(io);
+    assert_next_pending!(io);
+    assert_next_pending!(io);
     assert_next_eq!(io, b"abcdefghi");
-    assert_pending!(io);
-    assert_pending!(io);
+    assert_next_pending!(io);
+    assert_next_pending!(io);
     assert_next_eq!(io, b"123");
     assert_next_eq!(io, b"hello world");
-    assert_pending!(io);
+    assert_next_pending!(io);
     assert_done!(io);
 }
 
@@ -246,7 +246,7 @@ fn read_incomplete_head() {
     );
     pin_mut!(io);
 
-    assert_err!(io);
+    assert_next_err!(io);
 }
 
 #[test]
@@ -261,9 +261,9 @@ fn read_incomplete_head_multi() {
     );
     pin_mut!(io);
 
-    assert_pending!(io);
-    assert_pending!(io);
-    assert_err!(io);
+    assert_next_pending!(io);
+    assert_next_pending!(io);
+    assert_next_err!(io);
 }
 
 #[test]
@@ -279,9 +279,9 @@ fn read_incomplete_payload() {
     );
     pin_mut!(io);
 
-    assert_pending!(io);
-    assert_pending!(io);
-    assert_err!(io);
+    assert_next_pending!(io);
+    assert_next_pending!(io);
+    assert_next_err!(io);
 }
 
 #[test]
@@ -293,7 +293,7 @@ fn read_max_frame_len() {
         });
     pin_mut!(io);
 
-    assert_err!(io);
+    assert_next_err!(io);
 }
 
 #[test]
@@ -306,7 +306,7 @@ fn read_update_max_frame_len_at_rest() {
 
     assert_next_eq!(io, b"abcdefghi");
     io.decoder_mut().set_max_frame_length(5);
-    assert_err!(io);
+    assert_next_err!(io);
 }
 
 #[test]
@@ -319,10 +319,10 @@ fn read_update_max_frame_len_in_flight() {
     });
     pin_mut!(io);
 
-    assert_pending!(io);
+    assert_next_pending!(io);
     io.decoder_mut().set_max_frame_length(5);
     assert_next_eq!(io, b"abcdefghi");
-    assert_err!(io);
+    assert_next_err!(io);
 }
 
 #[test]
@@ -533,8 +533,8 @@ fn write_single_frame_would_block() {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        tokio_test::assert_pending!(io.as_mut().poll_flush(cx));
-        tokio_test::assert_pending!(io.as_mut().poll_flush(cx));
+        assert_pending!(io.as_mut().poll_flush(cx));
+        assert_pending!(io.as_mut().poll_flush(cx));
         assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         assert!(io.get_ref().calls.is_empty());
@@ -561,84 +561,104 @@ fn write_single_frame_little_endian() {
     });
 }
 
-/*
 #[test]
 fn write_single_frame_with_short_length_field() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .length_field_length(1)
         .new_write(mock! {
-            Ok(b"\x09"[..].into()),
-            Ok(b"abcdefghi"[..].into()),
-            Ok(Flush),
+            data(b"\x09"),
+            data(b"abcdefghi"),
+            flush(),
         });
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdefghi")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_max_frame_len() {
-    let mut io = length_delimited::Builder::new()
+    let io = length_delimited::Builder::new()
         .max_frame_length(5)
         .new_write(mock! {});
+    pin_mut!(io);
 
-    assert_eq!(
-        io.start_send(Bytes::from("abcdef")).unwrap_err().kind(),
-        io::ErrorKind::InvalidInput
-    );
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
+
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_update_max_frame_len_at_rest() {
-    let mut io = length_delimited::Builder::new().new_write(mock! {
-        Ok(b"\x00\x00\x00\x06"[..].into()),
-        Ok(b"abcdef"[..].into()),
-        Ok(Flush),
+    let io = length_delimited::Builder::new().new_write(mock! {
+        data(b"\x00\x00\x00\x06"),
+        data(b"abcdef"),
+        flush(),
     });
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
-    assert!(io.poll_complete().unwrap().is_ready());
-    io.encoder_mut().set_max_frame_length(5);
-    assert_eq!(
-        io.start_send(Bytes::from("abcdef")).unwrap_err().kind(),
-        io::ErrorKind::InvalidInput
-    );
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+
+        io.encoder_mut().set_max_frame_length(5);
+
+        assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
+
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_update_max_frame_len_in_flight() {
-    let mut io = length_delimited::Builder::new().new_write(mock! {
-        Ok(b"\x00\x00\x00\x06"[..].into()),
-        Ok(b"ab"[..].into()),
-        Err(would_block()),
-        Ok(b"cdef"[..].into()),
-        Ok(Flush),
+    let io = length_delimited::Builder::new().new_write(mock! {
+        data(b"\x00\x00\x00\x06"),
+        data(b"ab"),
+        Pending,
+        data(b"cdef"),
+        flush(),
     });
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
-    assert!(!io.poll_complete().unwrap().is_ready());
-    io.encoder_mut().set_max_frame_length(5);
-    assert!(io.poll_complete().unwrap().is_ready());
-    assert_eq!(
-        io.start_send(Bytes::from("abcdef")).unwrap_err().kind(),
-        io::ErrorKind::InvalidInput
-    );
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
+
+        assert_pending!(io.as_mut().poll_flush(cx));
+
+        io.encoder_mut().set_max_frame_length(5);
+
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+
+        assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
 fn write_zero() {
-    let mut io = length_delimited::Builder::new().new_write(mock! {});
+    let io = length_delimited::Builder::new().new_write(mock! {});
+    pin_mut!(io);
 
-    assert!(io.start_send(Bytes::from("abcdef")).unwrap().is_ready());
-    assert_eq!(
-        io.poll_complete().unwrap_err().kind(),
-        io::ErrorKind::WriteZero
-    );
-    assert!(io.get_ref().calls.is_empty());
+    MockTask::new().enter(|cx| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
+
+        assert_ready_err!(io.as_mut().poll_flush(cx));
+
+        assert!(io.get_ref().calls.is_empty());
+    });
 }
 
 #[test]
@@ -654,7 +674,6 @@ fn encode_overflow() {
     // Trying to encode the length header should resize the buffer if it won't fit.
     codec.encode(Bytes::from("hello"), &mut buf).unwrap();
 }
-*/
 
 // ===== Test utils =====
 
