@@ -41,9 +41,8 @@
 //! ```
 //! #![feature(async_await)]
 //!
-//! use tokio_io::{AsyncRead, AsyncWrite};
-//! use tokio_codec::{Framed, LengthDelimitedCodec};
-//! use futures::SinkExt;
+//! use tokio::codec::{Framed, LengthDelimitedCodec};
+//! use tokio::prelude::*;
 //!
 //! use bytes::Bytes;
 //!
