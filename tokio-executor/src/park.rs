@@ -220,6 +220,7 @@ impl Parker {
 // ==== impl Inner ====
 
 impl Inner {
+    #[allow(clippy::wrong_self_convention)]
     pub fn into_raw(this: Arc<Inner>) -> *const () {
         Arc::into_raw(this) as *const ()
     }
