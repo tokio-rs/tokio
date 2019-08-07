@@ -14,7 +14,7 @@ use crate::loom::{
         atomic::{AtomicPtr, AtomicUsize},
         CausalCell,
     },
-    yield_now,
+    thread,
 };
 
 use std::fmt;
@@ -432,7 +432,7 @@ impl Semaphore {
                                 if curr.has_waiter(&self.stub) {
                                     // Inconsistent
                                     debug!(" + pop; inconsistent 1");
-                                    yield_now();
+                                    thread::yield_now();
                                     continue 'outer;
                                 }
 
@@ -479,7 +479,7 @@ impl Semaphore {
                 if tail != head {
                     // Inconsistent
                     debug!(" + pop; inconsistent 2");
-                    yield_now();
+                    thread::yield_now();
                     continue 'outer;
                 }
 
@@ -495,7 +495,7 @@ impl Semaphore {
 
                 // Inconsistent state, loop
                 debug!(" + pop; inconsistent 3");
-                yield_now();
+                thread::yield_now();
             }
         }
     }

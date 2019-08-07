@@ -2,8 +2,8 @@
 
 use super::block::{self, Block};
 use crate::loom::{
-    self,
     sync::atomic::{AtomicPtr, AtomicUsize},
+    thread,
 };
 use std::fmt;
 use std::ptr::NonNull;
@@ -163,7 +163,7 @@ impl<T> Tx<T> {
 
             block_ptr = next_block.as_ptr();
 
-            loom::yield_now();
+            thread::yield_now();
         }
     }
 
@@ -270,7 +270,7 @@ impl<T> Rx<T> {
 
             self.head = next_block;
 
-            loom::yield_now();
+            thread::yield_now();
         }
     }
 
@@ -308,7 +308,7 @@ impl<T> Rx<T> {
                 tx.reclaim_block(block);
             }
 
-            loom::yield_now();
+            thread::yield_now();
         }
     }
 
