@@ -63,7 +63,7 @@ fn smoke() {
                 }
                 None => {
                     debug!(" + pop() -> None");
-                    loom::yield_now();
+                    thread::yield_now();
                 }
             }
         }
