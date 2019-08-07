@@ -51,7 +51,7 @@
 //!
 //! ```rust,no_run
 //! #![feature(async_await)]
-//! #![cfg(unix)]
+//! # #[cfg(unix)] {
 //!
 //! use futures_util::future;
 //! use futures_util::stream::StreamExt;
@@ -80,6 +80,7 @@
 //!     println!("got signal {:?}", signal);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 
 #[macro_use]
