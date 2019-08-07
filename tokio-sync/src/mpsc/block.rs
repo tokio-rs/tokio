@@ -1,7 +1,7 @@
 use crate::loom::{
-    self,
     sync::atomic::{AtomicPtr, AtomicUsize},
     sync::CausalCell,
+    thread,
 };
 use std::mem::{self, ManuallyDrop};
 use std::ops;
@@ -344,7 +344,7 @@ impl<T> Block<T> {
             };
 
             // When running outside of loom, this calls `spin_loop_hint`.
-            loom::yield_now();
+            thread::yield_now();
         }
     }
 }
