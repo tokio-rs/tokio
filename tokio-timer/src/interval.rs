@@ -2,6 +2,7 @@ use crate::clock;
 use crate::Delay;
 
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
@@ -75,8 +76,6 @@ impl Interval {
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     #[allow(clippy::should_implement_trait)] // false positive : https://github.com/rust-lang/rust-clippy/issues/4290
     pub async fn next(&mut self) -> Option<Instant> {
-        use async_util::future::poll_fn;
-
         poll_fn(|cx| self.poll_next(cx)).await
     }
 }

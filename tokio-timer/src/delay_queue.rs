@@ -10,6 +10,7 @@ use crate::wheel::{self, Wheel};
 use crate::{Delay, Error};
 
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use slab::Slab;
 use std::cmp;
 use std::future::Future;
@@ -373,8 +374,6 @@ impl<T> DelayQueue<T> {
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     #[allow(clippy::should_implement_trait)] // false positive : https://github.com/rust-lang/rust-clippy/issues/4290
     pub async fn next(&mut self) -> Option<Result<Expired<T>, Error>> {
-        use async_util::future::poll_fn;
-
         poll_fn(|cx| self.poll_next(cx)).await
     }
 
