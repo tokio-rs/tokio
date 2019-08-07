@@ -2,9 +2,9 @@ use crate::split::{
     split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
     TcpStreamWriteHalfMut,
 };
-use async_util::future::poll_fn;
 use bytes::{Buf, BufMut};
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use iovec::IoVec;
 use mio;
 use std::convert::TryFrom;

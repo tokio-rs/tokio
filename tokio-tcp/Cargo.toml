@@ -25,7 +25,7 @@ publish = false
 async-traits = []
 
 [dependencies]
-async-util = { git = "https://github.com/tokio-rs/async" }
+futures-util-preview = "= 0.3.0-alpha.17"
 tokio-io = { version = "0.2.0", path = "../tokio-io" }
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 bytes = "0.4"

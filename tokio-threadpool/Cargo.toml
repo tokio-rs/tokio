@@ -25,9 +25,9 @@ publish = false
 [dependencies]
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
-futures-core-preview = "0.3.0-alpha.17"
+futures-core-preview = "= 0.3.0-alpha.17"
+futures-util-preview = "= 0.3.0-alpha.17"
 
-arc-waker = { git = "https://github.com/tokio-rs/async" }
 crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"
 crossbeam-utils = "0.6.4"
@@ -39,6 +39,6 @@ lazy_static = "1"
 [dev-dependencies]
 rand = "0.7"
 env_logger = "0.5"
-async-util = { git = "https://github.com/tokio-rs/async" }
 tokio = { version = "0.2.0", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
+futures-util-preview = "= 0.3.0-alpha.17"

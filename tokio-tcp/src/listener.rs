@@ -2,6 +2,7 @@
 use super::incoming::Incoming;
 use super::TcpStream;
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use mio;
 use std::convert::TryFrom;
 use std::fmt;
@@ -87,7 +88,6 @@ impl TcpListener {
     /// ```
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        use async_util::future::poll_fn;
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 

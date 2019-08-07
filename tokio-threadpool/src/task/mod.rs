@@ -8,6 +8,7 @@ use self::state::State;
 use crate::pool::Pool;
 use crate::waker::Waker;
 
+use futures_util::task::ArcWake;
 use log::trace;
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
@@ -134,7 +135,7 @@ impl Task {
 
             let mut g = Guard(fut, true);
 
-            let waker = arc_waker::waker(Arc::new(Waker {
+            let waker = ArcWake::into_waker(Arc::new(Waker {
                 task: me.clone(),
                 pool: pool.clone(),
             }));
