@@ -4,16 +4,18 @@
 use tokio::codec::*;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::prelude::*;
-use tokio_test::{assert_ok, assert_err, assert_ready, assert_ready_ok, assert_ready_err, assert_pending};
 use tokio_test::task::MockTask;
+use tokio_test::{
+    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
+};
 
-use futures_util::pin_mut;
 use bytes::{BufMut, Bytes, BytesMut};
+use futures_util::pin_mut;
 use std::collections::VecDeque;
-use std::pin::Pin;
 use std::io;
-use std::task::{Context, Poll};
+use std::pin::Pin;
 use std::task::Poll::*;
+use std::task::{Context, Poll};
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
@@ -33,33 +35,29 @@ macro_rules! assert_next_eq {
                 None => panic!("none"),
             }
         });
-    }}
+    }};
 }
 
 macro_rules! assert_next_pending {
     ($io:ident) => {{
-        MockTask::new().enter(|cx| {
-            match $io.as_mut().poll_next(cx) {
-                Ready(Some(Ok(v))) => panic!("value = {:?}", v),
-                Ready(Some(Err(e))) => panic!("error = {:?}", e),
-                Ready(None) => panic!("done"),
-                Pending => {}
-            }
+        MockTask::new().enter(|cx| match $io.as_mut().poll_next(cx) {
+            Ready(Some(Ok(v))) => panic!("value = {:?}", v),
+            Ready(Some(Err(e))) => panic!("error = {:?}", e),
+            Ready(None) => panic!("done"),
+            Pending => {}
         });
-    }}
+    }};
 }
 
 macro_rules! assert_next_err {
     ($io:ident) => {{
-        MockTask::new().enter(|cx| {
-            match $io.as_mut().poll_next(cx) {
-                Ready(Some(Ok(v))) => panic!("value = {:?}", v),
-                Ready(Some(Err(_))) => {}
-                Ready(None) => panic!("done"),
-                Pending => panic!("pending"),
-            }
+        MockTask::new().enter(|cx| match $io.as_mut().poll_next(cx) {
+            Ready(Some(Ok(v))) => panic!("value = {:?}", v),
+            Ready(Some(Err(_))) => {}
+            Ready(None) => panic!("done"),
+            Pending => panic!("pending"),
         });
-    }}
+    }};
 }
 
 macro_rules! assert_done {
@@ -72,7 +70,7 @@ macro_rules! assert_done {
                 None => {}
             }
         });
-    }}
+    }};
 }
 
 #[test]
@@ -470,8 +468,7 @@ fn write_single_multi_frame_one_packet() {
         assert_ok!(io.as_mut().start_send(Bytes::from("123")));
 
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut()
-            .start_send(Bytes::from("hello world")));
+        assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());

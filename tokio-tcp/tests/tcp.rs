@@ -22,8 +22,14 @@ async fn connect() {
     let mine = assert_ok!(TcpStream::connect(&addr).await);
     let theirs = assert_ok!(rx.await);
 
-    assert_eq!(assert_ok!(mine.local_addr()), assert_ok!(theirs.peer_addr()));
-    assert_eq!(assert_ok!(theirs.local_addr()), assert_ok!(mine.peer_addr()));
+    assert_eq!(
+        assert_ok!(mine.local_addr()),
+        assert_ok!(theirs.peer_addr())
+    );
+    assert_eq!(
+        assert_ok!(theirs.local_addr()),
+        assert_ok!(mine.peer_addr())
+    );
 }
 
 /*

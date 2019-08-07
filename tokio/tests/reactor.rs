@@ -10,7 +10,7 @@ use futures_util::task::ArcWake;
 use std::future::Future;
 use std::net::TcpStream;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::task::Context;
 
 struct Task<T> {
@@ -71,7 +71,6 @@ fn test_drop_on_notify() {
         let mut cx = Context::from_waker(&waker);
         assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
     });
-
 
     // Get the address
     let addr = addr_rx.recv().unwrap();
