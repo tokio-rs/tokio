@@ -23,7 +23,6 @@ categories = ["concurrency", "asynchronous"]
 publish = false
 
 [dependencies]
-crossbeam-utils = { git = "https://github.com/stjepang/crossbeam", branch = "raw-parker" }
 
 [dev-dependencies]
 futures-core-preview = "=0.3.0-alpha.17"
