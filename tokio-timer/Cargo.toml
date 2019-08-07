@@ -28,8 +28,8 @@ async-traits = []
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
 futures-core-preview = "0.3.0-alpha.17"
+futures-util-preview = "0.3.0-alpha.17"
 
-async-util = { git = "https://github.com/tokio-rs/async" }
 crossbeam-utils = "0.6.0"
 # Backs `DelayQueue`
 slab = "0.4.1"
