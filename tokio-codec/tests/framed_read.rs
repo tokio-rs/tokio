@@ -8,7 +8,7 @@ use tokio_test::task::MockTask;
 
 use bytes::{Buf, BytesMut, IntoBuf};
 use std::collections::VecDeque;
-use std::io::{self, Read};
+use std::io;
 use std::pin::Pin;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
@@ -286,10 +286,10 @@ struct Slice<'a>(&'a [u8]);
 
 impl<'a> AsyncRead for Slice<'a> {
     fn poll_read(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Ready(Pin::get_mut(self).0.read(buf))
+        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }
