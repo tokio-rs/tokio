@@ -27,6 +27,7 @@
 
 extern crate futures;
 extern crate tokio_executor;
+extern crate tokio_timer;
 
 mod scheduler;
 
@@ -34,6 +35,7 @@ use self::scheduler::Scheduler;
 
 use tokio_executor::park::{Park, ParkThread, Unpark};
 use tokio_executor::{Enter, SpawnError};
+use tokio_timer::timer::HasWheel;
 
 use futures::future::{ExecuteError, ExecuteErrorKind, Executor};
 use futures::{executor, Async, Future};
@@ -269,6 +271,16 @@ impl CurrentThread<ParkThread> {
     /// Create a new instance of `CurrentThread`.
     pub fn new() -> Self {
         CurrentThread::new_with_park(ParkThread::new())
+    }
+}
+
+impl<P> CurrentThread<P>
+where P: Park + HasWheel
+{
+    /// Get the next expiration of the underlying `Park`'s timer wheel
+    pub fn next_expiration_in(&mut self) -> Option<Duration>
+    {
+        self.park.next_expiration_in()
     }
 }
 
