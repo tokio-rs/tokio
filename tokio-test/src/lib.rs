@@ -12,7 +12,7 @@
 //!
 //! # Example
 //!
-//! ```
+//! ```ignore
 //! # use futures::{Future, future};
 //! use tokio_test::assert_ready;
 //!
@@ -24,8 +24,6 @@ pub mod clock;
 pub mod io;
 mod macros;
 pub mod task;
-
-pub use assertive::{assert_err, assert_ok};
 
 /*
 #[doc(hidden)]

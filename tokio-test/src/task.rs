@@ -5,7 +5,7 @@
 //! This example will use the `MockTask` to set the current task on
 //! poll.
 //!
-//! ```
+//! ```ignore
 //! # use tokio_test::assert_ready_eq;
 //! # use tokio_test::task::MockTask;
 //! # use futures::{sync::mpsc, Stream, Sink, Future, Async};
@@ -26,10 +26,34 @@ use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+/// Run the provided closure in a `MockTask` context.
+///
+/// # Examples
+///
+/// ```
+/// use std::future::Future;
+/// use futures_util::{future, pin_mut};
+/// use tokio_test::task;
+///
+/// task::mock(|cx| {
+///     let fut = future::ready(());
+///
+///     pin_mut!(fut);
+///     assert!(fut.poll(cx).is_ready());
+/// })
+/// ```
+pub fn mock<F, R>(f: F) -> R
+where
+    F: Fn(&mut Context<'_>) -> R,
+{
+    let mut task = MockTask::new();
+    task.enter(|cx| f(cx))
+}
+
 /// Mock task
 ///
 /// A mock task is able to intercept and track wake notifications.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MockTask {
     waker: Arc<ThreadWaker>,
 }
