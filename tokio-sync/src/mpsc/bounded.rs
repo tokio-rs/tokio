@@ -124,7 +124,49 @@ impl<T> Receiver<T> {
         Receiver { chan }
     }
 
-    /// TODO: Dox
+    /// Receive the next value for this receiver.
+    ///
+    /// `None` is returned when all `Sender` halves have dropped, indicating
+    /// that no further values can be sent on the channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.send("hello").await.unwrap();
+    ///     });
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(None, rx.recv().await);
+    /// }
+    /// ```
+    ///
+    /// Values are buffered:
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///     tx.send("world").await.unwrap();
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(Some("world"), rx.recv().await);
+    /// }
+    /// ```
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn recv(&mut self) -> Option<T> {
         use futures_util::future::poll_fn;
@@ -132,7 +174,7 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// TODO: Dox
+    #[doc(hidden)] // TODO: remove
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
@@ -160,26 +202,7 @@ impl<T> Sender<T> {
         Sender { chan }
     }
 
-    /// Check if the `Sender` is ready to handle a value.
-    ///
-    /// Polls the channel to determine if there is guaranteed capacity to send
-    /// at least one item without waiting.
-    ///
-    /// When `poll_ready` returns `Ready`, the channel reserves capacity for one
-    /// message for this `Sender` instance. The capacity is held until a message
-    /// is send or the `Sender` instance is dropped. Callers should ensure a
-    /// message is sent in a timely fashion in order to not starve other
-    /// `Sender` instances.
-    ///
-    /// # Return value
-    ///
-    /// This method returns:
-    ///
-    /// - `Poll::Ready(Ok(_))` if capacity is reserved for a single message.
-    /// - `Poll::Pending` if the channel may not have capacity, in which
-    ///   case the current task is queued to be notified once
-    ///   capacity is available;
-    /// - `Poll::Ready(Err(SendError))` if the receiver has been dropped.
+    #[doc(hidden)] // TODO: remove
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), SendError>> {
         self.chan.poll_ready(cx).map_err(|_| SendError(()))
     }
