@@ -9,7 +9,7 @@ mod atomic_waker;
 use crate::atomic_waker::AtomicWaker;
 
 use futures_util::future::poll_fn;
-use loom::futures::block_on;
+use loom::future::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;
 use std::sync::atomic::Ordering::Relaxed;

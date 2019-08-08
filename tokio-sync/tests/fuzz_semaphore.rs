@@ -11,7 +11,7 @@ use crate::semaphore::*;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
-use loom::futures::block_on;
+use loom::future::block_on;
 use loom::thread;
 use std::future::Future;
 use std::pin::Pin;
