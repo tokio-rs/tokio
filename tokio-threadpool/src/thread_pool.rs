@@ -51,19 +51,19 @@ impl ThreadPool {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio_threadpool::ThreadPool;
-    /// use futures::future::{Future, lazy};
+    /// #![feature(async_await)]
+    ///
+    /// use tokio_threadpool::ThreadPool;
     ///
     /// // Create a thread pool with default configuration values
     /// let thread_pool = ThreadPool::new();
     ///
-    /// thread_pool.spawn(lazy(|| {
+    /// thread_pool.spawn(async {
     ///     println!("called from a worker thread");
-    ///     Ok(())
-    /// }));
+    /// });
     ///
     /// // Gracefully shutdown the threadpool
-    /// thread_pool.shutdown().wait().unwrap();
+    /// thread_pool.shutdown().wait();
     /// ```
     ///
     /// # Panics

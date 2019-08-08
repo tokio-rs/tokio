@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-buf/0.1.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-buf/0.2.0-alpha.1")]
 #![deny(
     missing_docs,
     missing_debug_implementations,

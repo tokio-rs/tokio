@@ -52,19 +52,33 @@ use tokio_io::{AsyncRead, AsyncWrite};
 /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
 /// [`clear_read_ready`].
 ///
-/// ```rust,ignore
-/// pub fn poll_accept(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
-///     let ready = Ready::readable();
+/// ```rust
+/// use tokio_reactor::PollEvented;
 ///
-///     try_ready!(self.poll_evented.poll_read_ready(ready));
+/// use futures_core::ready;
+/// use mio::Ready;
+/// use mio::net::{TcpStream, TcpListener};
+/// use std::io;
+/// use std::task::{Context, Poll};
 ///
-///     match self.poll_evented.get_ref().accept_std() {
-///         Ok(pair) => Ok(Async::Ready(pair)),
-///         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-///             self.poll_evented.clear_read_ready(ready);
-///             Ok(Async::NotReady)
+/// struct MyListener {
+///     poll_evented: PollEvented<TcpListener>,
+/// }
+///
+/// impl MyListener {
+///     pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<TcpStream, io::Error>> {
+///         let ready = Ready::readable();
+///
+///         ready!(self.poll_evented.poll_read_ready(cx, ready))?;
+///
+///         match self.poll_evented.get_ref().accept() {
+///             Ok((socket, _)) => Poll::Ready(Ok(socket)),
+///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+///                 self.poll_evented.clear_read_ready(cx, ready);
+///                 Poll::Pending
+///             }
+///             Err(e) => Poll::Ready(Err(e)),
 ///         }
-///         Err(e) => Err(e),
 ///     }
 /// }
 /// ```
@@ -209,8 +223,8 @@ where
     /// `writable`. HUP is always implicitly included on platforms that support
     /// it.
     ///
-    /// If the resource is not ready for a read then `Async::NotReady` is
-    /// returned and the current task is notified once a new event is received.
+    /// If the resource is not ready for a read then `Poll::Pending` is returned
+    /// and the current task is notified once a new event is received.
     ///
     /// The I/O resource will remain in a read-ready state until readiness is
     /// cleared by calling [`clear_read_ready`].
@@ -241,8 +255,8 @@ where
     /// Clears the I/O resource's read readiness state and registers the current
     /// task to be notified once a read readiness event is received.
     ///
-    /// After calling this function, `poll_read_ready` will return `NotReady`
-    /// until a new read readiness event has been received.
+    /// After calling this function, `poll_read_ready` will return
+    /// `Poll::Pending` until a new read readiness event has been received.
     ///
     /// The `mask` argument specifies the readiness bits to clear. This may not
     /// include `writable` or `hup`.

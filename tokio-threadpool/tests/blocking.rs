@@ -4,8 +4,8 @@
 use tokio_test::*;
 use tokio_threadpool::*;
 
-use async_util::future::poll_fn;
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use rand::*;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::*;

@@ -1,63 +1,53 @@
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(feature = "default")]
 
-use env_logger;
-use futures::stream::Stream;
-use futures::Future;
-use std::io::{BufReader, BufWriter, Read, Write};
+use tokio::net::TcpListener;
+use tokio::prelude::*;
+use tokio_test::assert_ok;
+
+use std::io::prelude::*;
 use std::net::TcpStream;
 use std::thread;
-use tokio::net::TcpListener;
-use tokio_io::io::copy;
 
-macro_rules! t {
-    ($e:expr) => {
-        match $e {
-            Ok(e) => e,
-            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-        }
-    };
-}
-
-#[test]
-fn echo_server() {
+#[tokio::test]
+async fn echo_server() {
     const N: usize = 1024;
-    drop(env_logger::try_init());
 
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
-    let addr = t!(srv.local_addr());
+    let addr = assert_ok!("127.0.0.1:0".parse());
+    let mut srv = assert_ok!(TcpListener::bind(&addr));
+    let addr = assert_ok!(srv.local_addr());
 
     let msg = "foo bar baz";
+
     let t = thread::spawn(move || {
-        let mut s = t!(TcpStream::connect(&addr));
+        let mut s = assert_ok!(TcpStream::connect(&addr));
 
         let t2 = thread::spawn(move || {
-            let mut s = t!(TcpStream::connect(&addr));
+            let mut s = assert_ok!(TcpStream::connect(&addr));
             let mut b = vec![0; msg.len() * N];
-            t!(s.read_exact(&mut b));
+            assert_ok!(s.read_exact(&mut b));
             b
         });
 
         let mut expected = Vec::<u8>::new();
         for _i in 0..N {
             expected.extend(msg.as_bytes());
-            assert_eq!(t!(s.write(msg.as_bytes())), msg.len());
+            let res = assert_ok!(s.write(msg.as_bytes()));
+            assert_eq!(res, msg.len());
         }
+
         (expected, t2)
     });
 
-    let clients = srv.incoming().take(2).collect();
-    let copied = clients.and_then(|clients| {
-        let mut clients = clients.into_iter();
-        let a = BufReader::new(clients.next().unwrap());
-        let b = BufWriter::new(clients.next().unwrap());
-        copy(a, b)
-    });
+    let (mut a, _) = assert_ok!(srv.accept().await);
+    let (mut b, _) = assert_ok!(srv.accept().await);
 
-    let (amt, _, _) = t!(copied.wait());
+    let n = assert_ok!(a.copy(&mut b).await);
+
     let (expected, t2) = t.join().unwrap();
     let actual = t2.join().unwrap();
 
     assert!(expected == actual);
-    assert_eq!(amt, msg.len() as u64 * 1024);
+    assert_eq!(n, msg.len() as u64 * 1024);
 }

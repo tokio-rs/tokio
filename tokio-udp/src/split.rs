@@ -12,9 +12,12 @@
 //! The halves can be reunited to the original socket with their `reunite`
 //! methods.
 
-use super::{Recv, RecvFrom, Send, SendTo, UdpSocket};
+use super::UdpSocket;
+
+use futures_util::future::poll_fn;
 use std::error::Error;
 use std::fmt;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -82,8 +85,8 @@ impl UdpSocketRecvHalf {
     /// The function must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
-    pub fn recv_from<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> RecvFrom<'a, 'b> {
-        RecvFrom::new(&self.0, buf)
+    pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        poll_fn(|cx| self.0.poll_recv_from_priv(cx, buf)).await
     }
 
     /// Returns a future that receives a single datagram message on the socket from
@@ -98,8 +101,8 @@ impl UdpSocketRecvHalf {
     /// will fail if the socket is not connected.
     ///
     /// [`connect`]: super::UdpSocket::connect
-    pub fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> Recv<'a, 'b> {
-        Recv::new(&self.0, buf)
+    pub async fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.0.poll_recv_priv(cx, buf)).await
     }
 }
 
@@ -116,8 +119,8 @@ impl UdpSocketSendHalf {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    pub fn send_to<'a, 'b>(&'a mut self, buf: &'b [u8], target: &'b SocketAddr) -> SendTo<'a, 'b> {
-        SendTo::new(&self.0, buf, target)
+    pub async fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+        poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, target)).await
     }
 
     /// Returns a future that sends data on the socket to the remote address to which it is connected.
@@ -127,8 +130,8 @@ impl UdpSocketSendHalf {
     /// will resolve to an error if the socket is not connected.
     ///
     /// [`connect`]: super::UdpSocket::connect
-    pub fn send<'a, 'b>(&'a mut self, buf: &'b [u8]) -> Send<'a, 'b> {
-        Send::new(&self.0, buf)
+    pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.0.poll_send_priv(cx, buf)).await
     }
 }
 

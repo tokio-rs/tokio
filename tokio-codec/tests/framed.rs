@@ -1,16 +1,14 @@
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
+use tokio::prelude::*;
+use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
+use tokio_test::assert_ok;
+
+use bytes::{Buf, BufMut, BytesMut, IntoBuf};
 use std::io::{self, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-
-use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
-use tokio_current_thread::block_on_all;
-use tokio_io::AsyncRead;
-
-use bytes::{Buf, BufMut, BytesMut, IntoBuf};
-use futures::future::FutureExt;
-use futures::stream::StreamExt;
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
 
@@ -65,19 +63,13 @@ impl AsyncRead for DontReadIntoThis {
     }
 }
 
-#[test]
-fn can_read_from_existing_buf() {
+#[tokio::test]
+async fn can_read_from_existing_buf() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec);
     parts.read_buf = vec![0, 0, 0, 42].into();
 
-    let framed = Framed::from_parts(parts);
-
-    let num = block_on_all(
-        framed
-            .into_future()
-            .map(|(first_num, _)| first_num.unwrap()),
-    )
-    .unwrap();
+    let mut framed = Framed::from_parts(parts);
+    let num = assert_ok!(framed.next().await.unwrap());
 
     assert_eq!(num, 42);
 }

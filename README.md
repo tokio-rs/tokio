@@ -30,12 +30,8 @@ the Rust programming language. It is:
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
-[API Docs](https://docs.rs/tokio/0.1.22/tokio) |
+[API Docs](https://docs.rs/tokio/0.2.0-alpha.1/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
-
-The API docs for the master branch are currently out of date as master is
-undergoing significant churn as it is updated to use `std::future`. The docs
-will be udpated once the branch stabilizes.
 
 ## Overview
 
@@ -51,50 +47,51 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.1.22/tokio/net/index.html
-[reactor]: https://docs.rs/tokio/0.1.22/tokio/reactor/index.html
-[scheduler]: https://docs.rs/tokio/0.1.22/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/net/index.html
+[reactor]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/reactor/index.html
+[scheduler]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/runtime/index.html
 
 ## Example
 
 A basic TCP echo server with Tokio:
 
 ```rust
-use tokio::prelude::*;
-use tokio::io::copy;
+#![feature(async_await)]
+
 use tokio::net::TcpListener;
+use tokio::prelude::*;
 
-fn main() {
-    // Bind the server's socket.
-    let addr = "127.0.0.1:12345".parse().unwrap();
-    let listener = TcpListener::bind(&addr)
-        .expect("unable to bind TCP listener");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let addr = "127.0.0.1:8080".parse()?;
+    let mut listener = TcpListener::bind(&addr).unwrap();
 
-    // Pull out a stream of sockets for incoming connections
-    let server = listener.incoming()
-        .map_err(|e| eprintln!("accept failed = {:?}", e))
-        .for_each(|sock| {
-            // Split up the reading and writing parts of the
-            // socket.
-            let (reader, writer) = sock.split();
+    loop {
+        let (mut socket, _) = listener.accept().await?;
 
-            // A future that echos the data and returns how
-            // many bytes were copied...
-            let bytes_copied = copy(reader, writer);
+        tokio::spawn(async move {
+            let mut buf = [0; 1024];
 
-            // ... after which we'll print what happened.
-            let handle_conn = bytes_copied.map(|amt| {
-                println!("wrote {:?} bytes", amt)
-            }).map_err(|err| {
-                eprintln!("IO error {:?}", err)
-            });
+            // In a loop, read data from the socket and write the data back.
+            loop {
+                let n = match socket.read(&mut buf).await {
+                    // socket closed
+                    Ok(n) if n == 0 => return,
+                    Ok(n) => n,
+                    Err(e) => {
+                        println!("failed to read from socket; err = {:?}", e);
+                        return;
+                    }
+                };
 
-            // Spawn the future as a concurrent task.
-            tokio::spawn(handle_conn)
+                // Write the data back
+                if let Err(e) = socket.write_all(&buf[0..n]).await {
+                    println!("failed to write to socket; err = {:?}", e);
+                    return;
+                }
+            }
         });
-
-    // Start the Tokio runtime
-    tokio::run(server);
+    }
 }
 ```
 
@@ -112,7 +109,7 @@ the [Tokio Gitter channel][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
-[API documentation]: https://docs.rs/tokio/0.1.22/tokio
+[API documentation]: https://docs.rs/tokio/0.2.0-alpha.1/tokio
 [chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 

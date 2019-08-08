@@ -20,7 +20,7 @@ use std::io;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
 /// use tokio::runtime::current_thread::Builder;
 /// use tokio_timer::clock::Clock;
 ///

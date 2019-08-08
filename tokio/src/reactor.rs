@@ -20,25 +20,22 @@
 //!
 //! Let's start with a basic example, establishing a TCP connection.
 //!
-//! ```rust,ignore
-//! # fn dox() {
-//! use tokio::prelude::*;
+//! ```
+//! #![feature(async_await)]
+//!
 //! use tokio::net::TcpStream;
 //!
-//! let addr = "93.184.216.34:9243".parse().unwrap();
+//! # async fn process<T>(t: T) {}
+//! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+//! let addr = "93.184.216.34:9243".parse()?;
 //!
-//! let connect_future = TcpStream::connect(&addr);
+//! let stream = TcpStream::connect(&addr).await?;
 //!
-//! let task = connect_future
-//!     .and_then(|socket| {
-//!         println!("successfully connected");
-//!         Ok(())
-//!     })
-//!     .map_err(|e| println!("failed to connect; err={:?}", e));
+//! println!("successfully connected");
 //!
-//! tokio::run(task);
+//! process(stream).await;
+//! # Ok(())
 //! # }
-//! # fn main() {}
 //! ```
 //!
 //! Establishing a TCP connection usually cannot be completed immediately.

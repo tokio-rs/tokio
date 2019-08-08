@@ -92,3 +92,29 @@ where
         self.get_mut().as_mut().consume(amt)
     }
 }
+
+impl AsyncBufRead for &[u8] {
+    fn poll_fill_buf<'a>(
+        self: Pin<&'a mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<io::Result<&'a [u8]>> {
+        Poll::Ready(Ok(*self))
+    }
+
+    fn consume(mut self: Pin<&mut Self>, amt: usize) {
+        *self = &self[amt..];
+    }
+}
+
+impl<T: AsRef<[u8]> + Unpin> AsyncBufRead for io::Cursor<T> {
+    fn poll_fill_buf<'a>(
+        self: Pin<&'a mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<io::Result<&'a [u8]>> {
+        Poll::Ready(io::BufRead::fill_buf(self.get_mut()))
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        io::BufRead::consume(self.get_mut(), amt)
+    }
+}

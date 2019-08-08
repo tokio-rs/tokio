@@ -1,7 +1,7 @@
 use crate::pool::Pool;
 use crate::task::Task;
 
-use arc_waker::Wake;
+use futures_util::task::ArcWake;
 use std::sync::Arc;
 
 /// Implements the future `Waker` API.
@@ -17,7 +17,7 @@ pub(crate) struct Waker {
 unsafe impl Send for Waker {}
 unsafe impl Sync for Waker {}
 
-impl Wake for Waker {
+impl ArcWake for Waker {
     fn wake_by_ref(me: &Arc<Self>) {
         Task::schedule(&me.task, &me.pool);
     }

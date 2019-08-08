@@ -1,4 +1,4 @@
-pub(crate) mod futures {
+pub(crate) mod future {
     pub(crate) use crate::task::AtomicWaker;
 }
 
@@ -31,6 +31,8 @@ pub(crate) mod sync {
     }
 }
 
-pub(crate) fn yield_now() {
-    ::std::sync::atomic::spin_loop_hint();
+pub(crate) mod thread {
+    pub(crate) fn yield_now() {
+        ::std::sync::atomic::spin_loop_hint();
+    }
 }

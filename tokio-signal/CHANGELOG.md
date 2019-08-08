@@ -1,12 +1,13 @@
-# 0.3.0
+# 0.3.0-alpha.1 (August 8, 2019)
 
 ### Changed
-- **Breaking:** `windows::Event` has been removed in favor of `CtrlC` and
-a separate `windows::CtrlBreak` struct.
-- **Breaking:** `ctrl_c{,_with_handle}` has been replaced with a `CtrlC` struct
-(which can be constructed via `CtrlC::{new, with_handle}`.
-- **Breaking:** `unix::Signal` returns `()` instead of the signal number used in registration
-- **Breaking:** `unis::Signal` constructors now return a simple result rather than a lazy future
+- Switch to `async`, `await`, and `std::future`.
+- `windows::Event` has been removed in favor of `CtrlC` and
+  a separate `windows::CtrlBreak` struct.
+- `ctrl_c{,_with_handle}` has been replaced with a `CtrlC` struct
+  (which can be constructed via `CtrlC::{new, with_handle}`.
+- `unix::Signal` returns `()` instead of the signal number used in registration
+- `unis::Signal` constructors now return a simple result rather than a lazy future
 
 # 0.2.9
 

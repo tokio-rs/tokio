@@ -155,3 +155,31 @@ where
         self.get_mut().as_mut().poll_read(cx, buf)
     }
 }
+
+impl AsyncRead for &[u8] {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
+        false
+    }
+
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Poll::Ready(io::Read::read(self.get_mut(), buf))
+    }
+}
+
+impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
+        false
+    }
+
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Poll::Ready(io::Read::read(self.get_mut(), buf))
+    }
+}

@@ -1,6 +1,7 @@
-use crate::{Recv, RecvFrom, Send, SendTo};
+use tokio_reactor::{Handle, PollEvented};
+
 use futures_core::ready;
-use mio::Ready;
+use futures_util::future::poll_fn;
 use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
@@ -9,9 +10,7 @@ use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
-use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a Unix datagram socket.
 pub struct UnixDatagram {
@@ -71,37 +70,9 @@ impl UnixDatagram {
         self.io.get_ref().connect(path)
     }
 
-    /// Returns a future that sends data on the socket to the remote address to which it is connected.
-    /// On success, the future will resolve to the number of bytes written.
-    ///
-    /// The [`connect`] method will connect this socket to a remote address. The future
-    /// will resolve to an error if the socket is not connected.
-    ///
-    /// [`connect`]: #method.connect
-    pub fn send<'a, 'b>(&'a mut self, buf: &'b [u8]) -> Send<'a, 'b> {
-        Send::new(self, buf)
-    }
-
-    /// Sends data on the socket to the remote address to which it is connected.
-    ///
-    /// The [`connect`] method will connect this socket to a remote address. This
-    /// method will fail if the socket is not connected.
-    ///
-    /// [`connect`]: #method.connect
-    ///
-    /// # Return
-    ///
-    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
-    ///
-    /// If the socket is not ready for writing, the method returns
-    /// `Poll::Pending` and arranges for the current task to receive a
-    /// notification when the socket becomes writable.
-    pub fn poll_send(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        self.poll_send_priv(cx, buf)
+    /// Sends data on the socket to the socket's peer.
+    pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.poll_send_priv(cx, buf)).await
     }
 
     // Poll IO functions that takes `&self` are provided for the split API.
@@ -130,47 +101,9 @@ impl UnixDatagram {
         }
     }
 
-    /// Returns a future that receives a single datagram message on the socket from
-    /// the remote address to which it is connected. On success, the future will resolve
-    /// to the number of bytes read.
-    ///
-    /// The function must be called with valid byte array `buf` of sufficient size to
-    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
-    /// excess bytes may be discarded.
-    ///
-    /// The [`connect`] method will connect this socket to a remote address. The future
-    /// will fail if the socket is not connected.
-    ///
-    /// [`connect`]: #method.connect
-    pub fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> Recv<'a, 'b> {
-        Recv::new(self, buf)
-    }
-
-    /// Receives a single datagram message on the socket from the remote address to
-    /// which it is connected. On success, returns the number of bytes read.
-    ///
-    /// The function must be called with valid byte array `buf` of sufficient size to
-    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
-    /// excess bytes may be discarded.
-    ///
-    /// The [`connect`] method will connect this socket to a remote address. This
-    /// method will fail if the socket is not connected.
-    ///
-    /// [`connect`]: #method.connect
-    ///
-    /// # Return
-    ///
-    /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
-    ///
-    /// If no data is available for reading, the method returns
-    /// `Poll::Pending` and arranges for the current task to receive a
-    /// notification when the socket becomes receivable or is closed.
-    pub fn poll_recv(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        self.poll_recv_priv(cx, buf)
+    /// Receives data from the socket.
+    pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.poll_recv_priv(cx, buf)).await
     }
 
     pub(crate) fn poll_recv_priv(
@@ -189,38 +122,12 @@ impl UnixDatagram {
         }
     }
 
-    /// Returns a future that sends data on the socket to the given address.
-    /// On success, the future will resolve to the number of bytes written.
-    ///
-    /// The future will resolve to an error if the IP version of the socket does
-    /// not match that of `target`.
-    pub fn send_to<'a, 'b, P>(&'a mut self, buf: &'b [u8], target: P) -> SendTo<'a, 'b, P>
+    /// Sends data on the socket to the specified address.
+    pub async fn send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
     where
         P: AsRef<Path> + Unpin,
     {
-        SendTo::new(self, buf, target)
-    }
-
-    /// Sends data on the socket to the given address. On success, returns the
-    /// number of bytes written.
-    ///
-    /// This will return an error when the IP version of the local socket
-    /// does not match that of `target`.
-    ///
-    /// # Return
-    ///
-    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
-    ///
-    /// If the socket is not ready for writing, the method returns
-    /// `Poll::Pending` and arranges for the current task to receive a
-    /// notification when the socket becomes writable.
-    pub fn poll_send_to<P: AsRef<Path>>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-        target: P,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_send_to_priv(cx, buf, target.as_ref())
+        poll_fn(|cx| self.poll_send_to_priv(cx, buf, target.as_ref())).await
     }
 
     pub(crate) fn poll_send_to_priv(
@@ -240,24 +147,9 @@ impl UnixDatagram {
         }
     }
 
-    /// Returns a future that receives a single datagram on the socket. On success,
-    /// the future resolves to the number of bytes read and the origin.
-    ///
-    /// The function must be called with valid byte array `buf` of sufficient size
-    /// to hold the message bytes. If a message is too long to fit in the supplied
-    /// buffer, excess bytes may be discarded.
-    pub fn recv_from<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> RecvFrom<'a, 'b> {
-        RecvFrom::new(self, buf)
-    }
-
-    /// Receives data from the socket. On success, returns the number of bytes
-    /// read and the address from whence the data came.
-    pub fn poll_recv_from(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<Result<(usize, SocketAddr), io::Error>> {
-        self.poll_recv_from_priv(cx, buf)
+    /// Receives data from the socket.
+    pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        poll_fn(|cx| self.poll_recv_from_priv(cx, buf)).await
     }
 
     pub(crate) fn poll_recv_from_priv(
@@ -274,16 +166,6 @@ impl UnixDatagram {
             }
             x => Poll::Ready(x),
         }
-    }
-
-    /// Test whether this socket is ready to be read or not.
-    pub fn poll_read_ready(&self, cx: &mut Context<'_>, ready: Ready) -> Poll<io::Result<Ready>> {
-        self.io.poll_read_ready(cx, ready)
-    }
-
-    /// Test whether this socket is ready to be written to or not.
-    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        self.io.poll_write_ready(cx)
     }
 
     /// Returns the local address that this socket is bound to.

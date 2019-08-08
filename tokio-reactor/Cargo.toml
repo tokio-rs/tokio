@@ -5,22 +5,20 @@ name = "tokio-reactor"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-reactor/0.1.9/tokio_reactor"
+documentation = "https://docs.rs/tokio-reactor/0.2.0-alpha.1/tokio_reactor"
 description = """
 Event loop that drives Tokio I/O resources.
 """
 categories = ["asynchronous", "network-programming"]
-publish = false
 
 [dependencies]
 crossbeam-utils = "0.6.0"
@@ -30,12 +28,12 @@ mio = "0.6.14"
 num_cpus = "1.8.0"
 parking_lot = "0.9"
 slab = "0.4.0"
-tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
-tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
-futures-core-preview = "0.3.0-alpha.17"
+tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
+futures-core-preview = "=0.3.0-alpha.17"
 
 [dev-dependencies]
 num_cpus = "1.8.0"
-tokio = "0.1.7"
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-io-pool = "0.1.4"

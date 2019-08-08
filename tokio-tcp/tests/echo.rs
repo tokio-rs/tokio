@@ -1,51 +1,43 @@
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
-#![cfg(feature = "broken")]
 
-use env_logger;
-use futures::stream::Stream;
-use futures::Future;
-use std::io::{Read, Write};
-use std::net::TcpStream;
-use std::thread;
-use tokio_io::io::copy;
-use tokio_io::AsyncRead;
-use tokio_tcp::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::prelude::*;
+use tokio::sync::oneshot;
+use tokio_test::assert_ok;
 
-macro_rules! t {
-    ($e:expr) => {
-        match $e {
-            Ok(e) => e,
-            Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-        }
-    };
-}
+#[tokio::test]
+async fn echo_server() {
+    const ITER: usize = 1024;
 
-#[test]
-fn echo_server() {
-    drop(env_logger::try_init());
+    let (tx, rx) = oneshot::channel();
 
-    let srv = t!(TcpListener::bind(&t!("127.0.0.1:0".parse())));
-    let addr = t!(srv.local_addr());
+    let addr = assert_ok!("127.0.0.1:0".parse());
+    let mut srv = assert_ok!(TcpListener::bind(&addr));
+    let addr = assert_ok!(srv.local_addr());
 
     let msg = "foo bar baz";
-    let t = thread::spawn(move || {
-        let mut s = TcpStream::connect(&addr).unwrap();
+    tokio::spawn(async move {
+        let mut stream = assert_ok!(TcpStream::connect(&addr).await);
 
-        for _i in 0..1024 {
-            assert_eq!(t!(s.write(msg.as_bytes())), msg.len());
-            let mut buf = [0; 1024];
-            assert_eq!(t!(s.read(&mut buf)), msg.len());
-            assert_eq!(&buf[..msg.len()], msg.as_bytes());
+        for _ in 0..ITER {
+            // write
+            assert_ok!(stream.write_all(msg.as_bytes()).await);
+
+            // read
+            let mut buf = [0; 11];
+            assert_ok!(stream.read_exact(&mut buf).await);
+            assert_eq!(&buf[..], msg.as_bytes());
         }
+
+        assert_ok!(tx.send(()));
     });
 
-    let clients = srv.incoming();
-    let client = clients.into_future().map(|e| e.0.unwrap()).map_err(|e| e.0);
-    let halves = client.map(|s| s.split());
-    let copied = halves.and_then(|(a, b)| copy(a, b));
+    let (stream, _) = assert_ok!(srv.accept().await);
+    let (mut rd, mut wr) = stream.split();
 
-    let (amt, _, _) = t!(copied.wait());
-    t.join().unwrap();
+    let n = assert_ok!(rd.copy(&mut wr).await);
+    assert_eq!(n, (ITER * msg.len()) as u64);
 
-    assert_eq!(amt, msg.len() as u64 * 1024);
+    assert_ok!(rx.await);
 }

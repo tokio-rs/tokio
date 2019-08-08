@@ -1,39 +1,29 @@
 //! An asynchronous `Mutex`-like type.
 //!
 //! This module provides [`Lock`], a type that acts similarly to an asynchronous `Mutex`, with one
-//! major difference: the [`LockGuard`] returned by `poll_lock` is not tied to the lifetime of the
+//! major difference: the [`LockGuard`] returned by `lock` is not tied to the lifetime of the
 //! `Mutex`. This enables you to acquire a lock, and then pass that guard into a future, and then
 //! release it at some later point in time.
 //!
 //! This allows you to do something along the lines of:
 //!
 //! ```rust,no_run
-//! use futures::{try_ready, future, Poll, Async, Future, Stream};
-//! use tokio::sync::lock::{Lock, LockGuard};
+//! #![feature(async_await)]
 //!
-//! struct MyType<S> {
-//!     lock: Lock<S>,
-//! }
+//! use tokio::sync::Lock;
 //!
-//! impl<S> Future for MyType<S>
-//!   where S: Stream<Item = u32> + Send + 'static
-//! {
-//!     type Item = ();
-//!     type Error = ();
+//! #[tokio::main]
+//! async fn main() {
+//!     let mut data1 = Lock::new(0);
+//!     let mut data2 = data1.clone();
 //!
-//!     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//!         match self.lock.poll_lock() {
-//!             Async::Ready(mut guard) => {
-//!                 tokio::spawn(future::poll_fn(move || {
-//!                     let item = try_ready!(guard.poll().map_err(|_| ()));
-//!                     println!("item = {:?}", item);
-//!                     Ok(().into())
-//!                 }));
-//!                 Ok(().into())
-//!             },
-//!             Async::NotReady => Ok(Async::NotReady)
-//!         }
-//!     }
+//!     tokio::spawn(async move {
+//!         let mut lock = data2.lock().await;
+//!         *lock += 1;
+//!     });
+//!
+//!     let mut lock = data1.lock().await;
+//!     *lock += 1;
 //! }
 //! ```
 //!
@@ -43,11 +33,10 @@
 use crate::semaphore;
 
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::future::Future;
 use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll::Ready;
 use std::task::{Context, Poll};
@@ -55,8 +44,8 @@ use std::task::{Context, Poll};
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
 /// Each mutex has a type parameter (`T`) which represents the data that it is protecting. The data
-/// can only be accessed through the RAII guards returned from `poll_lock`, which guarantees that
-/// the data is only ever accessed when the mutex is locked.
+/// can only be accessed through the RAII guards returned from `lock`, which
+/// guarantees that the data is only ever accessed when the mutex is locked.
 #[derive(Debug)]
 pub struct Lock<T> {
     inner: Arc<State<T>>,
@@ -69,16 +58,10 @@ pub struct Lock<T> {
 /// internally keeps a reference-couned pointer to the original `Lock`, so even if the lock goes
 /// away, the guard remains valid.
 ///
-/// The lock is automatically released whenever the guard is dropped, at which point `poll_lock`
+/// The lock is automatically released whenever the guard is dropped, at which point `lock`
 /// will succeed yet again.
 #[derive(Debug)]
 pub struct LockGuard<T>(Lock<T>);
-
-/// A future that resolves to a `LockGuard`.
-#[derive(Debug)]
-pub struct LockFuture<'a, T> {
-    lock: &'a mut Lock<T>,
-}
 
 // As long as T: Send, it's fine to send and share Lock<T> between threads.
 // If T was not Send, sending and sharing a Lock<T> would be bad, since you can access T through
@@ -111,10 +94,7 @@ impl<T> Lock<T> {
         }
     }
 
-    /// Try to acquire the lock.
-    ///
-    /// If the lock is already held, the current task is notified when it is released.
-    pub fn poll_lock(&mut self, cx: &mut Context<'_>) -> Poll<LockGuard<T>> {
+    fn poll_lock(&mut self, cx: &mut Context<'_>) -> Poll<LockGuard<T>> {
         ready!(self.permit.poll_acquire(cx, &self.inner.s)).unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
@@ -131,8 +111,9 @@ impl<T> Lock<T> {
     }
 
     /// A future that resolves on acquiring the lock and returns the `LockGuard`.
-    pub fn lock(&mut self) -> LockFuture<'_, T> {
-        LockFuture { lock: self }
+    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    pub async fn lock(&mut self) -> LockGuard<T> {
+        poll_fn(|cx| self.poll_lock(cx)).await
     }
 }
 
@@ -191,14 +172,5 @@ impl<T> DerefMut for LockGuard<T> {
 impl<T: fmt::Display> fmt::Display for LockGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
-    }
-}
-
-impl<T> Future for LockFuture<'_, T> {
-    type Output = LockGuard<T>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let me = &mut *self;
-        Pin::new(&mut *me.lock).poll_lock(cx)
     }
 }

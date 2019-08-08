@@ -58,7 +58,7 @@ pub mod udp {
     //! [`Send`]: struct.Send.html
     //! [`RecvFrom`]: struct.RecvFrom.html
     //! [`SendTo`]: struct.SendTo.html
-    pub use tokio_udp::{split, Recv, RecvFrom, Send, SendTo, UdpSocket};
+    pub use tokio_udp::{split, UdpSocket};
 }
 #[cfg(feature = "udp")]
 pub use self::udp::UdpSocket;

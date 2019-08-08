@@ -1,12 +1,15 @@
 use crate::ucred::{self, UCred};
+
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_reactor::{Handle, PollEvented};
+
 use bytes::{Buf, BufMut};
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use iovec::IoVec;
-use mio::Ready;
 use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
-use std::future::Future;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -14,8 +17,6 @@ use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_reactor::{Handle, PollEvented};
 
 /// A structure representing a connected Unix socket.
 ///
@@ -26,26 +27,21 @@ pub struct UnixStream {
     io: PollEvented<mio_uds::UnixStream>,
 }
 
-/// Future returned by `UnixStream::connect` which will resolve to a
-/// `UnixStream` when the stream is connected.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ConnectFuture {
-    stream: Option<io::Result<UnixStream>>,
-}
-
 impl UnixStream {
     /// Connects to the socket named by `path`.
     ///
     /// This function will create a new Unix socket and connect to the path
     /// specified, associating the returned stream with the default event loop's
     /// handle.
-    pub fn connect<P>(path: P) -> ConnectFuture
+    pub async fn connect<P>(path: P) -> io::Result<UnixStream>
     where
         P: AsRef<Path>,
     {
-        let res = mio_uds::UnixStream::connect(path).map(UnixStream::new);
-        ConnectFuture { stream: Some(res) }
+        let stream = mio_uds::UnixStream::connect(path)?;
+        let stream = UnixStream::new(stream);
+
+        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
+        Ok(stream)
     }
 
     /// Consumes a `UnixStream` in the standard library and returns a
@@ -76,16 +72,6 @@ impl UnixStream {
     pub(crate) fn new(stream: mio_uds::UnixStream) -> UnixStream {
         let io = PollEvented::new(stream);
         UnixStream { io }
-    }
-
-    /// Test whether this socket is ready to be read or not.
-    pub fn poll_read_ready(&self, cx: &mut Context<'_>, ready: Ready) -> Poll<io::Result<Ready>> {
-        self.io.poll_read_ready(cx, ready)
-    }
-
-    /// Test whether this socket is ready to be written to or not.
-    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        self.io.poll_write_ready(cx)
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -338,31 +324,5 @@ impl fmt::Debug for UnixStream {
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.io.get_ref().as_raw_fd()
-    }
-}
-
-impl Future for ConnectFuture {
-    type Output = io::Result<UnixStream>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let stream = self
-            .stream
-            .take()
-            .expect("ConnectFuture polled after completion")?;
-
-        match stream.io.poll_write_ready(cx) {
-            Poll::Pending => {
-                self.stream = Some(Ok(stream));
-                return Poll::Pending;
-            }
-            Poll::Ready(Err(e)) => return Err(e).into(),
-            _ => (),
-        }
-
-        if let Some(e) = stream.io.get_ref().take_error()? {
-            return Err(e).into();
-        }
-
-        Ok(stream).into()
     }
 }

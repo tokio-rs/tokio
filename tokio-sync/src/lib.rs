@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-sync/0.1.5")]
+#![doc(html_root_url = "https://docs.rs/tokio-sync/0.2.0-alpha.1")]
 #![deny(
     missing_debug_implementations,
     missing_docs,
@@ -27,10 +27,13 @@ macro_rules! if_fuzz {
     }}
 }
 
-pub mod lock;
+mod lock;
 mod loom;
 pub mod mpsc;
 pub mod oneshot;
 pub mod semaphore;
-pub mod task;
+mod task;
 pub mod watch;
+
+pub use lock::{Lock, LockGuard};
+pub use task::AtomicWaker;
