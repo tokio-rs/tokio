@@ -1,4 +1,4 @@
-pub(crate) mod futures {
+pub(crate) mod future {
     pub(crate) use crate::task::AtomicWaker;
 }
 

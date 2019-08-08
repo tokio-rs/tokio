@@ -19,7 +19,7 @@ mod mpsc;
 mod semaphore;
 
 use futures_util::future::poll_fn;
-use loom::futures::block_on;
+use loom::future::block_on;
 use loom::thread;
 
 #[test]
