@@ -1,3 +1,7 @@
+# 0.2.0-alpha.1 (August 8, 2019)
+
+- Update to `std::future::Future`.
+
 # 0.1.12 (March 1, 2019)
 
 ### Added
