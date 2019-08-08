@@ -2,12 +2,6 @@
 
 Synchronization utilities
 
-[Documentation](https://docs.rs/tokio-sync/0.1.6/tokio_sync/)
-
-## Overview
-
-This crate provides synchronization utilities for usage with Tokio.
-
 ## License
 
 This project is licensed under the [MIT license](LICENSE).

@@ -1,3 +1,8 @@
+# 0.2.0-alpha.1 (August 8, 2019)
+
+### Changed
+- Switch to `async`, `await`, and `std::future`.
+
 # 0.1.3 (January 6, 2019)
 
 * Deprecate `TcpStream::try_clone()` (#824).

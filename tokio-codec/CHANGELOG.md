@@ -1,6 +1,7 @@
-# 0.2.0 (August 8, 2019)
+# 0.2.0-alpha.1 (August 8, 2019)
 
-* Update to `std::future::Future`
+### Changed
+- Switch to `async`, `await`, and `std::future`.
 
 # 0.1.1 (September 26, 2018)
 

@@ -5,7 +5,6 @@ name = "tokio-signal"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
 version = "0.3.0-alpha.1"
@@ -14,16 +13,11 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-signal/0.2.8/tokio_signal"
+documentation = "https://docs.rs/tokio-signal/0.3.0-alpha.1/tokio_signal"
 description = """
 An implementation of an asynchronous Unix signal handling backed futures.
 """
 categories = ["asynchronous"]
-publish = false
-
-[badges]
-travis-ci = { repository = "tokio-rs/tokio" }
-appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
 futures-core-preview = "=0.3.0-alpha.17"

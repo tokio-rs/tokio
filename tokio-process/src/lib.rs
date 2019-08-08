@@ -1,3 +1,5 @@
+#![doc(html_root_url = "https://docs.rs/tokio-process/0.3.0-alpha.1")]
+
 //! An implementation of asynchronous process management for Tokio.
 //!
 //! This crate provides a `CommandExt` trait to enhance the functionality of the

@@ -5,21 +5,19 @@ name = "tokio-uds"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
 version = "0.3.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-uds/0.2.5/tokio_uds/"
+documentation = "https://docs.rs/tokio-uds/0.3.0-alpha.1/tokio_uds/"
 description = """
 Unix Domain sockets for Tokio
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 async-traits = []

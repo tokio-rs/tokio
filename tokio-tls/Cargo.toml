@@ -10,17 +10,16 @@ name = "tokio-tls"
 # - Create "v0.3.x" git tag.
 version = "0.3.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-tls/0.2.1/tokio_tls/"
+documentation = "https://docs.rs/tokio-tls/0.3.0-alpha.1/tokio_tls/"
 description = """
 An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
 for nonblocking I/O streams.
 """
 categories = ["asynchronous", "network-programming"]
-publish = false
 
 [badges]
 travis-ci = { repository = "tokio-rs/tokio-tls" }

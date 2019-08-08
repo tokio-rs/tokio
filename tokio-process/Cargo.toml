@@ -1,11 +1,13 @@
 [package]
 name = "tokio-process"
 # When releasing to crates.io:
+# - Remove path dependencies
 # - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
 # - Update CHANGELOG.md.
-# - Create "X.Y.Z" git tag.
+# - Create "v0.1.x" git tag.
 version = "0.3.0-alpha.1"
-publish = false
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"

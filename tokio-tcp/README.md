@@ -2,8 +2,6 @@
 
 TCP bindings for `tokio`.
 
-[Documentation](https://docs.rs/tokio-tcp/0.1.3/tokio_tcp)
-
 ## License
 
 This project is licensed under the [MIT license](./LICENSE).
