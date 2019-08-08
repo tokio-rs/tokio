@@ -8,33 +8,33 @@ name = "tokio-tls"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
-version = "0.3.0"
+version = "0.3.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-tls/0.2.1/tokio_tls/"
+documentation = "https://docs.rs/tokio-tls/0.3.0-alpha.1/tokio_tls/"
 description = """
 An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
 for nonblocking I/O streams.
 """
 categories = ["asynchronous", "network-programming"]
-publish = false
 
 [badges]
 travis-ci = { repository = "tokio-rs/tokio-tls" }
 
 [dependencies]
 native-tls = "0.2"
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 
 [dev-dependencies]
-tokio = { version = "0.2.0", path = "../tokio" }
-tokio-tcp = { version = "0.2.0", path = "../tokio-tcp", features = ["async-traits"] }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+tokio-tcp = { version = "=0.2.0-alpha.1", path = "../tokio-tcp", features = ["async-traits"] }
+
 cfg-if = "0.1"
 env_logger = { version = "0.5", default-features = false }
-futures-preview = { version = "0.3.0-alpha.17", features = ["async-await", "nightly"] }
+futures-preview = { version = "=0.3.0-alpha.17", features = ["async-await", "nightly"] }
 
 [target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]
 openssl = "0.10"

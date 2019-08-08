@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-codec/0.1.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-codec/0.2.0-alpha.1")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]

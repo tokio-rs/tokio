@@ -5,25 +5,24 @@ name = "tokio-executor"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-documentation = "https://docs.rs/tokio-executor/0.1.7/tokio_executor"
+documentation = "https://docs.rs/tokio-executor/0.2.0-alpha.1/tokio_executor"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 description = """
 Future execution primitives
 """
 keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
-publish = false
 
 [dependencies]
 
 [dev-dependencies]
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+
 futures-core-preview = "=0.3.0-alpha.17"
-tokio = { version = "*", path = "../tokio" }

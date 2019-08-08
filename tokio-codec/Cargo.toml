@@ -5,30 +5,30 @@ name = "tokio-codec"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>", "Bryan Burgers <bryan@burgers.io>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-codec/0.1.1/tokio_codec"
+documentation = "https://docs.rs/tokio-codec/0.2.0-alpha.1/tokio_codec"
 description = """
 Utilities for encoding and decoding frames.
 """
 categories = ["asynchronous"]
-publish = false
 
 [dependencies]
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
+
 bytes = "0.4.7"
-futures-core-preview = "= 0.3.0-alpha.17"
-futures-sink-preview = "= 0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.17"
+futures-sink-preview = "=0.3.0-alpha.17"
 log = "0.4"
 
 [dev-dependencies]
-futures-util-preview = "= 0.3.0-alpha.17"
-tokio = { version = "0.2.0", path = "../tokio" }
-tokio-test = { version = "0.2.0", path = "../tokio-test" }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
+
+futures-util-preview = "=0.3.0-alpha.17"

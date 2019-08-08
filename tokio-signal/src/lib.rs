@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-signal/0.2.8")]
+#![doc(html_root_url = "https://docs.rs/tokio-signal/0.3.0-alpha.1")]
 #![deny(missing_debug_implementations, missing_docs, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(test, feature(async_await))]

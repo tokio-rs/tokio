@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.1.22/tokio/"
+documentation = "https://docs.rs/tokio/0.2.0-alpha.1/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -22,7 +22,6 @@ backed applications.
 """
 categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
-publish = false
 
 [features]
 default = [
@@ -59,39 +58,38 @@ udp = ["tokio-udp"]
 uds = ["tokio-uds"]
 
 [dependencies]
-# Only non-optional dependency...
-#futures = "0.1.20"
-futures-core-preview = "= 0.3.0-alpha.17"
-futures-sink-preview = "= 0.3.0-alpha.17"
-futures-util-preview = { version = "= 0.3.0-alpha.17", features = ["sink"] }
+futures-core-preview = "=0.3.0-alpha.17"
+futures-sink-preview = "=0.3.0-alpha.17"
+futures-util-preview = { version = "=0.3.0-alpha.17", features = ["sink"] }
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-tokio-codec = { version = "0.2.0", optional = true, path = "../tokio-codec" }
-tokio-current-thread = { version = "0.2.0", optional = true, path = "../tokio-current-thread" }
-tokio-fs = { version = "0.2.0", optional = true, path = "../tokio-fs" }
-tokio-io = { version = "0.2.0", optional = true, features = ["util"], path = "../tokio-io" }
-tokio-executor = { version = "0.2.0", optional = true, path = "../tokio-executor" }
-tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
-tokio-reactor = { version = "0.2.0", optional = true, path = "../tokio-reactor" }
-tokio-sync = { version = "0.2.0", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tokio-threadpool = { version = "0.2.0", optional = true, path = "../tokio-threadpool" }
-tokio-tcp = { version = "0.2.0", optional = true, path = "../tokio-tcp", features = ["async-traits"] }
-tokio-udp = { version = "0.2.0", optional = true, path = "../tokio-udp" }
-tokio-timer = { version = "0.3.0", optional = true, path = "../tokio-timer", features = ["async-traits"] }
+tokio-codec = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-codec" }
+tokio-current-thread = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-current-thread" }
+tokio-fs = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-fs" }
+tokio-io = { version = "=0.2.0-alpha.1", optional = true, features = ["util"], path = "../tokio-io" }
+tokio-executor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-executor" }
+tokio-macros = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-macros" }
+tokio-reactor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-reactor" }
+tokio-sync = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-sync", features = ["async-traits"] }
+tokio-threadpool = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-threadpool" }
+tokio-tcp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-tcp", features = ["async-traits"] }
+tokio-udp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-udp" }
+tokio-timer = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "0.3.0", optional = true, path = "../tokio-uds", features = ["async-traits"] }
+tokio-uds = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-uds", features = ["async-traits"] }
 
 [dev-dependencies]
-futures-preview = "0.3.0-alpha.17"
-tokio-test = { path = "../tokio-test" }
-pin-utils = "0.1.0-alpha.4"
+tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
+
+futures-preview = "=0.3.0-alpha.17"
+futures-util-preview = "=0.3.0-alpha.17"
+pin-utils = "=0.1.0-alpha.4"
 env_logger = { version = "0.5", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
-futures-cpupool = "0.1"
 http = "0.1"
 httparse = "1.0"
 libc = "0.2"
@@ -99,4 +97,3 @@ num_cpus = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = "0.1"
-futures-util-preview = "0.3.0-alpha.17"

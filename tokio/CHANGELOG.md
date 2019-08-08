@@ -1,6 +1,10 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.2.0-alpha.1 (August 8, 2019)
+
+- Switch to `async`, `await`, and `std::future`.
+
 # 0.1.21 (May 30, 2019)
 
 ### Changed

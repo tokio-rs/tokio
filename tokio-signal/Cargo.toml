@@ -5,34 +5,28 @@ name = "tokio-signal"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
-version = "0.3.0"
+version = "0.3.0-alpha.1"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-signal/0.2.8/tokio_signal"
+documentation = "https://docs.rs/tokio-signal/0.3.0-alpha.1/tokio_signal"
 description = """
 An implementation of an asynchronous Unix signal handling backed futures.
 """
 categories = ["asynchronous"]
-publish = false
-
-[badges]
-travis-ci = { repository = "tokio-rs/tokio" }
-appveyor = { repository = "carllerche/tokio", id = "s83yxhy9qeb58va7" }
 
 [dependencies]
-futures-core-preview = "0.3.0-alpha.17"
-futures-util-preview = "0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.17"
+futures-util-preview = "=0.3.0-alpha.17"
 lazy_static = "1"
-tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
-tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
-tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
+tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
+tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -41,9 +35,9 @@ mio-uds = "0.6"
 signal-hook-registry = "~1"
 
 [dev-dependencies]
-tokio = { version = "0.2.0", path = "../tokio" }
-tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
-tokio-sync = { version = "0.2.0", path = "../tokio-sync", features = ["async-traits"]}
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+tokio-timer = { version = "=0.3.0-alpha.1", path = "../tokio-timer" }
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync", features = ["async-traits"]}
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"

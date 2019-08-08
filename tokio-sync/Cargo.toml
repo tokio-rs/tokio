@@ -5,34 +5,32 @@ name = "tokio-sync"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-sync/0.1.5/tokio_sync"
+documentation = "https://docs.rs/tokio-sync/0.2.0-alpha.1/tokio_sync"
 description = """
 Synchronization utilities.
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 async-traits = ["futures-sink-preview"]
 
 [dependencies]
 fnv = "1.0.6"
-futures-core-preview = { version = "= 0.3.0-alpha.17" }
-futures-sink-preview = { version = "= 0.3.0-alpha.17", optional = true }
-futures-util-preview = { version = "= 0.3.0-alpha.17" }
+futures-core-preview = { version = "=0.3.0-alpha.17" }
+futures-sink-preview = { version = "=0.3.0-alpha.17", optional = true }
+futures-util-preview = { version = "=0.3.0-alpha.17" }
 
 [dev-dependencies]
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
+
 env_logger = { version = "0.5", default-features = false }
-pin-utils = "0.1.0-alpha.4"
-tokio = { version = "*", path = "../tokio" }
-tokio-test = { version = "0.2.0", path = "../tokio-test" }
 loom = { version = "0.2.0", features = ["futures"] }

@@ -8,25 +8,24 @@ name = "tokio-threadpool"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-documentation = "https://docs.rs/tokio-threadpool/0.1.14/tokio_threadpool"
+documentation = "https://docs.rs/tokio-threadpool/0.2.0-alpha.1/tokio_threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 description = """
 A task scheduler backed by a work-stealing thread pool.
 """
 keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
-publish = false
 
 [dependencies]
-tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
-tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
-futures-core-preview = "= 0.3.0-alpha.17"
-futures-util-preview = "= 0.3.0-alpha.17"
+tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
+futures-core-preview = "=0.3.0-alpha.17"
+futures-util-preview = "=0.3.0-alpha.17"
 
 crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"
@@ -37,7 +36,8 @@ log = "0.4"
 lazy_static = "1"
 
 [dev-dependencies]
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
+
 rand = "0.7"
 env_logger = "0.5"
-tokio = { version = "0.2.0", path = "../tokio" }
-tokio-test = { version = "0.2.0", path = "../tokio-test" }

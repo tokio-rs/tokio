@@ -5,40 +5,39 @@ name = "tokio-uds"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
-version = "0.3.0"
+version = "0.3.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-uds/0.2.5/tokio_uds/"
+documentation = "https://docs.rs/tokio-uds/0.3.0-alpha.1/tokio_uds/"
 description = """
 Unix Domain sockets for Tokio
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 async-traits = []
 
 [dependencies]
+tokio-codec = { version = "=0.2.0-alpha.1", path = "../tokio-codec" }
+tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
+
 bytes = "0.4.8"
 mio = "0.6.14"
 mio-uds = "0.6.5"
-tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
-tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
-
-futures-core-preview = { version = "= 0.3.0-alpha.17" }
-futures-util-preview = { version = "= 0.3.0-alpha.17" }
+futures-core-preview = "=0.3.0-alpha.17"
+futures-util-preview = "=0.3.0-alpha.17"
 iovec = "0.1.2"
 libc = "0.2.42"
 log = "0.4.2"
 
 [dev-dependencies]
-tokio = { version = "0.2.0", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+
 tempfile = "3"
-futures-preview = "0.3.0-alpha.17"
+futures-preview = "=0.3.0-alpha.17"

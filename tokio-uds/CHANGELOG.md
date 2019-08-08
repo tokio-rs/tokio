@@ -1,3 +1,8 @@
+# 0.2.0-alpha.1 (August 8, 2019)
+
+### Changed
+- Switch to `async`, `await`, and `std::future`.
+
 # 0.2.5 (January 6, 2019)
 
 * Fix bug in `UnixDatagram::send` (#782).

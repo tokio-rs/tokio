@@ -2,8 +2,6 @@
 
 UDP bindings for `tokio`.
 
-[Documentation](https://docs.rs/tokio-udp/0.1.3/tokio_udp/)
-
 ## License
 
 This project is licensed under the [MIT license](./LICENSE).

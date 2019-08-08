@@ -5,35 +5,31 @@ name = "tokio-fs"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-fs/0.1.6/tokio_fs"
+documentation = "https://docs.rs/tokio-fs/0.2.0-alpha.1/tokio_fs"
 description = """
 Filesystem API for Tokio.
 """
 keywords = ["tokio", "futures", "fs", "file", "async"]
 categories = ["asynchronous", "network-programming", "filesystem"]
-publish = false
 
 [dependencies]
-tokio-io = { version = "0.2.0", features = ["util"], path = "../tokio-io" }
-tokio-threadpool = { version = "0.2.0", path = "../tokio-threadpool" }
+tokio-io = { version = "=0.2.0-alpha.1", features = ["util"], path = "../tokio-io" }
+tokio-threadpool = { version = "=0.2.0-alpha.1", path = "../tokio-threadpool" }
 
-futures-core-preview = "= 0.3.0-alpha.17"
-futures-util-preview = "= 0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.17"
+futures-util-preview = "=0.3.0-alpha.17"
 
 [dev-dependencies]
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+
 rand = "0.7"
 tempfile = "3"
-# tokio-codec = { version = "0.2.0", path = "../tokio-codec" }
-tokio = { version = "*", path = "../tokio" }
-# futures-preview = { version = "0.3.0-alpha.17" }
-# futures-util-preview = "0.3.0-alpha.17"
