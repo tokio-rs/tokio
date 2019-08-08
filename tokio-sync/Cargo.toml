@@ -32,7 +32,6 @@ futures-util-preview = { version = "= 0.3.0-alpha.17" }
 
 [dev-dependencies]
 env_logger = { version = "0.5", default-features = false }
-pin-utils = "0.1.0-alpha.4"
-tokio = { version = "*", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
 loom = { version = "0.2.0", features = ["futures"] }

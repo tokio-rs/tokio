@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.1.22/tokio/"
+documentation = "https://docs.rs/tokio/0.2.0-alpha.1/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -22,7 +22,6 @@ backed applications.
 """
 categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
-publish = false
 
 [features]
 default = [
@@ -59,19 +58,17 @@ udp = ["tokio-udp"]
 uds = ["tokio-uds"]
 
 [dependencies]
-# Only non-optional dependency...
-#futures = "0.1.20"
-futures-core-preview = "= 0.3.0-alpha.17"
-futures-sink-preview = "= 0.3.0-alpha.17"
-futures-util-preview = { version = "= 0.3.0-alpha.17", features = ["sink"] }
+futures-core-preview = "=0.3.0-alpha.17"
+futures-sink-preview = "=0.3.0-alpha.17"
+futures-util-preview = { version = "=0.3.0-alpha.17", features = ["sink"] }
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-tokio-codec = { version = "0.2.0", optional = true, path = "../tokio-codec" }
+tokio-codec = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-codec" }
 tokio-current-thread = { version = "0.2.0", optional = true, path = "../tokio-current-thread" }
 tokio-fs = { version = "0.2.0", optional = true, path = "../tokio-fs" }
-tokio-io = { version = "0.2.0", optional = true, features = ["util"], path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.1", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "0.2.0", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
 tokio-reactor = { version = "0.2.0", optional = true, path = "../tokio-reactor" }

@@ -37,7 +37,7 @@ slab = "0.4.1"
 
 [dev-dependencies]
 rand = "0.7"
-tokio = { version = "0.2.0", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-current-thread = { version = "0.2.0", path = "../tokio-current-thread" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync", features = ["async-traits"] }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }

@@ -24,7 +24,7 @@ publish = false
 [dependencies]
 pin-convert = "0.1.0"
 tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
-tokio-io = { version = "0.2.0", path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
 tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
 futures-core-preview = "=0.3.0-alpha.17"

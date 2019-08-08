@@ -26,4 +26,4 @@ publish = false
 
 [dev-dependencies]
 futures-core-preview = "=0.3.0-alpha.17"
-tokio = { version = "*", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }

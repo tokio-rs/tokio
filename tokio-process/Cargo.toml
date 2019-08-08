@@ -18,14 +18,14 @@ An implementation of an asynchronous process management backed futures.
 categories = ["asynchronous"]
 
 [dependencies]
-futures-core-preview = { version = "0.3.0-alpha.17" }
-futures-util-preview = { version = "0.3.0-alpha.17" }
+futures-core-preview = "=0.3.0-alpha.17"
+futures-util-preview = "=0.3.0-alpha.17"
 log = "0.4"
-tokio-io = { version = "0.2.0", path = "../tokio-io", features = ["util"] }
+tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io", features = ["util"] }
 tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
 
 [dev-dependencies.tokio]
-version = "0.2.0"
+version = "=0.2.0-alpha.1"
 path = "../tokio"
 default-features = false
 features = ["codec", "rt-full"]
