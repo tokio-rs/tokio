@@ -164,7 +164,6 @@ where
         }
     }
 
-    /// TODO: Docs
     pub(crate) fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
         self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }

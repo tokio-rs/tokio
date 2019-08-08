@@ -1,18 +1,17 @@
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
+use tokio::prelude::*;
+use tokio_codec::{Decoder, FramedRead};
+use tokio_test::assert_ready;
+use tokio_test::task::MockTask;
+
+use bytes::{Buf, BytesMut, IntoBuf};
 use std::collections::VecDeque;
-use std::io::{self, Read};
+use std::io;
 use std::pin::Pin;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
-
-use bytes::{Buf, BytesMut, IntoBuf};
-use futures::Stream;
-
-use tokio_codec::{Decoder, FramedRead};
-use tokio_io::AsyncRead;
-use tokio_test::assert_ready;
-use tokio_test::task::MockTask;
 
 macro_rules! mock {
     ($($x:expr,)*) => {{
@@ -261,29 +260,23 @@ struct Mock {
     calls: VecDeque<io::Result<Vec<u8>>>,
 }
 
-impl Read for Mock {
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        match self.calls.pop_front() {
-            Some(Ok(data)) => {
-                debug_assert!(dst.len() >= data.len());
-                dst[..data.len()].copy_from_slice(&data[..]);
-                Ok(data.len())
-            }
-            Some(Err(e)) => Err(e),
-            None => Ok(0),
-        }
-    }
-}
-
 impl AsyncRead for Mock {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        match Pin::get_mut(self).read(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Pending,
-            other => Ready(other),
+        use io::ErrorKind::WouldBlock;
+
+        match self.calls.pop_front() {
+            Some(Ok(data)) => {
+                debug_assert!(buf.len() >= data.len());
+                buf[..data.len()].copy_from_slice(&data[..]);
+                Ready(Ok(data.len()))
+            }
+            Some(Err(ref e)) if e.kind() == WouldBlock => Pending,
+            Some(Err(e)) => Ready(Err(e)),
+            None => Ready(Ok(0)),
         }
     }
 }
@@ -293,10 +286,10 @@ struct Slice<'a>(&'a [u8]);
 
 impl<'a> AsyncRead for Slice<'a> {
     fn poll_read(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Ready(Pin::get_mut(self).0.read(buf))
+        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }

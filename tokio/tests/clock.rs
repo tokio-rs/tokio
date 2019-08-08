@@ -1,14 +1,14 @@
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(feature = "default")]
 
-use env_logger;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
-use tokio::prelude::*;
 use tokio::runtime::{self, current_thread};
 use tokio::timer::*;
 use tokio_timer;
 use tokio_timer::clock::Clock;
+
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 struct MockNow(Instant);
 
@@ -20,8 +20,6 @@ impl tokio_timer::clock::Now for MockNow {
 
 #[test]
 fn clock_and_timer_concurrent() {
-    let _ = env_logger::try_init();
-
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
@@ -29,14 +27,10 @@ fn clock_and_timer_concurrent() {
 
     let (tx, rx) = mpsc::channel();
 
-    rt.spawn({
-        Delay::new(when)
-            .map_err(|e| panic!("unexpected error; err={:?}", e))
-            .and_then(move |_| {
-                assert!(Instant::now() < when);
-                tx.send(()).unwrap();
-                Ok(())
-            })
+    rt.spawn(async move {
+        Delay::new(when).await;
+        assert!(Instant::now() < when);
+        tx.send(()).unwrap();
     });
 
     rx.recv().unwrap();
@@ -44,20 +38,13 @@ fn clock_and_timer_concurrent() {
 
 #[test]
 fn clock_and_timer_single_threaded() {
-    let _ = env_logger::try_init();
-
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
     let mut rt = current_thread::Builder::new().clock(clock).build().unwrap();
 
-    rt.block_on({
-        Delay::new(when)
-            .map_err(|e| panic!("unexpected error; err={:?}", e))
-            .and_then(move |_| {
-                assert!(Instant::now() < when);
-                Ok(())
-            })
-    })
-    .unwrap();
+    rt.block_on(async move {
+        Delay::new(when).await;
+        assert!(Instant::now() < when);
+    });
 }

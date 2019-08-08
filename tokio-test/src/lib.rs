@@ -9,16 +9,6 @@
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Tokio and Futures based testing utilites
-//!
-//! # Example
-//!
-//! ```ignore
-//! # use futures::{Future, future};
-//! use tokio_test::assert_ready;
-//!
-//! let mut fut = future::ok::<(), ()>(());
-//! assert_ready!(fut.poll());
-//! ```
 
 pub mod clock;
 pub mod io;

@@ -10,7 +10,6 @@ use crate::wheel::{self, Wheel};
 use crate::{Delay, Error};
 
 use futures_core::ready;
-use futures_util::future::poll_fn;
 use slab::Slab;
 use std::cmp;
 use std::future::Future;
@@ -72,8 +71,10 @@ use std::time::{Duration, Instant};
 ///
 /// ```rust,no_run
 /// use tokio::timer::{delay_queue, DelayQueue, Error};
-/// use futures::{try_ready, Async, Poll, Stream};
+///
+/// use futures_core::ready;
 /// use std::collections::HashMap;
+/// use std::task::{Context, Poll};
 /// use std::time::Duration;
 /// # type CacheKey = String;
 /// # type Value = String;
@@ -104,12 +105,13 @@ use std::time::{Duration, Instant};
 ///         }
 ///     }
 ///
-///     fn poll_purge(&mut self) -> Poll<(), Error> {
-///         while let Some(entry) = try_ready!(self.expirations.poll()) {
+///     fn poll_purge(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+///         while let Some(res) = ready!(self.expirations.poll_next(cx)) {
+///             let entry = res?;
 ///             self.entries.remove(entry.get_ref());
 ///         }
 ///
-///         Ok(Async::Ready(()))
+///         Poll::Ready(Ok(()))
 ///     }
 /// }
 /// ```
@@ -349,7 +351,9 @@ impl<T> DelayQueue<T> {
         Key::new(key)
     }
 
-    /// TODO: Dox... also is the fn signature correct?
+    /// Attempt to pull out the next value of the delay queue, registering the
+    /// current task for wakeup if the value is not yet available, and returning
+    /// None if the queue is exhausted.
     pub fn poll_next(
         &mut self,
         cx: &mut task::Context<'_>,
@@ -368,13 +372,6 @@ impl<T> DelayQueue<T> {
                 }
             })
         }))
-    }
-
-    /// TODO: Dox... also is the fn signature correct?
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
-    #[allow(clippy::should_implement_trait)] // false positive : https://github.com/rust-lang/rust-clippy/issues/4290
-    pub async fn next(&mut self) -> Option<Result<Expired<T>, Error>> {
-        poll_fn(|cx| self.poll_next(cx)).await
     }
 
     /// Insert `value` into the queue set to expire after the requested duration

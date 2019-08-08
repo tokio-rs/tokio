@@ -1,21 +1,4 @@
 //! Futures task based helpers
-//!
-//! # Example
-//!
-//! This example will use the `MockTask` to set the current task on
-//! poll.
-//!
-//! ```ignore
-//! # use tokio_test::assert_ready_eq;
-//! # use tokio_test::task::MockTask;
-//! # use futures::{sync::mpsc, Stream, Sink, Future, Async};
-//! let mut task = MockTask::new();
-//! let (tx, mut rx) = mpsc::channel(5);
-//!
-//! tx.send(()).wait();
-//!
-//! assert_ready_eq!(task.enter(|| rx.poll()), Some(()));
-//! ```
 
 use tokio_executor::enter;
 

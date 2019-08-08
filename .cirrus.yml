@@ -8,7 +8,7 @@ freebsd_instance:
 task:
   name: FreeBSD 12.0
   env:
-    LOOM_MAX_DURATION: 10
+    LOOM_MAX_PREEMPTIONS: 2
   setup_script:
     - pkg install -y curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -33,7 +33,7 @@ task:
       echo "~~~~~~~~~~~~~~~~~~~~"
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --lib && cargo test --all --tests
+    - cargo test --all
     - cargo doc --all --no-deps
   # TODO: Re-enable
   # i686_test_script:

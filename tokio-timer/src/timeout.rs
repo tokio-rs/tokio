@@ -31,28 +31,33 @@ use std::time::{Duration, Instant};
 /// then a timeout should be set on the future that processes the stream. For
 /// example:
 ///
-/// ```rust
-/// // import the `timeout` function, usually this is done
-/// // with `use tokio::prelude::*`
-/// use tokio::prelude::FutureExt;
-/// use futures::Stream;
-/// use futures::sync::mpsc;
+/// ```rust,no_run
+/// #![feature(async_await)]
+///
+/// use tokio::prelude::*;
+/// use tokio::sync::mpsc;
+///
+/// use std::thread;
 /// use std::time::Duration;
 ///
-/// let (tx, rx) = mpsc::unbounded();
-/// # tx.unbounded_send(()).unwrap();
-/// # drop(tx);
+/// # async fn dox() {
+/// let (mut tx, rx) = mpsc::unbounded_channel();
+///
+/// thread::spawn(move || {
+///     tx.try_send(()).unwrap();
+///     thread::sleep(Duration::from_millis(10));
+///     tx.try_send(()).unwrap();
+/// });
 ///
 /// let process = rx.for_each(|item| {
 ///     // do something with `item`
 /// # drop(item);
-/// # Ok(())
+/// # tokio::future::ready(())
 /// });
 ///
-/// # tokio::runtime::current_thread::block_on_all(
 /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
-/// process.timeout(Duration::from_millis(10))
-/// # ).unwrap();
+/// process.timeout(Duration::from_millis(10)).await;
+/// # }
 /// ```
 ///
 /// # Cancelation
@@ -91,18 +96,20 @@ impl<T> Timeout<T> {
     /// Create a new `Timeout` set to expire in 10 milliseconds.
     ///
     /// ```rust
+    /// #![feature(async_await)]
+    ///
     /// use tokio::timer::Timeout;
-    /// use futures::Future;
-    /// use futures::sync::oneshot;
+    /// use tokio::sync::oneshot;
+    ///
     /// use std::time::Duration;
     ///
+    /// # async fn dox() {
     /// let (tx, rx) = oneshot::channel();
     /// # tx.send(()).unwrap();
     ///
-    /// # tokio::runtime::current_thread::block_on_all(
     /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
-    /// Timeout::new(rx, Duration::from_millis(10))
-    /// # ).unwrap();
+    /// Timeout::new(rx, Duration::from_millis(10)).await;
+    /// }
     /// ```
     pub fn new(value: T, timeout: Duration) -> Timeout<T> {
         let delay = Delay::new_timeout(now() + timeout, timeout);

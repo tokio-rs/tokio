@@ -1,41 +1,41 @@
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(feature = "default")]
 
-use futures::future;
-use futures::prelude::*;
-use futures::sync::oneshot;
-use std::net;
-use std::thread;
 use tokio::net::TcpListener;
 use tokio::reactor::Reactor;
+use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 #[test]
 fn tcp_doesnt_block() {
-    let core = Reactor::new().unwrap();
-    let handle = core.handle();
-    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let listener = TcpListener::from_std(listener, &handle).unwrap();
-    drop(core);
-    assert!(listener.incoming().wait().next().unwrap().is_err());
+    let reactor = Reactor::new().unwrap();
+    let handle = reactor.handle();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let mut listener = TcpListener::from_std(listener, &handle).unwrap();
+    drop(reactor);
+
+    let mut task = task::spawn(async move {
+        assert_err!(listener.accept().await);
+    });
+
+    assert_ready!(task.poll());
 }
 
 #[test]
 fn drop_wakes() {
-    let core = Reactor::new().unwrap();
-    let handle = core.handle();
-    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let listener = TcpListener::from_std(listener, &handle).unwrap();
-    let (tx, rx) = oneshot::channel::<()>();
-    let t = thread::spawn(move || {
-        let incoming = listener.incoming();
-        let new_socket = incoming.into_future().map_err(|_| ());
-        let drop_tx = future::lazy(|| {
-            drop(tx);
-            future::ok(())
-        });
-        assert!(new_socket.join(drop_tx).wait().is_err());
+    let reactor = Reactor::new().unwrap();
+    let handle = reactor.handle();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let mut listener = TcpListener::from_std(listener, &handle).unwrap();
+
+    let mut task = task::spawn(async move {
+        assert_err!(listener.accept().await);
     });
-    drop(rx.wait());
-    drop(core);
-    t.join().unwrap();
+
+    assert_pending!(task.poll());
+
+    drop(reactor);
+
+    assert!(task.is_woken());
+    assert_ready!(task.poll());
 }

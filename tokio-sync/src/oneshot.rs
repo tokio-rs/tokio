@@ -157,18 +157,7 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    /// Check if the associated [`Receiver`] handle has been dropped.
-    ///
-    /// # Return values
-    ///
-    /// If `Ready(Ok(_))` is returned then the associated `Receiver` has been
-    /// dropped, which means any work required for sending should be canceled.
-    ///
-    /// If `Pending` is returned then the associated `Receiver` is still
-    /// alive and may be able to receive a message if sent. The current task is
-    /// registered to receive a notification if the `Receiver` handle goes away.
-    ///
-    /// [`Receiver`]: struct.Receiver.html
+    #[doc(hidden)] // TODO: remove
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         let inner = self.inner.as_ref().unwrap();
 

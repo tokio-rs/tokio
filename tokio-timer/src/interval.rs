@@ -55,7 +55,7 @@ impl Interval {
         Interval { delay, duration }
     }
 
-    /// TODO: dox
+    #[doc(hidden)] // TODO: remove
     pub fn poll_next(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Instant>> {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
@@ -72,9 +72,30 @@ impl Interval {
         Poll::Ready(Some(now))
     }
 
-    /// TODO: dox
+    /// Completes when the next instant in the interval has been reached.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::timer::Interval;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interval = Interval::new_interval(Duration::from_millis(10));
+    ///
+    ///     interval.next().await;
+    ///     interval.next().await;
+    ///     interval.next().await;
+    ///
+    ///     // approximately 30ms have elapsed.
+    /// }
+    /// ```
     #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
-    #[allow(clippy::should_implement_trait)] // false positive : https://github.com/rust-lang/rust-clippy/issues/4290
+    #[allow(clippy::should_implement_trait)] // TODO: rename (tokio-rs/tokio#1261)
     pub async fn next(&mut self) -> Option<Instant> {
         poll_fn(|cx| self.poll_next(cx)).await
     }

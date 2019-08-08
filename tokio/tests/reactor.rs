@@ -1,15 +1,35 @@
-#![cfg(feature = "broken")]
+#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
+#![cfg(feature = "default")]
 
-use futures::executor::{spawn, Notify, Spawn};
-use futures::{Future, Stream};
-use std::mem;
-use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
-use tokio_executor;
-use tokio_reactor;
 use tokio_reactor::Reactor;
 use tokio_tcp::TcpListener;
+use tokio_test::{assert_ok, assert_pending};
+
+use futures_util::task::ArcWake;
+use std::future::Future;
+use std::net::TcpStream;
+use std::pin::Pin;
+use std::sync::{mpsc, Arc, Mutex};
+use std::task::Context;
+
+struct Task<T> {
+    future: Mutex<Pin<Box<T>>>,
+}
+
+impl<T: Send> ArcWake for Task<T> {
+    fn wake_by_ref(_: &Arc<Self>) {
+        // Do nothing...
+    }
+}
+
+impl<T> Task<T> {
+    fn new(future: T) -> Task<T> {
+        Task {
+            future: Mutex::new(Box::pin(future)),
+        }
+    }
+}
 
 #[test]
 fn test_drop_on_notify() {
@@ -26,59 +46,34 @@ fn test_drop_on_notify() {
     // shutting down. Then, when the task handle is dropped, the task itself is
     // dropped.
 
-    struct MyNotify;
-
-    type Task = Mutex<Spawn<Box<dyn Future<Item = (), Error = ()>>>>;
-
-    impl Notify for MyNotify {
-        fn notify(&self, _: usize) {
-            // Do nothing
-        }
-
-        fn clone_id(&self, id: usize) -> usize {
-            let ptr = id as *const Task;
-            let task = unsafe { Arc::from_raw(ptr) };
-
-            mem::forget(task.clone());
-            mem::forget(task);
-
-            id
-        }
-
-        fn drop_id(&self, id: usize) {
-            let ptr = id as *const Task;
-            let _ = unsafe { Arc::from_raw(ptr) };
-        }
-    }
-
-    let addr = "127.0.0.1:0".parse().unwrap();
-    let mut reactor = Reactor::new().unwrap();
-
-    // Create a listener
-    let listener = TcpListener::bind(&addr).unwrap();
-    let addr = listener.local_addr().unwrap();
+    let mut reactor = assert_ok!(Reactor::new());
+    let (addr_tx, addr_rx) = mpsc::channel();
 
     // Define a task that just drains the listener
-    let task = Box::new({
-        listener
-            .incoming()
-            .for_each(|_| Ok(()))
-            .map_err(|_| panic!())
-    }) as Box<dyn Future<Item = (), Error = ()>>;
+    let task = Arc::new(Task::new(async move {
+        let addr = assert_ok!("127.0.0.1:0".parse());
+        // Create a listener
+        let mut listener = assert_ok!(TcpListener::bind(&addr));
 
-    let task = Arc::new(Mutex::new(spawn(task)));
-    let notify = Arc::new(MyNotify);
+        // Send the address
+        let addr = listener.local_addr().unwrap();
+        addr_tx.send(addr).unwrap();
 
-    let mut enter = tokio_executor::enter().unwrap();
+        loop {
+            let _ = listener.accept().await;
+        }
+    }));
 
-    tokio_reactor::with_default(&reactor.handle(), &mut enter, |_| {
-        let id = &*task as *const Task as usize;
+    let _enter = tokio_executor::enter().unwrap();
 
-        task.lock()
-            .unwrap()
-            .poll_future_notify(&notify, id)
-            .unwrap();
+    tokio_reactor::with_default(&reactor.handle(), || {
+        let waker = task.clone().into_waker();
+        let mut cx = Context::from_waker(&waker);
+        assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
     });
+
+    // Get the address
+    let addr = addr_rx.recv().unwrap();
 
     drop(task);
 

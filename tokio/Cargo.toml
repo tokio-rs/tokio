@@ -29,19 +29,18 @@ default = [
   "codec",
   "fs",
   "io",
+  "net",
   "reactor",
   "rt-full",
   "sync",
-  "tcp",
   "timer",
-  "udp",
-  "uds",
 ]
 
 codec = ["io", "tokio-codec", "bytes"]
 fs = ["tokio-fs"]
 io = ["tokio-io"]
 reactor = ["io", "tokio-reactor"]
+net = ["reactor", "tcp", "udp", "uds"]
 rt-full = [
   "num_cpus",
   "reactor",

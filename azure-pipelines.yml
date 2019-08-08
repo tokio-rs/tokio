@@ -26,7 +26,17 @@ jobs:
     cross: true
     crates:
       tokio:
-        - default
+        - codec
+        - fs
+        - io
+        - reactor
+        - rt-full
+        - net
+        - sync
+        - tcp
+        - timer
+        - udp
+        - uds
 
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml
@@ -42,7 +52,6 @@ jobs:
       tokio-signal: []
       tokio-tcp:
         - async-traits
-#       - tokio-tls
       tokio-udp: []
       tokio-uds:
         - async-traits
@@ -54,7 +63,7 @@ jobs:
     displayName: Test sub crates -
     rust: $(nightly)
     crates:
-      # - tokio-buf
+      tokio-buf: []
       tokio-codec: []
       tokio-current-thread: []
       tokio-executor: []

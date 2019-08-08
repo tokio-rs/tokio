@@ -41,4 +41,3 @@ rand = "0.7"
 env_logger = "0.5"
 tokio = { version = "0.2.0", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
-futures-util-preview = "= 0.3.0-alpha.17"

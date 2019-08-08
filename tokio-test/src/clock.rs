@@ -2,21 +2,26 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use tokio_test::clock;
-//! use tokio_test::{assert_ready, assert_not_ready};
+//! ```
+//! #![feature(async_await)]
+//!
+//! use tokio::clock;
+//! use tokio_test::{assert_ready, assert_pending, task};
 //! use tokio_timer::Delay;
+//!
 //! use std::time::Duration;
-//! use futures::Future;
 //!
-//! clock::mock(|handle| {
-//!     let mut delay = Delay::new(handle.now() + Duration::from_secs(1));
+//! tokio_test::clock::mock(|handle| {
+//!     let mut task = task::spawn(async {
+//!         let delay = Delay::new(clock::now() + Duration::from_secs(1));
+//!         delay.await
+//!     });
 //!
-//!     assert_not_ready!(delay.poll());
+//!     assert_pending!(task.poll());
 //!
 //!     handle.advance(Duration::from_secs(1));
 //!
-//!     assert_ready!(delay.poll());
+//!     assert_ready!(task.poll());
 //! });
 //! ```
 

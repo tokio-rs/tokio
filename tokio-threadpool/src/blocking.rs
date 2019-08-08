@@ -80,11 +80,11 @@ pub struct BlockingError {
 /// that needs to be performed.
 ///
 /// ```rust
+/// #![feature(async_await)]
+///
 /// use tokio_threadpool::{ThreadPool, blocking};
 ///
-/// use futures::Future;
-/// use futures::future::{lazy, poll_fn};
-///
+/// use futures_util::future::poll_fn;
 /// use std::sync::mpsc;
 /// use std::thread;
 /// use std::time::Duration;
@@ -101,21 +101,21 @@ pub struct BlockingError {
 ///
 ///     let pool = ThreadPool::new();
 ///
-///     pool.spawn(lazy(move || {
+///     pool.spawn(async move {
 ///         // Because `blocking` returns `Poll`, it is intended to be used
 ///         // from the context of a `Future` implementation. Since we don't
 ///         // have a complicated requirement, we can use `poll_fn` in this
 ///         // case.
-///         poll_fn(move || {
+///         poll_fn(move |_| {
 ///             blocking(|| {
 ///                 let msg = rx.recv().unwrap();
 ///                 println!("message = {}", msg);
 ///             }).map_err(|_| panic!("the threadpool shut down"))
-///         })
-///     }));
+///         }).await;
+///     });
 ///
 ///     // Wait for the task we just spawned to complete.
-///     pool.shutdown_on_idle().wait().unwrap();
+///     pool.shutdown_on_idle().wait();
 /// }
 /// ```
 pub fn blocking<F, T>(f: F) -> Poll<Result<T, BlockingError>>

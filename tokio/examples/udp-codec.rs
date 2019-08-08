@@ -7,6 +7,7 @@
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
 #![feature(async_await)]
+#![cfg(feature = "rt-full")]
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio::io;
