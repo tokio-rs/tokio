@@ -35,4 +35,4 @@ env_logger = { version = "0.5", default-features = false }
 pin-utils = "0.1.0-alpha.4"
 tokio = { version = "*", path = "../tokio" }
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
-loom = { git = "https://github.com/carllerche/loom", features = ["futures"] }
+loom = { version = "0.2.0", features = ["futures"] }
