@@ -36,15 +36,13 @@ fn changing_rx_task() {
         });
 
         let rx = thread::spawn(move || {
-            let ready = block_on(poll_fn(|cx| {
-                match Pin::new(&mut rx).poll(cx) {
-                    Ready(Ok(value)) => {
-                        assert_eq!(1, value);
-                        Ready(true)
-                    }
-                    Ready(Err(_)) => unimplemented!(),
-                    Pending => Ready(false),
+            let ready = block_on(poll_fn(|cx| match Pin::new(&mut rx).poll(cx) {
+                Ready(Ok(value)) => {
+                    assert_eq!(1, value);
+                    Ready(true)
                 }
+                Ready(Err(_)) => unimplemented!(),
+                Pending => Ready(false),
             }));
 
             if ready {
