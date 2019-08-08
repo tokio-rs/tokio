@@ -8,7 +8,7 @@ name = "tokio-test"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
@@ -22,13 +22,15 @@ categories = ["asynchronous", "testing"]
 publish = false
 
 [dependencies]
-pin-convert = "0.1.0"
-tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
+tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
-tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
-tokio-timer = { version = "0.3.0", path = "../tokio-timer" }
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
+tokio-timer = { version = "=0.3.0-alpha.1", path = "../tokio-timer" }
+
 futures-core-preview = "=0.3.0-alpha.17"
+pin-convert = "0.1.0"
 
 [dev-dependencies]
-tokio = { path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
+
 futures-util-preview = "=0.3.0-alpha.17"

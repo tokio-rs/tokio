@@ -8,7 +8,7 @@ name = "tokio-fs"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
@@ -25,13 +25,13 @@ publish = false
 
 [dependencies]
 tokio-io = { version = "=0.2.0-alpha.1", features = ["util"], path = "../tokio-io" }
-tokio-threadpool = { version = "0.2.0", path = "../tokio-threadpool" }
+tokio-threadpool = { version = "=0.2.0-alpha.1", path = "../tokio-threadpool" }
 
 futures-core-preview = "=0.3.0-alpha.17"
 futures-util-preview = "=0.3.0-alpha.17"
 
 [dev-dependencies]
-rand = "0.7"
-tempfile = "3"
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 
+rand = "0.7"
+tempfile = "3"

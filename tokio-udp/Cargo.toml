@@ -8,7 +8,7 @@ name = "tokio-udp"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
@@ -22,12 +22,14 @@ categories = ["asynchronous"]
 publish = false
 
 [dependencies]
-tokio-reactor = { version = "0.2.0", path = "../tokio-reactor" }
+tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
+
 mio = "0.6.14"
 log = "0.4"
 futures-core-preview = "=0.3.0-alpha.17"
 futures-util-preview = "=0.3.0-alpha.17"
 
 [dev-dependencies]
-env_logger = { version = "0.5", default-features = false }
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio", default-features = false, features = ["rt-full"] }
+
+env_logger = { version = "0.5", default-features = false }

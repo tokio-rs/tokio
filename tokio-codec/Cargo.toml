@@ -28,6 +28,7 @@ futures-sink-preview = "=0.3.0-alpha.17"
 log = "0.4"
 
 [dev-dependencies]
-futures-util-preview = "=0.3.0-alpha.17"
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
-tokio-test = { version = "0.2.0", path = "../tokio-test" }
+tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
+
+futures-util-preview = "=0.3.0-alpha.17"
