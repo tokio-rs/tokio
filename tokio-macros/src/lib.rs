@@ -62,6 +62,12 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         };
 
         return TokenStream::from(tokens);
+    } else if !input.decl.inputs.is_empty() {
+        let tokens = quote_spanned! { input.span() =>
+          compile_error!("the main function cannot accept arguments");
+        };
+
+        return TokenStream::from(tokens);
     }
 
     let mut runtime = RuntimeType::Multi;
@@ -102,7 +108,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// #![feature(async_await)]
 ///
 /// #[tokio::test]
@@ -132,6 +138,12 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     if input.asyncness.is_none() {
         let tokens = quote_spanned! { input.span() =>
           compile_error!("the async keyword is missing from the function declaration");
+        };
+
+        return TokenStream::from(tokens);
+    } else if !input.decl.inputs.is_empty() {
+        let tokens = quote_spanned! { input.span() =>
+          compile_error!("the test function cannot accept arguments");
         };
 
         return TokenStream::from(tokens);
