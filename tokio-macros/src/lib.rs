@@ -129,7 +129,7 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     for attr in attrs {
         if attr.path.is_ident("test") {
             let msg = "second test attribute is supplied";
-            return syn::Error::new_spanned(&attr.path, msg)
+            return syn::Error::new_spanned(&attr, msg)
                 .to_compile_error()
                 .into();
         }
