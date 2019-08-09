@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(await_macro, async_await)]
 
 #[test]

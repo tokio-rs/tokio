@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use bytes::{BufMut, Bytes, BytesMut};
 use tokio_codec::{BytesCodec, Decoder, Encoder, LinesCodec};

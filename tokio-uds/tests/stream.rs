@@ -1,6 +1,6 @@
 #![cfg(unix)]
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use futures::future::try_join;
 use tempfile::Builder;

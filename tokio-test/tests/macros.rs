@@ -1,5 +1,5 @@
 #![cfg(feature = "broken")]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use futures::{future, Async, Future, Poll};
 use tokio_macros::{assert_not_ready, assert_ready, assert_ready_eq};

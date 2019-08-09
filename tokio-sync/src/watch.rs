@@ -60,14 +60,16 @@ use crate::task::AtomicWaker;
 use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;
-use futures_core::ready;
 use futures_util::future::poll_fn;
-use futures_util::pin_mut;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
 
+#[cfg(feature = "async-traits")]
+use futures_core::ready;
+#[cfg(feature = "async-traits")]
+use futures_util::pin_mut;
 #[cfg(feature = "async-traits")]
 use std::pin::Pin;
 

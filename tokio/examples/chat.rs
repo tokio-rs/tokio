@@ -25,7 +25,7 @@
 //! messages.
 
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use futures::{Poll, SinkExt, Stream, StreamExt};
 use std::{collections::HashMap, env, error::Error, io, net::SocketAddr, pin::Pin, task::Context};

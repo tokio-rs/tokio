@@ -1,5 +1,5 @@
 #![cfg(unix)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use futures_util::future::FutureExt;
 use libc::{c_int, getpid, kill};

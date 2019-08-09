@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use tokio_test::task::MockTask;
 use tokio_test::{assert_ok, assert_pending, assert_ready, clock};

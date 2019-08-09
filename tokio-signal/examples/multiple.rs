@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 //! A small example of how to listen for two signals at the same time

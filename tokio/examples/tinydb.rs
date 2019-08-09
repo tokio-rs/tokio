@@ -40,7 +40,7 @@
 //!   returning the previous value, if any.
 
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::env;

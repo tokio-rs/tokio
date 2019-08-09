@@ -8,7 +8,7 @@
 
 #![feature(async_await)]
 #![cfg(feature = "rt-full")]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use tokio::io;
 use tokio::net::UdpSocket;

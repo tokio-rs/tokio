@@ -1,5 +1,5 @@
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use tokio::prelude::*;
 use tokio_codec::{Decoder, Encoder, Framed, FramedParts};

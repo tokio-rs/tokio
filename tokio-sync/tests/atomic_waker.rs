@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use std::task::Waker;
 use tokio_sync::AtomicWaker;

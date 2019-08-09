@@ -1,6 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-tls/0.3.0-alpha.1")]
-#![deny(rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![warn(rust_2018_idioms)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]
 
