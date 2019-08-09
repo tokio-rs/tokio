@@ -33,7 +33,7 @@ tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-tcp = { version = "=0.2.0-alpha.1", path = "../tokio-tcp", features = ["async-traits"] }
 
 cfg-if = "0.1"
-env_logger = { version = "0.5", default-features = false }
+env_logger = { version = "0.6", default-features = false }
 futures-preview = { version = "=0.3.0-alpha.17", features = ["async-await", "nightly"] }
 
 [target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]

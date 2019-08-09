@@ -30,4 +30,4 @@ futures-util-preview = "=0.3.0-alpha.17"
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio", default-features = false, features = ["rt-full"] }
 
-env_logger = { version = "0.5", default-features = false }
+env_logger = { version = "0.6", default-features = false }

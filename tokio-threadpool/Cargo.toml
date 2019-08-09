@@ -40,4 +40,4 @@ tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
 
 rand = "0.7"
-env_logger = "0.5"
+env_logger = { version = "0.6", default-features = false }
