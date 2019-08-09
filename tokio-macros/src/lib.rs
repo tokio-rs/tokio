@@ -7,8 +7,7 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use quote::{quote, quote_spanned};
-use syn::spanned::Spanned;
+use quote::quote;
 
 /// Marks async function to be executed by selected runtime.
 ///
@@ -56,17 +55,15 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = &input.attrs;
 
     if input.asyncness.is_none() {
-        let tokens = quote_spanned! { input.span() =>
-          compile_error!("the async keyword is missing from the function declaration");
-        };
-
-        return TokenStream::from(tokens);
+        let msg = "the async keyword is missing from the function declaration";
+        return syn::Error::new_spanned(input.decl.fn_token, msg)
+            .to_compile_error()
+            .into();
     } else if !input.decl.inputs.is_empty() {
-        let tokens = quote_spanned! { input.span() =>
-          compile_error!("the main function cannot accept arguments");
-        };
-
-        return TokenStream::from(tokens);
+        let msg = "the main function cannot accept arguments";
+        return syn::Error::new_spanned(&input.decl.inputs, msg)
+            .to_compile_error()
+            .into();
     }
 
     let mut runtime = RuntimeType::Multi;
@@ -76,7 +73,12 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             match ident.to_string().to_lowercase().as_str() {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
-                name => panic!("Unknown attribute {} is specified", name),
+                name => {
+                    let msg = format!("Unknown attribute {} is specified", name);
+                    return syn::Error::new_spanned(ident, msg)
+                        .to_compile_error()
+                        .into();
+                }
             }
         }
     }
@@ -126,26 +128,23 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     for attr in attrs {
         if attr.path.is_ident("test") {
-            let tokens = quote_spanned! { input.span() =>
-                compile_error!("second test attribute is supplied");
-            };
-
-            return TokenStream::from(tokens);
+            let msg = "second test attribute is supplied";
+            return syn::Error::new_spanned(&attr, msg)
+                .to_compile_error()
+                .into();
         }
     }
 
     if input.asyncness.is_none() {
-        let tokens = quote_spanned! { input.span() =>
-          compile_error!("the async keyword is missing from the function declaration");
-        };
-
-        return TokenStream::from(tokens);
+        let msg = "the async keyword is missing from the function declaration";
+        return syn::Error::new_spanned(&input, msg)
+            .to_compile_error()
+            .into();
     } else if !input.decl.inputs.is_empty() {
-        let tokens = quote_spanned! { input.span() =>
-          compile_error!("the test function cannot accept arguments");
-        };
-
-        return TokenStream::from(tokens);
+        let msg = "the test function cannot accept arguments";
+        return syn::Error::new_spanned(&input.decl.inputs, msg)
+            .to_compile_error()
+            .into();
     }
 
     let result = quote! {
