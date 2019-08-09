@@ -1,3 +1,7 @@
+use crate::split::{
+    split, split_mut, UnixStreamReadHalf, UnixStreamReadHalfMut, UnixStreamWriteHalf,
+    UnixStreamWriteHalfMut,
+};
 use crate::ucred::{self, UCred};
 
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -101,6 +105,24 @@ impl UnixStream {
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
+    }
+
+    /// Split a `UnixStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split(self) -> (UnixStreamReadHalf, UnixStreamWriteHalf) {
+        split(self)
+    }
+
+    /// Split a `UnixStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split_mut(&mut self) -> (UnixStreamReadHalfMut<'_>, UnixStreamWriteHalfMut<'_>) {
+        split_mut(self)
     }
 }
 

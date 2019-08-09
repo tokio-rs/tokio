@@ -12,6 +12,7 @@ mod datagram;
 // mod frame;
 mod incoming;
 mod listener;
+pub mod split;
 mod stream;
 mod ucred;
 
