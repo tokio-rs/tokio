@@ -16,9 +16,6 @@ use super::Framed;
 /// Implementations are able to track state on `self`, which enables
 /// implementing stateful streaming parsers. In many cases, though, this type
 /// will simply be a unit struct (e.g. `struct HttpDecoder`).
-
-// Note: We can't deprecate this trait, because the deprecation carries through to tokio-codec, and
-// there doesn't seem to be a way to un-deprecate the re-export.
 pub trait Decoder {
     /// The type of decoded frames.
     type Item;
