@@ -1,6 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/tokio-reactor/0.2.0-alpha.1")]
-#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Event loop that drives Tokio I/O resources.

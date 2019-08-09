@@ -3,6 +3,7 @@ pr: ["master", "std-future"]
 
 variables:
   nightly: nightly-2019-07-17
+  RUSTFLAGS: -Dwarnings
 
 jobs:
 # Check formatting

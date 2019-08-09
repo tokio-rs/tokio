@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![cfg(feature = "async-traits")]
 
 use tokio_sync::mpsc;

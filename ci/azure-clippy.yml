@@ -12,5 +12,5 @@ jobs:
         cargo clippy --version
       displayName: Install clippy
     - script: |
-        cargo clippy --all --all-features -- -D warnings -A clippy::mutex-atomic
+        cargo clippy --all --all-features -- -A clippy::mutex-atomic
       displayName: cargo clippy --all

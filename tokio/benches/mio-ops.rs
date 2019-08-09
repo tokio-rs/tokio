@@ -1,7 +1,7 @@
 // Measure cost of different operations
 // to get a sense of performance tradeoffs
 #![feature(test)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 extern crate test;
 

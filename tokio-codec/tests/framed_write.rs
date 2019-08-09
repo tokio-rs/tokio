@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use tokio_codec::{Encoder, FramedWrite};
 use tokio_io::AsyncWrite;

@@ -14,7 +14,7 @@
 //! this repository! Many of them recommend running this as a simple "hook up
 //! stdin/stdout to a server" to get up and running.
 
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 use futures::{SinkExt, Stream};

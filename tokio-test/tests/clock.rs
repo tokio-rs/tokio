@@ -1,5 +1,5 @@
 #![cfg(feature = "broken")]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use futures::Future;
 use std::time::{Duration, Instant};

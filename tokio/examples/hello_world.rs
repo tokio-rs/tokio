@@ -11,7 +11,7 @@
 //!
 //!     cargo run --example hello_world
 
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 use tokio;

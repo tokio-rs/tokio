@@ -118,8 +118,7 @@
 //! be regained with the `Child::forget` method.
 
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.3.0")]
-#![deny(missing_debug_implementations, missing_docs, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![warn(missing_debug_implementations, missing_docs, rust_2018_idioms)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]
 
