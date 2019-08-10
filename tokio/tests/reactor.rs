@@ -6,7 +6,7 @@ use tokio_reactor::Reactor;
 use tokio_tcp::TcpListener;
 use tokio_test::{assert_ok, assert_pending};
 
-use futures_util::task::ArcWake;
+use futures_util::task::{waker_ref, ArcWake};
 use std::future::Future;
 use std::net::TcpStream;
 use std::pin::Pin;
@@ -67,7 +67,7 @@ fn test_drop_on_notify() {
     let _enter = tokio_executor::enter().unwrap();
 
     tokio_reactor::with_default(&reactor.handle(), || {
-        let waker = task.clone().into_waker();
+        let waker = waker_ref(&task);
         let mut cx = Context::from_waker(&waker);
         assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
     });
