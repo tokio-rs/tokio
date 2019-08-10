@@ -22,7 +22,7 @@ pub(crate) struct AtomicStackEntries {
 const SHUTDOWN: *mut Entry = 1 as *mut _;
 
 impl AtomicStack {
-    pub fn new() -> AtomicStack {
+    pub(crate) fn new() -> AtomicStack {
         AtomicStack {
             head: AtomicPtr::new(ptr::null_mut()),
         }
@@ -32,7 +32,7 @@ impl AtomicStack {
     ///
     /// Returns `true` if the entry was pushed, `false` if the entry is already
     /// on the stack, `Err` if the timer is shutdown.
-    pub fn push(&self, entry: &Arc<Entry>) -> Result<bool, Error> {
+    pub(crate) fn push(&self, entry: &Arc<Entry>) -> Result<bool, Error> {
         // First, set the queued bit on the entry
         let queued = entry.queued.fetch_or(true, SeqCst);
 
@@ -72,14 +72,14 @@ impl AtomicStack {
     }
 
     /// Take all entries from the stack
-    pub fn take(&self) -> AtomicStackEntries {
+    pub(crate) fn take(&self) -> AtomicStackEntries {
         let ptr = self.head.swap(ptr::null_mut(), SeqCst);
         AtomicStackEntries { ptr }
     }
 
     /// Drain all remaining nodes in the stack and prevent any new nodes from
     /// being pushed onto the stack.
-    pub fn shutdown(&self) {
+    pub(crate) fn shutdown(&self) {
         // Shutdown the processing queue
         let ptr = self.head.swap(SHUTDOWN, SeqCst);
 

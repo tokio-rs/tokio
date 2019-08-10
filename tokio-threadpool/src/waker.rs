@@ -10,8 +10,8 @@ use std::sync::Arc;
 /// to poll the future again.
 #[derive(Debug)]
 pub(crate) struct Waker {
-    pub pool: Arc<Pool>,
-    pub task: Arc<Task>,
+    pub(crate) pool: Arc<Pool>,
+    pub(crate) task: Arc<Task>,
 }
 
 unsafe impl Send for Waker {}

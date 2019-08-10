@@ -104,7 +104,7 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub fn new(deadline: Instant, duration: Duration) -> Entry {
+    pub(crate) fn new(deadline: Instant, duration: Duration) -> Entry {
         Entry {
             time: CachePadded::new(UnsafeCell::new(Time { deadline, duration })),
             inner: None,
@@ -119,24 +119,24 @@ impl Entry {
     }
 
     /// Only called by `Registration`
-    pub fn time_ref(&self) -> &Time {
+    pub(crate) fn time_ref(&self) -> &Time {
         unsafe { &*self.time.get() }
     }
 
     /// Only called by `Registration`
     #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
-    pub unsafe fn time_mut(&self) -> &mut Time {
+    pub(crate) unsafe fn time_mut(&self) -> &mut Time {
         &mut *self.time.get()
     }
 
     /// Returns `true` if the `Entry` is currently associated with a timer
     /// instance.
-    pub fn is_registered(&self) -> bool {
+    pub(crate) fn is_registered(&self) -> bool {
         self.inner.is_some()
     }
 
     /// Only called by `Registration`
-    pub fn register(me: &mut Arc<Self>) {
+    pub(crate) fn register(me: &mut Arc<Self>) {
         let handle = match HandlePriv::try_current() {
             Ok(handle) => handle,
             Err(_) => {
@@ -152,7 +152,7 @@ impl Entry {
     }
 
     /// Only called by `Registration`
-    pub fn register_with(me: &mut Arc<Self>, handle: HandlePriv) {
+    pub(crate) fn register_with(me: &mut Arc<Self>, handle: HandlePriv) {
         assert!(!me.is_registered(), "only register an entry once");
 
         let deadline = me.time_ref().deadline;
@@ -202,18 +202,18 @@ impl Entry {
 
     /// The current entry state as known by the timer. This is not the value of
     /// `state`, but lets the timer know how to converge its state to `state`.
-    pub fn when_internal(&self) -> Option<u64> {
+    pub(crate) fn when_internal(&self) -> Option<u64> {
         unsafe { (*self.when.get()) }
     }
 
-    pub fn set_when_internal(&self, when: Option<u64>) {
+    pub(crate) fn set_when_internal(&self, when: Option<u64>) {
         unsafe {
             (*self.when.get()) = when;
         }
     }
 
     /// Called by `Timer` to load the current value of `state` for processing
-    pub fn load_state(&self) -> Option<u64> {
+    pub(crate) fn load_state(&self) -> Option<u64> {
         let state = self.state.load(SeqCst);
 
         if is_elapsed(state) {
@@ -223,12 +223,12 @@ impl Entry {
         }
     }
 
-    pub fn is_elapsed(&self) -> bool {
+    pub(crate) fn is_elapsed(&self) -> bool {
         let state = self.state.load(SeqCst);
         is_elapsed(state)
     }
 
-    pub fn fire(&self, when: u64) {
+    pub(crate) fn fire(&self, when: u64) {
         let mut curr = self.state.load(SeqCst);
 
         loop {
@@ -249,7 +249,7 @@ impl Entry {
         self.waker.wake();
     }
 
-    pub fn error(&self) {
+    pub(crate) fn error(&self) {
         // Only transition to the error state if not currently elapsed
         let mut curr = self.state.load(SeqCst);
 
@@ -272,7 +272,7 @@ impl Entry {
         self.waker.wake();
     }
 
-    pub fn cancel(entry: &Arc<Entry>) {
+    pub(crate) fn cancel(entry: &Arc<Entry>) {
         let state = entry.state.fetch_or(ELAPSED, SeqCst);
 
         if is_elapsed(state) {
@@ -289,7 +289,7 @@ impl Entry {
         let _ = inner.queue(entry);
     }
 
-    pub fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    pub(crate) fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         let mut curr = self.state.load(SeqCst);
 
         if is_elapsed(curr) {
@@ -316,7 +316,7 @@ impl Entry {
     }
 
     /// Only called by `Registration`
-    pub fn reset(entry: &mut Arc<Entry>) {
+    pub(crate) fn reset(entry: &mut Arc<Entry>) {
         if !entry.is_registered() {
             return;
         }

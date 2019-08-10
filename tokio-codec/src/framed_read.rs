@@ -16,7 +16,7 @@ pub struct FramedRead<T, D> {
     inner: FramedRead2<Fuse<T, D>>,
 }
 
-pub struct FramedRead2<T> {
+pub(crate) struct FramedRead2<T> {
     inner: T,
     eof: bool,
     is_readable: bool,
@@ -136,7 +136,7 @@ where
 
 // ===== impl FramedRead2 =====
 
-pub fn framed_read2<T>(inner: T) -> FramedRead2<T> {
+pub(crate) fn framed_read2<T>(inner: T) -> FramedRead2<T> {
     FramedRead2 {
         inner,
         eof: false,
@@ -145,7 +145,7 @@ pub fn framed_read2<T>(inner: T) -> FramedRead2<T> {
     }
 }
 
-pub fn framed_read2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedRead2<T> {
+pub(crate) fn framed_read2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedRead2<T> {
     if buf.capacity() < INITIAL_CAPACITY {
         let bytes_to_reserve = INITIAL_CAPACITY - buf.capacity();
         buf.reserve(bytes_to_reserve);
@@ -159,19 +159,19 @@ pub fn framed_read2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedRead2<T
 }
 
 impl<T> FramedRead2<T> {
-    pub fn get_ref(&self) -> &T {
+    pub(crate) fn get_ref(&self) -> &T {
         &self.inner
     }
 
-    pub fn into_inner(self) -> T {
+    pub(crate) fn into_inner(self) -> T {
         self.inner
     }
 
-    pub fn into_parts(self) -> (T, BytesMut) {
+    pub(crate) fn into_parts(self) -> (T, BytesMut) {
         (self.inner, self.buffer)
     }
 
-    pub fn get_mut(&mut self) -> &mut T {
+    pub(crate) fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 }

@@ -67,18 +67,18 @@ struct State(usize);
 /// This flag also serves as a "notification" bit. If another thread is
 /// attempting to hand off a worker to the backup thread, then the pushed bit
 /// will not be set when the thread tries to shutdown.
-pub const PUSHED: usize = 0b001;
+pub(crate) const PUSHED: usize = 0b001;
 
 /// Set when the thread is running
-pub const RUNNING: usize = 0b010;
+pub(crate) const RUNNING: usize = 0b010;
 
 /// Set when the thread pool has terminated
-pub const TERMINATED: usize = 0b100;
+pub(crate) const TERMINATED: usize = 0b100;
 
 // ===== impl Backup =====
 
 impl Backup {
-    pub fn new() -> Backup {
+    pub(crate) fn new() -> Backup {
         Backup {
             handoff: UnsafeCell::new(None),
             state: AtomicUsize::new(State::new().into()),
@@ -88,7 +88,7 @@ impl Backup {
     }
 
     /// Called when the thread is starting
-    pub fn start(&self, worker_id: &WorkerId) {
+    pub(crate) fn start(&self, worker_id: &WorkerId) {
         debug_assert!({
             let state: State = self.state.load(Relaxed).into();
 
@@ -107,7 +107,7 @@ impl Backup {
         }
     }
 
-    pub fn is_running(&self) -> bool {
+    pub(crate) fn is_running(&self) -> bool {
         let state: State = self.state.load(Relaxed).into();
         state.is_running()
     }
@@ -115,7 +115,7 @@ impl Backup {
     /// Hands off the worker to a thread.
     ///
     /// Returns `true` if the thread needs to be spawned.
-    pub fn worker_handoff(&self, worker_id: WorkerId) -> bool {
+    pub(crate) fn worker_handoff(&self, worker_id: WorkerId) -> bool {
         unsafe {
             // The backup worker should not already have been handoff a worker.
             debug_assert!((*self.handoff.get()).is_none());
@@ -139,7 +139,7 @@ impl Backup {
     }
 
     /// Terminate the worker
-    pub fn signal_stop(&self) {
+    pub(crate) fn signal_stop(&self) {
         let prev: State = self.state.fetch_xor(TERMINATED | PUSHED, AcqRel).into();
 
         debug_assert!(!prev.is_terminated());
@@ -151,14 +151,14 @@ impl Backup {
     }
 
     /// Release the worker
-    pub fn release(&self) {
+    pub(crate) fn release(&self) {
         let prev: State = self.state.fetch_xor(RUNNING, AcqRel).into();
 
         debug_assert!(prev.is_running());
     }
 
     /// Wait for a worker handoff
-    pub fn wait_for_handoff(&self, timeout: Option<Duration>) -> Handoff {
+    pub(crate) fn wait_for_handoff(&self, timeout: Option<Duration>) -> Handoff {
         let sleep_until = timeout.map(|dur| Instant::now() + dur);
         let mut state: State = self.state.load(Acquire).into();
 
@@ -208,23 +208,23 @@ impl Backup {
         }
     }
 
-    pub fn is_pushed(&self) -> bool {
+    pub(crate) fn is_pushed(&self) -> bool {
         let state: State = self.state.load(Relaxed).into();
         state.is_pushed()
     }
 
-    pub fn set_pushed(&self, ordering: Ordering) {
+    pub(crate) fn set_pushed(&self, ordering: Ordering) {
         let prev: State = self.state.fetch_or(PUSHED, ordering).into();
         debug_assert!(!prev.is_pushed());
     }
 
     #[inline]
-    pub fn next_sleeper(&self) -> BackupId {
+    pub(crate) fn next_sleeper(&self) -> BackupId {
         unsafe { *self.next_sleeper.get() }
     }
 
     #[inline]
-    pub fn set_next_sleeper(&self, val: BackupId) {
+    pub(crate) fn set_next_sleeper(&self, val: BackupId) {
         unsafe {
             *self.next_sleeper.get() = val;
         }

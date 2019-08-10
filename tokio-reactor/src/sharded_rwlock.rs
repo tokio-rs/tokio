@@ -30,7 +30,7 @@ use std::thread::{self, ThreadId};
 /// Read operations lock only one shard specific to the current thread, while write operations lock
 /// every shard in succession. This strategy makes concurrent read operations faster due to less
 /// contention, but write operations are slower due to increased amount of locking.
-pub struct RwLock<T> {
+pub(crate) struct RwLock<T> {
     /// A list of locks protecting the internal data.
     shards: Vec<CachePadded<parking_lot::RwLock<()>>>,
 
@@ -43,7 +43,7 @@ unsafe impl<T: Send + Sync> Sync for RwLock<T> {}
 
 impl<T> RwLock<T> {
     /// Creates a new `RwLock` initialized with `value`.
-    pub fn new(value: T) -> RwLock<T> {
+    pub(crate) fn new(value: T) -> RwLock<T> {
         // The number of shards is a power of two so that the modulo operation in `read` becomes a
         // simple bitwise "and".
         let num_shards = num_cpus::get().next_power_of_two();
@@ -65,7 +65,7 @@ impl<T> RwLock<T> {
     /// or writers will acquire the lock first.
     ///
     /// Returns an RAII guard which will release this thread's shared access once it is dropped.
-    pub fn read(&self) -> RwLockReadGuard<'_, T> {
+    pub(crate) fn read(&self) -> RwLockReadGuard<'_, T> {
         // Take the current thread index and map it to a shard index. Thread indices will tend to
         // distribute shards among threads equally, thus reducing contention due to read-locking.
         let shard_index = thread_index() & (self.shards.len() - 1);
@@ -84,7 +84,7 @@ impl<T> RwLock<T> {
     /// the lock.
     ///
     /// Returns an RAII guard which will drop the write access of this rwlock when dropped.
-    pub fn write(&self) -> RwLockWriteGuard<'_, T> {
+    pub(crate) fn write(&self) -> RwLockWriteGuard<'_, T> {
         // Write-lock each shard in succession.
         for shard in &self.shards {
             // The write guard is forgotten, but the lock will be manually unlocked in `drop`.
@@ -99,7 +99,7 @@ impl<T> RwLock<T> {
 }
 
 /// A guard used to release the shared read access of a `RwLock` when dropped.
-pub struct RwLockReadGuard<'a, T> {
+pub(crate) struct RwLockReadGuard<'a, T> {
     parent: &'a RwLock<T>,
     _guard: parking_lot::RwLockReadGuard<'a, ()>,
     _marker: PhantomData<parking_lot::RwLockReadGuard<'a, T>>,
@@ -116,7 +116,7 @@ impl<'a, T> Deref for RwLockReadGuard<'a, T> {
 }
 
 /// A guard used to release the exclusive write access of a `RwLock` when dropped.
-pub struct RwLockWriteGuard<'a, T> {
+pub(crate) struct RwLockWriteGuard<'a, T> {
     parent: &'a RwLock<T>,
     _marker: PhantomData<parking_lot::RwLockWriteGuard<'a, T>>,
 }
@@ -154,7 +154,7 @@ impl<'a, T> DerefMut for RwLockWriteGuard<'a, T> {
 /// between 0 and the number of running threads, but there are no guarantees. During TLS teardown
 /// the associated index might change.
 #[inline]
-pub fn thread_index() -> usize {
+pub(crate) fn thread_index() -> usize {
     REGISTRATION.try_with(|reg| reg.index).unwrap_or(0)
 }
 

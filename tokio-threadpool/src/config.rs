@@ -7,14 +7,14 @@ use std::time::Duration;
 /// Thread pool specific configuration values
 #[derive(Clone)]
 pub(crate) struct Config {
-    pub keep_alive: Option<Duration>,
+    pub(crate) keep_alive: Option<Duration>,
     // Used to configure a worker thread
-    pub name_prefix: Option<String>,
-    pub stack_size: Option<usize>,
-    pub around_worker: Option<Callback>,
-    pub after_start: Option<Arc<dyn Fn() + Send + Sync>>,
-    pub before_stop: Option<Arc<dyn Fn() + Send + Sync>>,
-    pub panic_handler: Option<PanicHandler>,
+    pub(crate) name_prefix: Option<String>,
+    pub(crate) stack_size: Option<usize>,
+    pub(crate) around_worker: Option<Callback>,
+    pub(crate) after_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    pub(crate) before_stop: Option<Arc<dyn Fn() + Send + Sync>>,
+    pub(crate) panic_handler: Option<PanicHandler>,
 }
 
 // Define type alias to avoid clippy::type_complexity.

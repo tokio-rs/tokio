@@ -38,7 +38,7 @@ pub(crate) struct Pool {
     //
     // The value of this atomic is deserialized into a `pool::State` instance.
     // See comments for that type.
-    pub state: CachePadded<AtomicUsize>,
+    pub(crate) state: CachePadded<AtomicUsize>,
 
     // Stack tracking sleeping workers.
     sleep_stack: CachePadded<worker::Stack>,
@@ -49,19 +49,19 @@ pub(crate) struct Pool {
     // futures.
     //
     // The number of workers will *usually* be small.
-    pub workers: Arc<[worker::Entry]>,
+    pub(crate) workers: Arc<[worker::Entry]>,
 
     // The global MPMC queue of tasks.
     //
     // Spawned tasks are pushed into this queue. Although worker threads have their own dedicated
     // task queues, they periodically steal tasks from this global queue, too.
-    pub queue: Arc<Injector<Arc<Task>>>,
+    pub(crate) queue: Arc<Injector<Arc<Task>>>,
 
     // Completes the shutdown process when the `ThreadPool` and all `Worker`s get dropped.
     //
     // When spawning a new `Worker`, this weak reference is upgraded and handed out to the new
     // thread.
-    pub trigger: Weak<ShutdownTrigger>,
+    pub(crate) trigger: Weak<ShutdownTrigger>,
 
     // Backup thread state
     //
@@ -71,19 +71,19 @@ pub(crate) struct Pool {
     backup: Box<[Backup]>,
 
     // Stack of sleeping backup threads
-    pub backup_stack: BackupStack,
+    pub(crate) backup_stack: BackupStack,
 
     // State regarding coordinating blocking sections and tracking tasks that
     // are pending blocking capacity.
     blocking: Blocking,
 
     // Configuration
-    pub config: Config,
+    pub(crate) config: Config,
 }
 
 impl Pool {
     /// Create a new `Pool`
-    pub fn new(
+    pub(crate) fn new(
         workers: Arc<[worker::Entry]>,
         trigger: Weak<ShutdownTrigger>,
         max_blocking: usize,
@@ -133,7 +133,7 @@ impl Pool {
 
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
-    pub fn shutdown(&self, now: bool, purge_queue: bool) {
+    pub(crate) fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
 
         trace!("shutdown; state={:?}", state);
@@ -198,11 +198,11 @@ impl Pool {
     /// Called by `Worker` as it tries to enter a sleeping state. Before it
     /// sleeps, it must push itself onto the sleep stack. This enables other
     /// threads to see it when signaling work.
-    pub fn push_sleeper(&self, idx: usize) -> Result<(), ()> {
+    pub(crate) fn push_sleeper(&self, idx: usize) -> Result<(), ()> {
         self.sleep_stack.push(&self.workers, idx)
     }
 
-    pub fn terminate_sleeping_workers(&self) {
+    pub(crate) fn terminate_sleeping_workers(&self) {
         use crate::worker::Lifecycle::Signaled;
 
         trace!("  -> shutting down workers");
@@ -222,7 +222,7 @@ impl Pool {
         }
     }
 
-    pub fn poll_blocking_capacity(
+    pub(crate) fn poll_blocking_capacity(
         &self,
         task: &Arc<Task>,
     ) -> Poll<Result<(), crate::BlockingError>> {
@@ -233,7 +233,7 @@ impl Pool {
     ///
     /// Called from either inside or outside of the scheduler. If currently on
     /// the scheduler, then a fast path is taken.
-    pub fn submit(&self, task: Arc<Task>, pool: &Arc<Pool>) {
+    pub(crate) fn submit(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
         Worker::with_current(|worker| {
@@ -265,7 +265,7 @@ impl Pool {
     ///
     /// Called from outside of the scheduler, this function is how new tasks
     /// enter the system.
-    pub fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
+    pub(crate) fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
         trace!("    -> submit external");
@@ -274,7 +274,7 @@ impl Pool {
         self.signal_work(pool);
     }
 
-    pub fn release_backup(&self, backup_id: BackupId) -> Result<(), ()> {
+    pub(crate) fn release_backup(&self, backup_id: BackupId) -> Result<(), ()> {
         // First update the state, this cannot fail because the caller must have
         // exclusive access to the backup token.
         self.backup[backup_id.0].release();
@@ -283,13 +283,13 @@ impl Pool {
         self.backup_stack.push(&self.backup, backup_id)
     }
 
-    pub fn notify_blocking_task(&self, pool: &Arc<Pool>) {
+    pub(crate) fn notify_blocking_task(&self, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
         self.blocking.notify_task(&pool);
     }
 
     /// Provision a thread to run a worker
-    pub fn spawn_thread(&self, id: WorkerId, pool: &Arc<Pool>) {
+    pub(crate) fn spawn_thread(&self, id: WorkerId, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
         let backup_id = match self.backup_stack.pop(&self.backup, false) {
@@ -396,7 +396,7 @@ impl Pool {
 
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
-    pub fn signal_work(&self, pool: &Arc<Pool>) {
+    pub(crate) fn signal_work(&self, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
         use crate::worker::Lifecycle::Signaled;
@@ -422,7 +422,7 @@ impl Pool {
     /// Generates a random number
     ///
     /// Uses a thread-local random number generator based on XorShift.
-    pub fn rand_usize(&self) -> usize {
+    pub(crate) fn rand_usize(&self) -> usize {
         thread_local! {
             static RNG: Cell<Wrapping<u32>> = Cell::new(Wrapping(prng_seed()));
         }

@@ -7,4 +7,5 @@ pub trait Now {
     fn now(&mut self) -> Instant;
 }
 
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use crate::clock::Clock as SystemNow;

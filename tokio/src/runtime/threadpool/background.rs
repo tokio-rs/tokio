@@ -10,14 +10,14 @@ use tokio_timer::timer::{self, Timer};
 use std::{io, thread};
 
 #[derive(Debug)]
-pub struct Background {
+pub(crate) struct Background {
     reactor_handle: tokio_reactor::Handle,
     timer_handle: timer::Handle,
     shutdown_tx: Option<oneshot::Sender<()>>,
     thread: Option<thread::JoinHandle<()>>,
 }
 
-pub fn spawn(clock: &Clock) -> io::Result<Background> {
+pub(crate) fn spawn(clock: &Clock) -> io::Result<Background> {
     let clock = clock.clone();
 
     let reactor = Reactor::new()?;

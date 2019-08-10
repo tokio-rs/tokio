@@ -2,7 +2,9 @@ mod background;
 mod builder;
 mod task_executor;
 
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::builder::Builder;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::task_executor::TaskExecutor;
 use background::Background;
 

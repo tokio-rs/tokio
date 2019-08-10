@@ -81,7 +81,7 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Child {
+pub(crate) struct Child {
     inner: Reaper<process::Child, GlobalOrphanQueue, Signal>,
 }
 
@@ -112,7 +112,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
 }
 
 impl Child {
-    pub fn id(&self) -> u32 {
+    pub(crate) fn id(&self) -> u32 {
         self.inner.id()
     }
 }
@@ -132,7 +132,7 @@ impl Future for Child {
 }
 
 #[derive(Debug)]
-pub struct Fd<T> {
+pub(crate) struct Fd<T> {
     inner: T,
 }
 
@@ -196,9 +196,9 @@ where
     }
 }
 
-pub type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
-pub type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
-pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
+pub(crate) type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
+pub(crate) type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
+pub(crate) type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
 
 fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<Fd<T>>>>
 where
