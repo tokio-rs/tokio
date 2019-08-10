@@ -16,7 +16,7 @@ use tokio_executor::park::Unpark;
 /// A generic task-aware scheduler.
 ///
 /// This is used both by `FuturesUnordered` and the current-thread executor.
-pub struct Scheduler<U> {
+pub(crate) struct Scheduler<U> {
     inner: Arc<Inner<U>>,
     nodes: List<U>,
 }
@@ -117,7 +117,7 @@ enum Dequeue<U> {
 struct Task(Pin<Box<dyn Future<Output = ()>>>);
 
 /// A task that is scheduled. `turn` must be called
-pub struct Scheduled<'a, U> {
+pub(crate) struct Scheduled<'a, U> {
     task: &'a mut Task,
     node: &'a Arc<Node<U>>,
     done: &'a mut bool,
@@ -131,7 +131,7 @@ where
     ///
     /// The returned `Scheduler` does not contain any items and, in this
     /// state, `Scheduler::poll` will return `Ok(Async::Ready(None))`.
-    pub fn new(unpark: U) -> Self {
+    pub(crate) fn new(unpark: U) -> Self {
         let stub = Arc::new(Node {
             item: UnsafeCell::new(None),
             notified_at: AtomicUsize::new(0),
@@ -156,11 +156,11 @@ where
         }
     }
 
-    pub fn waker(&self) -> Waker {
+    pub(crate) fn waker(&self) -> Waker {
         waker_inner(self.inner.clone())
     }
 
-    pub fn schedule(&mut self, item: Pin<Box<dyn Future<Output = ()>>>) {
+    pub(crate) fn schedule(&mut self, item: Pin<Box<dyn Future<Output = ()>>>) {
         // Get the current scheduler tick
         let tick_num = self.inner.tick_num.load(SeqCst);
 
@@ -187,7 +187,7 @@ where
     }
 
     /// Returns `true` if there are currently any pending futures
-    pub fn has_pending_futures(&mut self) -> bool {
+    pub(crate) fn has_pending_futures(&mut self) -> bool {
         // See function definition for why the unsafe is needed and
         // correctly used here
         unsafe { self.inner.has_pending_futures() }
@@ -198,7 +198,7 @@ where
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub fn tick(&mut self, eid: u64, num_futures: &AtomicUsize) -> bool {
+    pub(crate) fn tick(&mut self, eid: u64, num_futures: &AtomicUsize) -> bool {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst).wrapping_add(1);
 
@@ -331,7 +331,7 @@ where
 
 impl<U: Unpark> Scheduled<'_, U> {
     /// Polls the task, returns `true` if the task has completed.
-    pub fn tick(&mut self) -> bool {
+    pub(crate) fn tick(&mut self) -> bool {
         let waker = unsafe {
             // Safety: we don't hold this waker ref longer than
             // this `tick` function
@@ -349,7 +349,7 @@ impl<U: Unpark> Scheduled<'_, U> {
 }
 
 impl Task {
-    pub fn new(future: Pin<Box<dyn Future<Output = ()> + 'static>>) -> Self {
+    pub(crate) fn new(future: Pin<Box<dyn Future<Output = ()> + 'static>>) -> Self {
         Task(future)
     }
 }

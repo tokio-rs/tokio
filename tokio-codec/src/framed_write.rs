@@ -20,7 +20,7 @@ pub struct FramedWrite<T, E> {
     inner: FramedWrite2<Fuse<T, E>>,
 }
 
-pub struct FramedWrite2<T> {
+pub(crate) struct FramedWrite2<T> {
     inner: T,
     buffer: BytesMut,
 }
@@ -136,14 +136,14 @@ where
 
 // ===== impl FramedWrite2 =====
 
-pub fn framed_write2<T>(inner: T) -> FramedWrite2<T> {
+pub(crate) fn framed_write2<T>(inner: T) -> FramedWrite2<T> {
     FramedWrite2 {
         inner,
         buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
     }
 }
 
-pub fn framed_write2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedWrite2<T> {
+pub(crate) fn framed_write2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedWrite2<T> {
     if buf.capacity() < INITIAL_CAPACITY {
         let bytes_to_reserve = INITIAL_CAPACITY - buf.capacity();
         buf.reserve(bytes_to_reserve);
@@ -152,19 +152,19 @@ pub fn framed_write2_with_buffer<T>(inner: T, mut buf: BytesMut) -> FramedWrite2
 }
 
 impl<T> FramedWrite2<T> {
-    pub fn get_ref(&self) -> &T {
+    pub(crate) fn get_ref(&self) -> &T {
         &self.inner
     }
 
-    pub fn into_inner(self) -> T {
+    pub(crate) fn into_inner(self) -> T {
         self.inner
     }
 
-    pub fn into_parts(self) -> (T, BytesMut) {
+    pub(crate) fn into_parts(self) -> (T, BytesMut) {
         (self.inner, self.buffer)
     }
 
-    pub fn get_mut(&mut self) -> &mut T {
+    pub(crate) fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 }

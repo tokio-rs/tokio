@@ -40,13 +40,13 @@ pub(crate) struct Task {
     ///
     /// The worker ID is represented by a `u32` rather than `usize` in order to save some space
     /// on 64-bit platforms.
-    pub reg_worker: Cell<Option<u32>>,
+    pub(crate) reg_worker: Cell<Option<u32>>,
 
     /// The key associated with this task in the `Slab` it was registered in.
     ///
     /// This field can be a `Cell` because it's only accessed by the worker thread that has
     /// registered the task.
-    pub reg_index: Cell<usize>,
+    pub(crate) reg_index: Cell<usize>,
 
     /// Store the future at the head of the struct
     ///
@@ -67,7 +67,7 @@ type BoxFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 impl Task {
     /// Create a new `Task` as a harness for `future`.
-    pub fn new(future: BoxFuture) -> Task {
+    pub(crate) fn new(future: BoxFuture) -> Task {
         Task {
             state: AtomicUsize::new(State::new().into()),
             blocking: AtomicUsize::new(BlockingState::new().into()),
@@ -95,7 +95,7 @@ impl Task {
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
-    pub fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
+    pub(crate) fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
         use self::State::*;
 
         // Transition task to running state. At this point, the task must be
@@ -200,7 +200,7 @@ impl Task {
     ///
     /// This is called when the threadpool shuts down and the task has already beed polled but not
     /// completed.
-    pub fn abort(&self) {
+    pub(crate) fn abort(&self) {
         use self::State::*;
 
         let mut state = self.state.load(Acquire).into();
@@ -232,12 +232,12 @@ impl Task {
     }
 
     /// Notify the task it has been allocated blocking capacity
-    pub fn notify_blocking(me: Arc<Task>, pool: &Arc<Pool>) {
+    pub(crate) fn notify_blocking(me: Arc<Task>, pool: &Arc<Pool>) {
         BlockingState::notify_blocking(&me.blocking, AcqRel);
         Task::schedule(&me, pool);
     }
 
-    pub fn schedule(me: &Arc<Self>, pool: &Arc<Pool>) {
+    pub(crate) fn schedule(me: &Arc<Self>, pool: &Arc<Pool>) {
         if me.schedule2() {
             let task = me.clone();
             pool.submit(task, &pool);
@@ -281,7 +281,7 @@ impl Task {
     /// Consumes any allocated capacity to block.
     ///
     /// Returns `true` if capacity was allocated, `false` otherwise.
-    pub fn consume_blocking_allocation(&self) -> CanBlock {
+    pub(crate) fn consume_blocking_allocation(&self) -> CanBlock {
         // This flag is the primary point of coordination. The queued flag
         // happens "around" setting the blocking capacity.
         BlockingState::consume_allocation(&self.blocking, AcqRel)

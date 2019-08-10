@@ -23,7 +23,7 @@ pub struct Framed<T, U> {
     inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
 }
 
-pub struct Fuse<T, U>(pub T, pub U);
+pub(crate) struct Fuse<T, U>(pub(crate) T, pub(crate) U);
 
 impl<T, U> Framed<T, U>
 where

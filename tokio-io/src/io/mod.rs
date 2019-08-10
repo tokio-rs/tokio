@@ -52,6 +52,9 @@ mod shutdown;
 mod write;
 mod write_all;
 
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::async_buf_read_ext::AsyncBufReadExt;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::async_read_ext::AsyncReadExt;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::async_write_ext::AsyncWriteExt;

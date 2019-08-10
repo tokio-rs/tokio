@@ -45,7 +45,7 @@ use winapi::um::winbase::*;
 use winapi::um::winnt::*;
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Child {
+pub(crate) struct Child {
     child: process::Child,
     waiting: Option<Waiting>,
 }
@@ -87,7 +87,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
 }
 
 impl Child {
-    pub fn id(&self) -> u32 {
+    pub(crate) fn id(&self) -> u32 {
         self.child.id()
     }
 }
@@ -161,7 +161,7 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let _ = complete.take().unwrap().send(());
 }
 
-pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
+pub(crate) fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
     unsafe {
         match WaitForSingleObject(child.as_raw_handle(), 0) {
             WAIT_OBJECT_0 => {}
@@ -178,9 +178,9 @@ pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
     }
 }
 
-pub type ChildStdin = PollEvented<NamedPipe>;
-pub type ChildStdout = PollEvented<NamedPipe>;
-pub type ChildStderr = PollEvented<NamedPipe>;
+pub(crate) type ChildStdin = PollEvented<NamedPipe>;
+pub(crate) type ChildStdout = PollEvented<NamedPipe>;
+pub(crate) type ChildStderr = PollEvented<NamedPipe>;
 
 fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<NamedPipe>>>
 where

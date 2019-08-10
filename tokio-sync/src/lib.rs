@@ -2,8 +2,8 @@
 #![warn(
     missing_debug_implementations,
     missing_docs,
-    unreachable_pub,
-    rust_2018_idioms
+    rust_2018_idioms,
+    unreachable_pub
 )]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]

@@ -1,5 +1,10 @@
 #![doc(html_root_url = "https://docs.rs/tokio-tls/0.3.0-alpha.1")]
-#![warn(rust_2018_idioms)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]
 
@@ -21,6 +26,7 @@
 //! `native-tls` crate.
 
 use native_tls::{Error, HandshakeError, MidHandshakeTlsStream};
+use std::fmt;
 use std::future::Future;
 use std::io::{self, Read, Write};
 use std::marker::Unpin;
@@ -270,6 +276,12 @@ impl TlsConnector {
     }
 }
 
+impl fmt::Debug for TlsConnector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TlsConnector").finish()
+    }
+}
+
 impl From<native_tls::TlsConnector> for TlsConnector {
     fn from(inner: native_tls::TlsConnector) -> TlsConnector {
         TlsConnector(inner)
@@ -292,6 +304,12 @@ impl TlsAcceptor {
         S: AsyncRead + AsyncWrite + Unpin,
     {
         handshake(|s| self.0.accept(s), stream).await
+    }
+}
+
+impl fmt::Debug for TlsAcceptor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TlsAcceptor").finish()
     }
 }
 

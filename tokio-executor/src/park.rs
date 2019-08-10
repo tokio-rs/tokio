@@ -194,7 +194,7 @@ thread_local! {
 // ==== impl Parker ====
 
 impl Parker {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             unparker: Arc::new(Inner {
                 state: AtomicUsize::new(IDLE),
@@ -204,15 +204,15 @@ impl Parker {
         }
     }
 
-    pub fn unparker(&self) -> &Arc<Inner> {
+    pub(crate) fn unparker(&self) -> &Arc<Inner> {
         &self.unparker
     }
 
-    pub fn park(&self) -> Result<(), ParkError> {
+    pub(crate) fn park(&self) -> Result<(), ParkError> {
         self.unparker.park(None)
     }
 
-    pub fn park_timeout(&self, timeout: Duration) -> Result<(), ParkError> {
+    pub(crate) fn park_timeout(&self, timeout: Duration) -> Result<(), ParkError> {
         self.unparker.park(Some(timeout))
     }
 }
@@ -221,16 +221,16 @@ impl Parker {
 
 impl Inner {
     #[allow(clippy::wrong_self_convention)]
-    pub fn into_raw(this: Arc<Inner>) -> *const () {
+    pub(crate) fn into_raw(this: Arc<Inner>) -> *const () {
         Arc::into_raw(this) as *const ()
     }
 
-    pub unsafe fn from_raw(ptr: *const ()) -> Arc<Inner> {
+    pub(crate) unsafe fn from_raw(ptr: *const ()) -> Arc<Inner> {
         Arc::from_raw(ptr as *const Inner)
     }
 
     /// Park the current thread for at most `dur`.
-    pub fn park(&self, timeout: Option<Duration>) -> Result<(), ParkError> {
+    pub(crate) fn park(&self, timeout: Option<Duration>) -> Result<(), ParkError> {
         // If currently notified, then we skip sleeping. This is checked outside
         // of the lock to avoid acquiring a mutex if not necessary.
         match self.state.compare_and_swap(NOTIFY, IDLE, Ordering::SeqCst) {
@@ -272,7 +272,7 @@ impl Inner {
         Ok(())
     }
 
-    pub fn unpark(&self) {
+    pub(crate) fn unpark(&self) {
         // First, try transitioning from IDLE -> NOTIFY, this does not require a
         // lock.
         match self.state.compare_and_swap(IDLE, NOTIFY, Ordering::SeqCst) {

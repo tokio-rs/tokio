@@ -58,7 +58,7 @@ const ABA_GUARD_MASK: usize = (1 << (32 - ABA_GUARD_SHIFT)) - 1;
 
 impl Stack {
     /// Create a new `Stack` representing the empty state.
-    pub fn new() -> Stack {
+    pub(crate) fn new() -> Stack {
         let state = AtomicUsize::new(State::new().into());
         Stack { state }
     }
@@ -71,7 +71,7 @@ impl Stack {
     ///
     /// Returns `Err` if the pool has transitioned to the `TERMINATED` state.
     /// When terminated, pushing new entries is no longer permitted.
-    pub fn push(&self, entries: &[worker::Entry], idx: usize) -> Result<(), ()> {
+    pub(crate) fn push(&self, entries: &[worker::Entry], idx: usize) -> Result<(), ()> {
         let mut state: State = self.state.load(Acquire).into();
 
         debug_assert!(worker::State::from(entries[idx].state.load(Relaxed)).is_pushed());
@@ -113,7 +113,7 @@ impl Stack {
     /// Returns the index of the popped worker and the worker's observed state.
     ///
     /// `None` if the stack is empty.
-    pub fn pop(
+    pub(crate) fn pop(
         &self,
         entries: &[worker::Entry],
         max_lifecycle: worker::Lifecycle,

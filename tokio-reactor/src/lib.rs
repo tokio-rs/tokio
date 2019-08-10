@@ -1,5 +1,10 @@
 #![doc(html_root_url = "https://docs.rs/tokio-reactor/0.2.0-alpha.1")]
-#![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Event loop that drives Tokio I/O resources.
@@ -585,11 +590,11 @@ mod platform {
     use mio::unix::UnixReady;
     use mio::Ready;
 
-    pub fn hup() -> Ready {
+    pub(crate) fn hup() -> Ready {
         UnixReady::hup().into()
     }
 
-    pub fn is_hup(ready: Ready) -> bool {
+    pub(crate) fn is_hup(ready: Ready) -> bool {
         UnixReady::from(ready).is_hup()
     }
 }
@@ -598,11 +603,11 @@ mod platform {
 mod platform {
     use mio::Ready;
 
-    pub fn hup() -> Ready {
+    pub(crate) fn hup() -> Ready {
         Ready::empty()
     }
 
-    pub fn is_hup(_: Ready) -> bool {
+    pub(crate) fn is_hup(_: Ready) -> bool {
         false
     }
 }

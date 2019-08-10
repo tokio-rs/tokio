@@ -22,13 +22,13 @@ pub(crate) struct Level<T> {
 #[derive(Debug)]
 pub(crate) struct Expiration {
     /// The level containing the slot.
-    pub level: usize,
+    pub(crate) level: usize,
 
     /// The slot index.
-    pub slot: usize,
+    pub(crate) slot: usize,
 
     /// The instant at which the slot needs to be processed.
-    pub deadline: u64,
+    pub(crate) deadline: u64,
 }
 
 /// Level multiplier.
@@ -37,7 +37,7 @@ pub(crate) struct Expiration {
 const LEVEL_MULT: usize = 64;
 
 impl<T: Stack> Level<T> {
-    pub fn new(level: usize) -> Level<T> {
+    pub(crate) fn new(level: usize) -> Level<T> {
         // Rust's derived implementations for arrays require that the value
         // contained by the array be `Copy`. So, here we have to manually
         // initialize every single slot.
@@ -123,7 +123,7 @@ impl<T: Stack> Level<T> {
 
     /// Finds the slot that needs to be processed next and returns the slot and
     /// `Instant` at which this slot must be processed.
-    pub fn next_expiration(&self, now: u64) -> Option<Expiration> {
+    pub(crate) fn next_expiration(&self, now: u64) -> Option<Expiration> {
         // Use the `occupied` bit field to get the index of the next slot that
         // needs to be processed.
         let slot = match self.next_occupied_slot(now) {
@@ -172,14 +172,14 @@ impl<T: Stack> Level<T> {
         Some(slot)
     }
 
-    pub fn add_entry(&mut self, when: u64, item: T::Owned, store: &mut T::Store) {
+    pub(crate) fn add_entry(&mut self, when: u64, item: T::Owned, store: &mut T::Store) {
         let slot = slot_for(when, self.level);
 
         self.slot[slot].push(item, store);
         self.occupied |= occupied_bit(slot);
     }
 
-    pub fn remove_entry(&mut self, when: u64, item: &T::Borrowed, store: &mut T::Store) {
+    pub(crate) fn remove_entry(&mut self, when: u64, item: &T::Borrowed, store: &mut T::Store) {
         let slot = slot_for(when, self.level);
 
         self.slot[slot].remove(item, store);
@@ -193,7 +193,7 @@ impl<T: Stack> Level<T> {
         }
     }
 
-    pub fn pop_entry_slot(&mut self, slot: usize, store: &mut T::Store) -> Option<T::Owned> {
+    pub(crate) fn pop_entry_slot(&mut self, slot: usize, store: &mut T::Store) -> Option<T::Owned> {
         let ret = self.slot[slot].pop(store);
 
         if ret.is_some() && self.slot[slot].is_empty() {

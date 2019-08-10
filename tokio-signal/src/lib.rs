@@ -1,5 +1,10 @@
 #![doc(html_root_url = "https://docs.rs/tokio-signal/0.3.0-alpha.1")]
-#![warn(missing_debug_implementations, missing_docs, rust_2018_idioms)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![cfg_attr(test, feature(async_await))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 

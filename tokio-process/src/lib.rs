@@ -1,4 +1,12 @@
 #![doc(html_root_url = "https://docs.rs/tokio-process/0.3.0-alpha.1")]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
+#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! An implementation of asynchronous process management for Tokio.
 //!
@@ -116,11 +124,6 @@
 //! future of the child's `ExitStatus`, a child process is terminated if
 //! `tokio_process::Child` is dropped. The behavior of the standard library can
 //! be regained with the `Child::forget` method.
-
-#![doc(html_root_url = "https://docs.rs/tokio-process/0.3.0")]
-#![warn(missing_debug_implementations, missing_docs, rust_2018_idioms)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-#![feature(async_await)]
 
 #[cfg(unix)]
 #[macro_use]

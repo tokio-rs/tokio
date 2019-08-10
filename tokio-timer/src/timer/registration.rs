@@ -14,7 +14,7 @@ pub(crate) struct Registration {
 }
 
 impl Registration {
-    pub fn new(deadline: Instant, duration: Duration) -> Registration {
+    pub(crate) fn new(deadline: Instant, duration: Duration) -> Registration {
         fn is_send<T: Send + Sync>() {}
         is_send::<Registration>();
 
@@ -23,21 +23,21 @@ impl Registration {
         }
     }
 
-    pub fn deadline(&self) -> Instant {
+    pub(crate) fn deadline(&self) -> Instant {
         self.entry.time_ref().deadline
     }
 
-    pub fn register(&mut self) {
+    pub(crate) fn register(&mut self) {
         if !self.entry.is_registered() {
             Entry::register(&mut self.entry)
         }
     }
 
-    pub fn register_with(&mut self, handle: HandlePriv) {
+    pub(crate) fn register_with(&mut self, handle: HandlePriv) {
         Entry::register_with(&mut self.entry, handle)
     }
 
-    pub fn reset(&mut self, deadline: Instant) {
+    pub(crate) fn reset(&mut self, deadline: Instant) {
         unsafe {
             self.entry.time_mut().deadline = deadline;
         }
@@ -46,7 +46,7 @@ impl Registration {
 
     // Used by `Timeout<Stream>`
     #[cfg(feature = "async-traits")]
-    pub fn reset_timeout(&mut self) {
+    pub(crate) fn reset_timeout(&mut self) {
         let deadline = crate::clock::now() + self.entry.time_ref().duration;
         unsafe {
             self.entry.time_mut().deadline = deadline;
@@ -54,11 +54,11 @@ impl Registration {
         Entry::reset(&mut self.entry);
     }
 
-    pub fn is_elapsed(&self) -> bool {
+    pub(crate) fn is_elapsed(&self) -> bool {
         self.entry.is_elapsed()
     }
 
-    pub fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    pub(crate) fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         self.entry.poll_elapsed(cx)
     }
 }

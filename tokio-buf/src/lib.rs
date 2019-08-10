@@ -1,9 +1,9 @@
 #![doc(html_root_url = "https://docs.rs/tokio-buf/0.2.0-alpha.1")]
 #![warn(
-    missing_docs,
     missing_debug_implementations,
-    unreachable_pub,
-    rust_2018_idioms
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
 )]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
