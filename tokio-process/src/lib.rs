@@ -132,7 +132,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
-use std::io::{self, Read, Write};
+use std::io;
 use std::process::{Command, ExitStatus, Output, Stdio};
 
 use futures_core::future::TryFuture;
@@ -613,9 +613,8 @@ impl Future for OutputAsync {
 
 /// The standard input stream for spawned children.
 ///
-/// This type implements the `Write` trait to pass data to the stdin handle of
-/// a child process. Note that this type is also "futures aware" meaning that it
-/// is both (a) nonblocking and (b) will panic if used off of a future's task.
+/// This type implements the `AsyncWrite` trait to pass data to the stdin handle of
+/// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdin {
     inner: imp::ChildStdin,
@@ -623,10 +622,8 @@ pub struct ChildStdin {
 
 /// The standard output stream for spawned children.
 ///
-/// This type implements the `Read` trait to read data from the stdout handle
-/// of a child process. Note that this type is also "futures aware" meaning
-/// that it is both (a) nonblocking and (b) will panic if used off of a
-/// future's task.
+/// This type implements the `AsyncRead` trait to read data from the stdout
+/// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdout {
     inner: imp::ChildStdout,
@@ -634,23 +631,11 @@ pub struct ChildStdout {
 
 /// The standard error stream for spawned children.
 ///
-/// This type implements the `Read` trait to read data from the stderr handle
-/// of a child process. Note that this type is also "futures aware" meaning
-/// that it is both (a) nonblocking and (b) will panic if used off of a
-/// future's task.
+/// This type implements the `AsyncRead` trait to read data from the stderr
+/// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStderr {
     inner: imp::ChildStderr,
-}
-
-impl Write for ChildStdin {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.inner.get_mut().write(bytes)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.get_mut().flush()
-    }
 }
 
 impl AsyncWrite for ChildStdin {
@@ -671,12 +656,6 @@ impl AsyncWrite for ChildStdin {
     }
 }
 
-impl Read for ChildStdout {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.get_mut().read(buf)
-    }
-}
-
 impl AsyncRead for ChildStdout {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -684,12 +663,6 @@ impl AsyncRead for ChildStdout {
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
-    }
-}
-
-impl Read for ChildStderr {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.get_mut().read(buf)
     }
 }
 
