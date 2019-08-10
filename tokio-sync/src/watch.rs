@@ -295,7 +295,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// This is equivalent to calling `clone()` on the value returned by
     /// `recv()`.
-    #[allow(clippy::needless_lifetimes, clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     pub async fn recv(&mut self) -> Option<T> {
         self.recv_ref().await.map(|v_ref| v_ref.clone())
     }
