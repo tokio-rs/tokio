@@ -30,8 +30,8 @@ tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 bytes = "0.4.8"
 mio = "0.6.14"
 mio-uds = "0.6.5"
-futures-core-preview = "=0.3.0-alpha.17"
-futures-util-preview = "=0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.18"
 iovec = "0.1.2"
 libc = "0.2.42"
 log = "0.4.2"
@@ -40,4 +40,4 @@ log = "0.4.2"
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 
 tempfile = "3"
-futures-preview = "=0.3.0-alpha.17"
+futures-preview = "=0.3.0-alpha.18"

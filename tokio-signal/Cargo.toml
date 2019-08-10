@@ -20,8 +20,8 @@ An implementation of an asynchronous Unix signal handling backed futures.
 categories = ["asynchronous"]
 
 [dependencies]
-futures-core-preview = "=0.3.0-alpha.17"
-futures-util-preview = "=0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.18"
 lazy_static = "1"
 tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
 tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
