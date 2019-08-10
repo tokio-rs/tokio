@@ -124,7 +124,7 @@ impl Task {
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             struct Guard<'a>(&'a mut Option<BoxFuture>, bool);
 
-            impl<'a> Drop for Guard<'a> {
+            impl Drop for Guard<'_> {
                 fn drop(&mut self) {
                     // This drops the future
                     if self.1 {

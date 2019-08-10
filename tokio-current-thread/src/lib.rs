@@ -434,7 +434,7 @@ impl<P: Park + Default> Default for CurrentThread<P> {
 
 // ===== impl Entered =====
 
-impl<'a, P: Park> Entered<'a, P> {
+impl<P: Park> Entered<'_, P> {
     /// Spawn the future on the executor.
     ///
     /// This internally queues the future to be executed once `run` is called.
@@ -598,7 +598,7 @@ impl<'a, P: Park> Entered<'a, P> {
     }
 }
 
-impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
+impl<P: Park> fmt::Debug for Entered<'_, P> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Entered")
             .field("executor", &self.executor)
@@ -743,7 +743,7 @@ where
 
 // ===== impl Borrow =====
 
-impl<'a, U: Unpark> Borrow<'a, U> {
+impl<U: Unpark> Borrow<'_, U> {
     fn enter<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -755,7 +755,7 @@ impl<'a, U: Unpark> Borrow<'a, U> {
     }
 }
 
-impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
+impl<U: Unpark> SpawnLocal for Borrow<'_, U> {
     fn spawn_local(&mut self, future: Pin<Box<dyn Future<Output = ()>>>, already_counted: bool) {
         if !already_counted {
             // NOTE: we have a borrow of the Runtime, so we know that it isn't shut down.
@@ -775,7 +775,7 @@ impl CurrentRunner {
     {
         struct Reset<'a>(&'a CurrentRunner);
 
-        impl<'a> Drop for Reset<'a> {
+        impl Drop for Reset<'_> {
             fn drop(&mut self) {
                 self.0.spawn.set(None);
                 self.0.id.set(None);

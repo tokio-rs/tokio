@@ -380,7 +380,6 @@ mod and_turn {
             },
         );
     }
-
 }
 
 mod in_drop {
@@ -441,7 +440,6 @@ mod in_drop {
             },
         );
     }
-
 }
 
 /*

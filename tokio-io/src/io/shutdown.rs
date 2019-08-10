@@ -22,7 +22,7 @@ where
     Shutdown { a }
 }
 
-impl<'a, A> Unpin for Shutdown<'a, A> where A: Unpin + ?Sized {}
+impl<A> Unpin for Shutdown<'_, A> where A: Unpin + ?Sized {}
 
 impl<A> Future for Shutdown<'_, A>
 where

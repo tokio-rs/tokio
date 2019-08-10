@@ -101,7 +101,7 @@ impl UdpSocketRecvHalf {
     /// will fail if the socket is not connected.
     ///
     /// [`connect`]: super::UdpSocket::connect
-    pub async fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> io::Result<usize> {
+    pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.0.poll_recv_priv(cx, buf)).await
     }
 }

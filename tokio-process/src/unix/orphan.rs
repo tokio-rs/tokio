@@ -10,7 +10,7 @@ pub(crate) trait Wait {
     fn try_wait(&mut self) -> io::Result<Option<ExitStatus>>;
 }
 
-impl<'a, T: 'a + Wait> Wait for &'a mut T {
+impl<T: Wait> Wait for &mut T {
     fn id(&self) -> u32 {
         (**self).id()
     }
@@ -29,7 +29,7 @@ pub(crate) trait OrphanQueue<T> {
     fn reap_orphans(&self);
 }
 
-impl<'a, T, O: 'a + OrphanQueue<T>> OrphanQueue<T> for &'a O {
+impl<T, O: OrphanQueue<T>> OrphanQueue<T> for &O {
     fn push_orphan(&self, orphan: T) {
         (**self).push_orphan(orphan);
     }

@@ -280,10 +280,7 @@ impl<T: AsyncRead + Unpin> AsyncRead for FramedWrite2<T> {
 }
 
 impl<T: AsyncBufRead + Unpin> AsyncBufRead for FramedWrite2<T> {
-    fn poll_fill_buf<'a>(
-        self: Pin<&'a mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<&'a [u8]>> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         pin!(self.get_mut().inner).poll_fill_buf(cx)
     }
 

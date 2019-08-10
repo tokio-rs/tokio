@@ -35,7 +35,6 @@ mod platform {
             println!("received SIGTERM");
         }
     }
-
 }
 
 #[cfg(not(unix))]

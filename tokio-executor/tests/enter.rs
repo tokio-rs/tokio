@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![feature(await_macro, async_await)]
+#![feature(async_await)]
 
 #[test]
 fn block_on_ready() {

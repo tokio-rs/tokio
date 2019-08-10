@@ -22,7 +22,7 @@ where
     Flush { a }
 }
 
-impl<'a, A> Unpin for Flush<'a, A> where A: Unpin + ?Sized {}
+impl<A> Unpin for Flush<'_, A> where A: Unpin + ?Sized {}
 
 impl<A> Future for Flush<'_, A>
 where
