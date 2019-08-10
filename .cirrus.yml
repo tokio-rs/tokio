@@ -9,6 +9,7 @@ task:
   name: FreeBSD 12.0
   env:
     LOOM_MAX_PREEMPTIONS: 2
+    RUSTFLAGS: -Dwarnings
   setup_script:
     - pkg install -y curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
