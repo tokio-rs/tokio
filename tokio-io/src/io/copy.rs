@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<'a, R, W> Future for Copy<'a, R, W>
+impl<R, W> Future for Copy<'_, R, W>
 where
     R: AsyncRead + Unpin + ?Sized,
     W: AsyncWrite + Unpin + ?Sized,

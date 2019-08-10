@@ -14,7 +14,7 @@ task:
     - pkg install -y curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     # TODO: switch back to nightly
-    - sh rustup.sh -y --default-toolchain nightly-2019-07-17
+    - sh rustup.sh -y --default-toolchain nightly-2019-08-10
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
     - |

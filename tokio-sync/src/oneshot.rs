@@ -225,7 +225,6 @@ impl<T> Sender<T> {
     ///     println!("the receiver dropped");
     /// }
     /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn closed(&mut self) {
         use futures_util::future::poll_fn;
 

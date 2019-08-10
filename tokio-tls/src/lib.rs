@@ -72,7 +72,7 @@ struct Guard<'a, S>(&'a mut TlsStream<S>)
 where
     AllowStd<S>: Read + Write;
 
-impl<'a, S> Drop for Guard<'a, S>
+impl<S> Drop for Guard<'_, S>
 where
     AllowStd<S>: Read + Write,
 {
@@ -287,7 +287,6 @@ impl TlsAcceptor {
     /// This is typically used after a new socket has been accepted from a
     /// `TcpListener`. That socket is then passed to this function to perform
     /// the server half of accepting a client connection.
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn accept<S>(&self, stream: S) -> Result<TlsStream<S>, Error>
     where
         S: AsyncRead + AsyncWrite + Unpin,

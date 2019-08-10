@@ -22,7 +22,7 @@ where
 }
 
 // forward Unpin
-impl<'a, W: Unpin + ?Sized> Unpin for Write<'a, W> {}
+impl<W: Unpin + ?Sized> Unpin for Write<'_, W> {}
 
 impl<W> Future for Write<'_, W>
 where

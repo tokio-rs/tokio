@@ -249,8 +249,7 @@ impl<T> Receiver<T> {
     ///
     /// Only the **most recent** value is returned. If the receiver is falling
     /// behind the sender, intermediate values are dropped.
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
-    pub async fn recv_ref<'a>(&'a mut self) -> Option<Ref<'a, T>> {
+    pub async fn recv_ref(&mut self) -> Option<Ref<'_, T>> {
         let shared = &self.shared;
         let inner = &self.inner;
         let version = self.ver;
@@ -296,7 +295,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// This is equivalent to calling `clone()` on the value returned by
     /// `recv()`.
-    #[allow(clippy::needless_lifetimes, clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     pub async fn recv(&mut self) -> Option<T> {
         self.recv_ref().await.map(|v_ref| v_ref.clone())
     }
@@ -388,7 +387,6 @@ impl<T> Sender<T> {
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn closed(&mut self) {
         poll_fn(|cx| self.poll_close(cx)).await
     }
@@ -447,7 +445,7 @@ impl<T> Drop for Sender<T> {
 
 // ===== impl Ref =====
 
-impl<'a, T: 'a> ops::Deref for Ref<'a, T> {
+impl<T> ops::Deref for Ref<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {

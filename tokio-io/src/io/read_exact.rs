@@ -40,7 +40,7 @@ fn eof() -> io::Error {
 }
 
 // forward Unpin
-impl<'a, A: Unpin + ?Sized> Unpin for ReadExact<'_, A> {}
+impl<A: Unpin + ?Sized> Unpin for ReadExact<'_, A> {}
 
 impl<A> Future for ReadExact<'_, A>
 where
