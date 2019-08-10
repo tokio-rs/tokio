@@ -34,7 +34,7 @@ tokio-tcp = { version = "=0.2.0-alpha.1", path = "../tokio-tcp", features = ["as
 
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
-futures-preview = { version = "=0.3.0-alpha.17", features = ["async-await", "nightly"] }
+futures-preview = { version = "=0.3.0-alpha.18", features = ["async-await", "nightly"] }
 
 [target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]
 openssl = "0.10"

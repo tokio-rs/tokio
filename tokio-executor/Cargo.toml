@@ -25,4 +25,4 @@ categories = ["concurrency", "asynchronous"]
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 
-futures-core-preview = "=0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.18"

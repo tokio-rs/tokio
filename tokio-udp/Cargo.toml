@@ -24,8 +24,8 @@ tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
 
 mio = "0.6.14"
 log = "0.4"
-futures-core-preview = "=0.3.0-alpha.17"
-futures-util-preview = "=0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.18"
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio", default-features = false, features = ["rt-full"] }

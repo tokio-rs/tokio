@@ -24,13 +24,13 @@ async-traits = ["futures-sink-preview"]
 
 [dependencies]
 fnv = "1.0.6"
-futures-core-preview = { version = "=0.3.0-alpha.17" }
-futures-sink-preview = { version = "=0.3.0-alpha.17", optional = true }
-futures-util-preview = { version = "=0.3.0-alpha.17" }
+futures-core-preview = { version = "=0.3.0-alpha.18" }
+futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
+futures-util-preview = { version = "=0.3.0-alpha.18" }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }
 
 env_logger = { version = "0.6", default-features = false }
-loom = { version = "0.2.0", features = ["futures"] }
+loom = { version = "0.2.1", features = ["futures"] }

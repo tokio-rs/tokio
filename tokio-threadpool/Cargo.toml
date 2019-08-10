@@ -24,8 +24,8 @@ categories = ["concurrency", "asynchronous"]
 [dependencies]
 tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
 tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
-futures-core-preview = "=0.3.0-alpha.17"
-futures-util-preview = "=0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.18"
 
 crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"

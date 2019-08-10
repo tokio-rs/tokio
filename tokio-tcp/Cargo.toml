@@ -26,8 +26,8 @@ async-traits = []
 tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
 
-futures-core-preview = "=0.3.0-alpha.17"
-futures-util-preview = "=0.3.0-alpha.17"
+futures-core-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.18"
 bytes = "0.4"
 mio = "0.6.14"
 iovec = "0.1"
