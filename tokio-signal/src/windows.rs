@@ -198,10 +198,10 @@ impl Stream for CtrlBreak {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::future::{self, FutureExt};
+    use futures_util::future::FutureExt;
     use futures_util::stream::StreamExt;
+    use std::future::Future;
     use std::time::Duration;
-    use tokio::runtime::current_thread;
     use tokio_timer::Timeout;
 
     fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
