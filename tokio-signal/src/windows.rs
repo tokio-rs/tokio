@@ -219,7 +219,7 @@ mod tests {
             super::handler(CTRL_C_EVENT);
         }
 
-        with_timeout(ctrl_c.into_future()).await;
+        let _ = with_timeout(ctrl_c.into_future()).await;
     }
 
     #[tokio::test]
@@ -233,6 +233,6 @@ mod tests {
             super::handler(CTRL_BREAK_EVENT);
         }
 
-        with_timeout(ctrl_break.into_future()).await;
+        let _ = with_timeout(ctrl_break.into_future()).await;
     }
 }
