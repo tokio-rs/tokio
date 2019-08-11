@@ -57,17 +57,11 @@ impl Storage for OsStorage {
 }
 
 #[derive(Debug)]
-pub(crate) struct OsExtraData {
-    driver_waker: Sender<()>,
-}
+pub(crate) struct OsExtraData {}
 
 impl Init for OsExtraData {
     fn init() -> Self {
-        let (driver_waker, driver_rx) = channel(1);
-
-        tokio_executor::spawn(DriverTask { rx: driver_rx });
-
-        Self { driver_waker }
+        Self {}
     }
 }
 
@@ -88,11 +82,6 @@ impl Init for OsExtraData {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub(crate) struct Event {
-    rx: Receiver<()>,
-}
-
-#[derive(Debug)]
-struct DriverTask {
     rx: Receiver<()>,
 }
 
@@ -149,39 +138,21 @@ fn global_init() -> io::Result<()> {
     init.unwrap_or_else(|| Ok(()))
 }
 
-impl Future for DriverTask {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            // Ensure we keep polling our waker until we know there are no more
-            // events (and therefore we've registered interest to be woken again).
-            match self.rx.poll_recv(cx) {
-                Poll::Ready(Some(())) => continue,
-                Poll::Ready(None) => panic!("driver got disconnected?"),
-                Poll::Pending => break,
-            }
-        }
-
-        globals().broadcast();
-
-        // TODO(1000): when to finish this task?
-        Poll::Pending
-    }
-}
-
 unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
     let globals = globals();
     globals.record_event(ty as EventId);
 
-    // FIXME: revisit this, we'd probably want to panic if the driver task goes away,
-    // but that would unwind across the FFI boundary...
-    let _ = globals.driver_waker.clone().try_send(());
-
-    // TODO(1000): this will report that we handled a CTRL_BREAK_EVENT when
-    //       in fact we may not have any streams actually created for that
-    //       event.
-    TRUE
+    // According to https://docs.microsoft.com/en-us/windows/console/handlerroutine
+    // the handler routine is always invoked in a new thread, thus we don't
+    // have the same restrictions as in Unix signal handlers, meaning we can
+    // go ahead and perform the broadcast here.
+    if globals.broadcast() {
+        TRUE
+    } else {
+        // No one is listening for this notification any more
+        // let the OS fire the next (possibly the default) handler.
+        FALSE
+    }
 }
 
 /// Represents a stream which receives "ctrl-break" notifications sent to the process
@@ -238,14 +209,9 @@ mod tests {
         Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
     }
 
-    #[test]
-    fn ctrl_c_and_ctrl_break() {
-        // FIXME(1000): combining into one test due to a restriction where the
-        // first event loop cannot go away
-        let mut rt = current_thread::Runtime::new().unwrap();
-        let event_ctrl_c = rt
-            .block_on(with_timeout(future::lazy(|_| crate::CtrlC::new())))
-            .expect("failed to run future");
+    #[tokio::test]
+    async fn ctrl_c() {
+        let ctrl_c = crate::CtrlC::new().expect("failed to create CtrlC");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS
@@ -254,16 +220,20 @@ mod tests {
             super::handler(CTRL_C_EVENT);
         }
 
-        let _ = rt.block_on(with_timeout(event_ctrl_c.into_future()));
+        with_timeout(event_ctrl_c.into_future()).await;
+    }
 
-        let event_ctrl_break = rt
-            .block_on(with_timeout(future::lazy(|_| CtrlBreak::new())))
-            .expect("failed to run future");
+    #[tokio::test]
+    async fn ctrl_break() {
+        let ctrl_c = crate::CtrlBreak::new().expect("failed to create CtrlC");
 
+        // Windows doesn't have a good programmatic way of sending events
+        // like sending signals on Unix, so we'll stub out the actual OS
+        // integration and test that our handling works.
         unsafe {
             super::handler(CTRL_BREAK_EVENT);
         }
 
-        let _ = rt.block_on(with_timeout(event_ctrl_break.into_future()));
+        with_timeout(event_ctrl_c.into_future()).await;
     }
 }
