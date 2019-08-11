@@ -8,7 +8,6 @@
 #![cfg(windows)]
 
 use std::convert::TryFrom;
-use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::sync::Once;
@@ -16,7 +15,7 @@ use std::task::{Context, Poll};
 
 use futures_core::stream::Stream;
 use tokio_reactor::Handle;
-use tokio_sync::mpsc::{channel, Receiver, Sender};
+use tokio_sync::mpsc::{channel, Receiver};
 use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
