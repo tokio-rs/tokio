@@ -219,12 +219,12 @@ mod tests {
             super::handler(CTRL_C_EVENT);
         }
 
-        with_timeout(event_ctrl_c.into_future()).await;
+        with_timeout(ctrl_c.into_future()).await;
     }
 
     #[tokio::test]
     async fn ctrl_break() {
-        let ctrl_c = crate::CtrlBreak::new().expect("failed to create CtrlC");
+        let ctrl_break = crate::CtrlBreak::new().expect("failed to create CtrlC");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS
@@ -233,6 +233,6 @@ mod tests {
             super::handler(CTRL_BREAK_EVENT);
         }
 
-        with_timeout(event_ctrl_c.into_future()).await;
+        with_timeout(ctrl_break.into_future()).await;
     }
 }
