@@ -224,7 +224,7 @@ mod tests {
 
     #[tokio::test]
     async fn ctrl_break() {
-        let ctrl_break = crate::CtrlBreak::new().expect("failed to create CtrlC");
+        let ctrl_break = super::CtrlBreak::new().expect("failed to create CtrlC");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS
