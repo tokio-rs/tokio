@@ -59,7 +59,7 @@
 //!
 //! use futures_util::future;
 //! use futures_util::stream::StreamExt;
-//! use tokio_signal::unix::{Signal, SIGHUP};
+//! use tokio_signal::unix::{Signal, SignalKind};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,7 +77,7 @@
 //!
 //!     // Like the previous example, this is an infinite stream of signals
 //!     // being received, and signals may be coalesced while pending.
-//!     let stream = Signal::new(SIGHUP)?;
+//!     let stream = Signal::new(SignalKind::sighup())?;
 //!
 //!     // Convert out stream into a future and block the program
 //!     let (signal, _signal) = stream.into_future().await;

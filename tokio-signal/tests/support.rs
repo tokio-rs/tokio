@@ -10,7 +10,7 @@ use tokio_timer::Timeout;
 pub use futures_util::future;
 pub use futures_util::stream::StreamExt;
 pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
-pub use tokio_signal::unix::Signal;
+pub use tokio_signal::unix::{Signal, SignalKind};
 
 pub fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
     Timeout::new(future, Duration::from_secs(1)).map(Result::unwrap)

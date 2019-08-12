@@ -9,7 +9,8 @@ use libc;
 
 #[tokio::test]
 async fn twice() {
-    let mut signal = Signal::new(libc::SIGUSR1).expect("failed to get signal");
+    let kind = SignalKind::sigusr1();
+    let mut signal = Signal::new(kind).expect("failed to get signal");
 
     for _ in 0..2 {
         send_signal(libc::SIGUSR1);
