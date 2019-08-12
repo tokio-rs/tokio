@@ -40,7 +40,7 @@ use std::process::{self, ExitStatus};
 use std::task::Context;
 use std::task::Poll;
 use tokio_reactor::{Handle, PollEvented};
-use tokio_signal::unix::Signal;
+use tokio_signal::unix::{Signal, SignalKind};
 
 impl Wait for process::Child {
     fn id(&self) -> u32 {
@@ -99,7 +99,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stdout = stdio(child.stdout.take(), handle)?;
     let stderr = stdio(child.stderr.take(), handle)?;
 
-    let signal = Signal::with_handle(libc::SIGCHLD, handle)?;
+    let signal = Signal::with_handle(SignalKind::sigchld(), handle)?;
 
     Ok(SpawnedChild {
         child: Child {
