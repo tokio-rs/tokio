@@ -20,6 +20,7 @@ Testing utilities for Tokio- and futures-based code
 categories = ["asynchronous", "testing"]
 
 [dependencies]
+tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
@@ -29,6 +30,4 @@ futures-core-preview = "=0.3.0-alpha.18"
 pin-convert = "0.1.0"
 
 [dev-dependencies]
-tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
-
 futures-util-preview = "=0.3.0-alpha.18"
