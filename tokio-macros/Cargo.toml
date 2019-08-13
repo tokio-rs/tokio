@@ -25,9 +25,8 @@ proc-macro = true
 [features]
 
 [dependencies]
-proc-macro2 = "0.4.27"
-quote = "0.6.11"
-syn = { version = "0.15.27", features = ["full", "extra-traits", "visit-mut"] }
+quote = "1"
+syn = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio", default-features = false, features = ["rt-full"] }

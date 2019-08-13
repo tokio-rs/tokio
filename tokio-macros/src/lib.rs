@@ -54,19 +54,19 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
-    let ret = &input.decl.output;
-    let name = &input.ident;
+    let ret = &input.sig.output;
+    let name = &input.sig.ident;
     let body = &input.block;
     let attrs = &input.attrs;
 
-    if input.asyncness.is_none() {
+    if input.sig.asyncness.is_none() {
         let msg = "the async keyword is missing from the function declaration";
-        return syn::Error::new_spanned(input.decl.fn_token, msg)
+        return syn::Error::new_spanned(input.sig.fn_token, msg)
             .to_compile_error()
             .into();
-    } else if !input.decl.inputs.is_empty() {
+    } else if !input.sig.inputs.is_empty() {
         let msg = "the main function cannot accept arguments";
-        return syn::Error::new_spanned(&input.decl.inputs, msg)
+        return syn::Error::new_spanned(&input.sig.inputs, msg)
             .to_compile_error()
             .into();
     }
@@ -74,8 +74,9 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut runtime = RuntimeType::Multi;
 
     for arg in args {
-        if let syn::NestedMeta::Meta(syn::Meta::Word(ident)) = arg {
-            match ident.to_string().to_lowercase().as_str() {
+        if let syn::NestedMeta::Meta(syn::Meta::Path(ident)) = arg {
+            let seg = ident.segments.first().expect("Must have specified ident");
+            match seg.ident.to_string().to_lowercase().as_str() {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
                 name => {
@@ -126,8 +127,8 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
-    let ret = &input.decl.output;
-    let name = &input.ident;
+    let ret = &input.sig.output;
+    let name = &input.sig.ident;
     let body = &input.block;
     let attrs = &input.attrs;
 
@@ -140,14 +141,14 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    if input.asyncness.is_none() {
+    if input.sig.asyncness.is_none() {
         let msg = "the async keyword is missing from the function declaration";
         return syn::Error::new_spanned(&input, msg)
             .to_compile_error()
             .into();
-    } else if !input.decl.inputs.is_empty() {
+    } else if !input.sig.inputs.is_empty() {
         let msg = "the test function cannot accept arguments";
-        return syn::Error::new_spanned(&input.decl.inputs, msg)
+        return syn::Error::new_spanned(&input.sig.inputs, msg)
             .to_compile_error()
             .into();
     }
