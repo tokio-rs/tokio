@@ -40,6 +40,26 @@ fn basic() {
 }
 
 #[test]
+fn other_executors_can_run_inside_blocking() {
+    let _ = ::env_logger::try_init();
+
+    let pool = Builder::new().pool_size(1).max_blocking(1).build();
+
+    let (tx, rx) = mpsc::channel();
+
+    pool.spawn(async move {
+        let res = blocking(|| {
+            let _e = tokio_executor::enter().expect("nested blocking enter");
+            tx.send(()).unwrap();
+        });
+
+        assert_ready!(res).unwrap();
+    });
+
+    rx.recv().unwrap();
+}
+
+#[test]
 fn notify_task_on_capacity() {
     const BLOCKING: usize = 10;
 

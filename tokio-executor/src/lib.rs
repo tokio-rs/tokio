@@ -64,7 +64,7 @@ mod global;
 pub mod park;
 mod typed;
 
-pub use crate::enter::{enter, Enter, EnterError};
+pub use crate::enter::{enter, exit, Enter, EnterError};
 pub use crate::error::SpawnError;
 pub use crate::executor::Executor;
 pub use crate::global::{spawn, with_default, DefaultExecutor};
