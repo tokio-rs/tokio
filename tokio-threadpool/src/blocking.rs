@@ -1,10 +1,10 @@
 use crate::worker::Worker;
 
 use futures_core::ready;
-use tokio_executor;
 use std::error::Error;
 use std::fmt;
 use std::task::Poll;
+use tokio_executor;
 
 /// Error raised by `blocking`.
 pub struct BlockingError {

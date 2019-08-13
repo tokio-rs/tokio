@@ -97,7 +97,6 @@ pub fn exit<F: FnOnce() -> R, R>(f: F) -> R {
     ret
 }
 
-
 impl Enter {
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
