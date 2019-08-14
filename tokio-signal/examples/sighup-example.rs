@@ -5,11 +5,11 @@
 #[cfg(unix)]
 mod platform {
     use futures_util::stream::StreamExt;
-    use tokio_signal::unix::{Signal, SIGHUP};
+    use tokio_signal::unix::{Signal, SignalKind};
 
     pub async fn main() {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
-        let mut stream = Signal::new(SIGHUP).unwrap();
+        let mut stream = Signal::new(SignalKind::sighup()).unwrap();
 
         println!("Waiting for SIGHUPS (Ctrl+C to quit)");
         println!(
