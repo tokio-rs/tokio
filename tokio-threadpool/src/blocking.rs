@@ -4,6 +4,7 @@ use futures_core::ready;
 use std::error::Error;
 use std::fmt;
 use std::task::Poll;
+use tokio_executor;
 
 /// Error raised by `blocking`.
 pub struct BlockingError {
@@ -140,7 +141,10 @@ where
     ready!(res)?;
 
     // Currently in blocking mode, so call the inner closure
-    let ret = f();
+    //
+    // "Exit" the current executor in case the blocking function wants
+    // to call a different executor.
+    let ret = tokio_executor::exit(move || f());
 
     // Try to transition out of blocking mode. This is a fast path that takes
     // back ownership of the worker if the worker handoff didn't complete yet.
