@@ -40,7 +40,8 @@
 #[cfg(feature = "fs")]
 pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
 pub use tokio_io::{
-    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
+    BufWriter,
 };
 
 // Re-export io::Error so that users don't have to deal
