@@ -4,7 +4,6 @@ members = [
   "tokio",
   "tokio-buf",
   "tokio-codec",
-  "tokio-current-thread",
   "tokio-executor",
   "tokio-fs",
   "tokio-io",
@@ -20,4 +19,5 @@ members = [
   "tokio-tls",
   "tokio-udp",
   "tokio-uds",
+  "ui-tests",
 ]

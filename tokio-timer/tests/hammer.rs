@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio_current_thread::CurrentThread;
+use tokio_executor::current_thread::CurrentThread;
 use tokio_executor::park::{Park, Unpark, UnparkThread};
 use tokio_timer::{Delay, Timer};
 

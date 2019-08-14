@@ -1,7 +1,7 @@
 //! Temporary reactor + timer that runs on a background thread. This it to make
 //! `block_on` work.
 
-use tokio_current_thread::CurrentThread;
+use tokio_executor::current_thread::CurrentThread;
 use tokio_reactor::Reactor;
 use tokio_sync::oneshot;
 use tokio_timer::clock::Clock;
