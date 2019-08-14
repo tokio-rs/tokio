@@ -47,7 +47,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
         let (n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
             let res = ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
-            let (n, addr) = res.unwrap();
+            let (n, addr) = res?;
             pin.rd.advance_mut(n);
             (n, addr)
         };
@@ -55,10 +55,10 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
         let frame_res = pin.codec.decode(&mut pin.rd);
         pin.rd.clear();
         let frame = frame_res?;
-        let result = frame.map(|frame| (frame, addr)); // frame -> (frame, addr)
-        let result = result.unwrap();
+        let result = frame.map(|frame| Ok((frame, addr))); // frame -> (frame, addr)
+
         trace!("frame decoded from buffer");
-        Poll::Ready(Some(Ok(result)))
+        Poll::Ready(result)
     }
 }
 
