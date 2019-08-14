@@ -7,6 +7,7 @@ use tokio_timer::*;
 
 use futures_core::Stream;
 use std::time::Duration;
+use std::pin::Pin;
 
 #[test]
 #[should_panic]
@@ -26,7 +27,7 @@ fn usage() {
 
         macro_rules! poll {
             () => {
-                task.enter(|cx| int.poll_next(cx))
+                task.enter(|cx| Pin::new(&mut int).poll_next(cx))
             };
         }
 

@@ -6,10 +6,11 @@ use tokio_timer::*;
 
 use futures_core::Stream;
 use std::time::Duration;
+use std::pin::Pin;
 
 macro_rules! poll {
     ($task:ident, $queue:ident) => {
-        $task.enter(|cx| $queue.poll_next(cx))
+        $task.enter(|cx| Pin::new(&mut $queue).poll_next(cx))
     };
 }
 

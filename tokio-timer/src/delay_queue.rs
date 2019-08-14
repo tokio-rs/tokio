@@ -72,8 +72,9 @@ use std::time::{Duration, Instant};
 /// ```rust,no_run
 /// use tokio::timer::{delay_queue, DelayQueue, Error};
 ///
-/// use futures_core::ready;
+/// use futures_core::{ready, Stream};
 /// use std::collections::HashMap;
+/// use std::pin::Pin;
 /// use std::task::{Context, Poll};
 /// use std::time::Duration;
 /// # type CacheKey = String;
@@ -106,7 +107,7 @@ use std::time::{Duration, Instant};
 ///     }
 ///
 ///     fn poll_purge(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-///         while let Some(res) = ready!(self.expirations.poll_next(cx)) {
+///         while let Some(res) = ready!(Pin::new(&mut self.expirations).poll_next(cx)) {
 ///             let entry = res?;
 ///             self.entries.remove(entry.get_ref());
 ///         }
