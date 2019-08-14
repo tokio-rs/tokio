@@ -1,4 +1,4 @@
-use crate::UnixStream;
+use crate::{Incoming, UnixStream};
 
 use tokio_reactor::{Handle, PollEvented};
 
@@ -91,9 +91,8 @@ impl UnixListener {
     ///
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
-    #[cfg(feature = "async-traits")]
-    pub fn incoming(self) -> crate::Incoming {
-        crate::Incoming::new(self)
+    pub fn incoming(self) -> Incoming {
+        Incoming::new(self)
     }
 }
 

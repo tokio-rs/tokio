@@ -22,7 +22,6 @@ mod stream;
 mod ucred;
 
 pub use crate::datagram::UnixDatagram;
-#[cfg(feature = "async-traits")]
 pub use crate::incoming::Incoming;
 pub use crate::listener::UnixListener;
 pub use crate::stream::UnixStream;

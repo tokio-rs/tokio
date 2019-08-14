@@ -130,7 +130,6 @@ fn deadline_future_elapses() {
     });
 }
 
-#[cfg(feature = "async-traits")]
 macro_rules! poll {
     ($task:ident, $stream:ident) => {{
         use futures_core::Stream;
@@ -139,7 +138,6 @@ macro_rules! poll {
 }
 
 #[test]
-#[cfg(feature = "async-traits")]
 fn stream_and_timeout_in_future() {
     use tokio_sync::mpsc;
 
@@ -169,7 +167,6 @@ fn stream_and_timeout_in_future() {
 }
 
 #[test]
-#[cfg(feature = "async-traits")]
 fn idle_stream_timesout_periodically() {
     use tokio_sync::mpsc;
 

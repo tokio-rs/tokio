@@ -74,13 +74,13 @@ tokio-macros = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-m
 tokio-reactor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-reactor" }
 tokio-sync = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-sync", features = ["async-traits"] }
 tokio-threadpool = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-threadpool" }
-tokio-tcp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-tcp", features = ["async-traits"] }
+tokio-tcp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-tcp" }
 tokio-udp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-udp" }
-tokio-timer = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-timer", features = ["async-traits"] }
+tokio-timer = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-timer" }
 tracing-core = { version = "0.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-uds", features = ["async-traits"] }
+tokio-uds = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-uds" }
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }

@@ -2,7 +2,6 @@ use crate::clock;
 use crate::Delay;
 
 use futures_core::ready;
-use futures_util::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
@@ -54,9 +53,12 @@ impl Interval {
     pub(crate) fn new_with_delay(delay: Delay, duration: Duration) -> Interval {
         Interval { delay, duration }
     }
+}
 
-    #[doc(hidden)] // TODO: remove
-    pub fn poll_next(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Instant>> {
+impl futures_core::Stream for Interval {
+    type Item = Instant;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
 
@@ -70,41 +72,5 @@ impl Interval {
 
         // Return the current instant
         Poll::Ready(Some(now))
-    }
-
-    /// Completes when the next instant in the interval has been reached.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// #![feature(async_await)]
-    ///
-    /// use tokio::timer::Interval;
-    ///
-    /// use std::time::Duration;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interval = Interval::new_interval(Duration::from_millis(10));
-    ///
-    ///     interval.next().await;
-    ///     interval.next().await;
-    ///     interval.next().await;
-    ///
-    ///     // approximately 30ms have elapsed.
-    /// }
-    /// ```
-    #[allow(clippy::should_implement_trait)] // TODO: rename (tokio-rs/tokio#1261)
-    pub async fn next(&mut self) -> Option<Instant> {
-        poll_fn(|cx| self.poll_next(cx)).await
-    }
-}
-
-#[cfg(feature = "async-traits")]
-impl futures_core::Stream for Interval {
-    type Item = Instant;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        Interval::poll_next(self.get_mut(), cx)
     }
 }

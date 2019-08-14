@@ -38,7 +38,6 @@
 
 pub mod clock;
 pub mod delay_queue;
-#[cfg(feature = "async-traits")]
 pub mod throttle;
 pub mod timeout;
 pub mod timer;

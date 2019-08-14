@@ -1,4 +1,3 @@
-#[cfg(feature = "async-traits")]
 use super::incoming::Incoming;
 use super::TcpStream;
 use futures_core::ready;
@@ -203,7 +202,6 @@ impl TcpListener {
     /// necessarily fatal ‒ for example having too many open file descriptors or the other side
     /// closing the connection while it waits in an accept queue. These would terminate the stream
     /// if not handled in any way.
-    #[cfg(feature = "async-traits")]
     pub fn incoming(self) -> Incoming {
         Incoming::new(self)
     }

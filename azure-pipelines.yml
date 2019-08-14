@@ -51,11 +51,9 @@ jobs:
       tokio-process: []
       tokio-reactor: []
       tokio-signal: []
-      tokio-tcp:
-        - async-traits
+      tokio-tcp: []
       tokio-udp: []
-      tokio-uds:
-        - async-traits
+      tokio-uds: []
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
@@ -74,8 +72,7 @@ jobs:
         - async-traits
       tokio-macros: []
       # - tokio-threadpool
-      tokio-timer:
-        - async-traits
+      tokio-timer: []
       tokio-test: []
 
 # - template: ci/azure-cargo-check.yml

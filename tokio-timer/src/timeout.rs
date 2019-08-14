@@ -6,7 +6,6 @@
 
 use crate::clock::now;
 use crate::Delay;
-#[cfg(feature = "async-traits")]
 use futures_core::ready;
 use std::fmt;
 use std::future::Future;
@@ -182,7 +181,6 @@ where
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_core::Stream for Timeout<T>
 where
     T: futures_core::Stream,

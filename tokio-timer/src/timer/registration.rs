@@ -45,7 +45,6 @@ impl Registration {
     }
 
     // Used by `Timeout<Stream>`
-    #[cfg(feature = "async-traits")]
     pub(crate) fn reset_timeout(&mut self) {
         let deadline = crate::clock::now() + self.entry.time_ref().duration;
         unsafe {

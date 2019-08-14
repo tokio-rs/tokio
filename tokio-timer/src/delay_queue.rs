@@ -351,29 +351,6 @@ impl<T> DelayQueue<T> {
         Key::new(key)
     }
 
-    /// Attempt to pull out the next value of the delay queue, registering the
-    /// current task for wakeup if the value is not yet available, and returning
-    /// None if the queue is exhausted.
-    pub fn poll_next(
-        &mut self,
-        cx: &mut task::Context<'_>,
-    ) -> Poll<Option<Result<Expired<T>, Error>>> {
-        let item = ready!(self.poll_idx(cx));
-        Poll::Ready(item.map(|result| {
-            result.map(|idx| {
-                let data = self.slab.remove(idx);
-                debug_assert!(data.next.is_none());
-                debug_assert!(data.prev.is_none());
-
-                Expired {
-                    key: Key::new(idx),
-                    data: data.inner,
-                    deadline: self.start + Duration::from_millis(data.when),
-                }
-            })
-        }))
-    }
-
     /// Insert `value` into the queue set to expire after the requested duration
     /// elapses.
     ///
@@ -723,14 +700,29 @@ impl<T> DelayQueue<T> {
 // We never put `T` in a `Pin`...
 impl<T> Unpin for DelayQueue<T> {}
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_core::Stream for DelayQueue<T> {
     // DelayQueue seems much more specific, where a user may care that it
     // has reached capacity, so return those errors instead of panicking.
     type Item = Result<Expired<T>, Error>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        DelayQueue::poll_next(self.get_mut(), cx)
+    /// Attempt to pull out the next value of the delay queue, registering the
+    /// current task for wakeup if the value is not yet available, and returning
+    /// None if the queue is exhausted.
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        let item = ready!(self.poll_idx(cx));
+        Poll::Ready(item.map(|result| {
+            result.map(|idx| {
+                let data = self.slab.remove(idx);
+                debug_assert!(data.next.is_none());
+                debug_assert!(data.prev.is_none());
+
+                Expired {
+                    key: Key::new(idx),
+                    data: data.inner,
+                    deadline: self.start + Duration::from_millis(data.when),
+                }
+            })
+        }))
     }
 }
 

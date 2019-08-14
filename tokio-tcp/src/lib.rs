@@ -27,7 +27,6 @@
 //! [incoming_method]: struct.TcpListener.html#method.incoming
 //! [`Incoming`]: struct.Incoming.html
 
-#[cfg(feature = "async-traits")]
 mod incoming;
 mod listener;
 pub mod split;
