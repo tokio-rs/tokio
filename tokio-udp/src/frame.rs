@@ -33,6 +33,8 @@ pub struct UdpFramed<C> {
     wr: BytesMut,
     out_addr: SocketAddr,
     flushed: bool,
+    is_readable: bool,
+    current_addr: Option<SocketAddr>,
 }
 
 impl<C: Decoder> Stream for UdpFramed<C> {
@@ -42,19 +44,37 @@ impl<C: Decoder> Stream for UdpFramed<C> {
     fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
         self.rd.reserve(INITIAL_RD_CAPACITY);
 
-        let (n, addr) = unsafe {
-            // Read into the buffer without having to initialize the memory.
-            let (n, addr) = try_ready!(self.socket.poll_recv_from(self.rd.bytes_mut()));
-            self.rd.advance_mut(n);
-            (n, addr)
-        };
-        trace!("received {} bytes, decoding", n);
-        let frame_res = self.codec.decode(&mut self.rd);
-        self.rd.clear();
-        let frame = frame_res?;
-        let result = frame.map(|frame| (frame, addr)); // frame -> (frame, addr)
-        trace!("frame decoded from buffer");
-        Ok(Async::Ready(result))
+        loop {
+            // Are there are still bytes left in the read buffer to decode?
+            if self.is_readable {
+                if let Some(frame) = self.codec.decode(&mut self.rd)? {
+                    trace!("frame decoded from buffer");
+                    
+                    let current_addr = self
+                        .current_addr
+                        .expect("will always be set before this line is called");
+
+                    return Ok(Async::Ready(Some((frame, current_addr))));
+                }
+
+                // if this line has been reached then decode has returned `None`.
+                self.is_readable = false;
+                self.rd.clear();
+            }
+
+            // We're out of data. Try and fetch more data to decode
+            let (n, addr) = unsafe {
+                // Read into the buffer without having to initialize the memory.
+                let (n, addr) = try_ready!(self.socket.poll_recv_from(self.rd.bytes_mut()));
+                self.rd.advance_mut(n);
+                (n, addr)
+            };
+
+            self.current_addr = Some(addr);
+            self.is_readable = true;
+
+            trace!("received {} bytes, decoding", n);
+        }
     }
 }
 
@@ -126,6 +146,8 @@ impl<C> UdpFramed<C> {
             rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
             wr: BytesMut::with_capacity(INITIAL_WR_CAPACITY),
             flushed: true,
+            is_readable: false,
+            current_addr: None,
         }
     }
 

@@ -293,24 +293,22 @@ fn send_framed_byte_codec() {
 fn send_framed_lines_codec() {
     drop(env_logger::try_init());
 
-    let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
-    let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
+    let a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
+    let b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
     let a_addr = t!(a_soc.local_addr());
     let b_addr = t!(b_soc.local_addr());
-    
+
     let a = UdpFramed::new(a_soc, ByteCodec);
     let b = UdpFramed::new(b_soc, LinesCodec::new());
 
-    let msg = b"1\r\n2\r\n3\r\nLet's go!\r\n".to_vec();
+    let msg = b"1\r\n2\r\n3\r\n".to_vec();
 
     let send = a.send((msg.clone(), b_addr));
     t!(send.wait());
-    
-    let mut recv = Stream::wait(b);
-    let mut recv = recv.map(|e| e.unwrap());
+
+    let mut recv = Stream::wait(b).map(|e| e.unwrap());
 
     assert_eq!(recv.next(), Some(("1".to_string(), a_addr)));
     assert_eq!(recv.next(), Some(("2".to_string(), a_addr)));
     assert_eq!(recv.next(), Some(("3".to_string(), a_addr)));
-    assert_eq!(recv.next(), Some(("Let's go!".to_string(), a_addr)));
 }
