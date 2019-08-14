@@ -1,7 +1,11 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
-use tokio_udp::UdpSocket;
+use bytes::{BufMut, BytesMut};
+use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
+use std::io;
+use tokio_codec::{Decoder, Encoder};
+use tokio_udp::{UdpFramed, UdpSocket};
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
@@ -72,68 +76,73 @@ async fn reunite_error() -> std::io::Result<()> {
     Ok(())
 }
 
-// pub struct ByteCodec;
+pub struct ByteCodec;
 
-// impl Decoder for ByteCodec {
-//     type Item = Vec<u8>;
-//     type Error = io::Error;
+impl Decoder for ByteCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
 
-//     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Vec<u8>>, io::Error> {
-//         let len = buf.len();
-//         Ok(Some(buf.split_to(len).to_vec()))
-//     }
-// }
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Vec<u8>>, io::Error> {
+        let len = buf.len();
+        Ok(Some(buf.split_to(len).to_vec()))
+    }
+}
 
-// impl Encoder for ByteCodec {
-//     type Item = Vec<u8>;
-//     type Error = io::Error;
+impl Encoder for ByteCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
 
-//     fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
-//         buf.reserve(data.len());
-//         buf.put(data);
-//         Ok(())
-//     }
-// }
+    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
+        buf.reserve(data.len());
+        buf.put(data);
+        Ok(())
+    }
+}
 
-// #[test]
-// fn send_framed() {
-//     drop(env_logger::try_init());
+#[tokio::test]
+async fn send_framed() -> std::io::Result<()> {
+    drop(env_logger::try_init());
 
-//     let mut a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
-//     let mut b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
-//     let a_addr = t!(a_soc.local_addr());
-//     let b_addr = t!(b_soc.local_addr());
+    let mut a_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let mut b_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
 
-//     {
-//         let a = UdpFramed::new(a_soc, ByteCodec);
-//         let b = UdpFramed::new(b_soc, ByteCodec);
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
 
-//         let msg = b"4567".to_vec();
+    // test sending & receiving bytes
+    {
+        let mut a = UdpFramed::new(a_soc, ByteCodec);
+        let mut b = UdpFramed::new(b_soc, ByteCodec);
 
-//         let send = a.send((msg.clone(), b_addr));
-//         let recv = b.into_future().map_err(|e| e.0);
-//         let (sendt, received) = t!(send.join(recv).wait());
+        let msg = b"4567".to_vec();
 
-//         let (data, addr) = received.0.unwrap();
-//         assert_eq!(msg, data);
-//         assert_eq!(a_addr, addr);
+        let send = a.send((msg.clone(), b_addr));
+        let recv = b.next().map(|e| e.unwrap());
+        let (_, received) = try_join(send, recv).await.unwrap();
 
-//         a_soc = sendt.into_inner();
-//         b_soc = received.1.into_inner();
-//     }
+        let (data, addr) = received;
+        assert_eq!(msg, data);
+        assert_eq!(a_addr, addr);
 
-//     {
-//         let a = UdpFramed::new(a_soc, ByteCodec);
-//         let b = UdpFramed::new(b_soc, ByteCodec);
+        a_soc = a.into_inner();
+        b_soc = b.into_inner();
+    }
 
-//         let msg = b"".to_vec();
+    // test sending & receiving an empty message
+    {
+        let mut a = UdpFramed::new(a_soc, ByteCodec);
+        let mut b = UdpFramed::new(b_soc, ByteCodec);
 
-//         let send = a.send((msg.clone(), b_addr));
-//         let recv = b.into_future().map_err(|e| e.0);
-//         let received = t!(send.join(recv).wait()).1;
+        let msg = b"".to_vec();
 
-//         let (data, addr) = received.0.unwrap();
-//         assert_eq!(msg, data);
-//         assert_eq!(a_addr, addr);
-//     }
-// }
+        let send = a.send((msg.clone(), b_addr));
+        let recv = b.next().map(|e| e.unwrap());
+        let (_, received) = try_join(send, recv).await.unwrap();
+
+        let (data, addr) = received;
+        assert_eq!(msg, data);
+        assert_eq!(a_addr, addr);
+    }
+
+    Ok(())
+}

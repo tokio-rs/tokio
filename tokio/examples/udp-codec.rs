@@ -10,14 +10,18 @@
 #![cfg(feature = "rt-full")]
 #![warn(rust_2018_idioms)]
 
-use tokio::io;
-use tokio::net::UdpSocket;
-use tokio::prelude::*;
-
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::time::Duration;
+
+use bytes::Bytes;
+
+use futures::{FutureExt, SinkExt, StreamExt};
+use tokio::codec::BytesCodec;
+use tokio::future::FutureExt as TokioFutureExt;
+use tokio::io;
+use tokio::net::{UdpFramed, UdpSocket};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -27,9 +31,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let addr = addr.parse::<SocketAddr>()?;
 
     // Bind both our sockets and then figure out what ports we got.
-    let mut a = UdpSocket::bind(&addr)?;
-    let mut b = UdpSocket::bind(&addr)?;
+    let a = UdpSocket::bind(&addr)?;
+    let b = UdpSocket::bind(&addr)?;
+
     let b_addr = b.local_addr()?;
+
+    let mut a = UdpFramed::new(a, BytesCodec::new());
+    let mut b = UdpFramed::new(b, BytesCodec::new());
 
     // Start off by sending a ping from a to b, afterwards we just print out
     // what they send us and continually send pings
@@ -48,39 +56,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn ping(socket: &mut UdpSocket, b_addr: SocketAddr) -> Result<(), io::Error> {
-    socket.send_to(b"PING", &b_addr).await?;
+async fn ping(socket: &mut UdpFramed<BytesCodec>, b_addr: SocketAddr) -> Result<(), io::Error> {
+    socket.send((Bytes::from(&b"PING"[..]), b_addr)).await?;
 
     for _ in 0..4usize {
-        let mut buffer = [0u8; 255];
+        let (bytes, addr) = socket.next().map(|e| e.unwrap()).await?;
 
-        let (bytes_read, addr) = socket.recv_from(&mut buffer).await?;
+        println!("[a] recv: {}", String::from_utf8_lossy(&bytes));
 
-        println!(
-            "[a] recv: {}",
-            String::from_utf8_lossy(&buffer[..bytes_read])
-        );
-
-        socket.send_to(b"PING", &addr).await?;
+        socket.send((Bytes::from(&b"PING"[..]), addr)).await?;
     }
 
     Ok(())
 }
 
-async fn pong(socket: &mut UdpSocket) -> Result<(), io::Error> {
-    let mut buffer = [0u8; 255];
+async fn pong(socket: &mut UdpFramed<BytesCodec>) -> Result<(), io::Error> {
+    let timeout = Duration::from_millis(200);
 
-    while let Ok(Ok((bytes_read, addr))) = socket
-        .recv_from(&mut buffer)
-        .timeout(Duration::from_millis(200))
-        .await
-    {
-        println!(
-            "[b] recv: {}",
-            String::from_utf8_lossy(&buffer[..bytes_read])
-        );
+    while let Ok(Some(Ok((bytes, addr)))) = socket.next().timeout(timeout).await {
+        println!("[b] recv: {}", String::from_utf8_lossy(&bytes));
 
-        socket.send_to(b"PONG", &addr).await?;
+        socket.send((Bytes::from(&b"PONG"[..]), addr)).await?;
     }
 
     Ok(())
