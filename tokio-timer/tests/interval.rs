@@ -5,6 +5,7 @@ use tokio_test::task::MockTask;
 use tokio_test::{assert_pending, assert_ready_eq, clock};
 use tokio_timer::*;
 
+use futures_core::Stream;
 use std::time::Duration;
 
 #[test]

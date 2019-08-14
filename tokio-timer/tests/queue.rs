@@ -4,6 +4,7 @@ use tokio_test::task::MockTask;
 use tokio_test::{assert_ok, assert_pending, assert_ready, clock};
 use tokio_timer::*;
 
+use futures_core::Stream;
 use std::time::Duration;
 
 macro_rules! poll {
