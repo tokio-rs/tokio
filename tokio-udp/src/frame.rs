@@ -49,7 +49,7 @@ impl<C: Decoder> Stream for UdpFramed<C> {
             if self.is_readable {
                 if let Some(frame) = self.codec.decode(&mut self.rd)? {
                     trace!("frame decoded from buffer");
-                    
+
                     let current_addr = self
                         .current_addr
                         .expect("will always be set before this line is called");
