@@ -1,7 +1,7 @@
 use crate::task::Task;
 use crate::worker;
 
-use tokio_sync::task::AtomicWaker;
+use tokio_sync::AtomicWaker;
 
 use crossbeam_deque::Injector;
 use std::future::Future;

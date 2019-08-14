@@ -3,7 +3,7 @@ use tokio_test::task::MockTask;
 use tokio_test::{assert_ready_err, assert_ready_ok};
 
 use bytes::{BufMut, BytesMut};
-use pin_utils::pin_mut;
+use futures_util::pin_mut;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};

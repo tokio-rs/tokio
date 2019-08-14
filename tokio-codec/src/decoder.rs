@@ -16,9 +16,6 @@ use super::Framed;
 /// Implementations are able to track state on `self`, which enables
 /// implementing stateful streaming parsers. In many cases, though, this type
 /// will simply be a unit struct (e.g. `struct HttpDecoder`).
-
-// Note: We can't deprecate this trait, because the deprecation carries through to tokio-codec, and
-// there doesn't seem to be a way to un-deprecate the re-export.
 pub trait Decoder {
     /// The type of decoded frames.
     type Item;
@@ -63,6 +60,46 @@ pub trait Decoder {
     /// Finally, if the bytes in the buffer are malformed then an error is
     /// returned indicating why. This informs `Framed` that the stream is now
     /// corrupt and should be terminated.
+    ///
+    /// # Buffer management
+    ///
+    /// Before returning from the function, implementations should ensure that
+    /// the buffer has appropriate capacity in anticipation of future calls to
+    /// `decode`. Failing to do so leads to inefficiency.
+    ///
+    /// For example, if frames have a fixed length, or if the length of the
+    /// current frame is known from a header, a possible buffer management
+    /// strategy is:
+    ///
+    /// ```no_run
+    /// # use std::io;
+    /// #
+    /// # use bytes::BytesMut;
+    /// # use tokio_codec::Decoder;
+    /// #
+    /// # struct MyCodec;
+    /// #
+    /// impl Decoder for MyCodec {
+    ///     // ...
+    ///     # type Item = BytesMut;
+    ///     # type Error = io::Error;
+    ///
+    ///     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    ///         // ...
+    ///
+    ///         // Reserve enough to complete decoding of the current frame.
+    ///         let current_frame_len: usize = 1000; // Example.
+    ///         // And to start decoding the next frame.
+    ///         let next_frame_header_len: usize = 10; // Example.
+    ///         src.reserve(current_frame_len + next_frame_header_len);
+    ///
+    ///         return Ok(None);
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// An optimal buffer management strategy minimizes reallocations and
+    /// over-allocations.
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error>;
 
     /// A default method available to be called when there are no more bytes

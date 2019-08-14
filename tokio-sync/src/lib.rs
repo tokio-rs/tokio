@@ -1,11 +1,10 @@
-#![doc(html_root_url = "https://docs.rs/tokio-sync/0.1.5")]
-#![deny(
+#![doc(html_root_url = "https://docs.rs/tokio-sync/0.2.0-alpha.1")]
+#![warn(
     missing_debug_implementations,
     missing_docs,
-    unreachable_pub,
-    rust_2018_idioms
+    rust_2018_idioms,
+    unreachable_pub
 )]
-#![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 #![feature(async_await)]
 
@@ -27,10 +26,13 @@ macro_rules! if_fuzz {
     }}
 }
 
-pub mod lock;
+mod lock;
 mod loom;
 pub mod mpsc;
 pub mod oneshot;
 pub mod semaphore;
-pub mod task;
+mod task;
 pub mod watch;
+
+pub use lock::{Lock, LockGuard};
+pub use task::AtomicWaker;

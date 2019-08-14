@@ -21,13 +21,13 @@ pub(crate) struct WorkerEntry {
     //
     // The `usize` value is deserialized to a `worker::State` instance. See
     // comments on that type.
-    pub state: CachePadded<AtomicUsize>,
+    pub(crate) state: CachePadded<AtomicUsize>,
 
     // Next entry in the parked Trieber stack
     next_sleeper: UnsafeCell<usize>,
 
     // Worker half of deque
-    pub worker: Worker<Arc<Task>>,
+    pub(crate) worker: Worker<Arc<Task>>,
 
     // Stealer half of deque
     stealer: Stealer<Arc<Task>>,
@@ -50,7 +50,7 @@ pub(crate) struct WorkerEntry {
 }
 
 impl WorkerEntry {
-    pub fn new(park: BoxPark, unpark: BoxUnpark) -> Self {
+    pub(crate) fn new(park: BoxPark, unpark: BoxUnpark) -> Self {
         let w = Worker::new_fifo();
         let s = w.stealer();
 
@@ -76,14 +76,14 @@ impl WorkerEntry {
     /// # Ordering
     ///
     /// The specified ordering is established on the entry's state variable.
-    pub fn fetch_unset_pushed(&self, ordering: Ordering) -> State {
+    pub(crate) fn fetch_unset_pushed(&self, ordering: Ordering) -> State {
         self.state.fetch_and(!PUSHED_MASK, ordering).into()
     }
 
     /// Submit a task to this worker while currently on the same thread that is
     /// running the worker.
     #[inline]
-    pub fn submit_internal(&self, task: Arc<Task>) {
+    pub(crate) fn submit_internal(&self, task: Arc<Task>) {
         self.push_internal(task);
     }
 
@@ -93,7 +93,7 @@ impl WorkerEntry {
     ///
     /// The `state` must have been obtained with an `Acquire` ordering.
     #[inline]
-    pub fn notify(&self, mut state: State) -> bool {
+    pub(crate) fn notify(&self, mut state: State) -> bool {
         use crate::worker::Lifecycle::*;
 
         loop {
@@ -138,7 +138,7 @@ impl WorkerEntry {
     /// Returns `Ok` when the worker was successfully signaled.
     ///
     /// Returns `Err` if the worker has already terminated.
-    pub fn signal_stop(&self, mut state: State) {
+    pub(crate) fn signal_stop(&self, mut state: State) {
         use crate::worker::Lifecycle::*;
 
         // Transition the worker state to signaled
@@ -189,7 +189,7 @@ impl WorkerEntry {
     /// This **must** only be called by the thread that owns the worker entry.
     /// This function is not `Sync`.
     #[inline]
-    pub fn pop_task(&self) -> Option<Arc<Task>> {
+    pub(crate) fn pop_task(&self) -> Option<Arc<Task>> {
         self.worker.pop()
     }
 
@@ -201,26 +201,26 @@ impl WorkerEntry {
     /// At the same time, this method steals some additional tasks and moves
     /// them into `dest` in order to balance the work distribution among
     /// workers.
-    pub fn steal_tasks(&self, dest: &Self) -> Steal<Arc<Task>> {
+    pub(crate) fn steal_tasks(&self, dest: &Self) -> Steal<Arc<Task>> {
         self.stealer.steal_batch_and_pop(&dest.worker)
     }
 
     /// Drain (and drop) all tasks that are queued for work.
     ///
     /// This is called when the pool is shutting down.
-    pub fn drain_tasks(&self) {
+    pub(crate) fn drain_tasks(&self) {
         while self.worker.pop().is_some() {}
     }
 
     /// Parks the worker thread.
-    pub fn park(&self) {
+    pub(crate) fn park(&self) {
         if let Some(park) = unsafe { (*self.park.get()).as_mut() } {
             park.park().unwrap();
         }
     }
 
     /// Parks the worker thread for at most `duration`.
-    pub fn park_timeout(&self, duration: Duration) {
+    pub(crate) fn park_timeout(&self, duration: Duration) {
         if let Some(park) = unsafe { (*self.park.get()).as_mut() } {
             park.park_timeout(duration).unwrap();
         }
@@ -228,7 +228,7 @@ impl WorkerEntry {
 
     /// Unparks the worker thread.
     #[inline]
-    pub fn unpark(&self) {
+    pub(crate) fn unpark(&self) {
         if let Some(park) = unsafe { (*self.unpark.get()).as_ref() } {
             park.unpark();
         }
@@ -238,7 +238,7 @@ impl WorkerEntry {
     ///
     /// Called when the task is being polled for the first time.
     #[inline]
-    pub fn register_task(&self, task: &Arc<Task>) {
+    pub(crate) fn register_task(&self, task: &Arc<Task>) {
         let running_tasks = unsafe { &mut *self.running_tasks.get() };
 
         let key = running_tasks.insert(task.clone());
@@ -249,7 +249,7 @@ impl WorkerEntry {
     ///
     /// Called when the task is completed and was previously registered in this worker.
     #[inline]
-    pub fn unregister_task(&self, task: Arc<Task>) {
+    pub(crate) fn unregister_task(&self, task: Arc<Task>) {
         let running_tasks = unsafe { &mut *self.running_tasks.get() };
         running_tasks.remove(task.reg_index.get());
         self.drain_remotely_completed_tasks();
@@ -260,7 +260,7 @@ impl WorkerEntry {
     /// Called when the task is completed by another worker and was previously registered in this
     /// worker.
     #[inline]
-    pub fn remotely_complete_task(&self, task: Arc<Task>) {
+    pub(crate) fn remotely_complete_task(&self, task: Arc<Task>) {
         self.remotely_completed_tasks.push(task);
         self.needs_drain.store(true, Release);
     }
@@ -268,7 +268,7 @@ impl WorkerEntry {
     /// Drops the remaining incomplete tasks and the parker associated with this worker.
     ///
     /// This function is called by the shutdown trigger.
-    pub fn shutdown(&self) {
+    pub(crate) fn shutdown(&self) {
         self.drain_remotely_completed_tasks();
 
         // Abort all incomplete tasks.
@@ -297,17 +297,17 @@ impl WorkerEntry {
     }
 
     #[inline]
-    pub fn push_internal(&self, task: Arc<Task>) {
+    pub(crate) fn push_internal(&self, task: Arc<Task>) {
         self.worker.push(task);
     }
 
     #[inline]
-    pub fn next_sleeper(&self) -> usize {
+    pub(crate) fn next_sleeper(&self) -> usize {
         unsafe { *self.next_sleeper.get() }
     }
 
     #[inline]
-    pub fn set_next_sleeper(&self, val: usize) {
+    pub(crate) fn set_next_sleeper(&self, val: usize) {
         unsafe {
             *self.next_sleeper.get() = val;
         }

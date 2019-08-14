@@ -52,7 +52,7 @@
 //! ```
 //!
 
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use std::env;
 use std::net::SocketAddr;

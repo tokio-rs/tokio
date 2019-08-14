@@ -28,8 +28,9 @@ impl TaskExecutor {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// # use futures::{future, Future, Stream};
+    /// ```
+    /// #![feature(async_await)]
+    ///
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -38,12 +39,10 @@ impl TaskExecutor {
     /// let executor = rt.executor();
     ///
     /// // Spawn a future onto the runtime
-    /// executor.spawn(future::lazy(|| {
+    /// executor.spawn(async {
     ///     println!("now running on a worker thread");
-    ///     Ok(())
-    /// }));
+    /// });
     /// # }
-    /// # pub fn main() {}
     /// ```
     ///
     /// # Panics

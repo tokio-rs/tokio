@@ -1,5 +1,10 @@
-#![deny(missing_debug_implementations, unreachable_pub, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![doc(html_root_url = "https://docs.rs/tokio-macros/0.2.0-alpha.1")]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Macros for use with Tokio
@@ -7,8 +12,7 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use quote::{quote, quote_spanned};
-use syn::spanned::Spanned;
+use quote::quote;
 
 /// Marks async function to be executed by selected runtime.
 ///
@@ -50,27 +54,37 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
-    let ret = &input.decl.output;
-    let name = &input.ident;
+    let ret = &input.sig.output;
+    let name = &input.sig.ident;
     let body = &input.block;
     let attrs = &input.attrs;
 
-    if input.asyncness.is_none() {
-        let tokens = quote_spanned! { input.span() =>
-          compile_error!("the async keyword is missing from the function declaration");
-        };
-
-        return TokenStream::from(tokens);
+    if input.sig.asyncness.is_none() {
+        let msg = "the async keyword is missing from the function declaration";
+        return syn::Error::new_spanned(input.sig.fn_token, msg)
+            .to_compile_error()
+            .into();
+    } else if !input.sig.inputs.is_empty() {
+        let msg = "the main function cannot accept arguments";
+        return syn::Error::new_spanned(&input.sig.inputs, msg)
+            .to_compile_error()
+            .into();
     }
 
     let mut runtime = RuntimeType::Multi;
 
     for arg in args {
-        if let syn::NestedMeta::Meta(syn::Meta::Word(ident)) = arg {
-            match ident.to_string().to_lowercase().as_str() {
+        if let syn::NestedMeta::Meta(syn::Meta::Path(ident)) = arg {
+            let seg = ident.segments.first().expect("Must have specified ident");
+            match seg.ident.to_string().to_lowercase().as_str() {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
-                name => panic!("Unknown attribute {} is specified", name),
+                name => {
+                    let msg = format!("Unknown attribute {} is specified", name);
+                    return syn::Error::new_spanned(ident, msg)
+                        .to_compile_error()
+                        .into();
+                }
             }
         }
     }
@@ -101,7 +115,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// #![feature(async_await)]
 ///
 /// #[tokio::test]
@@ -113,27 +127,30 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
-    let ret = &input.decl.output;
-    let name = &input.ident;
+    let ret = &input.sig.output;
+    let name = &input.sig.ident;
     let body = &input.block;
     let attrs = &input.attrs;
 
     for attr in attrs {
         if attr.path.is_ident("test") {
-            let tokens = quote_spanned! { input.span() =>
-                compile_error!("second test attribute is supplied");
-            };
-
-            return TokenStream::from(tokens);
+            let msg = "second test attribute is supplied";
+            return syn::Error::new_spanned(&attr, msg)
+                .to_compile_error()
+                .into();
         }
     }
 
-    if input.asyncness.is_none() {
-        let tokens = quote_spanned! { input.span() =>
-          compile_error!("the async keyword is missing from the function declaration");
-        };
-
-        return TokenStream::from(tokens);
+    if input.sig.asyncness.is_none() {
+        let msg = "the async keyword is missing from the function declaration";
+        return syn::Error::new_spanned(&input, msg)
+            .to_compile_error()
+            .into();
+    } else if !input.sig.inputs.is_empty() {
+        let msg = "the test function cannot accept arguments";
+        return syn::Error::new_spanned(&input.sig.inputs, msg)
+            .to_compile_error()
+            .into();
     }
 
     let result = quote! {

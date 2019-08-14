@@ -1,6 +1,10 @@
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.7")]
-#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.2.0-alpha.1")]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Task execution related traits and utilities.
@@ -60,7 +64,7 @@ mod global;
 pub mod park;
 mod typed;
 
-pub use crate::enter::{enter, Enter, EnterError};
+pub use crate::enter::{enter, exit, Enter, EnterError};
 pub use crate::error::SpawnError;
 pub use crate::executor::Executor;
 pub use crate::global::{spawn, with_default, DefaultExecutor};

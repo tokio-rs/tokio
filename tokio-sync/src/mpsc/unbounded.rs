@@ -87,15 +87,56 @@ impl<T> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
     }
 
-    /// TODO: dox
+    #[doc(hidden)] // TODO: remove
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
 
-    /// TODO: Dox
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    /// Receive the next value for this receiver.
+    ///
+    /// `None` is returned when all `Sender` halves have dropped, indicating
+    /// that no further values can be sent on the channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::unbounded_channel();
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.try_send("hello").unwrap();
+    ///     });
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(None, rx.recv().await);
+    /// }
+    /// ```
+    ///
+    /// Values are buffered:
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::unbounded_channel();
+    ///
+    ///     tx.try_send("hello").unwrap();
+    ///     tx.try_send("world").unwrap();
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(Some("world"), rx.recv().await);
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }

@@ -1,5 +1,5 @@
 #![cfg(unix)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 pub mod support;
@@ -9,7 +9,7 @@ use libc;
 
 #[tokio::test]
 async fn simple() {
-    let signal = Signal::new(libc::SIGUSR1).expect("failed to create signal");
+    let signal = Signal::new(SignalKind::sigusr1()).expect("failed to create signal");
 
     send_signal(libc::SIGUSR1);
 

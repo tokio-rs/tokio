@@ -8,7 +8,7 @@
 //! Note that the error handling is a bit left out. Also, the `run` could be modified to return the
 //! result of the provided future.
 
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use futures::{future, Future};
 use std::io::Error as IoError;

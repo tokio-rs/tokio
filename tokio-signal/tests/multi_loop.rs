@@ -1,5 +1,5 @@
 #![cfg(unix)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 pub mod support;
 use crate::support::*;
@@ -20,7 +20,7 @@ fn multi_loop() {
                 let sender = sender.clone();
                 thread::spawn(move || {
                     let mut rt = CurrentThreadRuntime::new().unwrap();
-                    let signal = Signal::new(libc::SIGHUP).unwrap();
+                    let signal = Signal::new(SignalKind::sighup()).unwrap();
                     sender.send(()).unwrap();
                     let _ = run_with_timeout(&mut rt, signal.into_future());
                 })

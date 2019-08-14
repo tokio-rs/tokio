@@ -1,8 +1,8 @@
 use super::UdpSocket;
 use bytes::{BufMut, BytesMut};
 use core::task::{Context, Poll};
-use futures::Sink;
 use futures_core::{ready, Stream};
+use futures_sink::Sink;
 use log::trace;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -46,7 +46,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
         let (n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
-            let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, pin.rd.bytes_mut()));
+            let res = ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
             let (n, addr) = res.unwrap();
             pin.rd.advance_mut(n);
             (n, addr)
@@ -105,7 +105,7 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
             ..
         } = *self;
 
-        let n = ready!(socket.poll_send_to(cx, &wr, &out_addr))?;
+        let n = ready!(socket.poll_send_to_priv(cx, &wr, &out_addr))?;
         trace!("written {}", n);
 
         let wrote_all = n == self.wr.len();

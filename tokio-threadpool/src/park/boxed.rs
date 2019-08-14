@@ -9,7 +9,7 @@ pub(crate) type BoxUnpark = Box<dyn Unpark>;
 pub(crate) struct BoxedPark<T>(T);
 
 impl<T> BoxedPark<T> {
-    pub fn new(inner: T) -> Self {
+    pub(crate) fn new(inner: T) -> Self {
         BoxedPark(inner)
     }
 }

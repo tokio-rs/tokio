@@ -64,7 +64,7 @@ where
 {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             // If the child hasn't exited yet, then it's our responsibility to
             // ensure the current task gets notified when it might be able to
@@ -203,7 +203,7 @@ mod test {
     impl Stream for MockStream {
         type Item = io::Result<()>;
 
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
             let inner = Pin::get_mut(self);
             inner.total_polls += 1;
             match inner.values.remove(0) {

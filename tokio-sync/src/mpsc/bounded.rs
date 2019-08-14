@@ -82,34 +82,27 @@ pub struct RecvError(());
 /// # Examples
 ///
 /// ```rust
-/// use tokio::sync::mpsc::channel;
-/// use tokio::prelude::*;
-/// use futures::future::lazy;
+/// #![feature(async_await)]
 ///
-/// # fn some_computation() -> impl Future<Item = (), Error = ()> + Send {
-/// # futures::future::ok::<(), ()>(())
-/// # }
+/// use tokio::sync::mpsc;
 ///
-/// tokio::run(lazy(|| {
-///     let (tx, rx) = channel(100);
+/// #[tokio::main]
+/// async fn main() {
+///     let (mut tx, mut rx) = mpsc::channel(100);
 ///
-///     tokio::spawn({
-///         some_computation()
-///             .and_then(|value| {
-///                 tx.send(value)
-///                     .map_err(|_| ())
-///             })
-///             .map(|_| ())
-///             .map_err(|_| ())
+///     tokio::spawn(async move {
+///         for i in 0..10 {
+///             if let Err(_) = tx.send(i).await {
+///                 println!("receiver dropped");
+///                 return;
+///             }
+///         }
 ///     });
 ///
-///     rx.for_each(|value| {
-///         println!("got value = {:?}", value);
-///         Ok(())
-///     })
-///     .map(|_| ())
-///     .map_err(|_| ())
-/// }));
+///     while let Some(i) = rx.recv().await {
+///         println!("got = {}", i);
+///     }
+/// }
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
@@ -131,15 +124,56 @@ impl<T> Receiver<T> {
         Receiver { chan }
     }
 
-    /// TODO: Dox
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
+    /// Receive the next value for this receiver.
+    ///
+    /// `None` is returned when all `Sender` halves have dropped, indicating
+    /// that no further values can be sent on the channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.send("hello").await.unwrap();
+    ///     });
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(None, rx.recv().await);
+    /// }
+    /// ```
+    ///
+    /// Values are buffered:
+    ///
+    /// ```
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///     tx.send("world").await.unwrap();
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(Some("world"), rx.recv().await);
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// TODO: Dox
+    #[doc(hidden)] // TODO: remove
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
@@ -167,26 +201,7 @@ impl<T> Sender<T> {
         Sender { chan }
     }
 
-    /// Check if the `Sender` is ready to handle a value.
-    ///
-    /// Polls the channel to determine if there is guaranteed capacity to send
-    /// at least one item without waiting.
-    ///
-    /// When `poll_ready` returns `Ready`, the channel reserves capacity for one
-    /// message for this `Sender` instance. The capacity is held until a message
-    /// is send or the `Sender` instance is dropped. Callers should ensure a
-    /// message is sent in a timely fashion in order to not starve other
-    /// `Sender` instances.
-    ///
-    /// # Return value
-    ///
-    /// This method returns:
-    ///
-    /// - `Poll::Ready(Ok(_))` if capacity is reserved for a single message.
-    /// - `Poll::Pending` if the channel may not have capacity, in which
-    ///   case the current task is queued to be notified once
-    ///   capacity is available;
-    /// - `Poll::Ready(Err(SendError))` if the receiver has been dropped.
+    #[doc(hidden)] // TODO: remove
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), SendError>> {
         self.chan.poll_ready(cx).map_err(|_| SendError(()))
     }
@@ -202,12 +217,34 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
+    /// In the following example, each call to `send` will block until the
+    /// previously sent value was received.
+    ///
+    /// ```rust
+    /// #![feature(async_await)]
+    ///
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     tokio::spawn(async move {
+    ///         for i in 0..10 {
+    ///             if let Err(_) = tx.send(i).await {
+    ///                 println!("receiver dropped");
+    ///                 return;
+    ///             }
+    ///         }
+    ///     });
+    ///
+    ///     while let Some(i) = rx.recv().await {
+    ///         println!("got = {}", i);
+    ///     }
+    /// }
     /// ```
-    /// unimplemented!();
-    /// ```
-    #[allow(clippy::needless_lifetimes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3988
     pub async fn send(&mut self, value: T) -> Result<(), SendError> {
-        use async_util::future::poll_fn;
+        use futures_util::future::poll_fn;
 
         poll_fn(|cx| self.poll_ready(cx)).await?;
 

@@ -1,6 +1,10 @@
-#![doc(html_root_url = "https://docs.rs/tokio-signal/0.2.8")]
-#![deny(missing_debug_implementations, missing_docs, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![doc(html_root_url = "https://docs.rs/tokio-signal/0.3.0-alpha.1")]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![cfg_attr(test, feature(async_await))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
@@ -51,10 +55,11 @@
 //!
 //! ```rust,no_run
 //! #![feature(async_await)]
+//! # #[cfg(unix)] {
 //!
 //! use futures_util::future;
 //! use futures_util::stream::StreamExt;
-//! use tokio_signal::unix::{Signal, SIGHUP};
+//! use tokio_signal::unix::{Signal, SignalKind};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,13 +77,14 @@
 //!
 //!     // Like the previous example, this is an infinite stream of signals
 //!     // being received, and signals may be coalesced while pending.
-//!     let stream = Signal::new(SIGHUP)?;
+//!     let stream = Signal::new(SignalKind::sighup())?;
 //!
 //!     // Convert out stream into a future and block the program
 //!     let (signal, _signal) = stream.into_future().await;
 //!     println!("got signal {:?}", signal);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 
 #[macro_use]

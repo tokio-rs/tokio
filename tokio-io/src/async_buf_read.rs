@@ -31,10 +31,7 @@ pub trait AsyncBufRead: AsyncRead {
     ///
     /// [`poll_read`]: AsyncRead::poll_read
     /// [`consume`]: AsyncBufRead::consume
-    fn poll_fill_buf<'a>(
-        self: Pin<&'a mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<&'a [u8]>>;
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>>;
 
     /// Tells this buffer that `amt` bytes have been consumed from the buffer,
     /// so they should no longer be returned in calls to [`poll_read`].
@@ -56,8 +53,8 @@ pub trait AsyncBufRead: AsyncRead {
 
 macro_rules! deref_async_buf_read {
     () => {
-        fn poll_fill_buf<'a>(self: Pin<&'a mut Self>, cx: &mut Context<'_>)
-            -> Poll<io::Result<&'a [u8]>>
+        fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>)
+            -> Poll<io::Result<&[u8]>>
         {
             Pin::new(&mut **self.get_mut()).poll_fill_buf(cx)
         }
@@ -81,14 +78,31 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncBufRead,
 {
-    fn poll_fill_buf<'a>(
-        self: Pin<&'a mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<&'a [u8]>> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         self.get_mut().as_mut().poll_fill_buf(cx)
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
         self.get_mut().as_mut().consume(amt)
+    }
+}
+
+impl AsyncBufRead for &[u8] {
+    fn poll_fill_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        Poll::Ready(Ok(*self))
+    }
+
+    fn consume(mut self: Pin<&mut Self>, amt: usize) {
+        *self = &self[amt..];
+    }
+}
+
+impl<T: AsRef<[u8]> + Unpin> AsyncBufRead for io::Cursor<T> {
+    fn poll_fill_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        Poll::Ready(io::BufRead::fill_buf(self.get_mut()))
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        io::BufRead::consume(self.get_mut(), amt)
     }
 }

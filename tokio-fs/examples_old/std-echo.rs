@@ -1,5 +1,4 @@
 //! Echo everything received on STDIN to STDOUT.
-#![deny(deprecated, warnings)]
 #![feature(async_await)]
 
 use tokio_codec::{FramedRead, FramedWrite, LinesCodec};

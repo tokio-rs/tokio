@@ -85,7 +85,7 @@ const NUM_SHIFT: usize = 1;
 //
 impl Blocking {
     /// Create a new `Blocking`.
-    pub fn new(capacity: usize) -> Blocking {
+    pub(crate) fn new(capacity: usize) -> Blocking {
         assert!(capacity > 0, "blocking capacity must be greater than zero");
 
         let stub = Box::new(Task::stub());
@@ -110,7 +110,7 @@ impl Blocking {
     ///
     /// The caller must ensure that `task` has not previously been queued to be
     /// notified when capacity becomes available.
-    pub fn poll_blocking_capacity(
+    pub(crate) fn poll_blocking_capacity(
         &self,
         task: &Arc<Task>,
     ) -> Poll<Result<(), crate::BlockingError>> {
@@ -243,7 +243,7 @@ impl Blocking {
         (*prev).next_blocking.store(task, Release);
     }
 
-    pub fn notify_task(&self, pool: &Arc<Pool>) {
+    pub(crate) fn notify_task(&self, pool: &Arc<Pool>) {
         let prev = self.lock.fetch_add(1, AcqRel);
 
         if prev != 0 {

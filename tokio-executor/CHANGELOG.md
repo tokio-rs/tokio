@@ -1,4 +1,7 @@
-# 0.2.0 (unreleased)
+# 0.2.0-alpha.1 (August 8, 2019)
+
+### Changed
+- Switch to `async`, `await`, and `std::future`.
 
 ### Removed
 - `Enter::make_permanent` and `Enter::on_exit` (#???)

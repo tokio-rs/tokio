@@ -1,7 +1,12 @@
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.1.3")]
-#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.2.0-alpha.1")]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! UDP bindings for `tokio`.
 //!
@@ -13,17 +18,8 @@
 //! [`Recv`], [`Send`], [`RecvFrom`] and [`SendTo`] structs respectively.
 
 mod frame;
-mod recv;
-mod recv_from;
-mod send;
-mod send_to;
 mod socket;
 pub mod split;
 
 pub use self::frame::UdpFramed;
-pub use self::recv::Recv;
-pub use self::recv_from::RecvFrom;
-pub use self::send::Send;
-pub use self::send_to::SendTo;
-
 pub use self::socket::UdpSocket;

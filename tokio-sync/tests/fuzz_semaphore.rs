@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 #[macro_use]
 extern crate loom;
@@ -9,9 +9,9 @@ mod semaphore;
 
 use crate::semaphore::*;
 
-use async_util::future::poll_fn;
 use futures_core::ready;
-use loom::futures::block_on;
+use futures_util::future::poll_fn;
+use loom::future::block_on;
 use loom::thread;
 use std::future::Future;
 use std::pin::Pin;

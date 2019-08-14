@@ -82,7 +82,10 @@ impl<S: Storage> Registry<S> {
     }
 
     /// Broadcast all previously recorded events to their respective listeners.
-    fn broadcast(&self) {
+    ///
+    /// Returns true if an event was delivered to at least one listener.
+    fn broadcast(&self) -> bool {
+        let mut did_notify = false;
         self.storage.for_each(|event_info| {
             // Any signal of this kind arrived since we checked last?
             if !event_info.pending.swap(false, Ordering::SeqCst) {
@@ -97,7 +100,7 @@ impl<S: Storage> Registry<S> {
             // has gone away then we can remove that slot.
             for i in (0..recipients.len()).rev() {
                 match recipients[i].try_send(()) {
-                    Ok(()) => {}
+                    Ok(()) => did_notify = true,
                     Err(ref e) if e.is_closed() => {
                         recipients.swap_remove(i);
                     }
@@ -112,6 +115,8 @@ impl<S: Storage> Registry<S> {
                 }
             }
         });
+
+        did_notify
     }
 }
 
@@ -141,7 +146,9 @@ impl Globals {
     }
 
     /// Broadcast all previously recorded events to their respective listeners.
-    pub(crate) fn broadcast(&self) {
+    ///
+    /// Returns true if an event was delivered to at least one listener.
+    pub(crate) fn broadcast(&self) -> bool {
         self.registry.broadcast()
     }
 
@@ -267,5 +274,28 @@ mod tests {
         let results: Vec<()> = third_rx.collect().await;
 
         assert_eq!(1, results.len());
+    }
+
+    #[test]
+    fn broadcast_returns_if_at_least_one_event_fired() {
+        let registry = Registry::new(vec![EventInfo::default()]);
+
+        registry.record_event(0);
+        assert_eq!(false, registry.broadcast());
+
+        let (first_tx, first_rx) = channel(1);
+        let (second_tx, second_rx) = channel(1);
+
+        registry.register_listener(0, first_tx);
+        registry.register_listener(0, second_tx);
+
+        registry.record_event(0);
+        assert_eq!(true, registry.broadcast());
+
+        drop(first_rx);
+        registry.record_event(0);
+        assert_eq!(false, registry.broadcast());
+
+        drop(second_rx);
     }
 }

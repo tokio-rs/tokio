@@ -15,9 +15,6 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-extern crate mio_named_pipes;
-extern crate winapi;
-
 use crate::kill::Kill;
 
 use std::fmt;
@@ -34,27 +31,27 @@ use std::task::Poll;
 use futures_util::future::Fuse;
 use futures_util::future::FutureExt;
 
-use self::mio_named_pipes::NamedPipe;
-use self::winapi::shared::minwindef::*;
-use self::winapi::shared::winerror::*;
-use self::winapi::um::handleapi::*;
-use self::winapi::um::processthreadsapi::*;
-use self::winapi::um::synchapi::*;
-use self::winapi::um::threadpoollegacyapiset::*;
-use self::winapi::um::winbase::*;
-use self::winapi::um::winnt::*;
 use super::SpawnedChild;
+use mio_named_pipes::NamedPipe;
 use tokio_reactor::{Handle, PollEvented};
 use tokio_sync::oneshot;
+use winapi::shared::minwindef::*;
+use winapi::shared::winerror::*;
+use winapi::um::handleapi::*;
+use winapi::um::processthreadsapi::*;
+use winapi::um::synchapi::*;
+use winapi::um::threadpoollegacyapiset::*;
+use winapi::um::winbase::*;
+use winapi::um::winnt::*;
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Child {
+pub(crate) struct Child {
     child: process::Child,
     waiting: Option<Waiting>,
 }
 
 impl fmt::Debug for Child {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Child")
             .field("pid", &self.id())
             .field("child", &self.child)
@@ -90,7 +87,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
 }
 
 impl Child {
-    pub fn id(&self) -> u32 {
+    pub(crate) fn id(&self) -> u32 {
         self.child.id()
     }
 }
@@ -104,7 +101,7 @@ impl Kill for Child {
 impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = Pin::get_mut(self);
         loop {
             if let Some(ref mut w) = inner.waiting {
@@ -164,7 +161,7 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let _ = complete.take().unwrap().send(());
 }
 
-pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
+pub(crate) fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
     unsafe {
         match WaitForSingleObject(child.as_raw_handle(), 0) {
             WAIT_OBJECT_0 => {}
@@ -181,9 +178,9 @@ pub fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
     }
 }
 
-pub type ChildStdin = PollEvented<NamedPipe>;
-pub type ChildStdout = PollEvented<NamedPipe>;
-pub type ChildStderr = PollEvented<NamedPipe>;
+pub(crate) type ChildStdin = PollEvented<NamedPipe>;
+pub(crate) type ChildStdout = PollEvented<NamedPipe>;
+pub(crate) type ChildStderr = PollEvented<NamedPipe>;
 
 fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<NamedPipe>>>
 where

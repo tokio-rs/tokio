@@ -1,11 +1,11 @@
-#![deny(/* warnings, */ rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 use tokio_test::*;
 use tokio_threadpool::*;
 
-use async_util::future::poll_fn;
 use futures_core::ready;
+use futures_util::future::poll_fn;
 use rand::*;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::*;
@@ -37,6 +37,26 @@ fn basic() {
     });
 
     rx2.recv().unwrap();
+}
+
+#[test]
+fn other_executors_can_run_inside_blocking() {
+    let _ = ::env_logger::try_init();
+
+    let pool = Builder::new().pool_size(1).max_blocking(1).build();
+
+    let (tx, rx) = mpsc::channel();
+
+    pool.spawn(async move {
+        let res = blocking(|| {
+            let _e = tokio_executor::enter().expect("nested blocking enter");
+            tx.send(()).unwrap();
+        });
+
+        assert_ready!(res).unwrap();
+    });
+
+    rx.recv().unwrap();
 }
 
 #[test]

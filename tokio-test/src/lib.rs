@@ -1,31 +1,30 @@
-#![doc(html_root_url = "https://docs.rs/tokio-test/0.1.0")]
-#![deny(
-    missing_docs,
+#![doc(html_root_url = "https://docs.rs/tokio-test/0.2.0-alpha.1")]
+#![warn(
     missing_debug_implementations,
-    unreachable_pub,
-    rust_2018_idioms
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
 )]
-#![cfg_attr(test, deny(warnings))]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Tokio and Futures based testing utilites
-//!
-//! # Example
-//!
-//! ```
-//! # use futures::{Future, future};
-//! use tokio_test::assert_ready;
-//!
-//! let mut fut = future::ok::<(), ()>(());
-//! assert_ready!(fut.poll());
-//! ```
 
 pub mod clock;
 pub mod io;
 mod macros;
 pub mod task;
 
-pub use assertive::{assert_err, assert_ok};
+/// Runs the provided future, blocking the current thread until the
+/// future completes.
+///
+/// For more information, see the documentation for
+/// [`tokio::runtime::current_thread::Runtime::block_on`][runtime-block-on].
+///
+/// [runtime-block-on]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/runtime/current_thread/struct.Runtime.html#method.block_on
+pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+    rt.block_on(future)
+}
 
 /*
 #[doc(hidden)]

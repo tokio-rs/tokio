@@ -121,8 +121,9 @@ impl Runtime {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
-    /// # use futures::{future, Future, Stream};
+    /// ```
+    /// #![feature(async_await)]
+    ///
     /// use tokio::runtime::current_thread::Runtime;
     ///
     /// # fn dox() {
@@ -130,12 +131,10 @@ impl Runtime {
     /// let mut rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
-    /// rt.spawn(future::lazy(|| {
-    ///     println!("running on the runtime");
-    ///     Ok(())
-    /// }));
+    /// rt.spawn(async {
+    ///     println!("now running on a worker thread");
+    /// });
     /// # }
-    /// # pub fn main() {}
     /// ```
     ///
     /// # Panics

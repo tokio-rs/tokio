@@ -1,15 +1,15 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 #[path = "../src/oneshot.rs"]
 #[allow(warnings)]
 mod oneshot;
 
-// use futures::{self, Async, Future};
 use loom;
-use loom::futures::{block_on, poll_future};
+use loom::future::block_on;
 use loom::thread;
 
+use futures_util::future::poll_fn;
 use std::task::Poll::{Pending, Ready};
 
 #[test]
@@ -36,14 +36,19 @@ fn changing_rx_task() {
         });
 
         let rx = thread::spawn(move || {
-            match poll_future(&mut rx) {
+            let ready = block_on(poll_fn(|cx| match Pin::new(&mut rx).poll(cx) {
                 Ready(Ok(value)) => {
-                    // ok
                     assert_eq!(1, value);
-                    None
+                    Ready(true)
                 }
                 Ready(Err(_)) => unimplemented!(),
-                Pending => Some(rx),
+                Pending => Ready(false),
+            }));
+
+            if ready {
+                None
+            } else {
+                Some(rx)
             }
         })
         .join()
@@ -73,11 +78,12 @@ impl<'a> OnClose<'a> {
     }
 }
 
-impl<'a> Future for OnClose<'a> {
-    type Output = ();
+impl Future for OnClose<'_> {
+    type Output = bool;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        self.get_mut().tx.poll_closed(cx)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<bool> {
+        let res = self.get_mut().tx.poll_closed(cx);
+        Ready(res.is_ready())
     }
 }
 
@@ -91,11 +97,12 @@ fn changing_tx_task() {
         });
 
         let tx = thread::spawn(move || {
-            let t1 = poll_future(&mut OnClose::new(&mut tx));
+            let t1 = block_on(OnClose::new(&mut tx));
 
-            match t1 {
-                Ready(()) => None,
-                Pending => Some(tx),
+            if t1 {
+                None
+            } else {
+                Some(tx)
             }
         })
         .join()

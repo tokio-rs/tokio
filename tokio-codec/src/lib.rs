@@ -1,6 +1,10 @@
-#![doc(html_root_url = "https://docs.rs/tokio-codec/0.1.1")]
-#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
-#![cfg_attr(test, deny(warnings))]
+#![doc(html_root_url = "https://docs.rs/tokio-codec/0.2.0-alpha.1")]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! Utilities for encoding and decoding frames.
@@ -23,6 +27,7 @@ mod encoder;
 mod framed;
 mod framed_read;
 mod framed_write;
+pub mod length_delimited;
 mod lines_codec;
 
 pub use crate::bytes_codec::BytesCodec;
@@ -31,4 +36,5 @@ pub use crate::encoder::Encoder;
 pub use crate::framed::{Framed, FramedParts};
 pub use crate::framed_read::FramedRead;
 pub use crate::framed_write::FramedWrite;
+pub use crate::length_delimited::{LengthDelimitedCodec, LengthDelimitedCodecError};
 pub use crate::lines_codec::{LinesCodec, LinesCodecError};

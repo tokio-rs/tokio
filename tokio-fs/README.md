@@ -2,12 +2,6 @@
 
 Asynchronous filesystem manipulation operations (and stdin, stdout, stderr).
 
-[Documentation](https://docs.rs/tokio-fs/0.1.6/tokio_fs)
-
-## Overview
-
-This crate provides filesystem manipulation facilities for usage with Tokio.
-
 ## License
 
 This project is licensed under the [MIT license](LICENSE).

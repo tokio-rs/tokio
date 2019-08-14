@@ -21,21 +21,16 @@
 //! processes in general aren't scalable (e.g. millions) so it shouldn't be that
 //! bad in theory...
 
-extern crate libc;
-extern crate mio;
-extern crate tokio_signal;
-
 mod orphan;
 mod reap;
 
-use self::mio::event::Evented;
-use self::mio::unix::{EventedFd, UnixReady};
-use self::mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
-use futures_util::future::FutureExt;
+use mio::event::Evented;
+use mio::unix::{EventedFd, UnixReady};
+use mio::{Poll as MioPoll, PollOpt, Ready, Token};
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -45,7 +40,7 @@ use std::process::{self, ExitStatus};
 use std::task::Context;
 use std::task::Poll;
 use tokio_reactor::{Handle, PollEvented};
-use tokio_signal::unix::Signal;
+use tokio_signal::unix::{Signal, SignalKind};
 
 impl Wait for process::Child {
     fn id(&self) -> u32 {
@@ -70,7 +65,7 @@ lazy_static! {
 struct GlobalOrphanQueue;
 
 impl fmt::Debug for GlobalOrphanQueue {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         ORPHAN_QUEUE.fmt(fmt)
     }
 }
@@ -86,12 +81,12 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Child {
+pub(crate) struct Child {
     inner: Reaper<process::Child, GlobalOrphanQueue, Signal>,
 }
 
 impl fmt::Debug for Child {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Child")
             .field("pid", &self.inner.id())
             .finish()
@@ -104,7 +99,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stdout = stdio(child.stdout.take(), handle)?;
     let stderr = stdio(child.stderr.take(), handle)?;
 
-    let signal = Signal::with_handle(libc::SIGCHLD, handle)?;
+    let signal = Signal::with_handle(SignalKind::sigchld(), handle)?;
 
     Ok(SpawnedChild {
         child: Child {
@@ -117,7 +112,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
 }
 
 impl Child {
-    pub fn id(&self) -> u32 {
+    pub(crate) fn id(&self) -> u32 {
         self.inner.id()
     }
 }
@@ -131,13 +126,13 @@ impl Kill for Child {
 impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        (&mut Pin::get_mut(self).inner).poll_unpin(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.inner).poll(cx)
     }
 }
 
 #[derive(Debug)]
-pub struct Fd<T> {
+pub(crate) struct Fd<T> {
     inner: T,
 }
 
@@ -201,9 +196,9 @@ where
     }
 }
 
-pub type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
-pub type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
-pub type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
+pub(crate) type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
+pub(crate) type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
+pub(crate) type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
 
 fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<Fd<T>>>>
 where

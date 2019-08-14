@@ -1,9 +1,8 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
+#![cfg(feature = "default")]
 
-use tokio;
 use tokio::prelude::*;
-// use tokio::sync::mpsc;
 use tokio::timer::*;
 
 use std::sync::mpsc;
@@ -25,8 +24,7 @@ fn timer_with_threaded_runtime() {
         tx.send(()).unwrap();
     });
 
-    let mut e = tokio_executor::enter().unwrap();
-    e.block_on(rt.shutdown_on_idle());
+    rt.shutdown_on_idle();
 
     rx.recv().unwrap();
 }

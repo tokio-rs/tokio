@@ -5,26 +5,24 @@ name = "tokio-current-thread"
 # - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
-#   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0"
+version = "0.2.0-alpha.1"
 edition = "2018"
-documentation = "https://docs.rs/tokio-current-thread/0.1.6/tokio_current_thread"
-repository = "https://github.com/tokio-rs/tokio"
-homepage = "https://github.com/tokio-rs/tokio"
+authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
-authors = ["Carl Lerche <me@carllerche.com>"]
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-current-thread/0.2.0-alpha.1/tokio_current_thread"
 description = """
 Single threaded executor which manage many tasks concurrently on the current thread.
 """
 keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
-publish = false
 
 [dependencies]
-tokio-executor = { version = "0.2.0", path = "../tokio-executor" }
+tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
 crossbeam-channel = "0.3.8"
 
 [dev-dependencies]
-tokio-sync = { version = "0.2.0", path = "../tokio-sync" }
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }

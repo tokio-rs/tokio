@@ -1,8 +1,8 @@
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use bytes::{BufMut, BytesMut};
-use futures::{future, FutureExt, SinkExt, StreamExt};
+use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
 use std::io;
 use tokio_codec::{Decoder, Encoder};
 use tokio_udp::{UdpFramed, UdpSocket};
@@ -118,7 +118,7 @@ async fn send_framed() -> std::io::Result<()> {
 
         let send = a.send((msg.clone(), b_addr));
         let recv = b.next().map(|e| e.unwrap());
-        let (_, received) = future::try_join(send, recv).await.unwrap();
+        let (_, received) = try_join(send, recv).await.unwrap();
 
         let (data, addr) = received;
         assert_eq!(msg, data);
@@ -137,7 +137,7 @@ async fn send_framed() -> std::io::Result<()> {
 
         let send = a.send((msg.clone(), b_addr));
         let recv = b.next().map(|e| e.unwrap());
-        let (_, received) = future::try_join(send, recv).await.unwrap();
+        let (_, received) = try_join(send, recv).await.unwrap();
 
         let (data, addr) = received;
         assert_eq!(msg, data);

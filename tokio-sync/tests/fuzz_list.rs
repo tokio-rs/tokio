@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 #[macro_use]
 extern crate loom;
@@ -63,7 +63,7 @@ fn smoke() {
                 }
                 None => {
                     debug!(" + pop() -> None");
-                    loom::yield_now();
+                    thread::yield_now();
                 }
             }
         }

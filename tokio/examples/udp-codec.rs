@@ -7,7 +7,8 @@
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![cfg(feature = "rt-full")]
+#![warn(rust_2018_idioms)]
 
 use std::env;
 use std::error::Error;

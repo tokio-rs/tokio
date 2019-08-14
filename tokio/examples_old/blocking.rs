@@ -10,7 +10,7 @@
 //! their task.
 
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use std::pin::Pin;
 use std::thread;

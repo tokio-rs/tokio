@@ -20,7 +20,7 @@
 //! should be able to see them all make progress simultaneously.
 
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

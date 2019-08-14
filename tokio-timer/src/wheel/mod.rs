@@ -63,7 +63,7 @@ where
     T: Stack,
 {
     /// Create a new timing wheel
-    pub fn new() -> Wheel<T> {
+    pub(crate) fn new() -> Wheel<T> {
         let levels = (0..NUM_LEVELS).map(Level::new).collect();
 
         Wheel { elapsed: 0, levels }
@@ -71,7 +71,7 @@ where
 
     /// Return the number of milliseconds that have elapsed since the timing
     /// wheel's creation.
-    pub fn elapsed(&self) -> u64 {
+    pub(crate) fn elapsed(&self) -> u64 {
         self.elapsed
     }
 
@@ -96,7 +96,7 @@ where
     /// immediately.
     ///
     /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
-    pub fn insert(
+    pub(crate) fn insert(
         &mut self,
         when: u64,
         item: T::Owned,
@@ -124,7 +124,7 @@ where
     }
 
     /// Remove `item` from thee timing wheel.
-    pub fn remove(&mut self, item: &T::Borrowed, store: &mut T::Store) {
+    pub(crate) fn remove(&mut self, item: &T::Borrowed, store: &mut T::Store) {
         let when = T::when(item, store);
         let level = self.level_for(when);
 
@@ -132,11 +132,11 @@ where
     }
 
     /// Instant at which to poll
-    pub fn poll_at(&self) -> Option<u64> {
+    pub(crate) fn poll_at(&self) -> Option<u64> {
         self.next_expiration().map(|expiration| expiration.deadline)
     }
 
-    pub fn poll(&mut self, poll: &mut Poll, store: &mut T::Store) -> Option<T::Owned> {
+    pub(crate) fn poll(&mut self, poll: &mut Poll, store: &mut T::Store) -> Option<T::Owned> {
         loop {
             if poll.expiration.is_none() {
                 poll.expiration = self.next_expiration().and_then(|expiration| {
@@ -194,7 +194,7 @@ where
         None
     }
 
-    pub fn poll_expiration(
+    pub(crate) fn poll_expiration(
         &mut self,
         expiration: &Expiration,
         store: &mut T::Store,
@@ -249,7 +249,7 @@ fn level_for(elapsed: u64, when: u64) -> usize {
 }
 
 impl Poll {
-    pub fn new(now: u64) -> Poll {
+    pub(crate) fn new(now: u64) -> Poll {
         Poll {
             now,
             expiration: None,

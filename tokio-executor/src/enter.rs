@@ -61,6 +61,42 @@ pub fn enter() -> Result<Enter, EnterError> {
     })
 }
 
+// Forces the current "entered" state to be cleared while the closure
+// is executed.
+//
+// # Warning
+//
+// This is hidden for a reason. Do not use without fully understanding
+// executors. Misuing can easily cause your program to deadlock.
+#[doc(hidden)]
+pub fn exit<F: FnOnce() -> R, R>(f: F) -> R {
+    // Reset in case the closure panics
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            ENTERED.with(|c| {
+                c.set(true);
+            });
+        }
+    }
+
+    ENTERED.with(|c| {
+        debug_assert!(c.get());
+        c.set(false);
+    });
+
+    let reset = Reset;
+    let ret = f();
+    ::std::mem::forget(reset);
+
+    ENTERED.with(|c| {
+        assert!(!c.get(), "closure claimed permanent executor");
+        c.set(true);
+    });
+
+    ret
+}
+
 impl Enter {
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.

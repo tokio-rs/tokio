@@ -32,8 +32,10 @@ use tokio_executor::park::Park;
 /// # Examples
 ///
 /// ```
+/// #![feature(async_await)]
+///
 /// use tokio_threadpool::Builder;
-/// use futures::future::{Future, lazy};
+///
 /// use std::time::Duration;
 ///
 /// let thread_pool = Builder::new()
@@ -41,13 +43,12 @@ use tokio_executor::park::Park;
 ///     .keep_alive(Some(Duration::from_secs(30)))
 ///     .build();
 ///
-/// thread_pool.spawn(lazy(|| {
+/// thread_pool.spawn(async {
 ///     println!("called from a worker thread");
-///     Ok(())
-/// }));
+/// });
 ///
 /// // Gracefully shutdown the threadpool
-/// thread_pool.shutdown().wait().unwrap();
+/// thread_pool.shutdown().wait();
 /// ```
 pub struct Builder {
     /// Thread pool specific configuration values

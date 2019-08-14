@@ -34,7 +34,7 @@ const ABA_GUARD_MASK: usize = (1 << (32 - ABA_GUARD_SHIFT)) - 1;
 // ===== impl BackupStack =====
 
 impl BackupStack {
-    pub fn new() -> BackupStack {
+    pub(crate) fn new() -> BackupStack {
         let state = AtomicUsize::new(State::new().into());
         BackupStack { state }
     }
@@ -47,7 +47,7 @@ impl BackupStack {
     ///
     /// Returns `Err` if the pool has transitioned to the `TERMINATED` state.
     /// When terminated, pushing new entries is no longer permitted.
-    pub fn push(&self, entries: &[Backup], id: BackupId) -> Result<(), ()> {
+    pub(crate) fn push(&self, entries: &[Backup], id: BackupId) -> Result<(), ()> {
         let mut state: State = self.state.load(Acquire).into();
 
         entries[id.0].set_pushed(AcqRel);
@@ -91,7 +91,7 @@ impl BackupStack {
     ///
     /// * `Ok(None)` if the stack is empty.
     /// * `Err(_)` is returned if the pool has been shutdown.
-    pub fn pop(&self, entries: &[Backup], terminate: bool) -> Result<Option<BackupId>, ()> {
+    pub(crate) fn pop(&self, entries: &[Backup], terminate: bool) -> Result<Option<BackupId>, ()> {
         // Figure out the empty value
         let terminal = if terminate { TERMINATED } else { EMPTY };
 

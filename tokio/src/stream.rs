@@ -48,22 +48,23 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// use tokio::prelude::*;
-    /// use std::time::Duration;
-    /// # use futures::future::{self, FutureResult};
+    /// #![feature(async_await)]
     ///
-    /// # fn long_future() -> FutureResult<(), ()> {
-    /// #   future::ok(())
+    /// use tokio::prelude::*;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// # fn slow_stream() -> impl Stream<Item = ()> {
+    /// #   tokio::stream::empty()
     /// # }
     /// #
-    /// # fn main() {
-    /// let stream = long_future()
-    ///     .into_stream()
-    ///     .timeout(Duration::from_secs(1))
-    ///     .for_each(|i| future::ok(println!("item = {:?}", i)))
-    ///     .map_err(|e| println!("error = {:?}", e));
+    /// # async fn dox() {
+    /// let mut stream = slow_stream()
+    ///     .timeout(Duration::from_secs(1));
     ///
-    /// tokio::run(stream);
+    /// while let Some(value) = stream.next().await {
+    ///     println!("value = {:?}", value);
+    /// }
     /// # }
     /// ```
     #[cfg(feature = "timer")]

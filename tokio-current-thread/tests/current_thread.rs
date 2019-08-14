@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 use std::any::Any;
@@ -380,7 +380,6 @@ mod and_turn {
             },
         );
     }
-
 }
 
 mod in_drop {
@@ -441,7 +440,6 @@ mod in_drop {
             },
         );
     }
-
 }
 
 /*

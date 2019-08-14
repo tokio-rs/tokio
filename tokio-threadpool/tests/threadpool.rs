@@ -1,4 +1,4 @@
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 use tokio_executor::park::{Park, Unpark};
@@ -350,7 +350,7 @@ fn busy_threadpool_is_not_idle() {
 
     struct IdleFut<'a>(&'a mut Shutdown);
 
-    impl<'a> Future for IdleFut<'a> {
+    impl Future for IdleFut<'_> {
         type Output = ();
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {

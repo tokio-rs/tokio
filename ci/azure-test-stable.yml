@@ -20,40 +20,42 @@ jobs:
       # rust_version: stable
       rust_version: ${{ parameters.rust }}
 
-#   - template: azure-is-release.yml
-#
-#   - ${{ each crate in parameters.crates }}:
-#     - script: cargo test
-#       env:
-#         LOOM_MAX_DURATION: 10
-#         CI: 'True'
-#       displayName: cargo test -p ${{ crate }}
-#       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-#       condition: and(succeeded(), ne(variables['isRelease'], 'true'))
-
-  - template: azure-patch-crates.yml
+  - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
     # Run with default crate features
-    - script: cargo test --tests
+    - script: cargo test
       env:
-        LOOM_MAX_DURATION: 10
+        LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
-      displayName: ${{ crate.key }} - cargo test --tests
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
-    - script: cargo test --examples
-      displayName: ${{ crate.key }} - cargo test --examples
+      displayName: ${{ crate.key }} - cargo test
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
     # Run with each specified feature
     - ${{ each feature in crate.value }}:
       - script: cargo test --tests --no-default-features --features ${{ feature }}
         env:
-          LOOM_MAX_DURATION: 10
+          LOOM_MAX_PREEMPTIONS: 2
           CI: 'True'
-        displayName: ${{ crate.key }} - cargo test --tests --features ${{ feature }}
+        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
         workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
-      - script: cargo test --examples --no-default-features --features ${{ feature }}
-        displayName: ${{ crate.key }} - cargo test --examples --features ${{ feature }}
+  - template: azure-patch-crates.yml
+
+  - ${{ each crate in parameters.crates }}:
+    # Run with default crate features
+    - script: cargo test
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate.key }} - cargo test
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+
+    # Run with each specified feature
+    - ${{ each feature in crate.value }}:
+      - script: cargo test --tests --no-default-features --features ${{ feature }}
+        env:
+          LOOM_MAX_PREEMPTIONS: 2
+          CI: 'True'
+        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
         workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}

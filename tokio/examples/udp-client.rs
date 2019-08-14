@@ -27,7 +27,7 @@
 //! connection the server needs to be run first, otherwise the client will block forever.
 
 #![feature(async_await)]
-#![deny(warnings, rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 
 use std::env;
 use std::error::Error;

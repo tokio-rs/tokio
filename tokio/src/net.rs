@@ -58,7 +58,7 @@ pub mod udp {
     //! [`Send`]: struct.Send.html
     //! [`RecvFrom`]: struct.RecvFrom.html
     //! [`SendTo`]: struct.SendTo.html
-    pub use tokio_udp::{split, Recv, RecvFrom, Send, SendTo, UdpFramed, UdpSocket};
+    pub use tokio_udp::{split, UdpFramed, UdpSocket};
 }
 #[cfg(feature = "udp")]
 pub use self::udp::{UdpFramed, UdpSocket};
@@ -67,7 +67,7 @@ pub use self::udp::{UdpFramed, UdpSocket};
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
 
-    pub use tokio_uds::{UCred, UnixDatagram, UnixListener, UnixStream};
+    pub use tokio_uds::{split, UCred, UnixDatagram, UnixListener, UnixStream};
 }
 #[cfg(all(unix, feature = "uds"))]
 pub use self::unix::{UnixDatagram, UnixListener, UnixStream};

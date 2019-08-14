@@ -4,6 +4,7 @@ use futures_core::ready;
 use std::error::Error;
 use std::fmt;
 use std::task::Poll;
+use tokio_executor;
 
 /// Error raised by `blocking`.
 pub struct BlockingError {
@@ -80,11 +81,11 @@ pub struct BlockingError {
 /// that needs to be performed.
 ///
 /// ```rust
+/// #![feature(async_await)]
+///
 /// use tokio_threadpool::{ThreadPool, blocking};
 ///
-/// use futures::Future;
-/// use futures::future::{lazy, poll_fn};
-///
+/// use futures_util::future::poll_fn;
 /// use std::sync::mpsc;
 /// use std::thread;
 /// use std::time::Duration;
@@ -101,21 +102,21 @@ pub struct BlockingError {
 ///
 ///     let pool = ThreadPool::new();
 ///
-///     pool.spawn(lazy(move || {
+///     pool.spawn(async move {
 ///         // Because `blocking` returns `Poll`, it is intended to be used
 ///         // from the context of a `Future` implementation. Since we don't
 ///         // have a complicated requirement, we can use `poll_fn` in this
 ///         // case.
-///         poll_fn(move || {
+///         poll_fn(move |_| {
 ///             blocking(|| {
 ///                 let msg = rx.recv().unwrap();
 ///                 println!("message = {}", msg);
 ///             }).map_err(|_| panic!("the threadpool shut down"))
-///         })
-///     }));
+///         }).await;
+///     });
 ///
 ///     // Wait for the task we just spawned to complete.
-///     pool.shutdown_on_idle().wait().unwrap();
+///     pool.shutdown_on_idle().wait();
 /// }
 /// ```
 pub fn blocking<F, T>(f: F) -> Poll<Result<T, BlockingError>>
@@ -140,7 +141,10 @@ where
     ready!(res)?;
 
     // Currently in blocking mode, so call the inner closure
-    let ret = f();
+    //
+    // "Exit" the current executor in case the blocking function wants
+    // to call a different executor.
+    let ret = tokio_executor::exit(move || f());
 
     // Try to transition out of blocking mode. This is a fast path that takes
     // back ownership of the worker if the worker handoff didn't complete yet.

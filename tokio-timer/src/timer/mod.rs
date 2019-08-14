@@ -49,11 +49,10 @@ pub use self::handle::{with_default, Handle};
 pub use self::now::{Now, SystemNow};
 pub(crate) use self::registration::Registration;
 
-use crate::atomic::AtomicU64;
 use crate::wheel;
 use crate::Error;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicU64, AtomicUsize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::usize;
