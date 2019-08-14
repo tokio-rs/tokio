@@ -71,7 +71,7 @@ jobs:
       tokio-io:
         - util
       tokio-sync:
-        - async-traits
+        - sink
       tokio-macros: []
       # - tokio-threadpool
       tokio-timer:

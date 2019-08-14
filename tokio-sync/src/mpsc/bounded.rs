@@ -1,10 +1,8 @@
 use super::chan;
 
 use std::fmt;
-use std::task::{Context, Poll};
-
-#[cfg(feature = "async-traits")]
 use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
 ///
@@ -187,7 +185,6 @@ impl<T> Receiver<T> {
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_core::Stream for Receiver<T> {
     type Item = T;
 
@@ -252,7 +249,7 @@ impl<T> Sender<T> {
     }
 }
 
-#[cfg(feature = "async-traits")]
+#[cfg(feature = "sink")]
 impl<T> futures_sink::Sink<T> for Sender<T> {
     type Error = SendError;
 

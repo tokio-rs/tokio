@@ -2,10 +2,8 @@ use super::chan;
 use crate::loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
-use std::task::{Context, Poll};
-
-#[cfg(feature = "async-traits")]
 use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// Send values to the associated `UnboundedReceiver`.
 ///
@@ -150,7 +148,6 @@ impl<T> UnboundedReceiver<T> {
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_core::Stream for UnboundedReceiver<T> {
     type Item = T;
 
@@ -171,7 +168,7 @@ impl<T> UnboundedSender<T> {
     }
 }
 
-#[cfg(feature = "async-traits")]
+#[cfg(feature = "sink")]
 impl<T> futures_sink::Sink<T> for UnboundedSender<T> {
     type Error = UnboundedSendError;
 

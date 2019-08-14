@@ -97,7 +97,6 @@ fn single_rx_recv() {
 }
 
 #[test]
-#[cfg(feature = "async-traits")]
 fn stream_impl() {
     use tokio::prelude::*;
 

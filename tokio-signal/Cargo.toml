@@ -36,7 +36,7 @@ signal-hook-registry = "~1"
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
 tokio-timer = { version = "=0.3.0-alpha.1", path = "../tokio-timer" }
-tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync", features = ["async-traits"]}
+tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync", features = ["sink"]}
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"

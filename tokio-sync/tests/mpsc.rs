@@ -54,7 +54,7 @@ async fn async_send_recv_with_buffer() {
 }
 
 #[test]
-#[cfg(feature = "async-traits")]
+#[cfg(feature = "sink")]
 fn send_sink_recv_with_buffer() {
     use futures_core::Stream;
     use futures_sink::Sink;
@@ -167,7 +167,7 @@ async fn async_send_recv_unbounded() {
 }
 
 #[test]
-#[cfg(feature = "async-traits")]
+#[cfg(feature = "sink")]
 fn sink_send_recv_unbounded() {
     use futures_core::Stream;
     use futures_sink::Sink;

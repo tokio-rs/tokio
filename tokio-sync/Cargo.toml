@@ -20,7 +20,7 @@ Synchronization utilities.
 categories = ["asynchronous"]
 
 [features]
-async-traits = ["futures-sink-preview"]
+sink = ["futures-sink-preview"]
 
 [dependencies]
 fnv = "1.0.6"
