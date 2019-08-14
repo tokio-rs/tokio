@@ -9,7 +9,7 @@ use crate::timer::Handle;
 use crate::wheel::{self, Wheel};
 use crate::{Delay, Error};
 
-use futures_core::ready;
+use futures_core::{ready, Stream};
 use slab::Slab;
 use std::cmp;
 use std::future::Future;
@@ -701,7 +701,7 @@ impl<T> DelayQueue<T> {
 // We never put `T` in a `Pin`...
 impl<T> Unpin for DelayQueue<T> {}
 
-impl<T> futures_core::Stream for DelayQueue<T> {
+impl<T> Stream for DelayQueue<T> {
     // DelayQueue seems much more specific, where a user may care that it
     // has reached capacity, so return those errors instead of panicking.
     type Item = Result<Expired<T>, Error>;

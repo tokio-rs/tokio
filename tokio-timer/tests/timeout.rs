@@ -8,6 +8,7 @@ use tokio_test::{
 };
 use tokio_timer::*;
 
+use futures_core::Stream;
 use std::time::Duration;
 
 #[test]
@@ -132,7 +133,6 @@ fn deadline_future_elapses() {
 
 macro_rules! poll {
     ($task:ident, $stream:ident) => {{
-        use futures_core::Stream;
         $task.enter(|cx| Pin::new(&mut $stream).poll_next(cx))
     }};
 }

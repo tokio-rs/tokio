@@ -6,7 +6,7 @@
 
 use crate::clock::now;
 use crate::Delay;
-use futures_core::ready;
+use futures_core::{ready, Stream};
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -181,9 +181,9 @@ where
     }
 }
 
-impl<T> futures_core::Stream for Timeout<T>
+impl<T> Stream for Timeout<T>
 where
-    T: futures_core::Stream,
+    T: Stream,
 {
     type Item = Result<T::Item, Elapsed>;
 

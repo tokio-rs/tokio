@@ -1,7 +1,7 @@
 use crate::clock;
 use crate::Delay;
 
-use futures_core::ready;
+use futures_core::{ready, Stream};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
@@ -55,7 +55,7 @@ impl Interval {
     }
 }
 
-impl futures_core::Stream for Interval {
+impl Stream for Interval {
     type Item = Instant;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
