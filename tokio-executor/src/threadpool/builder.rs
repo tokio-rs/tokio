@@ -8,7 +8,7 @@ use super::worker::{self, Worker, WorkerId};
 use crate::park::Park;
 
 use crossbeam_deque::Injector;
-use log::trace;
+use tracing::trace;
 use num_cpus;
 use std::any::Any;
 use std::cmp::max;

@@ -17,7 +17,7 @@ use super::BlockingError;
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use lazy_static::lazy_static;
-use log::{debug, error, trace};
+use tracing::{debug, error, trace};
 use std::cell::Cell;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};

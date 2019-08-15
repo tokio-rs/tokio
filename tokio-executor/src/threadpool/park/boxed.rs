@@ -1,6 +1,6 @@
 use crate::park::{Park, Unpark};
 
-use log::warn;
+use tracing::warn;
 use std::error::Error;
 use std::time::Duration;
 

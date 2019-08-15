@@ -9,7 +9,7 @@ use super::pool::Pool;
 use super::waker::Waker;
 
 use futures_util::task;
-use log::trace;
+use tracing::trace;
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
 use std::pin::Pin;

@@ -3,7 +3,7 @@ use super::task::Task;
 
 use crate::{Executor, SpawnError, TypedExecutor};
 
-use log::trace;
+use tracing::trace;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
