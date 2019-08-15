@@ -18,7 +18,7 @@ use mio_uds::UnixStream;
 use std::future::Future;
 use std::task::{Context, Poll};
 use tokio_io::AsyncRead;
-use tokio_reactor::{Handle, PollEvented};
+use tokio_net::{Handle, PollEvented};
 use tokio_sync::mpsc::{channel, Receiver};
 
 use crate::registry::{globals, EventId, EventInfo, Globals, Init, Storage};

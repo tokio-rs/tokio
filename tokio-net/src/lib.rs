@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.2.0-alpha.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-net/0.2.0-alpha.1")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -23,7 +23,7 @@
 //!   resources that are driven by the reactor.
 //!
 //! Application authors will not use this crate directly. Instead, they will use the
-//! `tokio` crate. Library authors should only depend on `tokio-reactor` if they
+//! `tokio` crate. Library authors should only depend on `tokio-net` if they
 //! are building a custom I/O resource.
 //!
 //! For more details, see [reactor module] documentation in the Tokio crate.

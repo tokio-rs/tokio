@@ -24,7 +24,7 @@ futures-core-preview = "=0.3.0-alpha.18"
 futures-util-preview = "=0.3.0-alpha.18"
 log = "0.4"
 tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io", features = ["util"] }
-tokio-reactor = { version = "=0.2.0-alpha.1", path = "../tokio-reactor" }
+tokio-net = { version = "=0.2.0-alpha.1", path = "../tokio-net" }
 
 [dev-dependencies.tokio]
 version = "=0.2.0-alpha.1"

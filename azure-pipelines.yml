@@ -48,8 +48,8 @@ jobs:
     rust: $(nightly)
     crates:
       tokio-fs: []
+      tokio-net: []
       tokio-process: []
-      tokio-reactor: []
       tokio-signal: []
       tokio-tcp:
         - async-traits
@@ -87,6 +87,8 @@ jobs:
     crates:
       ui-tests:
         - executor-without-current-thread
+        - tokio-no-features
+        - tokio-with-net
 
 # - template: ci/azure-cargo-check.yml
 #   parameters:

@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "default")]
 
-use tokio_reactor::Reactor;
+use tokio_net::Reactor;
 use tokio_tcp::TcpListener;
 use tokio_test::{assert_ok, assert_pending};
 
@@ -66,7 +66,7 @@ fn test_drop_on_notify() {
 
     let _enter = tokio_executor::enter().unwrap();
 
-    tokio_reactor::with_default(&reactor.handle(), || {
+    tokio_net::with_default(&reactor.handle(), || {
         let waker = waker_ref(&task);
         let mut cx = Context::from_waker(&waker);
         assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));

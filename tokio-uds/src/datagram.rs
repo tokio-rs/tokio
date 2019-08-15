@@ -1,4 +1,4 @@
-use tokio_reactor::{Handle, PollEvented};
+use tokio_net::{Handle, PollEvented};
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -200,7 +200,7 @@ impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// See [`tokio_net::PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     fn try_from(value: UnixDatagram) -> Result<Self, Self::Error> {
         value.io.into_inner()

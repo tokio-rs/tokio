@@ -129,10 +129,7 @@ have greater guarantees of stability.
 
 The crates included as part of Tokio are:
 
-* [`tokio-current-thread`]: Schedule the execution of futures on the current
-  thread.
-
-* [`tokio-executor`]: Task execution related traits and utilities.
+* [`tokio-executor`]: Task executors and related utilities.
 
 * [`tokio-fs`]: Filesystem (and standard in / out) APIs.
 
@@ -142,20 +139,19 @@ The crates included as part of Tokio are:
 
 * [`tokio-macros`]: Macros for usage with Tokio.
 
-* [`tokio-reactor`]: Event loop that drives I/O resources (like TCP and UDP
+* [`tokio-net`]: Event loop that drives I/O resources (like TCP and UDP
   sockets).
 
-* [`tokio-tcp`]: TCP bindings for use with `tokio-io` and `tokio-reactor`.
+* [`tokio-tcp`]: TCP listener and acceptor.
 
 * [`tokio-threadpool`]: Schedules the execution of futures across a pool of
   threads.
 
 * [ `tokio-timer`]: Time related APIs.
 
-* [`tokio-udp`]: UDP bindings for use with `tokio-io` and `tokio-reactor`.
+* [`tokio-udp`]: UDP socket.
 
-* [`tokio-uds`]: Unix Domain Socket bindings for use with `tokio-io` and
-  `tokio-reactor`.
+* [`tokio-uds`]: Unix Domain Socket bindings.
 
 [`tokio-codec`]: tokio-codec
 [`tokio-current-thread`]: tokio-current-thread
@@ -163,7 +159,7 @@ The crates included as part of Tokio are:
 [`tokio-fs`]: tokio-fs
 [`tokio-io`]: tokio-io
 [`tokio-macros`]: tokio-macros
-[`tokio-reactor`]: tokio-reactor
+[`tokio-net`]: tokio-net
 [`tokio-tcp`]: tokio-tcp
 [`tokio-threadpool`]: tokio-threadpool
 [`tokio-timer`]: tokio-timer

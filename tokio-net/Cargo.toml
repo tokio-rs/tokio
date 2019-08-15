@@ -1,5 +1,5 @@
 [package]
-name = "tokio-reactor"
+name = "tokio-net"
 # When releasing to crates.io:
 # - Remove path dependencies
 # - Update html_root_url.
@@ -14,7 +14,7 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-reactor/0.2.0-alpha.1/tokio_reactor"
+documentation = "https://docs.rs/tokio-net/0.2.0-alpha.1/tokio_net"
 description = """
 Event loop that drives Tokio I/O resources.
 """

@@ -2,6 +2,10 @@ use crate::split::{
     split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
     TcpStreamWriteHalfMut,
 };
+
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_net::{Handle, PollEvented};
+
 use bytes::{Buf, BufMut};
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -16,8 +20,6 @@ use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP stream connected to a remote endpoint.
 ///
@@ -123,7 +125,7 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio_reactor::Handle;
+    /// use tokio_net::Handle;
     ///
     /// # fn dox() -> std::io::Result<()> {
     /// let std_stream = std::net::TcpStream::connect("127.0.0.1:34254")?;
@@ -799,7 +801,7 @@ impl TryFrom<TcpStream> for mio::net::TcpStream {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// See [`tokio_net::PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
         value.io.into_inner()

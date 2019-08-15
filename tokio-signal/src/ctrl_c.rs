@@ -2,11 +2,13 @@
 use crate::unix::Signal as Inner;
 #[cfg(windows)]
 use crate::windows::Event as Inner;
+
+use tokio_net::Handle;
+
 use futures_core::stream::Stream;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_reactor::Handle;
 
 /// Represents a stream which receives "ctrl-c" notifications sent to the process.
 ///
