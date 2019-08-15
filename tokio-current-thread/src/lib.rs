@@ -64,7 +64,7 @@ pub struct CurrentThread<P: Park = ParkThread> {
     spawn_handle: Handle,
 
     /// Receiver for futures spawned from other threads
-    spawn_receiver: mpsc::Receiver<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    spawn_receiver: mpsc::Receiver<Box<dyn Future<Item = (), Error = ()> + Send + 'static>>,
 
     /// The thread-local ID assigned to this executor.
     id: u64,
@@ -186,11 +186,15 @@ struct Borrow<'a, U: 'a> {
 }
 
 trait SpawnLocal {
-    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>, already_counted: bool);
+    fn spawn_local(
+        &mut self,
+        future: Box<dyn Future<Item = (), Error = ()>>,
+        already_counted: bool,
+    );
 }
 
 struct CurrentRunner {
-    spawn: Cell<Option<*mut SpawnLocal>>,
+    spawn: Cell<Option<*mut dyn SpawnLocal>>,
     id: Cell<Option<u64>>,
 }
 
@@ -424,7 +428,7 @@ impl<P: Park> Drop for CurrentThread<P> {
 impl tokio_executor::Executor for CurrentThread {
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.borrow().spawn_local(future, false);
         Ok(())
@@ -629,7 +633,7 @@ impl<'a, P: Park> fmt::Debug for Entered<'a, P> {
 /// Handle to spawn a future on the corresponding `CurrentThread` instance
 #[derive(Clone)]
 pub struct Handle {
-    sender: mpsc::Sender<Box<Future<Item = (), Error = ()> + Send + 'static>>,
+    sender: mpsc::Sender<Box<dyn Future<Item = (), Error = ()> + Send + 'static>>,
     num_futures: Arc<atomic::AtomicUsize>,
     shut_down: Cell<bool>,
     notify: executor::NotifyHandle,
@@ -731,7 +735,7 @@ impl TaskExecutor {
     /// Spawn a future onto the current `CurrentThread` instance.
     pub fn spawn_local(
         &mut self,
-        future: Box<Future<Item = (), Error = ()>>,
+        future: Box<dyn Future<Item = (), Error = ()>>,
     ) -> Result<(), SpawnError> {
         CURRENT.with(|current| match current.spawn.get() {
             Some(spawn) => {
@@ -746,7 +750,7 @@ impl TaskExecutor {
 impl tokio_executor::Executor for TaskExecutor {
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.spawn_local(future)
     }
@@ -791,7 +795,11 @@ impl<'a, U: Unpark> Borrow<'a, U> {
 }
 
 impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
-    fn spawn_local(&mut self, future: Box<Future<Item = (), Error = ()>>, already_counted: bool) {
+    fn spawn_local(
+        &mut self,
+        future: Box<dyn Future<Item = (), Error = ()>>,
+        already_counted: bool,
+    ) {
         if !already_counted {
             // NOTE: we have a borrow of the Runtime, so we know that it isn't shut down.
             // NOTE: += 2 since LSB is the shutdown bit
@@ -804,7 +812,7 @@ impl<'a, U: Unpark> SpawnLocal for Borrow<'a, U> {
 // ===== impl CurrentRunner =====
 
 impl CurrentRunner {
-    fn set_spawn<F, R>(&self, spawn: &mut SpawnLocal, f: F) -> R
+    fn set_spawn<F, R>(&self, spawn: &mut dyn SpawnLocal, f: F) -> R
     where
         F: FnOnce() -> R,
     {
@@ -819,14 +827,14 @@ impl CurrentRunner {
 
         let _reset = Reset(self);
 
-        let spawn = unsafe { hide_lt(spawn as *mut SpawnLocal) };
+        let spawn = unsafe { hide_lt(spawn as *mut dyn SpawnLocal) };
         self.spawn.set(Some(spawn));
 
         f()
     }
 }
 
-unsafe fn hide_lt<'a>(p: *mut (SpawnLocal + 'a)) -> *mut (SpawnLocal + 'static) {
+unsafe fn hide_lt<'a>(p: *mut (dyn SpawnLocal + 'a)) -> *mut (dyn SpawnLocal + 'static) {
     use std::mem;
     mem::transmute(p)
 }

@@ -7,7 +7,7 @@ use tokio_executor::Enter;
 
 #[derive(Clone)]
 pub(crate) struct Callback {
-    f: Arc<Fn(&Worker, &mut Enter) + Send + Sync>,
+    f: Arc<dyn Fn(&Worker, &mut Enter) + Send + Sync>,
 }
 
 impl Callback {

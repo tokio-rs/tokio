@@ -652,7 +652,7 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    fn add_source(&self, source: &Evented) -> io::Result<usize> {
+    fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
@@ -690,7 +690,7 @@ impl Inner {
     }
 
     /// Deregisters an I/O resource from the reactor.
-    fn deregister_source(&self, source: &Evented) -> io::Result<()> {
+    fn deregister_source(&self, source: &dyn Evented) -> io::Result<()> {
         self.io.deregister(source)
     }
 

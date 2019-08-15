@@ -41,7 +41,7 @@ use std::io::BufReader;
 use std::iter;
 use std::rc::Rc;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = Runtime::new().unwrap();
 
     // Create the TCP listener we'll accept connections on.

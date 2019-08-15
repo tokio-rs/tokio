@@ -19,7 +19,7 @@ use tokio::net::{UdpFramed, UdpSocket};
 use tokio::prelude::*;
 use tokio_codec::BytesCodec;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = env_logger::init();
 
     let addr: SocketAddr = "127.0.0.1:0".parse()?;

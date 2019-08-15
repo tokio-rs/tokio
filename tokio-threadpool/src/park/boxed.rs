@@ -3,8 +3,8 @@ use tokio_executor::park::{Park, Unpark};
 use std::error::Error;
 use std::time::Duration;
 
-pub(crate) type BoxPark = Box<Park<Unpark = BoxUnpark, Error = ()> + Send>;
-pub(crate) type BoxUnpark = Box<Unpark>;
+pub(crate) type BoxPark = Box<dyn Park<Unpark = BoxUnpark, Error = ()> + Send>;
+pub(crate) type BoxUnpark = Box<dyn Unpark>;
 
 pub(crate) struct BoxedPark<T>(T);
 

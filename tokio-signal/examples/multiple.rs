@@ -11,7 +11,7 @@ mod platform {
     use futures::{Future, Stream};
     use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 
-    pub fn main() -> Result<(), Box<::std::error::Error>> {
+    pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Create a stream for each of the signals we'd like to handle.
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -49,6 +49,6 @@ mod platform {
     }
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     platform::main()
 }

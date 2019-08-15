@@ -17,7 +17,7 @@ use std::time::Instant;
 /// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
 #[derive(Default, Clone)]
 pub struct Clock {
-    now: Option<Arc<Now>>,
+    now: Option<Arc<dyn Now>>,
 }
 
 thread_local! {

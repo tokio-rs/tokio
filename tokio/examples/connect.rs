@@ -29,7 +29,7 @@ use std::thread;
 use futures::sync::mpsc;
 use tokio::prelude::*;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Determine if we're going to run in TCP or UDP mode
     let mut args = env::args().skip(1).collect::<Vec<_>>();
     let tcp = match args.iter().position(|a| a == "--udp") {
@@ -133,8 +133,8 @@ mod tcp {
 
     pub fn connect(
         addr: &SocketAddr,
-        stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>,
-    ) -> Result<Box<Stream<Item = BytesMut, Error = io::Error> + Send>, Box<Error>> {
+        stdin: Box<dyn Stream<Item = Vec<u8>, Error = io::Error> + Send>,
+    ) -> Result<Box<dyn Stream<Item = BytesMut, Error = io::Error> + Send>, Box<dyn Error>> {
         let tcp = TcpStream::connect(addr);
 
         // After the TCP connection has been established, we set up our client
@@ -185,8 +185,8 @@ mod udp {
 
     pub fn connect(
         &addr: &SocketAddr,
-        stdin: Box<Stream<Item = Vec<u8>, Error = io::Error> + Send>,
-    ) -> Result<Box<Stream<Item = BytesMut, Error = io::Error> + Send>, Box<Error>> {
+        stdin: Box<dyn Stream<Item = Vec<u8>, Error = io::Error> + Send>,
+    ) -> Result<Box<dyn Stream<Item = BytesMut, Error = io::Error> + Send>, Box<dyn Error>> {
         // We'll bind our UDP socket to a local IP/port, but for now we
         // basically let the OS pick both of those.
         let addr_to_bind = if addr.ip().is_ipv4() {
