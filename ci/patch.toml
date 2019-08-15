@@ -11,7 +11,6 @@ tokio-macros = { path = "tokio-macros" }
 tokio-net = { path = "tokio-net" }
 tokio-signal = { path = "tokio-signal" }
 tokio-sync = { path = "tokio-sync" }
-tokio-threadpool = { path = "tokio-threadpool" }
 tokio-timer = { path = "tokio-timer" }
 tokio-tcp = { path = "tokio-tcp" }
 tokio-tls = { path = "tokio-tls" }

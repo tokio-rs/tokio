@@ -129,7 +129,8 @@ have greater guarantees of stability.
 
 The crates included as part of Tokio are:
 
-* [`tokio-executor`]: Task executors and related utilities.
+* [`tokio-executor`]: Task executors and related utilities. Includes a
+  single-threaded executor and a multi-threaded, work-stealing, executor.
 
 * [`tokio-fs`]: Filesystem (and standard in / out) APIs.
 
@@ -143,9 +144,6 @@ The crates included as part of Tokio are:
   sockets).
 
 * [`tokio-tcp`]: TCP listener and acceptor.
-
-* [`tokio-threadpool`]: Schedules the execution of futures across a pool of
-  threads.
 
 * [ `tokio-timer`]: Time related APIs.
 
@@ -161,7 +159,6 @@ The crates included as part of Tokio are:
 [`tokio-macros`]: tokio-macros
 [`tokio-net`]: tokio-net
 [`tokio-tcp`]: tokio-tcp
-[`tokio-threadpool`]: tokio-threadpool
 [`tokio-timer`]: tokio-timer
 [`tokio-udp`]: tokio-udp
 [`tokio-uds`]: tokio-uds

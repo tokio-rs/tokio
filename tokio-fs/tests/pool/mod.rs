@@ -1,6 +1,5 @@
-use tokio_threadpool;
+use tokio_executor::threadpool::Builder;
 
-use self::tokio_threadpool::Builder;
 use std::future::Future;
 use std::io;
 use std::sync::mpsc;

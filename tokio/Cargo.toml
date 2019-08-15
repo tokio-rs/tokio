@@ -44,8 +44,8 @@ rt-full = [
   "sync",
   "timer",
   "tokio-executor/current-thread",
+  "tokio-executor/threadpool",
   "tokio-macros",
-  "tokio-threadpool",
   "tracing-core",
 ]
 sync = ["tokio-sync"]
@@ -69,7 +69,6 @@ tokio-executor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio
 tokio-macros = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-macros" }
 tokio-net = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tokio-threadpool = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-threadpool" }
 tokio-tcp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-tcp", features = ["async-traits"] }
 tokio-udp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-udp" }
 tokio-timer = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-timer", features = ["async-traits"] }

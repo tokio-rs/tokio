@@ -1,5 +1,5 @@
 use tokio_executor::SpawnError;
-use tokio_threadpool::Sender;
+use tokio_executor::threadpool::Sender;
 
 use std::future::Future;
 use std::pin::Pin;

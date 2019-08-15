@@ -1,7 +1,7 @@
 use super::{background, Inner, Runtime};
 use crate::reactor::Reactor;
 
-use tokio_threadpool::Builder as ThreadPoolBuilder;
+use tokio_executor::threadpool;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
@@ -51,7 +51,7 @@ use std::any::Any;
 #[derive(Debug)]
 pub struct Builder {
     /// Thread pool specific builder
-    threadpool_builder: ThreadPoolBuilder,
+    threadpool_builder: threadpool::Builder,
 
     /// The number of worker threads
     core_threads: usize,
@@ -68,7 +68,7 @@ impl Builder {
     pub fn new() -> Builder {
         let core_threads = num_cpus::get().max(1);
 
-        let mut threadpool_builder = ThreadPoolBuilder::new();
+        let mut threadpool_builder = threadpool::Builder::new();
         threadpool_builder.name_prefix("tokio-runtime-worker-");
         threadpool_builder.pool_size(core_threads);
 
