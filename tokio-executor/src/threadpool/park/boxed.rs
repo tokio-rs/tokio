@@ -1,8 +1,8 @@
 use crate::park::{Park, Unpark};
 
-use tracing::warn;
 use std::error::Error;
 use std::time::Duration;
+use tracing::warn;
 
 pub(crate) type BoxPark = Box<dyn Park<Unpark = BoxUnpark, Error = ()> + Send>;
 pub(crate) type BoxUnpark = Box<dyn Unpark>;

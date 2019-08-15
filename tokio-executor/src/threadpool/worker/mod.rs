@@ -12,7 +12,6 @@ use super::shutdown::ShutdownTrigger;
 use super::task::{self, CanBlock, Task};
 use super::BlockingError;
 
-use tracing::{trace, trace_span};
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr;
@@ -22,6 +21,7 @@ use std::sync::Arc;
 use std::task::Poll;
 use std::thread;
 use std::time::Duration;
+use tracing::{trace, trace_span};
 
 /// Thread worker
 ///

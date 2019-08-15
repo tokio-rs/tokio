@@ -8,7 +8,6 @@ use super::worker::{self, Worker, WorkerId};
 use crate::park::Park;
 
 use crossbeam_deque::Injector;
-use tracing::trace;
 use num_cpus;
 use std::any::Any;
 use std::cmp::max;
@@ -16,6 +15,7 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::trace;
 
 /// Builds a thread pool with custom configuration values.
 ///

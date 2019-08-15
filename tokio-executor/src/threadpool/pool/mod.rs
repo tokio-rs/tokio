@@ -17,7 +17,6 @@ use super::BlockingError;
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use lazy_static::lazy_static;
-use tracing::{debug, error, trace};
 use std::cell::Cell;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};
@@ -27,6 +26,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::{Arc, Weak};
 use std::task::Poll;
 use std::thread;
+use tracing::{debug, error, trace};
 
 #[derive(Debug)]
 pub(crate) struct Pool {

@@ -9,7 +9,6 @@ use super::pool::Pool;
 use super::waker::Waker;
 
 use futures_util::task;
-use tracing::trace;
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
 use std::pin::Pin;
@@ -18,6 +17,7 @@ use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::{fmt, panic, ptr};
+use tracing::trace;
 
 /// Harness around a future.
 ///
