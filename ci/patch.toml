@@ -7,7 +7,8 @@ tokio-codec = { path = "tokio-codec" }
 tokio-executor = { path = "tokio-executor" }
 tokio-fs = { path = "tokio-fs" }
 tokio-io = { path = "tokio-io" }
-tokio-reactor = { path = "tokio-reactor" }
+tokio-macros = { path = "tokio-macros" }
+tokio-net = { path = "tokio-net" }
 tokio-signal = { path = "tokio-signal" }
 tokio-sync = { path = "tokio-sync" }
 tokio-threadpool = { path = "tokio-threadpool" }

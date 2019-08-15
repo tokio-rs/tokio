@@ -132,22 +132,21 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
-use std::io;
-use std::process::{Command, ExitStatus, Output, Stdio};
+use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio_net::Handle;
 
 use futures_core::future::TryFuture;
 use futures_util::future;
 use futures_util::future::FutureExt;
 use futures_util::try_future::TryFutureExt;
-
 use kill::Kill;
 use std::fmt;
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
+use std::process::{Command, ExitStatus, Output, Stdio};
 use std::task::Context;
 use std::task::Poll;
-use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
-use tokio_reactor::Handle;
 
 #[path = "unix/mod.rs"]
 #[cfg(unix)]

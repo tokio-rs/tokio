@@ -5,7 +5,7 @@ use crate::split::{
 use crate::ucred::{self, UCred};
 
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_reactor::{Handle, PollEvented};
+use tokio_net::{Handle, PollEvented};
 
 use bytes::{Buf, BufMut};
 use futures_core::ready;
@@ -131,7 +131,7 @@ impl TryFrom<UnixStream> for mio_uds::UnixStream {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// See [`tokio_net::PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
         value.io.into_inner()

@@ -33,7 +33,7 @@ use futures_util::future::FutureExt;
 
 use super::SpawnedChild;
 use mio_named_pipes::NamedPipe;
-use tokio_reactor::{Handle, PollEvented};
+use tokio_net::{Handle, PollEvented};
 use tokio_sync::oneshot;
 use winapi::shared::minwindef::*;
 use winapi::shared::winerror::*;

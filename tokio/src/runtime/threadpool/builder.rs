@@ -1,7 +1,6 @@
 use super::{background, Inner, Runtime};
 use crate::reactor::Reactor;
 
-use tokio_reactor;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
@@ -344,7 +343,7 @@ impl Builder {
             .around_worker(move |w| {
                 let index = w.id().to_usize();
 
-                tokio_reactor::with_default(&reactor_handles[index], || {
+                tokio_net::with_default(&reactor_handles[index], || {
                     clock::with_default(&clock, || {
                         timer::with_default(&timer_handles[index], || {
                             trace::dispatcher::with_default(&dispatch, || {

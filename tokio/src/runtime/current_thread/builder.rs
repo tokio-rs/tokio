@@ -1,7 +1,7 @@
 use crate::runtime::current_thread::Runtime;
 
 use tokio_executor::current_thread::CurrentThread;
-use tokio_reactor::Reactor;
+use tokio_net::Reactor;
 use tokio_timer::clock::Clock;
 use tokio_timer::timer::Timer;
 

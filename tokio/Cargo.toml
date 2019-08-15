@@ -29,7 +29,6 @@ default = [
   "fs",
   "io",
   "net",
-  "reactor",
   "rt-full",
   "sync",
   "timer",
@@ -38,11 +37,10 @@ default = [
 codec = ["io", "tokio-codec", "bytes"]
 fs = ["tokio-fs"]
 io = ["tokio-io"]
-reactor = ["io", "tokio-reactor"]
-net = ["reactor", "tcp", "udp", "uds"]
+net = ["tcp", "udp", "uds"]
 rt-full = [
   "num_cpus",
-  "reactor",
+  "net",
   "sync",
   "timer",
   "tokio-executor/current-thread",
@@ -51,10 +49,10 @@ rt-full = [
   "tracing-core",
 ]
 sync = ["tokio-sync"]
-tcp = ["tokio-tcp"]
+tcp = ["io", "tokio-net", "tokio-tcp"]
 timer = ["tokio-timer"]
-udp = ["tokio-udp"]
-uds = ["tokio-uds"]
+udp = ["io", "tokio-net", "tokio-udp"]
+uds = ["io", "tokio-net", "tokio-uds"]
 
 [dependencies]
 futures-core-preview = "=0.3.0-alpha.18"
@@ -69,7 +67,7 @@ tokio-fs = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-fs" }
 tokio-io = { version = "=0.2.0-alpha.1", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-macros" }
-tokio-reactor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-reactor" }
+tokio-net = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-sync", features = ["async-traits"] }
 tokio-threadpool = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-threadpool" }
 tokio-tcp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-tcp", features = ["async-traits"] }

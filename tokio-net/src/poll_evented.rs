@@ -1,4 +1,7 @@
 use crate::{Handle, Registration};
+
+use tokio_io::{AsyncRead, AsyncWrite};
+
 use futures_core::ready;
 use mio;
 use mio::event::Evented;
@@ -9,7 +12,6 @@ use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
 
 /// Associates an I/O resource that implements the [`std::io::Read`] and/or
 /// [`std::io::Write`] traits with the reactor that drives it.
@@ -53,7 +55,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 /// [`clear_read_ready`].
 ///
 /// ```rust
-/// use tokio_reactor::PollEvented;
+/// use tokio_net::PollEvented;
 ///
 /// use futures_core::ready;
 /// use mio::Ready;

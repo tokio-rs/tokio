@@ -173,7 +173,7 @@ impl Runtime {
         let trace = &self.inner().trace;
 
         tokio_executor::with_default(&mut self.inner().pool.sender(), || {
-            tokio_reactor::with_default(bg.reactor(), || {
+            tokio_net::with_default(bg.reactor(), || {
                 timer::with_default(bg.timer(), || {
                     trace::dispatcher::with_default(trace, || {
                         entered.block_on(future)

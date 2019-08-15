@@ -7,20 +7,20 @@
 
 #![cfg(windows)]
 
+use crate::registry::{globals, EventId, EventInfo, Init, Storage};
+
+use tokio_net::Handle;
+use tokio_sync::mpsc::{channel, Receiver};
+
+use futures_core::stream::Stream;
 use std::convert::TryFrom;
 use std::io;
 use std::pin::Pin;
 use std::sync::Once;
 use std::task::{Context, Poll};
-
-use futures_core::stream::Stream;
-use tokio_reactor::Handle;
-use tokio_sync::mpsc::{channel, Receiver};
 use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
-
-use crate::registry::{globals, EventId, EventInfo, Init, Storage};
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {

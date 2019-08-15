@@ -1,6 +1,6 @@
 use crate::UnixStream;
 
-use tokio_reactor::{Handle, PollEvented};
+use tokio_net::{Handle, PollEvented};
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -102,7 +102,7 @@ impl TryFrom<UnixListener> for mio_uds::UnixListener {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// See [`tokio_net::PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
         value.io.into_inner()

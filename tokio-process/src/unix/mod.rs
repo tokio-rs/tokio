@@ -28,6 +28,10 @@ use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
+
+use tokio_net::{Handle, PollEvented};
+use tokio_signal::unix::{Signal, SignalKind};
+
 use mio::event::Evented;
 use mio::unix::{EventedFd, UnixReady};
 use mio::{Poll as MioPoll, PollOpt, Ready, Token};
@@ -39,8 +43,6 @@ use std::pin::Pin;
 use std::process::{self, ExitStatus};
 use std::task::Context;
 use std::task::Poll;
-use tokio_reactor::{Handle, PollEvented};
-use tokio_signal::unix::{Signal, SignalKind};
 
 impl Wait for process::Child {
     fn id(&self) -> u32 {

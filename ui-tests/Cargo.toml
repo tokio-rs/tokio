@@ -7,11 +7,14 @@ publish = false
 
 [features]
 executor-without-current-thread = ["tokio-executor"]
+tokio-no-features = ["tokio"]
+tokio-with-net = ["tokio/net"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 tokio-executor = { path = "../tokio-executor", optional = true }
+tokio = { path = "../tokio", optional = true, default-features = false }
 
 [dev-dependencies]
 trybuild = "1.0"

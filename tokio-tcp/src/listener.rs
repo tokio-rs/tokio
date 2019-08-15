@@ -1,6 +1,8 @@
 #[cfg(feature = "async-traits")]
 use super::incoming::Incoming;
 use super::TcpStream;
+use tokio_net::{Handle, PollEvented};
+
 use futures_core::ready;
 use futures_util::future::poll_fn;
 use mio;
@@ -9,7 +11,6 @@ use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
 use std::task::{Context, Poll};
-use tokio_reactor::{Handle, PollEvented};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
@@ -259,7 +260,7 @@ impl TryFrom<TcpListener> for mio::net::TcpListener {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`tokio_reactor::PollEvented::into_inner`] for more details about
+    /// See [`tokio_net::PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     fn try_from(value: TcpListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
