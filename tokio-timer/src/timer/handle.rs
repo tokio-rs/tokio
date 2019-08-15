@@ -49,8 +49,7 @@ thread_local! {
 
 #[derive(Debug)]
 ///Unsets default timer handler on drop.
-pub struct DefaultHandlerReset {
-}
+pub struct DefaultHandlerReset {}
 
 impl Drop for DefaultHandlerReset {
     fn drop(&mut self) {
@@ -73,7 +72,7 @@ pub fn set_default(handle: &Handle) -> DefaultHandlerReset {
         assert!(
             current.is_none(),
             "default Tokio timer already set \
-            for execution context"
+             for execution context"
         );
 
         let handle = handle
@@ -83,8 +82,7 @@ pub fn set_default(handle: &Handle) -> DefaultHandlerReset {
         *current = Some(handle.clone());
     });
 
-    DefaultHandlerReset {
-    }
+    DefaultHandlerReset {}
 }
 
 impl Handle {

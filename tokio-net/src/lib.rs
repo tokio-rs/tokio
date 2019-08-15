@@ -181,7 +181,7 @@ pub fn set_current(handle: &Handle) -> CurrentReactorReset {
         assert!(
             current.is_none(),
             "default Tokio reactor already set \
-            for execution context"
+             for execution context"
         );
 
         let handle = match handle.as_priv() {
@@ -194,9 +194,7 @@ pub fn set_current(handle: &Handle) -> CurrentReactorReset {
         *current = Some(handle.clone());
     });
 
-
-    CurrentReactorReset {
-    }
+    CurrentReactorReset {}
 }
 
 impl Reactor {
