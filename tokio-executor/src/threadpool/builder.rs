@@ -374,7 +374,7 @@ impl Builder {
     ///     .build();
     /// ```
     pub fn build(&self) -> ThreadPool {
-        trace!("build; num-workers={}", self.pool_size);
+        trace!(message = "build;", num_workers = self.pool_size);
 
         // Create the worker entry list
         let workers: Arc<[worker::Entry]> = {

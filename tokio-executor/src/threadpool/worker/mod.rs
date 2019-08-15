@@ -410,9 +410,9 @@ impl Worker {
                         self.run_task(task, pool);
 
                         trace!(
-                            "try_steal_task -- signal_work; self={}; from={}",
-                            self.id.0,
-                            idx
+                            message = "try_steal_task -- signal_work;",
+                            self = self.id.0,
+                            from = idx,
                         );
 
                         // Signal other workers that work is available
@@ -487,7 +487,7 @@ impl Worker {
                         .into();
 
                     if actual == state {
-                        trace!("task complete; state={:?}", next);
+                        trace!(message = "task complete;", state = ?next);
 
                         if state.num_futures() == 1 {
                             // If the thread pool has been flagged as shutdown,
@@ -570,8 +570,8 @@ impl Worker {
         // Putting a worker to sleep is a multipart operation. This is, in part,
         // due to the fact that a worker can be notified without it being popped
         // from the sleep stack. Extra care is needed to deal with this.
-
-        trace!("Worker::sleep; worker={:?}", self.id);
+        let span = trace_span!("Worker::sleep", idx = self.id.0, id = ?self.id);
+        let _e = span.enter();
 
         let mut state: State = self.entry().state.load(Acquire).into();
 
@@ -617,12 +617,12 @@ impl Worker {
                 if !state.is_pushed() {
                     debug_assert!(next.is_pushed());
 
-                    trace!("  sleeping -- push to stack; idx={}", self.id.0);
+                    trace!("push to stack");
 
                     // We obtained permission to push the worker into the
                     // sleeper queue.
                     if self.pool.push_sleeper(self.id.0).is_err() {
-                        trace!("  sleeping -- push to stack failed; idx={}", self.id.0);
+                        trace!("push to stack failed");
                         // The push failed due to the pool being terminated.
                         //
                         // This is true because the "work" being woken up for is
@@ -637,7 +637,7 @@ impl Worker {
             state = actual;
         }
 
-        trace!("    -> starting to sleep; idx={}", self.id.0);
+        trace!("starting to sleep");
 
         // Do a quick check to see if there are any notifications in the
         // reactor or new tasks in the global queue. Since this call will
@@ -686,7 +686,7 @@ impl Worker {
 
             self.entry().park();
 
-            trace!("    -> wakeup; idx={}", self.id.0);
+            trace!("wakeup");
         }
     }
 
@@ -719,7 +719,7 @@ impl Worker {
 
 impl Drop for Worker {
     fn drop(&mut self) {
-        trace!("shutting down thread; idx={}", self.id.0);
+        trace!(message = "shutting down thread", idx = self.id.0);
 
         if self.should_finalize.get() {
             // Drain the work queue

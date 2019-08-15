@@ -109,8 +109,10 @@ impl Task {
             Scheduled => {}
             _ => panic!("unexpected task state; {:?}", actual),
         }
+        let span = tracing::trace_span!("Task::run");
+        let _enter = span.enter();
 
-        trace!("Task::run; state={:?}", State::from(me.state.load(Relaxed)));
+        trace!(state = ?State::from(me.state.load(Relaxed)));
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained.
@@ -151,7 +153,7 @@ impl Task {
 
         match res {
             Ok(Poll::Ready(_)) | Err(_) => {
-                trace!("    -> task complete");
+                trace!("task complete");
 
                 // The future has completed. Drop it immediately to free
                 // resources and run drop handlers.
@@ -172,7 +174,7 @@ impl Task {
                 Run::Complete
             }
             Ok(Poll::Pending) => {
-                trace!("    -> not ready");
+                trace!("not ready");
 
                 // Attempt to transition from Running -> Idle, if successful,
                 // then the task does not need to be scheduled again. If the CAS
