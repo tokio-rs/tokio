@@ -15,8 +15,16 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
+use super::SpawnedChild;
 use crate::kill::Kill;
 
+use tokio_net::driver::Handle;
+use tokio_net::util::PollEvented;
+use tokio_sync::oneshot;
+
+use futures_util::future::Fuse;
+use futures_util::future::FutureExt;
+use mio_named_pipes::NamedPipe;
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -27,14 +35,6 @@ use std::process::{self, ExitStatus};
 use std::ptr;
 use std::task::Context;
 use std::task::Poll;
-
-use futures_util::future::Fuse;
-use futures_util::future::FutureExt;
-
-use super::SpawnedChild;
-use mio_named_pipes::NamedPipe;
-use tokio_net::{Handle, PollEvented};
-use tokio_sync::oneshot;
 use winapi::shared::minwindef::*;
 use winapi::shared::winerror::*;
 use winapi::um::handleapi::*;

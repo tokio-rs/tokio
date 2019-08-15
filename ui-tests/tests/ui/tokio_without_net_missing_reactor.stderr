@@ -1,7 +1,0 @@
-error[E0432]: unresolved import `ui_tests::tokio::reactor`
- --> $DIR/tokio_without_net_missing_reactor.rs:1:5
-  |
-1 | use ui_tests::tokio::reactor;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^ no `reactor` in `tokio`
-
-For more information about this error, try `rustc --explain E0432`.
