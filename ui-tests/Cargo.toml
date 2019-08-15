@@ -1,0 +1,17 @@
+[package]
+name = "ui-tests"
+version = "0.1.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+edition = "2018"
+publish = false
+
+[features]
+executor-without-current-thread = ["tokio-executor"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio-executor = { path = "../tokio-executor", optional = true }
+
+[dev-dependencies]
+trybuild = "1.0"

@@ -1,12 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.2.0-alpha.1")]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub
-)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-
 //! A single-threaded executor which executes tasks on the same thread from which
 //! they are spawned.
 //!
@@ -26,7 +17,10 @@
 
 mod scheduler;
 
-use crate::scheduler::Scheduler;
+use self::scheduler::Scheduler;
+use crate::park::{Park, ParkThread, Unpark};
+use crate::{EnterError, Executor, SpawnError, TypedExecutor};
+
 use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
@@ -37,8 +31,6 @@ use std::sync::{atomic, Arc};
 use std::task::{Context, Poll, Waker};
 use std::thread;
 use std::time::{Duration, Instant};
-use tokio_executor::park::{Park, ParkThread, Unpark};
-use tokio_executor::SpawnError;
 
 /// Executes tasks on the current thread
 pub struct CurrentThread<P: Park = ParkThread> {
@@ -318,21 +310,21 @@ impl<P: Park> CurrentThread<P> {
     where
         F: Future,
     {
-        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        let _enter = crate::enter().expect("failed to start `current_thread::Runtime`");
         self.enter().block_on(future)
     }
 
     /// Run the executor to completion, blocking the thread until **all**
     /// spawned futures have completed.
     pub fn run(&mut self) -> Result<(), RunError> {
-        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        let _enter = crate::enter().expect("failed to start `current_thread::Runtime`");
         self.enter().run()
     }
 
     /// Run the executor to completion, blocking the thread until all
     /// spawned futures have completed **or** `duration` time has elapsed.
     pub fn run_timeout(&mut self, duration: Duration) -> Result<(), RunTimeoutError> {
-        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        let _enter = crate::enter().expect("failed to start `current_thread::Runtime`");
         self.enter().run_timeout(duration)
     }
 
@@ -340,7 +332,7 @@ impl<P: Park> CurrentThread<P> {
     ///
     /// This function blocks the current thread even if the executor is idle.
     pub fn turn(&mut self, duration: Option<Duration>) -> Result<Turn, TurnError> {
-        let _enter = tokio_executor::enter().expect("failed to start `current_thread::Runtime`");
+        let _enter = crate::enter().expect("failed to start `current_thread::Runtime`");
         self.enter().turn(duration)
     }
 
@@ -394,7 +386,7 @@ impl<P: Park> Drop for CurrentThread<P> {
     }
 }
 
-impl tokio_executor::Executor for CurrentThread {
+impl Executor for CurrentThread {
     fn spawn(
         &mut self,
         future: Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -404,7 +396,7 @@ impl tokio_executor::Executor for CurrentThread {
     }
 }
 
-impl<T> tokio_executor::TypedExecutor<T> for CurrentThread
+impl<T> TypedExecutor<T> for CurrentThread
 where
     T: Future<Output = ()> + 'static,
 {
@@ -723,7 +715,7 @@ impl TaskExecutor {
     }
 }
 
-impl tokio_executor::Executor for TaskExecutor {
+impl Executor for TaskExecutor {
     fn spawn(
         &mut self,
         future: Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -732,7 +724,7 @@ impl tokio_executor::Executor for TaskExecutor {
     }
 }
 
-impl<F> tokio_executor::TypedExecutor<F> for TaskExecutor
+impl<F> TypedExecutor<F> for TaskExecutor
 where
     F: Future<Output = ()> + 'static,
 {
@@ -811,8 +803,8 @@ impl RunTimeoutError {
     }
 }
 
-impl From<tokio_executor::EnterError> for RunTimeoutError {
-    fn from(_: tokio_executor::EnterError) -> Self {
+impl From<EnterError> for RunTimeoutError {
+    fn from(_: EnterError) -> Self {
         RunTimeoutError::new(false)
     }
 }
@@ -826,8 +818,8 @@ impl<T> BlockError<T> {
     }
 }
 
-impl<T> From<tokio_executor::EnterError> for BlockError<T> {
-    fn from(_: tokio_executor::EnterError) -> Self {
+impl<T> From<EnterError> for BlockError<T> {
+    fn from(_: EnterError) -> Self {
         BlockError { inner: None }
     }
 }

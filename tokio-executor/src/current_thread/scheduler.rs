@@ -1,4 +1,6 @@
-use crate::Borrow;
+use super::Borrow;
+use crate::park::Unpark;
+
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
 use std::future::Future;
@@ -11,7 +13,6 @@ use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::thread;
 use std::usize;
-use tokio_executor::park::Unpark;
 
 /// A generic task-aware scheduler.
 ///

@@ -66,8 +66,8 @@ jobs:
     crates:
       tokio-buf: []
       tokio-codec: []
-      tokio-current-thread: []
-      tokio-executor: []
+      tokio-executor:
+        - current-thread
       tokio-io:
         - util
       tokio-sync:
@@ -77,6 +77,16 @@ jobs:
       tokio-timer:
         - async-traits
       tokio-test: []
+
+# Test compilation failure
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_features
+    displayName: Test feature flags
+    rust: $(nightly)
+    crates:
+      ui-tests:
+        - executor-without-current-thread
 
 # - template: ci/azure-cargo-check.yml
 #   parameters:

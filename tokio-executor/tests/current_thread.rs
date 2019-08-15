@@ -1,6 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
+use tokio::sync::oneshot;
+use tokio_executor::current_thread::{self, block_on_all, CurrentThread, TaskExecutor};
+use tokio_executor::TypedExecutor;
+
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::future::Future;
@@ -9,9 +13,6 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
-use tokio_current_thread::{block_on_all, CurrentThread};
-use tokio_executor::TypedExecutor;
-use tokio_sync::oneshot;
 
 mod from_block_on_all {
     use super::*;
@@ -19,7 +20,7 @@ mod from_block_on_all {
         let cnt = Rc::new(Cell::new(0));
         let c = cnt.clone();
 
-        let msg = tokio_current_thread::block_on_all(async move {
+        let msg = block_on_all(async move {
             c.set(1 + c.get());
 
             // Spawn!
@@ -36,15 +37,13 @@ mod from_block_on_all {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn)
+        test(current_thread::spawn)
     }
 
     #[test]
     fn execute() {
         test(|f| {
-            tokio_current_thread::TaskExecutor::current()
-                .spawn(f)
-                .unwrap();
+            TaskExecutor::current().spawn(f).unwrap();
         });
     }
 }
@@ -129,15 +128,13 @@ mod from_block_on_future {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn);
+        test(current_thread::spawn);
     }
 
     #[test]
     fn execute() {
         test(|f| {
-            tokio_current_thread::TaskExecutor::current()
-                .spawn(f)
-                .unwrap();
+            current_thread::TaskExecutor::current().spawn(f).unwrap();
         });
     }
 }
@@ -185,7 +182,7 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn, |rt, f| {
+        test(current_thread::spawn, |rt, f| {
             rt.spawn(f);
         })
     }
@@ -194,9 +191,7 @@ mod outstanding_tasks_are_dropped_when_executor_is_dropped {
     fn execute() {
         test(
             |f| {
-                tokio_current_thread::TaskExecutor::current()
-                    .spawn(f)
-                    .unwrap();
+                current_thread::TaskExecutor::current().spawn(f).unwrap();
             },
             // Note: `CurrentThread` doesn't currently implement
             // `futures::Executor`, so we'll call `.spawn(...)` rather than
@@ -224,7 +219,7 @@ mod run_in_future {
     #[should_panic]
     fn spawn() {
         block_on_all(async {
-            tokio_current_thread::spawn(async {
+            current_thread::spawn(async {
                 block_on_all(async {});
             });
         });
@@ -234,7 +229,7 @@ mod run_in_future {
     #[should_panic]
     fn execute() {
         block_on_all(async {
-            tokio_current_thread::TaskExecutor::current()
+            current_thread::TaskExecutor::current()
                 .spawn(async {
                     block_on_all(async {});
                 })
@@ -303,15 +298,13 @@ mod tasks_are_scheduled_fairly {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn)
+        test(current_thread::spawn)
     }
 
     #[test]
     fn execute() {
         test(|f| {
-            tokio_current_thread::TaskExecutor::current()
-                .spawn(f)
-                .unwrap();
+            current_thread::TaskExecutor::current().spawn(f).unwrap();
         })
     }
 }
@@ -358,7 +351,7 @@ mod and_turn {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn, |rt, f| {
+        test(current_thread::spawn, |rt, f| {
             rt.spawn(f);
         })
     }
@@ -367,9 +360,7 @@ mod and_turn {
     fn execute() {
         test(
             |f| {
-                tokio_current_thread::TaskExecutor::current()
-                    .spawn(f)
-                    .unwrap();
+                current_thread::TaskExecutor::current().spawn(f).unwrap();
             },
             // Note: `CurrentThread` doesn't currently implement
             // `futures::Executor`, so we'll call `.spawn(...)` rather than
@@ -418,7 +409,7 @@ mod in_drop {
 
     #[test]
     fn spawn() {
-        test(tokio_current_thread::spawn, |rt, f| {
+        test(current_thread::spawn, |rt, f| {
             rt.spawn(f);
         })
     }
@@ -427,9 +418,7 @@ mod in_drop {
     fn execute() {
         test(
             |f| {
-                tokio_current_thread::TaskExecutor::current()
-                    .spawn(f)
-                    .unwrap();
+                current_thread::TaskExecutor::current().spawn(f).unwrap();
             },
             // Note: `CurrentThread` doesn't currently implement
             // `futures::Executor`, so we'll call `.spawn(...)` rather than

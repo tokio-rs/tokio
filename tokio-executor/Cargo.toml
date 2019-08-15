@@ -20,7 +20,11 @@ Future execution primitives
 keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
+[features]
+current-thread = ["crossbeam-channel"]
+
 [dependencies]
+crossbeam-channel = { version = "0.3.8", optional = true }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
