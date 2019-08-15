@@ -30,7 +30,7 @@ fn test_drop_on_notify() {
 
     struct MyNotify;
 
-    type Task = Mutex<Spawn<Box<Future<Item = (), Error = ()>>>>;
+    type Task = Mutex<Spawn<Box<dyn Future<Item = (), Error = ()>>>>;
 
     impl Notify for MyNotify {
         fn notify(&self, _: usize) {
@@ -66,7 +66,7 @@ fn test_drop_on_notify() {
             .incoming()
             .for_each(|_| Ok(()))
             .map_err(|_| panic!())
-    }) as Box<Future<Item = (), Error = ()>>;
+    }) as Box<dyn Future<Item = (), Error = ()>>;
 
     let task = Arc::new(Mutex::new(spawn(task)));
     let notify = Arc::new(MyNotify);

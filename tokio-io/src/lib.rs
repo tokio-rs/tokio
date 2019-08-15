@@ -21,10 +21,10 @@ use std::io as std_io;
 use futures::{Future, Stream};
 
 /// A convenience typedef around a `Future` whose error component is `io::Error`
-pub type IoFuture<T> = Box<Future<Item = T, Error = std_io::Error> + Send>;
+pub type IoFuture<T> = Box<dyn Future<Item = T, Error = std_io::Error> + Send>;
 
 /// A convenience typedef around a `Stream` whose error component is `io::Error`
-pub type IoStream<T> = Box<Stream<Item = T, Error = std_io::Error> + Send>;
+pub type IoStream<T> = Box<dyn Stream<Item = T, Error = std_io::Error> + Send>;
 
 /// A convenience macro for working with `io::Result<T>` from the `Read` and
 /// `Write` traits.
@@ -65,6 +65,6 @@ pub use self::async_write::AsyncWrite;
 
 fn _assert_objects() {
     fn _assert<T>() {}
-    _assert::<Box<AsyncRead>>();
-    _assert::<Box<AsyncWrite>>();
+    _assert::<Box<dyn AsyncRead>>();
+    _assert::<Box<dyn AsyncWrite>>();
 }

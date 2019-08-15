@@ -91,7 +91,7 @@ jobs:
 - template: ci/azure-check-minrust.yml
   parameters:
     name: minrust
-    rust_version: 1.26.0
+    rust_version: 1.28.0
 
 - template: ci/azure-tsan.yml
   parameters:

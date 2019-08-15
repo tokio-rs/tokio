@@ -67,7 +67,7 @@ pub struct Builder {
     max_blocking: usize,
 
     /// Generates the `Park` instances
-    new_park: Box<Fn(&WorkerId) -> BoxPark>,
+    new_park: Box<dyn Fn(&WorkerId) -> BoxPark>,
 }
 
 impl Builder {
@@ -223,7 +223,7 @@ impl Builder {
     /// ```
     pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(Box<Any + Send>) + Send + Sync + 'static,
+        F: Fn(Box<dyn Any + Send>) + Send + Sync + 'static,
     {
         self.config.panic_handler = Some(Arc::new(f));
         self

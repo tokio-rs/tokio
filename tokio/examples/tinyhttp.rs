@@ -34,7 +34,7 @@ use bytes::BytesMut;
 use http::header::HeaderValue;
 use http::{Request, Response, StatusCode};
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
@@ -82,7 +82,7 @@ fn process(socket: TcpStream) {
 /// This function is a map from and HTTP request to a future of a response and
 /// represents the various handling a server might do. Currently the contents
 /// here are pretty uninteresting.
-fn respond(req: Request<()>) -> Box<Future<Item = Response<String>, Error = io::Error> + Send> {
+fn respond(req: Request<()>) -> Box<dyn Future<Item = Response<String>, Error = io::Error> + Send> {
     let f = future::lazy(move || {
         let mut response = Response::builder();
         let body = match req.uri().path() {

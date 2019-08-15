@@ -11,7 +11,7 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 ///
 /// For more details, see [`enter` documentation](fn.enter.html)
 pub struct Enter {
-    on_exit: Vec<Box<Callback>>,
+    on_exit: Vec<Box<dyn Callback>>,
     permanent: bool,
 }
 

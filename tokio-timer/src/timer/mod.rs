@@ -162,7 +162,7 @@ pub(crate) struct Inner {
     process: AtomicStack,
 
     /// Unparks the timer thread.
-    unpark: Box<Unpark>,
+    unpark: Box<dyn Unpark>,
 }
 
 /// Maximum number of timeouts the system can handle concurrently.
@@ -426,7 +426,7 @@ impl<T, N> Drop for Timer<T, N> {
 // ===== impl Inner =====
 
 impl Inner {
-    fn new(start: Instant, unpark: Box<Unpark>) -> Inner {
+    fn new(start: Instant, unpark: Box<dyn Unpark>) -> Inner {
         Inner {
             num: AtomicUsize::new(0),
             elapsed: AtomicU64::new(0),
