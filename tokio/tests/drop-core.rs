@@ -3,7 +3,7 @@
 #![cfg(feature = "default")]
 
 use tokio::net::TcpListener;
-use tokio::reactor::Reactor;
+use tokio_net::driver::Reactor;
 use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 #[test]

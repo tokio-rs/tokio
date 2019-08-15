@@ -2,7 +2,7 @@ use crate::runtime::current_thread::Builder;
 
 use tokio_executor::current_thread::Handle as ExecutorHandle;
 use tokio_executor::current_thread::{self, CurrentThread};
-use tokio_net::{self, Reactor};
+use tokio_net::driver::{self, Reactor};
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
@@ -19,7 +19,7 @@ use std::io;
 /// [mod]: index.html
 #[derive(Debug)]
 pub struct Runtime {
-    reactor_handle: tokio_net::Handle,
+    reactor_handle: driver::Handle,
     timer_handle: timer::Handle,
     clock: Clock,
     executor: CurrentThread<Parker>,
@@ -93,7 +93,7 @@ impl Runtime {
     }
 
     pub(super) fn new2(
-        reactor_handle: tokio_net::Handle,
+        reactor_handle: driver::Handle,
         timer_handle: timer::Handle,
         clock: Clock,
         executor: CurrentThread<Parker>,
@@ -197,7 +197,7 @@ impl Runtime {
 
         // This will set the default handle and timer to use inside the closure
         // and run the future.
-        let _reactor = tokio_net::set_default(&reactor_handle);
+        let _reactor = driver::set_default(&reactor_handle);
         clock::with_default(clock, || {
             let _timer = timer::set_default(&timer_handle);
             // The TaskExecutor is a fake executor that looks into the

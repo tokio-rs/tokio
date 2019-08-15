@@ -2,7 +2,7 @@
 //! `block_on` work.
 
 use tokio_executor::current_thread::CurrentThread;
-use tokio_net::Reactor;
+use tokio_net::driver::{self, Reactor};
 use tokio_sync::oneshot;
 use tokio_timer::clock::Clock;
 use tokio_timer::timer::{self, Timer};
@@ -11,7 +11,7 @@ use std::{io, thread};
 
 #[derive(Debug)]
 pub(crate) struct Background {
-    reactor_handle: tokio_net::Handle,
+    reactor_handle: driver::Handle,
     timer_handle: timer::Handle,
     shutdown_tx: Option<oneshot::Sender<()>>,
     thread: Option<thread::JoinHandle<()>>,
@@ -44,7 +44,7 @@ pub(crate) fn spawn(clock: &Clock) -> io::Result<Background> {
 }
 
 impl Background {
-    pub(super) fn reactor(&self) -> &tokio_net::Handle {
+    pub(super) fn reactor(&self) -> &driver::Handle {
         &self.reactor_handle
     }
 

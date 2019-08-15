@@ -9,7 +9,7 @@
 
 use crate::registry::{globals, EventId, EventInfo, Init, Storage};
 
-use tokio_net::Handle;
+use tokio_net::driver::Handle;
 use tokio_sync::mpsc::{channel, Receiver};
 
 use futures_core::stream::Stream;

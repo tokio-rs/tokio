@@ -3,7 +3,7 @@ use crate::unix::Signal as Inner;
 #[cfg(windows)]
 use crate::windows::Event as Inner;
 
-use tokio_net::Handle;
+use tokio_net::driver::Handle;
 
 use futures_core::stream::Stream;
 use std::io;

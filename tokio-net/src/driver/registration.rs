@@ -1,4 +1,6 @@
-use crate::{Direction, Handle, HandlePriv};
+use super::platform;
+use super::reactor::{Direction, Handle, HandlePriv};
+
 use log::debug;
 use mio::{self, Evented};
 use std::cell::UnsafeCell;
@@ -504,7 +506,7 @@ impl Inner {
         };
 
         let mask = direction.mask();
-        let mask_no_hup = (mask - crate::platform::hup()).as_usize();
+        let mask_no_hup = (mask - platform::hup()).as_usize();
 
         let io_dispatch = inner.io_dispatch.read();
         let sched = &io_dispatch[self.token];

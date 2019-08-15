@@ -10,6 +10,7 @@ use background::Background;
 
 use tokio_executor::enter;
 use tokio_executor::threadpool::ThreadPool;
+use tokio_net::driver;
 use tokio_timer::timer;
 
 use tracing_core as trace;
@@ -174,7 +175,7 @@ impl Runtime {
         let trace = &self.inner().trace;
 
         tokio_executor::with_default(&mut self.inner().pool.sender(), || {
-            let _reactor = tokio_net::set_default(bg.reactor());
+            let _reactor = driver::set_default(bg.reactor());
             let _timer = timer::set_default(bg.timer());
             trace::dispatcher::with_default(trace, || {
                 entered.block_on(future)
