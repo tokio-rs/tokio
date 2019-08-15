@@ -1,5 +1,6 @@
 #[test]
 #[cfg(feature = "tokio-with-net")]
+#[allow(unused-imports)]
 fn tokio_with_net() {
     // Reactor is present
     use ui_tests::tokio::reactor;
