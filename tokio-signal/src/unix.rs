@@ -12,14 +12,14 @@ use tokio_net::driver::Handle;
 use tokio_net::util::PollEvented;
 use tokio_sync::mpsc::{channel, Receiver};
 
-use std::io::{self, Error, ErrorKind, Write};
-use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Once;
 use futures_core::stream::Stream;
 use libc::c_int;
 use mio_uds::UnixStream;
 use std::future::Future;
+use std::io::{self, Error, ErrorKind, Write};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Once;
 use std::task::{Context, Poll};
 
 use crate::registry::{globals, EventId, EventInfo, Globals, Init, Storage};

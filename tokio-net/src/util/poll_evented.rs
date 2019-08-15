@@ -272,10 +272,7 @@ where
     pub fn clear_read_ready(&self, cx: &mut Context<'_>, ready: mio::Ready) -> io::Result<()> {
         // Cannot clear write readiness
         assert!(!ready.is_writable(), "cannot clear write readiness");
-        assert!(
-            !platform::is_hup(ready),
-            "cannot clear HUP readiness"
-        );
+        assert!(!platform::is_hup(ready), "cannot clear HUP readiness");
 
         self.inner
             .read_readiness
