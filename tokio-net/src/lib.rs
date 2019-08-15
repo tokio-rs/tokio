@@ -160,54 +160,43 @@ fn _assert_kinds() {
 
 // ===== impl Reactor =====
 
-/// Set the default reactor for the duration of the closure
-///
-/// # Panics
-///
-/// This function panics if there already is a default reactor set.
-pub fn with_default<F, R>(handle: &Handle, f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    // Ensure that the executor is removed from the thread-local context
-    // when leaving the scope. This handles cases that involve panicking.
-    struct Reset;
+#[derive(Debug)]
+///Guard that resets current reactor on drop.
+pub struct CurrentReactorReset {}
 
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            CURRENT_REACTOR.with(|current| {
-                let mut current = current.borrow_mut();
-                *current = None;
-            });
-        }
-    }
-
-    // This ensures the value for the current reactor gets reset even if there
-    // is a panic.
-    let _r = Reset;
-
-    CURRENT_REACTOR.with(|current| {
-        {
+impl Drop for CurrentReactorReset {
+    fn drop(&mut self) {
+        CURRENT_REACTOR.with(|current| {
             let mut current = current.borrow_mut();
+            *current = None;
+        });
+    }
+}
 
-            assert!(
-                current.is_none(),
-                "default Tokio reactor already set \
-                 for execution context"
-            );
+///Sets handle to current reactor, returning guard that unsets it on drop.
+pub fn set_current(handle: &Handle) -> CurrentReactorReset {
+    CURRENT_REACTOR.with(|current| {
+        let mut current = current.borrow_mut();
 
-            let handle = match handle.as_priv() {
-                Some(handle) => handle,
-                None => {
-                    panic!("`handle` does not reference a reactor");
-                }
-            };
+        assert!(
+            current.is_none(),
+            "default Tokio reactor already set \
+            for execution context"
+        );
 
-            *current = Some(handle.clone());
-        }
+        let handle = match handle.as_priv() {
+            Some(handle) => handle,
+            None => {
+                panic!("`handle` does not reference a reactor");
+            }
+        };
 
-        f()
-    })
+        *current = Some(handle.clone());
+    });
+
+
+    CurrentReactorReset {
+    }
 }
 
 impl Reactor {

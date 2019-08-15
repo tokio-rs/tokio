@@ -343,15 +343,13 @@ impl Builder {
             .around_worker(move |w| {
                 let index = w.id().to_usize();
 
-                tokio_net::with_default(&reactor_handles[index], || {
-                    clock::with_default(&clock, || {
-                        timer::with_default(&timer_handles[index], || {
-                            trace::dispatcher::with_default(&dispatch, || {
-                                w.run();
-                            })
-                        });
+                let _reactor = tokio_net::set_default(&reactor_handles[index]);
+                clock::with_default(&clock, || {
+                    let _timer = timer::set_default(&timer_handles[index]);
+                    trace::dispatcher::with_default(&dispatch, || {
+                        w.run();
                     })
-                });
+                })
             })
             .custom_park(move |worker_id| {
                 let index = worker_id.to_usize();
