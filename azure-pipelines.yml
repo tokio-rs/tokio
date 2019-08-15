@@ -66,8 +66,8 @@ jobs:
     crates:
       tokio-buf: []
       tokio-codec: []
-      tokio-current-thread: []
-      tokio-executor: []
+      tokio-executor:
+        - current-thread
       tokio-io:
         - util
       tokio-sync:

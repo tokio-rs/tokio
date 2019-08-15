@@ -1,12 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-current-thread/0.2.0-alpha.1")]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub
-)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-
 //! A single-threaded executor which executes tasks on the same thread from which
 //! they are spawned.
 //!
