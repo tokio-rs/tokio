@@ -564,6 +564,8 @@ impl Worker {
     /// Put the worker to sleep
     ///
     /// Returns `true` if woken up due to new work arriving.
+    // tracing macro expansion adds enough branches to make clippy angry here.
+    #[allow(clippy::cognitive_complexity)]
     fn sleep(&self) -> bool {
         use self::Lifecycle::*;
 

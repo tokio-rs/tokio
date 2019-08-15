@@ -95,6 +95,9 @@ impl Task {
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
+    ///
+    // tracing macro expansion adds enough branches to make clippy angry here.
+    #[allow(clippy::cognitive_complexity)]
     pub(crate) fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
         use self::State::*;
 
