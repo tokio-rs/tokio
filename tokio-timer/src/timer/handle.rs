@@ -3,6 +3,7 @@ use crate::timer::Inner;
 use crate::{Delay, Error, /*Interval,*/ Timeout};
 use std::cell::RefCell;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -49,9 +50,11 @@ thread_local! {
 
 #[derive(Debug)]
 ///Unsets default timer handler on drop.
-pub struct DefaultHandlerReset {}
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a u8>,
+}
 
-impl Drop for DefaultHandlerReset {
+impl Drop for DefaultGuard<'_> {
     fn drop(&mut self) {
         CURRENT_TIMER.with(|current| {
             let mut current = current.borrow_mut();
@@ -65,7 +68,7 @@ impl Drop for DefaultHandlerReset {
 /// # Panics
 ///
 /// This function panics if there already is a default timer set.
-pub fn set_default(handle: &Handle) -> DefaultHandlerReset {
+pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_TIMER.with(|current| {
         let mut current = current.borrow_mut();
 
@@ -82,7 +85,9 @@ pub fn set_default(handle: &Handle) -> DefaultHandlerReset {
         *current = Some(handle.clone());
     });
 
-    DefaultHandlerReset {}
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 impl Handle {

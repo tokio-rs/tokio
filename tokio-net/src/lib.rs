@@ -53,6 +53,7 @@ use mio::event::Evented;
 use slab::Slab;
 use std::cell::RefCell;
 use std::io;
+use std::marker::PhantomData;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::AtomicUsize;
@@ -162,9 +163,11 @@ fn _assert_kinds() {
 
 #[derive(Debug)]
 ///Guard that resets current reactor on drop.
-pub struct CurrentReactorReset {}
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a u8>,
+}
 
-impl Drop for CurrentReactorReset {
+impl Drop for DefaultGuard<'_> {
     fn drop(&mut self) {
         CURRENT_REACTOR.with(|current| {
             let mut current = current.borrow_mut();
@@ -173,8 +176,8 @@ impl Drop for CurrentReactorReset {
     }
 }
 
-///Sets handle to current reactor, returning guard that unsets it on drop.
-pub fn set_current(handle: &Handle) -> CurrentReactorReset {
+///Sets handle for a default reactor, returning guard that unsets it on drop.
+pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_REACTOR.with(|current| {
         let mut current = current.borrow_mut();
 
@@ -194,7 +197,9 @@ pub fn set_current(handle: &Handle) -> CurrentReactorReset {
         *current = Some(handle.clone());
     });
 
-    CurrentReactorReset {}
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 impl Reactor {

@@ -67,7 +67,8 @@ fn test_drop_on_notify() {
     let _enter = tokio_executor::enter().unwrap();
 
     {
-        let _reactor = tokio_net::set_current(&reactor.handle());
+        let handle = reactor.handle();
+        let _reactor = tokio_net::set_default(&handle);
         let waker = waker_ref(&task);
         let mut cx = Context::from_waker(&waker);
         assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
