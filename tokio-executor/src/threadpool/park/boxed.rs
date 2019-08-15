@@ -29,8 +29,8 @@ where
     fn park(&mut self) -> Result<(), Self::Error> {
         self.0.park().map_err(|e| {
             warn!(
-                "calling `park` on worker thread errored -- shutting down thread: {}",
-                e
+                message = "calling `park` on worker thread errored -- shutting down thread",
+                error = %e
             );
         })
     }
@@ -38,8 +38,8 @@ where
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
         self.0.park_timeout(duration).map_err(|e| {
             warn!(
-                "calling `park` on worker thread errored -- shutting down thread: {}",
-                e
+                message = "calling `park` on worker thread errored -- shutting down thread",
+                error = %e,
             );
         })
     }

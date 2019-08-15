@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::{fmt, panic, ptr};
-use tracing::trace;
+use tracing::{trace, trace_span};
 
 /// Harness around a future.
 ///
@@ -109,7 +109,7 @@ impl Task {
             Scheduled => {}
             _ => panic!("unexpected task state; {:?}", actual),
         }
-        let span = tracing::trace_span!("Task::run");
+        let span = trace_span!("Task::run");
         let _enter = span.enter();
 
         trace!(state = ?State::from(me.state.load(Relaxed)));
