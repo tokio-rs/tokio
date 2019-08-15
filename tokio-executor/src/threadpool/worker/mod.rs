@@ -12,7 +12,7 @@ use super::shutdown::ShutdownTrigger;
 use super::task::{self, CanBlock, Task};
 use super::BlockingError;
 
-use tracing::trace;
+use tracing::{trace, trace_span};
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr;
