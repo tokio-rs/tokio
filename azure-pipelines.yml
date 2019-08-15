@@ -30,7 +30,6 @@ jobs:
         - codec
         - fs
         - io
-        - reactor
         - rt-full
         - net
         - sync
