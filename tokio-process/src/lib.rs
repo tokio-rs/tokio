@@ -133,7 +133,7 @@ extern crate lazy_static;
 extern crate log;
 
 use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
-use tokio_net::Handle;
+use tokio_net::driver::Handle;
 
 use futures_core::future::TryFuture;
 use futures_util::future;

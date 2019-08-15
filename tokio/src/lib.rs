@@ -88,8 +88,6 @@ pub mod io;
 #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
 pub mod net;
 pub mod prelude;
-#[cfg(feature = "tokio-net")]
-pub mod reactor;
 pub mod stream;
 #[cfg(feature = "sync")]
 pub mod sync;

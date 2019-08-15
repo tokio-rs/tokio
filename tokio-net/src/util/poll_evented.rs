@@ -1,4 +1,4 @@
-use crate::{Handle, Registration};
+use crate::driver::{platform, Handle, Registration};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -55,7 +55,7 @@ use std::task::{Context, Poll};
 /// [`clear_read_ready`].
 ///
 /// ```rust
-/// use tokio_net::PollEvented;
+/// use tokio_net::util::PollEvented;
 ///
 /// use futures_core::ready;
 /// use mio::Ready;
@@ -125,7 +125,7 @@ macro_rules! poll_ready {
 
         // Load cached & encoded readiness.
         let mut cached = $me.inner.$cache.load(Relaxed);
-        let mask = $mask | crate::platform::hup();
+        let mask = $mask | platform::hup();
 
         // See if the current readiness matches any bits.
         let mut ret = mio::Ready::from_usize(cached) & $mask;
@@ -272,10 +272,7 @@ where
     pub fn clear_read_ready(&self, cx: &mut Context<'_>, ready: mio::Ready) -> io::Result<()> {
         // Cannot clear write readiness
         assert!(!ready.is_writable(), "cannot clear write readiness");
-        assert!(
-            !crate::platform::is_hup(ready),
-            "cannot clear HUP readiness"
-        );
+        assert!(!platform::is_hup(ready), "cannot clear HUP readiness");
 
         self.inner
             .read_readiness

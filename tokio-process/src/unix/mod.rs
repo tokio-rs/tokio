@@ -29,7 +29,8 @@ use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
 
-use tokio_net::{Handle, PollEvented};
+use tokio_net::driver::Handle;
+use tokio_net::util::PollEvented;
 use tokio_signal::unix::{Signal, SignalKind};
 
 use mio::event::Evented;

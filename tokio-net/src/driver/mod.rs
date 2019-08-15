@@ -131,4 +131,10 @@
 //! [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 
-pub use tokio_net::{Handle, PollEvented, Reactor, Registration, Turn};
+pub(crate) mod platform;
+mod reactor;
+mod registration;
+mod sharded_rwlock;
+
+pub use self::reactor::{set_default, Handle, Reactor};
+pub use self::registration::Registration;

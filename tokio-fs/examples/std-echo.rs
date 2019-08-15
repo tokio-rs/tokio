@@ -5,8 +5,8 @@ use futures_util::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec, LinesCodecError};
 use tokio::future::ready;
+use tokio_executor::threadpool::Builder;
 use tokio_fs::{stderr, stdin, stdout};
-use tokio_threadpool::Builder;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
