@@ -13,6 +13,9 @@
 //! addresses, to get and set socket options, and to shutdown the sockets.
 
 use super::TcpStream;
+
+use tokio_io::{AsyncRead, AsyncWrite};
+
 use bytes::{Buf, BufMut};
 use std::error::Error;
 use std::fmt;
@@ -21,7 +24,6 @@ use std::net::Shutdown;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
 
 /// Read half of a `TcpStream`.
 #[derive(Debug)]
@@ -89,7 +91,7 @@ impl TcpStreamReadHalf {
             // reader and one for the writer, and those `Arc`s are never exposed
             // externally. And so when we drop one here, the other one must be
             // the only remaining one.
-            Ok(Arc::try_unwrap(self.0).expect("tokio_tcp: try_unwrap failed in reunite"))
+            Ok(Arc::try_unwrap(self.0).expect("tcp: try_unwrap failed in reunite"))
         } else {
             Err(ReuniteError(self, other))
         }

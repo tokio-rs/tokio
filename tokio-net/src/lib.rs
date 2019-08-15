@@ -6,6 +6,7 @@
     unreachable_pub
 )]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! Event loop that drives Tokio I/O resources.
 //!
@@ -38,3 +39,6 @@
 
 pub mod driver;
 pub mod util;
+
+#[cfg(feature = "tcp")]
+pub mod tcp;

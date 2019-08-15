@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.2.0-alpha.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-udp/0.2.0-alpha.1")]
 #![warn(
     missing_debug_implementations,
     missing_docs,

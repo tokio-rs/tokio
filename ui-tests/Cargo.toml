@@ -7,6 +7,8 @@ publish = false
 
 [features]
 executor-without-current-thread = ["tokio-executor"]
+net-no-features = ["tokio-net"]
+net-with-tcp = ["tokio-net/tcp"]
 tokio-no-features = ["tokio"]
 tokio-with-net = ["tokio/net"]
 
@@ -14,6 +16,7 @@ tokio-with-net = ["tokio/net"]
 
 [dependencies]
 tokio-executor = { path = "../tokio-executor", optional = true }
+tokio-net = { path = "../tokio-net", optional = true }
 tokio = { path = "../tokio", optional = true, default-features = false }
 
 [dev-dependencies]
