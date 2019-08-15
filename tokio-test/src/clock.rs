@@ -134,11 +134,10 @@ impl MockClock {
             let handle = timer.handle();
             let time = self.time.clone();
 
-            ::tokio_timer::with_default(&handle, || {
-                let mut handle = Handle::new(timer, time);
-                f(&mut handle)
-                // lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()
-            })
+            let _timer = ::tokio_timer::set_default(&handle);
+            let mut handle = Handle::new(timer, time);
+            f(&mut handle)
+            // lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()
         })
     }
 }

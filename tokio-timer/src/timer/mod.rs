@@ -45,7 +45,7 @@ use self::entry::Entry;
 use self::stack::Stack;
 
 pub(crate) use self::handle::HandlePriv;
-pub use self::handle::{with_default, Handle};
+pub use self::handle::{set_default, Handle};
 pub use self::now::{Now, SystemNow};
 pub(crate) use self::registration::Registration;
 

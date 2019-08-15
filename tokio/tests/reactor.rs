@@ -66,11 +66,13 @@ fn test_drop_on_notify() {
 
     let _enter = tokio_executor::enter().unwrap();
 
-    tokio_net::with_default(&reactor.handle(), || {
+    {
+        let handle = reactor.handle();
+        let _reactor = tokio_net::set_default(&handle);
         let waker = waker_ref(&task);
         let mut cx = Context::from_waker(&waker);
         assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
-    });
+    }
 
     // Get the address
     let addr = addr_rx.recv().unwrap();

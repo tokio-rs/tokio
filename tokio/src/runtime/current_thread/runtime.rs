@@ -197,18 +197,16 @@ impl Runtime {
 
         // This will set the default handle and timer to use inside the closure
         // and run the future.
-        tokio_net::with_default(&reactor_handle, || {
-            clock::with_default(clock, || {
-                timer::with_default(&timer_handle, || {
-                    // The TaskExecutor is a fake executor that looks into the
-                    // current single-threaded executor when used. This is a trick,
-                    // because we need two mutable references to the executor (one
-                    // to run the provided future, another to install as the default
-                    // one). We use the fake one here as the default one.
-                    let mut default_executor = current_thread::TaskExecutor::current();
-                    tokio_executor::with_default(&mut default_executor, || f(executor))
-                })
-            })
+        let _reactor = tokio_net::set_default(&reactor_handle);
+        clock::with_default(clock, || {
+            let _timer = timer::set_default(&timer_handle);
+            // The TaskExecutor is a fake executor that looks into the
+            // current single-threaded executor when used. This is a trick,
+            // because we need two mutable references to the executor (one
+            // to run the provided future, another to install as the default
+            // one). We use the fake one here as the default one.
+            let mut default_executor = current_thread::TaskExecutor::current();
+            tokio_executor::with_default(&mut default_executor, || f(executor))
         })
     }
 }

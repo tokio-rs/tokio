@@ -3,6 +3,7 @@ use crate::timer::Inner;
 use crate::{Delay, Error, /*Interval,*/ Timeout};
 use std::cell::RefCell;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -47,57 +48,46 @@ thread_local! {
     static CURRENT_TIMER: RefCell<Option<HandlePriv>> = RefCell::new(None)
 }
 
-/// Set the default timer for the duration of the closure.
-///
-/// From within the closure, [`Delay`] instances that are created via
-/// [`Delay::new`] can be used.
+#[derive(Debug)]
+///Unsets default timer handler on drop.
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a u8>,
+}
+
+impl Drop for DefaultGuard<'_> {
+    fn drop(&mut self) {
+        CURRENT_TIMER.with(|current| {
+            let mut current = current.borrow_mut();
+            *current = None;
+        })
+    }
+}
+
+///Sets handle to default timer, returning guard that unsets it on drop.
 ///
 /// # Panics
 ///
 /// This function panics if there already is a default timer set.
-///
-/// [`Delay`]: ../struct.Delay.html
-/// [`Delay::new`]: ../struct.Delay.html#method.new
-pub fn with_default<F, R>(handle: &Handle, f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    // Ensure that the timer is removed from the thread-local context
-    // when leaving the scope. This handles cases that involve panicking.
-    struct Reset;
-
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            CURRENT_TIMER.with(|current| {
-                let mut current = current.borrow_mut();
-                *current = None;
-            });
-        }
-    }
-
-    // This ensures the value for the current timer gets reset even if there is
-    // a panic.
-    let _r = Reset;
-
+pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_TIMER.with(|current| {
-        {
-            let mut current = current.borrow_mut();
+        let mut current = current.borrow_mut();
 
-            assert!(
-                current.is_none(),
-                "default Tokio timer already set \
-                 for execution context"
-            );
+        assert!(
+            current.is_none(),
+            "default Tokio timer already set \
+             for execution context"
+        );
 
-            let handle = handle
-                .as_priv()
-                .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
+        let handle = handle
+            .as_priv()
+            .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
 
-            *current = Some(handle.clone());
-        }
+        *current = Some(handle.clone());
+    });
 
-        f()
-    })
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 impl Handle {

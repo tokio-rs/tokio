@@ -265,7 +265,7 @@ cfg_if! {
 
         use std::env;
         use std::fs::File;
-        use std::io::Error;
+        use std::io;
         use std::mem;
         use std::sync::Once;
 

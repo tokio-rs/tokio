@@ -55,7 +55,7 @@ pub use error::Error;
 pub use interval::Interval;
 #[doc(inline)]
 pub use timeout::Timeout;
-pub use timer::{with_default, Timer};
+pub use timer::{set_default, Timer};
 
 use std::time::{Duration, Instant};
 
