@@ -9,6 +9,7 @@ pub use self::task_executor::TaskExecutor;
 use background::Background;
 
 use tokio_executor::enter;
+use tokio_executor::threadpool::ThreadPool;
 use tokio_timer::timer;
 
 use tracing_core as trace;
@@ -37,7 +38,7 @@ pub struct Runtime {
 #[derive(Debug)]
 struct Inner {
     /// Task execution pool.
-    pool: tokio_threadpool::ThreadPool,
+    pool: ThreadPool,
 
     /// Tracing dispatcher
     trace: trace::Dispatch,

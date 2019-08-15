@@ -28,12 +28,12 @@
 //! type. Adaptions also extend to traits like `std::io::Read` where methods
 //! return `std::io::Result`.  Be warned that these adapted methods may return
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
-//! to a *backup* thread immediately. See [tokio-threadpool] for more details
+//! to a *backup* thread immediately. See [tokio-executor] for more details
 //! of the threading model and [`blocking`].
 //!
-//! [`blocking`]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool/fn.blocking.html
+//! [`blocking`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/fn.blocking.html
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
-//! [tokio-threadpool]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool
+//! [tokio-executor]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/index.html
 
 mod create_dir;
 mod create_dir_all;
@@ -85,7 +85,9 @@ fn blocking_io<F, T>(f: F) -> Poll<io::Result<T>>
 where
     F: FnOnce() -> io::Result<T>,
 {
-    match tokio_threadpool::blocking(f) {
+    use tokio_executor::threadpool::blocking;
+
+    match blocking(f) {
         Ready(Ok(v)) => Ready(v),
         Ready(Err(_)) => Ready(Err(blocking_err())),
         Pending => Pending,

@@ -133,7 +133,7 @@
 //! [timer]: ../timer/index.html
 //! [`Runtime`]: struct.Runtime.html
 //! [`Reactor`]: ../reactor/struct.Reactor.html
-//! [`ThreadPool`]: https://docs.rs/tokio-threadpool/0.1/tokio_threadpool/struct.ThreadPool.html
+//! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
