@@ -13,14 +13,14 @@ use tokio_net::Handle;
 use tokio_sync::mpsc::{channel, Receiver};
 
 use futures_core::stream::Stream;
-use winapi::shared::minwindef::*;
-use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon::*;
 use std::convert::TryFrom;
 use std::io;
 use std::pin::Pin;
 use std::sync::Once;
 use std::task::{Context, Poll};
+use winapi::shared::minwindef::*;
+use winapi::um::consoleapi::SetConsoleCtrlHandler;
+use winapi::um::wincon::*;
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {
