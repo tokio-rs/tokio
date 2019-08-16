@@ -1,11 +1,11 @@
-use crate::split::{
+use super::split::{
     split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
     TcpStreamWriteHalfMut,
 };
+use crate::driver::Handle;
+use crate::util::PollEvented;
 
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_net::driver::Handle;
-use tokio_net::util::PollEvented;
 
 use bytes::{Buf, BufMut};
 use futures_core::ready;

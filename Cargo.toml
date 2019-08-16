@@ -14,7 +14,6 @@ members = [
   "tokio-sync",
   "tokio-test",
   "tokio-timer",
-  "tokio-tcp",
   "tokio-tls",
   "tokio-udp",
   "tokio-uds",

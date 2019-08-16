@@ -1,6 +1,6 @@
 #![feature(async_await)]
 
-use tokio_tcp::{TcpListener, TcpStream};
+use tokio_net::tcp::{TcpListener, TcpStream};
 
 #[tokio::test]
 async fn split_reunite() -> std::io::Result<()> {

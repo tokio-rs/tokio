@@ -1,13 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-tcp/0.2.0-alpha.1")]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub
-)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-#![feature(async_await)]
-
 //! TCP bindings for `tokio`.
 //!
 //! This module contains the TCP networking types, similar to the standard

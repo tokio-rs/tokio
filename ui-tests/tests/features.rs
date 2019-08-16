@@ -1,6 +1,20 @@
+#![allow(unused_imports)]
+
+#[test]
+#[cfg(feature = "tokio-net")]
+fn net_default() {
+    use ui_tests::tokio_net::driver::{set_default, Handle, Reactor, Registration};
+    use ui_tests::tokio_net::util::PollEvented;
+}
+
+#[test]
+#[cfg(feature = "net-with-tcp")]
+fn net_with_tcp() {
+    use ui_tests::tokio_net::tcp;
+}
+
 #[test]
 #[cfg(feature = "tokio-with-net")]
-#[allow(unused_imports)]
 fn tokio_with_net() {
     // net is present
     use ui_tests::tokio::net;
@@ -11,6 +25,9 @@ fn compile_fail() {
 
     #[cfg(feature = "executor-without-current-thread")]
     t.compile_fail("tests/ui/executor_without_current_thread.rs");
+
+    #[cfg(feature = "net-no-features")]
+    t.compile_fail("tests/ui/net_without_tcp_missing_tcp.rs");
 
     #[cfg(feature = "tokio-no-features")]
     t.compile_fail("tests/ui/tokio_without_net_missing_net.rs");

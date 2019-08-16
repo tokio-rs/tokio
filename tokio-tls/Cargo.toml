@@ -30,7 +30,7 @@ tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
-tokio-tcp = { version = "=0.2.0-alpha.1", path = "../tokio-tcp", features = ["async-traits"] }
+tokio-net = { version = "=0.2.0-alpha.1", path = "../tokio-net", features = ["tcp", "async-traits"] }
 
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
