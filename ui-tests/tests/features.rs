@@ -1,11 +1,10 @@
 #![allow(unused_imports)]
 
-
 #[test]
 #[cfg(feature = "tokio-net")]
 fn net_default() {
-    use ui_tests::tokio_net::driver::{Reactor, Handle, Registration, set_default};
-    use ui_tests::tokio_net::util::{PollEvented};
+    use ui_tests::tokio_net::driver::{set_default, Handle, Reactor, Registration};
+    use ui_tests::tokio_net::util::PollEvented;
 }
 
 #[test]
