@@ -9,7 +9,7 @@ mod platform {
 
     pub async fn main() {
         // on Unix, we can listen to whatever signal we want, in this case: SIGHUP
-        let mut stream = Signal::new(SignalKind::sighup()).unwrap();
+        let mut stream = Signal::new(SignalKind::hangup()).unwrap();
 
         println!("Waiting for SIGHUPS (Ctrl+C to quit)");
         println!(

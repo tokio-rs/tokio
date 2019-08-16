@@ -9,7 +9,7 @@ use libc;
 
 #[tokio::test]
 async fn notify_both() {
-    let kind = SignalKind::sigusr2();
+    let kind = SignalKind::user_defined2();
     let signal1 = Signal::new(kind).expect("failed to create signal1");
 
     let signal2 = Signal::new(kind).expect("failed to create signal2");

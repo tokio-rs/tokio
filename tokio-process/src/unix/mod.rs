@@ -102,7 +102,7 @@ pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Re
     let stdout = stdio(child.stdout.take(), handle)?;
     let stderr = stdio(child.stderr.take(), handle)?;
 
-    let signal = Signal::with_handle(SignalKind::sigchld(), handle)?;
+    let signal = Signal::with_handle(SignalKind::child(), handle)?;
 
     Ok(SpawnedChild {
         child: Child {

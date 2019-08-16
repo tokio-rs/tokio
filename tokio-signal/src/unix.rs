@@ -86,7 +86,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when a real-time timer has expired.
     /// By default, the process is terminated by this signal.
-    pub fn sigalrm() -> Self {
+    pub fn alarm() -> Self {
         Self(libc::SIGALRM)
     }
 
@@ -94,7 +94,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the status of a child process
     /// has changed. By default, this signal is ignored.
-    pub fn sigchld() -> Self {
+    pub fn child() -> Self {
         Self(libc::SIGCHLD)
     }
 
@@ -102,7 +102,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the terminal is disconnected.
     /// By default, the process is terminated by this signal.
-    pub fn sighup() -> Self {
+    pub fn hangup() -> Self {
         Self(libc::SIGHUP)
     }
 
@@ -117,7 +117,7 @@ impl SignalKind {
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    pub fn siginfo() -> Self {
+    pub fn info() -> Self {
         Self(libc::SIGINFO)
     }
 
@@ -125,7 +125,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent to interrupt a program.
     /// By default, the process is terminated by this signal.
-    pub fn sigint() -> Self {
+    pub fn interrupt() -> Self {
         Self(libc::SIGINT)
     }
 
@@ -133,7 +133,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when I/O operations are possible
     /// on some file descriptor. By default, this signal is ignored.
-    pub fn sigio() -> Self {
+    pub fn io() -> Self {
         Self(libc::SIGIO)
     }
 
@@ -142,7 +142,7 @@ impl SignalKind {
     /// On Unix systems this signal is sent when the process attempts to write
     /// to a pipe which has no reader. By default, the process is terminated by
     /// this signal.
-    pub fn sigpipe() -> Self {
+    pub fn pipe() -> Self {
         Self(libc::SIGPIPE)
     }
 
@@ -151,7 +151,7 @@ impl SignalKind {
     /// On Unix systems this signal is sent to issue a shutdown of the
     /// process, after which the OS will dump the process core.
     /// By default, the process is terminated by this signal.
-    pub fn sigquit() -> Self {
+    pub fn quit() -> Self {
         Self(libc::SIGQUIT)
     }
 
@@ -159,7 +159,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent to issue a shutdown of the
     /// process. By default, the process is terminated by this signal.
-    pub fn sigterm() -> Self {
+    pub fn terminate() -> Self {
         Self(libc::SIGTERM)
     }
 
@@ -167,7 +167,7 @@ impl SignalKind {
     ///
     /// On Unix systems this is a user defined signal.
     /// By default, the process is terminated by this signal.
-    pub fn sigusr1() -> Self {
+    pub fn user_defined1() -> Self {
         Self(libc::SIGUSR1)
     }
 
@@ -175,7 +175,7 @@ impl SignalKind {
     ///
     /// On Unix systems this is a user defined signal.
     /// By default, the process is terminated by this signal.
-    pub fn sigusr2() -> Self {
+    pub fn user_defined2() -> Self {
         Self(libc::SIGUSR2)
     }
 
@@ -183,7 +183,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the terminal window is resized.
     /// By default, this signal is ignored.
-    pub fn sigwinch() -> Self {
+    pub fn window_change() -> Self {
         Self(libc::SIGWINCH)
     }
 }
@@ -421,7 +421,7 @@ impl Signal {
     }
 
     pub(crate) fn ctrl_c(handle: &Handle) -> io::Result<Self> {
-        Self::with_handle(SignalKind::sigint(), handle)
+        Self::with_handle(SignalKind::interrupt(), handle)
     }
 }
 

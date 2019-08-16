@@ -9,7 +9,7 @@ use crate::support::*;
 
 #[tokio::test]
 async fn drop_then_get_a_signal() {
-    let kind = SignalKind::sigusr1();
+    let kind = SignalKind::user_defined1();
     let signal = Signal::new(kind).expect("failed to create first signal");
     drop(signal);
 

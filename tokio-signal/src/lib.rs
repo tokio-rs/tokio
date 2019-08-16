@@ -77,7 +77,7 @@
 //!
 //!     // Like the previous example, this is an infinite stream of signals
 //!     // being received, and signals may be coalesced while pending.
-//!     let stream = Signal::new(SignalKind::sighup())?;
+//!     let stream = Signal::new(SignalKind::hangup())?;
 //!
 //!     // Convert out stream into a future and block the program
 //!     let (signal, _signal) = stream.into_future().await;

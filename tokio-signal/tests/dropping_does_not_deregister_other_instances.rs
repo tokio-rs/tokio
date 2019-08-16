@@ -9,7 +9,7 @@ use crate::support::*;
 
 #[tokio::test]
 async fn dropping_signal_does_not_deregister_any_other_instances() {
-    let kind = SignalKind::sigusr1();
+    let kind = SignalKind::user_defined1();
 
     // NB: Testing for issue alexcrichton/tokio-signal#38:
     // signals should not starve based on ordering
