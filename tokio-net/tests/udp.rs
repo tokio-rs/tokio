@@ -1,11 +1,12 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
+use tokio_codec::{Decoder, Encoder};
+use tokio_net::udp::{UdpFramed, UdpSocket};
+
 use bytes::{BufMut, BytesMut};
 use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
 use std::io;
-use tokio_codec::{Decoder, Encoder};
-use tokio_udp::{UdpFramed, UdpSocket};
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
@@ -101,8 +102,6 @@ impl Encoder for ByteCodec {
 
 #[tokio::test]
 async fn send_framed() -> std::io::Result<()> {
-    drop(env_logger::try_init());
-
     let mut a_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
     let mut b_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
 

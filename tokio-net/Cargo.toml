@@ -27,8 +27,14 @@ tcp = [
     "futures-util-preview",
     "iovec",
 ]
+udp = [
+    "bytes",
+    "futures-sink-preview",
+    "futures-util-preview",
+]
 
 [dependencies]
+tokio-codec = { version = "=0.2.0-alpha.1", path = "../tokio-codec" }
 tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
@@ -43,8 +49,9 @@ num_cpus = "1.8.0"
 parking_lot = "0.9"
 slab = "0.4.0"
 
-# TCP
+# TCP / UDP
 bytes = { version = "0.4", optional = true }
+futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
 futures-util-preview = { version = "=0.3.0-alpha.18", optional = true }
 iovec = { version = "0.1", optional = true }
 

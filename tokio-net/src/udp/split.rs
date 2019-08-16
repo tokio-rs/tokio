@@ -65,7 +65,7 @@ fn reunite(s: UdpSocketSendHalf, r: UdpSocketRecvHalf) -> Result<UdpSocket, Reun
         // receiver and one for the sender, and those `Arc`s are never exposed
         // externally. And so when we drop one here, the other one must be the
         // only remaining one.
-        Ok(Arc::try_unwrap(s.0).expect("tokio_udp: try_unwrap failed in reunite"))
+        Ok(Arc::try_unwrap(s.0).expect("udp: try_unwrap failed in reunite"))
     } else {
         Err(ReuniteError(s, r))
     }

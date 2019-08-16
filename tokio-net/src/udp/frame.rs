@@ -1,4 +1,7 @@
 use super::UdpSocket;
+
+use tokio_codec::{Decoder, Encoder};
+
 use bytes::{BufMut, BytesMut};
 use core::task::{Context, Poll};
 use futures_core::{ready, Stream};
@@ -7,7 +10,6 @@ use log::trace;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
-use tokio_codec::{Decoder, Encoder};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.

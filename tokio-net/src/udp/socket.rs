@@ -1,7 +1,6 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-
-use tokio_net::driver::Handle;
-use tokio_net::util::PollEvented;
+use crate::driver::Handle;
+use crate::util::PollEvented;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
