@@ -15,7 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
 use std::task::Waker;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{fmt, usize};
 use tracing::{debug, trace};
 
