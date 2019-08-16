@@ -45,3 +45,7 @@ pub mod tcp;
 
 #[cfg(feature = "udp")]
 pub mod udp;
+
+#[cfg(feature = "uds")]
+#[cfg(unix)]
+pub mod uds;

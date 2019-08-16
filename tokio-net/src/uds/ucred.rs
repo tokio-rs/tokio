@@ -27,7 +27,8 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) mod impl_linux {
-    use crate::UnixStream;
+    use crate::uds::UnixStream;
+
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
     use std::{io, mem};
 
@@ -81,7 +82,8 @@ pub(crate) mod impl_linux {
     target_os = "openbsd"
 ))]
 pub(crate) mod impl_macos {
-    use crate::UnixStream;
+    use crate::uds::UnixStream;
+
     use libc::getpeereid;
     use std::io;
     use std::mem::MaybeUninit;
@@ -155,7 +157,8 @@ pub(crate) mod impl_solaris {
 #[cfg(not(target_os = "dragonfly"))]
 #[cfg(test)]
 mod test {
-    use crate::UnixStream;
+    use crate::uds::UnixStream;
+
     use libc::getegid;
     use libc::geteuid;
 

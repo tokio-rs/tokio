@@ -12,13 +12,15 @@
 //! addresses, to get and set socket options, and to shutdown the sockets.
 
 use super::UnixStream;
+
+use tokio_io::{AsyncRead, AsyncWrite};
+
 use bytes::{Buf, BufMut};
 use std::io;
 use std::net::Shutdown;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
 
 /// Read half of a `UnixStream`.
 #[derive(Debug)]

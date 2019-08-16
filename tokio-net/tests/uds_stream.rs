@@ -2,10 +2,11 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
+use tokio_net::uds::*;
+
 use futures::future::try_join;
 use tempfile::Builder;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio_uds::*;
 
 #[tokio::test]
 async fn accept_read_write() -> std::io::Result<()> {

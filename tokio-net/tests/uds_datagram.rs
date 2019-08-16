@@ -2,9 +2,10 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
+use tokio_net::uds::*;
+
 use std::io;
 use tempfile;
-use tokio_uds::*;
 
 // struct StringDatagramCodec;
 

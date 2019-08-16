@@ -1,7 +1,6 @@
-use crate::UnixStream;
-
-use tokio_net::driver::Handle;
-use tokio_net::util::PollEvented;
+use super::UnixStream;
+use crate::driver::Handle;
+use crate::util::PollEvented;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -93,8 +92,8 @@ impl UnixListener {
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
     #[cfg(feature = "async-traits")]
-    pub fn incoming(self) -> crate::Incoming {
-        crate::Incoming::new(self)
+    pub fn incoming(self) -> super::Incoming {
+        super::Incoming::new(self)
     }
 }
 

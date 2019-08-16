@@ -1,6 +1,7 @@
 #![cfg(feature = "async-traits")]
 
-use crate::{UnixListener, UnixStream};
+use super::{UnixListener, UnixStream};
+
 use futures_core::ready;
 use futures_core::stream::Stream;
 use std::io;

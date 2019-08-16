@@ -13,4 +13,3 @@ tokio-signal = { path = "tokio-signal" }
 tokio-sync = { path = "tokio-sync" }
 tokio-timer = { path = "tokio-timer" }
 tokio-tls = { path = "tokio-tls" }
-tokio-uds = { path = "tokio-uds" }
