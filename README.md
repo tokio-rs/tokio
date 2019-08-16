@@ -140,12 +140,10 @@ The crates included as part of Tokio are:
 
 * [`tokio-macros`]: Macros for usage with Tokio.
 
-* [`tokio-net`]: Event loop that drives I/O resources as well as TCP and UDP
-  apis.
+* [`tokio-net`]: Event loop that drives I/O resources as well as TCP, UDP, and
+  unix domain socket apis.
 
 * [ `tokio-timer`]: Time related APIs.
-
-* [`tokio-uds`]: Unix Domain Socket bindings.
 
 [`tokio-codec`]: tokio-codec
 [`tokio-current-thread`]: tokio-current-thread
@@ -155,7 +153,6 @@ The crates included as part of Tokio are:
 [`tokio-macros`]: tokio-macros
 [`tokio-net`]: tokio-net
 [`tokio-timer`]: tokio-timer
-[`tokio-uds`]: tokio-uds
 
 ## Related Projects
 

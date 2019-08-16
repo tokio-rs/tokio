@@ -50,10 +50,9 @@ jobs:
       tokio-net:
         - tcp
         - udp
+        - uds
       tokio-process: []
       tokio-signal: []
-      tokio-uds:
-        - async-traits
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
@@ -90,6 +89,7 @@ jobs:
         - net-no-features
         - net-with-tcp
         - net-with-udp
+        - net-with-uds
         - tokio-no-features
         - tokio-with-net
 

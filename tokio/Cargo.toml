@@ -52,7 +52,7 @@ sync = ["tokio-sync"]
 tcp = ["io", "tokio-net/tcp"]
 timer = ["tokio-timer"]
 udp = ["io", "tokio-net/udp"]
-uds = ["io", "tokio-net", "tokio-uds"]
+uds = ["io", "tokio-net/uds"]
 
 [dependencies]
 futures-core-preview = "=0.3.0-alpha.18"
@@ -71,9 +71,6 @@ tokio-net = { version = "=0.2.0-alpha.1", optional = true, features = ["async-tr
 tokio-sync = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-sync", features = ["async-traits"] }
 tokio-timer = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
-
-[target.'cfg(unix)'.dependencies]
-tokio-uds = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-uds", features = ["async-traits"] }
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.1", path = "../tokio-test" }

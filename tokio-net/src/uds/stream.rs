@@ -1,18 +1,17 @@
-use crate::split::{
+use super::split::{
     split, split_mut, UnixStreamReadHalf, UnixStreamReadHalfMut, UnixStreamWriteHalf,
     UnixStreamWriteHalfMut,
 };
-use crate::ucred::{self, UCred};
+use super::ucred::{self, UCred};
+use crate::driver::Handle;
+use crate::util::PollEvented;
 
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_net::driver::Handle;
-use tokio_net::util::PollEvented;
 
 use bytes::{Buf, BufMut};
 use futures_core::ready;
 use futures_util::future::poll_fn;
 use iovec::IoVec;
-use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};

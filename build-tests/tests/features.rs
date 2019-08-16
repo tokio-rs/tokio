@@ -20,6 +20,12 @@ fn net_with_udp() {
 }
 
 #[test]
+#[cfg(feature = "net-with-uds")]
+fn net_with_udp() {
+    use build_tests::tokio_net::uds;
+}
+
+#[test]
 #[cfg(feature = "tokio-with-net")]
 fn tokio_with_net() {
     // net is present
@@ -36,6 +42,7 @@ fn compile_fail() {
     {
         t.compile_fail("tests/fail/net_without_tcp_missing_tcp.rs");
         t.compile_fail("tests/fail/net_without_udp_missing_udp.rs");
+        t.compile_fail("tests/fail/net_without_uds_missing_uds.rs");
     }
 
     #[cfg(feature = "tokio-no-features")]

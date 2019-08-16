@@ -10,6 +10,7 @@ executor-without-current-thread = ["tokio-executor"]
 net-no-features = ["tokio-net"]
 net-with-tcp = ["tokio-net/tcp"]
 net-with-udp = ["tokio-net/udp"]
+net-with-uds = ["tokio-net/uds"]
 tokio-no-features = ["tokio"]
 tokio-with-net = ["tokio/net"]
 
