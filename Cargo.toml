@@ -16,5 +16,5 @@ members = [
   "tokio-timer",
   "tokio-tls",
   "tokio-uds",
-  "ui-tests",
+  "build-tests",
 ]
