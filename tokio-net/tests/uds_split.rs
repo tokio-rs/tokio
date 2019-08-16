@@ -3,7 +3,7 @@
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio::prelude::*;
-use tokio_uds::UnixStream;
+use tokio::net::UnixStream;
 
 /// Checks that `UnixStream` can be split into a read half and a write half using
 /// `UnixStream::split` and `UnixStream::split_mut`.
