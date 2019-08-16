@@ -83,7 +83,7 @@ jobs:
     displayName: Test feature flags
     rust: $(nightly)
     crates:
-      ui-tests:
+      build-tests:
         - tokio-executor
         - tokio-net
         - executor-without-current-thread
