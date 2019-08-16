@@ -51,7 +51,7 @@ rt-full = [
 sync = ["tokio-sync"]
 tcp = ["io", "tokio-net/tcp"]
 timer = ["tokio-timer"]
-udp = ["io", "tokio-net", "tokio-udp"]
+udp = ["io", "tokio-net/udp"]
 uds = ["io", "tokio-net", "tokio-uds"]
 
 [dependencies]
@@ -69,7 +69,6 @@ tokio-executor = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio
 tokio-macros = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-macros" }
 tokio-net = { version = "=0.2.0-alpha.1", optional = true, features = ["async-traits"], path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tokio-udp = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-udp" }
 tokio-timer = { version = "=0.3.0-alpha.1", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
 

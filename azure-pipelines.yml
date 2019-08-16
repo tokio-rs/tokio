@@ -49,9 +49,9 @@ jobs:
       tokio-fs: []
       tokio-net:
         - tcp
+        - udp
       tokio-process: []
       tokio-signal: []
-      tokio-udp: []
       tokio-uds:
         - async-traits
 
@@ -89,6 +89,7 @@ jobs:
         - executor-without-current-thread
         - net-no-features
         - net-with-tcp
+        - net-with-udp
         - tokio-no-features
         - tokio-with-net
 
