@@ -11,8 +11,10 @@ mod platform {
 
     pub async fn main() {
         // Create a stream for each of the signals we'd like to handle.
-        let sigint = Signal::new(SignalKind::sigint()).unwrap().map(|_| "SIGINT");
-        let sigterm = Signal::new(SignalKind::sigterm())
+        let sigint = Signal::new(SignalKind::interrupt())
+            .unwrap()
+            .map(|_| "SIGINT");
+        let sigterm = Signal::new(SignalKind::terminate())
             .unwrap()
             .map(|_| "SIGTERM");
 

@@ -9,7 +9,7 @@ use crate::support::*;
 #[test]
 fn dropping_loops_does_not_cause_starvation() {
     let (mut rt, signal) = {
-        let kind = SignalKind::sigusr1();
+        let kind = SignalKind::user_defined1();
 
         let mut first_rt = CurrentThreadRuntime::new().expect("failed to init first runtime");
         let mut first_signal = Signal::new(kind).expect("failed to register first signal");
