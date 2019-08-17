@@ -7,8 +7,8 @@
 
 #![cfg(windows)]
 
-use crate::driver::Handle;
 use super::registry::{globals, EventId, EventInfo, Init, Storage};
+use crate::driver::Handle;
 
 use tokio_sync::mpsc::{channel, Receiver};
 

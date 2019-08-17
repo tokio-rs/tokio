@@ -19,8 +19,8 @@ async fn simple() {
 #[tokio::test]
 #[cfg(unix)]
 async fn ctrl_c() {
-    use tokio_net::signal::CtrlC;
     use tokio::sync::oneshot;
+    use tokio_net::signal::CtrlC;
 
     let ctrl_c = CtrlC::new().expect("failed to init ctrl_c");
 

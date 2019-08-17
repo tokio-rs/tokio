@@ -5,9 +5,9 @@
 
 #![cfg(unix)]
 
+use super::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::driver::Handle;
 use crate::util::PollEvented;
-use super::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 
 use tokio_io::AsyncRead;
 use tokio_sync::mpsc::{channel, Receiver};
