@@ -439,11 +439,6 @@ impl Stream for Signal {
 mod tests {
     use super::*;
 
-    use tokio::timer::Timeout;
-
-    use futures_util::future::FutureExt;
-    use std::time::Duration;
-
     #[test]
     fn signal_enable_error_on_invalid_input() {
         signal_enable(-1).unwrap_err();
@@ -452,9 +447,5 @@ mod tests {
     #[test]
     fn signal_enable_error_on_forbidden_input() {
         signal_enable(signal_hook_registry::FORBIDDEN[0]).unwrap_err();
-    }
-
-    fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
-        Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
     }
 }
