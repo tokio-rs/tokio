@@ -27,6 +27,7 @@ signal = [
     "mio-uds",
     "libc",
     "signal-hook-registry",
+    "winapi",
 ]
 tcp = [
     "bytes",
@@ -73,6 +74,11 @@ iovec = { version = "0.1", optional = true }
 mio-uds = { version = "0.6.5", optional = true }
 libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "~1", optional = true }
+
+[target.'cfg(windows)'.dependencies.winapi]
+version = "0.3"
+features = ["consoleapi", "minwindef", "wincon"]
+optional = true
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
