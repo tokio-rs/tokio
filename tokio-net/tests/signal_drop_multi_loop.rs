@@ -1,8 +1,8 @@
 #![cfg(unix)]
+#![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 
-use libc;
-
+#[path = "support/signal.rs"]
 pub mod support;
 use crate::support::*;
 

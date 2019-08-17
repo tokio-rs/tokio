@@ -11,7 +11,7 @@
 //!
 //! Our best approximation here is to check *all spawned processes* for all
 //! SIGCHLD signals received. To do that we create a `Signal`, implemented in
-//! the `tokio-signal` crate, which is a stream over signals being received.
+//! the `tokio-net` crate, which is a stream over signals being received.
 //!
 //! Later when we poll the process's exit status we simply check to see if a
 //! SIGCHLD has happened since we last checked, and while that returns "yes" we
@@ -30,8 +30,8 @@ use super::SpawnedChild;
 use crate::kill::Kill;
 
 use tokio_net::driver::Handle;
+use tokio_net::signal::unix::{Signal, SignalKind};
 use tokio_net::util::PollEvented;
-use tokio_signal::unix::{Signal, SignalKind};
 
 use mio::event::Evented;
 use mio::unix::{EventedFd, UnixReady};

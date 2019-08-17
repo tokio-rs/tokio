@@ -1,13 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-signal/0.3.0-alpha.1")]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub
-)]
-#![cfg_attr(test, feature(async_await))]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-
 //! Asynchronous signal handling for Tokio
 //!
 //! This crate implements asynchronous signal handling for Tokio, an
@@ -30,6 +20,8 @@
 //! ```rust,no_run
 //! #![feature(async_await)]
 //!
+//! use tokio_net::signal;
+//!
 //! use futures_util::future;
 //! use futures_util::stream::StreamExt;
 //!
@@ -37,7 +29,7 @@
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
 //!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = tokio_signal::CtrlC::new()?;
+//!     let ctrl_c = signal::CtrlC::new()?;
 //!
 //!     // Process each ctrl-c as it comes in
 //!     let prog = ctrl_c.for_each(|_| {
@@ -57,15 +49,16 @@
 //! #![feature(async_await)]
 //! # #[cfg(unix)] {
 //!
+//! use tokio_net::signal::{self, unix::{Signal, SignalKind}};
+//!
 //! use futures_util::future;
 //! use futures_util::stream::StreamExt;
-//! use tokio_signal::unix::{Signal, SignalKind};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
 //!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = tokio_signal::CtrlC::new()?;
+//!     let ctrl_c = signal::CtrlC::new()?;
 //!
 //!     // Process each ctrl-c as it comes in
 //!     let prog = ctrl_c.for_each(|_| {
@@ -87,9 +80,6 @@
 //! # }
 //! ```
 
-#[macro_use]
-extern crate lazy_static;
-
 mod ctrl_c;
 mod registry;
 
@@ -103,4 +93,4 @@ mod os {
 pub mod unix;
 pub mod windows;
 
-pub use ctrl_c::CtrlC;
+pub use self::ctrl_c::CtrlC;

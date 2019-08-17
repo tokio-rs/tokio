@@ -48,11 +48,11 @@ jobs:
     crates:
       tokio-fs: []
       tokio-net:
+        - signal
         - tcp
         - udp
         - uds
       tokio-process: []
-      tokio-signal: []
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml

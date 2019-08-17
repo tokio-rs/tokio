@@ -1,11 +1,11 @@
 #![cfg(unix)]
+#![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
+#[path = "support/signal.rs"]
 pub mod support;
 use crate::support::*;
-
-use libc;
 
 #[tokio::test]
 async fn notify_both() {

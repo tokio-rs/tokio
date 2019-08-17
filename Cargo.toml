@@ -10,7 +10,6 @@ members = [
   "tokio-macros",
   "tokio-net",
   "tokio-process",
-  "tokio-signal",
   "tokio-sync",
   "tokio-test",
   "tokio-timer",

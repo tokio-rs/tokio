@@ -40,6 +40,9 @@
 pub mod driver;
 pub mod util;
 
+#[cfg(feature = "signal")]
+pub mod signal;
+
 #[cfg(feature = "tcp")]
 pub mod tcp;
 

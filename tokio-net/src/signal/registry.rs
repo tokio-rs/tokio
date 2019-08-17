@@ -1,10 +1,12 @@
+use super::os::{OsExtraData, OsStorage};
+
+use tokio_sync::mpsc::Sender;
+
+use lazy_static::lazy_static;
 use std::ops;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-
-use crate::os::{OsExtraData, OsStorage};
-use tokio_sync::mpsc::Sender;
 
 pub(crate) type EventId = usize;
 
