@@ -7,9 +7,9 @@
 
 #![cfg(windows)]
 
-use crate::registry::{globals, EventId, EventInfo, Init, Storage};
+use super::registry::{globals, EventId, EventInfo, Init, Storage};
+use crate::driver::Handle;
 
-use tokio_net::driver::Handle;
 use tokio_sync::mpsc::{channel, Receiver};
 
 use futures_core::stream::Stream;
@@ -198,11 +198,13 @@ impl Stream for CtrlBreak {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use tokio::timer::Timeout;
+
     use futures_util::future::FutureExt;
     use futures_util::stream::StreamExt;
     use std::future::Future;
     use std::time::Duration;
-    use tokio_timer::Timeout;
 
     fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
         Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
@@ -210,7 +212,7 @@ mod tests {
 
     #[tokio::test]
     async fn ctrl_c() {
-        let ctrl_c = crate::CtrlC::new().expect("failed to create CtrlC");
+        let ctrl_c = crate::signal::CtrlC::new().expect("failed to create CtrlC");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS

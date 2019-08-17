@@ -1,10 +1,9 @@
 #![cfg(unix)]
+#![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 
-use libc;
-
-pub mod support;
-use crate::support::*;
+pub mod signal_support;
+use crate::signal_support::*;
 
 #[test]
 fn dropping_loops_does_not_cause_starvation() {

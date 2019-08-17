@@ -1,0 +1,37 @@
+#![cfg(unix)]
+#![cfg(feature = "signal")]
+#![warn(rust_2018_idioms)]
+#![feature(async_await)]
+
+pub mod signal_support;
+use crate::signal_support::*;
+
+#[tokio::test]
+async fn simple() {
+    let signal = Signal::new(SignalKind::user_defined1()).expect("failed to create signal");
+
+    send_signal(libc::SIGUSR1);
+
+    let _ = with_timeout(signal.into_future()).await;
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn ctrl_c() {
+    use tokio::sync::oneshot;
+    use tokio_net::signal::CtrlC;
+
+    let ctrl_c = CtrlC::new().expect("failed to init ctrl_c");
+
+    let (fire, wait) = oneshot::channel();
+
+    // NB: simulate a signal coming in by exercising our signal handler
+    // to avoid complications with sending SIGINT to the test process
+    tokio::spawn(async {
+        wait.await.expect("wait failed");
+        send_signal(libc::SIGINT);
+    });
+
+    let _ = fire.send(());
+    let _ = with_timeout(ctrl_c.into_future()).await;
+}

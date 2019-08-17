@@ -55,4 +55,4 @@ lazy_static = "1.3"
 libc = "0.2"
 log = "0.4"
 mio = "0.6.5"
-tokio-signal = { version = "=0.3.0-alpha.1", path = "../tokio-signal" }
+tokio-net = { version = "=0.2.0-alpha.1", path = "../tokio-net", features = ["signal"] }

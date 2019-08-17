@@ -1,11 +1,10 @@
 #![cfg(unix)]
+#![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-use libc;
-
-pub mod support;
-use crate::support::*;
+pub mod signal_support;
+use crate::signal_support::*;
 
 #[tokio::test]
 async fn drop_then_get_a_signal() {

@@ -5,12 +5,14 @@
 
 #![cfg(unix)]
 
-pub use libc;
+use super::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
+use crate::driver::Handle;
+use crate::util::PollEvented;
 
 use tokio_io::AsyncRead;
-use tokio_net::driver::Handle;
-use tokio_net::util::PollEvented;
 use tokio_sync::mpsc::{channel, Receiver};
+
+pub use libc;
 
 use futures_core::stream::Stream;
 use libc::c_int;
@@ -21,8 +23,6 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
-
-use crate::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
@@ -73,7 +73,7 @@ impl SignalKind {
     /// For example, this can be used for listening for platform-specific
     /// signals.
     /// ```rust,no_run
-    /// # use tokio_signal::unix::SignalKind;
+    /// # use tokio_net::signal::unix::SignalKind;
     /// # let signum = -1;
     /// // let signum = libc::OS_SPECIFIC_SIGNAL;
     /// let kind = SignalKind::from_raw(signum);
@@ -438,11 +438,6 @@ impl Stream for Signal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::future::FutureExt;
-    use futures_util::StreamExt;
-    use std::time::Duration;
-    use tokio_sync::oneshot;
-    use tokio_timer::Timeout;
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
@@ -452,26 +447,5 @@ mod tests {
     #[test]
     fn signal_enable_error_on_forbidden_input() {
         signal_enable(signal_hook_registry::FORBIDDEN[0]).unwrap_err();
-    }
-
-    fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
-        Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
-    }
-
-    #[tokio::test]
-    async fn ctrl_c() {
-        let ctrl_c = crate::CtrlC::new().expect("failed to init ctrl_c");
-
-        let (fire, wait) = oneshot::channel();
-
-        // NB: simulate a signal coming in by exercising our signal handler
-        // to avoid complications with sending SIGINT to the test process
-        tokio::spawn(async {
-            wait.await.expect("wait failed");
-            action(globals(), libc::SIGINT);
-        });
-
-        let _ = fire.send(());
-        let _ = with_timeout(ctrl_c.into_future()).await;
     }
 }

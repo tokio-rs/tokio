@@ -1,11 +1,10 @@
 #![cfg(unix)]
+#![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-use libc;
-
-pub mod support;
-use crate::support::*;
+pub mod signal_support;
+use crate::signal_support::*;
 
 #[tokio::test]
 async fn dropping_signal_does_not_deregister_any_other_instances() {

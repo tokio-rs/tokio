@@ -1,11 +1,10 @@
 #![cfg(unix)]
+#![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-pub mod support;
-use crate::support::*;
-
-use libc;
+pub mod signal_support;
+use crate::signal_support::*;
 
 #[tokio::test]
 async fn twice() {
