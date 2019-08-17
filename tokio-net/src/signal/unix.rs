@@ -438,13 +438,10 @@ impl Stream for Signal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::signal::CtrlC;
 
-    use tokio::sync::oneshot;
     use tokio::timer::Timeout;
 
     use futures_util::future::FutureExt;
-    use futures_util::StreamExt;
     use std::time::Duration;
 
     #[test]

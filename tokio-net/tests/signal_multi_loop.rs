@@ -2,9 +2,8 @@
 #![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 
-#[path = "support/signal.rs"]
-pub mod support;
-use crate::support::*;
+pub mod signal_support;
+use crate::signal_support::*;
 
 use std::sync::mpsc::channel;
 use std::thread;

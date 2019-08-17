@@ -3,9 +3,8 @@
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-#[path = "support/signal.rs"]
-pub mod support;
-use crate::support::*;
+pub mod signal_support;
+use crate::signal_support::*;
 
 #[tokio::test]
 async fn drop_then_get_a_signal() {
