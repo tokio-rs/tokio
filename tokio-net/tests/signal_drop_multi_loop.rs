@@ -11,10 +11,10 @@ fn dropping_loops_does_not_cause_starvation() {
         let kind = SignalKind::user_defined1();
 
         let mut first_rt = CurrentThreadRuntime::new().expect("failed to init first runtime");
-        let mut first_signal = Signal::new(kind).expect("failed to register first signal");
+        let mut first_signal = signal(kind).expect("failed to register first signal");
 
         let mut second_rt = CurrentThreadRuntime::new().expect("failed to init second runtime");
-        let mut second_signal = Signal::new(kind).expect("failed to register second signal");
+        let mut second_signal = signal(kind).expect("failed to register second signal");
 
         send_signal(libc::SIGUSR1);
 

@@ -8,7 +8,6 @@
 #![cfg(windows)]
 
 use super::registry::{globals, EventId, EventInfo, Init, Storage};
-use crate::driver::Handle;
 
 use tokio_sync::mpsc::{channel, Receiver};
 
@@ -85,23 +84,7 @@ pub(crate) struct Event {
 }
 
 impl Event {
-    /// Creates a new stream listening for the `CTRL_C_EVENT` events.
-    ///
-    /// This function will register a handler via `SetConsoleCtrlHandler` and
-    /// deliver notifications to the returned stream.
-    pub(crate) fn ctrl_c(handle: &Handle) -> io::Result<Self> {
-        Event::new(CTRL_C_EVENT, handle)
-    }
-
-    /// Creates a new stream listening for the `CTRL_BREAK_EVENT` events.
-    ///
-    /// This function will register a handler via `SetConsoleCtrlHandler` and
-    /// deliver notifications to the returned stream.
-    fn ctrl_break_handle(handle: &Handle) -> io::Result<Self> {
-        Event::new(CTRL_BREAK_EVENT, handle)
-    }
-
-    fn new(signum: DWORD, _handle: &Handle) -> io::Result<Self> {
+    fn new(signum: DWORD) -> io::Result<Self> {
         global_init()?;
 
         let (tx, rx) = channel(1);
@@ -109,6 +92,10 @@ impl Event {
 
         Ok(Event { rx })
     }
+}
+
+pub(crate) fn ctrl_c() -> io::Result<Event> {
+    Event::new(CTRL_C_EVENT)
 }
 
 impl Stream for Event {
@@ -167,22 +154,12 @@ pub struct CtrlBreak {
     inner: Event,
 }
 
-impl CtrlBreak {
-    /// Creates a new stream which receives "ctrl-break" notifications sent to the
-    /// process.
-    ///
-    /// This function binds to the default reactor.
-    pub fn new() -> io::Result<Self> {
-        Self::with_handle(&Handle::default())
-    }
-
-    /// Creates a new stream which receives "ctrl-break" notifications sent to the
-    /// process.
-    ///
-    /// This function binds to reactor specified by `handle`.
-    pub fn with_handle(handle: &Handle) -> io::Result<Self> {
-        Event::ctrl_break_handle(handle).map(|inner| Self { inner })
-    }
+/// Creates a new stream which receives "ctrl-break" notifications sent to the
+/// process.
+///
+/// This function binds to the default reactor.
+pub fn ctrl_break() -> io::Result<CtrlBreak> {
+    Event::new(CTRL_BREAK_EVENT).map(|inner| CtrlBreak { inner })
 }
 
 impl Stream for CtrlBreak {
@@ -212,7 +189,7 @@ mod tests {
 
     #[tokio::test]
     async fn ctrl_c() {
-        let ctrl_c = crate::signal::CtrlC::new().expect("failed to create CtrlC");
+        let ctrl_c = crate::signal::ctrl_c().expect("failed to create CtrlC");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS
@@ -226,7 +203,7 @@ mod tests {
 
     #[tokio::test]
     async fn ctrl_break() {
-        let ctrl_break = super::CtrlBreak::new().expect("failed to create CtrlC");
+        let ctrl_break = super::ctrl_break().expect("failed to create CtrlC");
 
         // Windows doesn't have a good programmatic way of sending events
         // like sending signals on Unix, so we'll stub out the actual OS

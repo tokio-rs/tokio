@@ -20,7 +20,7 @@ fn multi_loop() {
                 let sender = sender.clone();
                 thread::spawn(move || {
                     let mut rt = CurrentThreadRuntime::new().unwrap();
-                    let signal = Signal::new(SignalKind::hangup()).unwrap();
+                    let signal = signal(SignalKind::hangup()).unwrap();
                     sender.send(()).unwrap();
                     let _ = run_with_timeout(&mut rt, signal.into_future());
                 })

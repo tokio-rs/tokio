@@ -1,8 +1,7 @@
 #[cfg(unix)]
-use super::unix::Signal as Inner;
+use super::unix::{self as os_impl, Signal as Inner};
 #[cfg(windows)]
-use super::windows::Event as Inner;
-use crate::driver::Handle;
+use super::windows::{self as os_impl, Event as Inner};
 
 use futures_core::stream::Stream;
 use std::io;
@@ -30,22 +29,12 @@ pub struct CtrlC {
     inner: Inner,
 }
 
-impl CtrlC {
-    /// Creates a new stream which receives "ctrl-c" notifications sent to the
-    /// process.
-    ///
-    /// This function binds to the default reactor.
-    pub fn new() -> io::Result<Self> {
-        Self::with_handle(&Handle::default())
-    }
-
-    /// Creates a new stream which receives "ctrl-c" notifications sent to the
-    /// process.
-    ///
-    /// This function binds to reactor specified by `handle`.
-    pub fn with_handle(handle: &Handle) -> io::Result<Self> {
-        Inner::ctrl_c(handle).map(|inner| Self { inner })
-    }
+/// Creates a new stream which receives "ctrl-c" notifications sent to the
+/// process.
+///
+/// This function binds to the default reactor.
+pub fn ctrl_c() -> io::Result<CtrlC> {
+    os_impl::ctrl_c().map(|inner| CtrlC { inner })
 }
 
 impl Stream for CtrlC {
