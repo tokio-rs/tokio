@@ -1,3 +1,12 @@
+# 0.2.0-alpha.2 (August 17, 2019)
+
+### Changed
+- Update `futures` dependency to 0.3.0-alpha.18.
+
+### Added
+- Implement `AsyncWrite` for `Vec<u8>` (#1409).
+- Add `BufReader`, `BufWriter` (#1438).
+
 # 0.2.0-alpha.1 (August 8, 2019)
 
 ### Changed

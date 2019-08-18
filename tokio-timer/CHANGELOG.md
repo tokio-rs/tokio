@@ -1,3 +1,9 @@
+# 0.3.0-alpha.2 (August 17, 2019)
+
+### Changed
+- Update `futures` dependency to 0.3.0-alpha.18.
+- Switch `with_default(..., || )` to `set_default(...) -> Guard` (#1449).
+
 # 0.3.0-alpha.1 (August 8, 2019)
 
 ### Changed

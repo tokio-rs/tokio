@@ -1,3 +1,15 @@
+# 0.2.0-alpha.2 (August 17, 2019)
+
+### Fixed
+- allow running executor from within blocking clause (#1433).
+
+### Changed
+- Update `futures` dependency to 0.3.0-alpha.18.
+
+### Added
+- Import `current-thread` executor (#1447).
+- Import `threadpool` executor (#1152).
+
 # 0.2.0-alpha.1 (August 8, 2019)
 
 ### Changed

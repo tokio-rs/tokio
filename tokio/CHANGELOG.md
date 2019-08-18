@@ -1,6 +1,16 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.2.0-alpha.2 (August 17, 2019)
+
+### Changed
+- Update `futures` dependency to 0.3.0-alpha.18.
+- Remove `reactor` module.
+
+### Added
+- Add `BufReader` / `BufWriter` (#1438).
+- Update `UdpFramed` to `std::future` (#1370).
+
 # 0.2.0-alpha.1 (August 8, 2019)
 
 - Switch to `async`, `await`, and `std::future`.
