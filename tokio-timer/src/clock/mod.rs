@@ -12,8 +12,8 @@
 //!
 //! [n]: fn.now.html
 //! [`Now`]: trait.Now.html
-//! [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
-//! [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+//! [`Instant`]: std::time::Instant
+//! [`Instant::now`]: std::time::Instant::now
 //! [`with_default`]: fn.with_default.html
 
 mod now;
@@ -31,8 +31,8 @@ use std::time::Instant;
 /// `Clock` instances return [`Instant`] values corresponding to "now". The source
 /// of these values is configurable. The default source is [`Instant::now`].
 ///
-/// [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
-/// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+/// [`Instant`]: std::time::Instant
+/// [`Instant::now`]: std::time::Instant::now
 #[derive(Default, Clone)]
 pub struct Clock {
     now: Option<Arc<dyn Now>>,
@@ -87,7 +87,7 @@ impl Clock {
     /// Return a new `Clock` instance that uses [`Instant::now`] as the source
     /// of time.
     ///
-    /// [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+    /// [`Instant::now`]: std::time::Instant::now
     pub fn system() -> Clock {
         Clock { now: None }
     }

@@ -4,8 +4,8 @@
 //! library, which can be used to implement networking protocols.
 //!
 //! The main struct for UDP is the [`UdpSocket`], which represents a UDP socket.
-//! Reading and writing to it can be done using futures, which return the
-//! [`Recv`], [`Send`], [`RecvFrom`] and [`SendTo`] structs respectively.
+//!
+//! [`UdpSocket`]: struct.UdpSocket
 
 mod frame;
 mod socket;

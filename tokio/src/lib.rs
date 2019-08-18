@@ -15,7 +15,7 @@
 //! provides a few major components:
 //!
 //! * A multi threaded, work-stealing based task [scheduler][runtime].
-//! * A [reactor] backed by the operating system's event queue (epoll, kqueue,
+//! * A [driver] backed by the operating system's event queue (epoll, kqueue,
 //!   IOCP, etc...).
 //! * Asynchronous [TCP and UDP][net] sockets.
 //! * Asynchronous [filesystem][fs] operations.
@@ -23,6 +23,7 @@
 //!
 //! Guide level documentation is found on the [website].
 //!
+//! [driver]: tokio_net::driver
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples

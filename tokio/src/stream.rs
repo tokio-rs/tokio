@@ -23,7 +23,8 @@ pub use futures_util::stream::{empty, iter, once, pending, poll_fn, repeat, unfo
 /// This trait can be imported directly or via the Tokio prelude: `use
 /// tokio::prelude::*`.
 ///
-/// [`timeout`]: #method.timeout
+/// [`throttle`]: method.throttle
+/// [`timeout`]: method.timeout
 pub trait StreamExt: Stream {
     /// Throttle down the stream by enforcing a fixed delay between items.
     ///

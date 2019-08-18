@@ -108,7 +108,7 @@ impl Handle {
     ///
     /// See [type] level documentation for more ways to obtain a `Handle` value.
     ///
-    /// [`with_default`]: ../fn.with_default.html
+    /// [`with_default`]: fn.with_default
     /// [type]: #
     pub fn current() -> Handle {
         let private =

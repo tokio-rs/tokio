@@ -2,7 +2,7 @@
 //!
 //! Applications using Tokio require some runtime support in order to work:
 //!
-//! * A [reactor] to drive I/O resources.
+//! * A [driver] to drive I/O resources.
 //! * An [executor] to execute tasks that use these I/O resources.
 //! * A [timer] for scheduling work to run after a set period of time.
 //!
@@ -128,7 +128,7 @@
 //! }
 //! ```
 //!
-//! [reactor]: ../reactor/struct.Reactor.html
+//! [driver]: tokio_net::driver
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
 //! [timer]: ../timer/index.html
 //! [`Runtime`]: struct.Runtime.html
@@ -138,6 +138,7 @@
 //! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
+//! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
 pub mod current_thread;
 mod threadpool;

@@ -59,7 +59,7 @@ pub trait AsyncRead {
     ///
     /// This function is called from [`poll_read_buf`].
     ///
-    /// [`io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+    /// [`io::Read`]: std::io::Read
     /// [`poll_read_buf`]: #method.poll_read_buf
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         for x in buf {

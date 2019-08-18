@@ -23,12 +23,12 @@
 //!
 //! [`Timer`]: struct.Timer.html
 //! [`Handle`]: struct.Handle.html
-//! [`Delay`]: ../struct.Delay.html
-//! [`Now`]: ../clock/trait.Now.html
-//! [`Now::now`]: ../clock/trait.Now.html#method.now
+//! [`Delay`]: Delay
+//! [`Now`]: clock::Now
+//! [`Now::now`]: clock::Now::now
 //! [`SystemNow`]: struct.SystemNow.html
-//! [`Instant`]: https://doc.rust-lang.org/std/time/struct.Instant.html
-//! [`Instant::now`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+//! [`Instant`]: std::time::Instant
+//! [`Instant::now`]: std::time::Instant::now
 
 // This allows the usage of the old `Now` trait.
 #![allow(deprecated)]
@@ -115,9 +115,9 @@ use tokio_executor::park::{Park, ParkThread, Unpark};
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
 ///
-/// [`Delay`]: ../struct.Delay.html
-/// [`Interval`]: ../struct.Interval.html
-/// [`Timeout`]: ../struct.Timeout.html
+/// [`Delay`]: struct.Delay.html
+/// [`Interval`]: struct.Interval.html
+/// [`Timeout`]: struct.Timeout.html
 /// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
 /// [`handle`]: #method.handle
 /// [`turn`]: #method.turn
