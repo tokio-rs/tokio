@@ -66,7 +66,7 @@ tokio-codec = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-co
 tokio-fs = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-fs" }
 tokio-io = { version = "=0.2.0-alpha.2", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-executor" }
-tokio-macros = { version = "=0.2.0-alpha.1", optional = true, path = "../tokio-macros" }
+tokio-macros = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-macros" }
 tokio-net = { version = "=0.2.0-alpha.2", optional = true, features = ["async-traits"], path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-sync", features = ["async-traits"] }
 tokio-timer = { version = "=0.3.0-alpha.2", optional = true, path = "../tokio-timer", features = ["async-traits"] }
