@@ -181,7 +181,7 @@ pub(crate) type ChildStdin = PollEvented<NamedPipe>;
 pub(crate) type ChildStdout = PollEvented<NamedPipe>;
 pub(crate) type ChildStderr = PollEvented<NamedPipe>;
 
-fn stdio<T>(option: Option<T>) -> io::Result<Option<PollEvented<NamedPipe>>>
+fn stdio<T>(option: Option<T>) -> Option<PollEvented<NamedPipe>>
 where
     T: IntoRawHandle,
 {
