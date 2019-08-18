@@ -146,7 +146,6 @@ use futures_util::try_future::TryFutureExt;
 
 use kill::Kill;
 use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
-use tokio_net::driver::Handle;
 
 #[path = "unix/mod.rs"]
 #[cfg(unix)]
@@ -493,24 +492,7 @@ impl Command {
     ///         .expect("ls command failed to run")
     /// }
     pub fn spawn(&mut self) -> io::Result<Child> {
-        self.spawn_with_handle(&Handle::default())
-    }
-
-    /// Executes the command as a child process, returning a handle to it.
-    ///
-    /// By default, stdin, stdout and stderr are inherited from the parent.
-    ///
-    /// This method will spawn the child process synchronously and return a
-    /// handle to a future-aware child process. The `Child` returned implements
-    /// `Future` itself to acquire the `ExitStatus` of the child, and otherwise
-    /// the `Child` has methods to acquire handles to the stdin, stdout, and
-    /// stderr streams.
-    ///
-    /// The `handle` specified to this method must be a handle to a valid event
-    /// loop, and all I/O this child does will be associated with the specified
-    /// event loop.
-    pub fn spawn_with_handle(&mut self, handle: &Handle) -> io::Result<Child> {
-        imp::spawn_child(&mut self.std, handle).map(|spawned_child| Child {
+        imp::spawn_child(&mut self.std).map(|spawned_child| Child {
             child: ChildDropGuard::new(spawned_child.child),
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
@@ -556,32 +538,7 @@ impl Command {
     ///         .expect("ls command failed to run")
     /// }
     pub fn status(&mut self) -> io::Result<StatusAsync> {
-        self.status_with_handle(&Handle::default())
-    }
-
-    /// Executes a command as a child process, waiting for it to finish and
-    /// collecting its exit status.
-    ///
-    /// By default, stdin, stdout and stderr are inherited from the parent.
-    ///
-    /// The `StatusAsync` future returned will resolve to the `ExitStatus`
-    /// type in the standard library representing how the process exited. If
-    /// any input/output handles are set to a pipe then they will be immediately
-    ///  closed after the child is spawned.
-    ///
-    /// The `handle` specified must be a handle to a valid event loop, and all
-    /// I/O this child does will be associated with the specified event loop.
-    ///
-    /// If the `StatusAsync` future is dropped before the future resolves, then
-    /// the child will be killed, if it was spawned.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error immediately if the child process
-    /// cannot be spawned. Otherwise errors obtained while waiting for the child
-    /// are returned through the `StatusAsync` future.
-    pub fn status_with_handle(&mut self, handle: &Handle) -> io::Result<StatusAsync> {
-        self.spawn_with_handle(handle).map(|mut child| {
+        self.spawn().map(|mut child| {
             // Ensure we close any stdio handles so we can't deadlock
             // waiting on the child which may be waiting to read/write
             // to a pipe we're holding.
@@ -630,34 +587,10 @@ impl Command {
     ///     println!("stderr of ls: {:?}", output.stderr);
     /// }
     pub fn output(&mut self) -> OutputAsync {
-        self.output_with_handle(&Handle::default())
-    }
-
-    /// Executes the command as a child process, waiting for it to finish and
-    /// collecting all of its output.
-    ///
-    /// > **Note**: this method, unlike the standard library, will
-    /// > unconditionally configure the stdout/stderr handles to be pipes, even
-    /// > if they have been previously configured. If this is not desired then
-    /// > the `spawn` method should be used in combination with the
-    /// > `wait_with_output` method on child.
-    ///
-    /// This method will return a future representing the collection of the
-    /// child process's stdout/stderr. The `OutputAsync` future will resolve to
-    /// the `Output` type in the standard library, containing `stdout` and
-    /// `stderr` as `Vec<u8>` along with an `ExitStatus` representing how the
-    /// process exited.
-    ///
-    /// The `handle` specified must be a handle to a valid event loop, and all
-    /// I/O this child does will be associated with the specified event loop.
-    ///
-    /// If the `OutputAsync` future is dropped before the future resolves, then
-    /// the child will be killed, if it was spawned.
-    pub fn output_with_handle(&mut self, handle: &Handle) -> OutputAsync {
         self.std.stdout(Stdio::piped());
         self.std.stderr(Stdio::piped());
 
-        let inner = future::ready(self.spawn_with_handle(handle)).and_then(Child::wait_with_output);
+        let inner = future::ready(self.spawn()).and_then(Child::wait_with_output);
 
         OutputAsync {
             inner: inner.boxed(),

@@ -3,7 +3,7 @@
 
 pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
 use tokio::timer::Timeout;
-pub use tokio_net::signal::unix::{Signal, SignalKind};
+pub use tokio_net::signal::unix::{signal, SignalKind};
 
 pub use futures_util::future;
 use futures_util::future::FutureExt;

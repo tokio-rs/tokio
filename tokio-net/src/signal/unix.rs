@@ -6,7 +6,6 @@
 #![cfg(unix)]
 
 use super::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 
 use tokio_io::AsyncRead;
@@ -280,7 +279,7 @@ impl Future for Driver {
 }
 
 impl Driver {
-    fn new(handle: &Handle) -> io::Result<Driver> {
+    fn new() -> io::Result<Driver> {
         // NB: We give each driver a "fresh" reciever file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.
         //
@@ -295,7 +294,7 @@ impl Driver {
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let stream = globals().receiver.try_clone()?;
-        let wakeup = PollEvented::new_with_handle(stream, handle)?;
+        let wakeup = PollEvented::new(stream);
 
         Ok(Driver { wakeup })
     }
@@ -359,70 +358,48 @@ pub struct Signal {
     rx: Receiver<()>,
 }
 
-impl Signal {
-    /// Creates a new stream which will receive notifications when the current
-    /// process receives the signal `signal`.
-    ///
-    /// This function will create a new stream which binds to the default reactor.
-    /// The `Signal` stream is an infinite stream which will receive
-    /// notifications whenever a signal is received. More documentation can be
-    /// found on `Signal` itself, but to reiterate:
-    ///
-    /// * Signals may be coalesced beyond what the kernel already does.
-    /// * Once a signal handler is registered with the process the underlying
-    ///   libc signal handler is never unregistered.
-    ///
-    /// A `Signal` stream can be created for a particular signal number
-    /// multiple times. When a signal is received then all the associated
-    /// channels will receive the signal notification.
-    ///
-    /// # Errors
-    ///
-    /// * If the lower-level C functions fail for some reason.
-    /// * If the previous initialization of this specific signal failed.
-    /// * If the signal is one of
-    ///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
-    pub fn new(kind: SignalKind) -> io::Result<Self> {
-        Signal::with_handle(kind, &Handle::default())
-    }
+/// Creates a new stream which will receive notifications when the current
+/// process receives the signal `signal`.
+///
+/// This function will create a new stream which binds to the default reactor.
+/// The `Signal` stream is an infinite stream which will receive
+/// notifications whenever a signal is received. More documentation can be
+/// found on `Signal` itself, but to reiterate:
+///
+/// * Signals may be coalesced beyond what the kernel already does.
+/// * Once a signal handler is registered with the process the underlying
+///   libc signal handler is never unregistered.
+///
+/// A `Signal` stream can be created for a particular signal number
+/// multiple times. When a signal is received then all the associated
+/// channels will receive the signal notification.
+///
+/// # Errors
+///
+/// * If the lower-level C functions fail for some reason.
+/// * If the previous initialization of this specific signal failed.
+/// * If the signal is one of
+///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
+pub fn signal(kind: SignalKind) -> io::Result<Signal> {
+    let signal = kind.0;
 
-    /// Creates a new stream which will receive notifications when the current
-    /// process receives the signal `signal`.
-    ///
-    /// This function will create a new stream which may be based on the
-    /// provided reactor handle.
-    /// The `Signal` stream is an infinite stream which will receive
-    /// notifications whenever a signal is received. More documentation can be
-    /// found on `Signal` itself, but to reiterate:
-    ///
-    /// * Signals may be coalesced beyond what the kernel already does.
-    /// * Once a signal handler is registered with the process the underlying
-    ///   libc signal handler is never unregistered.
-    ///
-    /// A `Signal` stream can be created for a particular signal number
-    /// multiple times. When a signal is received then all the associated
-    /// channels will receive the signal notification.
-    pub fn with_handle(kind: SignalKind, handle: &Handle) -> io::Result<Self> {
-        let signal = kind.0;
+    // Turn the signal delivery on once we are ready for it
+    signal_enable(signal)?;
 
-        // Turn the signal delivery on once we are ready for it
-        signal_enable(signal)?;
+    // Ensure there's a driver for our associated event loop processing
+    // signals.
+    let driver = Driver::new()?;
 
-        // Ensure there's a driver for our associated event loop processing
-        // signals.
-        let driver = Driver::new(&handle)?;
+    // One wakeup in a queue is enough, no need for us to buffer up any
+    // more.
+    let (tx, rx) = channel(1);
+    globals().register_listener(signal as EventId, tx);
 
-        // One wakeup in a queue is enough, no need for us to buffer up any
-        // more.
-        let (tx, rx) = channel(1);
-        globals().register_listener(signal as EventId, tx);
+    Ok(Signal { driver, rx })
+}
 
-        Ok(Signal { driver, rx })
-    }
-
-    pub(crate) fn ctrl_c(handle: &Handle) -> io::Result<Self> {
-        Self::with_handle(SignalKind::interrupt(), handle)
-    }
+pub(crate) fn ctrl_c() -> io::Result<Signal> {
+    signal(SignalKind::interrupt())
 }
 
 impl Stream for Signal {

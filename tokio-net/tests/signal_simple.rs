@@ -8,7 +8,7 @@ use crate::signal_support::*;
 
 #[tokio::test]
 async fn simple() {
-    let signal = Signal::new(SignalKind::user_defined1()).expect("failed to create signal");
+    let signal = signal(SignalKind::user_defined1()).expect("failed to create signal");
 
     send_signal(libc::SIGUSR1);
 
@@ -19,9 +19,9 @@ async fn simple() {
 #[cfg(unix)]
 async fn ctrl_c() {
     use tokio::sync::oneshot;
-    use tokio_net::signal::CtrlC;
+    use tokio_net::signal::ctrl_c;
 
-    let ctrl_c = CtrlC::new().expect("failed to init ctrl_c");
+    let ctrl_c = ctrl_c().expect("failed to init ctrl_c");
 
     let (fire, wait) = oneshot::channel();
 

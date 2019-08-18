@@ -29,8 +29,7 @@ use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::kill::Kill;
 
-use tokio_net::driver::Handle;
-use tokio_net::signal::unix::{Signal, SignalKind};
+use tokio_net::signal::unix::{signal, Signal, SignalKind};
 use tokio_net::util::PollEvented;
 
 use mio::event::Evented;
@@ -96,13 +95,13 @@ impl fmt::Debug for Child {
     }
 }
 
-pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Result<SpawnedChild> {
+pub(crate) fn spawn_child(cmd: &mut process::Command) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
-    let stdin = stdio(child.stdin.take(), handle)?;
-    let stdout = stdio(child.stdout.take(), handle)?;
-    let stderr = stdio(child.stderr.take(), handle)?;
+    let stdin = stdio(child.stdin.take())?;
+    let stdout = stdio(child.stdout.take())?;
+    let stderr = stdio(child.stderr.take())?;
 
-    let signal = Signal::with_handle(SignalKind::child(), handle)?;
+    let signal = signal(SignalKind::child())?;
 
     Ok(SpawnedChild {
         child: Child {
@@ -203,7 +202,7 @@ pub(crate) type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
 pub(crate) type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
 pub(crate) type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
 
-fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<Fd<T>>>>
+fn stdio<T>(option: Option<T>) -> io::Result<Option<PollEvented<Fd<T>>>>
 where
     T: AsRawFd,
 {
@@ -224,6 +223,5 @@ where
             return Err(io::Error::last_os_error());
         }
     }
-    let io = PollEvented::new_with_handle(Fd { inner: io }, handle)?;
-    Ok(Some(io))
+    Ok(Some(PollEvented::new(Fd { inner: io })))
 }

@@ -18,7 +18,6 @@
 use super::SpawnedChild;
 use crate::kill::Kill;
 
-use tokio_net::driver::Handle;
 use tokio_net::util::PollEvented;
 use tokio_sync::oneshot;
 
@@ -69,11 +68,11 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
-pub(crate) fn spawn_child(cmd: &mut process::Command, handle: &Handle) -> io::Result<SpawnedChild> {
+pub(crate) fn spawn_child(cmd: &mut process::Command) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
-    let stdin = stdio(child.stdin.take(), handle)?;
-    let stdout = stdio(child.stdout.take(), handle)?;
-    let stderr = stdio(child.stderr.take(), handle)?;
+    let stdin = stdio(child.stdin.take());
+    let stdout = stdio(child.stdout.take());
+    let stderr = stdio(child.stderr.take());
 
     Ok(SpawnedChild {
         child: Child {
@@ -182,15 +181,14 @@ pub(crate) type ChildStdin = PollEvented<NamedPipe>;
 pub(crate) type ChildStdout = PollEvented<NamedPipe>;
 pub(crate) type ChildStderr = PollEvented<NamedPipe>;
 
-fn stdio<T>(option: Option<T>, handle: &Handle) -> io::Result<Option<PollEvented<NamedPipe>>>
+fn stdio<T>(option: Option<T>) -> Option<PollEvented<NamedPipe>>
 where
     T: IntoRawHandle,
 {
     let io = match option {
         Some(io) => io,
-        None => return Ok(None),
+        None => return None,
     };
     let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
-    let io = PollEvented::new_with_handle(pipe, handle)?;
-    Ok(Some(io))
+    Some(PollEvented::new(pipe))
 }
