@@ -58,3 +58,6 @@ tokio-test = { version = "0.2.0-alpha.1", path = "../tokio-test" }
 
 futures-core-preview = "=0.3.0-alpha.18"
 rand = "0.7"
+
+[package.metadata.docs.rs]
+all-features = true

@@ -33,3 +33,6 @@ tokio = { version = "0.2.0-alpha.1", path = "../tokio" }
 
 rand = "0.7"
 tempfile = "3"
+
+[package.metadata.docs.rs]
+all-features = true
