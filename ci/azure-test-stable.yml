@@ -33,7 +33,7 @@ jobs:
 
     # Run with each specified feature
     - ${{ each feature in crate.value }}:
-      - script: cargo test --tests --no-default-features --features ${{ feature }}
+      - script: cargo test --no-default-features --features ${{ feature }}
         env:
           LOOM_MAX_PREEMPTIONS: 2
           CI: 'True'
@@ -53,7 +53,7 @@ jobs:
 
     # Run with each specified feature
     - ${{ each feature in crate.value }}:
-      - script: cargo test --tests --no-default-features --features ${{ feature }}
+      - script: cargo test --no-default-features --features ${{ feature }}
         env:
           LOOM_MAX_PREEMPTIONS: 2
           CI: 'True'
