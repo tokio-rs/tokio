@@ -1,8 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-use tokio_process::CommandExt;
-
 mod support;
 
 #[tokio::test]
@@ -10,7 +8,7 @@ async fn simple() {
     let mut cmd = support::cmd("exit");
     cmd.arg("2");
 
-    let mut child = cmd.spawn_async().unwrap();
+    let mut child = cmd.spawn().unwrap();
 
     let id = child.id();
     assert!(id > 0);

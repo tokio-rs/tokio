@@ -4,9 +4,9 @@ use futures_util::future;
 use futures_util::future::FutureExt;
 use std::env;
 use std::future::Future;
-use std::process::Command;
 use std::time::Duration;
 use tokio::timer::Timeout;
+use tokio_process::Command;
 
 #[allow(dead_code)]
 pub fn cmd(s: &str) -> Command {

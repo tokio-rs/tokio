@@ -5,14 +5,14 @@
 extern crate log;
 
 use std::io;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 
 use futures_util::future;
 use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::io::AsyncWriteExt;
-use tokio_process::{Child, CommandExt};
+use tokio_process::{Child, Command};
 
 mod support;
 
@@ -97,14 +97,14 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
 /// - The child does produce EOF on stdout after the last line.
 #[tokio::test]
 async fn feed_a_lot() {
-    let child = cat().spawn_async().unwrap();
+    let child = cat().spawn().unwrap();
     let status = support::with_timeout(feed_cat(child, 10000)).await.unwrap();
     assert_eq!(status.code(), Some(0));
 }
 
 #[tokio::test]
 async fn wait_with_output_captures() {
-    let mut child = cat().spawn_async().unwrap();
+    let mut child = cat().spawn().unwrap();
     let mut stdin = child.stdin().take().unwrap();
 
     let write_bytes = b"1234";
@@ -128,7 +128,7 @@ async fn status_closes_any_pipes() {
     // Cat will open a pipe between the parent and child.
     // If `status_async` doesn't ensure the handles are closed,
     // we would end up blocking forever (and time out).
-    let child = cat().status_async().expect("failed to spawn child");
+    let child = cat().status().expect("failed to spawn child");
 
     support::with_timeout(child)
         .await
