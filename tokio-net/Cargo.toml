@@ -89,3 +89,6 @@ tokio-io-pool = "0.1.4"
 # UDS tests
 tempfile = "3"
 futures-preview = "=0.3.0-alpha.18"
+
+[package.metadata.docs.rs]
+all-features = true

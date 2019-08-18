@@ -58,3 +58,6 @@ features = [
   "wincrypt",
   "winerror",
 ]
+
+[package.metadata.docs.rs]
+all-features = true

@@ -56,3 +56,6 @@ libc = "0.2"
 log = "0.4"
 mio = "0.6.5"
 tokio-net = { version = "=0.2.0-alpha.2", path = "../tokio-net", features = ["signal"] }
+
+[package.metadata.docs.rs]
+all-features = true

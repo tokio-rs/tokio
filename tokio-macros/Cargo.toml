@@ -30,3 +30,6 @@ syn = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 tokio = { version = "0.2.0-alpha.1", path = "../tokio", default-features = false, features = ["rt-full"] }
+
+[package.metadata.docs.rs]
+all-features = true
