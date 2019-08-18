@@ -7,8 +7,6 @@ use std::task::{Context, Poll};
 /// A future used to shutdown an I/O object.
 ///
 /// Created by the [`AsyncWriteExt::shutdown`] function.
-///
-/// [`shutdown`]: fn.shutdown.html
 #[derive(Debug)]
 pub struct Shutdown<'a, A: ?Sized> {
     a: &'a mut A,

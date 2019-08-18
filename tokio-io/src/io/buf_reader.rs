@@ -22,9 +22,6 @@ use std::{cmp, fmt};
 /// When the `BufReader` is dropped, the contents of its buffer will be
 /// discarded. Creating multiple instances of a `BufReader` on the same
 /// stream can cause data loss.
-///
-/// [`AsyncRead`]: tokio_io::AsyncRead
-///
 // TODO: Examples
 pub struct BufReader<R> {
     inner: R,

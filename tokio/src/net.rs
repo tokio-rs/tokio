@@ -50,14 +50,8 @@ pub mod udp {
     //! UDP bindings for `tokio`.
     //!
     //! The main struct for UDP is the [`UdpSocket`], which represents a UDP socket.
-    //! Reading and writing to it can be done using futures, which return the
-    //! [`Recv`], [`Send`], [`RecvFrom`], [`SendTo`] structs respectively.
     //!
     //! [`UdpSocket`]: struct.UdpSocket.html
-    //! [`Recv`]: struct.Recv.html
-    //! [`Send`]: struct.Send.html
-    //! [`RecvFrom`]: struct.RecvFrom.html
-    //! [`SendTo`]: struct.SendTo.html
     pub use tokio_net::udp::{split, UdpFramed, UdpSocket};
 }
 #[cfg(feature = "udp")]

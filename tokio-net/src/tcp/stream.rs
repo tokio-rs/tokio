@@ -802,8 +802,10 @@ impl TryFrom<TcpStream> for mio::net::TcpStream {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`tokio_net::util::PollEvented::into_inner`] for more details about
+    /// See [`PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
+    ///
+    /// [`PollEvented::into_inner`]: crate::util::PollEvented::into_inner
     fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

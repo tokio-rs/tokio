@@ -31,10 +31,10 @@
 //!
 //! [`Delay`]: struct.Delay.html
 //! [`DelayQueue`]: struct.DelayQueue.html
-//! [`Throttle`]: throttle/struct.Throttle.html
+//! [`Throttle`]: throttle::Throttle
 //! [`Timeout`]: struct.Timeout.html
 //! [`Interval`]: struct.Interval.html
-//! [`Timer`]: timer/struct.Timer.html
+//! [`Timer`]: timer::Timer
 
 pub mod clock;
 pub mod delay_queue;
