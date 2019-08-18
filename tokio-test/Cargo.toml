@@ -7,24 +7,24 @@ name = "tokio-test"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-test/0.2.0-alpha.1/tokio_test"
+documentation = "https://docs.rs/tokio-test/0.2.0-alpha.2/tokio_test"
 description = """
 Testing utilities for Tokio- and futures-based code
 """
 categories = ["asynchronous", "testing"]
 
 [dependencies]
-tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
-tokio-executor = { version = "=0.2.0-alpha.1", path = "../tokio-executor" }
-tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
-tokio-sync = { version = "=0.2.0-alpha.1", path = "../tokio-sync" }
-tokio-timer = { version = "=0.3.0-alpha.1", path = "../tokio-timer" }
+tokio = { version = "=0.2.0-alpha.2", path = "../tokio" }
+tokio-executor = { version = "=0.2.0-alpha.2", path = "../tokio-executor" }
+tokio-io = { version = "=0.2.0-alpha.2", path = "../tokio-io" }
+tokio-sync = { version = "=0.2.0-alpha.2", path = "../tokio-sync" }
+tokio-timer = { version = "=0.3.0-alpha.2", path = "../tokio-timer" }
 
 futures-core-preview = "=0.3.0-alpha.18"
 pin-convert = "0.1.0"

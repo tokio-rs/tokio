@@ -8,13 +8,13 @@ name = "tokio-tls"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
-version = "0.3.0-alpha.1"
+version = "0.3.0-alpha.2"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-tls/0.3.0-alpha.1/tokio_tls/"
+documentation = "https://docs.rs/tokio-tls/0.3.0-alpha.2/tokio_tls/"
 description = """
 An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
 for nonblocking I/O streams.
@@ -26,11 +26,11 @@ travis-ci = { repository = "tokio-rs/tokio-tls" }
 
 [dependencies]
 native-tls = "0.2"
-tokio-io = { version = "=0.2.0-alpha.1", path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.2", path = "../tokio-io" }
 
 [dev-dependencies]
-tokio = { version = "=0.2.0-alpha.1", path = "../tokio" }
-tokio-net = { version = "=0.2.0-alpha.1", path = "../tokio-net", features = ["tcp", "async-traits"] }
+tokio = { version = "=0.2.0-alpha.2", path = "../tokio" }
+tokio-net = { version = "=0.2.0-alpha.2", path = "../tokio-net", features = ["tcp", "async-traits"] }
 
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
