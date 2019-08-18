@@ -6,12 +6,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::oneshot;
-use tokio::timer::Delay;
 use tokio_test::{assert_err, assert_ok};
 
 use env_logger;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use tokio::timer::delay;
 
 async fn client_server(tx: mpsc::Sender<()>) {
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -47,7 +47,7 @@ fn spawn_run_spawn_root() {
 
     let tx2 = tx.clone();
     rt.spawn(async move {
-        Delay::new(Instant::now() + Duration::from_millis(1000)).await;
+        delay(Instant::now() + Duration::from_millis(1000)).await;
         tx2.send(()).unwrap();
     });
 
@@ -68,7 +68,7 @@ fn spawn_run_nested_spawn() {
     let tx2 = tx.clone();
     rt.spawn(async move {
         tokio::spawn(async move {
-            Delay::new(Instant::now() + Duration::from_millis(1000)).await;
+            delay(Instant::now() + Duration::from_millis(1000)).await;
             tx2.send(()).unwrap();
         });
     });
@@ -89,7 +89,7 @@ fn block_on() {
 
     let tx2 = tx.clone();
     rt.spawn(async move {
-        Delay::new(Instant::now() + Duration::from_millis(1000)).await;
+        delay(Instant::now() + Duration::from_millis(1000)).await;
         tx2.send(()).unwrap();
     });
 

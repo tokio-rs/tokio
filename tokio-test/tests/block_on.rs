@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 use tokio_test::block_on;
-use tokio_timer::Delay;
+use tokio_timer::delay;
 
 #[test]
 fn async_block() {
@@ -20,9 +20,7 @@ fn async_fn() {
 }
 
 #[test]
-fn delay() {
+fn test_delay() {
     let deadline = Instant::now() + Duration::from_millis(100);
-    let delay = Delay::new(deadline);
-
-    assert_eq!((), block_on(delay));
+    assert_eq!((), block_on(delay(deadline)));
 }

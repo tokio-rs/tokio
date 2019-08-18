@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use tokio_test::clock::MockClock;
 use tokio_test::task::MockTask;
 use tokio_test::{assert_not_ready, assert_ready};
-use tokio_timer::Delay;
+use tokio_timer::delay;
 
 #[test]
 fn clock() {
@@ -14,7 +14,7 @@ fn clock() {
 
     mock.enter(|handle| {
         let deadline = Instant::now() + Duration::from_secs(1);
-        let mut delay = Delay::new(deadline);
+        let mut delay = delay(deadline);
 
         assert_not_ready!(delay.poll());
 
@@ -31,7 +31,7 @@ fn notify() {
     let mut task = MockTask::new();
 
     mock.enter(|handle| {
-        let mut delay = Delay::new(deadline);
+        let mut delay = delay(deadline);
 
         task.enter(|| assert_not_ready!(delay.poll()));
 

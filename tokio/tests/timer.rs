@@ -18,7 +18,7 @@ fn timer_with_threaded_runtime() {
     rt.spawn(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        Delay::new(when).await;
+        delay(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();
@@ -39,7 +39,7 @@ fn timer_with_current_thread_runtime() {
     rt.spawn(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        Delay::new(when).await;
+        tokio::timer::delay(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();
@@ -55,9 +55,9 @@ async fn starving() {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    struct Starve(Delay, u64);
+    struct Starve<T: Future<Output = ()> + Unpin>(T, u64);
 
-    impl Future for Starve {
+    impl<T: Future<Output = ()> + Unpin> Future for Starve<T> {
         type Output = u64;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<u64> {
@@ -74,7 +74,7 @@ async fn starving() {
     }
 
     let when = Instant::now() + Duration::from_millis(20);
-    let starve = Starve(Delay::new(when), 0);
+    let starve = Starve(delay(when), 0);
 
     starve.await;
     assert!(Instant::now() >= when);

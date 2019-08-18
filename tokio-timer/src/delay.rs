@@ -33,7 +33,7 @@ impl Delay {
     /// Only millisecond level resolution is guaranteed. There is no guarantee
     /// as to how the sub-millisecond portion of `deadline` will be handled.
     /// `Delay` should not be used for high-resolution timer use cases.
-    pub fn new(deadline: Instant) -> Delay {
+    pub(crate) fn new(deadline: Instant) -> Delay {
         let registration = Registration::new(deadline, Duration::from_millis(0));
 
         Delay { registration }
