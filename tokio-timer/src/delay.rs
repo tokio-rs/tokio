@@ -91,6 +91,13 @@ impl Delay {
     }
 }
 
+#[cfg(feature = "async-traits")]
+impl futures_core::FusedFuture for Delay {
+    fn is_terminated(&self) -> bool {
+        self.is_elapsed()
+    }
+}
+
 impl Future for Delay {
     type Output = ();
 
