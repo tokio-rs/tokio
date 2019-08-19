@@ -122,11 +122,11 @@ use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::Context;
 use std::task::Poll;
 
+use self::kill::Kill;
 use futures_core::TryFuture;
 use futures_util::future;
 use futures_util::future::FutureExt;
 use futures_util::try_future::TryFutureExt;
-use self::kill::Kill;
 use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 #[path = "unix/mod.rs"]
@@ -975,8 +975,8 @@ mod test {
 
     use futures_util::future::FutureExt;
 
-    use super::ChildDropGuard;
     use super::kill::Kill;
+    use super::ChildDropGuard;
 
     struct Mock {
         num_kills: usize,

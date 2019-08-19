@@ -15,8 +15,9 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-use crate::util::PollEvented;
+use super::SpawnedChild;
 use crate::process::kill::Kill;
+use crate::util::PollEvented;
 use futures_util::future::Fuse;
 use futures_util::future::FutureExt;
 use mio_named_pipes::NamedPipe;
@@ -30,7 +31,6 @@ use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
 use std::ptr;
 use std::task::Context;
 use std::task::Poll;
-use super::SpawnedChild;
 use tokio_sync::oneshot;
 use winapi::shared::minwindef::FALSE;
 use winapi::shared::winerror::WAIT_TIMEOUT;

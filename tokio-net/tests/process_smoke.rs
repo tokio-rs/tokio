@@ -19,10 +19,7 @@ async fn simple() {
         cmd.arg("-c");
     }
 
-    let mut child = cmd
-        .arg("exit 2")
-        .spawn()
-        .unwrap();
+    let mut child = cmd.arg("exit 2").spawn().unwrap();
 
     let id = child.id();
     assert!(id > 0);
