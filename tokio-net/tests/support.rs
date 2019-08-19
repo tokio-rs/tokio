@@ -1,8 +1,11 @@
 #![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![allow(dead_code)]
 
 pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
 use tokio::timer::Timeout;
+
+#[cfg(feature = "signal")]
 pub use tokio_net::signal::unix::{signal, SignalKind};
 
 pub use futures_util::future;
