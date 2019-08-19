@@ -101,6 +101,13 @@ impl Interval {
 }
 
 #[cfg(feature = "async-traits")]
+impl futures_core::FusedStream for Interval {
+    fn is_terminated(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(feature = "async-traits")]
 impl futures_core::Stream for Interval {
     type Item = Instant;
 
