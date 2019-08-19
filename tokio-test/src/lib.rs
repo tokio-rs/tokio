@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-test/0.2.0-alpha.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-test/0.2.0-alpha.2")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -20,7 +20,7 @@ pub mod task;
 /// For more information, see the documentation for
 /// [`tokio::runtime::current_thread::Runtime::block_on`][runtime-block-on].
 ///
-/// [runtime-block-on]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/runtime/current_thread/struct.Runtime.html#method.block_on
+/// [runtime-block-on]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/current_thread/struct.Runtime.html#method.block_on
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
     rt.block_on(future)

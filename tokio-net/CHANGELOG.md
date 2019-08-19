@@ -1,3 +1,16 @@
+# 0.2.0-alpha.2 (August 17, 2019)
+
+### Changed
+- Renamed `tokio-net` from `tokio-reactor` (#1450).
+- Switch `with_default(..., || )` to `set_default(...) -> Guard` (#1449).
+- Update `futures` dependency to 0.3.0-alpha.18.
+
+### Added
+- Import `tokio-tcp` (#1456).
+- Import `tokio-udp` (#1459).
+- Import `tokio-uds` (#1462).
+- Import `tokio-signal` (#1463).
+
 # 0.2.0-alpha.1 (August 8, 2019)
 
 ### Changed

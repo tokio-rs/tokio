@@ -3,7 +3,7 @@
 #![cfg(feature = "default")]
 
 use tokio_net::driver::Reactor;
-use tokio_tcp::TcpListener;
+use tokio_net::tcp::TcpListener;
 use tokio_test::{assert_ok, assert_pending};
 
 use futures_util::task::{waker_ref, ArcWake};

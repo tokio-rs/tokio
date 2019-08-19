@@ -30,7 +30,7 @@ the Rust programming language. It is:
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
-[API Docs](https://docs.rs/tokio/0.2.0-alpha.1/tokio) |
+[API Docs](https://docs.rs/tokio/0.2.0-alpha.2/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
 ## Overview
@@ -40,16 +40,15 @@ asynchronous applications with the Rust programming language. At a high
 level, it provides a few major components:
 
 * A multithreaded, work-stealing based task [scheduler].
-* A [reactor] backed by the operating system's event queue (epoll, kqueue,
+* A reactor backed by the operating system's event queue (epoll, kqueue,
   IOCP, etc...).
 * Asynchronous [TCP and UDP][net] sockets.
 
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/net/index.html
-[reactor]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/reactor/index.html
-[scheduler]: https://docs.rs/tokio/0.2.0-alpha.1/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/net/index.html
+[scheduler]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/index.html
 
 ## Example
 
@@ -109,7 +108,7 @@ the [Tokio Gitter channel][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
-[API documentation]: https://docs.rs/tokio/0.2.0-alpha.1/tokio
+[API documentation]: https://docs.rs/tokio/0.2.0-alpha.2/tokio
 [chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
@@ -140,16 +139,10 @@ The crates included as part of Tokio are:
 
 * [`tokio-macros`]: Macros for usage with Tokio.
 
-* [`tokio-net`]: Event loop that drives I/O resources (like TCP and UDP
-  sockets).
-
-* [`tokio-tcp`]: TCP listener and acceptor.
+* [`tokio-net`]: Event loop that drives I/O resources as well as TCP, UDP, and
+  unix domain socket apis.
 
 * [ `tokio-timer`]: Time related APIs.
-
-* [`tokio-udp`]: UDP socket.
-
-* [`tokio-uds`]: Unix Domain Socket bindings.
 
 [`tokio-codec`]: tokio-codec
 [`tokio-current-thread`]: tokio-current-thread
@@ -158,10 +151,7 @@ The crates included as part of Tokio are:
 [`tokio-io`]: tokio-io
 [`tokio-macros`]: tokio-macros
 [`tokio-net`]: tokio-net
-[`tokio-tcp`]: tokio-tcp
 [`tokio-timer`]: tokio-timer
-[`tokio-udp`]: tokio-udp
-[`tokio-uds`]: tokio-uds
 
 ## Related Projects
 

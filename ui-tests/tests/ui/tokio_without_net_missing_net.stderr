@@ -1,7 +1,0 @@
-error[E0432]: unresolved import `ui_tests::tokio::net`
- --> $DIR/tokio_without_net_missing_net.rs:1:5
-  |
-1 | use ui_tests::tokio::net;
-  |     ^^^^^^^^^^^^^^^^^^^^ no `net` in `tokio`
-
-For more information about this error, try `rustc --explain E0432`.

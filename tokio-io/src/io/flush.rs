@@ -7,8 +7,6 @@ use std::task::{Context, Poll};
 /// A future used to fully flush an I/O object.
 ///
 /// Created by the [`AsyncWriteExt::flush`] function.
-///
-/// [`flush`]: fn.flush.html
 #[derive(Debug)]
 pub struct Flush<'a, A: ?Sized> {
     a: &'a mut A,

@@ -24,7 +24,7 @@ use std::task::{Context, Poll};
 /// stream can cause data loss. If you need to write out the contents of its
 /// buffer, you must manually call flush before the writer is dropped.
 ///
-/// [`AsyncWrite`]: tokio_io::AsyncWrite
+/// [`AsyncWrite`]: AsyncWrite
 /// [`flush`]: super::AsyncWriteExt::flush
 ///
 // TODO: Examples

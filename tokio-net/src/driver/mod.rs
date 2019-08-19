@@ -136,5 +136,5 @@ mod reactor;
 mod registration;
 mod sharded_rwlock;
 
-pub use self::reactor::{set_default, Handle, Reactor};
+pub use self::reactor::{set_default, DefaultGuard, Handle, Reactor};
 pub use self::registration::Registration;

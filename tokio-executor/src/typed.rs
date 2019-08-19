@@ -20,6 +20,7 @@ use crate::SpawnError;
 /// such, the function takes a stream and an executor on which the background
 /// task is spawned.
 ///
+/// [`spawn`]: TypedExecutor::spawn
 /// ```
 /// #![feature(async_await)]
 ///

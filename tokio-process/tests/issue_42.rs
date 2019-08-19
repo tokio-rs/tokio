@@ -4,13 +4,13 @@
 use futures_util::future::FutureExt;
 use futures_util::stream::FuturesOrdered;
 use futures_util::stream::StreamExt;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio::runtime::current_thread;
-use tokio_process::CommandExt;
+use tokio_process::Command;
 
 mod support;
 
@@ -27,7 +27,7 @@ fn run_test() {
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
-                    .spawn_async()
+                    .spawn()
                     .unwrap()
                     .boxed(),
             )

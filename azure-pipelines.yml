@@ -47,14 +47,12 @@ jobs:
     rust: $(nightly)
     crates:
       tokio-fs: []
-      tokio-net: []
+      tokio-net:
+        - signal
+        - tcp
+        - udp
+        - uds
       tokio-process: []
-      tokio-signal: []
-      tokio-tcp:
-        - async-traits
-      tokio-udp: []
-      tokio-uds:
-        - async-traits
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
@@ -84,8 +82,14 @@ jobs:
     displayName: Test feature flags
     rust: $(nightly)
     crates:
-      ui-tests:
+      build-tests:
+        - tokio-executor
+        - tokio-net
         - executor-without-current-thread
+        - net-no-features
+        - net-with-tcp
+        - net-with-udp
+        - net-with-uds
         - tokio-no-features
         - tokio-with-net
 
@@ -111,16 +115,18 @@ jobs:
 #   parameters:
 #     name: tsan
 #     rust: $(nightly)
-#
-# - template: ci/azure-deploy-docs.yml
-#   parameters:
-#     dependsOn:
-#       - rustfmt
-#       - test_tokio
-#       - test_sub_cross
-#       - test_linux
-#       - features
-#       - test_nightly
-#       - cross_32bit_linux
-#       - minrust
-#       - tsan
+
+- template: ci/azure-deploy-docs.yml
+  parameters:
+    rust: $(nightly)
+    dependsOn:
+      - rustfmt
+      - clippy
+      - test_tokio
+      - test_sub_cross
+      - test_linux
+      - test_features
+#      - test_nightly
+#      - cross_32bit_linux
+#      - minrust
+#      - tsan

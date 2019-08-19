@@ -29,3 +29,6 @@ either = { version =  "1.5", optional = true}
 
 [dev-dependencies]
 tokio-mock-task = "0.1.1"
+
+[package.metadata.docs.rs]
+all-features = true

@@ -40,7 +40,7 @@ pub mod tcp {
     //! [`TcpListener`]: struct.TcpListener.html
     //! [incoming_method]: struct.TcpListener.html#method.incoming
     //! [`Incoming`]: struct.Incoming.html
-    pub use tokio_tcp::{split, TcpListener, TcpStream};
+    pub use tokio_net::tcp::{split, TcpListener, TcpStream};
 }
 #[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
@@ -50,15 +50,9 @@ pub mod udp {
     //! UDP bindings for `tokio`.
     //!
     //! The main struct for UDP is the [`UdpSocket`], which represents a UDP socket.
-    //! Reading and writing to it can be done using futures, which return the
-    //! [`Recv`], [`Send`], [`RecvFrom`], [`SendTo`] structs respectively.
     //!
     //! [`UdpSocket`]: struct.UdpSocket.html
-    //! [`Recv`]: struct.Recv.html
-    //! [`Send`]: struct.Send.html
-    //! [`RecvFrom`]: struct.RecvFrom.html
-    //! [`SendTo`]: struct.SendTo.html
-    pub use tokio_udp::{split, UdpFramed, UdpSocket};
+    pub use tokio_net::udp::{split, UdpFramed, UdpSocket};
 }
 #[cfg(feature = "udp")]
 pub use self::udp::{UdpFramed, UdpSocket};
@@ -67,7 +61,7 @@ pub use self::udp::{UdpFramed, UdpSocket};
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
 
-    pub use tokio_uds::{split, UCred, UnixDatagram, UnixListener, UnixStream};
+    pub use tokio_net::uds::{split, UCred, UnixDatagram, UnixListener, UnixStream};
 }
 #[cfg(all(unix, feature = "uds"))]
 pub use self::unix::{UnixDatagram, UnixListener, UnixStream};

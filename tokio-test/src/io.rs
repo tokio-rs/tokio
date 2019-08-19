@@ -12,6 +12,9 @@
 //!
 //! Attempting to write data that the mock isn't expected will result in a
 //! panic.
+//!
+//! [`AsyncRead`]: tokio_io::AsyncRead
+//! [`AsyncWrite`]: tokio_io::AsyncWrite
 
 use std::collections::VecDeque;
 use std::future::Future;

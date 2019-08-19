@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-net/0.2.0-alpha.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-net/0.2.0-alpha.2")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -6,6 +6,7 @@
     unreachable_pub
 )]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![feature(async_await)]
 
 //! Event loop that drives Tokio I/O resources.
 //!
@@ -38,3 +39,16 @@
 
 pub mod driver;
 pub mod util;
+
+#[cfg(feature = "signal")]
+pub mod signal;
+
+#[cfg(feature = "tcp")]
+pub mod tcp;
+
+#[cfg(feature = "udp")]
+pub mod udp;
+
+#[cfg(feature = "uds")]
+#[cfg(unix)]
+pub mod uds;
