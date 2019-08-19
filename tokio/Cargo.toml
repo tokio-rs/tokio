@@ -73,8 +73,8 @@ tokio-sync = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-syn
 tokio-timer = { version = "=0.3.0-alpha.2", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
 
-[target.'cfg(feature = "tracing")'.dependencies.tokio-executor]
-features = ["tracing"]
+[target.'cfg(feature = "tracing")'.dependencies]
+tokio-executor = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-executor", features = ["tracing"] }
 
 [dev-dependencies]
 tokio-test = { version = "0.2.0-alpha.1", path = "../tokio-test" }
