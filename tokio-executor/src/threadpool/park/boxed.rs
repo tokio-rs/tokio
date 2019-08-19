@@ -2,7 +2,6 @@ use crate::park::{Park, Unpark};
 
 use std::error::Error;
 use std::time::Duration;
-use tracing::warn;
 
 pub(crate) type BoxPark = Box<dyn Park<Unpark = BoxUnpark, Error = ()> + Send>;
 pub(crate) type BoxUnpark = Box<dyn Unpark>;
@@ -27,19 +26,20 @@ where
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.0.park().map_err(|e| {
+        self.0.park().map_err(|_e| {
+            // if tracing is disabled, the compiler will flag this as unused.
             warn!(
                 message = "calling `park` on worker thread errored -- shutting down thread",
-                error = %e
+                error = %_e
             );
         })
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.0.park_timeout(duration).map_err(|e| {
+        self.0.park_timeout(duration).map_err(|_e| {
             warn!(
                 message = "calling `park` on worker thread errored -- shutting down thread",
-                error = %e,
+                error = %_e,
             );
         })
     }

@@ -26,7 +26,6 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::{Arc, Weak};
 use std::task::Poll;
 use std::thread;
-use tracing::{debug, error, trace};
 
 #[derive(Debug)]
 pub(crate) struct Pool {
@@ -133,7 +132,7 @@ impl Pool {
 
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
-    #[tracing::instrument(level = "trace")]
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
     pub(crate) fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
         trace!(?state);
@@ -402,7 +401,7 @@ impl Pool {
         use super::worker::Lifecycle::Signaled;
 
         if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
-            let span = tracing::trace_span!("signal_work", idx);
+            let span = trace_span!("signal_work", idx);
             let _enter = span.enter();
 
             let entry = &self.workers[idx];

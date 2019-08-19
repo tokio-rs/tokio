@@ -21,7 +21,6 @@ use std::sync::Arc;
 use std::task::Poll;
 use std::thread;
 use std::time::Duration;
-use tracing::{trace, trace_span};
 
 /// Thread worker
 ///
@@ -565,7 +564,7 @@ impl Worker {
     ///
     /// Returns `true` if woken up due to new work arriving.
     // tracing macro expansion adds enough branches to make clippy angry here.
-    #[allow(clippy::cognitive_complexity)]
+    #[cfg_attr(feature = "tracing", allow(clippy::cognitive_complexity))]
     fn sleep(&self) -> bool {
         use self::Lifecycle::*;
 

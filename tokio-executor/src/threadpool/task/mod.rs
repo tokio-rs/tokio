@@ -12,12 +12,11 @@ use futures_util::task;
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::{fmt, panic, ptr};
-use tracing::{trace, trace_span};
 
 /// Harness around a future.
 ///
@@ -100,6 +99,8 @@ impl Task {
     #[allow(clippy::cognitive_complexity)]
     pub(crate) fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
         use self::State::*;
+        #[cfg(feature = "tracing")]
+        use std::sync::atomic::Ordering::Relaxed;
 
         // Transition task to running state. At this point, the task must be
         // scheduled.

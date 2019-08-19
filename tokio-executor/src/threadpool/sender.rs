@@ -7,7 +7,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-use tracing::trace;
 
 /// Submit futures to the associated thread pool for execution.
 ///
