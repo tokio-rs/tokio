@@ -1,4 +1,3 @@
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
 #![allow(dead_code)]
 
@@ -11,6 +10,7 @@ pub use tokio_net::signal::unix::{signal, SignalKind};
 pub use futures_util::future;
 use futures_util::future::FutureExt;
 pub use futures_util::stream::StreamExt;
+#[cfg(unix)]
 use libc::{c_int, getpid, kill};
 use std::future::Future;
 use std::time::Duration;
