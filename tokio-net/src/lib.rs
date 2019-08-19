@@ -55,3 +55,6 @@ pub mod udp;
 #[cfg(feature = "uds")]
 #[cfg(unix)]
 pub mod uds;
+
+#[macro_use]
+mod tracing;

@@ -17,7 +17,6 @@ use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
 use std::{fmt, usize};
-use tracing::{debug, trace};
 
 /// The core reactor, or event loop.
 ///
@@ -235,7 +234,7 @@ impl Reactor {
         self.inner.io_dispatch.read().is_empty()
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.

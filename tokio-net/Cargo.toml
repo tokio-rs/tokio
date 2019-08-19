@@ -71,6 +71,8 @@ tokio-executor = { version = "=0.2.0-alpha.2", path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.2", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.2", path = "../tokio-sync" }
 
+tracing = { version = "0.1.5", optional = true }
+
 # driver implementation
 crossbeam-utils = "0.6.0"
 futures-core-preview = "=0.3.0-alpha.18"
@@ -85,8 +87,6 @@ bytes = { version = "0.4", optional = true }
 futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
 futures-util-preview = { version = "=0.3.0-alpha.18", optional = true }
 iovec = { version = "0.1", optional = true }
-
-tracing = "0.1.5"
 
 [target.'cfg(unix)'.dependencies]
 # UDS / Signal

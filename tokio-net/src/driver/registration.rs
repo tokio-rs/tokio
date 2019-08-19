@@ -7,7 +7,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
 use std::{io, ptr, usize};
-use tracing::debug;
 
 /// Associates an I/O resource with the reactor instance that drives it.
 ///
