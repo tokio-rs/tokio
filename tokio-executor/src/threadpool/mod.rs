@@ -138,7 +138,7 @@ mod thread_pool;
 mod waker;
 mod worker;
 
-pub use self::blocking::{blocking, BlockingError};
+pub use self::blocking::{blocking, enter_blocking_section, exit_blocking_section, BlockingError};
 pub use self::builder::Builder;
 pub use self::sender::Sender;
 pub use self::shutdown::Shutdown;

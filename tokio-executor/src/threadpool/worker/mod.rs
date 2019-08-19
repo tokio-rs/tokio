@@ -6,6 +6,7 @@ pub(crate) use self::entry::WorkerEntry as Entry;
 pub(crate) use self::stack::Stack;
 pub(crate) use self::state::{Lifecycle, State};
 
+use super::blocking::Kind;
 use super::pool::{self, BackupId, Pool};
 use super::sender::Sender;
 use super::shutdown::ShutdownTrigger;
@@ -148,7 +149,7 @@ impl Worker {
     }
 
     /// Transition the current worker to a blocking worker
-    pub(crate) fn transition_to_blocking(&self) -> Poll<Result<(), BlockingError>> {
+    pub(crate) fn transition_to_blocking(&self) -> Result<(), BlockingError> {
         use self::CanBlock::*;
 
         // If we get this far, then `current_task` has been set.
@@ -161,7 +162,7 @@ impl Worker {
 
             // The task has already requested capacity to block, but there is
             // none yet available.
-            NoCapacity => return Poll::Pending,
+            NoCapacity => return Err(BlockingError(Kind::NoCapacity)),
 
             // The task has yet to ask for capacity
             CanRequest => {
@@ -174,7 +175,7 @@ impl Worker {
                     }
                     Poll::Pending => {
                         self.current_task.set_can_block(NoCapacity);
-                        return Poll::Pending;
+                        return Err(BlockingError(Kind::NoCapacity));
                     }
                 }
             }
@@ -186,8 +187,8 @@ impl Worker {
 
         if self.is_blocking.get() {
             // The thread is already in blocking mode, so there is nothing else
-            // to do. Return `Ready` and allow the caller to block the thread.
-            return Poll::Ready(Ok(()));
+            // to do. Return `Ok` and allow the caller to block the thread.
+            return Ok(());
         }
 
         trace!("transition to blocking state");
@@ -200,7 +201,7 @@ impl Worker {
         // Track that the thread has now fully entered the blocking state.
         self.is_blocking.set(true);
 
-        Poll::Ready(Ok(()))
+        Ok(())
     }
 
     /// Transition from blocking
