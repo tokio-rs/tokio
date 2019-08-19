@@ -4,7 +4,7 @@
 pub use tokio::runtime::current_thread::{self, Runtime as CurrentThreadRuntime};
 use tokio::timer::Timeout;
 
-#[cfg(feature = "signal")]
+#[cfg(all(unix, feature = "signal"))]
 pub use tokio_net::signal::unix::{signal, SignalKind};
 
 pub use futures_util::future;
