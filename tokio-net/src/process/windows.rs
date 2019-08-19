@@ -39,7 +39,7 @@ use winapi::um::processthreadsapi::GetExitCodeProcess;
 use winapi::um::synchapi::WaitForSingleObject;
 use winapi::um::threadpoollegacyapiset::UnregisterWaitEx;
 use winapi::um::winbase::{RegisterWaitForSingleObject, INFINITE, WAIT_OBJECT_0};
-use winapi::um::winnt::{BOOLEAN, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE};
+use winapi::um::winnt::{BOOLEAN, HANDLE, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE};
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
