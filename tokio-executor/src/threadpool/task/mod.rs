@@ -9,11 +9,10 @@ use super::pool::Pool;
 use super::waker::Waker;
 
 use futures_util::task;
-use log::trace;
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicPtr, AtomicUsize};
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -95,8 +94,13 @@ impl Task {
 
     /// Execute the task returning `Run::Schedule` if the task needs to be
     /// scheduled again.
+    ///
+    // tracing macro expansion adds enough branches to make clippy angry here.
+    #[allow(clippy::cognitive_complexity)]
     pub(crate) fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
         use self::State::*;
+        #[cfg(feature = "tracing")]
+        use std::sync::atomic::Ordering::Relaxed;
 
         // Transition task to running state. At this point, the task must be
         // scheduled.
@@ -109,8 +113,10 @@ impl Task {
             Scheduled => {}
             _ => panic!("unexpected task state; {:?}", actual),
         }
+        let span = trace_span!("Task::run");
+        let _enter = span.enter();
 
-        trace!("Task::run; state={:?}", State::from(me.state.load(Relaxed)));
+        trace!(state = ?State::from(me.state.load(Relaxed)));
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained.
@@ -151,7 +157,7 @@ impl Task {
 
         match res {
             Ok(Poll::Ready(_)) | Err(_) => {
-                trace!("    -> task complete");
+                trace!("task complete");
 
                 // The future has completed. Drop it immediately to free
                 // resources and run drop handlers.
@@ -172,7 +178,7 @@ impl Task {
                 Run::Complete
             }
             Ok(Poll::Pending) => {
-                trace!("    -> not ready");
+                trace!("not ready");
 
                 // Attempt to transition from Running -> Idle, if successful,
                 // then the task does not need to be scheduled again. If the CAS

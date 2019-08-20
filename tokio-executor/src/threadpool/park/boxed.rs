@@ -1,6 +1,5 @@
 use crate::park::{Park, Unpark};
 
-use log::warn;
 use std::error::Error;
 use std::time::Duration;
 
@@ -27,19 +26,20 @@ where
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.0.park().map_err(|e| {
+        self.0.park().map_err(|_e| {
+            // if tracing is disabled, the compiler will flag this as unused.
             warn!(
-                "calling `park` on worker thread errored -- shutting down thread: {}",
-                e
+                message = "calling `park` on worker thread errored -- shutting down thread",
+                error = %_e
             );
         })
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.0.park_timeout(duration).map_err(|e| {
+        self.0.park_timeout(duration).map_err(|_e| {
             warn!(
-                "calling `park` on worker thread errored -- shutting down thread: {}",
-                e
+                message = "calling `park` on worker thread errored -- shutting down thread",
+                error = %_e,
             );
         })
     }

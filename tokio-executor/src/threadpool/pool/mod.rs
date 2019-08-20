@@ -17,7 +17,6 @@ use super::BlockingError;
 use crossbeam_deque::Injector;
 use crossbeam_utils::CachePadded;
 use lazy_static::lazy_static;
-use log::{debug, error, trace};
 use std::cell::Cell;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};
@@ -133,10 +132,10 @@ impl Pool {
 
     /// Start shutting down the pool. This means that no new futures will be
     /// accepted.
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
     pub(crate) fn shutdown(&self, now: bool, purge_queue: bool) {
         let mut state: State = self.state.load(Acquire).into();
-
-        trace!("shutdown; state={:?}", state);
+        trace!(?state);
 
         // For now, this must be true
         debug_assert!(!purge_queue || now);
@@ -184,7 +183,7 @@ impl Pool {
             state = actual;
         }
 
-        trace!("  -> transitioned to shutdown");
+        trace!("transitioned to shutdown");
 
         // Only transition to terminate if there are no futures currently on the
         // pool
@@ -205,7 +204,7 @@ impl Pool {
     pub(crate) fn terminate_sleeping_workers(&self) {
         use super::worker::Lifecycle::Signaled;
 
-        trace!("  -> shutting down workers");
+        trace!("shutting down workers");
         // Wakeup all sleeping workers. They will wake up, see the state
         // transition, and terminate.
         while let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, true) {
@@ -249,7 +248,7 @@ impl Pool {
                 if !worker.is_blocking() && *self == *worker.pool {
                     let idx = worker.id.0;
 
-                    trace!("    -> submit internal; idx={}", idx);
+                    trace!(message = "submit internal;", idx);
 
                     worker.pool.workers[idx].submit_internal(task);
                     worker.pool.signal_work(pool);
@@ -268,7 +267,7 @@ impl Pool {
     pub(crate) fn submit_external(&self, task: Arc<Task>, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
-        trace!("    -> submit external");
+        trace!("submit external");
 
         self.queue.push(task);
         self.signal_work(pool);
@@ -388,9 +387,9 @@ impl Pool {
             }
         });
 
-        if let Err(e) = res {
-            error!("failed to spawn worker thread; err={:?}", e);
-            panic!("failed to spawn worker thread: {:?}", e);
+        if let Err(err) = res {
+            error!(message = "failed to spawn worker thread;", ?err);
+            panic!("failed to spawn worker thread: {:?}", err);
         }
     }
 
@@ -402,6 +401,9 @@ impl Pool {
         use super::worker::Lifecycle::Signaled;
 
         if let Some((idx, worker_state)) = self.sleep_stack.pop(&self.workers, Signaled, false) {
+            let span = trace_span!("signal_work", idx);
+            let _enter = span.enter();
+
             let entry = &self.workers[idx];
 
             debug_assert!(
@@ -410,10 +412,10 @@ impl Pool {
                 worker_state.lifecycle(),
             );
 
-            trace!("signal_work -- notify; idx={}", idx);
+            trace!("notify");
 
             if !entry.notify(worker_state) {
-                trace!("signal_work -- spawn; idx={}", idx);
+                trace!("spawn;");
                 self.spawn_thread(WorkerId(idx), pool);
             }
         }

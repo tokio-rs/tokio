@@ -56,6 +56,9 @@
 //! [`DefaultExecutor`]: struct.DefaultExecutor.html
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://doc.rust-lang.org/std/future/trait.Future.html#tymethod.poll
+#[cfg(any(feature = "current-thread", feature = "threadpool"))]
+#[macro_use]
+mod tracing;
 
 mod enter;
 mod error;
