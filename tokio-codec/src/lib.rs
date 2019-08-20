@@ -32,7 +32,7 @@ pub mod length_delimited;
 mod lines_codec;
 
 pub use crate::bytes_codec::BytesCodec;
-pub use crate::datagram::{DatagramFramed, DatagramSocket};
+pub use crate::datagram::DatagramFramed;
 pub use crate::decoder::Decoder;
 pub use crate::encoder::Encoder;
 pub use crate::framed::{Framed, FramedParts};

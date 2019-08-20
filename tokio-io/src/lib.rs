@@ -16,6 +16,7 @@
 //! [low level details]: https://tokio.rs/docs/going-deeper-tokio/core-low-level/
 
 mod async_buf_read;
+mod async_datagram;
 mod async_read;
 mod async_write;
 
@@ -23,6 +24,7 @@ mod async_write;
 mod io;
 
 pub use self::async_buf_read::AsyncBufRead;
+pub use self::async_datagram::AsyncDatagram;
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
 

@@ -7,6 +7,7 @@ use futures_sink::Sink;
 use log::trace;
 use std::io;
 use std::pin::Pin;
+use tokio_io::AsyncDatagram;
 
 /// A unified `Stream` and `Sink` interface to an underlying datagram socket, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -31,13 +32,8 @@ pub struct DatagramFramed<C, S, A> {
     flushed: bool,
 }
 
-pub trait DatagramSocket<A> {
-    fn poll_datagram_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<(usize, A), io::Error>>;
-    fn poll_datagram_send(&self, cx: &mut Context<'_>, buf: &mut [u8], target: &A) -> Poll<io::Result<usize>>;
-}
-
-impl<C: Decoder + Unpin, S: DatagramSocket<A> + Unpin, A: Unpin> Stream for DatagramFramed<C, S, A> {
-    type Item = Result<(C::Item, A), C::Error>;
+impl<C: Decoder + Unpin, S: AsyncDatagram + Unpin> Stream for DatagramFramed<C, S, S::Address> {
+    type Item = Result<(C::Item, S::Address), C::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let pin = self.get_mut();
@@ -62,7 +58,7 @@ impl<C: Decoder + Unpin, S: DatagramSocket<A> + Unpin, A: Unpin> Stream for Data
     }
 }
 
-impl<C: Encoder + Unpin, S: DatagramSocket<A> + Unpin, A: Unpin> Sink<(C::Item, A)> for DatagramFramed<C, S, A> {
+impl<C: Encoder + Unpin, S: AsyncDatagram + Unpin> Sink<(C::Item, S::Address)> for DatagramFramed<C, S, S::Address> {
     type Error = C::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -76,7 +72,7 @@ impl<C: Encoder + Unpin, S: DatagramSocket<A> + Unpin, A: Unpin> Sink<(C::Item, 
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: (C::Item, A)) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: (C::Item, S::Address)) -> Result<(), Self::Error> {
         trace!("sending frame");
 
         let (frame, out_addr) = item;
@@ -134,7 +130,7 @@ impl<C: Encoder + Unpin, S: DatagramSocket<A> + Unpin, A: Unpin> Sink<(C::Item, 
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
 const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
-impl<C, S, A> DatagramFramed<C, S, A> {
+impl<C, S: AsyncDatagram> DatagramFramed<C, S, S::Address> {
     /// Create a new `DatagramFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
