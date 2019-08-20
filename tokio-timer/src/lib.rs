@@ -59,9 +59,14 @@ pub use timer::{set_default, Timer};
 
 use std::time::{Duration, Instant};
 
+/// Create a Future that completes at `deadline`.
+pub fn delay(deadline: Instant) -> Delay {
+    Delay::new(deadline)
+}
+
 /// Create a Future that completes in `duration` from now.
 pub fn sleep(duration: Duration) -> Delay {
-    Delay::new(Instant::now() + duration)
+    delay(Instant::now() + duration)
 }
 
 // ===== Internal utils =====

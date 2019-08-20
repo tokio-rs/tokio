@@ -28,7 +28,7 @@ fn clock_and_timer_concurrent() {
     let (tx, rx) = mpsc::channel();
 
     rt.spawn(async move {
-        Delay::new(when).await;
+        delay(when).await;
         assert!(Instant::now() < when);
         tx.send(()).unwrap();
     });
@@ -44,7 +44,7 @@ fn clock_and_timer_single_threaded() {
     let mut rt = current_thread::Builder::new().clock(clock).build().unwrap();
 
     rt.block_on(async move {
-        Delay::new(when).await;
+        delay(when).await;
         assert!(Instant::now() < when);
     });
 }

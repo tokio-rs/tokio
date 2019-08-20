@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
+use std::time::{Duration, Instant};
+
 use tokio_test::task::MockTask;
 use tokio_test::{assert_pending, assert_ready, clock};
+use tokio_timer::delay;
 use tokio_timer::timer::Handle;
-use tokio_timer::Delay;
-
-use std::time::{Duration, Instant};
 
 #[test]
 fn immediate_delay() {
@@ -14,10 +14,10 @@ fn immediate_delay() {
 
     clock::mock(|clock| {
         // Create `Delay` that elapsed immediately.
-        let mut delay = Delay::new(clock.now());
+        let mut fut = delay(clock.now());
 
         // Ready!
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
 
         // Turn the timer, it runs for the elapsed time
         clock.turn_for(ms(1000));
@@ -34,15 +34,15 @@ fn delayed_delay_level_0() {
     for &i in &[1, 10, 60] {
         clock::mock(|clock| {
             // Create a `Delay` that elapses in the future
-            let mut delay = Delay::new(clock.now() + ms(i));
+            let mut fut = delay(clock.now() + ms(i));
 
             // The delay has not elapsed.
-            assert_pending!(task.poll(&mut delay));
+            assert_pending!(task.poll(&mut fut));
 
             clock.turn();
             assert_eq!(clock.advanced(), ms(i));
 
-            assert_ready!(task.poll(&mut delay));
+            assert_ready!(task.poll(&mut fut));
         });
     }
 }
@@ -55,12 +55,12 @@ fn sub_ms_delayed_delay() {
         for _ in 0..5 {
             let deadline = clock.now() + Duration::from_millis(1) + Duration::new(0, 1);
 
-            let mut delay = Delay::new(deadline);
+            let mut fut = delay(deadline);
 
-            assert_pending!(task.poll(&mut delay));
+            assert_pending!(task.poll(&mut fut));
 
             clock.turn();
-            assert_ready!(task.poll(&mut delay));
+            assert_ready!(task.poll(&mut fut));
 
             assert!(clock.now() >= deadline);
 
@@ -77,18 +77,18 @@ fn delayed_delay_wrapping_level_0() {
         clock.turn_for(ms(5));
         assert_eq!(clock.advanced(), ms(5));
 
-        let mut delay = Delay::new(clock.now() + ms(60));
+        let mut fut = delay(clock.now() + ms(60));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(64));
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(65));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -98,14 +98,14 @@ fn timer_wrapping_with_higher_levels() {
 
     clock::mock(|clock| {
         // Set delay to hit level 1
-        let mut s1 = Delay::new(clock.now() + ms(64));
+        let mut s1 = delay(clock.now() + ms(64));
         assert_pending!(task.poll(&mut s1));
 
         // Turn a bit
         clock.turn_for(ms(5));
 
         // Set timeout such that it will hit level 0, but wrap
-        let mut s2 = Delay::new(clock.now() + ms(60));
+        let mut s2 = delay(clock.now() + ms(60));
         assert_pending!(task.poll(&mut s2));
 
         // This should result in s1 firing
@@ -128,11 +128,11 @@ fn delay_with_deadline_in_past() {
 
     clock::mock(|clock| {
         // Create `Delay` that elapsed immediately.
-        let mut delay = Delay::new(clock.now() - ms(100));
+        let mut fut = delay(clock.now() - ms(100));
 
         // Even though the delay expires in the past, it is not ready yet
         // because the timer must observe it.
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
 
         // Turn the timer, it runs for the elapsed time
         clock.turn_for(ms(1000));
@@ -148,52 +148,52 @@ fn delayed_delay_level_1() {
 
     clock::mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut delay = Delay::new(clock.now() + ms(234));
+        let mut fut = delay(clock.now() + ms(234));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Turn the timer, this will wake up to cascade the timer down.
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(192));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Turn the timer again
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(234));
 
         // The delay has elapsed.
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 
     clock::mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut delay = Delay::new(clock.now() + ms(234));
+        let mut fut = delay(clock.now() + ms(234));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Turn the timer with a smaller timeout than the cascade.
         clock.turn_for(ms(100));
         assert_eq!(clock.advanced(), ms(100));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Turn the timer, this will wake up to cascade the timer down.
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(192));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Turn the timer again
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(234));
 
         // The delay has elapsed.
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -203,24 +203,24 @@ fn creating_delay_outside_of_context() {
 
     // This creates a delay outside of the context of a mock timer. This tests
     // that it will still expire.
-    let mut delay = Delay::new(now + ms(500));
+    let mut fut = delay(now + ms(500));
     let mut task = MockTask::new();
 
     clock::mock_at(now, |clock| {
         // This registers the delay with the timer
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Wait some time... the timer is cascading
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(448));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(500));
 
         // The delay has elapsed
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -230,12 +230,12 @@ fn concurrently_set_two_timers_second_one_shorter() {
     let mut t2 = MockTask::new();
 
     clock::mock(|clock| {
-        let mut delay1 = Delay::new(clock.now() + ms(500));
-        let mut delay2 = Delay::new(clock.now() + ms(200));
+        let mut fut1 = delay(clock.now() + ms(500));
+        let mut fut2 = delay(clock.now() + ms(200));
 
         // The delay has not elapsed
-        assert_pending!(t1.poll(&mut delay1));
-        assert_pending!(t2.poll(&mut delay2));
+        assert_pending!(t1.poll(&mut fut1));
+        assert_pending!(t2.poll(&mut fut2));
 
         // Delay until a cascade
         clock.turn();
@@ -246,19 +246,19 @@ fn concurrently_set_two_timers_second_one_shorter() {
         assert_eq!(clock.advanced(), ms(200));
 
         // The shorter delay fires
-        assert_ready!(t2.poll(&mut delay2));
-        assert_pending!(t1.poll(&mut delay1));
+        assert_ready!(t2.poll(&mut fut2));
+        assert_pending!(t1.poll(&mut fut1));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(448));
 
-        assert_pending!(t1.poll(&mut delay1));
+        assert_pending!(t1.poll(&mut fut1));
 
         // Turn again, this time the time will advance to the second delay
         clock.turn();
         assert_eq!(clock.advanced(), ms(500));
 
-        assert_ready!(t1.poll(&mut delay1));
+        assert_ready!(t1.poll(&mut fut1));
     })
 }
 
@@ -268,16 +268,16 @@ fn short_delay() {
 
     clock::mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut delay = Delay::new(clock.now() + ms(1));
+        let mut fut = delay(clock.now() + ms(1));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         // Turn the timer, but not enough time will go by.
         clock.turn();
 
         // The delay has elapsed.
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
 
         // The time has advanced to the point of the delay elapsing.
         assert_eq!(clock.advanced(), ms(1));
@@ -292,10 +292,10 @@ fn sorta_long_delay() {
 
     clock::mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut delay = Delay::new(clock.now() + ms(MIN_5));
+        let mut fut = delay(clock.now() + ms(MIN_5));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         let cascades = &[262_144, 262_144 + 9 * 4096, 262_144 + 9 * 4096 + 15 * 64];
 
@@ -303,14 +303,14 @@ fn sorta_long_delay() {
             clock.turn();
             assert_eq!(clock.advanced(), ms(elapsed));
 
-            assert_pending!(task.poll(&mut delay));
+            assert_pending!(task.poll(&mut fut));
         }
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(MIN_5));
 
         // The delay has elapsed.
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     })
 }
 
@@ -322,10 +322,10 @@ fn very_long_delay() {
 
     clock::mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut delay = Delay::new(clock.now() + ms(MO_5));
+        let mut fut = delay(clock.now() + ms(MO_5));
 
         // The delay has not elapsed.
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         let cascades = &[
             12_884_901_888,
@@ -338,7 +338,7 @@ fn very_long_delay() {
             clock.turn();
             assert_eq!(clock.advanced(), ms(elapsed));
 
-            assert_pending!(task.poll(&mut delay));
+            assert_pending!(task.poll(&mut fut));
         }
 
         // Turn the timer, but not enough time will go by.
@@ -348,7 +348,7 @@ fn very_long_delay() {
         assert_eq!(clock.advanced(), ms(MO_5));
 
         // The delay has elapsed.
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     })
 }
 
@@ -361,14 +361,14 @@ fn greater_than_max() {
 
     clock::mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut delay = Delay::new(clock.now() + ms(YR_5));
+        let mut fut = delay(clock.now() + ms(YR_5));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn_for(ms(0));
 
         // boom
-        let _ = task.poll(&mut delay);
+        let _ = task.poll(&mut fut);
     })
 }
 
@@ -379,21 +379,21 @@ fn unpark_is_delayed() {
     let mut t3 = MockTask::new();
 
     clock::mock(|clock| {
-        let mut delay1 = Delay::new(clock.now() + ms(100));
-        let mut delay2 = Delay::new(clock.now() + ms(101));
-        let mut delay3 = Delay::new(clock.now() + ms(200));
+        let mut fut1 = delay(clock.now() + ms(100));
+        let mut fut2 = delay(clock.now() + ms(101));
+        let mut fut3 = delay(clock.now() + ms(200));
 
-        assert_pending!(t1.poll(&mut delay1));
-        assert_pending!(t2.poll(&mut delay2));
-        assert_pending!(t3.poll(&mut delay3));
+        assert_pending!(t1.poll(&mut fut1));
+        assert_pending!(t2.poll(&mut fut2));
+        assert_pending!(t3.poll(&mut fut3));
 
         clock.park_for(ms(500));
 
         assert_eq!(clock.advanced(), ms(500));
 
-        assert_ready!(t1.poll(&mut delay1));
-        assert_ready!(t2.poll(&mut delay2));
-        assert_ready!(t3.poll(&mut delay3));
+        assert_ready!(t1.poll(&mut fut1));
+        assert_ready!(t2.poll(&mut fut2));
+        assert_ready!(t3.poll(&mut fut3));
     })
 }
 
@@ -409,13 +409,13 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
             clock.turn_for(ms(YR_1));
         }
 
-        let mut delay = Delay::new(clock.now() + ms(1));
-        assert_pending!(task.poll(&mut delay));
+        let mut fut = delay(clock.now() + ms(1));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(YR_5) + ms(1));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -424,21 +424,21 @@ fn reset_future_delay_before_fire() {
     let mut task = MockTask::new();
 
     clock::mock(|clock| {
-        let mut delay = Delay::new(clock.now() + ms(100));
+        let mut fut = delay(clock.now() + ms(100));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
-        delay.reset(clock.now() + ms(200));
+        fut.reset(clock.now() + ms(200));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(192));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(200));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -447,21 +447,21 @@ fn reset_past_delay_before_turn() {
     let mut task = MockTask::new();
 
     clock::mock(|clock| {
-        let mut delay = Delay::new(clock.now() + ms(100));
+        let mut fut = delay(clock.now() + ms(100));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
-        delay.reset(clock.now() + ms(80));
+        fut.reset(clock.now() + ms(80));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(64));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(80));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -470,23 +470,23 @@ fn reset_past_delay_before_fire() {
     let mut task = MockTask::new();
 
     clock::mock(|clock| {
-        let mut delay = Delay::new(clock.now() + ms(100));
+        let mut fut = delay(clock.now() + ms(100));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
         clock.turn_for(ms(10));
 
-        assert_pending!(task.poll(&mut delay));
-        delay.reset(clock.now() + ms(80));
+        assert_pending!(task.poll(&mut fut));
+        fut.reset(clock.now() + ms(80));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(64));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn();
         assert_eq!(clock.advanced(), ms(90));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -495,9 +495,9 @@ fn reset_future_delay_after_fire() {
     let mut task = MockTask::new();
 
     clock::mock(|clock| {
-        let mut delay = Delay::new(clock.now() + ms(100));
+        let mut fut = delay(clock.now() + ms(100));
 
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(64));
@@ -505,15 +505,15 @@ fn reset_future_delay_after_fire() {
         clock.turn();
         assert_eq!(clock.advanced(), ms(100));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
 
-        delay.reset(clock.now() + ms(10));
-        assert_pending!(task.poll(&mut delay));
+        fut.reset(clock.now() + ms(10));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn_for(ms(1000));
         assert_eq!(clock.advanced(), ms(110));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 
@@ -523,14 +523,14 @@ fn delay_with_default_handle() {
     let now = Instant::now();
     let mut task = MockTask::new();
 
-    let mut delay = handle.delay(now + ms(1));
+    let mut fut = handle.delay(now + ms(1));
 
     clock::mock_at(now, |clock| {
-        assert_pending!(task.poll(&mut delay));
+        assert_pending!(task.poll(&mut fut));
 
         clock.turn_for(ms(1));
 
-        assert_ready!(task.poll(&mut delay));
+        assert_ready!(task.poll(&mut fut));
     });
 }
 

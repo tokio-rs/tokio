@@ -7,14 +7,13 @@
 //!
 //! use tokio::clock;
 //! use tokio_test::{assert_ready, assert_pending, task};
-//! use tokio_timer::Delay;
+//! use tokio_timer::delay;
 //!
 //! use std::time::Duration;
 //!
 //! tokio_test::clock::mock(|handle| {
 //!     let mut task = task::spawn(async {
-//!         let delay = Delay::new(clock::now() + Duration::from_secs(1));
-//!         delay.await
+//!         delay(clock::now() + Duration::from_secs(1)).await
 //!     });
 //!
 //!     assert_pending!(task.poll());

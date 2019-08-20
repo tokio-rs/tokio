@@ -7,7 +7,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
-use tokio::timer::Delay;
+use tokio::timer::delay;
 use tokio_test::{assert_err, assert_ok};
 
 use env_logger;
@@ -65,8 +65,7 @@ fn block_on_timer() {
     let rt = Runtime::new().unwrap();
 
     let v = rt.block_on(async move {
-        let delay = Delay::new(Instant::now() + Duration::from_millis(100));
-        delay.await;
+        delay(Instant::now() + Duration::from_millis(100)).await;
         42
     });
 

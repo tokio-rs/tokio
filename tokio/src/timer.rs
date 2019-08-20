@@ -33,7 +33,7 @@
 //! #![feature(async_await)]
 //!
 //! use tokio::prelude::*;
-//! use tokio::timer::Delay;
+//! use tokio::timer::delay;
 //!
 //! use std::time::{Duration, Instant};
 //!
@@ -41,7 +41,7 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     let when = tokio::clock::now() + Duration::from_millis(100);
-//!     Delay::new(when).await;
+//!     delay(when).await;
 //!     println!("100 ms have elapsed");
 //! }
 //! ```
@@ -79,4 +79,4 @@
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-pub use tokio_timer::{delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout};
+pub use tokio_timer::{delay, delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout};
