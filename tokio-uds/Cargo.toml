@@ -33,4 +33,4 @@ tokio-io = "0.1.6"
 
 [dev-dependencies]
 tokio = "0.1.6"
-tempfile = ">=3.0.5, <3.1"
+tempfile = "~3.1.0"
