@@ -275,11 +275,11 @@ impl CurrentThread<ParkThread> {
 }
 
 impl<P> CurrentThread<P>
-where P: Park + HasWheel
+where
+    P: Park + HasWheel,
 {
     /// Get the next expiration of the underlying `Park`'s timer wheel
-    pub fn next_expiration_in(&mut self) -> Option<Duration>
-    {
+    pub fn next_expiration_in(&mut self) -> Option<Duration> {
         self.park.next_expiration_in()
     }
 }
