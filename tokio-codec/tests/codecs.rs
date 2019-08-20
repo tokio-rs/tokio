@@ -188,6 +188,7 @@ fn lines_decoder_max_length_newline_between_decodes() {
     assert_eq!("hello", codec.decode(buf).unwrap().unwrap());
 }
 
+// Regression test for [infinite loop bug](https://github.com/tokio-rs/tokio/issues/1483)
 #[test]
 fn lines_decoder_discard_repeat() {
     const MAX_LENGTH: usize = 1;
