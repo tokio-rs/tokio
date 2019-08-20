@@ -5,6 +5,7 @@
 #[macro_use]
 extern crate log;
 
+use std::env;
 use std::io;
 use std::process::{ExitStatus, Stdio};
 
@@ -19,15 +20,16 @@ mod support;
 use support::*;
 
 fn cat() -> Command {
-    let mut cmd;
+    let mut me = env::current_exe().unwrap();
+    me.pop();
 
-    if cfg!(windows) {
-        cmd = Command::new("cmd");
-        cmd.args(&["/c", "type CON"]);
-    } else {
-        cmd = Command::new("cat");
+    if me.ends_with("deps") {
+        me.pop();
     }
 
+    me.push("test-cat");
+
+    let mut cmd = Command::new(me);
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
     cmd
 }
