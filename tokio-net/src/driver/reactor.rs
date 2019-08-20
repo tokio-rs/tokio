@@ -244,9 +244,16 @@ impl Reactor {
         }
 
         // Process all the events that came in, dispatching appropriately
+
+        // event count is only used for  tracing instrumentation.
+        #[cfg(feature = "tracing")]
         let mut events = 0;
+
         for event in self.events.iter() {
-            events += 1;
+            #[cfg(feature = "tracing")]
+            {
+                events += 1;
+            }
             let token = event.token();
             trace!(event.readiness = ?event.readiness(), event.token = ?token);
 
