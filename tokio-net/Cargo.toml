@@ -113,5 +113,8 @@ tokio-io-pool = "0.1.4"
 tempfile = "3"
 futures-preview = "=0.3.0-alpha.18"
 
+# process tests
+log = "0.4"
+
 [package.metadata.docs.rs]
 all-features = true

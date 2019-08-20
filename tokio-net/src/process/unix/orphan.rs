@@ -1,5 +1,4 @@
 use crossbeam_queue::SegQueue;
-use log::error;
 use std::io;
 use std::process::ExitStatus;
 
@@ -71,9 +70,9 @@ impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
             match orphan.try_wait() {
                 Ok(Some(_)) => {}
                 Err(e) => error!(
-                    "leaking orphaned process {} due to try_wait() error: {}",
-                    orphan.id(),
-                    e,
+                    message = "leaking orphaned process due to try_wait() error",
+                    orphan.id =orphan.id(),
+                    error = %e,
                 ),
 
                 // Still not done yet, we need to put it back in the queue

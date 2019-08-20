@@ -27,3 +27,15 @@ macro_rules! debug {
 macro_rules! debug {
     ($($arg:tt)+) => {};
 }
+
+#[cfg(feature = "tracing")]
+macro_rules! error {
+    ($($arg:tt)+) => {
+        tracing::error!($($arg)+)
+    };
+}
+
+#[cfg(not(feature = "tracing"))]
+macro_rules! error {
+    ($($arg:tt)+) => {};
+}
