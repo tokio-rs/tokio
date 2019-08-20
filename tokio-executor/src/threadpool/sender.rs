@@ -3,7 +3,6 @@ use super::task::Task;
 
 use crate::{Executor, SpawnError, TypedExecutor};
 
-use log::trace;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
@@ -110,7 +109,7 @@ impl Sender {
                 .into();
 
             if actual == state {
-                trace!("execute; count={:?}", next.num_futures());
+                trace!(message = "execute;", count = next.num_futures());
                 break;
             }
 

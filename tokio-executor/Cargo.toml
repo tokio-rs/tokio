@@ -30,13 +30,14 @@ threadpool = [
   "futures-core-preview",
   "futures-util-preview",
   "num_cpus",
-  "log",
   "lazy_static",
   "slab",
 ]
 
 [dependencies]
 tokio-sync = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-sync" }
+
+tracing = { version = "0.1.5", optional = true }
 
 # current-thread dependencies
 crossbeam-channel = { version = "0.3.8", optional = true }
@@ -48,7 +49,6 @@ crossbeam-utils = { version = "0.6.4", optional = true }
 futures-core-preview = { version = "=0.3.0-alpha.18", optional = true }
 futures-util-preview = { version = "=0.3.0-alpha.18", optional = true }
 num_cpus = { version = "1.2", optional = true }
-log = { version = "0.4", optional = true }
 lazy_static = { version = "1", optional = true }
 slab = { version = "0.4.1", optional = true }
 
