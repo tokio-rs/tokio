@@ -3,7 +3,7 @@
 #![feature(async_await)]
 
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 use std::env;
 use std::io;

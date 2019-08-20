@@ -103,6 +103,9 @@ version = "0.3"
 default-features = false
 optional = true
 
+[target.'cfg(test)'.dependencies]
+tracing = { version = "0.1.5", features = ["log"] }
+
 [dev-dependencies]
 tokio = { version = "0.2.0-alpha.1", path = "../tokio" }
 tokio-test = { version = "0.2.0-alpha.1", path = "../tokio-test" }
@@ -112,9 +115,6 @@ tokio-io-pool = "0.1.4"
 # UDS tests
 tempfile = "3"
 futures-preview = "=0.3.0-alpha.18"
-
-# process tests
-log = "0.4"
 
 [package.metadata.docs.rs]
 all-features = true
