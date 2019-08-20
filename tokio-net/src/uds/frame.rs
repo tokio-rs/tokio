@@ -1,7 +1,6 @@
 use super::UnixDatagram;
 use bytes::{BufMut, BytesMut};
 use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
-use log::trace;
 use std::io;
 use std::os::unix::net::SocketAddr;
 use std::path::Path;
@@ -46,7 +45,7 @@ impl<A, C: Decoder> Stream for UnixDatagramFramed<A, C> {
             self.rd.advance_mut(n);
             (n, addr)
         };
-        trace!("received {} bytes, decoding", n);
+        trace!(message = "decoding", received_bytes = n);
         let frame_res = self.codec.decode(&mut self.rd);
         self.rd.clear();
         let frame = frame_res?;
@@ -74,7 +73,7 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
         self.codec.encode(frame, &mut self.wr)?;
         self.out_addr = Some(out_addr);
         self.flushed = false;
-        trace!("frame encoded; length={}", self.wr.len());
+        trace!(message = "frame encoded", frame.length = pin.wr.len());
 
         Ok(AsyncSink::Ready)
     }
@@ -96,11 +95,11 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
                 }
             };
 
-            trace!("flushing frame; length={}", self.wr.len());
+            trace!(message = "flushing frame", frame.length = self.wr.len());
             try_ready!(self.socket.poll_send_to(&self.wr, out_path))
         };
 
-        trace!("written {}", n);
+        trace!(written = n);
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();
