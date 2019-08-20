@@ -189,6 +189,20 @@ fn lines_decoder_max_length_newline_between_decodes() {
 }
 
 #[test]
+fn lines_decoder_discard_repeat() {
+    const MAX_LENGTH: usize = 1;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("aa");
+    assert!(codec.decode(buf).is_err());
+    buf.put("a");
+    assert!(codec.decode(buf).is_err());
+}
+
+#[test]
 fn lines_encoder() {
     let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();
