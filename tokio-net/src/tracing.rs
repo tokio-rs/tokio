@@ -28,14 +28,14 @@ macro_rules! debug {
     ($($arg:tt)+) => {};
 }
 
-#[cfg(feature = "tracing")]
+#[cfg(all(unix, feature = "process", feature = "tracing"))]
 macro_rules! error {
     ($($arg:tt)+) => {
         tracing::error!($($arg)+)
     };
 }
 
-#[cfg(not(feature = "tracing"))]
+#[cfg(all(unix, feature = "process", not(feature = "tracing")))]
 macro_rules! error {
     ($($arg:tt)+) => {};
 }
