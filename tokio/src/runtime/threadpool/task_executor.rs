@@ -67,7 +67,7 @@ where T: Future<Item = (), Error = ()> + Send + 'static,
 }
 
 impl ::executor::Executor for TaskExecutor {
-    fn spawn(&mut self, future: Box<Future<Item = (), Error = ()> + Send>)
+    fn spawn(&mut self, future: Box<dyn Future<Item = (), Error = ()> + Send>)
         -> Result<(), ::executor::SpawnError>
     {
         self.inner.spawn(future)

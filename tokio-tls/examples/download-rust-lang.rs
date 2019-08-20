@@ -12,7 +12,7 @@ use native_tls::TlsConnector;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = Runtime::new()?;
     let addr = "www.rust-lang.org:443"
         .to_socket_addrs()?

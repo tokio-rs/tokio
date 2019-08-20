@@ -35,13 +35,13 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::prelude::*;
 
-fn get_stdin_data() -> Result<Vec<u8>, Box<std::error::Error>> {
+fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut buf = Vec::new();
     stdin().read_to_end(&mut buf)?;
     Ok(buf)
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let remote_addr: SocketAddr = env::args()
         .nth(1)
         .unwrap_or("127.0.0.1:8080".into())

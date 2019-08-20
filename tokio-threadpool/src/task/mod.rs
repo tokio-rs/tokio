@@ -60,7 +60,7 @@ pub(crate) enum Run {
     Complete,
 }
 
-type BoxFuture = Box<Future<Item = (), Error = ()> + Send + 'static>;
+type BoxFuture = Box<dyn Future<Item = (), Error = ()> + Send + 'static>;
 
 // ===== impl Task =====
 

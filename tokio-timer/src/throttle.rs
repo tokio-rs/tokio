@@ -158,7 +158,7 @@ impl<T: StdError + 'static> StdError for ThrottleError<T> {
     // FIXME(taiki-e): When the minimum support version of tokio reaches Rust 1.30,
     // replace this with Error::source.
     #[allow(deprecated)]
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match self.0 {
             Either::A(ref err) => Some(err),
             Either::B(ref err) => Some(err),

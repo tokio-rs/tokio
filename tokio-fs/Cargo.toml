@@ -28,8 +28,7 @@ tokio-io = "0.1.6"
 
 [dev-dependencies]
 rand = "0.6"
-tempfile = "3"
-tempdir = "0.3"
+tempfile = ">=3.0.5, <3.1"
 tokio-io = "0.1.6"
 tokio-codec = "0.1.0"
 tokio = "0.1.7"
