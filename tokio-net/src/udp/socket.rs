@@ -10,6 +10,7 @@ use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::task::{Context, Poll};
+use tokio_codec::DatagramSocket;
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
@@ -352,6 +353,16 @@ impl TryFrom<net::UdpSocket> for UdpSocket {
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.io.get_ref().fmt(f)
+    }
+}
+
+impl DatagramSocket<SocketAddr> for UdpSocket {
+    fn poll_datagram_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<(usize, SocketAddr), io::Error>> {
+        self.poll_recv_from_priv(cx, buf)
+    }
+
+    fn poll_datagram_send(&self, cx: &mut Context<'_>, buf: &mut [u8], target: &SocketAddr) -> Poll<Result<usize, io::Error>> {
+        self.poll_send_to_priv(cx, buf, target)
     }
 }
 

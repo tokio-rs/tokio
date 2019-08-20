@@ -22,6 +22,7 @@
 mod macros;
 
 mod bytes_codec;
+mod datagram;
 mod decoder;
 mod encoder;
 mod framed;
@@ -31,6 +32,7 @@ pub mod length_delimited;
 mod lines_codec;
 
 pub use crate::bytes_codec::BytesCodec;
+pub use crate::datagram::{DatagramFramed, DatagramSocket};
 pub use crate::decoder::Decoder;
 pub use crate::encoder::Encoder;
 pub use crate::framed::{Framed, FramedParts};

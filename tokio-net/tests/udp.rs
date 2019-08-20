@@ -1,8 +1,8 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
-use tokio_codec::{Decoder, Encoder};
-use tokio_net::udp::{UdpFramed, UdpSocket};
+use tokio_codec::{Decoder, Encoder, DatagramFramed};
+use tokio_net::udp::{UdpSocket};
 
 use bytes::{BufMut, BytesMut};
 use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
@@ -110,8 +110,8 @@ async fn send_framed() -> std::io::Result<()> {
 
     // test sending & receiving bytes
     {
-        let mut a = UdpFramed::new(a_soc, ByteCodec);
-        let mut b = UdpFramed::new(b_soc, ByteCodec);
+        let mut a = DatagramFramed::new(a_soc, ByteCodec);
+        let mut b = DatagramFramed::new(b_soc, ByteCodec);
 
         let msg = b"4567".to_vec();
 
@@ -129,8 +129,8 @@ async fn send_framed() -> std::io::Result<()> {
 
     // test sending & receiving an empty message
     {
-        let mut a = UdpFramed::new(a_soc, ByteCodec);
-        let mut b = UdpFramed::new(b_soc, ByteCodec);
+        let mut a = DatagramFramed::new(a_soc, ByteCodec);
+        let mut b = DatagramFramed::new(b_soc, ByteCodec);
 
         let msg = b"".to_vec();
 
