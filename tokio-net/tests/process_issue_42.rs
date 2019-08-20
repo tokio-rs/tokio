@@ -1,3 +1,4 @@
+#![cfg(feature = "process")]
 #![cfg(unix)]
 #![warn(rust_2018_idioms)]
 
@@ -10,9 +11,10 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio::runtime::current_thread;
-use tokio_process::Command;
+use tokio_net::process::Command;
 
 mod support;
+use support::*;
 
 fn run_test() {
     let finished = Arc::new(AtomicBool::new(false));
@@ -34,7 +36,7 @@ fn run_test() {
         }
 
         let mut rt = current_thread::Runtime::new().expect("failed to get runtime");
-        rt.block_on(support::with_timeout(futures.collect::<Vec<_>>()));
+        rt.block_on(with_timeout(futures.collect::<Vec<_>>()));
         drop(rt);
 
         finished_clone.store(true, Ordering::SeqCst);

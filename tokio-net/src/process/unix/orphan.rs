@@ -1,4 +1,5 @@
 use crossbeam_queue::SegQueue;
+use log::error;
 use std::io;
 use std::process::ExitStatus;
 

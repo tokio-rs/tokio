@@ -1,5 +1,5 @@
 use super::orphan::{OrphanQueue, Wait};
-use crate::kill::Kill;
+use crate::process::kill::Kill;
 use futures_core::stream::Stream;
 use std::future::Future;
 use std::io;

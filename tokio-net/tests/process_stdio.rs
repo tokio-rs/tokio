@@ -1,9 +1,11 @@
+#![cfg(feature = "process")]
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
 #[macro_use]
 extern crate log;
 
+use std::env;
 use std::io;
 use std::process::{ExitStatus, Stdio};
 
@@ -12,12 +14,22 @@ use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::io::AsyncWriteExt;
-use tokio_process::{Child, Command};
+use tokio_net::process::{Child, Command};
 
 mod support;
+use support::*;
 
 fn cat() -> Command {
-    let mut cmd = support::cmd("cat");
+    let mut me = env::current_exe().unwrap();
+    me.pop();
+
+    if me.ends_with("deps") {
+        me.pop();
+    }
+
+    me.push("test-cat");
+
+    let mut cmd = Command::new(me);
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
     cmd
 }
@@ -98,7 +110,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
 #[tokio::test]
 async fn feed_a_lot() {
     let child = cat().spawn().unwrap();
-    let status = support::with_timeout(feed_cat(child, 10000)).await.unwrap();
+    let status = with_timeout(feed_cat(child, 10000)).await.unwrap();
     assert_eq!(status.code(), Some(0));
 }
 
@@ -116,7 +128,7 @@ async fn wait_with_output_captures() {
         out.await
     };
 
-    let output = support::with_timeout(future).await.unwrap();
+    let output = with_timeout(future).await.unwrap();
 
     assert!(output.status.success());
     assert_eq!(output.stdout, write_bytes);
@@ -130,7 +142,7 @@ async fn status_closes_any_pipes() {
     // we would end up blocking forever (and time out).
     let child = cat().status().expect("failed to spawn child");
 
-    support::with_timeout(child)
+    with_timeout(child)
         .await
         .expect("time out exceeded! did we get stuck waiting on the child?");
 }

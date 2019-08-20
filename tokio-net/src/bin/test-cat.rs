@@ -1,5 +1,6 @@
-// A cat-like utility that can be used as a subprocess to test I/O
-// stream communication.
+//! A cat-like utility that can be used as a subprocess to test I/O
+//! stream communication.
+
 use std::io;
 use std::io::Write;
 

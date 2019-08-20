@@ -3,8 +3,8 @@
 #![warn(rust_2018_idioms)]
 #![feature(async_await)]
 
-pub mod signal_support;
-use crate::signal_support::*;
+mod support;
+use support::*;
 
 #[tokio::test]
 async fn notify_both() {

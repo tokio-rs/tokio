@@ -22,12 +22,29 @@ categories = ["asynchronous", "network-programming"]
 
 [features]
 async-traits = []
+process = [
+    "crossbeam-queue",
+    "futures-util-preview",
+    "libc",
+    "mio-named-pipes",
+    "signal",
+    "winapi/handleapi",
+    "winapi/winerror",
+    "winapi/minwindef",
+    "winapi/processthreadsapi",
+    "winapi/synchapi",
+    "winapi/threadpoollegacyapiset",
+    "winapi/winbase",
+    "winapi/winnt",
+]
 signal = [
     "futures-util-preview",
     "mio-uds",
     "libc",
     "signal-hook-registry",
-    "winapi",
+    "winapi/consoleapi",
+    "winapi/minwindef",
+    "winapi/wincon"
 ]
 tcp = [
     "bytes",
@@ -71,13 +88,17 @@ iovec = { version = "0.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 # UDS / Signal
+crossbeam-queue = { version = "0.1.2", optional = true }
 mio-uds = { version = "0.6.5", optional = true }
 libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "~1", optional = true }
 
+[target.'cfg(windows)'.dependencies]
+mio-named-pipes = { version = "0.1", optional = true }
+
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
-features = ["consoleapi", "minwindef", "wincon"]
+default-features = false
 optional = true
 
 [dev-dependencies]

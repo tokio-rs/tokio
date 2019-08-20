@@ -1,16 +1,6 @@
-#![doc(html_root_url = "https://docs.rs/tokio-process/0.3.0-alpha.1")]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub
-)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-#![feature(async_await)]
-
 //! An implementation of asynchronous process management for Tokio.
 //!
-//! This crate provides a [Command](Command) struct that imitates the interface of the
+//! This module provides a [`Command`](Command) struct that imitates the interface of the
 //! [`std::process::Command`] type in the standard library, but provides asynchronous versions of
 //! functions that create processes. These functions (`spawn`, `status`, `output` and their
 //! variants) return "future aware" types that interoperate with Tokio. The asynchronous process
@@ -24,7 +14,7 @@
 //! ```no_run
 //! #![feature(async_await)]
 //!
-//! use tokio_process::Command;
+//! use tokio_net::process::Command;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,7 +39,7 @@
 //! ```no_run
 //! #![feature(async_await)]
 //!
-//! use tokio_process::Command;
+//! use tokio_net::process::Command;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -74,7 +64,7 @@
 //! use futures_util::stream::StreamExt;
 //! use std::process::{Stdio};
 //! use tokio::codec::{FramedRead, LinesCodec};
-//! use tokio_process::Command;
+//! use tokio_net::process::Command;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -117,17 +107,10 @@
 //! While similar to the standard library, this crate's `Child` type differs
 //! importantly in the behavior of `drop`. In the standard library, a child
 //! process will continue running after the instance of [`std::process::Child`]
-//! is dropped. In this crate, however, because [`tokio_process::Child`](Child) is a
+//! is dropped. In this crate, however, because [`tokio_net::process::Child`](Child) is a
 //! future of the child's `ExitStatus`, a child process is terminated if
-//! `tokio_process::Child` is dropped. The behavior of the standard library can
+//! `tokio_net::process::Child` is dropped. The behavior of the standard library can
 //! be regained with the [`Child::forget`] method.
-
-#[cfg(unix)]
-#[macro_use]
-extern crate lazy_static;
-#[cfg(unix)]
-#[macro_use]
-extern crate log;
 
 use std::ffi::OsStr;
 use std::fmt;
@@ -139,12 +122,11 @@ use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::Context;
 use std::task::Poll;
 
+use self::kill::Kill;
 use futures_core::TryFuture;
 use futures_util::future;
 use futures_util::future::FutureExt;
 use futures_util::try_future::TryFutureExt;
-
-use kill::Kill;
 use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 #[path = "unix/mod.rs"]
@@ -168,7 +150,7 @@ pub struct Command {
     std: StdCommand,
 }
 
-struct SpawnedChild {
+pub(crate) struct SpawnedChild {
     child: imp::Child,
     stdin: Option<imp::ChildStdin>,
     stdout: Option<imp::ChildStdout>,
@@ -200,7 +182,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     /// let command = Command::new("sh");
     /// ```
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
@@ -214,7 +196,7 @@ impl Command {
     /// Only one argument can be passed per use. So instead of:
     ///
     /// ```no_run
-    /// # tokio_process::Command::new("sh")
+    /// # tokio_net::process::Command::new("sh")
     /// .arg("-C /path/to/repo")
     /// # ;
     /// ```
@@ -222,7 +204,7 @@ impl Command {
     /// usage would be:
     ///
     /// ```no_run
-    /// # tokio_process::Command::new("sh")
+    /// # tokio_net::process::Command::new("sh")
     /// .arg("-C")
     /// .arg("/path/to/repo")
     /// # ;
@@ -237,7 +219,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .arg("-l")
@@ -259,7 +241,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .args(&["-l", "-a"]);
@@ -283,7 +265,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .env("PATH", "/bin");
@@ -307,7 +289,7 @@ impl Command {
     /// use std::process::{Stdio};
     /// use std::env;
     /// use std::collections::HashMap;
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let filtered_env : HashMap<String, String> =
     ///     env::vars().filter(|&(ref k, _)|
@@ -337,7 +319,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .env_remove("PATH");
@@ -354,7 +336,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .env_clear();
@@ -379,7 +361,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .current_dir("/bin");
@@ -405,7 +387,7 @@ impl Command {
     ///
     /// ```no_run
     /// use std::process::{Stdio};
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// let command = Command::new("ls")
     ///         .stdin(Stdio::null());
@@ -429,7 +411,7 @@ impl Command {
     ///
     /// ```no_run
     /// use std::process::{Stdio};
-    /// use tokio_process::Command;;
+    /// use tokio_net::process::Command;;
     ///
     /// let command = Command::new("ls")
     ///         .stdout(Stdio::null());
@@ -453,7 +435,7 @@ impl Command {
     ///
     /// ```no_run
     /// use std::process::{Stdio};
-    /// use tokio_process::Command;;
+    /// use tokio_net::process::Command;;
     ///
     /// let command = Command::new("ls")
     ///         .stderr(Stdio::null());
@@ -482,7 +464,7 @@ impl Command {
     ///
     /// ```no_run
     /// #![feature(async_await)]
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
     ///     Command::new("ls")
@@ -528,7 +510,7 @@ impl Command {
     ///
     /// ```no_run
     /// #![feature(async_await)]
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
     ///     Command::new("ls")
@@ -577,7 +559,7 @@ impl Command {
     ///
     /// ```no_run
     /// #![feature(async_await)]
-    /// use tokio_process::Command;
+    /// use tokio_net::process::Command;
     ///
     /// async fn run_ls() {
     ///     let output: std::process::Output = Command::new("ls")
@@ -661,7 +643,7 @@ impl<T: TryFuture + Kill + Unpin> Future for ChildDropGuard<T> {
 /// like the OS-assigned identifier and the stdio streams.
 ///
 /// > **Note**: The behavior of `drop` on a child in this crate is *different
-/// > than the behavior of the standard library*. If a `tokio_process::Child` is
+/// > than the behavior of the standard library*. If a `tokio_net::process::Child` is
 /// > dropped before the process finishes then the process will be terminated.
 /// > In the standard library, however, the process continues executing. This is
 /// > done because futures in general take `drop` as a sign of cancellation, and
@@ -773,7 +755,7 @@ impl Child {
     ///
     /// ```no_run
     /// # #![feature(async_await)]
-    /// # use tokio_process::Command;
+    /// # use tokio_net::process::Command;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -993,8 +975,7 @@ mod test {
 
     use futures_util::future::FutureExt;
 
-    use crate::kill::Kill;
-
+    use super::kill::Kill;
     use super::ChildDropGuard;
 
     struct Mock {

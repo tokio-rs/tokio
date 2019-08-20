@@ -2,8 +2,8 @@
 #![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
 
-pub mod signal_support;
-use crate::signal_support::*;
+pub mod support;
+use support::*;
 
 #[test]
 fn dropping_loops_does_not_cause_starvation() {

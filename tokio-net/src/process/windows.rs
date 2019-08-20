@@ -16,11 +16,8 @@
 //! from then on out.
 
 use super::SpawnedChild;
-use crate::kill::Kill;
-
-use tokio_net::util::PollEvented;
-use tokio_sync::oneshot;
-
+use crate::process::kill::Kill;
+use crate::util::PollEvented;
 use futures_util::future::Fuse;
 use futures_util::future::FutureExt;
 use mio_named_pipes::NamedPipe;
@@ -30,22 +27,23 @@ use std::io;
 use std::os::windows::prelude::*;
 use std::os::windows::process::ExitStatusExt;
 use std::pin::Pin;
-use std::process::{self, ExitStatus};
+use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
 use std::ptr;
 use std::task::Context;
 use std::task::Poll;
-use winapi::shared::minwindef::*;
-use winapi::shared::winerror::*;
-use winapi::um::handleapi::*;
-use winapi::um::processthreadsapi::*;
-use winapi::um::synchapi::*;
-use winapi::um::threadpoollegacyapiset::*;
-use winapi::um::winbase::*;
-use winapi::um::winnt::*;
+use tokio_sync::oneshot;
+use winapi::shared::minwindef::FALSE;
+use winapi::shared::winerror::WAIT_TIMEOUT;
+use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+use winapi::um::processthreadsapi::GetExitCodeProcess;
+use winapi::um::synchapi::WaitForSingleObject;
+use winapi::um::threadpoollegacyapiset::UnregisterWaitEx;
+use winapi::um::winbase::{RegisterWaitForSingleObject, INFINITE, WAIT_OBJECT_0};
+use winapi::um::winnt::{BOOLEAN, HANDLE, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE};
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
-    child: process::Child,
+    child: StdChild,
     waiting: Option<Waiting>,
 }
 
@@ -68,7 +66,7 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
-pub(crate) fn spawn_child(cmd: &mut process::Command) -> io::Result<SpawnedChild> {
+pub(crate) fn spawn_child(cmd: &mut StdCommand) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
     let stdin = stdio(child.stdin.take());
     let stdout = stdio(child.stdout.take());
@@ -160,7 +158,7 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let _ = complete.take().unwrap().send(());
 }
 
-pub(crate) fn try_wait(child: &process::Child) -> io::Result<Option<ExitStatus>> {
+pub(crate) fn try_wait(child: &StdChild) -> io::Result<Option<ExitStatus>> {
     unsafe {
         match WaitForSingleObject(child.as_raw_handle(), 0) {
             WAIT_OBJECT_0 => {}

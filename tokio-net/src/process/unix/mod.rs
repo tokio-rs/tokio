@@ -27,11 +27,9 @@ mod reap;
 use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
-use crate::kill::Kill;
-
-use tokio_net::signal::unix::{signal, Signal, SignalKind};
-use tokio_net::util::PollEvented;
-
+use crate::process::kill::Kill;
+use crate::signal::unix::{signal, Signal, SignalKind};
+use crate::util::PollEvented;
 use mio::event::Evented;
 use mio::unix::{EventedFd, UnixReady};
 use mio::{Poll as MioPoll, PollOpt, Ready, Token};
@@ -60,7 +58,7 @@ impl Kill for process::Child {
     }
 }
 
-lazy_static! {
+lazy_static::lazy_static! {
     static ref ORPHAN_QUEUE: AtomicOrphanQueue<process::Child> = AtomicOrphanQueue::new();
 }
 
