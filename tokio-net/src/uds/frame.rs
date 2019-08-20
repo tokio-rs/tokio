@@ -45,7 +45,11 @@ impl<A, C: Decoder> Stream for UnixDatagramFramed<A, C> {
             self.rd.advance_mut(n);
             (n, addr)
         };
-        trace!(message = "decoding", received_bytes = n);
+
+        let span = trace_span!("decoding", from.addr = %addr, dgram.length = n);
+        let _e = span.enter();
+        trace!("trying to decode a frame...");
+
         let frame_res = self.codec.decode(&mut self.rd);
         self.rd.clear();
         let frame = frame_res?;
@@ -60,7 +64,10 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
     type SinkError = C::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        trace!("sending frame");
+        let span = trace_span!("sending", to.addr = %item.0, flushed = self.flushed);
+        let _e = span.enter();
+
+        trace!("sending frame...");
 
         if !self.flushed {
             match self.poll_complete()? {
@@ -83,6 +90,9 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
             return Ok(Async::Ready(()));
         }
 
+        let span = trace_span!("flushing", to.addr = %self.out_addr);
+        let _e = span.enter();
+
         let n = {
             let out_path = match self.out_addr {
                 Some(ref out_path) => out_path.as_ref(),
@@ -99,11 +109,11 @@ impl<A: AsRef<Path>, C: Encoder> Sink for UnixDatagramFramed<A, C> {
             try_ready!(self.socket.poll_send_to(&self.wr, out_path))
         };
 
-        trace!(written = n);
-
         let wrote_all = n == self.wr.len();
         self.wr.clear();
         self.flushed = true;
+
+        trace!(written.length = n, written.complete = wrote_all);
 
         if wrote_all {
             self.out_addr = None;
