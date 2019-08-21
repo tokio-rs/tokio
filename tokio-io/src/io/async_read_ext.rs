@@ -1,12 +1,27 @@
+use crate::io::chain::{chain, Chain};
 use crate::io::copy::{copy, Copy};
 use crate::io::read::{read, Read};
 use crate::io::read_exact::{read_exact, ReadExact};
 use crate::io::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::read_to_string::{read_to_string, ReadToString};
+use crate::io::take::{take, Take};
 use crate::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.
 pub trait AsyncReadExt: AsyncRead {
+    /// Creates an adaptor which will chain this stream with another.
+    ///
+    /// The returned `AsyncRead` instance will first read all bytes from this object
+    /// until EOF is encountered. Afterwards the output is equivalent to the
+    /// output of `next`.
+    fn chain<R>(self, next: R) -> Chain<Self, R>
+    where
+        Self: Sized,
+        R: AsyncRead,
+    {
+        chain(self, next)
+    }
+
     /// Copy all data from `self` into the provided `AsyncWrite`.
     ///
     /// The returned future will copy all the bytes read from `reader` into the
@@ -62,6 +77,15 @@ pub trait AsyncReadExt: AsyncRead {
         Self: Unpin,
     {
         read_to_string(self, dst)
+    }
+
+    /// Creates an AsyncRead adapter which will read at most `limit` bytes
+    /// from the underlying reader.
+    fn take(self, limit: u64) -> Take<Self>
+    where
+        Self: Sized,
+    {
+        take(self, limit)
     }
 }
 
