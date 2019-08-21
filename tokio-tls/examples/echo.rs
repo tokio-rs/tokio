@@ -8,7 +8,7 @@ use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Bind the server's socket
     let addr = "127.0.0.1:12345".parse()?;
     let tcp = TcpListener::bind(&addr)?;

@@ -19,7 +19,7 @@ use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 
-pub fn main() -> Result<(), Box<std::error::Error>> {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "127.0.0.1:6142".parse()?;
 
     // Open a TCP stream to the socket address.

@@ -32,8 +32,6 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all
-    - (cd tokio-trace/test-log-support && cargo test)
-    - (cd tokio-trace/test_static_max_level_features && cargo test)
     - cargo doc --all
   i686_test_script:
     - . $HOME/.cargo/env

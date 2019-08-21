@@ -1,5 +1,5 @@
 #![deny(missing_docs, missing_debug_implementations, warnings)]
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.7")]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.8")]
 
 //! Task execution related traits and utilities.
 //!
@@ -61,7 +61,7 @@ mod global;
 pub mod park;
 mod typed;
 
-pub use enter::{enter, Enter, EnterError};
+pub use enter::{enter, exit, Enter, EnterError};
 pub use error::SpawnError;
 pub use executor::Executor;
 pub use global::{spawn, with_default, DefaultExecutor};

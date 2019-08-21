@@ -131,7 +131,7 @@ impl tokio_executor::Executor for Sender {
 
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         let mut s = &*self;
         tokio_executor::Executor::spawn(&mut s, future)
@@ -157,7 +157,7 @@ impl<'a> tokio_executor::Executor for &'a Sender {
 
     fn spawn(
         &mut self,
-        future: Box<Future<Item = (), Error = ()> + Send>,
+        future: Box<dyn Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), SpawnError> {
         self.prepare_for_spawn()?;
 

@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.1.21")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.1.22")]
 #![deny(missing_docs, warnings, missing_debug_implementations)]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
@@ -103,6 +103,8 @@ extern crate tokio_threadpool;
 extern crate tokio_timer;
 #[cfg(feature = "udp")]
 extern crate tokio_udp;
+#[cfg(feature = "experimental-tracing")]
+extern crate tracing_core;
 
 #[cfg(all(unix, feature = "uds"))]
 extern crate tokio_uds;
@@ -128,7 +130,6 @@ pub mod util;
 
 if_runtime! {
     extern crate tokio_executor;
-    extern crate tokio_trace_core;
     pub mod executor;
     pub mod runtime;
 

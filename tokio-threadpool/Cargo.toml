@@ -8,7 +8,7 @@ name = "tokio-threadpool"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.14"
+version = "0.1.15"
 documentation = "https://docs.rs/tokio-threadpool/0.1.14/tokio_threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
@@ -21,7 +21,7 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-tokio-executor = "0.1.7"
+tokio-executor = "0.1.8"
 futures = "0.1.19"
 crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"

@@ -1,3 +1,8 @@
+# 0.1.8 (June 2, 2019)
+
+### Added
+- Add `executor::exit` to allow other executors inside `threadpool::blocking` (#1155).
+
 # 0.1.7 (March 22, 2019)
 
 ### Added

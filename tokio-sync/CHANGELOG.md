@@ -1,3 +1,8 @@
+# 0.1.6 (June 4, 2019)
+
+### Added
+- Add Sync impl for Lock (#1117).
+
 # 0.1.5 (April 22, 2019)
 
 ### Added
