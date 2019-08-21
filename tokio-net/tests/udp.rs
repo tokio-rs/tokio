@@ -1,12 +1,13 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
-use tokio_codec::{Decoder, Encoder, DatagramFramed};
-use tokio_net::udp::{UdpSocket};
+use tokio_codec::DatagramFramed;
+use tokio_net::udp::UdpSocket;
 
-use bytes::{BufMut, BytesMut};
 use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
-use std::io;
+
+mod support;
+use support::ByteCodec;
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
@@ -75,29 +76,6 @@ async fn reunite_error() -> std::io::Result<()> {
     let (_, r1) = socket1.split();
     assert!(s.reunite(r1).is_err());
     Ok(())
-}
-
-pub struct ByteCodec;
-
-impl Decoder for ByteCodec {
-    type Item = Vec<u8>;
-    type Error = io::Error;
-
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Vec<u8>>, io::Error> {
-        let len = buf.len();
-        Ok(Some(buf.split_to(len).to_vec()))
-    }
-}
-
-impl Encoder for ByteCodec {
-    type Item = Vec<u8>;
-    type Error = io::Error;
-
-    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
-        buf.reserve(data.len());
-        buf.put(data);
-        Ok(())
-    }
 }
 
 #[tokio::test]

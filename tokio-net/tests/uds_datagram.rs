@@ -2,37 +2,15 @@
 #![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
+use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
+use tokio_codec::DatagramFramed;
 use tokio_net::uds::*;
 
 use std::io;
 use tempfile;
 
-// struct StringDatagramCodec;
-
-// /// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
-// impl Encoder for StringDatagramCodec {
-//     type Item = String;
-//     type Error = io::Error;
-
-//     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-//         dst.extend_from_slice(&item.into_bytes());
-//         Ok(())
-//     }
-// }
-
-// /// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
-// impl Decoder for StringDatagramCodec {
-//     type Item = String;
-//     type Error = io::Error;
-
-//     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-//         let decoded = str::from_utf8(buf)
-//             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-//             .to_string();
-
-//         Ok(Some(decoded))
-//     }
-// }
+mod support;
+use support::ByteCodec;
 
 async fn echo_server(mut socket: UnixDatagram) -> io::Result<()> {
     let mut recv_buf = vec![0u8; 1024];
@@ -65,6 +43,56 @@ async fn echo() -> io::Result<()> {
         let mut recv_buf = [0u8; 16];
         let len = socket.recv(&mut recv_buf[..]).await?;
         assert_eq!(&recv_buf[..len], b"ECHO");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_framed() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let a_path = dir.path().join("a.sock");
+    let b_path = dir.path().join("b.sock");
+
+    let mut a_soc = UnixDatagram::bind(a_path.clone())?;
+    let mut b_soc = UnixDatagram::bind(b_path.clone())?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    // test sending & receiving bytes
+    {
+        let mut a = DatagramFramed::new(a_soc, ByteCodec);
+        let mut b = DatagramFramed::new(b_soc, ByteCodec);
+
+        let msg = b"4567".to_vec();
+
+        let send = a.send((msg.clone(), b_addr.clone()));
+        let recv = b.next().map(|e| e.unwrap());
+        let (_, received) = try_join(send, recv).await.unwrap();
+
+        let (data, addr) = received;
+        assert_eq!(msg, data);
+        assert_eq!(a_addr.as_pathname(), addr.as_pathname());
+
+        a_soc = a.into_inner();
+        b_soc = b.into_inner();
+    }
+
+    // test sending & receiving an empty message
+    {
+        let mut a = DatagramFramed::new(a_soc, ByteCodec);
+        let mut b = DatagramFramed::new(b_soc, ByteCodec);
+
+        let msg = b"".to_vec();
+
+        let send = a.send((msg.clone(), b_addr.clone()));
+        let recv = b.next().map(|e| e.unwrap());
+        let (_, received) = try_join(send, recv).await.unwrap();
+
+        let (data, addr) = received;
+        assert_eq!(msg, data);
+        assert_eq!(a_addr.as_pathname(), addr.as_pathname());
     }
 
     Ok(())

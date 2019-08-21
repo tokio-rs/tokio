@@ -58,15 +58,14 @@ impl<C: Decoder + Unpin, S: AsyncDatagram + Unpin> Stream for DatagramFramed<C, 
     }
 }
 
-impl<C: Encoder + Unpin, S: AsyncDatagram + Unpin> Sink<(C::Item, S::Address)> for DatagramFramed<C, S, S::Address> {
+impl<C: Encoder + Unpin, S: AsyncDatagram + Unpin> Sink<(C::Item, S::Address)>
+    for DatagramFramed<C, S, S::Address>
+{
     type Error = C::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if !self.flushed {
-            match self.poll_flush(cx)? {
-                Poll::Ready(()) => {}
-                Poll::Pending => return Poll::Pending,
-            }
+            ready!(self.poll_flush(cx))?;
         }
 
         Poll::Ready(Ok(()))
@@ -115,7 +114,7 @@ impl<C: Encoder + Unpin, S: AsyncDatagram + Unpin> Sink<(C::Item, S::Address)> f
                 io::ErrorKind::Other,
                 "failed to write entire datagram to socket",
             )
-                .into())
+            .into())
         };
 
         Poll::Ready(res)

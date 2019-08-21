@@ -359,11 +359,20 @@ impl fmt::Debug for UdpSocket {
 impl AsyncDatagram for UdpSocket {
     type Address = SocketAddr;
 
-    fn poll_datagram_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<(usize, SocketAddr), io::Error>> {
+    fn poll_datagram_recv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<(usize, SocketAddr), io::Error>> {
         self.poll_recv_from_priv(cx, buf)
     }
 
-    fn poll_datagram_send(&self, cx: &mut Context<'_>, buf: &mut [u8], target: &SocketAddr) -> Poll<Result<usize, io::Error>> {
+    fn poll_datagram_send(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        target: &SocketAddr,
+    ) -> Poll<Result<usize, io::Error>> {
         self.poll_send_to_priv(cx, buf, target)
     }
 }

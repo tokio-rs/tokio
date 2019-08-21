@@ -12,6 +12,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::task::{Context, Poll};
+use tokio_io::AsyncDatagram;
 
 /// An I/O object representing a Unix datagram socket.
 pub struct UnixDatagram {
@@ -193,6 +194,33 @@ impl UnixDatagram {
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
+    }
+}
+
+impl AsyncDatagram for UnixDatagram {
+    type Address = SocketAddr;
+
+    fn poll_datagram_recv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<(usize, Self::Address), io::Error>> {
+        self.poll_recv_from_priv(cx, buf)
+    }
+
+    fn poll_datagram_send(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        target: &Self::Address,
+    ) -> Poll<Result<usize, io::Error>> {
+        self.poll_send_to_priv(
+            cx,
+            buf,
+            target
+                .as_pathname()
+                .expect("Attempting to send with to unbound Unix SocketAddr"),
+        )
     }
 }
 

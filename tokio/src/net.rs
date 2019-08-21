@@ -55,7 +55,7 @@ pub mod udp {
     pub use tokio_net::udp::{split, UdpSocket};
 }
 #[cfg(feature = "udp")]
-pub use self::udp::{UdpSocket};
+pub use self::udp::UdpSocket;
 
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {
