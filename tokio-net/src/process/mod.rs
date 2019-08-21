@@ -12,8 +12,6 @@
 //! for it complete.
 //!
 //! ```no_run
-//! #![feature(async_await)]
-//!
 //! use tokio_net::process::Command;
 //!
 //! #[tokio::main]
@@ -37,8 +35,6 @@
 //! world` but we also capture its output.
 //!
 //! ```no_run
-//! #![feature(async_await)]
-//!
 //! use tokio_net::process::Command;
 //!
 //! #[tokio::main]
@@ -59,8 +55,6 @@
 //! We can also read input line by line.
 //!
 //! ```no_run
-//! #![feature(async_await)]
-//!
 //! use futures_util::stream::StreamExt;
 //! use std::process::{Stdio};
 //! use tokio::codec::{FramedRead, LinesCodec};
@@ -463,7 +457,6 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// #![feature(async_await)]
     /// use tokio_net::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
@@ -509,7 +502,6 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// #![feature(async_await)]
     /// use tokio_net::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
@@ -558,7 +550,6 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// #![feature(async_await)]
     /// use tokio_net::process::Command;
     ///
     /// async fn run_ls() {
@@ -754,7 +745,6 @@ impl Child {
     /// > `Child` instance into an event loop as an alternative to this method.
     ///
     /// ```no_run
-    /// # #![feature(async_await)]
     /// # use tokio_net::process::Command;
     ///
     /// # #[tokio::main]

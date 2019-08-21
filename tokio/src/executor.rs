@@ -69,8 +69,6 @@ pub struct Spawn(());
 /// that processes each received connection.
 ///
 /// ```
-/// #![feature(async_await)]
-///
 /// use tokio::net::TcpListener;
 ///
 /// # async fn process<T>(t: T) {}

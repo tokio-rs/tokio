@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;

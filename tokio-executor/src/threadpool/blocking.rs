@@ -80,8 +80,6 @@ pub struct BlockingError {
 /// that needs to be performed.
 ///
 /// ```rust
-/// #![feature(async_await)]
-///
 /// use tokio_executor::threadpool::{ThreadPool, blocking};
 ///
 /// use futures_util::future::poll_fn;

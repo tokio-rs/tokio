@@ -8,8 +8,6 @@
 //! This allows you to do something along the lines of:
 //!
 //! ```rust,no_run
-//! #![feature(async_await)]
-//!
 //! use tokio::sync::Lock;
 //!
 //! #[tokio::main]

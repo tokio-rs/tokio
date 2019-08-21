@@ -59,8 +59,6 @@ impl Sender {
     /// # Examples
     ///
     /// ```rust
-    /// #![feature(async_await)]
-    ///
     /// use tokio_executor::threadpool::ThreadPool;
     ///
     /// // Create a thread pool with default configuration values

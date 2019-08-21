@@ -32,8 +32,6 @@ use std::task::Poll;
 /// Create a new file and asynchronously write bytes to it:
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// use tokio::fs::File;
 /// use tokio::prelude::*;
 ///
@@ -47,8 +45,6 @@ use std::task::Poll;
 /// Read the contents of a file into a buffer
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// use tokio::fs::File;
 /// use tokio::prelude::*;
 ///
@@ -83,8 +79,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     /// use tokio::prelude::*;
     ///
@@ -127,8 +121,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     /// use tokio::prelude::*;
     ///
@@ -168,8 +160,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     /// use tokio::prelude::*;
     ///
@@ -196,8 +186,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     /// use tokio::prelude::*;
     ///
@@ -224,8 +212,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     /// use tokio::prelude::*;
     ///
@@ -255,8 +241,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     /// use tokio::prelude::*;
     ///
@@ -276,8 +260,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     ///
     /// # async fn dox() -> std::io::Result<()> {
@@ -299,8 +281,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     ///
     /// # async fn dox() -> std::io::Result<()> {
@@ -333,8 +313,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     ///
     /// # async fn dox() -> std::io::Result<()> {
@@ -360,8 +338,6 @@ impl File {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs::File;
     ///
     /// # async fn dox() -> std::io::Result<()> {

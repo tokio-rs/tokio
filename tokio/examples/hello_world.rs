@@ -12,7 +12,6 @@
 //!     cargo run --example hello_world
 
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio;
 use tokio::io::AsyncWriteExt;

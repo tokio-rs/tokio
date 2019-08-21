@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio::sync::oneshot;
 use tokio_executor::current_thread::{self, block_on_all, CurrentThread, TaskExecutor};

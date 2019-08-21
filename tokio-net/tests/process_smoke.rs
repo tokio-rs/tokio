@@ -1,6 +1,5 @@
 #![cfg(feature = "process")]
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio_net::process::Command;
 

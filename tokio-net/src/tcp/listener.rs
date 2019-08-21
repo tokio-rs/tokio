@@ -21,8 +21,6 @@ use std::task::{Context, Poll};
 /// # Examples
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// use tokio::net::TcpListener;
 /// use std::error::Error;
 /// # async fn process_socket<T>(socket: T) {}
@@ -74,8 +72,6 @@ impl TcpListener {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
     /// use tokio::net::TcpListener;
     ///

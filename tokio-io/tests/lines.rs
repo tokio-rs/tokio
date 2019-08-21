@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use futures_util::StreamExt;
 use tokio_io::AsyncBufReadExt;

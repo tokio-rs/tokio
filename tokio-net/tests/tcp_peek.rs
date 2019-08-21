@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use std::thread;
 use std::{convert::TryInto, io::Write, net};

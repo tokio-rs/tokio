@@ -55,8 +55,6 @@ an asynchronous application.
 A basic TCP echo server with Tokio:
 
 ```rust
-#![feature(async_await)]
-
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 

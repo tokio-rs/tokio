@@ -6,7 +6,6 @@
 //! new message with a new destination. Overall, we then use this to construct a
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
-#![feature(async_await)]
 #![cfg(feature = "rt-full")]
 #![warn(rust_2018_idioms)]
 

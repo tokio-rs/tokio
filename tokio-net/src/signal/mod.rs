@@ -17,8 +17,6 @@
 //! Print out all ctrl-C notifications received
 //!
 //! ```rust,no_run
-//! #![feature(async_await)]
-//!
 //! use tokio_net::signal;
 //!
 //! use futures_util::future;
@@ -45,7 +43,6 @@
 //! Wait for SIGHUP on Unix
 //!
 //! ```rust,no_run
-//! #![feature(async_await)]
 //! # #[cfg(unix)] {
 //!
 //! use tokio_net::signal::{self, unix::{signal, SignalKind}};

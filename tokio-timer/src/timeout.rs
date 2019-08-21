@@ -32,8 +32,6 @@ use std::time::{Duration, Instant};
 /// example:
 ///
 /// ```rust,no_run
-/// #![feature(async_await)]
-///
 /// use tokio::prelude::*;
 /// use tokio::sync::mpsc;
 ///
@@ -96,8 +94,6 @@ impl<T> Timeout<T> {
     /// Create a new `Timeout` set to expire in 10 milliseconds.
     ///
     /// ```rust
-    /// #![feature(async_await)]
-    ///
     /// use tokio::timer::Timeout;
     /// use tokio::sync::oneshot;
     ///

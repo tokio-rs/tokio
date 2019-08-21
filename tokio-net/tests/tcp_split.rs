@@ -1,5 +1,3 @@
-#![feature(async_await)]
-
 use tokio_net::tcp::{TcpListener, TcpStream};
 
 #[tokio::test]

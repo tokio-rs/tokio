@@ -93,8 +93,6 @@ struct State(usize);
 /// # Examples
 ///
 /// ```
-/// #![feature(async_await)]
-///
 /// use tokio::sync::oneshot;
 ///
 /// #[tokio::main]
@@ -208,8 +206,6 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]

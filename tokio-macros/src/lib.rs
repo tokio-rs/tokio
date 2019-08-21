@@ -26,8 +26,6 @@ use quote::quote;
 /// ### Select runtime
 ///
 /// ```rust
-///#![feature(async_await)]
-///
 /// #[tokio::main(single_thread)]
 /// async fn main() {
 ///     println!("Hello world");
@@ -36,8 +34,6 @@ use quote::quote;
 /// ### Using default
 ///
 /// ```rust
-///#![feature(async_await)]
-///
 /// #[tokio::main]
 /// async fn main() {
 ///     println!("Hello world");
@@ -116,8 +112,6 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// #[tokio::test]
 /// async fn my_test() {
 ///     assert!(true);

@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_executor::threadpool;

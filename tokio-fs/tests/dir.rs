@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use futures_util::future;
 use futures_util::try_stream::TryStreamExt;

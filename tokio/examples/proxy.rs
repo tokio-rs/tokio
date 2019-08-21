@@ -21,7 +21,6 @@
 //! the echo server, and you'll be able to see data flowing between them.
 
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use futures::{future::try_join, FutureExt, StreamExt};
 use std::{env, error::Error, net::SocketAddr};

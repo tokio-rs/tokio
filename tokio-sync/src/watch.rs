@@ -18,8 +18,6 @@
 //! # Examples
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::sync::watch;
 //!
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
@@ -171,8 +169,6 @@ const CLOSED: usize = 1;
 /// # Examples
 ///
 /// ```
-/// #![feature(async_await)]
-///
 /// use tokio::sync::watch;
 ///
 /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {

@@ -2,7 +2,7 @@ trigger: ["master", "std-future"]
 pr: ["master", "std-future"]
 
 variables:
-  nightly: nightly-2019-08-10
+  nightly: nightly-2019-08-21
   RUSTFLAGS: -Dwarnings
 
 jobs:

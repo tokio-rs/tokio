@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio_sync::oneshot;
 use tokio_test::task::MockTask;

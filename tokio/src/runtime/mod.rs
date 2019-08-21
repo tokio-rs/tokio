@@ -34,8 +34,6 @@
 //! Most applications will use the [`tokio::main`] attribute macro.
 //!
 //! ```no_run
-//! #![feature(async_await)]
-//!
 //! use tokio::net::TcpListener;
 //! use tokio::prelude::*;
 //!
@@ -83,8 +81,6 @@
 //! A [`Runtime`] instance can also be used directly.
 //!
 //! ```no_run
-//! #![feature(async_await)]
-//!
 //! use tokio::net::TcpListener;
 //! use tokio::prelude::*;
 //! use tokio::runtime::Runtime;

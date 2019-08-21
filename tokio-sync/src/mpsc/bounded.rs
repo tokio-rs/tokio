@@ -82,8 +82,6 @@ pub struct RecvError(());
 /// # Examples
 ///
 /// ```rust
-/// #![feature(async_await)]
-///
 /// use tokio::sync::mpsc;
 ///
 /// #[tokio::main]
@@ -132,8 +130,6 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -152,8 +148,6 @@ impl<T> Receiver<T> {
     /// Values are buffered:
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -221,8 +215,6 @@ impl<T> Sender<T> {
     /// previously sent value was received.
     ///
     /// ```rust
-    /// #![feature(async_await)]
-    ///
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]

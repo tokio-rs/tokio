@@ -1,4 +1,3 @@
-#![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
 use tokio::prelude::*;

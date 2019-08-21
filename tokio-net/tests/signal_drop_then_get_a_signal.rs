@@ -1,7 +1,6 @@
 #![cfg(unix)]
 #![cfg(feature = "signal")]
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 mod support;
 use support::*;

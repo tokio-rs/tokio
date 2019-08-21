@@ -24,7 +24,6 @@
 //! connected clients they'll all join the same room and see everyone else's
 //! messages.
 
-#![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
 use futures::{Poll, SinkExt, Stream, StreamExt};

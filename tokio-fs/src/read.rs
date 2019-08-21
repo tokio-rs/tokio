@@ -12,8 +12,6 @@ use std::{io, path::Path};
 /// # Examples
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// use tokio::fs;
 ///
 /// # async fn dox() -> std::io::Result<()> {
