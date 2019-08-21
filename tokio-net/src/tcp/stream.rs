@@ -827,6 +827,7 @@ impl AsyncWrite for TcpStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.shutdown(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 
