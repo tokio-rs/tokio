@@ -3,6 +3,7 @@ mod async_read_ext;
 mod async_write_ext;
 mod buf_reader;
 mod buf_writer;
+mod chain;
 mod copy;
 mod flush;
 mod lines;
@@ -13,6 +14,7 @@ mod read_to_end;
 mod read_to_string;
 mod read_until;
 mod shutdown;
+mod take;
 mod write;
 mod write_all;
 
