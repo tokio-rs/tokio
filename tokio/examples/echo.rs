@@ -19,7 +19,6 @@
 //! you! If you open up multiple terminals running the `connect` example you
 //! should be able to see them all make progress simultaneously.
 
-#![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
 use tokio;

@@ -39,7 +39,6 @@
 //! * `SET $key $value` - this will set the value of `$key` to `$value`,
 //!   returning the previous value, if any.
 
-#![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;

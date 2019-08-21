@@ -30,8 +30,6 @@
 //! Wait 100ms and print "Hello World!"
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::prelude::*;
 //! use tokio::timer::delay;
 //!
@@ -51,8 +49,6 @@
 //! included in the prelude.
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::prelude::*;
 //! use std::time::Duration;
 //!

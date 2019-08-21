@@ -3,8 +3,6 @@
 //! # Example
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::clock;
 //! use tokio_test::{assert_ready, assert_pending, task};
 //! use tokio_timer::delay;

@@ -124,8 +124,6 @@ where
 /// # Examples
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// tokio::spawn(async {
 ///     println!("running on the default executor");
 /// });

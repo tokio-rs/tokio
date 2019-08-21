@@ -21,8 +21,6 @@
 //! Let's start with a basic example, establishing a TCP connection.
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::net::TcpStream;
 //!
 //! # async fn process<T>(t: T) {}

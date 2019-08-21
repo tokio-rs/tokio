@@ -123,8 +123,6 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::runtime::current_thread::Runtime;
     ///
     /// # fn dox() {

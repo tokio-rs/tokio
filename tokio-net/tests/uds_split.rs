@@ -1,5 +1,4 @@
 #![cfg(unix)]
-#![feature(async_await)]
 #![deny(warnings, rust_2018_idioms)]
 
 use tokio::net::UnixStream;

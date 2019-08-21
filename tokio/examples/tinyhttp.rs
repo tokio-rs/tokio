@@ -12,7 +12,6 @@
 //! available, and it doesn't support HTTP request bodies.
 
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use bytes::BytesMut;
 use futures::{SinkExt, StreamExt};

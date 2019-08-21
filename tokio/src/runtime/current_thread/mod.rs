@@ -24,8 +24,6 @@
 //! For example:
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::runtime::current_thread::Runtime;
 //! use tokio::prelude::*;
 //! use std::thread;

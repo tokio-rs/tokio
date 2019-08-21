@@ -1,5 +1,4 @@
 //! Echo everything received on STDIN to STDOUT and STDERR.
-#![feature(async_await)]
 
 use futures_util::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 

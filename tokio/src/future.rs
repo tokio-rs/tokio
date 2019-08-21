@@ -40,8 +40,6 @@ pub trait FutureExt: Future {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::prelude::*;
     /// use std::time::Duration;
     ///

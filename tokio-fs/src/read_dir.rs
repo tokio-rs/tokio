@@ -93,8 +93,6 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs;
     /// use tokio::prelude::*;
     ///
@@ -128,8 +126,6 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs;
     /// use tokio::prelude::*;
     ///
@@ -161,8 +157,6 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs;
     /// use tokio::prelude::*;
     ///
@@ -200,8 +194,6 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::fs;
     /// use tokio::prelude::*;
     ///

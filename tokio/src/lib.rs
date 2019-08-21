@@ -6,7 +6,6 @@
     unreachable_pub
 )]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
-#![feature(async_await)]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -31,8 +30,6 @@
 //! A simple TCP echo server:
 //!
 //! ```no_run
-//! #![feature(async_await)]
-//!
 //! use tokio::net::TcpListener;
 //! use tokio::prelude::*;
 //!

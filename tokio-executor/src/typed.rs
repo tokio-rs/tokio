@@ -22,8 +22,6 @@ use crate::SpawnError;
 ///
 /// [`spawn`]: TypedExecutor::spawn
 /// ```
-/// #![feature(async_await)]
-///
 /// use tokio::executor::TypedExecutor;
 /// use tokio::sync::oneshot;
 ///

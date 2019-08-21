@@ -29,8 +29,6 @@ impl TaskExecutor {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {

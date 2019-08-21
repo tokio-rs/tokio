@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_test::io::Builder;

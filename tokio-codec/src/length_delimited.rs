@@ -39,8 +39,6 @@
 //! Specifically, given the following:
 //!
 //! ```
-//! #![feature(async_await)]
-//!
 //! use tokio::codec::{Framed, LengthDelimitedCodec};
 //! use tokio::prelude::*;
 //!

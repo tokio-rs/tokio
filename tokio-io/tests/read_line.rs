@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use std::io::Cursor;
 use tokio_io::AsyncBufReadExt;

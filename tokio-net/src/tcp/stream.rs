@@ -34,8 +34,6 @@ use std::time::Duration;
 /// # Examples
 ///
 /// ```no_run
-/// #![feature(async_await)]
-///
 /// use tokio::net::TcpStream;
 /// use tokio::prelude::*;
 /// use std::error::Error;
@@ -81,8 +79,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use tokio::prelude::*;
     /// use std::error::Error;
@@ -182,8 +178,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -203,8 +197,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -243,8 +235,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use tokio::prelude::*;
     /// use std::error::Error;
@@ -282,8 +272,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use tokio::prelude::*;
     /// use std::error::Error;
@@ -315,8 +303,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -343,8 +329,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -369,8 +353,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -394,8 +376,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -429,8 +409,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -454,8 +432,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -481,8 +457,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -514,8 +488,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -540,8 +512,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -565,8 +535,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -592,8 +560,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///
@@ -624,8 +590,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// #![feature(async_await)]
-    ///
     /// use tokio::net::TcpStream;
     /// use std::net::SocketAddr;
     ///

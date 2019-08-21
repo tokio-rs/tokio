@@ -100,8 +100,6 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -120,8 +118,6 @@ impl<T> UnboundedReceiver<T> {
     /// Values are buffered:
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]

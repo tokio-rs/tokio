@@ -52,7 +52,6 @@
 //! ```
 //!
 
-#![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
 use std::env;

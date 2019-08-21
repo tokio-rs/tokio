@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use std::time::{Duration, Instant};
 use tokio_test::block_on;

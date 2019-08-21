@@ -15,7 +15,6 @@
 //! stdin/stdout to a server" to get up and running.
 
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use futures::{SinkExt, Stream};
 use std::{env, error::Error, net::SocketAddr};

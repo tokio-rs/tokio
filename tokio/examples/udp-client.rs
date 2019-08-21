@@ -26,7 +26,6 @@
 //! Please mind that since the UDP protocol doesn't have any capabilities to detect a broken
 //! connection the server needs to be run first, otherwise the client will block forever.
 
-#![feature(async_await)]
 #![warn(rust_2018_idioms)]
 
 use std::env;

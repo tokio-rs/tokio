@@ -77,8 +77,6 @@ impl Interval {
     /// # Examples
     ///
     /// ```
-    /// #![feature(async_await)]
-    ///
     /// use tokio::timer::Interval;
     ///
     /// use std::time::Duration;

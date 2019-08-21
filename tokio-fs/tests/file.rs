@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use rand::{distributions, thread_rng, Rng};
 use std::fs;

@@ -1,5 +1,4 @@
 // #![warn(rust_2018_idioms)]
-#![feature(async_await)]
 
 use native_tls::TlsConnector;
 use std::error::Error;

@@ -32,8 +32,6 @@ use std::time::Duration;
 /// # Examples
 ///
 /// ```
-/// #![feature(async_await)]
-///
 /// use tokio_executor::threadpool::Builder;
 ///
 /// use std::time::Duration;
