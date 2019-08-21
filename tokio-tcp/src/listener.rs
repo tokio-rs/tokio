@@ -178,7 +178,15 @@ impl TcpListener {
     /// # }
     /// ```
     pub fn poll_accept_std(&mut self) -> Poll<(net::TcpStream, SocketAddr), io::Error> {
-        // Error takes precedence, indicated by writable event on listening socket
+        // On iOS a TCP listening socket will be closed by the OS when you lock and unlock
+        // the device (pressing the power button). When the app returns to the foreground it
+        // will no longer receive any incoming connections. The error is indicated by mio
+        // as a "write ready" condition on the socket. Unless we poll for write ready, the
+        // error goes unnoticed indefinitely.
+        //
+        // This behaviour is not currently unit-tested because setting up the correct
+        // test environment programatically would be very arduous. Refer to discussion on
+        // GitHub PR #1114.
         if let Ok(_) = self.io.poll_write_ready() {
             if let Some(e) = self.io.get_ref().take_error()? {
                 return Err(e);
