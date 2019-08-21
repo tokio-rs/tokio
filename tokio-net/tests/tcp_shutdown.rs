@@ -1,8 +1,8 @@
 #![warn(rust_2018_idioms)]
 
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use tokio::io::AsyncWriteExt;
 use tokio_test::assert_ok;
 
 #[tokio::test]
