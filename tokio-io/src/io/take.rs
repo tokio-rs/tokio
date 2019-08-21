@@ -96,22 +96,25 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
     }
 }
 
-impl<T: AsyncBufRead> AsyncBufRead for Take<T> {
+impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let Self { inner, limit_ } = unsafe { self.get_unchecked_mut() };
+        let inner = unsafe { Pin::new_unchecked(inner) };
+
         // Don't call into inner reader at all at EOF because it may still block
-        if self.limit_ == 0 {
+        if *limit_ == 0 {
             return Poll::Ready(Ok(&[]));
         }
 
-        let buf = ready!(self.as_mut().inner().poll_fill_buf(cx)?);
-        let cap = cmp::min(buf.len() as u64, self.limit_) as usize;
+        let buf = ready!(inner.poll_fill_buf(cx)?);
+        let cap = cmp::min(buf.len() as u64, *limit_) as usize;
         Poll::Ready(Ok(&buf[..cap]))
     }
 
-    fn consume(self: Pin<&mut Self>, amt: usize) {
+    fn consume(mut self: Pin<&mut Self>, amt: usize) {
         // Don't let callers reset the limit by passing an overlarge value
         let amt = cmp::min(amt as u64, self.limit_) as usize;
-        *self.limit_() -= amt as u64;
+        *self.as_mut().limit_() -= amt as u64;
         self.inner().consume(amt);
     }
 }
