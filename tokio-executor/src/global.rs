@@ -1,4 +1,5 @@
 use super::{Executor, SpawnError};
+use futures_util::future::{FutureExt, RemoteHandle};
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
@@ -75,6 +76,19 @@ impl super::Executor for DefaultExecutor {
     ) -> Result<(), SpawnError> {
         DefaultExecutor::with_current(|executor| executor.spawn(future))
             .unwrap_or_else(|| Err(SpawnError::shutdown()))
+    }
+
+    fn spawn_with_handle<Fut>(
+        &mut self,
+        future: Fut,
+    ) -> Result<RemoteHandle<Fut::Output>, SpawnError>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send,
+    {
+        let (future, handle) = future.remote_handle();
+        self.spawn(future)?;
+        Ok(handle)
     }
 
     fn status(&self) -> Result<(), SpawnError> {
