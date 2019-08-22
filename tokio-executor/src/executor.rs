@@ -1,5 +1,5 @@
 use crate::SpawnError;
-use futures_util::future::RemoteHandle;
+use futures_util::future::{FutureExt, RemoteHandle};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -89,40 +89,6 @@ pub trait Executor {
     fn spawn(&mut self, future: Pin<Box<dyn Future<Output = ()> + Send>>)
         -> Result<(), SpawnError>;
 
-    /// Spawns a future object to run on this executor, returning a result of
-    /// its `RemoteHandle`.
-    ///
-    /// `future` is passed to the executor, which will begin running it. The
-    /// future may run on the current thread or another thread at the discretion
-    /// of the `Executor` implementation.
-    ///
-    /// # Panics
-    ///
-    /// Implementations are encouraged to avoid panics. However, panics are
-    /// permitted and the caller should check the implementation specific
-    /// documentation for more details on possible panics.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio_executor::Executor;
-    ///
-    /// # fn docs(my_executor: &mut dyn Executor) {
-    /// let handle = my_executor.spawn_with_handle(Box::pin(async {
-    ///     println!("running on the executor");
-    /// })).unwrap();
-    ///
-    /// handle.then(|_| println!("the future has completed"));
-    /// # }
-    /// ```
-    fn spawn_with_handle<Fut>(
-        &mut self,
-        future: Fut,
-    ) -> Result<RemoteHandle<Fut::Output>, SpawnError>
-    where
-        Fut: Future + Send + 'static,
-        Fut::Output: Send;
-
     /// Provides a best effort **hint** to whether or not `spawn` will succeed.
     ///
     /// This function may return both false positives **and** false negatives.
@@ -155,6 +121,47 @@ pub trait Executor {
     /// ```
     fn status(&self) -> Result<(), SpawnError> {
         Ok(())
+    }
+}
+
+impl dyn Executor {
+    /// Spawns a future object to run on this executor, returning a result of
+    /// its `RemoteHandle`.
+    ///
+    /// `future` is passed to the executor, which will begin running it. The
+    /// future may run on the current thread or another thread at the discretion
+    /// of the `Executor` implementation.
+    ///
+    /// # Panics
+    ///
+    /// Implementations are encouraged to avoid panics. However, panics are
+    /// permitted and the caller should check the implementation specific
+    /// documentation for more details on possible panics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_executor::Executor;
+    ///
+    /// # fn docs(my_executor: &mut dyn Executor) {
+    /// let handle = my_executor.spawn_with_handle(Box::pin(async {
+    ///     println!("running on the executor");
+    /// })).unwrap();
+    ///
+    /// handle.then(|_| println!("the future has completed"));
+    /// # }
+    /// ```
+    pub fn spawn_with_handle<Fut>(
+        &mut self,
+        future: Fut,
+    ) -> Result<RemoteHandle<Fut::Output>, SpawnError>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send,
+    {
+        let (future, handle) = future.remote_handle();
+        self.spawn(Box::pin(future))?;
+        Ok(handle)
     }
 }
 
