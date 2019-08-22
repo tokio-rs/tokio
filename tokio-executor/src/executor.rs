@@ -142,6 +142,7 @@ impl dyn Executor {
     ///
     /// ```
     /// use tokio_executor::Executor;
+    /// use futures_util::future::FutureExt;
     ///
     /// # fn docs(my_executor: &mut dyn Executor) {
     /// let handle = my_executor.spawn_with_handle(Box::pin(async {
