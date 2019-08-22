@@ -48,6 +48,7 @@ rt-full = [
   "tokio-macros",
   "tracing-core",
 ]
+signal = ["tokio-net/signal"]
 sync = ["tokio-sync"]
 tcp = ["io", "tokio-net/tcp"]
 timer = ["tokio-timer"]
