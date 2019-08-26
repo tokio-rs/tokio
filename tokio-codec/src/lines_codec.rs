@@ -84,23 +84,6 @@ impl LinesCodec {
     pub fn max_length(&self) -> usize {
         self.max_length
     }
-
-    fn discard(&mut self, newline_offset: Option<usize>, read_to: usize, buf: &mut BytesMut) {
-        let discard_to = if let Some(offset) = newline_offset {
-            // If we found a newline, discard up to that offset and
-            // then stop discarding. On the next iteration, we'll try
-            // to read a line normally.
-            self.is_discarding = false;
-            offset + self.next_index + 1
-        } else {
-            // Otherwise, we didn't find a newline, so we'll discard
-            // everything we read. On the next iteration, we'll continue
-            // discarding up to max_len bytes unless we find a newline.
-            read_to
-        };
-        buf.advance(discard_to);
-        self.next_index = 0;
-    }
 }
 
 fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
@@ -130,10 +113,26 @@ impl Decoder for LinesCodec {
                 .iter()
                 .position(|b| *b == b'\n');
 
-            if self.is_discarding {
-                self.discard(newline_offset, read_to, buf);
-            } else {
-                return if let Some(offset) = newline_offset {
+            match (self.is_discarding, newline_offset) {
+                (true, Some(offset)) => {
+                    // If we found a newline, discard up to that offset and
+                    // then stop discarding. On the next iteration, we'll try
+                    // to read a line normally.
+                    buf.advance(offset + self.next_index + 1);
+                    self.is_discarding = false;
+                    self.next_index = 0;
+                }
+                (true, None) => {
+                    // Otherwise, we didn't find a newline, so we'll discard
+                    // everything we read. On the next iteration, we'll continue
+                    // discarding up to max_len bytes unless we find a newline.
+                    buf.advance(read_to);
+                    self.next_index = 0;
+                    if buf.is_empty() {
+                        return Err(LinesCodecError::MaxLineLengthExceeded);
+                    }
+                }
+                (false, Some(offset)) => {
                     // Found a line!
                     let newline_index = offset + self.next_index;
                     self.next_index = 0;
@@ -141,20 +140,21 @@ impl Decoder for LinesCodec {
                     let line = &line[..line.len() - 1];
                     let line = without_carriage_return(line);
                     let line = utf8(line)?;
-
-                    Ok(Some(line.to_string()))
-                } else if buf.len() > self.max_length {
+                    return Ok(Some(line.to_string()));
+                }
+                (false, None) if buf.len() > self.max_length => {
                     // Reached the maximum length without finding a
                     // newline, return an error and start discarding on the
                     // next call.
                     self.is_discarding = true;
-                    Err(LinesCodecError::MaxLineLengthExceeded)
-                } else {
+                    return Err(LinesCodecError::MaxLineLengthExceeded);
+                }
+                (false, None) => {
                     // We didn't find a line or reach the length limit, so the next
                     // call will resume searching at the current offset.
                     self.next_index = read_to;
-                    Ok(None)
-                };
+                    return Ok(None);
+                }
             }
         }
     }
