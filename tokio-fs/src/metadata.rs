@@ -7,7 +7,8 @@ use std::path::Path;
 /// Queries the file system metadata for a path.
 pub async fn metadata<P>(path: P) -> io::Result<Metadata>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path>,
 {
-    asyncify(|| std::fs::metadata(&path)).await
+    let path = path.as_ref().to_owned();
+    asyncify(|| std::fs::metadata(path)).await
 }

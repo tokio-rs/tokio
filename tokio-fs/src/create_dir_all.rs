@@ -10,5 +10,6 @@ use std::path::Path;
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.create_dir_all.html
 pub async fn create_dir_all<P: AsRef<Path>>(path: P) -> io::Result<()> {
-    asyncify(|| std::fs::create_dir_all(&path)).await
+    let path = path.as_ref().to_owned();
+    asyncify(move || std::fs::create_dir_all(path)).await
 }

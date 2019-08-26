@@ -1,6 +1,5 @@
-use super::File;
+use crate::{asyncify, File};
 
-use futures_util::future::poll_fn;
 use std::io;
 use std::path::Path;
 
@@ -91,10 +90,13 @@ impl OpenOptions {
     /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
     pub async fn open<P>(&self, path: P) -> io::Result<File>
     where
-        P: AsRef<Path> + Send + Unpin + 'static,
+        P: AsRef<Path>,
     {
-        let std_file = poll_fn(|_| crate::blocking_io(|| self.0.open(&path))).await?;
-        Ok(File::from_std(std_file))
+        let path = path.as_ref().to_owned();
+        let opts = self.0.clone();
+
+        let std = asyncify(move || opts.open(path)).await?;
+        Ok(File::from_std(std))
     }
 }
 

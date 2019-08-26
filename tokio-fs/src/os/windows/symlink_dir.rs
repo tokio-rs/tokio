@@ -12,5 +12,8 @@ use std::path::Path;
 ///
 /// [std]: https://doc.rust-lang.org/std/os/windows/fs/fn.symlink_dir.html
 pub async fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> io::Result<()> {
-    asyncify(|| std::os::windows::fs::symlink_dir(&src, &dst)).await
+    let src = src.as_ref().to_owned();
+    let dst = dst.as_ref().to_owned();
+
+    asyncify(move || std::os::windows::fs::symlink_dir(src, dst)).await
 }

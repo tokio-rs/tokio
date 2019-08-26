@@ -1,6 +1,4 @@
-use crate::File;
-
-use tokio_io::AsyncWriteExt;
+use crate::asyncify;
 
 use std::{io, path::Path};
 
@@ -23,8 +21,8 @@ pub async fn write<P, C: AsRef<[u8]> + Unpin>(path: P, contents: C) -> io::Resul
 where
     P: AsRef<Path> + Send + Unpin + 'static,
 {
-    let mut file = File::create(path).await?;
-    file.write_all(contents.as_ref()).await?;
+    let path = path.as_ref().to_owned();
+    let contents = contents.as_ref().to_owned();
 
-    Ok(())
+    asyncify(move || std::fs::write(path, contents)).await
 }

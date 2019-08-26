@@ -12,5 +12,8 @@ use std::path::Path;
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.rename.html
 pub async fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> io::Result<()> {
-    asyncify(|| std::fs::rename(&from, &to)).await
+    let from = from.as_ref().to_owned();
+    let to = to.as_ref().to_owned();
+
+    asyncify(move || std::fs::rename(from, to)).await
 }
