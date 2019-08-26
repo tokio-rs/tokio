@@ -149,7 +149,7 @@ impl dyn Executor {
     ///     println!("running on the executor");
     /// })).unwrap();
     ///
-    /// handle.then(|_| println!("the future has completed"));
+    /// handle.map(|_| println!("the future has completed"));
     /// # }
     /// ```
     pub fn spawn_with_handle<Fut>(
