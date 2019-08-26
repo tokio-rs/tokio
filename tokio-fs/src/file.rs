@@ -216,11 +216,8 @@ impl File {
         if !buf.is_empty() {
             let n = buf.discard_read();
 
-            match pos {
-                SeekFrom::Current(ref mut offset) => {
-                    *offset += n;
-                }
-                _ => {}
+            if let SeekFrom::Current(ref mut offset) = pos {
+                *offset += n;
             }
         }
 
@@ -332,11 +329,11 @@ impl File {
             _ => unreachable!(),
         };
 
-        let mut seek = None;
-
-        if !buf.is_empty() {
-            seek = Some(SeekFrom::Current(buf.discard_read()));
-        }
+        let seek = if !buf.is_empty() {
+            Some(SeekFrom::Current(buf.discard_read()))
+        } else {
+            None
+        };
 
         let std = self.std.clone();
 
@@ -525,11 +522,12 @@ impl AsyncWrite for File {
             match self.state {
                 Idle(ref mut buf_cell) => {
                     let mut buf = buf_cell.take().unwrap();
-                    let mut seek = None;
 
-                    if !buf.is_empty() {
-                        seek = Some(SeekFrom::Current(buf.discard_read()));
-                    }
+                    let seek = if !buf.is_empty() {
+                        Some(SeekFrom::Current(buf.discard_read()))
+                    } else {
+                        None
+                    };
 
                     let n = buf.copy_from(src);
                     let std = self.std.clone();
