@@ -23,7 +23,7 @@ categories = ["asynchronous", "network-programming", "filesystem"]
 
 [dependencies]
 tokio-io = { version = "=0.2.0-alpha.2", features = ["util"], path = "../tokio-io" }
-tokio-executor = { version = "=0.2.0-alpha.2", features = ["threadpool"], path = "../tokio-executor" }
+tokio-executor = { version = "=0.2.0-alpha.2", features = ["blocking"], path = "../tokio-executor" }
 tokio-sync = { version = "=0.2.0-alpha.2", path = "../tokio-sync" }
 
 futures-core-preview = "=0.3.0-alpha.18"
