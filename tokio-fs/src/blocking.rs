@@ -9,8 +9,8 @@ use std::future::Future;
 use std::io;
 use std::io::prelude::*;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::task::Poll::*;
+use std::task::{Context, Poll};
 
 use self::State::*;
 
@@ -116,8 +116,7 @@ where
 
                     self.state = Busy(sys::run(move || {
                         let n = buf.len();
-                        let res = buf.write_to(&mut inner)
-                            .map(|_| n);
+                        let res = buf.write_to(&mut inner).map(|_| n);
 
                         (res, buf, inner)
                     }));
@@ -163,7 +162,7 @@ macro_rules! uninterruptibly {
                 res => break res,
             }
         }
-    }}
+    }};
 }
 
 impl Buf {
@@ -201,7 +200,9 @@ impl Buf {
         let n = cmp::min(src.len(), MAX_BUF);
 
         self.buf.reserve(n);
-        unsafe { self.buf.set_len(n); }
+        unsafe {
+            self.buf.set_len(n);
+        }
 
         self.buf[..n].copy_from_slice(&src[..n]);
 

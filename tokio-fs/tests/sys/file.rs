@@ -2,8 +2,8 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::io;
-use std::io::SeekFrom;
 use std::io::prelude::*;
+use std::io::SeekFrom;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -38,7 +38,8 @@ impl Handle {
 
     pub fn read_err(&self) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::Read(Err(io::ErrorKind::Other.into())));
+        s.calls
+            .push_back(Call::Read(Err(io::ErrorKind::Other.into())));
         self
     }
 
@@ -50,19 +51,22 @@ impl Handle {
 
     pub fn write_err(&self) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::Write(Err(io::ErrorKind::Other.into())));
+        s.calls
+            .push_back(Call::Write(Err(io::ErrorKind::Other.into())));
         self
     }
 
     pub fn seek_start_ok(&self, offset: u64) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::Seek(SeekFrom::Start(offset), Ok(offset)));
+        s.calls
+            .push_back(Call::Seek(SeekFrom::Start(offset), Ok(offset)));
         self
     }
 
     pub fn seek_current_ok(&self, offset: i64, ret: u64) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::Seek(SeekFrom::Current(offset), Ok(ret)));
+        s.calls
+            .push_back(Call::Seek(SeekFrom::Current(offset), Ok(ret)));
         self
     }
 
@@ -74,7 +78,8 @@ impl Handle {
 
     pub fn sync_all_err(&self) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::SyncAll(Err(io::ErrorKind::Other.into())));
+        s.calls
+            .push_back(Call::SyncAll(Err(io::ErrorKind::Other.into())));
         self
     }
 
@@ -86,7 +91,8 @@ impl Handle {
 
     pub fn sync_data_err(&self) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::SyncData(Err(io::ErrorKind::Other.into())));
+        s.calls
+            .push_back(Call::SyncData(Err(io::ErrorKind::Other.into())));
         self
     }
 
@@ -98,7 +104,8 @@ impl Handle {
 
     pub fn set_len_err(&self, size: u64) -> &Self {
         let mut s = self.shared.lock().unwrap();
-        s.calls.push_back(Call::SetLen(size, Err(io::ErrorKind::Other.into())));
+        s.calls
+            .push_back(Call::SetLen(size, Err(io::ErrorKind::Other.into())));
         self
     }
 
@@ -131,7 +138,9 @@ impl File {
             calls: VecDeque::new(),
         }));
 
-        let handle = Handle { shared: shared.clone() };
+        let handle = Handle {
+            shared: shared.clone(),
+        };
         let file = File { shared };
 
         (handle, file)
@@ -203,9 +212,7 @@ impl Read for &'_ File {
                 &mut dst[..data.len()].copy_from_slice(&data);
                 Ok(data.len())
             }
-            Some(Read(Err(e))) => {
-                Err(e)
-            }
+            Some(Read(Err(e))) => Err(e),
             Some(op) => panic!("expected next call to be {:?}; was a read", op),
             None => panic!("did not expect call"),
         }
@@ -223,9 +230,7 @@ impl Write for &'_ File {
                 assert_eq!(src, &data[..]);
                 Ok(src.len())
             }
-            Some(Write(Err(e))) => {
-                Err(e)
-            }
+            Some(Write(Err(e))) => Err(e),
             Some(op) => panic!("expected next call to be {:?}; was write", op),
             None => panic!("did not expect call"),
         }
@@ -255,7 +260,6 @@ impl Seek for &'_ File {
 
 impl fmt::Debug for File {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("mock::File")
-            .finish()
+        fmt.debug_struct("mock::File").finish()
     }
 }

@@ -27,7 +27,9 @@ pub struct Stderr {
 /// Tokio runtime.
 pub fn stderr() -> Stderr {
     let std = io::stderr();
-    Stderr { std: Blocking::new(std) }
+    Stderr {
+        std: Blocking::new(std),
+    }
 }
 
 impl AsyncWrite for Stderr {
@@ -43,7 +45,10 @@ impl AsyncWrite for Stderr {
         Pin::new(&mut self.std).poll_flush(cx)
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
         Pin::new(&mut self.std).poll_shutdown(cx)
     }
 }

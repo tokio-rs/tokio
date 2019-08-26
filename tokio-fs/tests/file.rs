@@ -3,8 +3,8 @@
 use tokio::fs::File;
 use tokio::prelude::*;
 
-use tempfile::NamedTempFile;
 use std::io::prelude::*;
+use tempfile::NamedTempFile;
 
 /*
 use rand::{distributions, thread_rng, Rng};

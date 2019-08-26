@@ -3,16 +3,16 @@
 //! [`File`]: file/struct.File.html
 
 use self::State::*;
-use crate::{asyncify, sys};
 use crate::blocking::Buf;
+use crate::{asyncify, sys};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_sync::oneshot;
 
 use futures_core::ready;
 use std::fmt;
-use std::future::Future;
 use std::fs::{Metadata, Permissions};
+use std::future::Future;
 use std::io::{self, Seek, SeekFrom};
 use std::path::Path;
 use std::pin::Pin;
@@ -342,11 +342,11 @@ impl File {
 
         self.state = Busy(sys::run(move || {
             let res = if let Some(seek) = seek {
-                (&*std).seek(seek)
-                    .and_then(|_| std.set_len(size))
+                (&*std).seek(seek).and_then(|_| std.set_len(size))
             } else {
                 std.set_len(size)
-            }.map(|_| 0); // the value is discarded later
+            }
+            .map(|_| 0); // the value is discarded later
 
             // Return the result as a seek
             (Operation::Seek(res), buf)
@@ -536,8 +536,7 @@ impl AsyncWrite for File {
 
                     self.state = Busy(sys::run(move || {
                         let res = if let Some(seek) = seek {
-                            (&*std).seek(seek)
-                                .and_then(|_| buf.write_to(&mut &*std))
+                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
                             buf.write_to(&mut &*std)
                         };

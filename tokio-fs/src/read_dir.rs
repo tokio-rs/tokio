@@ -75,11 +75,7 @@ impl Stream for ReadDir {
                     let (ret, std) = ready!(Pin::new(rx).poll(cx)).unwrap();
                     self.0 = State::Idle(Some(std));
 
-                    let ret = ret.map(|res| {
-                        res.map(|std| {
-                            DirEntry(Arc::new(std))
-                        })
-                    });
+                    let ret = ret.map(|res| res.map(|std| DirEntry(Arc::new(std))));
 
                     return Poll::Ready(ret);
                 }

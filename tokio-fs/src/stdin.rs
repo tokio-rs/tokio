@@ -33,7 +33,9 @@ pub struct Stdin {
 /// Tokio runtime.
 pub fn stdin() -> Stdin {
     let std = io::stdin();
-    Stdin { std: Blocking::new(std) }
+    Stdin {
+        std: Blocking::new(std),
+    }
 }
 
 impl AsyncRead for Stdin {

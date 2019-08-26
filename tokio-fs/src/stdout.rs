@@ -27,7 +27,9 @@ pub struct Stdout {
 /// runtime.
 pub fn stdout() -> Stdout {
     let std = io::stdout();
-    Stdout { std: Blocking::new(std) }
+    Stdout {
+        std: Blocking::new(std),
+    }
 }
 
 impl AsyncWrite for Stdout {
@@ -43,7 +45,10 @@ impl AsyncWrite for Stdout {
         Pin::new(&mut self.std).poll_flush(cx)
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
         Pin::new(&mut self.std).poll_shutdown(cx)
     }
 }

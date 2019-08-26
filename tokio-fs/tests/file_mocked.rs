@@ -110,9 +110,7 @@ fn read_with_smaller_buf() {
 #[test]
 fn read_with_bigger_buf() {
     let (mock, file) = sys::File::mock();
-    mock
-        .read(&HELLO[..4])
-        .read(&HELLO[4..]);
+    mock.read(&HELLO[..4]).read(&HELLO[4..]);
 
     let mut file = File::from_std(file);
 
@@ -153,9 +151,7 @@ fn read_with_bigger_buf() {
 #[test]
 fn read_err_then_read_success() {
     let (mock, file) = sys::File::mock();
-    mock
-        .read_err()
-        .read(&HELLO);
+    mock.read_err().read(&HELLO);
 
     let mut file = File::from_std(file);
 
@@ -221,20 +217,19 @@ fn flush_while_idle() {
 fn read_with_buffer_larger_than_max() {
     // Chunks
     let a = 16 * 1024;
-    let b = a*2;
-    let c = a*3;
-    let d = a*4;
+    let b = a * 2;
+    let c = a * 3;
+    let d = a * 4;
 
     assert_eq!(d / 1024, 64);
 
     let mut data = vec![];
-    for i in 0..(d-1) {
+    for i in 0..(d - 1) {
         data.push((i % 151) as u8);
     }
 
     let (mock, file) = sys::File::mock();
-    mock
-        .read(&data[0..a])
+    mock.read(&data[0..a])
         .read(&data[a..b])
         .read(&data[b..c])
         .read(&data[c..]);
@@ -244,7 +239,7 @@ fn read_with_buffer_larger_than_max() {
     let mut actual = vec![0; d];
     let mut pos = 0;
 
-    while pos < data.len()  {
+    while pos < data.len() {
         let mut t = task::spawn(file.read(&mut actual[pos..]));
 
         assert_pending!(t.poll());
@@ -265,20 +260,19 @@ fn read_with_buffer_larger_than_max() {
 fn write_with_buffer_larger_than_max() {
     // Chunks
     let a = 16 * 1024;
-    let b = a*2;
-    let c = a*3;
-    let d = a*4;
+    let b = a * 2;
+    let c = a * 3;
+    let d = a * 4;
 
     assert_eq!(d / 1024, 64);
 
     let mut data = vec![];
-    for i in 0..(d-1) {
+    for i in 0..(d - 1) {
         data.push((i % 151) as u8);
     }
 
     let (mock, file) = sys::File::mock();
-    mock
-        .write(&data[0..a])
+    mock.write(&data[0..a])
         .write(&data[a..b])
         .write(&data[b..c])
         .write(&data[c..]);
@@ -313,9 +307,7 @@ fn write_with_buffer_larger_than_max() {
 #[test]
 fn write_twice_before_dispatch() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write(HELLO)
-        .write(FOO);
+    mock.write(HELLO).write(FOO);
 
     let mut file = File::from_std(file);
 
@@ -345,8 +337,7 @@ fn write_twice_before_dispatch() {
 #[test]
 fn incomplete_read_followed_by_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .read(HELLO)
+    mock.read(HELLO)
         .seek_current_ok(-(HELLO.len() as i64), 0)
         .write(FOO);
 
@@ -372,10 +363,7 @@ fn incomplete_read_followed_by_write() {
 #[test]
 fn incomplete_partial_read_followed_by_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .read(HELLO)
-        .seek_current_ok(-10, 0)
-        .write(FOO);
+    mock.read(HELLO).seek_current_ok(-10, 0).write(FOO);
 
     let mut file = File::from_std(file);
 
@@ -402,8 +390,7 @@ fn incomplete_partial_read_followed_by_write() {
 #[test]
 fn incomplete_read_followed_by_flush() {
     let (mock, file) = sys::File::mock();
-    mock
-        .read(HELLO)
+    mock.read(HELLO)
         .seek_current_ok(-(HELLO.len() as i64), 0)
         .write(FOO);
 
@@ -428,9 +415,7 @@ fn incomplete_read_followed_by_flush() {
 #[test]
 fn incomplete_flush_followed_by_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write(HELLO)
-        .write(FOO);
+    mock.write(HELLO).write(FOO);
 
     let mut file = File::from_std(file);
 
@@ -490,9 +475,7 @@ fn write_write_err() {
 #[test]
 fn write_read_write_err() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write_err()
-        .read(HELLO);
+    mock.write_err().read(HELLO);
 
     let mut file = File::from_std(file);
 
@@ -515,9 +498,7 @@ fn write_read_write_err() {
 #[test]
 fn write_read_flush_err() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write_err()
-        .read(HELLO);
+    mock.write_err().read(HELLO);
 
     let mut file = File::from_std(file);
 
@@ -540,9 +521,7 @@ fn write_read_flush_err() {
 #[test]
 fn write_seek_write_err() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write_err()
-        .seek_start_ok(0);
+    mock.write_err().seek_start_ok(0);
 
     let mut file = File::from_std(file);
 
@@ -565,9 +544,7 @@ fn write_seek_write_err() {
 #[test]
 fn write_seek_flush_err() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write_err()
-        .seek_start_ok(0);
+    mock.write_err().seek_start_ok(0);
 
     let mut file = File::from_std(file);
 
@@ -590,9 +567,7 @@ fn write_seek_flush_err() {
 #[test]
 fn sync_all_ordered_after_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write(HELLO)
-        .sync_all();
+    mock.write(HELLO).sync_all();
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -617,9 +592,7 @@ fn sync_all_ordered_after_write() {
 #[test]
 fn sync_all_err_ordered_after_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write(HELLO)
-        .sync_all_err();
+    mock.write(HELLO).sync_all_err();
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -644,9 +617,7 @@ fn sync_all_err_ordered_after_write() {
 #[test]
 fn sync_data_ordered_after_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write(HELLO)
-        .sync_data();
+    mock.write(HELLO).sync_data();
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -671,9 +642,7 @@ fn sync_data_ordered_after_write() {
 #[test]
 fn sync_data_err_ordered_after_write() {
     let (mock, file) = sys::File::mock();
-    mock
-        .write(HELLO)
-        .sync_data_err();
+    mock.write(HELLO).sync_data_err();
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -734,8 +703,7 @@ fn open_set_len_err() {
 #[test]
 fn partial_read_set_len_ok() {
     let (mock, file) = sys::File::mock();
-    mock
-        .read(HELLO)
+    mock.read(HELLO)
         .seek_current_ok(-14, 0)
         .set_len(123)
         .read(FOO);

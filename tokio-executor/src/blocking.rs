@@ -5,8 +5,8 @@ use tokio_sync::oneshot;
 use lazy_static::lazy_static;
 use std::collections::VecDeque;
 use std::sync::{Condvar, Mutex};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 struct Pool {
     shared: Mutex<Shared>,
@@ -73,8 +73,7 @@ fn spawn_thread() {
     thread::Builder::new()
         .name("fs-driver".to_string())
         .spawn(|| {
-            'outer:
-            loop {
+            'outer: loop {
                 let mut shared = POOL.shared.lock().unwrap();
 
                 if let Some(task) = shared.queue.pop_front() {
