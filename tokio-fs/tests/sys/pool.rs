@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 use std::io;
 
 thread_local! {
-    static QUEUE: RefCell<VecDeque<Box<dyn Task>>> = RefCell::new(VecDeque::new())
+    static QUEUE: RefCell<VecDeque<Box<dyn FnOnce() + Send>>> = RefCell::new(VecDeque::new())
 }
 
 pub(crate) fn run<F, R>(f: F) -> oneshot::Receiver<R>
@@ -40,15 +40,5 @@ pub(crate) fn run_one() {
         .with(|cell| cell.borrow_mut().pop_front())
         .expect("expected task to run, but none ready");
 
-    task.run();
-}
-
-trait Task {
-    fn run(self: Box<Self>);
-}
-
-impl<F: FnOnce()> Task for F {
-    fn run(self: Box<Self>) {
-        self();
-    }
+    task();
 }

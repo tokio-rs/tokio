@@ -14,17 +14,13 @@ struct Pool {
 }
 
 struct Shared {
-    queue: VecDeque<Box<dyn Task>>,
+    queue: VecDeque<Box<dyn FnOnce() + Send>>,
     num_th: u32,
     num_idle: u32,
 }
 
 lazy_static! {
     static ref POOL: Pool = Pool::new();
-}
-
-trait Task: Send {
-    fn run(self: Box<Self>);
 }
 
 const MAX_THREADS: u32 = 1_000;
@@ -78,7 +74,7 @@ fn spawn_thread() {
 
                 if let Some(task) = shared.queue.pop_front() {
                     drop(shared);
-                    task.run();
+                    task();
                     continue;
                 }
 
@@ -90,7 +86,7 @@ fn spawn_thread() {
 
                     if let Some(task) = shared.queue.pop_front() {
                         drop(shared);
-                        task.run();
+                        task();
                         continue 'outer;
                     }
                 }
@@ -109,11 +105,5 @@ impl Pool {
             }),
             condvar: Condvar::new(),
         }
-    }
-}
-
-impl<F: FnOnce() + Send> Task for F {
-    fn run(self: Box<Self>) {
-        self();
     }
 }
