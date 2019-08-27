@@ -3,8 +3,8 @@ use tokio_sync::oneshot;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::Future;
-use std::pin::Pin;
 use std::io;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 thread_local! {
