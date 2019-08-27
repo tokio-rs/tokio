@@ -2,9 +2,9 @@ use super::split::{
     split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
     TcpStreamWriteHalfMut,
 };
-use crate::ToSocketAddrs;
 use crate::driver::Handle;
 use crate::util::PollEvented;
+use crate::ToSocketAddrs;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -96,7 +96,8 @@ impl TcpStream {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses")
+                "could not resolve to any addresses",
+            )
         }))
     }
 

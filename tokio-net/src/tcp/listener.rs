@@ -1,9 +1,9 @@
-use crate::ToSocketAddrs;
 #[cfg(feature = "async-traits")]
 use super::incoming::Incoming;
 use super::TcpStream;
 use crate::driver::Handle;
 use crate::util::PollEvented;
+use crate::ToSocketAddrs;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -88,7 +88,8 @@ impl TcpListener {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses")
+                "could not resolve to any addresses",
+            )
         }))
     }
 

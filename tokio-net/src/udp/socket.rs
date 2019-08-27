@@ -1,7 +1,7 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::ToSocketAddrs;
 use crate::driver::Handle;
 use crate::util::PollEvented;
+use crate::ToSocketAddrs;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -34,13 +34,13 @@ impl UdpSocket {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses")
+                "could not resolve to any addresses",
+            )
         }))
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
-        mio::net::UdpSocket::bind(&addr)
-            .map(UdpSocket::new)
+        mio::net::UdpSocket::bind(&addr).map(UdpSocket::new)
     }
 
     fn new(socket: mio::net::UdpSocket) -> UdpSocket {
@@ -97,7 +97,8 @@ impl UdpSocket {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses")
+                "could not resolve to any addresses",
+            )
         }))
     }
 
@@ -179,14 +180,11 @@ impl UdpSocket {
         let mut addrs = target.to_socket_addrs().await?;
 
         match addrs.next() {
-            Some(target) => {
-                poll_fn(|cx| self.poll_send_to_priv(cx, buf, &target)).await
-            }
-            None => {
-                Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "no addresses to send data to"))
-            }
+            Some(target) => poll_fn(|cx| self.poll_send_to_priv(cx, buf, &target)).await,
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "no addresses to send data to",
+            )),
         }
     }
 

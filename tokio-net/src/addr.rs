@@ -3,11 +3,10 @@ use tokio_executor::blocking;
 use futures_util::future;
 use std::future::Future;
 use std::io;
-use std::net::{SocketAddr, IpAddr};
+use std::net::{IpAddr, SocketAddr};
 
 /// Convert or resolve without blocking to one or more `SocketAddr` values.
-pub trait ToSocketAddrs: sealed::ToSocketAddrsPriv {
-}
+pub trait ToSocketAddrs: sealed::ToSocketAddrsPriv {}
 
 type BoxFuture<T> = Box<dyn Future<Output = io::Result<T>> + Unpin + Send>;
 
