@@ -1,6 +1,4 @@
-use crate::File;
-
-use tokio_io::AsyncReadExt;
+use crate::asyncify;
 
 use std::{io, path::Path};
 
@@ -22,12 +20,8 @@ use std::{io, path::Path};
 /// ```
 pub async fn read<P>(path: P) -> io::Result<Vec<u8>>
 where
-    P: AsRef<Path> + Send + Unpin + 'static,
+    P: AsRef<Path>,
 {
-    let mut file = File::open(path).await?;
-    let metadata = file.metadata().await?;
-
-    let mut contents = Vec::with_capacity(metadata.len() as usize + 1);
-    file.read_to_end(&mut contents).await?;
-    Ok(contents)
+    let path = path.as_ref().to_owned();
+    asyncify(move || std::fs::read(path)).await
 }

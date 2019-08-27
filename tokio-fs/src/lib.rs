@@ -34,6 +34,7 @@
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 //! [tokio-executor]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/index.html
 
+mod blocking;
 mod create_dir;
 mod create_dir_all;
 mod file;
@@ -76,37 +77,18 @@ pub use crate::symlink_metadata::symlink_metadata;
 pub use crate::write::write;
 
 use std::io;
-use std::io::ErrorKind::Other;
-use std::task::Poll;
-use std::task::Poll::*;
-
-fn blocking_io<F, T>(f: F) -> Poll<io::Result<T>>
-where
-    F: FnOnce() -> io::Result<T>,
-{
-    use tokio_executor::threadpool::blocking;
-
-    match blocking(f) {
-        Ready(Ok(v)) => Ready(v),
-        Ready(Err(_)) => Ready(Err(blocking_err())),
-        Pending => Pending,
-    }
-}
 
 async fn asyncify<F, T>(f: F) -> io::Result<T>
 where
-    F: FnOnce() -> io::Result<T>,
+    F: FnOnce() -> io::Result<T> + Send + 'static,
+    T: Send + 'static,
 {
-    use futures_util::future::poll_fn;
-
-    let mut f = Some(f);
-    poll_fn(move |_| blocking_io(|| f.take().unwrap()())).await
+    sys::run(f).await
 }
 
-fn blocking_err() -> io::Error {
-    io::Error::new(
-        Other,
-        "`blocking` annotated I/O must be called \
-         from the context of the Tokio runtime.",
-    )
+/// Types in this module can be mocked out in tests.
+mod sys {
+    pub(crate) use std::fs::File;
+
+    pub(crate) use tokio_executor::blocking::{run, Blocking};
 }

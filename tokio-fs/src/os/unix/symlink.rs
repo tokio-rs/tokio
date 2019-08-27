@@ -11,5 +11,8 @@ use std::path::Path;
 ///
 /// [std]: https://doc.rust-lang.org/std/os/unix/fs/fn.symlink.html
 pub async fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> io::Result<()> {
-    asyncify(|| std::os::unix::fs::symlink(&src, &dst)).await
+    let src = src.as_ref().to_owned();
+    let dst = dst.as_ref().to_owned();
+
+    asyncify(move || std::os::unix::fs::symlink(src, dst)).await
 }

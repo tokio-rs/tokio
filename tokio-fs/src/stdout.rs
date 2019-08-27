@@ -1,8 +1,8 @@
-use crate::blocking_io;
+use crate::blocking::Blocking;
 
 use tokio_io::AsyncWrite;
 
-use std::io::{self, Write};
+use std::io;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -18,7 +18,7 @@ use std::task::Poll;
 /// [`AsyncWrite`]: trait.AsyncWrite.html
 #[derive(Debug)]
 pub struct Stdout {
-    std: std::io::Stdout,
+    std: Blocking<std::io::Stdout>,
 }
 
 /// Constructs a new handle to the standard output of the current process.
@@ -27,23 +27,28 @@ pub struct Stdout {
 /// runtime.
 pub fn stdout() -> Stdout {
     let std = io::stdout();
-    Stdout { std }
+    Stdout {
+        std: Blocking::new(std),
+    }
 }
 
 impl AsyncWrite for Stdout {
     fn poll_write(
         mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        blocking_io(|| (&mut self.std).write(buf))
+        Pin::new(&mut self.std).poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        blocking_io(|| (&mut self.std).flush())
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        Pin::new(&mut self.std).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
+        Pin::new(&mut self.std).poll_shutdown(cx)
     }
 }

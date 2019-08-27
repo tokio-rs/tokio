@@ -1,8 +1,8 @@
-use crate::blocking_io;
+use crate::blocking::Blocking;
 
 use tokio_io::AsyncRead;
 
-use std::io::{self, Read};
+use std::io;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -24,7 +24,7 @@ use std::task::Poll;
 /// [`AsyncRead`]: trait.AsyncRead.html
 #[derive(Debug)]
 pub struct Stdin {
-    std: std::io::Stdin,
+    std: Blocking<std::io::Stdin>,
 }
 
 /// Constructs a new handle to the standard input of the current process.
@@ -33,15 +33,17 @@ pub struct Stdin {
 /// Tokio runtime.
 pub fn stdin() -> Stdin {
     let std = io::stdin();
-    Stdin { std }
+    Stdin {
+        std: Blocking::new(std),
+    }
 }
 
 impl AsyncRead for Stdin {
     fn poll_read(
         mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        blocking_io(|| (&mut self.std).read(buf))
+        Pin::new(&mut self.std).poll_read(cx, buf)
     }
 }

@@ -21,6 +21,7 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [features]
+blocking = ["tokio-sync"]
 current-thread = ["crossbeam-channel"]
 threadpool = [
   "tokio-sync",

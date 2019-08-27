@@ -13,5 +13,6 @@ pub async fn symlink_metadata<P>(path: P) -> io::Result<Metadata>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    asyncify(|| std::fs::symlink_metadata(&path)).await
+    let path = path.as_ref().to_owned();
+    asyncify(|| std::fs::symlink_metadata(path)).await
 }

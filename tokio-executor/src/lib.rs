@@ -67,6 +67,9 @@ mod global;
 pub mod park;
 mod typed;
 
+#[cfg(feature = "blocking")]
+pub mod blocking;
+
 #[cfg(feature = "current-thread")]
 pub mod current_thread;
 

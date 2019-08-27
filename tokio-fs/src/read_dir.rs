@@ -1,13 +1,16 @@
-use crate::{asyncify, blocking_io};
+use crate::{asyncify, sys};
 
+use futures_core::ready;
 use futures_core::stream::Stream;
 use std::ffi::OsString;
-use std::fs::{DirEntry as StdDirEntry, FileType, Metadata};
+use std::fs::{FileType, Metadata};
+use std::future::Future;
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::DirEntryExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
@@ -20,8 +23,10 @@ pub async fn read_dir<P>(path: P) -> io::Result<ReadDir>
 where
     P: AsRef<Path> + Send + 'static,
 {
-    let std = asyncify(|| std::fs::read_dir(&path)).await?;
-    Ok(ReadDir(std))
+    let path = path.as_ref().to_owned();
+    let std = asyncify(|| std::fs::read_dir(path)).await?;
+
+    Ok(ReadDir(State::Idle(Some(std))))
 }
 
 /// Stream of the entries in a directory.
@@ -42,22 +47,37 @@ where
 /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html#variant.Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
-pub struct ReadDir(std::fs::ReadDir);
+pub struct ReadDir(State);
+
+#[derive(Debug)]
+enum State {
+    Idle(Option<std::fs::ReadDir>),
+    Pending(sys::Blocking<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
+}
 
 impl Stream for ReadDir {
     type Item = io::Result<DirEntry>;
 
-    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let res = blocking_io(|| match self.0.next() {
-            Some(Err(err)) => Err(err),
-            Some(Ok(item)) => Ok(Some(Ok(DirEntry(item)))),
-            None => Ok(None),
-        });
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        loop {
+            match self.0 {
+                State::Idle(ref mut std) => {
+                    let mut std = std.take().unwrap();
 
-        match res {
-            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
-            Poll::Ready(Ok(v)) => Poll::Ready(v),
-            Poll::Pending => Poll::Pending,
+                    self.0 = State::Pending(sys::run(move || {
+                        let ret = std.next();
+                        (ret, std)
+                    }));
+                }
+                State::Pending(ref mut rx) => {
+                    let (ret, std) = ready!(Pin::new(rx).poll(cx));
+                    self.0 = State::Idle(Some(std));
+
+                    let ret = ret.map(|res| res.map(|std| DirEntry(Arc::new(std))));
+
+                    return Poll::Ready(ret);
+                }
+            }
         }
     }
 }
@@ -75,16 +95,9 @@ impl Stream for ReadDir {
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/struct.DirEntry.html
 #[derive(Debug)]
-pub struct DirEntry(StdDirEntry);
+pub struct DirEntry(Arc<std::fs::DirEntry>);
 
 impl DirEntry {
-    /// Destructures the `tokio_fs::DirEntry` into a [`std::fs::DirEntry`][std].
-    ///
-    /// [std]: https://doc.rust-lang.org/std/fs/struct.DirEntry.html
-    pub fn into_std(self) -> StdDirEntry {
-        self.0
-    }
-
     /// Returns the full path to the file that this entry represents.
     ///
     /// The full path is created by joining the original path to `read_dir`
@@ -177,7 +190,8 @@ impl DirEntry {
     /// # }
     /// ```
     pub async fn metadata(&self) -> io::Result<Metadata> {
-        asyncify(|| self.0.metadata()).await
+        let std = self.0.clone();
+        asyncify(move || std.metadata()).await
     }
 
     /// Return the file type for the file that this entry points at.
@@ -214,7 +228,8 @@ impl DirEntry {
     /// # }
     /// ```
     pub async fn file_type(&self) -> io::Result<FileType> {
-        asyncify(|| self.0.file_type()).await
+        let std = self.0.clone();
+        asyncify(move || std.file_type()).await
     }
 }
 
