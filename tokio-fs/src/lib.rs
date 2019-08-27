@@ -83,12 +83,12 @@ where
     F: FnOnce() -> io::Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    sys::run(f).await.unwrap()
+    sys::run(f).await
 }
 
 /// Types in this module can be mocked out in tests.
 mod sys {
     pub(crate) use std::fs::File;
 
-    pub(crate) use tokio_executor::blocking::run;
+    pub(crate) use tokio_executor::blocking::{run, Blocking};
 }

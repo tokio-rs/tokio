@@ -7,7 +7,6 @@ use crate::blocking::Buf;
 use crate::{asyncify, sys};
 
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_sync::oneshot;
 
 use futures_core::ready;
 use std::fmt;
@@ -78,7 +77,7 @@ pub struct File {
 #[derive(Debug)]
 enum State {
     Idle(Option<Buf>),
-    Busy(oneshot::Receiver<(Operation, Buf)>),
+    Busy(sys::Blocking<(Operation, Buf)>),
 }
 
 #[derive(Debug)]
@@ -231,7 +230,7 @@ impl File {
 
         let (op, buf) = match self.state {
             Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await.unwrap(),
+            Busy(ref mut rx) => rx.await,
         };
 
         self.state = Idle(Some(buf));
@@ -351,7 +350,7 @@ impl File {
 
         let (op, buf) = match self.state {
             Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await.unwrap(),
+            Busy(ref mut rx) => rx.await,
         };
 
         self.state = Idle(Some(buf));
@@ -472,7 +471,7 @@ impl AsyncRead for File {
                     }));
                 }
                 Busy(ref mut rx) => {
-                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx)).unwrap();
+                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx));
 
                     match op {
                         Operation::Read(Ok(_)) => {
@@ -545,7 +544,7 @@ impl AsyncWrite for File {
                     return Ready(Ok(n));
                 }
                 Busy(ref mut rx) => {
-                    let (op, buf) = ready!(Pin::new(rx).poll(cx)).unwrap();
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx));
                     self.state = Idle(Some(buf));
 
                     match op {
@@ -578,7 +577,7 @@ impl AsyncWrite for File {
 
         let (op, buf) = match self.state {
             Idle(_) => return Ready(Ok(())),
-            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx)).unwrap(),
+            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx)),
         };
 
         // The buffer is not used here

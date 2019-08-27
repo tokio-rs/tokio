@@ -1,7 +1,6 @@
 use crate::sys;
 
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_sync::oneshot;
 
 use futures_core::ready;
 use std::cmp;
@@ -32,7 +31,7 @@ pub(crate) const MAX_BUF: usize = 16 * 1024;
 #[derive(Debug)]
 enum State<T> {
     Idle(Option<Buf>),
-    Busy(oneshot::Receiver<(io::Result<usize>, Buf, T)>),
+    Busy(sys::Blocking<(io::Result<usize>, Buf, T)>),
 }
 
 impl<T> Blocking<T> {
@@ -73,7 +72,7 @@ where
                     }));
                 }
                 Busy(ref mut rx) => {
-                    let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx)).unwrap();
+                    let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx));
                     self.inner = Some(inner);
 
                     match res {
@@ -124,7 +123,7 @@ where
                     return Ready(Ok(n));
                 }
                 Busy(ref mut rx) => {
-                    let (res, buf, inner) = ready!(Pin::new(rx).poll(cx)).unwrap();
+                    let (res, buf, inner) = ready!(Pin::new(rx).poll(cx));
                     self.state = Idle(Some(buf));
                     self.inner = Some(inner);
 
@@ -138,7 +137,7 @@ where
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         let (res, buf, inner) = match self.state {
             Idle(_) => return Ready(Ok(())),
-            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx)).unwrap(),
+            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx)),
         };
 
         // The buffer is not used here

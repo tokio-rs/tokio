@@ -2,13 +2,21 @@ use tokio_sync::oneshot;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::io;
+use std::task::{Context, Poll};
 
 thread_local! {
     static QUEUE: RefCell<VecDeque<Box<dyn FnOnce() + Send>>> = RefCell::new(VecDeque::new())
 }
 
-pub(crate) fn run<F, R>(f: F) -> oneshot::Receiver<R>
+#[derive(Debug)]
+pub(crate) struct Blocking<T> {
+    rx: oneshot::Receiver<T>,
+}
+
+pub(crate) fn run<F, R>(f: F) -> Blocking<R>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
@@ -20,7 +28,21 @@ where
 
     QUEUE.with(|cell| cell.borrow_mut().push_back(task));
 
-    rx
+    Blocking { rx }
+}
+
+impl<T> Future for Blocking<T> {
+    type Output = T;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        use std::task::Poll::*;
+
+        match Pin::new(&mut self.rx).poll(cx) {
+            Ready(Ok(v)) => Ready(v),
+            Ready(Err(e)) => panic!("error = {:?}", e),
+            Pending => Pending,
+        }
+    }
 }
 
 pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>
@@ -28,7 +50,7 @@ where
     F: FnOnce() -> io::Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    run(f).await.unwrap()
+    run(f).await
 }
 
 pub(crate) fn len() -> usize {

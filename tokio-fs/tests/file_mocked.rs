@@ -5,7 +5,7 @@ mod sys {
     pub(crate) mod pool;
 
     pub(crate) use self::file::File;
-    pub(crate) use self::pool::run;
+    pub(crate) use self::pool::{run, Blocking};
 }
 use sys::pool::{self, asyncify};
 

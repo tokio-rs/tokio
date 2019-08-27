@@ -1,7 +1,5 @@
 use crate::{asyncify, sys};
 
-use tokio_sync::oneshot;
-
 use futures_core::ready;
 use futures_core::stream::Stream;
 use std::ffi::OsString;
@@ -54,7 +52,7 @@ pub struct ReadDir(State);
 #[derive(Debug)]
 enum State {
     Idle(Option<std::fs::ReadDir>),
-    Pending(oneshot::Receiver<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
+    Pending(sys::Blocking<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
 }
 
 impl Stream for ReadDir {
@@ -72,7 +70,7 @@ impl Stream for ReadDir {
                     }));
                 }
                 State::Pending(ref mut rx) => {
-                    let (ret, std) = ready!(Pin::new(rx).poll(cx)).unwrap();
+                    let (ret, std) = ready!(Pin::new(rx).poll(cx));
                     self.0 = State::Idle(Some(std));
 
                     let ret = ret.map(|res| res.map(|std| DirEntry(Arc::new(std))));

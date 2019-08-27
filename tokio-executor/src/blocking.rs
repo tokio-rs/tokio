@@ -4,9 +4,12 @@ use tokio_sync::oneshot;
 
 use lazy_static::lazy_static;
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
+use std::task::{Context, Poll};
 
 struct Pool {
     shared: Mutex<Shared>,
@@ -26,8 +29,14 @@ lazy_static! {
 const MAX_THREADS: u32 = 1_000;
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
+/// Result of a blocking operation running on the blocking thread pool.
+#[derive(Debug)]
+pub struct Blocking<T> {
+    rx: oneshot::Receiver<T>,
+}
+
 /// Run the provided function on a threadpool dedicated to blocking operations.
-pub fn run<F, R>(f: F) -> oneshot::Receiver<R>
+pub fn run<F, R>(f: F) -> Blocking<R>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
@@ -63,7 +72,21 @@ where
         spawn_thread();
     }
 
-    rx
+    Blocking { rx }
+}
+
+impl<T> Future for Blocking<T> {
+    type Output = T;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        use std::task::Poll::*;
+
+        match Pin::new(&mut self.rx).poll(cx) {
+            Ready(Ok(v)) => Ready(v),
+            Ready(Err(e)) => panic!("error = {:?}", e),
+            Pending => Pending,
+        }
+    }
 }
 
 fn spawn_thread() {
