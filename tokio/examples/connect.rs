@@ -126,13 +126,13 @@ mod udp {
         // We'll bind our UDP socket to a local IP/port, but for now we
         // basically let the OS pick both of those.
         let bind_addr = if addr.ip().is_ipv4() {
-            "0.0.0.0:0".parse()?
+            "0.0.0.0:0"
         } else {
-            "[::]:0".parse()?
+            "[::]:0"
         };
 
-        let socket = UdpSocket::bind(&bind_addr)?;
-        socket.connect(addr)?;
+        let socket = UdpSocket::bind(&bind_addr).await?;
+        socket.connect(addr).await?;
         let (mut r, mut w) = socket.split();
 
         future::try_join(send(stdin, &mut w), recv(stdout, &mut r)).await?;

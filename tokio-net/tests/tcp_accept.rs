@@ -6,8 +6,7 @@ use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn accept() {
-    let addr = "127.0.0.1:0".parse().unwrap();
-    let mut listener = assert_ok!(TcpListener::bind(&addr));
+    let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = listener.local_addr().unwrap();
 
     let (tx, rx) = oneshot::channel();

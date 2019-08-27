@@ -36,6 +36,9 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
 
+mod addr;
+pub use addr::ToSocketAddrs;
+
 pub mod driver;
 pub mod util;
 

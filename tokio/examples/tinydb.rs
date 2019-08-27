@@ -44,7 +44,6 @@
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
-use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use tokio;
@@ -88,8 +87,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
-    let mut listener = TcpListener::bind(&addr)?;
+
+    let mut listener = TcpListener::bind(&addr).await?;
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all

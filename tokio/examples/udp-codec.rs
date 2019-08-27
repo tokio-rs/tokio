@@ -27,11 +27,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _ = env_logger::init();
 
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:0".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
 
     // Bind both our sockets and then figure out what ports we got.
-    let a = UdpSocket::bind(&addr)?;
-    let b = UdpSocket::bind(&addr)?;
+    let a = UdpSocket::bind(&addr).await?;
+    let b = UdpSocket::bind(&addr).await?;
 
     let b_addr = b.local_addr()?;
 

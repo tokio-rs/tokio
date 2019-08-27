@@ -73,8 +73,7 @@ pub struct Spawn(());
 ///
 /// # async fn process<T>(t: T) {}
 /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-/// let addr = "127.0.0.1:8080".parse()?;
-/// let mut listener = TcpListener::bind(&addr).unwrap();
+/// let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
 /// loop {
 ///     let (socket, _) = listener.accept().await?;
@@ -84,7 +83,6 @@ pub struct Spawn(());
 ///         process(socket).await
 ///     });
 /// }
-/// # Ok(())
 /// # }
 /// ```
 ///

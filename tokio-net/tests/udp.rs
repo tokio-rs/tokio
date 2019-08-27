@@ -9,11 +9,11 @@ use std::io;
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
-    let mut sender = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
-    let mut receiver = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
-    sender.connect(&receiver.local_addr()?)?;
-    receiver.connect(&sender.local_addr()?)?;
+    sender.connect(receiver.local_addr()?).await?;
+    receiver.connect(sender.local_addr()?).await?;
 
     let message = b"hello!";
     sender.send(message).await?;
@@ -27,8 +27,8 @@ async fn send_recv() -> std::io::Result<()> {
 
 #[tokio::test]
 async fn send_to_recv_from() -> std::io::Result<()> {
-    let mut sender = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
-    let mut receiver = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let message = b"hello!";
     let receiver_addr = receiver.local_addr()?;
@@ -44,7 +44,7 @@ async fn send_to_recv_from() -> std::io::Result<()> {
 
 #[tokio::test]
 async fn split() -> std::io::Result<()> {
-    let socket = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
     let (mut r, mut s) = socket.split();
 
     let msg = b"hello";
@@ -60,7 +60,7 @@ async fn split() -> std::io::Result<()> {
 
 #[tokio::test]
 async fn reunite() -> std::io::Result<()> {
-    let socket = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
     let (s, r) = socket.split();
     assert!(s.reunite(r).is_ok());
     Ok(())
@@ -68,8 +68,8 @@ async fn reunite() -> std::io::Result<()> {
 
 #[tokio::test]
 async fn reunite_error() -> std::io::Result<()> {
-    let socket = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
-    let socket1 = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
+    let socket1 = UdpSocket::bind("127.0.0.1:0").await?;
     let (s, _) = socket.split();
     let (_, r1) = socket1.split();
     assert!(s.reunite(r1).is_err());
@@ -101,8 +101,8 @@ impl Encoder for ByteCodec {
 
 #[tokio::test]
 async fn send_framed() -> std::io::Result<()> {
-    let mut a_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
-    let mut b_soc = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap())?;
+    let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
 
     let a_addr = a_soc.local_addr()?;
     let b_addr = b_soc.local_addr()?;
