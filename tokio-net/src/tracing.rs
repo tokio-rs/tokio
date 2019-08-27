@@ -4,6 +4,13 @@
 //!
 //! This means we don't have to put a `#[cfg(feature = "tracing")]` on every
 //! individual use of a `tracing` macro.
+
+// The macros in this module may or may not be used depending on the combination
+// of feature flags enabled. Rather than feature-flagging each individual macro
+// to only be defined when the features that use it are enabled, just allow
+// unused macros in some cases.
+#![allow(unused_macros)]
+
 #[cfg(not(feature = "tracing"))]
 #[derive(Clone, Debug)]
 pub(crate) struct Span {}
@@ -32,14 +39,14 @@ macro_rules! debug {
     ($($arg:tt)+) => {};
 }
 
-#[cfg(all(unix, feature = "process", feature = "tracing"))]
+#[cfg(feature = "tracing")]
 macro_rules! error {
     ($($arg:tt)+) => {
         tracing::error!($($arg)+)
     };
 }
 
-#[cfg(all(unix, feature = "process", not(feature = "tracing")))]
+#[cfg(not(feature = "tracing"))]
 macro_rules! error {
     ($($arg:tt)+) => {};
 }
