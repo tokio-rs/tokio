@@ -83,7 +83,10 @@ impl<T> Future for Blocking<T> {
 
         match Pin::new(&mut self.rx).poll(cx) {
             Ready(Ok(v)) => Ready(v),
-            Ready(Err(e)) => panic!("error = {:?}", e),
+            Ready(Err(_)) => panic!(
+                "the blocking operation has been dropped before completing. \
+                 This should not happen and is a bug."
+            ),
             Pending => Pending,
         }
     }
