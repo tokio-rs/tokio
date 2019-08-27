@@ -85,12 +85,6 @@ impl TcpStream {
         let sys = mio::net::TcpStream::connect(addr)?;
         let stream = TcpStream::new(sys);
 
-        stream.finish_connect().await?;
-
-        Ok(stream)
-    }
-
-    async fn finish_connect(&self) -> io::Result<()> {
         // Once we've connected, wait for the stream to be writable as
         // that's when the actual connection has been initiated. Once we're
         // writable we check for `take_socket_error` to see if the connect
@@ -103,7 +97,7 @@ impl TcpStream {
             return Err(e);
         }
 
-        Ok(())
+        Ok(stream)
     }
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> TcpStream {
