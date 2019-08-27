@@ -29,7 +29,6 @@ threadpool = [
   "crossbeam-queue",
   "crossbeam-utils",
   "futures-core-preview",
-  "futures-util-preview",
   "num_cpus",
   "lazy_static",
   "slab",
@@ -39,6 +38,7 @@ threadpool = [
 tokio-sync = { version = "=0.2.0-alpha.2", optional = true, path = "../tokio-sync" }
 
 tracing = { version = "0.1.5", optional = true }
+futures-util-preview = { version = "=0.3.0-alpha.18", features = ["channel"] }
 
 # current-thread dependencies
 crossbeam-channel = { version = "0.3.8", optional = true }
@@ -48,7 +48,6 @@ crossbeam-deque = { version = "0.7.0", optional = true }
 crossbeam-queue = { version = "0.1.0", optional = true }
 crossbeam-utils = { version = "0.6.4", optional = true }
 futures-core-preview = { version = "=0.3.0-alpha.18", optional = true }
-futures-util-preview = { version = "=0.3.0-alpha.18", optional = true }
 num_cpus = { version = "1.2", optional = true }
 lazy_static = { version = "1", optional = true }
 slab = { version = "0.4.1", optional = true }

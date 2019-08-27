@@ -81,3 +81,4 @@ pub use crate::error::SpawnError;
 pub use crate::executor::Executor;
 pub use crate::global::{spawn, with_default, DefaultExecutor};
 pub use crate::typed::TypedExecutor;
+pub use futures_util::future::RemoteHandle;
