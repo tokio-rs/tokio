@@ -91,9 +91,9 @@ impl TcpStream {
         // actually hit an error or not.
         //
         // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| self.io.poll_write_ready(cx)).await?;
+        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
 
-        if let Some(e) = self.io.get_ref().take_error()? {
+        if let Some(e) = stream.io.get_ref().take_error()? {
             return Err(e);
         }
 
