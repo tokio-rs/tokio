@@ -45,7 +45,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
         pin.rd.reserve(INITIAL_RD_CAPACITY);
 
-        let (n, addr) = unsafe {
+        let (_n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
             let res = ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
             let (n, addr) = res?;
@@ -53,7 +53,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             (n, addr)
         };
 
-        let span = trace_span!("decoding", from.addr = %addr, dgram.length = n);
+        let span = trace_span!("decoding", from.addr = %addr, dgram.length = _n);
         let _e = span.enter();
         trace!("trying to decode a frame...");
 

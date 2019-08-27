@@ -40,13 +40,13 @@ impl<A, C: Decoder> Stream for UnixDatagramFramed<A, C> {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.rd.reserve(INITIAL_RD_CAPACITY);
 
-        let (n, addr) = unsafe {
+        let (_n, addr) = unsafe {
             let (n, addr) = try_ready!(self.socket.poll_recv_from(self.rd.bytes_mut()));
             self.rd.advance_mut(n);
             (n, addr)
         };
 
-        let span = trace_span!("decoding", from.addr = %addr, dgram.length = n);
+        let span = trace_span!("decoding", from.addr = %addr, dgram.length = _n);
         let _e = span.enter();
         trace!("trying to decode a frame...");
 
