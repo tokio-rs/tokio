@@ -199,13 +199,7 @@ impl Buf {
 
         let n = cmp::min(src.len(), MAX_BUF);
 
-        self.buf.reserve(n);
-        unsafe {
-            self.buf.set_len(n);
-        }
-
-        self.buf[..n].copy_from_slice(&src[..n]);
-
+        self.buf.extend_from_slice(&src[..n]);
         n
     }
 

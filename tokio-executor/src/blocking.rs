@@ -38,7 +38,8 @@ where
         let mut shared = POOL.shared.lock().unwrap();
 
         shared.queue.push_back(Box::new(move || {
-            tx.send(f()).ok().unwrap();
+            // The receiver may have dropped
+            let _ = tx.send(f());
         }));
 
         if shared.num_idle == 0 {
@@ -67,14 +68,14 @@ where
 
 fn spawn_thread() {
     thread::Builder::new()
-        .name("fs-driver".to_string())
+        .name("tokio-blocking-driver".to_string())
         .spawn(|| {
             'outer: loop {
                 let mut shared = POOL.shared.lock().unwrap();
 
                 if let Some(task) = shared.queue.pop_front() {
                     drop(shared);
-                    task();
+                    run_task(task);
                     continue;
                 }
 
@@ -86,13 +87,19 @@ fn spawn_thread() {
 
                     if let Some(task) = shared.queue.pop_front() {
                         drop(shared);
-                        task();
+                        run_task(task);
                         continue 'outer;
                     }
                 }
             }
         })
         .unwrap();
+}
+
+fn run_task(f: Box<dyn FnOnce() + Send>) {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    let _ = catch_unwind(AssertUnwindSafe(|| f()));
 }
 
 impl Pool {
