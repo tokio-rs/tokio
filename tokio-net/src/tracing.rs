@@ -10,6 +10,7 @@
 // to only be defined when the features that use it are enabled, just allow
 // unused macros in some cases.
 #![allow(unused_macros)]
+#![allow(dead_code)]
 
 #[cfg(not(feature = "tracing"))]
 #[derive(Clone, Debug)]
