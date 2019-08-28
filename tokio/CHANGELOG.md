@@ -1,6 +1,15 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.2.0-alpha.3 (August 28, 2019)
+
+### Changed
+- `delay(...)` instead of `Delay::new(...)` (#1440).
+- use `tracing` instead of `log` (#1454).
+
+### Added
+- re-export `tokio_net::signal::ctrl_c()` (#1491).
+
 # 0.2.0-alpha.2 (August 17, 2019)
 
 ### Changed

@@ -1,3 +1,12 @@
+# 0.2.0-alpha.3 (August 28, 2019)
+
+### Changed
+- use `tracing` instead of `log`
+
+### Added
+- thread pool dedicated to blocking operations (#1495).
+- `Executor::spawn_with_handle` (#1492).
+
 # 0.2.0-alpha.2 (August 17, 2019)
 
 ### Fixed

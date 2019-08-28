@@ -7,20 +7,20 @@ name = "tokio-codec"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.2"
+version = "0.2.0-alpha.3"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-codec/0.2.0-alpha.2/tokio_codec"
+documentation = "https://docs.rs/tokio-codec/0.2.0-alpha.3/tokio_codec"
 description = """
 Utilities for encoding and decoding frames.
 """
 categories = ["asynchronous"]
 
 [dependencies]
-tokio-io = { version = "=0.2.0-alpha.2", path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.3", path = "../tokio-io" }
 
 bytes = "0.4.7"
 futures-core-preview = "=0.3.0-alpha.18"
@@ -28,8 +28,8 @@ futures-sink-preview = "=0.3.0-alpha.18"
 log = "0.4"
 
 [dev-dependencies]
-tokio = { version = "0.2.0-alpha.1", path = "../tokio" }
-tokio-test = { version = "0.2.0-alpha.1", path = "../tokio-test" }
+tokio = { version = "=0.2.0-alpha.3", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.3", path = "../tokio-test" }
 
 futures-util-preview = "=0.3.0-alpha.18"
 
