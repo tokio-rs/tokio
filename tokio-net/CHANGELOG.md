@@ -1,3 +1,14 @@
+# 0.2.0-alpha.3 (August 28, 2019)
+
+### Changed
+- `signal::ctrl_c()` instead of `CtrlC::new()` (#1472).
+- `TcpStream`'s `AsyncWrite::shutdown` impl calls TCP shutdown (#1488).
+- use `tracing` instead of `log` (#1455).
+- perform DNS lookup on `connect` and `bind` (#1499).
+
+### Added
+- import `tokio-process` (#1475).
+
 # 0.2.0-alpha.2 (August 17, 2019)
 
 ### Changed

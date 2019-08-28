@@ -1,3 +1,8 @@
+# 0.3.0-alpha.3 (August 28, 2019)
+
+### Changed
+- `delay(...)` instead of `Delay::new(...)` (#1440).
+
 # 0.3.0-alpha.2 (August 17, 2019)
 
 ### Changed

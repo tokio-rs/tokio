@@ -8,12 +8,12 @@ name = "tokio-timer"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
-version = "0.3.0-alpha.2"
+version = "0.3.0-alpha.3"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio-timer/0.3.0-alpha.2/tokio_timer"
+documentation = "https://docs.rs/tokio-timer/0.3.0-alpha.3/tokio_timer"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 description = """
@@ -24,8 +24,8 @@ Timer facilities for Tokio
 async-traits = []
 
 [dependencies]
-tokio-executor = { version = "=0.2.0-alpha.2", path = "../tokio-executor" }
-tokio-sync = { version = "=0.2.0-alpha.2", path = "../tokio-sync" }
+tokio-executor = { version = "=0.2.0-alpha.3", path = "../tokio-executor" }
+tokio-sync = { version = "=0.2.0-alpha.3", path = "../tokio-sync" }
 
 futures-core-preview = "=0.3.0-alpha.18"
 futures-util-preview = "=0.3.0-alpha.18"
@@ -36,9 +36,9 @@ slab = "0.4.1"
 # optionals
 
 [dev-dependencies]
-tokio = { version = "0.2.0-alpha.1", path = "../tokio" }
-tokio-sync = { version = "0.2.0-alpha.1", path = "../tokio-sync", features = ["async-traits"] }
-tokio-test = { version = "0.2.0-alpha.1", path = "../tokio-test" }
+tokio = { version = "0.2.0-alpha.3", path = "../tokio" }
+tokio-sync = { version = "0.2.0-alpha.3", path = "../tokio-sync", features = ["async-traits"] }
+tokio-test = { version = "0.2.0-alpha.3", path = "../tokio-test" }
 
 rand = "0.7"
 

@@ -1,3 +1,8 @@
+# 0.2.0-alpha.3 (August 28, 2019)
+
+### Added
+- `AsyncReadExt::chain` and `AsyncReadExt::take` (#1484).
+
 # 0.2.0-alpha.2 (August 17, 2019)
 
 ### Changed
