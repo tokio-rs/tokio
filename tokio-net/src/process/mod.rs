@@ -663,19 +663,19 @@ impl Child {
     }
 
     /// Returns a handle for writing to the child's stdin, if it has been
-    /// captured
+    /// captured.
     pub fn stdin(&mut self) -> &mut Option<ChildStdin> {
         &mut self.stdin
     }
 
-    /// Returns a handle for writing to the child's stdout, if it has been
-    /// captured
+    /// Returns a handle for reading from the child's stdout, if it has been
+    /// captured.
     pub fn stdout(&mut self) -> &mut Option<ChildStdout> {
         &mut self.stdout
     }
 
-    /// Returns a handle for writing to the child's stderr, if it has been
-    /// captured
+    /// Returns a handle for reading from the child's stderr, if it has been
+    /// captured.
     pub fn stderr(&mut self) -> &mut Option<ChildStderr> {
         &mut self.stderr
     }
