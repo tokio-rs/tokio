@@ -19,7 +19,7 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
     type Future = BoxFuture<Self::Iter>;
 
     fn to_socket_addrs(&self) -> Self::Future {
-        let iter = Some(self.clone()).into_iter();
+        let iter = Some(*self).into_iter();
         Box::new(future::ready(Ok(iter)))
     }
 }
