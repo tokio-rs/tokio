@@ -1,3 +1,7 @@
+# 0.1.4 (August 28, 2019)
+
+* Fix `UdpFramed`'s ability to decode multiple frames in one datagram (#1444)
+
 # 0.1.3 (November 21, 2018)
 
 * Add `RecvDgram::into_parts` (#710).
