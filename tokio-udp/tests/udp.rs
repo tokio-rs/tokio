@@ -1,3 +1,5 @@
+#![allow(deprecated, unused_must_use)]
+
 extern crate futures;
 extern crate tokio_codec;
 extern crate tokio_udp;
