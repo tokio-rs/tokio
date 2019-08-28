@@ -40,7 +40,7 @@ tokio-sync = { version = "=0.2.0-alpha.3", optional = true, path = "../tokio-syn
 tracing = { version = "0.1.5", optional = true }
 futures-util-preview = { version = "=0.3.0-alpha.18", features = ["channel"] }
 
-# current-thread dependenci3s
+# current-thread dependencies
 crossbeam-channel = { version = "0.3.8", optional = true }
 
 # threadpool dependencies
