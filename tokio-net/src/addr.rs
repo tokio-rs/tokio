@@ -1,7 +1,6 @@
 use tokio_executor::blocking;
 
 use futures_util::future;
-use std::future::Future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -152,7 +151,7 @@ pub(crate) mod sealed {
     use std::net::SocketAddr;
     use std::option;
     use std::pin::Pin;
-    use std::task::{Poll, Context};
+    use std::task::{Context, Poll};
     use std::vec;
 
     #[doc(hidden)]
@@ -187,8 +186,7 @@ pub(crate) mod sealed {
                     Poll::Ready(Ok(iter))
                 }
                 MaybeReady::Blocking(ref mut rx) => {
-                    let res = ready!(Pin::new(rx).poll(cx))
-                        .map(OneOrMore::More);
+                    let res = ready!(Pin::new(rx).poll(cx)).map(OneOrMore::More);
 
                     Poll::Ready(res)
                 }
