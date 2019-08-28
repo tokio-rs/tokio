@@ -661,6 +661,7 @@ impl TcpStream {
                 unsafe {
                     buf.advance_mut(n);
                 }
+                trace!(tcp.written.bytes = n);
                 Poll::Ready(Ok(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

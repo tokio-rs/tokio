@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 use std::env;
 use std::io;

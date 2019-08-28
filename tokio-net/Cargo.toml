@@ -63,6 +63,7 @@ uds = [
     "iovec",
     "libc",
 ]
+log = ["tracing/log"]
 
 [dependencies]
 tokio-codec = { version = "=0.2.0-alpha.2", path = "../tokio-codec" }
@@ -70,11 +71,12 @@ tokio-executor = { version = "=0.2.0-alpha.2", path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.2", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.2", path = "../tokio-sync" }
 
+tracing = { version = "0.1.5", optional = true }
+
 # driver implementation
 crossbeam-utils = "0.6.0"
 futures-core-preview = "=0.3.0-alpha.18"
 lazy_static = "1.0.2"
-log = "0.4.6"
 mio = "0.6.14"
 num_cpus = "1.8.0"
 parking_lot = "0.9"
@@ -100,6 +102,9 @@ mio-named-pipes = { version = "0.1", optional = true }
 version = "0.3"
 default-features = false
 optional = true
+
+[target.'cfg(test)'.dependencies]
+tracing = { version = "0.1.5", features = ["log"] }
 
 [dev-dependencies]
 tokio = { version = "0.2.0-alpha.1", path = "../tokio" }

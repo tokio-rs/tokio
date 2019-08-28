@@ -1,7 +1,6 @@
 use super::platform;
 use super::reactor::{Direction, Handle, HandlePriv};
 
-use log::debug;
 use mio::{self, Evented};
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
@@ -524,7 +523,7 @@ impl Inner {
 
         if ready.is_empty() {
             if let Some(cx) = cx {
-                debug!("scheduling {:?} for: {}", direction, self.token);
+                debug!(message = "scheduling", ?direction, token = self.token);
                 // Update the task info
                 match direction {
                     Direction::Read => sched.reader.register_by_ref(cx.waker()),

@@ -6,7 +6,6 @@ use bytes::{BufMut, BytesMut};
 use core::task::{Context, Poll};
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
-use log::trace;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
@@ -46,14 +45,18 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
         pin.rd.reserve(INITIAL_RD_CAPACITY);
 
-        let (n, addr) = unsafe {
+        let (_n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
             let res = ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
             let (n, addr) = res?;
             pin.rd.advance_mut(n);
             (n, addr)
         };
-        trace!("received {} bytes, decoding", n);
+
+        let span = trace_span!("decoding", from.addr = %addr, dgram.length = _n);
+        let _e = span.enter();
+        trace!("trying to decode a frame...");
+
         let frame_res = pin.codec.decode(&mut pin.rd);
         pin.rd.clear();
         let frame = frame_res?;
@@ -79,16 +82,18 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: (C::Item, SocketAddr)) -> Result<(), Self::Error> {
-        trace!("sending frame");
-
         let (frame, out_addr) = item;
+
+        let span = trace_span!("sending", to.addr = %out_addr);
+        let _e = span.enter();
+        trace!("encoding frame...");
 
         let pin = self.get_mut();
 
         pin.codec.encode(frame, &mut pin.wr)?;
         pin.out_addr = out_addr;
         pin.flushed = false;
-        trace!("frame encoded; length={}", pin.wr.len());
+        trace!(message = "frame encoded", frame.length = pin.wr.len());
 
         Ok(())
     }
@@ -98,8 +103,6 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
             return Poll::Ready(Ok(()));
         }
 
-        trace!("flushing frame; length={}", self.wr.len());
-
         let Self {
             ref mut socket,
             ref mut out_addr,
@@ -107,12 +110,17 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
             ..
         } = *self;
 
+        let span = trace_span!("flushing", to.addr = %out_addr, frame.length = wr.len());
+        let _e = span.enter();
+        trace!("flushing frame...");
+
         let n = ready!(socket.poll_send_to_priv(cx, &wr, &out_addr))?;
-        trace!("written {}", n);
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();
         self.flushed = true;
+
+        trace!(written.length = n, written.complete = wrote_all);
 
         let res = if wrote_all {
             Ok(())

@@ -4,7 +4,6 @@ use super::sharded_rwlock::RwLock;
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
 
-use log::{debug, log_enabled, trace, Level};
 use mio::event::Evented;
 use slab::Slab;
 use std::cell::RefCell;
@@ -16,7 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
 use std::task::Waker;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{fmt, usize};
 
 /// The core reactor, or event loop.
@@ -235,6 +234,7 @@ impl Reactor {
         self.inner.io_dispatch.read().is_empty()
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
@@ -243,18 +243,19 @@ impl Reactor {
             Err(e) => return Err(e),
         }
 
-        let start = if log_enabled!(Level::Debug) {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
         // Process all the events that came in, dispatching appropriately
+
+        // event count is only used for  tracing instrumentation.
+        #[cfg(feature = "tracing")]
         let mut events = 0;
+
         for event in self.events.iter() {
-            events += 1;
+            #[cfg(feature = "tracing")]
+            {
+                events += 1;
+            }
             let token = event.token();
-            trace!("event {:?} {:?}", event.readiness(), event.token());
+            trace!(event.readiness = ?event.readiness(), event.token = ?token);
 
             if token == TOKEN_WAKEUP {
                 self.inner
@@ -266,15 +267,7 @@ impl Reactor {
             }
         }
 
-        if let Some(start) = start {
-            let dur = start.elapsed();
-            trace!(
-                "loop process - {} events, {}.{:03}s",
-                events,
-                dur.as_secs(),
-                dur.subsec_millis()
-            );
-        }
+        trace!(message = "loop process", events);
 
         Ok(())
     }
@@ -465,7 +458,7 @@ impl Inner {
         };
 
         let token = aba_guard | key;
-        debug!("adding I/O source: {}", token);
+        debug!(message = "adding I/O source", token);
 
         self.io.register(
             source,
@@ -483,13 +476,13 @@ impl Inner {
     }
 
     pub(super) fn drop_source(&self, token: usize) {
-        debug!("dropping I/O source: {}", token);
+        debug!(message = "dropping I/O source", token);
         self.io_dispatch.write().remove(token);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
     pub(super) fn register(&self, token: usize, dir: Direction, w: Waker) {
-        debug!("scheduling {:?} for: {}", dir, token);
+        debug!(message = "scheduling", direction = ?dir, token);
         let io_dispatch = self.io_dispatch.read();
         let sched = io_dispatch.get(token).unwrap();
 
