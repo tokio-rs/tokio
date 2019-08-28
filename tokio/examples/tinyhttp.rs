@@ -17,7 +17,7 @@ use bytes::BytesMut;
 use futures::{SinkExt, StreamExt};
 use http::{header::HeaderValue, Request, Response, StatusCode};
 use serde::Serialize;
-use std::{env, error::Error, fmt, io, net::SocketAddr};
+use std::{env, error::Error, fmt, io};
 use tokio::{
     codec::{Decoder, Encoder, Framed},
     net::{TcpListener, TcpStream},
@@ -28,9 +28,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
 
-    let mut incoming = TcpListener::bind(&addr)?.incoming();
+    let mut incoming = TcpListener::bind(&addr).await?.incoming();
     println!("Listening on: {}", addr);
 
     while let Some(Ok(stream)) = incoming.next().await {

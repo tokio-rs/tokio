@@ -4,21 +4,36 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio_test::assert_ok;
 
-#[tokio::test]
-async fn accept() {
-    let addr = "127.0.0.1:0".parse().unwrap();
-    let mut listener = assert_ok!(TcpListener::bind(&addr));
-    let addr = listener.local_addr().unwrap();
+use std::net::{IpAddr, SocketAddr};
 
-    let (tx, rx) = oneshot::channel();
+macro_rules! test_accept {
+    ($(($ident:ident, $target:expr),)*) => {
+        $(
+            #[tokio::test]
+            async fn $ident() {
+                let mut listener = assert_ok!(TcpListener::bind($target).await);
+                let addr = listener.local_addr().unwrap();
 
-    tokio::spawn(async move {
-        let (socket, _) = assert_ok!(listener.accept().await);
-        assert_ok!(tx.send(socket));
-    });
+                let (tx, rx) = oneshot::channel();
 
-    let cli = assert_ok!(TcpStream::connect(&addr).await);
-    let srv = assert_ok!(rx.await);
+                tokio::spawn(async move {
+                    let (socket, _) = assert_ok!(listener.accept().await);
+                    assert_ok!(tx.send(socket));
+                });
 
-    assert_eq!(cli.local_addr().unwrap(), srv.peer_addr().unwrap());
+                let cli = assert_ok!(TcpStream::connect(&addr).await);
+                let srv = assert_ok!(rx.await);
+
+                assert_eq!(cli.local_addr().unwrap(), srv.peer_addr().unwrap());
+            }
+        )*
+    }
+}
+
+test_accept! {
+    (ip_str, "127.0.0.1:0"),
+    (host_str, "localhost:0"),
+    (socket_addr, "127.0.0.1:0".parse::<SocketAddr>().unwrap()),
+    (str_port_tuple, ("127.0.0.1", 0)),
+    (ip_port_tuple, ("127.0.0.1".parse::<IpAddr>().unwrap(), 0)),
 }

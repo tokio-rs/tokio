@@ -3,6 +3,7 @@ use super::incoming::Incoming;
 use super::TcpStream;
 use crate::driver::Handle;
 use crate::util::PollEvented;
+use crate::ToSocketAddrs;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -22,13 +23,13 @@ use std::task::{Context, Poll};
 ///
 /// ```no_run
 /// use tokio::net::TcpListener;
-/// use std::error::Error;
+///
+/// use std::io;
 /// # async fn process_socket<T>(socket: T) {}
 ///
 /// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn Error>> {
-///     let addr = "127.0.0.1:8080".parse()?;
-///     let mut listener = TcpListener::bind(&addr)?;
+/// async fn main() -> io::Result<()> {
+///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
 ///     loop {
 ///         let (socket, _) = listener.accept().await?;
@@ -41,24 +42,60 @@ pub struct TcpListener {
 }
 
 impl TcpListener {
-    /// Create a new TCP listener associated with this event loop.
+    /// Creates a new TcpListener which will be bound to the specified address.
     ///
-    /// The TCP listener will bind to the provided `addr` address, if available.
-    /// If the result is `Ok`, the socket has successfully bound.
+    /// The returned listener is ready for accepting connections.
+    ///
+    /// Binding with a port number of 0 will request that the OS assigns a port
+    /// to this listener. The port allocated can be queried via the `local_addr`
+    /// method.
+    ///
+    /// The address type can be any implementor of `ToSocketAddrs` trait.
+    ///
+    /// If `addr` yields multiple addresses, bind will be attempted with each of
+    /// the addresses until one succeeds and returns the listener. If none of
+    /// the addresses succeed in creating a listener, the error returned from
+    /// the last attempt (the last address) is returned.
     ///
     /// # Examples
     ///
-    /// ```
-    /// use std::net::SocketAddr;
+    /// ```no_run
     /// use tokio::net::TcpListener;
     ///
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-    /// let listener = TcpListener::bind(&addr)?;
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let listener = TcpListener::bind("127.0.0.1:0").await?;
+    ///
+    ///     // use the listener
+    ///
+    ///     Ok(())
+    /// }
     /// ```
-    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
-        let l = mio::net::TcpListener::bind(addr)?;
-        Ok(TcpListener::new(l))
+    pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
+        let addrs = addr.to_socket_addrs().await?;
+
+        let mut last_err = None;
+
+        for addr in addrs {
+            match TcpListener::bind_addr(addr) {
+                Ok(listener) => return Ok(listener),
+                Err(e) => last_err = Some(e),
+            }
+        }
+
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "could not resolve to any addresses",
+            )
+        }))
+    }
+
+    fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
+        let listener = mio::net::TcpListener::bind(&addr)?;
+        Ok(TcpListener::new(listener))
     }
 
     /// Accept a new incoming connection from this listener.
@@ -71,18 +108,22 @@ impl TcpListener {
     ///
     /// # Examples
     ///
-    /// ```
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// ```no_run
     /// use tokio::net::TcpListener;
     ///
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let mut listener = TcpListener::bind(&addr)?;
-    /// match listener.accept().await {
-    ///     Ok((_socket, addr)) => println!("new client: {:?}", addr),
-    ///     Err(e) => println!("couldn't get client: {:?}", e),
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    ///
+    ///     match listener.accept().await {
+    ///         Ok((_socket, addr)) => println!("new client: {:?}", addr),
+    ///         Err(e) => println!("couldn't get client: {:?}", e),
+    ///     }
+    ///
+    ///     Ok(())
     /// }
-    /// # Ok(())
-    /// # }
     /// ```
     pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
         poll_fn(|cx| self.poll_accept(cx)).await
@@ -178,13 +219,19 @@ impl TcpListener {
     ///
     /// ```
     /// use tokio::net::TcpListener;
+    ///
+    /// use std::io;
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     ///
-    /// let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    /// let listener = TcpListener::bind(&addr)?;
-    /// assert_eq!(listener.local_addr()?,
-    ///            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    ///
+    ///     assert_eq!(listener.local_addr()?,
+    ///                SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8080)));
+    ///
+    ///     Ok(())
+    /// }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
@@ -215,17 +262,20 @@ impl TcpListener {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use tokio::net::TcpListener;
-    /// use std::net::SocketAddr;
     ///
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-    /// let listener = TcpListener::bind(&addr)?;
+    /// use std::io;
     ///
-    /// listener.set_ttl(100).expect("could not set TTL");
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///    let listener = TcpListener::bind("127.0.0.1:0").await?;
     ///
-    /// assert_eq!(listener.ttl()?, 100);
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    ///    listener.set_ttl(100).expect("could not set TTL");
+    ///    assert_eq!(listener.ttl()?, 100);
+    ///
+    ///    Ok(())
+    /// }
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
@@ -238,15 +288,19 @@ impl TcpListener {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use tokio::net::TcpListener;
-    /// use std::net::SocketAddr;
     ///
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-    /// let listener = TcpListener::bind(&addr)?;
+    /// use std::io;
     ///
-    /// listener.set_ttl(100).expect("could not set TTL");
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let listener = TcpListener::bind("127.0.0.1:0").await?;
+    ///
+    ///     listener.set_ttl(100).expect("could not set TTL");
+    ///
+    ///     Ok(())
+    /// }
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)

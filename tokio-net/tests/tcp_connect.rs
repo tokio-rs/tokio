@@ -4,11 +4,13 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio_test::assert_ok;
 
+use futures::join;
+
 #[tokio::test]
-async fn connect() {
-    let addr = assert_ok!("127.0.0.1:0".parse());
-    let mut srv = assert_ok!(TcpListener::bind(&addr));
+async fn connect_v4() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
+    assert!(addr.is_ipv4());
 
     let (tx, rx) = oneshot::channel();
 
@@ -29,6 +31,135 @@ async fn connect() {
         assert_ok!(theirs.local_addr()),
         assert_ok!(mine.peer_addr())
     );
+}
+
+#[tokio::test]
+async fn connect_v6() {
+    let mut srv = assert_ok!(TcpListener::bind("[::1]:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    assert!(addr.is_ipv6());
+
+    let (tx, rx) = oneshot::channel();
+
+    tokio::spawn(async move {
+        let (socket, addr) = assert_ok!(srv.accept().await);
+        assert_eq!(addr, assert_ok!(socket.peer_addr()));
+        assert_ok!(tx.send(socket));
+    });
+
+    let mine = assert_ok!(TcpStream::connect(&addr).await);
+    let theirs = assert_ok!(rx.await);
+
+    assert_eq!(
+        assert_ok!(mine.local_addr()),
+        assert_ok!(theirs.peer_addr())
+    );
+    assert_eq!(
+        assert_ok!(theirs.local_addr()),
+        assert_ok!(mine.peer_addr())
+    );
+}
+
+#[tokio::test]
+async fn connect_addr_ip_string() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    let addr = format!("127.0.0.1:{}", addr.port());
+
+    let server = async {
+        assert_ok!(srv.accept().await);
+    };
+
+    let client = async {
+        assert_ok!(TcpStream::connect(addr).await);
+    };
+
+    join!(server, client);
+}
+
+#[tokio::test]
+async fn connect_addr_ip_str_slice() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    let addr = format!("127.0.0.1:{}", addr.port());
+
+    let server = async {
+        assert_ok!(srv.accept().await);
+    };
+
+    let client = async {
+        assert_ok!(TcpStream::connect(&addr[..]).await);
+    };
+
+    join!(server, client);
+}
+
+#[tokio::test]
+async fn connect_addr_host_string() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    let addr = format!("localhost:{}", addr.port());
+
+    let server = async {
+        assert_ok!(srv.accept().await);
+    };
+
+    let client = async {
+        assert_ok!(TcpStream::connect(addr).await);
+    };
+
+    join!(server, client);
+}
+
+#[tokio::test]
+async fn connect_addr_ip_port_tuple() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    let addr = (addr.ip(), addr.port());
+
+    let server = async {
+        assert_ok!(srv.accept().await);
+    };
+
+    let client = async {
+        assert_ok!(TcpStream::connect(&addr).await);
+    };
+
+    join!(server, client);
+}
+
+#[tokio::test]
+async fn connect_addr_ip_str_port_tuple() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    let addr = ("127.0.0.1", addr.port());
+
+    let server = async {
+        assert_ok!(srv.accept().await);
+    };
+
+    let client = async {
+        assert_ok!(TcpStream::connect(&addr).await);
+    };
+
+    join!(server, client);
+}
+
+#[tokio::test]
+async fn connect_addr_host_str_port_tuple() {
+    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+    let addr = ("localhost", addr.port());
+
+    let server = async {
+        assert_ok!(srv.accept().await);
+    };
+
+    let client = async {
+        assert_ok!(TcpStream::connect(&addr).await);
+    };
+
+    join!(server, client);
 }
 
 /*

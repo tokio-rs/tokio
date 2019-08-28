@@ -54,13 +54,12 @@
 
 #![warn(rust_2018_idioms)]
 
-use std::env;
-use std::net::SocketAddr;
-
 use tokio;
 use tokio::codec::{BytesCodec, Decoder};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
+
+use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -68,14 +67,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // program, but otherwise we'll just set up our TCP listener on
     // 127.0.0.1:8080 for connections.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
     // above and must be associated with an event loop, so we pass in a handle
     // to our event loop. After the socket's created we inform that we're ready
     // to go and start accepting connections.
-    let mut listener = TcpListener::bind(&addr)?;
+    let mut listener = TcpListener::bind(&addr).await?;
     println!("Listening on: {}", addr);
 
     loop {

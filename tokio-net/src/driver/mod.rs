@@ -25,9 +25,7 @@
 //!
 //! # async fn process<T>(t: T) {}
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-//! let addr = "93.184.216.34:9243".parse()?;
-//!
-//! let stream = TcpStream::connect(&addr).await?;
+//! let stream = TcpStream::connect("93.184.216.34:9243").await?;
 //!
 //! println!("successfully connected");
 //!

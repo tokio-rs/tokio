@@ -38,6 +38,9 @@
 #[macro_use]
 mod tracing;
 
+mod addr;
+pub use addr::ToSocketAddrs;
+
 pub mod driver;
 pub mod util;
 

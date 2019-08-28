@@ -15,8 +15,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 async fn client_server(tx: mpsc::Sender<()>) {
-    let addr = assert_ok!("127.0.0.1:0".parse());
-    let mut server = assert_ok!(TcpListener::bind(&addr));
+    let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
     // Get the assigned address
     let addr = assert_ok!(server.local_addr());
@@ -78,11 +77,9 @@ fn block_on_socket() {
     let rt = Runtime::new().unwrap();
 
     rt.block_on(async move {
-        let addr = "127.0.0.1:0".parse().unwrap();
-
         let (tx, rx) = oneshot::channel();
 
-        let mut listener = TcpListener::bind(&addr).unwrap();
+        let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
         tokio::spawn(async move {

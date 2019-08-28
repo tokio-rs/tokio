@@ -4,6 +4,7 @@ use super::split::{
 };
 use crate::driver::Handle;
 use crate::util::PollEvented;
+use crate::ToSocketAddrs;
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -38,10 +39,8 @@ use std::time::Duration;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn Error>> {
-///     let addr = "127.0.0.1:8080".parse()?;
-///
 ///     // Connect to a peer
-///     let mut stream = TcpStream::connect(&addr).await?;
+///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
 ///
 ///     // Write some data.
 ///     stream.write_all(b"hello world!").await?;
@@ -54,12 +53,15 @@ pub struct TcpStream {
 }
 
 impl TcpStream {
-    /// Create a new TCP stream connected to the specified address.
+    /// Opens a TCP connection to a remote host.
     ///
-    /// This function will create a new TCP socket and attempt to connect it to
-    /// the `addr` provided. The returned future will be resolved once the
-    /// stream has successfully connected, or it will return an error if one
-    /// occurs.
+    /// `addr` is an address of the remote host. Anything which implements
+    /// `ToSocketAddrs` trait can be supplied for the address.
+    ///
+    /// If `addr` yields multiple addresses, connect will be attempted with each
+    /// of the addresses until a connection is successful. If none of the
+    /// addresses result in a successful connection, the error returned from the
+    /// last connection attempt (the last address) is returned.
     ///
     /// # Examples
     ///
@@ -70,10 +72,8 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let addr = "127.0.0.1:8080".parse()?;
-    ///
     ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect(&addr).await?;
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     ///     // Write some data.
     ///     stream.write_all(b"hello world!").await?;
@@ -81,8 +81,29 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
-        let sys = mio::net::TcpStream::connect(addr)?;
+    pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
+        let addrs = addr.to_socket_addrs().await?;
+
+        let mut last_err = None;
+
+        for addr in addrs {
+            match TcpStream::connect_addr(addr).await {
+                Ok(stream) => return Ok(stream),
+                Err(e) => last_err = Some(e),
+            }
+        }
+
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "could not resolve to any addresses",
+            )
+        }))
+    }
+
+    /// Establish a connection to the specified `addr`.
+    async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
+        let sys = mio::net::TcpStream::connect(&addr)?;
         let stream = TcpStream::new(sys);
 
         // Once we've connected, wait for the stream to be writable as
@@ -136,11 +157,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.local_addr()?);
     /// # Ok(())
@@ -155,11 +174,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.peer_addr()?);
     /// # Ok(())
@@ -198,10 +215,8 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let addr = "127.0.0.1:8080".parse()?;
-    ///
     ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect(&addr).await?;
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     ///     let mut b1 = [0; 10];
     ///     let mut b2 = [0; 10];
@@ -236,10 +251,8 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let addr = "127.0.0.1:8080".parse()?;
-    ///
     ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect(&addr).await?;
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     ///     // Shutdown the stream
     ///     stream.shutdown(Shutdown::Write)?;
@@ -261,11 +274,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.nodelay()?);
     /// # Ok(())
@@ -287,11 +298,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// stream.set_nodelay(true)?;
     /// # Ok(())
@@ -311,11 +320,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.recv_buffer_size()?);
     /// # Ok(())
@@ -334,11 +341,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// stream.set_recv_buffer_size(100)?;
     /// # Ok(())
@@ -367,11 +372,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.send_buffer_size()?);
     /// # Ok(())
@@ -390,11 +393,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// stream.set_send_buffer_size(100)?;
     /// # Ok(())
@@ -415,11 +416,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.keepalive()?);
     /// # Ok(())
@@ -446,11 +445,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// stream.set_keepalive(None)?;
     /// # Ok(())
@@ -470,11 +467,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.ttl()?);
     /// # Ok(())
@@ -493,11 +488,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// stream.set_ttl(123)?;
     /// # Ok(())
@@ -518,11 +511,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// println!("{:?}", stream.linger()?);
     /// # Ok(())
@@ -548,11 +539,9 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use std::net::SocketAddr;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let addr = "127.0.0.1:8080".parse()?;
-    /// let stream = TcpStream::connect(&addr).await?;
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
     ///
     /// stream.set_linger(None)?;
     /// # Ok(())

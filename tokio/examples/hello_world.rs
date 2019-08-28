@@ -13,7 +13,6 @@
 
 #![warn(rust_2018_idioms)]
 
-use tokio;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
@@ -21,12 +20,10 @@ use std::error::Error;
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
-    let addr = "127.0.0.1:6142".parse()?;
-
     // Open a TCP stream to the socket address.
     //
     // Note that this is the Tokio TcpStream, which is fully async.
-    let mut stream = TcpStream::connect(&addr).await?;
+    let mut stream = TcpStream::connect("127.0.0.1:6142").await?;
     println!("created stream");
 
     let result = stream.write(b"hello world\n").await;

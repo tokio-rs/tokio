@@ -1,6 +1,7 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
 use crate::driver::Handle;
 use crate::util::PollEvented;
+use crate::ToSocketAddrs;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -19,8 +20,27 @@ pub struct UdpSocket {
 impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
     /// the `addr` provided.
-    pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
-        mio::net::UdpSocket::bind(addr).map(UdpSocket::new)
+    pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<UdpSocket> {
+        let addrs = addr.to_socket_addrs().await?;
+        let mut last_err = None;
+
+        for addr in addrs {
+            match UdpSocket::bind_addr(addr) {
+                Ok(socket) => return Ok(socket),
+                Err(e) => last_err = Some(e),
+            }
+        }
+
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "could not resolve to any addresses",
+            )
+        }))
+    }
+
+    fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
+        mio::net::UdpSocket::bind(&addr).map(UdpSocket::new)
     }
 
     fn new(socket: mio::net::UdpSocket) -> UdpSocket {
@@ -63,8 +83,23 @@ impl UdpSocket {
     /// Connects the UDP socket setting the default destination for send() and
     /// limiting packets that are read via recv from the address specified in
     /// `addr`.
-    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
-        self.io.get_ref().connect(*addr)
+    pub async fn connect<A: ToSocketAddrs>(&self, addr: A) -> io::Result<()> {
+        let addrs = addr.to_socket_addrs().await?;
+        let mut last_err = None;
+
+        for addr in addrs {
+            match self.io.get_ref().connect(addr) {
+                Ok(_) => return Ok(()),
+                Err(e) => last_err = Some(e),
+            }
+        }
+
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "could not resolve to any addresses",
+            )
+        }))
     }
 
     /// Returns a future that sends data on the socket to the remote address to which it is connected.
@@ -141,8 +176,16 @@ impl UdpSocket {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    pub async fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_send_to_priv(cx, buf, target)).await
+    pub async fn send_to<A: ToSocketAddrs>(&mut self, buf: &[u8], target: A) -> io::Result<usize> {
+        let mut addrs = target.to_socket_addrs().await?;
+
+        match addrs.next() {
+            Some(target) => poll_fn(|cx| self.poll_send_to_priv(cx, buf, &target)).await,
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "no addresses to send data to",
+            )),
+        }
     }
 
     pub(crate) fn poll_send_to_priv(

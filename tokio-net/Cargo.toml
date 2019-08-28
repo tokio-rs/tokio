@@ -24,7 +24,6 @@ categories = ["asynchronous", "network-programming"]
 async-traits = []
 process = [
     "crossbeam-queue",
-    "futures-util-preview",
     "libc",
     "mio-named-pipes",
     "signal",
@@ -38,7 +37,6 @@ process = [
     "winapi/winnt",
 ]
 signal = [
-    "futures-util-preview",
     "mio-uds",
     "libc",
     "signal-hook-registry",
@@ -48,18 +46,15 @@ signal = [
 ]
 tcp = [
     "bytes",
-    "futures-util-preview",
     "iovec",
 ]
 udp = [
     "bytes",
     "futures-sink-preview",
-    "futures-util-preview",
 ]
 uds = [
     "bytes",
     "mio-uds",
-    "futures-util-preview",
     "iovec",
     "libc",
 ]
@@ -67,7 +62,7 @@ log = ["tracing/log"]
 
 [dependencies]
 tokio-codec = { version = "=0.2.0-alpha.2", path = "../tokio-codec" }
-tokio-executor = { version = "=0.2.0-alpha.2", path = "../tokio-executor" }
+tokio-executor = { version = "=0.2.0-alpha.2", features = ["blocking"], path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.2", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.2", path = "../tokio-sync" }
 
@@ -76,6 +71,7 @@ tracing = { version = "0.1.5", optional = true }
 # driver implementation
 crossbeam-utils = "0.6.0"
 futures-core-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.18"
 lazy_static = "1.0.2"
 mio = "0.6.14"
 num_cpus = "1.8.0"
@@ -85,7 +81,6 @@ slab = "0.4.0"
 # TCP / UDP
 bytes = { version = "0.4", optional = true }
 futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
-futures-util-preview = { version = "=0.3.0-alpha.18", optional = true }
 iovec = { version = "0.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
@@ -114,7 +109,7 @@ tokio-io-pool = "0.1.4"
 
 # UDS tests
 tempfile = "3"
-futures-preview = "=0.3.0-alpha.18"
+futures-preview = { version = "=0.3.0-alpha.18", features = ["nightly", "async-await"] }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -45,12 +45,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let state = Lock::new(Shared::new());
 
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:6142".to_string());
-    let addr = addr.parse::<SocketAddr>()?;
 
     // Bind a TCP listener to the socket address.
     //
     // Note that this is the Tokio TcpListener, which is fully async.
-    let mut listener = TcpListener::bind(&addr)?;
+    let mut listener = TcpListener::bind(&addr).await?;
 
     println!("server running on {}", addr);
 

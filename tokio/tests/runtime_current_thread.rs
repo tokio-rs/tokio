@@ -13,8 +13,7 @@ use std::time::{Duration, Instant};
 use tokio::timer::delay;
 
 async fn client_server(tx: mpsc::Sender<()>) {
-    let addr = assert_ok!("127.0.0.1:0".parse());
-    let mut server = assert_ok!(TcpListener::bind(&addr));
+    let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
     // Get the assigned address
     let addr = assert_ok!(server.local_addr());
