@@ -104,7 +104,7 @@ tokio-io-pool = "0.1.4"
 
 # UDS tests
 tempfile = "3"
-futures-preview = "=0.3.0-alpha.18"
+futures-preview = { version = "=0.3.0-alpha.18", features = ["nightly", "async-await"] }
 
 [package.metadata.docs.rs]
 all-features = true
