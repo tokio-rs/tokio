@@ -151,6 +151,34 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
+    // Connect a TcpStream asynchronously that may be built with a net2 TcpBuilder.
+    //
+    // This should be removed in favor of some in-crate TcpSocket builder API.
+    #[doc(hidden)]
+    pub async fn connect_std(
+        stream: net::TcpStream,
+        addr: &SocketAddr,
+        handle: &Handle,
+    ) -> io::Result<TcpStream> {
+        let io = mio::net::TcpStream::connect_stream(stream, addr)?;
+        let io = PollEvented::new_with_handle(io, handle)?;
+        let stream = TcpStream { io };
+
+        // Once we've connected, wait for the stream to be writable as
+        // that's when the actual connection has been initiated. Once we're
+        // writable we check for `take_socket_error` to see if the connect
+        // actually hit an error or not.
+        //
+        // If all that succeeded then we ship everything on up.
+        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
+
+        if let Some(e) = stream.io.get_ref().take_error()? {
+            return Err(e);
+        }
+
+        Ok(stream)
+    }
+
     /// Returns the local address that this stream is bound to.
     ///
     /// # Examples
