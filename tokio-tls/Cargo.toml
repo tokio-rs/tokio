@@ -26,11 +26,11 @@ travis-ci = { repository = "tokio-rs/tokio-tls" }
 
 [dependencies]
 native-tls = "0.2"
-tokio-io = { version = "=0.2.0-alpha.3", path = "../tokio-io" }
+tokio-io = { version = "=0.2.0-alpha.4", path = "../tokio-io" }
 
 [dev-dependencies]
-tokio = { version = "=0.2.0-alpha.3", path = "../tokio" }
-tokio-net = { version = "=0.2.0-alpha.3", path = "../tokio-net", features = ["tcp", "async-traits"] }
+tokio = { version = "=0.2.0-alpha.4", path = "../tokio" }
+tokio-net = { version = "=0.2.0-alpha.4", path = "../tokio-net", features = ["tcp", "async-traits"] }
 
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }

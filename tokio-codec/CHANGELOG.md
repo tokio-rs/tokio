@@ -1,3 +1,7 @@
+# 0.2.0-alpha.4 (August 29, 2019)
+
+- Track tokio release.
+
 # 0.2.0-alpha.3 (August 28, 2019)
 
 ### Fix
