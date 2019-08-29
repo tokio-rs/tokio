@@ -1,6 +1,10 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.2.0-alpha.4 (August 29, 2019)
+
+- Track tokio-net release.
+
 # 0.2.0-alpha.3 (August 28, 2019)
 
 ### Changed

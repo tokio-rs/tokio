@@ -7,13 +7,13 @@ name = "tokio-sync"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.3"
+version = "0.2.0-alpha.4"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-sync/0.2.0-alpha.3/tokio_sync"
+documentation = "https://docs.rs/tokio-sync/0.2.0-alpha.4/tokio_sync"
 description = """
 Synchronization utilities.
 """
@@ -29,8 +29,8 @@ futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
 futures-util-preview = { version = "=0.3.0-alpha.18" }
 
 [dev-dependencies]
-tokio = { version = "0.2.0-alpha.3", path = "../tokio" }
-tokio-test = { version = "0.2.0-alpha.3", path = "../tokio-test" }
+tokio = { version = "0.2.0-alpha.4", path = "../tokio" }
+tokio-test = { version = "0.2.0-alpha.4", path = "../tokio-test" }
 
 env_logger = { version = "0.6", default-features = false }
 loom = { version = "0.2.1", features = ["futures"] }

@@ -7,13 +7,13 @@ name = "tokio-macros"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.2.0-alpha.3"
+version = "0.2.0-alpha.4"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-macros/0.2.0-alpha.3/tokio_macros"
+documentation = "https://docs.rs/tokio-macros/0.2.0-alpha.4/tokio_macros"
 description = """
 Tokio's proc macros.
 """
@@ -29,7 +29,7 @@ quote = "1"
 syn = { version = "1", features = ["full"] }
 
 [dev-dependencies]
-tokio = { version = "0.2.0-alpha.3", path = "../tokio", default-features = false, features = ["rt-full"] }
+tokio = { version = "0.2.0-alpha.4", path = "../tokio", default-features = false, features = ["rt-full"] }
 
 [package.metadata.docs.rs]
 all-features = true
