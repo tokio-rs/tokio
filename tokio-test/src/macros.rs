@@ -33,13 +33,12 @@ macro_rules! assert_ready {
             Pending => panic!("pending"),
         }
     }};
-    ($e:expr, $($msg:tt),+) => {{
+    ($e:expr, $($msg:tt)+) => {{
         use core::task::Poll::*;
         match $e {
             Ready(v) => v,
             Pending => {
-                let msg = format_args!($($msg),+);
-                panic!("pending; {}", msg)
+                panic!("pending; {}", format_args!($($msg)+))
             }
         }
     }};
@@ -76,10 +75,10 @@ macro_rules! assert_ready_ok {
         let val = assert_ready!($e);
         assert_ok!(val)
     }};
-    ($e:expr, $($msg:tt),+) => {{
+    ($e:expr, $($msg:tt)+) => {{
         use tokio_test::{assert_ready, assert_ok};
-        let val = assert_ready!($e, $($msg),*);
-        assert_ok!(val, $($msg),*)
+        let val = assert_ready!($e, $($msg)*);
+        assert_ok!(val, $($msg)*)
     }};
 }
 
@@ -114,10 +113,10 @@ macro_rules! assert_ready_err {
         let val = assert_ready!($e);
         assert_err!(val)
     }};
-    ($e:expr, $($msg:tt),+) => {{
+    ($e:expr, $($msg:tt)+) => {{
         use tokio_test::{assert_ready, assert_err};
-        let val = assert_ready!($e, $($msg),*);
-        assert_err!(val, $($msg),*)
+        let val = assert_ready!($e, $($msg)*);
+        assert_err!(val, $($msg)*)
     }};
 }
 
@@ -155,13 +154,12 @@ macro_rules! assert_pending {
             Ready(v) => panic!("ready; value = {:?}", v),
         }
     }};
-    ($e:expr, $($msg:tt),+) => {{
+    ($e:expr, $($msg:tt)+) => {{
         use core::task::Poll::*;
         match $e {
             Pending => {}
             Ready(v) => {
-                let msg = format_args!($($msg),+);
-                panic!("ready; value = {:?}; {}", v, msg)
+                panic!("ready; value = {:?}; {}", v, format_args!($($msg)+))
             }
         }
     }};
@@ -198,9 +196,9 @@ macro_rules! assert_ready_eq {
         assert_eq!(val, $expect)
     };
 
-    ($e:expr, $expect:expr, $($msg:tt),+) => {
-        let val = $crate::assert_ready!($e);
-        assert_eq!(val, $expect, $($msg),*)
+    ($e:expr, $expect:expr, $($msg:tt)+) => {
+        let val = $crate::assert_ready!($e, $($msg)*);
+        assert_eq!(val, $expect, $($msg)*)
     };
 }
 
