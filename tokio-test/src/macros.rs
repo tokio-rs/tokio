@@ -197,7 +197,7 @@ macro_rules! assert_ready_eq {
     };
 
     ($e:expr, $expect:expr, $($msg:tt)+) => {
-        let val = $crate::assert_ready!($e);
+        let val = $crate::assert_ready!($e, $($msg)*);
         assert_eq!(val, $expect, $($msg)*)
     };
 }
