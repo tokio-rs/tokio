@@ -8,10 +8,10 @@ name = "tokio-udp"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Carl Lerche <me@carllerche.com>"]
 license = "MIT"
-documentation = "https://docs.rs/tokio-udp/0.1.4/tokio_udp"
+documentation = "https://docs.rs/tokio-udp/0.1.5/tokio_udp"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
