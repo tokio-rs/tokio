@@ -502,7 +502,8 @@ impl Command {
     /// locations may not appear where intended.
     #[cfg(unix)]
     pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
-        where F: FnMut() -> io::Result<()> + Send + Sync + 'static
+    where
+        F: FnMut() -> io::Result<()> + Send + Sync + 'static,
     {
         self.std.pre_exec(f);
         self
