@@ -64,7 +64,9 @@ pub fn delay(deadline: Instant) -> Delay {
 }
 
 /// Create a Future that completes in `duration` from now.
-pub fn sleep(duration: Duration) -> Delay {
+///
+/// Equivalent to `delay(Instant::now() + duration)`. Analogous to `std::thread::sleep`.
+pub fn delay_for(duration: Duration) -> Delay {
     delay(Instant::now() + duration)
 }
 

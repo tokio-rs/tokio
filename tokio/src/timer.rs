@@ -75,4 +75,6 @@
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-pub use tokio_timer::{delay, delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout};
+pub use tokio_timer::{
+    delay, delay_for, delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout,
+};
