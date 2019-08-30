@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 ///
 /// This is an async version of [`std::fs::read_link`][std]
 ///
-/// [std]: https://doc.rust-lang.org/std/fs/fn.read_link.html
+/// [std]: std::fs::read_link
 pub async fn read_link<P: AsRef<Path>>(path: P) -> io::Result<PathBuf> {
     let path = path.as_ref().to_owned();
     asyncify(move || std::fs::read_link(path)).await
