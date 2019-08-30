@@ -1,7 +1,4 @@
-use super::split::{
-    split, split_mut, UnixStreamReadHalf, UnixStreamReadHalfMut, UnixStreamWriteHalf,
-    UnixStreamWriteHalfMut,
-};
+use super::split::{split, ReadHalf, WriteHalf};
 use super::ucred::{self, UCred};
 use crate::driver::Handle;
 use crate::util::PollEvented;
@@ -112,17 +109,8 @@ impl UnixStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (UnixStreamReadHalf, UnixStreamWriteHalf) {
+    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         split(self)
-    }
-
-    /// Split a `UnixStream` into a read half and a write half, which can be used
-    /// to read and write the stream concurrently.
-    ///
-    /// See the module level documenation of [`split`](super::split) for more
-    /// details.
-    pub fn split_mut(&mut self) -> (UnixStreamReadHalfMut<'_>, UnixStreamWriteHalfMut<'_>) {
-        split_mut(self)
     }
 }
 

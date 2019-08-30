@@ -20,7 +20,7 @@ async fn shutdown() {
         assert_eq!(n, 0);
     });
 
-    let (stream, _) = assert_ok!(srv.accept().await);
+    let (mut stream, _) = assert_ok!(srv.accept().await);
     let (mut rd, mut wr) = stream.split();
 
     let n = assert_ok!(rd.copy(&mut wr).await);

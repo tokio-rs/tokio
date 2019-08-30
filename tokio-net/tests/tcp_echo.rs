@@ -31,7 +31,7 @@ async fn echo_server() {
         assert_ok!(tx.send(()));
     });
 
-    let (stream, _) = assert_ok!(srv.accept().await);
+    let (mut stream, _) = assert_ok!(srv.accept().await);
     let (mut rd, mut wr) = stream.split();
 
     let n = assert_ok!(rd.copy(&mut wr).await);

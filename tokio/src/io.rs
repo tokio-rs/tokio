@@ -39,6 +39,7 @@
 // standard input, output, and error
 #[cfg(feature = "fs")]
 pub use tokio_fs::{stderr, stdin, stdout, Stderr, Stdin, Stdout};
+pub use tokio_io::split::split;
 pub use tokio_io::{
     AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
     BufWriter,

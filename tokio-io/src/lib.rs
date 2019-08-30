@@ -22,6 +22,9 @@ mod async_write;
 #[cfg(feature = "util")]
 mod io;
 
+#[cfg(feature = "util")]
+pub mod split;
+
 pub use self::async_buf_read::AsyncBufRead;
 pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;

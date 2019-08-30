@@ -93,7 +93,8 @@ mod tcp {
         stdin: impl Stream<Item = Result<Vec<u8>, io::Error>> + Unpin,
         mut stdout: impl Sink<Vec<u8>, Error = io::Error> + Unpin,
     ) -> Result<(), Box<dyn Error>> {
-        let (r, w) = TcpStream::connect(addr).await?.split();
+        let mut stream = TcpStream::connect(addr).await?;
+        let (r, w) = stream.split();
         let sink = FramedWrite::new(w, codec::Bytes);
         let mut stream = FramedRead::new(r, codec::Bytes).filter_map(|i| match i {
             Ok(i) => future::ready(Some(i)),
