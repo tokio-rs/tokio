@@ -35,11 +35,11 @@ pub struct UdpSocketSendHalf(Arc<UdpSocket>);
 #[derive(Debug)]
 pub struct UdpSocketRecvHalf(Arc<UdpSocket>);
 
-pub(crate) fn split(socket: UdpSocket) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
+pub(crate) fn split(socket: UdpSocket) -> (UdpSocketSendHalf, UdpSocketRecvHalf) {
     let shared = Arc::new(socket);
     let send = shared.clone();
     let recv = shared;
-    (UdpSocketRecvHalf(recv), UdpSocketSendHalf(send))
+    (UdpSocketSendHalf(send), UdpSocketRecvHalf(recv))
 }
 
 /// Error indicating two halves were not from the same socket, and thus could

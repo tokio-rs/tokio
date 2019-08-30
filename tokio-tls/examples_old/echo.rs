@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .accept(tcp)
                 .and_then(move |tls| {
                     // Split up the read and write halves
-                    let (reader, writer) = tls.split();
+                    let (writer, reader) = tls.split();
 
                     // Copy the data back to the client
                     let conn = io::copy(reader, writer)

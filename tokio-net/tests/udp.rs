@@ -45,7 +45,7 @@ async fn send_to_recv_from() -> std::io::Result<()> {
 #[tokio::test]
 async fn split() -> std::io::Result<()> {
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
-    let (mut r, mut s) = socket.split();
+    let (mut s, mut r) = socket.split();
 
     let msg = b"hello";
     let addr = s.as_ref().local_addr()?;
@@ -61,7 +61,7 @@ async fn split() -> std::io::Result<()> {
 #[tokio::test]
 async fn reunite() -> std::io::Result<()> {
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
-    let (s, r) = socket.split();
+    let (r, s) = socket.split();
     assert!(s.reunite(r).is_ok());
     Ok(())
 }
@@ -70,8 +70,8 @@ async fn reunite() -> std::io::Result<()> {
 async fn reunite_error() -> std::io::Result<()> {
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
     let socket1 = UdpSocket::bind("127.0.0.1:0").await?;
-    let (s, _) = socket.split();
-    let (_, r1) = socket1.split();
+    let (_, s) = socket.split();
+    let (r1, _) = socket1.split();
     assert!(s.reunite(r1).is_err());
     Ok(())
 }

@@ -71,7 +71,7 @@ impl UdpSocket {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
+    pub fn split(self) -> (UdpSocketSendHalf, UdpSocketRecvHalf) {
         split(self)
     }
 

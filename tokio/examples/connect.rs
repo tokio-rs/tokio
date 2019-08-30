@@ -93,7 +93,7 @@ mod tcp {
         stdin: impl Stream<Item = Result<Vec<u8>, io::Error>> + Unpin,
         mut stdout: impl Sink<Vec<u8>, Error = io::Error> + Unpin,
     ) -> Result<(), Box<dyn Error>> {
-        let (r, w) = TcpStream::connect(addr).await?.split();
+        let (w, r) = TcpStream::connect(addr).await?.split();
         let sink = FramedWrite::new(w, codec::Bytes);
         let mut stream = FramedRead::new(r, codec::Bytes).filter_map(|i| match i {
             Ok(i) => future::ready(Some(i)),
@@ -133,7 +133,7 @@ mod udp {
 
         let socket = UdpSocket::bind(&bind_addr).await?;
         socket.connect(addr).await?;
-        let (mut r, mut w) = socket.split();
+        let (mut w, mut r) = socket.split();
 
         future::try_join(send(stdin, &mut w), recv(stdout, &mut r)).await?;
 

@@ -13,8 +13,8 @@ use tokio::prelude::*;
 async fn split() -> std::io::Result<()> {
     let (a, mut b) = UnixStream::pair()?;
 
-    let (mut a_read, mut a_write) = a.split();
-    let (mut b_read, mut b_write) = b.split_mut();
+    let (mut a_write, mut a_read) = a.split();
+    let (mut b_write, mut b_read) = b.split_mut();
 
     let (a_response, b_response) = futures::future::try_join(
         send_recv_all(&mut a_read, &mut a_write, b"A"),

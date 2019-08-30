@@ -584,7 +584,7 @@ impl TcpStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (TcpStreamReadHalf, TcpStreamWriteHalf) {
+    pub fn split(self) -> (TcpStreamWriteHalf, TcpStreamReadHalf) {
         split(self)
     }
 
@@ -593,7 +593,7 @@ impl TcpStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split_mut(&mut self) -> (TcpStreamReadHalfMut<'_>, TcpStreamWriteHalfMut<'_>) {
+    pub fn split_mut(&mut self) -> (TcpStreamWriteHalfMut<'_>, TcpStreamReadHalfMut<'_>) {
         split_mut(self)
     }
 

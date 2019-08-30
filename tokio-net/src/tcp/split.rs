@@ -36,11 +36,11 @@ pub struct TcpStreamReadHalf(Arc<TcpStream>);
 #[derive(Debug)]
 pub struct TcpStreamWriteHalf(Arc<TcpStream>);
 
-pub(crate) fn split(stream: TcpStream) -> (TcpStreamReadHalf, TcpStreamWriteHalf) {
+pub(crate) fn split(stream: TcpStream) -> (TcpStreamWriteHalf, TcpStreamReadHalf) {
     let shared = Arc::new(stream);
     (
-        TcpStreamReadHalf(shared.clone()),
-        TcpStreamWriteHalf(shared),
+        TcpStreamWriteHalf(shared.clone()),
+        TcpStreamReadHalf(shared),
     )
 }
 
@@ -57,10 +57,10 @@ pub struct TcpStreamWriteHalfMut<'a>(&'a TcpStream);
 
 pub(crate) fn split_mut(
     stream: &mut TcpStream,
-) -> (TcpStreamReadHalfMut<'_>, TcpStreamWriteHalfMut<'_>) {
+) -> (TcpStreamWriteHalfMut<'_>, TcpStreamReadHalfMut<'_>) {
     (
-        TcpStreamReadHalfMut(&*stream),
         TcpStreamWriteHalfMut(&*stream),
+        TcpStreamReadHalfMut(&*stream),
     )
 }
 

@@ -55,8 +55,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn transfer(inbound: TcpStream, proxy_addr: String) -> Result<(), Box<dyn Error>> {
     let outbound = TcpStream::connect(proxy_addr).await?;
 
-    let (mut ri, mut wi) = inbound.split();
-    let (mut ro, mut wo) = outbound.split();
+    let (mut wi, mut ri) = inbound.split();
+    let (mut wo, mut ro) = outbound.split();
 
     let client_to_server = ri.copy(&mut wo);
     let server_to_client = ro.copy(&mut wi);

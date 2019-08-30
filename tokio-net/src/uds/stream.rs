@@ -112,7 +112,7 @@ impl UnixStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (UnixStreamReadHalf, UnixStreamWriteHalf) {
+    pub fn split(self) -> (UnixStreamWriteHalf, UnixStreamReadHalf) {
         split(self)
     }
 
@@ -121,7 +121,7 @@ impl UnixStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split_mut(&mut self) -> (UnixStreamReadHalfMut<'_>, UnixStreamWriteHalfMut<'_>) {
+    pub fn split_mut(&mut self) -> (UnixStreamWriteHalfMut<'_>, UnixStreamReadHalfMut<'_>) {
         split_mut(self)
     }
 }

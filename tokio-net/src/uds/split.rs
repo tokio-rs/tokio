@@ -44,20 +44,20 @@ pub struct UnixStreamReadHalfMut<'a>(&'a UnixStream);
 #[derive(Debug)]
 pub struct UnixStreamWriteHalfMut<'a>(&'a UnixStream);
 
-pub(crate) fn split(stream: UnixStream) -> (UnixStreamReadHalf, UnixStreamWriteHalf) {
+pub(crate) fn split(stream: UnixStream) -> (UnixStreamWriteHalf, UnixStreamReadHalf) {
     let shared = Arc::new(stream);
     (
-        UnixStreamReadHalf(shared.clone()),
-        UnixStreamWriteHalf(shared),
+        UnixStreamWriteHalf(shared.clone()),
+        UnixStreamReadHalf(shared),
     )
 }
 
 pub(crate) fn split_mut(
     stream: &mut UnixStream,
-) -> (UnixStreamReadHalfMut<'_>, UnixStreamWriteHalfMut<'_>) {
+) -> (UnixStreamWriteHalfMut<'_>, UnixStreamReadHalfMut<'_>) {
     (
-        UnixStreamReadHalfMut(stream),
         UnixStreamWriteHalfMut(stream),
+        UnixStreamReadHalfMut(stream),
     )
 }
 
