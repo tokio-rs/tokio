@@ -301,9 +301,35 @@ fn send_framed_lines_codec() {
     let b_addr = t!(b_soc.local_addr());
 
     let a = UdpFramed::new(a_soc, ByteCodec);
-    let b = UdpFramed::new(b_soc, LinesCodec::new());
+    let b = UdpFramed::with_decode(b_soc, LinesCodec::new(), true);
 
     let msg = b"1\r\n2\r\n3\r\n".to_vec();
+
+    let send = a.send((msg.clone(), b_addr));
+    t!(send.wait());
+
+    let mut recv = Stream::wait(b).map(|e| e.unwrap());
+
+    assert_eq!(recv.next(), Some(("1".to_string(), a_addr)));
+    assert_eq!(recv.next(), Some(("2".to_string(), a_addr)));
+    assert_eq!(recv.next(), Some(("3".to_string(), a_addr)));
+}
+
+#[test]
+fn send_framed_lines_codec_with_non_terminating_frame() {
+    drop(env_logger::try_init());
+
+    let a_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
+    let b_soc = t!(UdpSocket::bind(&t!("127.0.0.1:0".parse())));
+    let a_addr = t!(a_soc.local_addr());
+    let b_addr = t!(b_soc.local_addr());
+
+    let a = UdpFramed::new(a_soc, ByteCodec);
+    let b = UdpFramed::with_decode(b_soc, LinesCodec::new(), true);
+
+    // This has no terminating delimiter thus we want to return the rest of the
+    // frame and this tests that if decode fails, we try to decode_eof.
+    let msg = b"1\r\n2\r\n3".to_vec();
 
     let send = a.send((msg.clone(), b_addr));
     t!(send.wait());
