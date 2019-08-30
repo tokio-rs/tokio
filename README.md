@@ -57,11 +57,12 @@ A basic TCP echo server with Tokio:
 ```rust
 use tokio::net::TcpListener;
 use tokio::prelude::*;
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "127.0.0.1:8080".parse()?;
-    let mut listener = TcpListener::bind(&addr).unwrap();
+    let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
+    let mut listener = TcpListener::bind(&addr).await?;
 
     loop {
         let (mut socket, _) = listener.accept().await?;
@@ -90,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 }
+
 ```
 
 More examples can be found [here](tokio/examples). Note that the `master` branch
