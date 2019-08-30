@@ -1,3 +1,8 @@
+# 0.3.0-alpha.4 (August 30, 2019)
+
+### Changed
+- Track `tokio` 0.2.0-alpha.4
+
 # 0.3.0-alpha.2 (August 17, 2019)
 
 ### Changed
