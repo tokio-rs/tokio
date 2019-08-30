@@ -1,40 +1,40 @@
-#![cfg(feature = "broken")]
 #![warn(rust_2018_idioms)]
 
-use futures::{future, Async, Future, Poll};
-use tokio_macros::{assert_not_ready, assert_ready, assert_ready_eq};
+use std::task::Poll;
+use tokio_test::{assert_pending, assert_ready, assert_ready_eq};
+
+fn ready() -> Poll<()> {
+    Poll::Ready(())
+}
+
+fn pending() -> Poll<()> {
+    Poll::Pending
+}
 
 #[test]
 fn assert_ready() {
-    let mut fut = future::ok::<(), ()>(());
-    assert_ready!(fut.poll());
-    let mut fut = future::ok::<(), ()>(());
-    assert_ready!(fut.poll(), "some message");
+    let fut = ready();
+    assert_ready!(fut);
+    let fut = ready();
+    assert_ready!(fut, "some message");
 }
 
 #[test]
 #[should_panic]
 fn assert_ready_err() {
-    let mut fut = future::err::<(), ()>(());
-    assert_ready!(fut.poll());
+    let fut = pending();
+    assert_ready!(fut);
 }
 
 #[test]
-fn assert_not_ready() {
-    let poll: Poll<(), ()> = Ok(Async::NotReady);
-    assert_not_ready!(poll);
-    assert_not_ready!(poll, "some message");
-}
-
-#[test]
-#[should_panic]
-fn assert_not_ready_err() {
-    let mut fut = future::err::<(), ()>(());
-    assert_not_ready!(fut.poll());
+fn assert_pending() {
+    let poll = pending();
+    assert_pending!(poll);
+    assert_pending!(poll, "some message");
 }
 
 #[test]
 fn assert_ready_eq() {
-    let mut fut = future::ok::<(), ()>(());
-    assert_ready_eq!(fut.poll(), ());
+    let fut = ready();
+    assert_ready_eq!(fut, ());
 }
