@@ -41,7 +41,10 @@ struct Guard<'a, T> {
 ///
 /// To restore this read/write object from its `split::ReadHalf` and
 /// `split::WriteHalf` use `unsplit`.
-pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>) {
+pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
+where
+    T: AsyncRead + AsyncWrite,
+{
     let inner = Arc::new(Inner {
         locked: AtomicBool::new(false),
         stream: UnsafeCell::new(stream),
