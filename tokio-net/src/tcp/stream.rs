@@ -1,7 +1,4 @@
-use super::split::{
-    split, split_mut, TcpStreamReadHalf, TcpStreamReadHalfMut, TcpStreamWriteHalf,
-    TcpStreamWriteHalfMut,
-};
+use super::split::{split, ReadHalf, WriteHalf};
 use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
@@ -584,17 +581,8 @@ impl TcpStream {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (TcpStreamReadHalf, TcpStreamWriteHalf) {
+    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         split(self)
-    }
-
-    /// Split a `TcpStream` into a read half and a write half, which can be used
-    /// to read and write the stream concurrently.
-    ///
-    /// See the module level documenation of [`split`](super::split) for more
-    /// details.
-    pub fn split_mut(&mut self) -> (TcpStreamReadHalfMut<'_>, TcpStreamWriteHalfMut<'_>) {
-        split_mut(self)
     }
 
     // == Poll IO functions that takes `&self` ==
