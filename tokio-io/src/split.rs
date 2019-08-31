@@ -160,6 +160,11 @@ impl<T> Drop for Guard<'_, T> {
     }
 }
 
+unsafe impl<T: Send> Send for ReadHalf<T> {}
+unsafe impl<T: Send> Send for WriteHalf<T> {}
+unsafe impl<T: Sync> Sync for ReadHalf<T> {}
+unsafe impl<T: Sync> Sync for WriteHalf<T> {}
+
 impl<T: fmt::Debug> fmt::Debug for ReadHalf<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("split::ReadHalf").finish()
