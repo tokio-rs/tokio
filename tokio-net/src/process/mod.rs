@@ -641,6 +641,12 @@ impl Command {
     }
 }
 
+impl From<StdCommand> for Command {
+    fn from(std: StdCommand) -> Command {
+        Command { std }
+    }
+}
+
 /// A drop guard which ensures the child process is killed on drop to maintain
 /// the contract of dropping a Future leads to "cancellation".
 #[derive(Debug)]
