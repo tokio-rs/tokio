@@ -139,7 +139,7 @@ async fn status_closes_any_pipes() {
     // Cat will open a pipe between the parent and child.
     // If `status_async` doesn't ensure the handles are closed,
     // we would end up blocking forever (and time out).
-    let child = cat().status().expect("failed to spawn child");
+    let child = cat().status();
 
     with_timeout(child)
         .await
