@@ -12,7 +12,7 @@ use std::cell::UnsafeCell;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -28,16 +28,13 @@ pub struct WriteHalf<T> {
 }
 
 struct Inner<T> {
-    state: AtomicU8,
+    locked: AtomicBool,
     stream: UnsafeCell<T>,
 }
 
 struct Guard<'a, T> {
     inner: &'a Inner<T>,
 }
-
-const INIT: u8 = 0;
-const LOCKED: u8 = 1;
 
 /// Split a single value implementing `AsyncRead + AsyncWrite` into separate
 /// `AsyncRead` and `AsyncWrite` handles.
@@ -46,7 +43,7 @@ const LOCKED: u8 = 1;
 /// `split::WriteHalf` use `unsplit`.
 pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>) {
     let inner = Arc::new(Inner {
-        state: AtomicU8::new(INIT),
+        locked: AtomicBool::new(false),
         stream: UnsafeCell::new(stream),
     });
 
@@ -133,9 +130,7 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
 
 impl<T> Inner<T> {
     fn poll_lock(&self, cx: &mut Context<'_>) -> Poll<Guard<'_, T>> {
-        let actual = self.state.compare_and_swap(INIT, LOCKED, Acquire);
-
-        if actual == INIT {
+        if !self.locked.compare_and_swap(false, true, Acquire) {
             Poll::Ready(Guard { inner: self })
         } else {
             // Spin... but investigate a better strategy
@@ -158,7 +153,7 @@ impl<T> Guard<'_, T> {
 
 impl<T> Drop for Guard<'_, T> {
     fn drop(&mut self) {
-        self.inner.state.store(INIT, Release);
+        self.inner.locked.store(false, Release);
     }
 }
 
