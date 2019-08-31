@@ -1,4 +1,5 @@
 use tokio::io::{split, AsyncRead, AsyncWrite};
+use tokio_io::split::{ReadHalf, WriteHalf};
 
 use std::io;
 use std::pin::Pin;
@@ -32,6 +33,14 @@ impl AsyncWrite for RW {
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Poll::Ready(Ok(()))
     }
+}
+
+#[test]
+fn is_send_and_sync() {
+    fn assert_bound<T: Send + Sync>() {}
+
+    assert_bound::<ReadHalf<RW>>();
+    assert_bound::<WriteHalf<RW>>();
 }
 
 #[test]
