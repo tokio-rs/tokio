@@ -110,6 +110,10 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::future::Future;
 use std::io;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
@@ -436,6 +440,72 @@ impl Command {
     /// ```
     pub fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
         self.std.stderr(cfg);
+        self
+    }
+
+    /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
+    ///
+    /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT`.
+    ///
+    /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
+    #[cfg(windows)]
+    pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
+        self.std.creation_flags(flags);
+        self
+    }
+
+    /// Sets the child process's user ID. This translates to a
+    /// `setuid` call in the child process. Failure in the `setuid`
+    /// call will cause the spawn to fail.
+    #[cfg(unix)]
+    pub fn uid(&mut self, id: u32) -> &mut Command {
+        self.std.uid(id);
+        self
+    }
+
+    /// Similar to `uid`, but sets the group ID of the child process. This has
+    /// the same semantics as the `uid` field.
+    #[cfg(unix)]
+    pub fn gid(&mut self, id: u32) -> &mut Command {
+        self.std.gid(id);
+        self
+    }
+
+    /// Schedules a closure to be run just before the `exec` function is
+    /// invoked.
+    ///
+    /// The closure is allowed to return an I/O error whose OS error code will
+    /// be communicated back to the parent and returned as an error from when
+    /// the spawn was requested.
+    ///
+    /// Multiple closures can be registered and they will be called in order of
+    /// their registration. If a closure returns `Err` then no further closures
+    /// will be called and the spawn operation will immediately return with a
+    /// failure.
+    ///
+    /// # Notes and Safety
+    ///
+    /// This closure will be run in the context of the child process after a
+    /// `fork`. This primarily means that any modifications made to memory on
+    /// behalf of this closure will **not** be visible to the parent process.
+    /// This is often a very constrained environment where normal operations
+    /// like `malloc` or acquiring a mutex are not guaranteed to work (due to
+    /// other threads perhaps still running when the `fork` was run).
+    ///
+    /// This also means that all resources such as file descriptors and
+    /// memory-mapped regions got duplicated. It is your responsibility to make
+    /// sure that the closure does not violate library invariants by making
+    /// invalid use of these duplicates.
+    ///
+    /// When this closure is run, aspects such as the stdio file descriptors and
+    /// working directory have successfully been changed, so output to these
+    /// locations may not appear where intended.
+    #[cfg(unix)]
+    pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
+    where
+        F: FnMut() -> io::Result<()> + Send + Sync + 'static,
+    {
+        self.std.pre_exec(f);
         self
     }
 
