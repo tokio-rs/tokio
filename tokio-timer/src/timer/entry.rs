@@ -1,10 +1,11 @@
+use crate::atomic::AtomicU64;
 use crate::timer::{HandlePriv, Inner};
 use crate::Error;
 use crossbeam_utils::CachePadded;
 use std::cell::UnsafeCell;
 use std::ptr;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
-use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::time::{Duration, Instant};

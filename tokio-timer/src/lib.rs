@@ -42,6 +42,7 @@ pub mod throttle;
 pub mod timeout;
 pub mod timer;
 
+mod atomic;
 mod delay;
 mod error;
 mod interval;
