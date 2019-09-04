@@ -15,33 +15,33 @@ mod imp {
     use std::sync::Mutex;
 
     #[derive(Debug)]
-    pub struct AtomicU64 {
+    pub(crate)  struct AtomicU64 {
         inner: Mutex<u64>,
     }
 
     impl AtomicU64 {
-        pub fn new(val: u64) -> AtomicU64 {
+        pub(crate)  fn new(val: u64) -> AtomicU64 {
             AtomicU64 {
                 inner: Mutex::new(val),
             }
         }
 
-        pub fn load(&self, _: Ordering) -> u64 {
+        pub(crate)  fn load(&self, _: Ordering) -> u64 {
             *self.inner.lock().unwrap()
         }
 
-        pub fn store(&self, val: u64, _: Ordering) {
+        pub(crate)  fn store(&self, val: u64, _: Ordering) {
             *self.inner.lock().unwrap() = val;
         }
 
-        pub fn fetch_or(&self, val: u64, _: Ordering) -> u64 {
+        pub(crate)  fn fetch_or(&self, val: u64, _: Ordering) -> u64 {
             let mut lock = self.inner.lock().unwrap();
             let prev = *lock;
             *lock = prev | val;
             prev
         }
 
-        pub fn compare_and_swap(&self, old: u64, new: u64, _: Ordering) -> u64 {
+        pub(crate)  fn compare_and_swap(&self, old: u64, new: u64, _: Ordering) -> u64 {
             let mut lock = self.inner.lock().unwrap();
             let prev = *lock;
 
