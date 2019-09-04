@@ -157,12 +157,18 @@ impl<S> TlsStream<S> {
     }
 
     /// Returns a shared reference to the inner stream.
-    pub fn get_ref(&self) -> &S where S: AsyncRead+ AsyncWrite + Unpin {
+    pub fn get_ref(&self) -> &S
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
         &self.0.get_ref().inner
     }
 
     /// Returns a mutable reference to the inner stream.
-    pub fn get_mut(&mut self) -> &mut S where S: AsyncRead+ AsyncWrite + Unpin {
+    pub fn get_mut(&mut self) -> &mut S
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
         &mut self.0.get_mut().inner
     }
 }
