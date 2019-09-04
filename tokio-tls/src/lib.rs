@@ -155,6 +155,22 @@ impl<S> TlsStream<S> {
         let g = Guard(self);
         f(&mut (g.0).0)
     }
+
+    /// Returns a shared reference to the inner stream.
+    pub fn get_ref(&self) -> &S
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
+        &self.0.get_ref().inner
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    pub fn get_mut(&mut self) -> &mut S
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
+        &mut self.0.get_mut().inner
+    }
 }
 
 impl<S> AsyncRead for TlsStream<S>
