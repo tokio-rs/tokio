@@ -25,7 +25,7 @@ use std::task::{Context, Poll};
 /// use tokio::net::TcpListener;
 ///
 /// use std::io;
-/// # async fn process_socket<T>(socket: T) {}
+/// # async fn process_socket<T>(_socket: T) {}
 ///
 /// #[tokio::main]
 /// async fn main() -> io::Result<()> {
@@ -33,7 +33,7 @@ use std::task::{Context, Poll};
 ///
 ///     loop {
 ///         let (socket, _) = listener.accept().await?;
-///         process_socket(socket);
+///         process_socket(socket).await;
 ///     }
 /// }
 /// ```
@@ -70,6 +70,7 @@ impl TcpListener {
     ///
     ///     // use the listener
     ///
+    ///     # let _ = listener;
     ///     Ok(())
     /// }
     /// ```
@@ -197,6 +198,7 @@ impl TcpListener {
     ///
     /// let std_listener = StdTcpListener::bind("127.0.0.1:0")?;
     /// let listener = TcpListener::from_std(std_listener, &Handle::default())?;
+    /// # let _ = listener;
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_std(listener: net::TcpListener, handle: &Handle) -> io::Result<TcpListener> {

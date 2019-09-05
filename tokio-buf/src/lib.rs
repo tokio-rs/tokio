@@ -5,7 +5,10 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
 //! Asynchronous stream of bytes.
 //!
