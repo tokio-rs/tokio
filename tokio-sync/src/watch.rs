@@ -6,14 +6,13 @@
 //!
 //! # Usage
 //!
-//! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are the producer
-//! and sender halves of the channel. The channel is created with an initial
-//! value. `Receiver::poll` will always be ready upon creation and will yield
-//! either this initial value or the latest value that has been sent by
-//! `Sender`.
+//! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are
+//! the producer and sender halves of the channel. The channel is
+//! created with an initial value. [`Receiver::get_ref`] will always
+//! be ready upon creation and will yield either this initial value or
+//! the latest value that has been sent by `Sender`.
 //!
-//! Calls to [`Receiver::poll`] and [`Receiver::poll_ref`] will always yield
-//! the latest value.
+//! Calls to [`Receiver::get_ref`] will always yield the latest value.
 //!
 //! # Examples
 //!
@@ -36,7 +35,7 @@
 //!
 //! # Closing
 //!
-//! [`Sender::poll_close`] allows the producer to detect when all [`Sender`]
+//! [`Sender::closed`] allows the producer to detect when all [`Receiver`]
 //! handles have been dropped. This indicates that there is no further interest
 //! in the values being produced and work can be stopped.
 //!
@@ -49,9 +48,8 @@
 //! [`Sender`]: struct.Sender.html
 //! [`Receiver`]: struct.Receiver.html
 //! [`channel`]: fn.channel.html
-//! [`Sender::poll_close`]: struct.Sender.html#method.poll_close
-//! [`Receiver::poll`]: struct.Receiver.html#method.poll
-//! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
+//! [`Sender::closed`]: struct.Sender.html#method.closed
+//! [`Receiver::get_ref`]: struct.Receiver.html#method.get_ref
 
 use crate::task::AtomicWaker;
 
@@ -71,7 +69,7 @@ use futures_util::pin_mut;
 #[cfg(feature = "async-traits")]
 use std::pin::Pin;
 
-/// Receives values from the associated `Sender`.
+/// Receives values from the associated [`Sender`](struct.Sender.html).
 ///
 /// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
@@ -89,7 +87,7 @@ pub struct Receiver<T> {
     ver: usize,
 }
 
-/// Sends values to the associated `Receiver`.
+/// Sends values to the associated [`Receiver`](struct.Receiver.html).
 ///
 /// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
@@ -162,8 +160,8 @@ const CLOSED: usize = 1;
 
 /// Create a new watch channel, returning the "send" and "receive" handles.
 ///
-/// All values sent by `Sender` will become visible to the `Receiver` handles.
-/// Only the last value sent is made available to the `Receiver` half. All
+/// All values sent by [`Sender`] will become visible to the [`Receiver`] handles.
+/// Only the last value sent is made available to the [`Receiver`] half. All
 /// intermediate values are dropped.
 ///
 /// # Examples
@@ -184,6 +182,9 @@ const CLOSED: usize = 1;
 /// # Ok(())
 /// # }
 /// ```
+///
+/// [`Sender`]: struct.Sender.html
+/// [`Receiver`]: struct.Receiver.html
 pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
     const INIT_ID: u64 = 0;
 
@@ -290,7 +291,7 @@ impl<T: Clone> Receiver<T> {
     /// Attempts to clone the latest value sent via the channel.
     ///
     /// This is equivalent to calling `clone()` on the value returned by
-    /// `recv()`.
+    /// `recv_ref()`.
     #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     pub async fn recv(&mut self) -> Option<T> {
         self.recv_ref().await.map(|v_ref| v_ref.clone())
