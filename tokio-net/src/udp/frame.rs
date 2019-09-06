@@ -66,19 +66,18 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             }
 
             // We're out of data. Try and fetch more data to decode
-            let (n, addr) = unsafe {
+            let addr = unsafe {
                 // Read into the buffer without having to initialize the memory.
                 let res =
                     ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
                 let (n, addr) = res?;
+                trace!("received {} bytes, decoding", n);
                 pin.rd.advance_mut(n);
-                (n, addr)
+                addr
             };
 
             pin.current_addr = Some(addr);
             pin.is_readable = true;
-
-            trace!("received {} bytes, decoding", n);
         }
     }
 }
