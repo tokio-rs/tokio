@@ -35,6 +35,8 @@ pub struct UdpFramed<C> {
     wr: BytesMut,
     out_addr: SocketAddr,
     flushed: bool,
+    is_readable: bool,
+    current_addr: Option<SocketAddr>,
 }
 
 impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
@@ -45,25 +47,39 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
         pin.rd.reserve(INITIAL_RD_CAPACITY);
 
-        let (_n, addr) = unsafe {
-            // Read into the buffer without having to initialize the memory.
-            let res = ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
-            let (n, addr) = res?;
-            pin.rd.advance_mut(n);
-            (n, addr)
-        };
+        loop {
+            // Are there are still bytes left in the read buffer to decode?
+            if pin.is_readable {
+                if let Some(frame) = pin.codec.decode(&mut pin.rd)? {
+                    trace!("frame decoded from buffer");
 
-        let span = trace_span!("decoding", from.addr = %addr, dgram.length = _n);
-        let _e = span.enter();
-        trace!("trying to decode a frame...");
+                    let current_addr = pin
+                        .current_addr
+                        .expect("will always be set before this line is called");
 
-        let frame_res = pin.codec.decode(&mut pin.rd);
-        pin.rd.clear();
-        let frame = frame_res?;
-        let result = frame.map(|frame| Ok((frame, addr))); // frame -> (frame, addr)
+                    return Poll::Ready(Some(Ok((frame, current_addr))));
+                }
 
-        trace!("frame decoded from buffer");
-        Poll::Ready(result)
+                // if this line has been reached then decode has returned `None`.
+                pin.is_readable = false;
+                pin.rd.clear();
+            }
+
+            // We're out of data. Try and fetch more data to decode
+            let (n, addr) = unsafe {
+                // Read into the buffer without having to initialize the memory.
+                let res =
+                    ready!(Pin::new(&mut pin.socket).poll_recv_from_priv(cx, pin.rd.bytes_mut()));
+                let (n, addr) = res?;
+                pin.rd.advance_mut(n);
+                (n, addr)
+            };
+
+            pin.current_addr = Some(addr);
+            pin.is_readable = true;
+
+            trace!("received {} bytes, decoding", n);
+        }
     }
 }
 
@@ -156,6 +172,8 @@ impl<C> UdpFramed<C> {
             rd: BytesMut::with_capacity(INITIAL_RD_CAPACITY),
             wr: BytesMut::with_capacity(INITIAL_WR_CAPACITY),
             flushed: true,
+            is_readable: false,
+            current_addr: None,
         }
     }
 
