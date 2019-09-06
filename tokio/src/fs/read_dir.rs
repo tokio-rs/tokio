@@ -81,7 +81,7 @@ impl Stream for ReadDir {
 ///
 /// [`ReadDir`]: struct.ReadDir.html
 ///
-/// This is a specialized version of [`std::fs::DirEntry`](std::fs::DirEntry) for usage from the
+/// This is a specialized version of [`std::fs::DirEntry`] for usage from the
 /// Tokio runtime.
 ///
 /// An instance of `DirEntry` represents an entry inside of a directory on the
