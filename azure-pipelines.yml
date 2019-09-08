@@ -93,12 +93,12 @@ jobs:
         - tokio-no-features
         - tokio-with-net
 
-# # Try cross compiling
-# - template: ci/azure-cross-compile.yml
-#   parameters:
-#     name: cross_32bit_linux
-#     target: i686-unknown-linux-gnu
-#
+# Try cross compiling
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross
+    rust: $(nightly)
+
 # # This represents the minimum Rust version supported by
 # # Tokio. Updating this should be done in a dedicated PR and
 # # cannot be greater than two 0.x releases prior to the
@@ -127,6 +127,6 @@ jobs:
       - test_linux
       - test_features
 #      - test_nightly
-#      - cross_32bit_linux
+      - cross
 #      - minrust
 #      - tsan
