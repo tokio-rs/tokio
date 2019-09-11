@@ -287,7 +287,7 @@ impl TlsConnector {
     where
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        handshake(|s| self.0.connect(domain, s), stream).await
+        handshake(move |s| self.0.connect(domain, s), stream).await
     }
 }
 
@@ -318,7 +318,7 @@ impl TlsAcceptor {
     where
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        handshake(|s| self.0.accept(s), stream).await
+        handshake(move |s| self.0.accept(s), stream).await
     }
 }
 
