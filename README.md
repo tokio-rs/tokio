@@ -30,7 +30,7 @@ the Rust programming language. It is:
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
-[API Docs](https://docs.rs/tokio/0.2.0-alpha.2/tokio) |
+[API Docs](https://docs.rs/tokio/latest/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
 ## Overview
@@ -47,8 +47,8 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/net/index.html
-[scheduler]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/latest/tokio/net/index.html
+[scheduler]: https://docs.rs/tokio/latest/tokio/runtime/index.html
 
 ## Example
 
@@ -108,7 +108,7 @@ the [Tokio Gitter channel][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
-[API documentation]: https://docs.rs/tokio/0.2.0-alpha.2/tokio
+[API documentation]: https://docs.rs/tokio/latest/tokio
 [chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
