@@ -7,8 +7,9 @@ use tokio_timer::timer::{self, Timer};
 
 use num_cpus;
 use std::any::Any;
+use std::fmt;
 use std::io;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing_core as trace;
 
@@ -48,7 +49,6 @@ use tracing_core as trace;
 ///     // use runtime ...
 /// }
 /// ```
-#[derive(Debug)]
 pub struct Builder {
     /// Thread pool specific builder
     threadpool_builder: threadpool::Builder,
@@ -58,6 +58,8 @@ pub struct Builder {
 
     /// The clock to use
     clock: Clock,
+
+    around_worker: Option<Arc<dyn Fn(&threadpool::Worker) + Send + Sync + 'static>>,
 }
 
 impl Builder {
@@ -76,6 +78,7 @@ impl Builder {
             threadpool_builder,
             core_threads,
             clock: Clock::new(),
+            around_worker: None,
         }
     }
 
@@ -367,6 +370,7 @@ impl Builder {
         let trace = dispatch.clone();
 
         let background = background::spawn(&clock)?;
+        let around_worker = self.around_worker.clone();
 
         let pool = self
             .threadpool_builder
@@ -377,7 +381,11 @@ impl Builder {
                 clock::with_default(&clock, || {
                     let _timer = timer::set_default(&timer_handles[index]);
                     trace::dispatcher::with_default(&dispatch, || {
-                        w.run();
+                        if let Some(around) = around_worker.clone() {
+                            around(w)
+                        } else {
+                            w.run();
+                        }
                     })
                 })
             })
@@ -401,5 +409,15 @@ impl Builder {
 impl Default for Builder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Debug for Builder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Builder")
+            .field("threadpool_builder", &self.threadpool_builder)
+            .field("core_threds", &self.core_threads)
+            .field("clock", &self.clock)
+            .finish()
     }
 }
