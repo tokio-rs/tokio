@@ -1,3 +1,4 @@
+#![cfg(feature = "broken")]
 #![feature(test)]
 #![warn(rust_2018_idioms)]
 
