@@ -332,15 +332,25 @@ impl Stream for Lines {
             .rd
             .windows(2)
             .enumerate()
-            .find(|&(_, bytes)| bytes == b"\r\n")
+            .find(|&(_, bytes)| {
+                (bytes == b"\r\n") ||
+                (bytes[0] == b'\n') ||
+                (bytes[1] == b'\n')
+            })
             .map(|(i, _)| i);
 
         if let Some(pos) = pos {
+            let mut newline_pos = pos;
             // Remove the line from the read buffer and set it to `line`.
-            let mut line = self.rd.split_to(pos + 2);
+            let mut len = 2;
+            if self.rd[pos] == b'\n' { len = 1 };
+            if self.rd[pos+1] == b'\n' && self.rd[pos] != b'\r' {
+                    len = 2; newline_pos = newline_pos + 1;
+            }
+            let mut line = self.rd.split_to(newline_pos + len);
 
-            // Drop the trailing \r\n
-            line.split_off(pos);
+            // Drop the trailing \r\n or \n
+            line.split_off(newline_pos);
 
             // Return the line
             return Ok(Async::Ready(Some(line)));
