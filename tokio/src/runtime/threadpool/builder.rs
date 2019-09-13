@@ -6,11 +6,11 @@ use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
 
 use num_cpus;
-use tracing_core as trace;
+use std::any::Any;
 use std::io;
 use std::sync::Mutex;
 use std::time::Duration;
-use std::any::Any;
+use tracing_core as trace;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -112,7 +112,6 @@ impl Builder {
         self.threadpool_builder.panic_handler(f);
         self
     }
-
 
     /// Set the maximum number of worker threads for the `Runtime`'s thread pool.
     ///
@@ -244,6 +243,35 @@ impl Builder {
         self
     }
 
+    /// Execute function `f` on each worker thread.
+    ///
+    /// This function is provided a handle to the worker and is expected to call
+    /// [`Worker::run`], otherwise the worker thread will shutdown without doing
+    /// any work.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Builder;
+    ///
+    /// let rt = Builder::new()
+    ///     .around_worker(|worker| {
+    ///         println!("worker is starting up");
+    ///         worker.run();
+    ///         println!("worker is shutting down");
+    ///     })
+    ///     .build();
+    /// ```
+    ///
+    /// [`Worker::run`]: struct.Worker.html#method.run
+    pub fn around_worker<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(&threadpool::Worker) + Send + Sync + 'static,
+    {
+        self.threadpool_builder.around_worker(f);
+        self
+    }
+
     /// Execute function `f` after each thread is started but before it starts
     /// doing work.
     ///
@@ -263,7 +291,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.threadpool_builder.after_start(f);
         self
@@ -287,7 +316,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.threadpool_builder.before_stop(f);
         self
@@ -354,11 +384,7 @@ impl Builder {
             .custom_park(move |worker_id| {
                 let index = worker_id.to_usize();
 
-                timers[index]
-                    .lock()
-                    .unwrap()
-                    .take()
-                    .unwrap()
+                timers[index].lock().unwrap().take().unwrap()
             })
             .build();
 
