@@ -1,5 +1,5 @@
 use super::DEFAULT_BUF_SIZE;
-use crate::{AsyncBufRead, AsyncRead};
+use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
 use futures_core::ready;
 use pin_utils::{unsafe_pinned, unsafe_unpinned};
 use std::io::{self, Read};
@@ -149,6 +149,24 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
 
     fn consume(mut self: Pin<&mut Self>, amt: usize) {
         *self.as_mut().pos() = cmp::min(self.pos + amt, self.cap);
+    }
+}
+
+impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.get_pin_mut().poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.get_pin_mut().poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.get_pin_mut().poll_shutdown(cx)
     }
 }
 

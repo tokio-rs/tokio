@@ -1,5 +1,5 @@
 use super::DEFAULT_BUF_SIZE;
-use crate::AsyncWrite;
+use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
 use futures_core::ready;
 use pin_utils::{unsafe_pinned, unsafe_unpinned};
 use std::fmt;
@@ -142,6 +142,31 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         ready!(self.as_mut().flush_buf(cx))?;
         self.inner().poll_shutdown(cx)
+    }
+}
+
+impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        self.get_pin_mut().poll_read(cx, buf)
+    }
+
+    // we can't skip unconditionally because of the large buffer case in read.
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        self.get_ref().prepare_uninitialized_buffer(buf)
+    }
+}
+
+impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        self.get_pin_mut().poll_fill_buf(cx)
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        self.get_pin_mut().consume(amt)
     }
 }
 
