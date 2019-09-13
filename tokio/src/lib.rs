@@ -5,6 +5,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
+#![deny(intra_doc_link_resolution_failure)]
 #![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
