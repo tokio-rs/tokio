@@ -1,6 +1,6 @@
 # Tokio
 
- _NOTE_: Tokio's [`master`](https://github.com/tokio-rs/tokio) branch is currently in the process of moving to [`std::future::Future`](https://doc.rust-lang.org/std/future/trait.Future.html), for `v0.1.x` based tokio releases please check out the [`v0.1.x`](https://github.com/tokio-rs/tokio/tree/v0.1.x) branch.
+ **NOTE**: Tokio's [`master`](https://github.com/tokio-rs/tokio) is currently undergoing heavy development. This branch and the alpha releases will see API breaking changes and there are currently significant performance regressions that still need to be fixed before the final release. Use the [`v0.1.x`](https://github.com/tokio-rs/tokio/tree/v0.1.x) branch for stable releases.
 
 A runtime for writing reliable, asynchronous, and slim applications with
 the Rust programming language. It is:

@@ -3,7 +3,7 @@ use crate::loom::{
     sync::CausalCell,
     thread,
 };
-use std::mem::{self, ManuallyDrop};
+use std::mem::MaybeUninit;
 use std::ops;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Release};
@@ -38,7 +38,7 @@ pub(crate) enum Read<T> {
     Closed,
 }
 
-struct Values<T>([CausalCell<ManuallyDrop<T>>; BLOCK_CAP]);
+struct Values<T>([CausalCell<MaybeUninit<T>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
 
@@ -131,7 +131,7 @@ impl<T> Block<T> {
         // Get the value
         let value = self.values[offset].with(|ptr| ptr::read(ptr));
 
-        Some(Read::Value(ManuallyDrop::into_inner(value)))
+        Some(Read::Value(value.assume_init()))
     }
 
     /// Write a value to the block at the given offset.
@@ -147,7 +147,7 @@ impl<T> Block<T> {
         let slot_offset = offset(slot_index);
 
         self.values[slot_offset].with_mut(|ptr| {
-            ptr::write(ptr, ManuallyDrop::new(value));
+            ptr::write(ptr, MaybeUninit::new(value));
         });
 
         // Release the value. After this point, the slot ref may no longer
@@ -362,26 +362,23 @@ fn is_tx_closed(bits: usize) -> bool {
 
 impl<T> Values<T> {
     unsafe fn uninitialized() -> Values<T> {
-        #[allow(deprecated)]
-        let mut vals = mem::uninitialized();
+        let mut vals = MaybeUninit::uninit();
 
         // When fuzzing, `CausalCell` needs to be initialized.
         if_fuzz! {
-            use std::ptr;
-
-            for v in &mut vals {
-                ptr::write(
-                    v as *mut _,
-                    CausalCell::new(mem::zeroed()));
+            let p = vals.as_mut_ptr() as *mut CausalCell<MaybeUninit<T>>;
+            for i in 0..BLOCK_CAP {
+                p.add(i)
+                    .write(CausalCell::new(MaybeUninit::uninit()));
             }
         }
 
-        Values(vals)
+        Values(vals.assume_init())
     }
 }
 
 impl<T> ops::Index<usize> for Values<T> {
-    type Output = CausalCell<ManuallyDrop<T>>;
+    type Output = CausalCell<MaybeUninit<T>>;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.0.index(index)

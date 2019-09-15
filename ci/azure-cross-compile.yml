@@ -1,27 +1,41 @@
 jobs:
 - job: ${{ parameters.name }}
   displayName: ${{ parameters.displayName }}
+  strategy:
+    matrix:
+      i686:
+        vmImage: ubuntu-16.04
+        target: i686-unknown-linux-gnu
+      powerpc:
+        vmImage: ubuntu-16.04
+        target: powerpc-unknown-linux-gnu
+      powerpc64:
+        vmImage: ubuntu-16.04
+        target: powerpc64-unknown-linux-gnu
+      mips:
+        vmImage: ubuntu-16.04
+        target: mips-unknown-linux-gnu
   pool:
-    vmImage: ubuntu-16.04
+    vmImage: $(vmImage)
   steps:
   - template: azure-install-rust.yml
     parameters:
-      rust_version: stable
+      rust_version: ${{ parameters.rust }}
 
   - script: sudo apt-get update
-    displayName: "apt-get update"
+    displayName: apt-get update
 
   - script: sudo apt-get install gcc-multilib
-    displayName: "Install gcc-multilib"
+    displayName: Install gcc-multilib
 
-  - script: rustup target add ${{ parameters.target }}
-    displayName: "Add target"
+  - script: cargo install cross
+    displayName: Install cross
 
   # Always patch
   - template: azure-patch-crates.yml
 
-  - script: cargo check --all --exclude tokio-tls --target ${{ parameters.target }}
+  - script: cross check --all --exclude tokio-tls --target $(target)
     displayName: Check source
 
-  - script: cargo check --tests --all --exclude tokio-tls --target ${{ parameters.target }}
-    displayName: Check tests
+  # - script: cross check --tests --all --exclude tokio-tls --target $(target)
+  #   displayName: Check tests

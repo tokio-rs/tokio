@@ -5,6 +5,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
+#![deny(intra_doc_link_resolution_failure)]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -290,7 +291,7 @@ impl TlsConnector {
     where
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        handshake(|s| self.0.connect(domain, s), stream).await
+        handshake(move |s| self.0.connect(domain, s), stream).await
     }
 }
 
@@ -321,7 +322,7 @@ impl TlsAcceptor {
     where
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        handshake(|s| self.0.accept(s), stream).await
+        handshake(move |s| self.0.accept(s), stream).await
     }
 }
 

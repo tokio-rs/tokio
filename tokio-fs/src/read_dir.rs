@@ -16,9 +16,7 @@ use std::task::Poll;
 
 /// Returns a stream over the entries within a directory.
 ///
-/// This is an async version of [`std::fs::read_dir`][std]
-///
-/// [std]: https://doc.rust-lang.org/std/fs/fn.read_dir.html
+/// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
 pub async fn read_dir<P>(path: P) -> io::Result<ReadDir>
 where
     P: AsRef<Path> + Send + 'static,
@@ -43,8 +41,8 @@ where
 ///
 /// [`read_dir`]: fn.read_dir.html
 /// [`DirEntry`]: struct.DirEntry.html
-/// [`Stream`]: ../futures/stream/trait.Stream.html
-/// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html#variant.Err
+/// [`Stream`]: Stream
+/// [`Err`]: std::result::Result::Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct ReadDir(State);
@@ -86,14 +84,12 @@ impl Stream for ReadDir {
 ///
 /// [`ReadDir`]: struct.ReadDir.html
 ///
-/// This is a specialized version of [`std::fs::DirEntry`][std] for usage from the
+/// This is a specialized version of [`std::fs::DirEntry`](std::fs::DirEntry) for usage from the
 /// Tokio runtime.
 ///
 /// An instance of `DirEntry` represents an entry inside of a directory on the
 /// filesystem. Each entry can be inspected via methods to learn about the full
 /// path or possibly other metadata through per-platform extension traits.
-///
-/// [std]: https://doc.rust-lang.org/std/fs/struct.DirEntry.html
 #[derive(Debug)]
 pub struct DirEntry(Arc<std::fs::DirEntry>);
 

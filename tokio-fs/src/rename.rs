@@ -8,9 +8,7 @@ use std::path::Path;
 ///
 /// This will not work if the new name is on a different mount point.
 ///
-/// This is an async version of [`std::fs::rename`][std]
-///
-/// [std]: https://doc.rust-lang.org/std/fs/fn.rename.html
+/// This is an async version of [`std::fs::rename`](std::fs::rename)
 pub async fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> io::Result<()> {
     let from = from.as_ref().to_owned();
     let to = to.as_ref().to_owned();

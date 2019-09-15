@@ -1,5 +1,6 @@
 // Measure cost of different operations
 // to get a sense of performance tradeoffs
+#![cfg(feature = "broken")]
 #![feature(test)]
 #![warn(rust_2018_idioms)]
 
