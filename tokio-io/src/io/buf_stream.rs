@@ -5,7 +5,7 @@ use crate::{AsyncRead, AsyncWrite};
 ///
 /// It can be excessively inefficient to work directly with something that implements [`AsyncWrite`]
 /// and [`AsyncRead`]. For example, every `write`, however small, has to traverse the syscall
-/// interface, and similarly every read has to do the same. The [`BufWriter`] and [`BufReader`]
+/// interface, and similarly, every read has to do the same. The [`BufWriter`] and [`BufReader`]
 /// types aid with these problems respectively, but do so in only one direction. `BufStream` wraps
 /// one in the other so that both directions are buffered. See their documentation for details.
 pub type BufStream<RW> = BufReader<BufWriter<RW>>;
