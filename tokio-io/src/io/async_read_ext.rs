@@ -5,6 +5,7 @@ use crate::io::read_exact::{read_exact, ReadExact};
 use crate::io::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::read_to_string::{read_to_string, ReadToString};
 use crate::io::take::{take, Take};
+use crate::io::BufReader;
 use crate::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.
@@ -86,6 +87,17 @@ pub trait AsyncReadExt: AsyncRead {
         Self: Sized,
     {
         take(self, limit)
+    }
+
+    /// Wraps the reader in a [`BufReader`] so that small reads are batched to the underlying
+    /// [`AsyncRead`].
+    ///
+    /// See [`BufReader`] for details.
+    fn buffered(self) -> BufReader<Self>
+    where
+        Self: Sized,
+    {
+        BufReader::new(self)
     }
 }
 
