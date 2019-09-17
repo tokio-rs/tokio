@@ -118,6 +118,7 @@ fn spawn_thread() {
                         run_task(task);
                         continue 'outer;
                     } else if timeout_result.timed_out() {
+                        shared.num_idle -= 1;
                         break 'outer;
                     }
                 }
