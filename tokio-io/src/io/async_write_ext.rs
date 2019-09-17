@@ -2,7 +2,7 @@ use crate::io::flush::{flush, Flush};
 use crate::io::shutdown::{shutdown, Shutdown};
 use crate::io::write::{write, Write};
 use crate::io::write_all::{write_all, WriteAll};
-use crate::io::{buffer, BufStream, BufWriter};
+use crate::io::{BufStream, BufWriter};
 use crate::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncWrite` types.
@@ -58,7 +58,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     where
         Self: Sized + AsyncRead,
     {
-        buffer(self)
+        BufStream::new(self)
     }
 }
 
