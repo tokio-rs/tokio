@@ -66,7 +66,7 @@ impl Barrier {
         }
     }
 
-    /// Does nto resolve until all tasks have rendezvoused here.
+    /// Does not resolve until all tasks have rendezvoused here.
     ///
     /// Barriers are re-usable after all threads have rendezvoused once, and can
     /// be used continuously.
