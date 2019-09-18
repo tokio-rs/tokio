@@ -5,7 +5,7 @@ use crate::io::read_exact::{read_exact, ReadExact};
 use crate::io::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::read_to_string::{read_to_string, ReadToString};
 use crate::io::take::{take, Take};
-use crate::io::BufReader;
+use crate::io::{BufReader, BufStream};
 use crate::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.
@@ -98,6 +98,17 @@ pub trait AsyncReadExt: AsyncRead {
         Self: Sized,
     {
         BufReader::new(self)
+    }
+
+    /// Wraps the underlying stream ([`AsyncRead`] + [`AsyncWrite`]) in a [`BufStream`] so that
+    /// small reads and writes are batched to the underlying stream.
+    ///
+    /// See [`BufStream`] for details.
+    fn buffered_duplex(self) -> BufStream<Self>
+    where
+        Self: Sized + AsyncWrite,
+    {
+        BufStream::new(self)
     }
 }
 
