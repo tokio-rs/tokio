@@ -11,7 +11,7 @@
 //! [`Delay`].
 //!
 //! The [`Now`] trait describes how to get an [`Instant`] representing the
-//! current moment in time. [`SystemNow`] is the default implementation, where
+//! current moment in time. [`Clock`] is the default implementation, where
 //! [`Now::now`] is implemented by calling [`Instant::now`].
 //!
 //! [`Timer`] is generic over [`Now`]. This allows the source of time to be
@@ -26,7 +26,7 @@
 //! [`Delay`]: Delay
 //! [`Now`]: clock::Now
 //! [`Now::now`]: clock::Now::now
-//! [`SystemNow`]: struct.SystemNow.html
+//! [`Clock`]: struct.Clock.html
 //! [`Instant`]: std::time::Instant
 //! [`Instant::now`]: std::time::Instant::now
 
@@ -36,7 +36,6 @@
 mod atomic_stack;
 mod entry;
 mod handle;
-mod now;
 mod registration;
 mod stack;
 
@@ -46,7 +45,7 @@ use self::stack::Stack;
 
 pub(crate) use self::handle::HandlePriv;
 pub use self::handle::{set_default, Handle};
-pub use self::now::{Now, SystemNow};
+pub use crate::clock::{Now, Clock};
 pub(crate) use self::registration::Registration;
 
 use crate::atomic::AtomicU64;
@@ -124,7 +123,7 @@ use tokio_executor::park::{Park, ParkThread, Unpark};
 /// [`turn`]: #method.turn
 /// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
-pub struct Timer<T, N = SystemNow> {
+pub struct Timer<T, N = Clock> {
     /// Shared state
     inner: Arc<Inner>,
 
@@ -183,7 +182,7 @@ where
     ///
     /// [`handle`]: #method.handle
     pub fn new(park: T) -> Self {
-        Timer::new_with_now(park, SystemNow::new())
+        Timer::new_with_now(park, Clock::new())
     }
 }
 
@@ -208,7 +207,7 @@ where
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
-    pub fn new_with_now(park: T, mut now: N) -> Self {
+    pub fn new_with_now(park: T, now: N) -> Self {
         let unpark = Box::new(park.unpark());
 
         Timer {
@@ -337,7 +336,7 @@ where
     }
 }
 
-impl Default for Timer<ParkThread, SystemNow> {
+impl Default for Timer<ParkThread, Clock> {
     fn default() -> Self {
         Timer::new(ParkThread::new())
     }

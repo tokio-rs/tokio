@@ -20,7 +20,6 @@ mod now;
 
 pub use self::now::Now;
 
-use crate::timer;
 use std::cell::Cell;
 use std::fmt;
 use std::sync::Arc;
@@ -102,9 +101,8 @@ impl Clock {
     }
 }
 
-#[allow(deprecated)]
-impl timer::Now for Clock {
-    fn now(&mut self) -> Instant {
+impl Now for Clock {
+    fn now(&self) -> Instant {
         Clock::now(self)
     }
 }
