@@ -105,7 +105,7 @@ impl Barrier {
 }
 
 /// A `BarrierWaitResult` is returned by `wait` when all threads in the `Barrier` have rendezvoused.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct BarrierWaitResult(bool);
 
 impl BarrierWaitResult {
