@@ -395,6 +395,7 @@ impl Pool {
 
     /// If there are any other workers currently relaxing, signal them that work
     /// is available so that they can try to find more work to process.
+    #[allow(clippy::cognitive_complexity)] // https://github.com/rust-lang/rust-clippy/issues/3900
     pub(crate) fn signal_work(&self, pool: &Arc<Pool>) {
         debug_assert_eq!(*self, **pool);
 
