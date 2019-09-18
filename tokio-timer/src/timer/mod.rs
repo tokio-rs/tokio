@@ -45,8 +45,8 @@ use self::stack::Stack;
 
 pub(crate) use self::handle::HandlePriv;
 pub use self::handle::{set_default, Handle};
-pub use crate::clock::{Now, Clock};
 pub(crate) use self::registration::Registration;
+pub use crate::clock::{Clock, Now};
 
 use crate::atomic::AtomicU64;
 use crate::wheel;
