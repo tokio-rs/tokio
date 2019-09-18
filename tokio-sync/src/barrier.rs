@@ -46,8 +46,8 @@ struct BarrierState {
 impl Barrier {
     /// Creates a new barrier that can block a given number of threads.
     ///
-    /// A barrier will block `n`-1 threads which call [`wait`] and then wake up
-    /// all threads at once when the `n`th thread calls [`wait`].
+    /// A barrier will block `n`-1 threads which call [`Barrier::wait`] and then wake up all
+    /// threads at once when the `n`th thread calls `wait`.
     pub fn new(n: usize) -> Barrier {
         let (waker, wait) = crate::watch::channel(0);
         Barrier {
@@ -66,10 +66,9 @@ impl Barrier {
     /// Barriers are re-usable after all threads have rendezvoused once, and can
     /// be used continuously.
     ///
-    /// A single (arbitrary) future will receive a [`BarrierWaitResult`] that
-    /// returns `true` from [`is_leader`] when returning from this function, and
-    /// all other threads will receive a result that will return `false` from
-    /// [`is_leader`].
+    /// A single (arbitrary) future will receive a [`BarrierWaitResult`] that returns `true` from
+    /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other threads
+    /// will receive a result that will return `false` from `is_leader`.
     pub async fn wait(&self) -> BarrierWaitResult {
         let mut lock = self.state.clone();
         let mut state = lock.lock().await;
