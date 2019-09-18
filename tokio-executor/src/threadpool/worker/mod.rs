@@ -564,7 +564,7 @@ impl Worker {
     ///
     /// Returns `true` if woken up due to new work arriving.
     // tracing macro expansion adds enough branches to make clippy angry here.
-    #[cfg_attr(feature = "tracing", allow(clippy::cognitive_complexity))]
+    #[allow(clippy::cognitive_complexity)] // https://github.com/rust-lang/rust-clippy/issues/3900
     fn sleep(&self) -> bool {
         use self::Lifecycle::*;
 
