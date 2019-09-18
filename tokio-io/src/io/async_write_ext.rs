@@ -2,7 +2,6 @@ use crate::io::flush::{flush, Flush};
 use crate::io::shutdown::{shutdown, Shutdown};
 use crate::io::write::{write, Write};
 use crate::io::write_all::{write_all, WriteAll};
-use crate::io::BufWriter;
 use crate::AsyncWrite;
 
 /// An extension trait which adds utility methods to `AsyncWrite` types.
@@ -37,17 +36,6 @@ pub trait AsyncWriteExt: AsyncWrite {
         Self: Unpin,
     {
         shutdown(self)
-    }
-
-    /// Wraps the writer in a [`BufWriter`] so that small writes are batched to the underlying
-    /// [`AsyncWrite`].
-    ///
-    /// See [`BufWriter`] for details.
-    fn buffered(self) -> BufWriter<Self>
-    where
-        Self: Sized,
-    {
-        BufWriter::new(self)
     }
 }
 
