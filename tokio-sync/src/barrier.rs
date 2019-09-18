@@ -1,12 +1,5 @@
-use crate::semaphore::{Permit, Semaphore};
 use crate::watch::{Receiver, Sender};
-use futures_util::{pin_mut, ready};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use crate::Lock;
 
 /// A barrier enables multiple threads to synchronize the beginning of some computation.
 ///
@@ -38,17 +31,16 @@ use std::{
 /// ```
 #[derive(Debug)]
 pub struct Barrier {
-    semaphore: Semaphore,
-    generation: AtomicUsize,
-    waker: Sender<usize>,
+    state: Lock<BarrierState>,
     wait: Receiver<usize>,
+    n: usize,
 }
 
-struct BarrierWaitFuture<'a> {
-    permit: Permit,
-    barrier: &'a Barrier,
+#[derive(Debug)]
+struct BarrierState {
+    waker: Sender<usize>,
+    arrived: usize,
     generation: usize,
-    wait: Receiver<usize>,
 }
 
 impl Barrier {
@@ -57,11 +49,14 @@ impl Barrier {
     /// A barrier will block `n`-1 threads which call [`wait`] and then wake up
     /// all threads at once when the `n`th thread calls [`wait`].
     pub fn new(n: usize) -> Barrier {
-        let (waker, wait) = crate::watch::channel(usize::max_value());
+        let (waker, wait) = crate::watch::channel(0);
         Barrier {
-            semaphore: Semaphore::new(n),
-            generation: AtomicUsize::new(0),
-            waker,
+            state: Lock::new(BarrierState {
+                waker,
+                arrived: 0,
+                generation: 1,
+            }),
+            n,
             wait,
         }
     }
@@ -76,63 +71,36 @@ impl Barrier {
     /// all other threads will receive a result that will return `false` from
     /// [`is_leader`].
     pub async fn wait(&self) -> BarrierWaitResult {
-        let generation = self.generation.load(Ordering::Acquire);
-        let wait = self.wait.clone();
-        BarrierWaitFuture {
-            permit: Permit::new(),
-            barrier: self,
-            generation,
-            wait,
-        }
-        .await
-    }
-}
-
-impl Future for BarrierWaitFuture<'_> {
-    type Output = BarrierWaitResult;
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = &mut *self;
-
-        if !this.permit.is_acquired() {
-            ready!(this.permit.poll_acquire(cx, &this.barrier.semaphore))
-                .expect("semaphore was never closed");
+        let mut lock = self.state.clone();
+        let mut state = lock.lock().await;
+        let generation = state.generation;
+        state.arrived += 1;
+        if state.arrived == self.n {
+            // we are the leader for this generation
+            // wake everyone, increment the generation, and return
+            state
+                .waker
+                .broadcast(state.generation)
+                .expect("there is at least one receiver");
+            state.arrived = 0;
+            state.generation += 1;
+            return BarrierWaitResult(true);
         }
 
-        if this.barrier.semaphore.available_permits() == 0 {
-            // we _may_ have to wake everyone up
-            if this.barrier.generation.compare_and_swap(
-                this.generation,
-                this.generation + 1,
-                Ordering::AcqRel,
-            ) == this.generation
-            {
-                // yes indeed -- it falls to us
-                this.permit.release(&this.barrier.semaphore);
-                this.barrier
-                    .waker
-                    .broadcast(this.generation)
-                    .expect("we are still holding a Receiver");
-                Poll::Ready(BarrierWaitResult(true))
-            } else {
-                // someone else is already doing it
-                this.permit.release(&this.barrier.semaphore);
-                Poll::Ready(BarrierWaitResult(false))
+        drop(state);
+
+        // we're going to have to wait for the last of the generation to arrive
+        let mut wait = self.wait.clone();
+
+        loop {
+            // note that the first time through the loop, this _will_ yield a generation
+            // immediately, since we cloned a receiver that has never seen any values.
+            if wait.recv().await.expect("sender hasn't been closed") >= generation {
+                break;
             }
-        } else {
-            // not everyone has arrived -- we need to wait
-            // it's a little awkward to have to re-create this future each time
-            loop {
-                let generation = this.wait.recv();
-                pin_mut!(generation);
-                if ready!(generation.as_mut().poll(cx)) == Some(this.generation) {
-                    break;
-                }
-            }
-
-            // the generation has rolled around already!
-            this.permit.release(&this.barrier.semaphore);
-            Poll::Ready(BarrierWaitResult(false))
         }
+
+        BarrierWaitResult(false)
     }
 }
 
