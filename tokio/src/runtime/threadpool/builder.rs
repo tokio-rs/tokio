@@ -416,7 +416,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Builder")
             .field("threadpool_builder", &self.threadpool_builder)
-            .field("core_threds", &self.core_threads)
+            .field("core_threads", &self.core_threads)
             .field("clock", &self.clock)
             .finish()
     }
