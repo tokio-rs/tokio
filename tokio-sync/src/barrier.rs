@@ -1,7 +1,6 @@
 use crate::semaphore::{Permit, Semaphore};
 use crate::watch::{Receiver, Sender};
 use futures_util::{pin_mut, ready};
-use pin_project::pin_project;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{
     future::Future,
@@ -45,7 +44,6 @@ pub struct Barrier {
     wait: Receiver<usize>,
 }
 
-#[pin_project]
 struct BarrierWaitFuture<'a> {
     permit: Permit,
     barrier: &'a Barrier,
@@ -93,7 +91,7 @@ impl Barrier {
 impl Future for BarrierWaitFuture<'_> {
     type Output = BarrierWaitResult;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
+        let this = &mut *self;
 
         if !this.permit.is_acquired() {
             ready!(this.permit.poll_acquire(cx, &this.barrier.semaphore))
@@ -103,16 +101,16 @@ impl Future for BarrierWaitFuture<'_> {
         if this.barrier.semaphore.available_permits() == 0 {
             // we _may_ have to wake everyone up
             if this.barrier.generation.compare_and_swap(
-                *this.generation,
-                *this.generation + 1,
+                this.generation,
+                this.generation + 1,
                 Ordering::AcqRel,
-            ) == *this.generation
+            ) == this.generation
             {
                 // yes indeed -- it falls to us
                 this.permit.release(&this.barrier.semaphore);
                 this.barrier
                     .waker
-                    .broadcast(*this.generation)
+                    .broadcast(this.generation)
                     .expect("we are still holding a Receiver");
                 Poll::Ready(BarrierWaitResult(true))
             } else {
@@ -126,7 +124,7 @@ impl Future for BarrierWaitFuture<'_> {
             loop {
                 let generation = this.wait.recv();
                 pin_mut!(generation);
-                if ready!(generation.as_mut().poll(cx)) == Some(*this.generation) {
+                if ready!(generation.as_mut().poll(cx)) == Some(this.generation) {
                     break;
                 }
             }
