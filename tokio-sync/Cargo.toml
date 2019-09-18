@@ -27,6 +27,7 @@ fnv = "1.0.6"
 futures-core-preview = { version = "=0.3.0-alpha.18" }
 futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
 futures-util-preview = { version = "=0.3.0-alpha.18" }
+pin-project = "0.4.0-alpha.11"
 
 [dev-dependencies]
 tokio = { version = "0.2.0-alpha.4", path = "../tokio" }
