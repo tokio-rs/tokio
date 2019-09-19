@@ -65,6 +65,12 @@ pub mod signal {
     pub use tokio_net::signal::ctrl_c;
 }
 
+#[cfg(feature = "process")]
+pub mod process {
+    //! An implementation of asynchronous process management for Tokio.
+    pub use tokio_net::process::*;
+}
+
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).
