@@ -1,3 +1,8 @@
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Fix
+- shutdown blocking pool threads when idle (#1562, #1514).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio release.

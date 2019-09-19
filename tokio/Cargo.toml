@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.4"
+version = "0.2.0-alpha.5"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.2.0-alpha.4/tokio/"
+documentation = "https://docs.rs/tokio/0.2.0-alpha.5/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -64,22 +64,22 @@ futures-util-preview = { version = "=0.3.0-alpha.18", features = ["sink"] }
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-tokio-codec = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-codec" }
-tokio-fs = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-fs" }
-tokio-io = { version = "=0.2.0-alpha.4", optional = true, features = ["util"], path = "../tokio-io" }
-tokio-executor = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-executor" }
-tokio-macros = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-macros" }
-tokio-net = { version = "=0.2.0-alpha.4", optional = true, features = ["async-traits"], path = "../tokio-net" }
-tokio-sync = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tokio-timer = { version = "=0.3.0-alpha.4", optional = true, path = "../tokio-timer", features = ["async-traits"] }
+tokio-codec = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-codec" }
+tokio-fs = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-fs" }
+tokio-io = { version = "=0.2.0-alpha.5", optional = true, features = ["util"], path = "../tokio-io" }
+tokio-executor = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-executor" }
+tokio-macros = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-macros" }
+tokio-net = { version = "=0.2.0-alpha.5", optional = true, features = ["async-traits"], path = "../tokio-net" }
+tokio-sync = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-sync", features = ["async-traits"] }
+tokio-timer = { version = "=0.3.0-alpha.5", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
 
 [target.'cfg(feature = "tracing")'.dependencies]
-tokio-net = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-net", features = ["tracing", "async-traits"] }
-tokio-executor = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-executor", features = ["tracing"] }
+tokio-net = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-net", features = ["tracing", "async-traits"] }
+tokio-executor = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio-executor", features = ["tracing"] }
 
 [dev-dependencies]
-tokio-test = { version = "0.2.0-alpha.4", path = "../tokio-test" }
+tokio-test = { version = "=0.2.0-alpha.5", path = "../tokio-test" }
 
 futures-preview = "=0.3.0-alpha.18"
 futures-util-preview = "=0.3.0-alpha.18"

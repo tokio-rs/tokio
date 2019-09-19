@@ -1,3 +1,12 @@
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Added
+- platform specific `Command` methods (#1516).
+- Implement `From<std::process::Command>` for `Command` (#1513).
+
+### Fixed
+- doc generation (#1575).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio release.

@@ -1,3 +1,8 @@
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Fix
+- propagate flush for stdout / stderr. (#1528).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio release.

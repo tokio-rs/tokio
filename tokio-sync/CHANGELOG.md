@@ -1,3 +1,11 @@
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Changed
+- rename `Lock` -> `Mutex` and make it more like `std::sync::Mutex` (#1573).
+
+### Added
+- `Barrier`, an async version of `std::sync::Barrier` (#1571).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio release.
