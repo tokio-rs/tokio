@@ -48,8 +48,16 @@ impl Barrier {
     ///
     /// A barrier will block `n`-1 threads which call [`Barrier::wait`] and then wake up all
     /// threads at once when the `n`th thread calls `wait`.
-    pub fn new(n: usize) -> Barrier {
+    pub fn new(mut n: usize) -> Barrier {
         let (waker, wait) = crate::watch::channel(0);
+
+        if n == 0 {
+            // if n is 0, it's not clear what behavior the user wants.
+            // in std::sync::Barrier, an n of 0 exhibits the same behavior as n == 1, where every
+            // .wait() immediately unblocks, so we adopt that here as well.
+            n = 1;
+        }
+
         Barrier {
             state: Mutex::new(BarrierState {
                 waker,

@@ -5,6 +5,22 @@ use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
 #[test]
+fn zero_does_not_block() {
+    let b = Barrier::new(0);
+
+    {
+        let mut w = spawn(b.wait());
+        let wr = assert_ready!(w.poll());
+        assert!(wr.is_leader());
+    }
+    {
+        let mut w = spawn(b.wait());
+        let wr = assert_ready!(w.poll());
+        assert!(wr.is_leader());
+    }
+}
+
+#[test]
 fn single() {
     let b = Barrier::new(1);
 
