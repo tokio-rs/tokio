@@ -1,4 +1,4 @@
-use crate::watch::{Receiver, Sender};
+use crate::watch;
 use crate::Mutex;
 
 /// A barrier enables multiple threads to synchronize the beginning of some computation.
@@ -32,13 +32,13 @@ use crate::Mutex;
 #[derive(Debug)]
 pub struct Barrier {
     state: Mutex<BarrierState>,
-    wait: Receiver<usize>,
+    wait: watch::Receiver<usize>,
     n: usize,
 }
 
 #[derive(Debug)]
 struct BarrierState {
-    waker: Sender<usize>,
+    waker: watch::Sender<usize>,
     arrived: usize,
     generation: usize,
 }
