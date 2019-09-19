@@ -23,6 +23,7 @@ categories = ["asynchronous", "network-programming"]
 [features]
 async-traits = []
 process = [
+    "tokio-io/util",
     "crossbeam-queue",
     "libc",
     "mio-named-pipes",

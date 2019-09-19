@@ -26,6 +26,12 @@ fn net_with_udp() {
 }
 
 #[test]
+#[cfg(feature = "net-with-process")]
+fn net_with_process() {
+    use build_tests::tokio_net::process;
+}
+
+#[test]
 #[cfg(feature = "tokio-with-net")]
 fn tokio_with_net() {
     // net is present
