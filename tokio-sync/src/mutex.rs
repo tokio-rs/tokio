@@ -1,18 +1,18 @@
 //! An asynchronous `Mutex`-like type.
 //!
-//! This module provides [`Lock`], a type that acts similarly to an asynchronous `Mutex`, with one
-//! major difference: the [`LockGuard`] returned by `lock` is not tied to the lifetime of the
+//! This module provides [`Mutex`], a type that acts similarly to an asynchronous `Mutex`, with one
+//! major difference: the [`MutexGuard`] returned by `lock` is not tied to the lifetime of the
 //! `Mutex`. This enables you to acquire a lock, and then pass that guard into a future, and then
 //! release it at some later point in time.
 //!
 //! This allows you to do something along the lines of:
 //!
 //! ```rust,no_run
-//! use tokio::sync::Lock;
+//! use tokio::sync::Mutex;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let mut data1 = Lock::new(0);
+//!     let mut data1 = Mutex::new(0);
 //!     let mut data2 = data1.clone();
 //!
 //!     tokio::spawn(async move {
@@ -25,8 +25,8 @@
 //! }
 //! ```
 //!
-//! [`Lock`]: struct.Lock.html
-//! [`LockGuard`]: struct.LockGuard.html
+//! [`Mutex`]: struct.Mutex.html
+//! [`MutexGuard`]: struct.MutexGuard.html
 
 use crate::semaphore;
 
@@ -45,28 +45,28 @@ use std::task::{Context, Poll};
 /// can only be accessed through the RAII guards returned from `lock`, which
 /// guarantees that the data is only ever accessed when the mutex is locked.
 #[derive(Debug)]
-pub struct Lock<T> {
+pub struct Mutex<T> {
     inner: Arc<State<T>>,
     permit: semaphore::Permit,
 }
 
-/// A handle to a held `Lock`.
+/// A handle to a held `Mutex`.
 ///
 /// As long as you have this guard, you have exclusive access to the underlying `T`. The guard
-/// internally keeps a reference-couned pointer to the original `Lock`, so even if the lock goes
+/// internally keeps a reference-couned pointer to the original `Mutex`, so even if the lock goes
 /// away, the guard remains valid.
 ///
 /// The lock is automatically released whenever the guard is dropped, at which point `lock`
 /// will succeed yet again.
 #[derive(Debug)]
-pub struct LockGuard<T>(Lock<T>);
+pub struct MutexGuard<T>(Mutex<T>);
 
-// As long as T: Send, it's fine to send and share Lock<T> between threads.
-// If T was not Send, sending and sharing a Lock<T> would be bad, since you can access T through
-// Lock<T>.
-unsafe impl<T> Send for Lock<T> where T: Send {}
-unsafe impl<T> Sync for Lock<T> where T: Send {}
-unsafe impl<T> Sync for LockGuard<T> where T: Send + Sync {}
+// As long as T: Send, it's fine to send and share Mutex<T> between threads.
+// If T was not Send, sending and sharing a Mutex<T> would be bad, since you can access T through
+// Mutex<T>.
+unsafe impl<T> Send for Mutex<T> where T: Send {}
+unsafe impl<T> Sync for Mutex<T> where T: Send {}
+unsafe impl<T> Sync for MutexGuard<T> where T: Send + Sync {}
 
 #[derive(Debug)]
 struct State<T> {
@@ -77,10 +77,10 @@ struct State<T> {
 #[test]
 fn bounds() {
     fn check<T: Send>() {}
-    check::<LockGuard<u32>>();
+    check::<MutexGuard<u32>>();
 }
 
-impl<T> Lock<T> {
+impl<T> Mutex<T> {
     /// Creates a new lock in an unlocked state ready for use.
     pub fn new(t: T) -> Self {
         Self {
@@ -92,7 +92,7 @@ impl<T> Lock<T> {
         }
     }
 
-    fn poll_lock(&mut self, cx: &mut Context<'_>) -> Poll<LockGuard<T>> {
+    fn poll_lock(&mut self, cx: &mut Context<'_>) -> Poll<MutexGuard<T>> {
         ready!(self.permit.poll_acquire(cx, &self.inner.s)).unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
@@ -105,16 +105,16 @@ impl<T> Lock<T> {
             inner: self.inner.clone(),
             permit: ::std::mem::replace(&mut self.permit, semaphore::Permit::new()),
         };
-        Ready(LockGuard(acquired))
+        Ready(MutexGuard(acquired))
     }
 
-    /// A future that resolves on acquiring the lock and returns the `LockGuard`.
-    pub async fn lock(&mut self) -> LockGuard<T> {
+    /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
+    pub async fn lock(&mut self) -> MutexGuard<T> {
         poll_fn(|cx| self.poll_lock(cx)).await
     }
 }
 
-impl<T> Drop for LockGuard<T> {
+impl<T> Drop for MutexGuard<T> {
     fn drop(&mut self) {
         if self.0.permit.is_acquired() {
             self.0.permit.release(&self.0.inner.s);
@@ -122,18 +122,18 @@ impl<T> Drop for LockGuard<T> {
             // A guard _should_ always hold its permit, but if the thread is already panicking,
             // we don't want to generate a panic-while-panicing, since that's just unhelpful!
         } else {
-            unreachable!("Permit not held when LockGuard was dropped")
+            unreachable!("Permit not held when MutexGuard was dropped")
         }
     }
 }
 
-impl<T> From<T> for Lock<T> {
+impl<T> From<T> for Mutex<T> {
     fn from(s: T) -> Self {
         Self::new(s)
     }
 }
 
-impl<T> Clone for Lock<T> {
+impl<T> Clone for Mutex<T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -142,7 +142,7 @@ impl<T> Clone for Lock<T> {
     }
 }
 
-impl<T> Default for Lock<T>
+impl<T> Default for Mutex<T>
 where
     T: Default,
 {
@@ -151,7 +151,7 @@ where
     }
 }
 
-impl<T> Deref for LockGuard<T> {
+impl<T> Deref for MutexGuard<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         assert!(self.0.permit.is_acquired());
@@ -159,14 +159,14 @@ impl<T> Deref for LockGuard<T> {
     }
 }
 
-impl<T> DerefMut for LockGuard<T> {
+impl<T> DerefMut for MutexGuard<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         assert!(self.0.permit.is_acquired());
         unsafe { &mut *self.0.inner.c.get() }
     }
 }
 
-impl<T: fmt::Display> fmt::Display for LockGuard<T> {
+impl<T: fmt::Display> fmt::Display for MutexGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }

@@ -29,13 +29,12 @@ macro_rules! if_fuzz {
     }}
 }
 
-mod lock;
 mod loom;
 pub mod mpsc;
+pub mod mutex;
 pub mod oneshot;
 pub mod semaphore;
 mod task;
 pub mod watch;
 
-pub use lock::{Lock, LockGuard};
 pub use task::AtomicWaker;

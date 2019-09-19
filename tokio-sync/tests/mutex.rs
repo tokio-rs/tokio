@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 
-use tokio_sync::Lock;
+use tokio_sync::mutex::Mutex;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
 #[test]
 fn straight_execution() {
-    let mut l = Lock::new(100);
+    let mut l = Mutex::new(100);
 
     {
         let mut t = spawn(l.lock());
@@ -35,7 +35,7 @@ fn straight_execution() {
 
 #[test]
 fn readiness() {
-    let mut l1 = Lock::new(100);
+    let mut l1 = Mutex::new(100);
     let mut l2 = l1.clone();
     let mut t1 = spawn(l1.lock());
     let mut t2 = spawn(l2.lock());
@@ -55,7 +55,7 @@ fn readiness() {
 #[test]
 #[ignore]
 fn lock() {
-    let mut lock = Lock::new(false);
+    let mut lock = Mutex::new(false);
 
     let mut lock2 = lock.clone();
     std::thread::spawn(move || {
