@@ -1,5 +1,5 @@
 use crate::watch::{Receiver, Sender};
-use crate::Lock;
+use crate::Mutex;
 
 /// A barrier enables multiple threads to synchronize the beginning of some computation.
 ///
@@ -31,7 +31,7 @@ use crate::Lock;
 /// ```
 #[derive(Debug)]
 pub struct Barrier {
-    state: Lock<BarrierState>,
+    state: Mutex<BarrierState>,
     wait: Receiver<usize>,
     n: usize,
 }
@@ -51,7 +51,7 @@ impl Barrier {
     pub fn new(n: usize) -> Barrier {
         let (waker, wait) = crate::watch::channel(0);
         Barrier {
-            state: Lock::new(BarrierState {
+            state: Mutex::new(BarrierState {
                 waker,
                 arrived: 0,
                 generation: 1,
@@ -70,8 +70,7 @@ impl Barrier {
     /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other threads
     /// will receive a result that will return `false` from `is_leader`.
     pub async fn wait(&self) -> BarrierWaitResult {
-        let mut lock = self.state.clone();
-        let mut state = lock.lock().await;
+        let mut state = self.state.lock().await;
         let generation = state.generation;
         state.arrived += 1;
         if state.arrived == self.n {
