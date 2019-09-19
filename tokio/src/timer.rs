@@ -30,10 +30,9 @@
 //! Wait 100ms and print "Hello World!"
 //!
 //! ```
-//! use tokio::prelude::*;
 //! use tokio::timer::delay;
 //!
-//! use std::time::{Duration, Instant};
+//! use std::time::Duration;
 //!
 //!
 //! #[tokio::main]

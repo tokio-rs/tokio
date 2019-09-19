@@ -96,7 +96,7 @@ impl Task {
     /// scheduled again.
     ///
     // tracing macro expansion adds enough branches to make clippy angry here.
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity)] // https://github.com/rust-lang/rust-clippy/issues/3900
     pub(crate) fn run(me: &Arc<Task>, pool: &Arc<Pool>) -> Run {
         use self::State::*;
         #[cfg(feature = "tracing")]

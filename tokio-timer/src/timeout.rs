@@ -38,7 +38,7 @@ use std::time::{Duration, Instant};
 /// use std::thread;
 /// use std::time::Duration;
 ///
-/// # async fn dox() {
+/// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
 /// let (mut tx, rx) = mpsc::unbounded_channel();
 ///
 /// thread::spawn(move || {
@@ -54,7 +54,8 @@ use std::time::{Duration, Instant};
 /// });
 ///
 /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
-/// process.timeout(Duration::from_millis(10)).await;
+/// process.timeout(Duration::from_millis(10)).await?;
+/// # Ok(())
 /// # }
 /// ```
 ///
@@ -99,13 +100,14 @@ impl<T> Timeout<T> {
     ///
     /// use std::time::Duration;
     ///
-    /// # async fn dox() {
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
     /// let (tx, rx) = oneshot::channel();
     /// # tx.send(()).unwrap();
     ///
     /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
-    /// Timeout::new(rx, Duration::from_millis(10)).await;
-    /// }
+    /// Timeout::new(rx, Duration::from_millis(10)).await??;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new(value: T, timeout: Duration) -> Timeout<T> {
         let delay = Delay::new_timeout(now() + timeout, timeout);

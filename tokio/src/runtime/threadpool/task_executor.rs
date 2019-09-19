@@ -33,7 +33,7 @@ impl TaskExecutor {
     ///
     /// # fn dox() {
     /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     /// let executor = rt.executor();
     ///
     /// // Spawn a future onto the runtime

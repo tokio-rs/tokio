@@ -63,7 +63,7 @@ use crate::SpawnError;
 ///             if item.is_none() { break; }
 ///         }
 ///
-///         self.tx.take().unwrap().send(()).map_err(|_| ());
+///         let _ = self.tx.take().unwrap().send(()).map_err(|_| ());
 ///         Poll::Ready(())
 ///     }
 /// }

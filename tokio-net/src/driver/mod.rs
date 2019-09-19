@@ -23,7 +23,7 @@
 //! ```
 //! use tokio::net::TcpStream;
 //!
-//! # async fn process<T>(t: T) {}
+//! # async fn process<T>(_t: T) {}
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
 //! let stream = TcpStream::connect("93.184.216.34:9243").await?;
 //!
