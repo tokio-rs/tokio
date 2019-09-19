@@ -1,5 +1,5 @@
 use crate::watch;
-use crate::Mutex;
+use std::sync::Mutex;
 
 /// A barrier enables multiple threads to synchronize the beginning of some computation.
 ///
@@ -70,7 +70,12 @@ impl Barrier {
     /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other threads
     /// will receive a result that will return `false` from `is_leader`.
     pub async fn wait(&self) -> BarrierWaitResult {
-        let mut state = self.state.lock().await;
+        // NOTE: we are taking a _synchronous_ lock here.
+        // It is okay to do so because the critical section is fast and never yields, so it cannot
+        // deadlock even if another future is concurrently holding the lock.
+        // It is _desireable_ to do so as synchronous Mutexes are, at least in theory, faster than
+        // the asynchronous counter-parts, so we should use them where possible [citation needed].
+        let mut state = self.state.lock().unwrap();
         let generation = state.generation;
         state.arrived += 1;
         if state.arrived == self.n {
