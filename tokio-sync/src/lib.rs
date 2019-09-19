@@ -29,6 +29,7 @@ macro_rules! if_fuzz {
     }}
 }
 
+mod barrier;
 mod loom;
 pub mod mpsc;
 mod mutex;
@@ -37,5 +38,6 @@ pub mod semaphore;
 mod task;
 pub mod watch;
 
+pub use barrier::{Barrier, BarrierWaitResult};
 pub use mutex::{Mutex, MutexGuard};
 pub use task::AtomicWaker;
