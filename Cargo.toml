@@ -2,7 +2,6 @@
 
 members = [
   "tokio",
-  "tokio-buf",
   "tokio-codec",
   "tokio-executor",
   "tokio-fs",
