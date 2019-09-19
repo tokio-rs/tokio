@@ -11,6 +11,7 @@ net-no-features = ["tokio-net"]
 net-with-tcp = ["tokio-net/tcp"]
 net-with-udp = ["tokio-net/udp"]
 net-with-uds = ["tokio-net/uds"]
+net-with-process = ["tokio-net/process"]
 tokio-no-features = ["tokio"]
 tokio-with-net = ["tokio/net"]
 
