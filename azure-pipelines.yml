@@ -61,7 +61,6 @@ jobs:
     displayName: Test sub crates -
     rust: $(nightly)
     crates:
-      tokio-buf: []
       tokio-codec: []
       tokio-executor:
         - current-thread
