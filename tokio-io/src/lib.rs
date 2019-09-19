@@ -34,7 +34,7 @@ pub use self::async_read::AsyncRead;
 pub use self::async_write::AsyncWrite;
 
 #[cfg(feature = "util")]
-pub use self::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+pub use self::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream, BufWriter};
 
 // Re-export `Buf` and `BufMut` since they are part of the API
 pub use bytes::{Buf, BufMut};
