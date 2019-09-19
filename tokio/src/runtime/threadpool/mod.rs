@@ -75,7 +75,6 @@ impl Runtime {
     ///
     /// ```
     /// use tokio::runtime::Runtime;
-    /// use tokio::prelude::*;
     ///
     /// let rt = Runtime::new()
     ///     .unwrap();
@@ -198,7 +197,6 @@ impl Runtime {
     ///
     /// ```
     /// use tokio::runtime::Runtime;
-    /// use tokio::prelude::*;
     ///
     /// let rt = Runtime::new()
     ///     .unwrap();
@@ -239,7 +237,6 @@ impl Runtime {
     ///
     /// ```
     /// use tokio::runtime::Runtime;
-    /// use tokio::prelude::*;
     ///
     /// let rt = Runtime::new()
     ///     .unwrap();

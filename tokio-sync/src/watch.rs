@@ -21,7 +21,7 @@
 //! use tokio::sync::watch;
 //!
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-//!     let (mut tx, mut rx) = watch::channel("hello");
+//!     let (tx, mut rx) = watch::channel("hello");
 //!
 //!     tokio::spawn(async move {
 //!         while let Some(value) = rx.recv().await {
@@ -172,7 +172,7 @@ const CLOSED: usize = 1;
 /// use tokio::sync::watch;
 ///
 /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-///     let (mut tx, mut rx) = watch::channel("hello");
+///     let (tx, mut rx) = watch::channel("hello");
 ///
 ///     tokio::spawn(async move {
 ///         while let Some(value) = rx.recv().await {

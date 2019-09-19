@@ -76,7 +76,7 @@ use std::task::{Context, Poll};
 ///         match self.poll_evented.get_ref().accept() {
 ///             Ok((socket, _)) => Poll::Ready(Ok(socket)),
 ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-///                 self.poll_evented.clear_read_ready(cx, ready);
+///                 self.poll_evented.clear_read_ready(cx, ready)?;
 ///                 Poll::Pending
 ///             }
 ///             Err(e) => Poll::Ready(Err(e)),

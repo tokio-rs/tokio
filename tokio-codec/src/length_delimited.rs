@@ -315,7 +315,6 @@
 //! ```
 //! # use tokio_io::AsyncWrite;
 //! # use tokio_codec::LengthDelimitedCodec;
-//! # use bytes::BytesMut;
 //! # fn write_frame<T: AsyncWrite>(io: T) {
 //! # let _ =
 //! LengthDelimitedCodec::builder()
@@ -842,7 +841,6 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio_io::AsyncRead;
     /// use tokio_codec::LengthDelimitedCodec;
     /// # pub fn main() {
     /// LengthDelimitedCodec::builder()
@@ -892,7 +890,6 @@ impl Builder {
     /// ```
     /// # use tokio_io::AsyncWrite;
     /// # use tokio_codec::LengthDelimitedCodec;
-    /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// LengthDelimitedCodec::builder()
     ///     .length_field_length(2)
@@ -914,7 +911,6 @@ impl Builder {
     /// ```
     /// # use tokio_io::{AsyncRead, AsyncWrite};
     /// # use tokio_codec::LengthDelimitedCodec;
-    /// # use bytes::BytesMut;
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
     /// # let _ =
     /// LengthDelimitedCodec::builder()
