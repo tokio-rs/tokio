@@ -35,7 +35,7 @@ use tokio::{
     self,
     codec::{Framed, LinesCodec, LinesCodecError},
     net::{TcpListener, TcpStream},
-    sync::{mpsc, mutex::Mutex},
+    sync::{mpsc, Mutex},
 };
 
 #[tokio::main]
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let (stream, addr) = listener.accept().await?;
 
         // Clone a handle to the `Shared` state for the new connection.
-        let state = state.clone();
+        let state = Arc::clone(&state);
 
         // Spawn our handler to be run asynchronously.
         tokio::spawn(async move {

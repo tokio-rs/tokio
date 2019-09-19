@@ -31,10 +31,11 @@ macro_rules! if_fuzz {
 
 mod loom;
 pub mod mpsc;
-pub mod mutex;
+mod mutex;
 pub mod oneshot;
 pub mod semaphore;
 mod task;
 pub mod watch;
 
+pub use mutex::{Mutex, MutexGuard};
 pub use task::AtomicWaker;
