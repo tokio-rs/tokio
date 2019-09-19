@@ -30,14 +30,10 @@
 
 use crate::semaphore;
 
-use futures_core::ready;
 use futures_util::future::poll_fn;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-use std::task::Poll::Ready;
-use std::task::{Context, Poll};
 
 /// An asynchronous mutual exclusion primitive useful for protecting shared data
 ///
@@ -46,8 +42,8 @@ use std::task::{Context, Poll};
 /// guarantees that the data is only ever accessed when the mutex is locked.
 #[derive(Debug)]
 pub struct Mutex<T> {
-    inner: Arc<State<T>>,
-    permit: semaphore::Permit,
+    c: UnsafeCell<T>,
+    s: semaphore::Semaphore,
 }
 
 /// A handle to a held `Mutex`.
@@ -59,65 +55,52 @@ pub struct Mutex<T> {
 /// The lock is automatically released whenever the guard is dropped, at which point `lock`
 /// will succeed yet again.
 #[derive(Debug)]
-pub struct MutexGuard<T>(Mutex<T>);
+pub struct MutexGuard<'a, T> {
+    lock: &'a Mutex<T>,
+    permit: semaphore::Permit,
+}
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
 // If T was not Send, sending and sharing a Mutex<T> would be bad, since you can access T through
 // Mutex<T>.
 unsafe impl<T> Send for Mutex<T> where T: Send {}
 unsafe impl<T> Sync for Mutex<T> where T: Send {}
-unsafe impl<T> Sync for MutexGuard<T> where T: Send + Sync {}
-
-#[derive(Debug)]
-struct State<T> {
-    c: UnsafeCell<T>,
-    s: semaphore::Semaphore,
-}
+unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 
 #[test]
 fn bounds() {
     fn check<T: Send>() {}
-    check::<MutexGuard<u32>>();
+    check::<MutexGuard<'_, u32>>();
 }
 
 impl<T> Mutex<T> {
     /// Creates a new lock in an unlocked state ready for use.
     pub fn new(t: T) -> Self {
         Self {
-            inner: Arc::new(State {
-                c: UnsafeCell::new(t),
-                s: semaphore::Semaphore::new(1),
-            }),
-            permit: semaphore::Permit::new(),
+            c: UnsafeCell::new(t),
+            s: semaphore::Semaphore::new(1),
         }
     }
 
-    fn poll_lock(&mut self, cx: &mut Context<'_>) -> Poll<MutexGuard<T>> {
-        ready!(self.permit.poll_acquire(cx, &self.inner.s)).unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
-
-        // We want to move the acquired permit into the guard,
-        // and leave an unacquired one in self.
-        let acquired = Self {
-            inner: self.inner.clone(),
-            permit: ::std::mem::replace(&mut self.permit, semaphore::Permit::new()),
-        };
-        Ready(MutexGuard(acquired))
-    }
-
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
-    pub async fn lock(&mut self) -> MutexGuard<T> {
-        poll_fn(|cx| self.poll_lock(cx)).await
+    pub async fn lock(&self) -> MutexGuard<'_, T> {
+        let mut permit = semaphore::Permit::new();
+        poll_fn(|cx| permit.poll_acquire(cx, &self.s))
+            .await
+            .unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+
+        MutexGuard { lock: self, permit }
     }
 }
 
-impl<T> Drop for MutexGuard<T> {
+impl<'a, T> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
-        if self.0.permit.is_acquired() {
-            self.0.permit.release(&self.0.inner.s);
+        if self.permit.is_acquired() {
+            self.permit.release(&self.lock.s);
         } else if ::std::thread::panicking() {
             // A guard _should_ always hold its permit, but if the thread is already panicking,
             // we don't want to generate a panic-while-panicing, since that's just unhelpful!
@@ -133,15 +116,6 @@ impl<T> From<T> for Mutex<T> {
     }
 }
 
-impl<T> Clone for Mutex<T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            permit: semaphore::Permit::new(),
-        }
-    }
-}
-
 impl<T> Default for Mutex<T>
 where
     T: Default,
@@ -151,22 +125,22 @@ where
     }
 }
 
-impl<T> Deref for MutexGuard<T> {
+impl<'a, T> Deref for MutexGuard<'a, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        assert!(self.0.permit.is_acquired());
-        unsafe { &*self.0.inner.c.get() }
+        assert!(self.permit.is_acquired());
+        unsafe { &*self.lock.c.get() }
     }
 }
 
-impl<T> DerefMut for MutexGuard<T> {
+impl<'a, T> DerefMut for MutexGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        assert!(self.0.permit.is_acquired());
-        unsafe { &mut *self.0.inner.c.get() }
+        assert!(self.permit.is_acquired());
+        unsafe { &mut *self.lock.c.get() }
     }
 }
 
-impl<T: fmt::Display> fmt::Display for MutexGuard<T> {
+impl<'a, T: fmt::Display> fmt::Display for MutexGuard<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }

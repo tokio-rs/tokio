@@ -1,12 +1,13 @@
 #![warn(rust_2018_idioms)]
 
+use std::sync::Arc;
 use tokio_sync::mutex::Mutex;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
 #[test]
 fn straight_execution() {
-    let mut l = Mutex::new(100);
+    let l = Mutex::new(100);
 
     {
         let mut t = spawn(l.lock());
@@ -22,21 +23,15 @@ fn straight_execution() {
     }
     {
         let mut t = spawn(l.lock());
-        let mut g = assert_ready!(t.poll());
+        let g = assert_ready!(t.poll());
         assert_eq!(&*g, &98);
-
-        // We can continue to access the guard even if the lock is dropped
-        drop(t);
-        drop(l);
-        *g = 97;
-        assert_eq!(&*g, &97);
     }
 }
 
 #[test]
 fn readiness() {
-    let mut l1 = Mutex::new(100);
-    let mut l2 = l1.clone();
+    let l1 = Arc::new(Mutex::new(100));
+    let l2 = Arc::clone(&l1);
     let mut t1 = spawn(l1.lock());
     let mut t2 = spawn(l2.lock());
 
