@@ -83,7 +83,7 @@ tokio-test = { version = "=0.2.0-alpha.5", path = "../tokio-test" }
 
 futures-preview = "=0.3.0-alpha.18"
 futures-util-preview = "=0.3.0-alpha.18"
-pin-utils = "=0.1.0-alpha.5"
+pin-utils = "=0.1.0-alpha.4"
 env_logger = { version = "0.6", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
 http = "0.1"
