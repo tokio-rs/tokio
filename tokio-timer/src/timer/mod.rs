@@ -46,6 +46,7 @@ use self::stack::Stack;
 pub(crate) use self::handle::HandlePriv;
 pub use self::handle::{set_default, Handle};
 pub(crate) use self::registration::Registration;
+pub use crate::clock;
 pub use crate::clock::{Clock, Now};
 
 use crate::atomic::AtomicU64;
@@ -123,7 +124,7 @@ use tokio_executor::park::{Park, ParkThread, Unpark};
 /// [`turn`]: #method.turn
 /// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
-pub struct Timer<T, N = Clock> {
+pub struct Timer<T> {
     /// Shared state
     inner: Arc<Inner>,
 
@@ -132,9 +133,6 @@ pub struct Timer<T, N = Clock> {
 
     /// Thread parker. The `Timer` park implementation delegates to this.
     park: T,
-
-    /// Source of "now" instances
-    now: N,
 }
 
 /// Return value from the `turn` method on `Timer`.
@@ -167,6 +165,18 @@ const MAX_TIMEOUTS: usize = usize::MAX >> 1;
 
 // ===== impl Timer =====
 
+impl<T> Timer<T> {
+    /// Returns a reference to the underlying `Park` instance.
+    pub fn get_park(&self) -> &T {
+        &self.park
+    }
+
+    /// Returns a mutable reference to the underlying `Park` instance.
+    pub fn get_park_mut(&mut self) -> &mut T {
+        &mut self.park
+    }
+}
+
 impl<T> Timer<T>
 where
     T: Park,
@@ -184,37 +194,19 @@ where
     pub fn new(park: T) -> Self {
         Timer::new_with_now(park, Clock::new())
     }
-}
-
-impl<T, N> Timer<T, N> {
-    /// Returns a reference to the underlying `Park` instance.
-    pub fn get_park(&self) -> &T {
-        &self.park
-    }
-
-    /// Returns a mutable reference to the underlying `Park` instance.
-    pub fn get_park_mut(&mut self) -> &mut T {
-        &mut self.park
-    }
-}
-
-impl<T, N> Timer<T, N>
-where
-    T: Park,
-    N: Now,
-{
+    
     /// Create a new `Timer` instance that uses `park` to block the current
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
-    pub fn new_with_now(park: T, now: N) -> Self {
+    pub fn new_with_now<N: Now>(park: T, now: N) -> Self
+    {
         let unpark = Box::new(park.unpark());
 
         Timer {
             inner: Arc::new(Inner::new(now.now(), unpark)),
             wheel: wheel::Wheel::new(),
             park,
-            now,
         }
     }
 
@@ -263,7 +255,7 @@ where
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = crate::ms(self.now.now() - self.inner.start, crate::Round::Down);
+        let now = crate::ms(clock::now() - self.inner.start, crate::Round::Down);
         let mut poll = wheel::Poll::new(now);
 
         while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
@@ -336,16 +328,15 @@ where
     }
 }
 
-impl Default for Timer<ParkThread, Clock> {
+impl Default for Timer<ParkThread> {
     fn default() -> Self {
         Timer::new(ParkThread::new())
     }
 }
 
-impl<T, N> Park for Timer<T, N>
+impl<T> Park for Timer<T>
 where
     T: Park,
-    N: Now,
 {
     type Unpark = T::Unpark;
     type Error = T::Error;
@@ -359,7 +350,7 @@ where
 
         match self.wheel.poll_at() {
             Some(when) => {
-                let now = self.now.now();
+                let now = clock::now();
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
@@ -383,7 +374,7 @@ where
 
         match self.wheel.poll_at() {
             Some(when) => {
-                let now = self.now.now();
+                let now = clock::now();
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
@@ -403,7 +394,7 @@ where
     }
 }
 
-impl<T, N> Drop for Timer<T, N> {
+impl<T> Drop for Timer<T> {
     fn drop(&mut self) {
         use std::u64;
 
