@@ -1,3 +1,9 @@
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Added
+- bring back generic `split` utility (#1521).
+- enable buffering both reads and writes (#1558).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio release.
