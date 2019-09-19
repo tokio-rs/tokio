@@ -25,14 +25,13 @@
 //!
 //! ```
 //! use tokio::runtime::current_thread::Runtime;
-//! use tokio::prelude::*;
 //! use std::thread;
 //!
-//! let mut runtime = Runtime::new().unwrap();
+//! let runtime = Runtime::new().unwrap();
 //! let handle = runtime.handle();
 //!
 //! thread::spawn(move || {
-//!     handle.spawn(async {
+//!     let _ = handle.spawn(async {
 //!         println!("hello world");
 //!     });
 //! }).join().unwrap();
@@ -45,9 +44,8 @@
 //!
 //! ```
 //! use tokio::runtime::current_thread::Runtime;
-//! use tokio::prelude::*;
 //!
-//! let mut runtime = Runtime::new().unwrap();
+//! let runtime = Runtime::new().unwrap();
 //!
 //! // Use the runtime...
 //! // runtime.block_on(f); // where f is a future

@@ -71,7 +71,7 @@ pub struct Spawn(());
 /// ```
 /// use tokio::net::TcpListener;
 ///
-/// # async fn process<T>(t: T) {}
+/// # async fn process<T>(_t: T) {}
 /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///

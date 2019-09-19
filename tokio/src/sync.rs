@@ -9,9 +9,9 @@
 //!   from one task to another.
 //! - [mpsc](mpsc/index.html), a multi-producer, single-consumer channel for
 //!   sending values between tasks.
-//! - [lock](lock/index.html), an asynchronous `Mutex`-like type.
+//! - [`Mutex`](struct.Mutex.html), an asynchronous `Mutex`-like type.
 //! - [watch](watch/index.html), a single-producer, multi-consumer channel that
 //!   only stores the **most recently** sent value.
 
 pub use tokio_sync::{mpsc, oneshot, watch};
-pub use tokio_sync::{Lock, LockGuard};
+pub use tokio_sync::{Mutex, MutexGuard};

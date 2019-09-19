@@ -6,7 +6,10 @@
     unreachable_pub
 )]
 #![deny(intra_doc_link_resolution_failure)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
 //! Utilities for encoding and decoding frames.
 //!
