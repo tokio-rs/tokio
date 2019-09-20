@@ -55,6 +55,7 @@ timer = ["tokio-timer"]
 tracing = ["tracing-core"]
 udp = ["io", "tokio-net/udp"]
 uds = ["io", "tokio-net/uds"]
+process = ["io", "tokio-net/process"]
 
 [dependencies]
 futures-core-preview = "=0.3.0-alpha.18"
