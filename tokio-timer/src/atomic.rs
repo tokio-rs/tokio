@@ -7,12 +7,12 @@ pub(crate) use self::imp::AtomicU64;
 // `AtomicU64` can only be used on targets with `target_has_atomic` is 64 or greater.
 // Once `cfg_target_has_atomic` feature is stable, we can replace it with
 // `#[cfg(target_has_atomic = "64")]`.
-#[cfg(not(any(target_arch = "mips", target_arch = "powerpc")))]
+#[cfg(not(any(target_arch = "arm", target_arch = "mips", target_arch = "powerpc")))]
 mod imp {
     pub(crate) use std::sync::atomic::AtomicU64;
 }
 
-#[cfg(any(target_arch = "mips", target_arch = "powerpc"))]
+#[cfg(any(target_arch = "arm", target_arch = "mips", target_arch = "powerpc"))]
 mod imp {
     use std::sync::atomic::Ordering;
     use std::sync::Mutex;
