@@ -5,7 +5,6 @@ use tokio_executor::current_thread::CurrentThread;
 use tokio_net::driver::{self, Reactor};
 use tokio_sync::oneshot;
 use tokio_timer::clock::Clock;
-use tokio_timer::timer::{self, Timer};
 
 use std::{io, thread};
 
@@ -23,7 +22,7 @@ pub(crate) fn spawn(clock: &Clock) -> io::Result<Background> {
     let reactor = Reactor::new()?;
     let reactor_handle = reactor.handle();
 
-    let timer = Timer::new_with_now(reactor, clock);
+    let timer = Clock::new_with_now(clock);
     let timer_handle = timer.handle();
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();

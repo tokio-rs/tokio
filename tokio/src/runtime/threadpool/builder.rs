@@ -3,7 +3,6 @@ use super::{background, Inner, Runtime};
 use tokio_executor::threadpool;
 use tokio_net::driver::{self, Reactor};
 use tokio_timer::clock::{self, Clock};
-use tokio_timer::timer::{self, Timer};
 
 use num_cpus;
 use tracing_core as trace;
@@ -321,7 +320,7 @@ impl Builder {
             reactor_handles.push(reactor.handle());
 
             // Create a new timer.
-            let timer = Timer::new_with_now(reactor, self.clock.clone());
+            let timer = Clock::new_with_now(self.clock.clone());
             timer_handles.push(timer.handle());
             timers.push(Mutex::new(Some(timer)));
         }
