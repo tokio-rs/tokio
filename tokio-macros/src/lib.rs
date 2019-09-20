@@ -74,16 +74,18 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut runtime = RuntimeType::Multi;
 
     for arg in args {
-        if let syn::NestedMeta::Meta(syn::Meta::Path(ident)) = arg {
-            let seg = ident.segments.first().expect("Must have specified ident");
-            match seg.ident.to_string().to_lowercase().as_str() {
+        if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg {
+            let ident = path.get_ident();
+            if ident.is_none() {
+                let msg = "Must have specified ident";
+                return syn::Error::new_spanned(path, msg).to_compile_error().into();
+            }
+            match ident.unwrap().to_string().to_lowercase().as_str() {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
                 name => {
                     let msg = format!("Unknown attribute {} is specified", name);
-                    return syn::Error::new_spanned(ident, msg)
-                        .to_compile_error()
-                        .into();
+                    return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
         }
