@@ -311,6 +311,9 @@ impl Builder {
         // TODO(stjepang): Once we remove the `threadpool_builder` method, remove this line too.
         self.threadpool_builder.pool_size(self.core_threads);
 
+        // Get a handle to the clock for the runtime.
+        let clock = self.clock.clone();
+
         let mut reactor_handles = Vec::new();
         let mut timer_handles = Vec::new();
         let mut timers = Vec::new();
@@ -320,14 +323,13 @@ impl Builder {
             let reactor = Reactor::new()?;
             reactor_handles.push(reactor.handle());
 
-            // Create a new timer.
-            let timer = Timer::new_with_now(reactor, self.clock.clone());
-            timer_handles.push(timer.handle());
-            timers.push(Mutex::new(Some(timer)));
+            clock::with_default(&clock, || {
+                // Create a new timer.
+                let timer = Timer::new(reactor);
+                timer_handles.push(timer.handle());
+                timers.push(Mutex::new(Some(timer)));
+            });
         }
-
-        // Get a handle to the clock for the runtime.
-        let clock = self.clock.clone();
 
         // Get the current trace dispatcher.
         // TODO(eliza): when `tokio-trace-core` is stable enough to take a
@@ -336,7 +338,7 @@ impl Builder {
         let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
         let trace = dispatch.clone();
 
-        let background = background::spawn(&clock)?;
+        let background = background::spawn()?;
 
         let pool = self
             .threadpool_builder

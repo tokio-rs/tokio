@@ -192,18 +192,10 @@ where
     ///
     /// [`handle`]: #method.handle
     pub fn new(park: T) -> Self {
-        Timer::new_with_now(park, Clock::new())
-    }
-
-    /// Create a new `Timer` instance that uses `park` to block the current
-    /// thread and `now` to get the current `Instant`.
-    ///
-    /// Specifying the source of time is useful when testing.
-    pub fn new_with_now<N: Now>(park: T, now: N) -> Self {
         let unpark = Box::new(park.unpark());
 
         Timer {
-            inner: Arc::new(Inner::new(now.now(), unpark)),
+            inner: Arc::new(Inner::new(clock::now(), unpark)),
             wheel: wheel::Wheel::new(),
             park,
         }

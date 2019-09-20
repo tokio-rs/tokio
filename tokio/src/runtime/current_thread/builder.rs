@@ -3,6 +3,7 @@ use crate::runtime::current_thread::Runtime;
 use tokio_executor::current_thread::CurrentThread;
 use tokio_net::driver::Reactor;
 use tokio_timer::clock::Clock;
+use tokio_timer::clock;
 use tokio_timer::timer::Timer;
 
 use std::io;
@@ -60,28 +61,30 @@ impl Builder {
 
     /// Create the configured `Runtime`.
     pub fn build(&mut self) -> io::Result<Runtime> {
-        // We need a reactor to receive events about IO objects from kernel
-        let reactor = Reactor::new()?;
-        let reactor_handle = reactor.handle();
+        let clock = self.clock.clone();
 
-        // Place a timer wheel on top of the reactor. If there are no timeouts to fire, it'll let the
-        // reactor pick up some new external events.
-        let timer = Timer::new_with_now(reactor, self.clock.clone());
-        let timer_handle = timer.handle();
+        clock::with_default(&self.clock, move || {
+            // We need a reactor to receive events about IO objects from kernel
+            let reactor = Reactor::new()?;
+            let reactor_handle = reactor.handle();
 
-        // And now put a single-threaded executor on top of the timer. When there are no futures ready
-        // to do something, it'll let the timer or the reactor to generate some new stimuli for the
-        // futures to continue in their life.
-        let executor = CurrentThread::new_with_park(timer);
+            // Place a timer wheel on top of the reactor. If there are no timeouts to fire, it'll let the
+            // reactor pick up some new external events.
+            let timer = Timer::new(reactor);
+            let timer_handle = timer.handle();
 
-        let runtime = Runtime::new2(
-            reactor_handle,
-            timer_handle,
-            self.clock.clone(),
-            executor,
-        );
+            // And now put a single-threaded executor on top of the timer. When there are no futures ready
+            // to do something, it'll let the timer or the reactor to generate some new stimuli for the
+            // futures to continue in their life.
+            let executor = CurrentThread::new_with_park(timer);
 
-        Ok(runtime)
+            Ok(Runtime::new2(
+                reactor_handle,
+                timer_handle,
+                clock,
+                executor,
+            ))
+        })
     }
 }
 
