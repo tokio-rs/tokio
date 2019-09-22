@@ -7,6 +7,7 @@ publish = false
 
 [features]
 executor-without-current-thread = ["tokio-executor"]
+macros-invalid-input = ["tokio/rt-full"]
 net-no-features = ["tokio-net"]
 net-with-tcp = ["tokio-net/tcp"]
 net-with-udp = ["tokio-net/udp"]
