@@ -13,8 +13,6 @@ pub struct ReadToEnd<'a, R: ?Sized> {
     start_len: usize,
 }
 
-impl<R: ?Sized + Unpin> Unpin for ReadToEnd<'_, R> {}
-
 pub(crate) fn read_to_end<'a, R>(reader: &'a mut R, buf: &'a mut Vec<u8>) -> ReadToEnd<'a, R>
 where
     R: AsyncRead + Unpin + ?Sized,
@@ -96,4 +94,10 @@ where
         let this = &mut *self;
         read_to_end_internal(Pin::new(&mut this.reader), cx, this.buf, this.start_len)
     }
+}
+
+#[test]
+fn assert_unpin() {
+    use std::marker::PhantomPinned;
+    super::is_unpin::<ReadToEnd<'_, PhantomPinned>>();
 }

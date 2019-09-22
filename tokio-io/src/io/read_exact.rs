@@ -37,9 +37,6 @@ fn eof() -> io::Error {
     io::Error::new(io::ErrorKind::UnexpectedEof, "early eof")
 }
 
-// forward Unpin
-impl<A: Unpin + ?Sized> Unpin for ReadExact<'_, A> {}
-
 impl<A> Future for ReadExact<'_, A>
 where
     A: AsyncRead + Unpin + ?Sized,
@@ -63,4 +60,10 @@ where
             }
         }
     }
+}
+
+#[test]
+fn assert_unpin() {
+    use std::marker::PhantomPinned;
+    super::is_unpin::<ReadExact<'_, PhantomPinned>>();
 }

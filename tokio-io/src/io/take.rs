@@ -118,3 +118,8 @@ impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
         me.inner.consume(amt);
     }
 }
+
+#[test]
+fn assert_unpin() {
+    super::is_unpin::<Take<()>>();
+}

@@ -172,7 +172,7 @@ impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
     }
 }
 
-impl<W: AsyncWrite + fmt::Debug> fmt::Debug for BufWriter<W> {
+impl<W: fmt::Debug> fmt::Debug for BufWriter<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BufWriter")
             .field("writer", &self.inner)
@@ -183,4 +183,9 @@ impl<W: AsyncWrite + fmt::Debug> fmt::Debug for BufWriter<W> {
             .field("written", &self.written)
             .finish()
     }
+}
+
+#[test]
+fn assert_unpin() {
+    super::is_unpin::<BufWriter<()>>();
 }

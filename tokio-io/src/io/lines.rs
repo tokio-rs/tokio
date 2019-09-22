@@ -58,3 +58,8 @@ impl<R: AsyncBufRead> Stream for Lines<R> {
         Poll::Ready(Some(Ok(mem::replace(buf, String::new()))))
     }
 }
+
+#[test]
+fn assert_unpin() {
+    super::is_unpin::<Lines<()>>();
+}

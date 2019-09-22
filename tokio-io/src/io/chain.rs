@@ -133,3 +133,8 @@ where
         }
     }
 }
+
+#[test]
+fn assert_unpin() {
+    super::is_unpin::<Chain<(), ()>>();
+}
