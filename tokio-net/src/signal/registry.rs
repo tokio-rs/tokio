@@ -166,10 +166,10 @@ where
     OsStorage: 'static + Send + Sync + Init,
 {
     lazy_static! {
-        static ref GLOBALS: Pin<Box<Globals>> = Pin::new(Box::new(Globals {
+        static ref GLOBALS: Pin<Box<Globals>> = Box::pin(Globals {
             extra: OsExtraData::init(),
             registry: Registry::new(OsStorage::init()),
-        }));
+        });
     }
 
     GLOBALS.as_ref()
