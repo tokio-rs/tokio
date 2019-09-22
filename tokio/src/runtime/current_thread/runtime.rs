@@ -114,6 +114,32 @@ impl Runtime {
         Handle(self.executor.handle().clone())
     }
 
+    /// Return a handle to the runtime's reactor
+    ///
+    /// The returned handle can be used to associate I/O objects
+    /// with this runtime explicitly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::current_thread::Runtime;
+    ///
+    /// let rt = Runtime::new().unwrap();
+    /// let reactor_handle = rt.reactor();
+    ///
+    /// // use reactor_handle to convert an std::net::TcpListener to
+    /// // tokio::net::TcpListener
+    ///
+    /// let listener =
+    ///     std::net::TcpListener::bind("127.0.0.1:80").unwrap();
+    /// let listener =
+    ///     tokio::net::TcpListener::from_std(listener, &reactor_handle);
+    ///
+    /// ```
+    pub fn reactor(&self) -> driver::Handle {
+        self.reactor_handle.clone()
+    }
+
     /// Spawn a future onto the single-threaded Tokio runtime.
     ///
     /// See [module level][mod] documentation for more details.

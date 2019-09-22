@@ -13,9 +13,9 @@ use tokio_executor::threadpool::ThreadPool;
 use tokio_net::driver;
 use tokio_timer::timer;
 
-use tracing_core as trace;
 use std::future::Future;
 use std::io;
+use tracing_core as trace;
 
 /// Handle to the Tokio runtime.
 ///
@@ -111,6 +111,32 @@ impl Runtime {
         TaskExecutor { inner }
     }
 
+    /// Return a handle to the runtime's reactor
+    ///
+    /// The returned handle can be used to associate I/O objects
+    /// with this runtime explicitly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new().unwrap();
+    /// let reactor_handle = rt.reactor();
+    ///
+    /// // use reactor_handle to convert an std::net::TcpListener to
+    /// // tokio::net::TcpListener
+    ///
+    /// let listener =
+    ///     std::net::TcpListener::bind("127.0.0.1:80").unwrap();
+    /// let listener =
+    ///     tokio::net::TcpListener::from_std(listener, &reactor_handle);
+    ///
+    /// ```
+    pub fn reactor(&self) -> driver::Handle {
+        self.inner().background.reactor().clone()
+    }
+
     /// Spawn a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
@@ -144,7 +170,8 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&self, future: F) -> &Self
-    where F: Future<Output = ()> + Send + 'static,
+    where
+        F: Future<Output = ()> + Send + 'static,
     {
         self.inner().pool.spawn(future);
         self
@@ -174,9 +201,7 @@ impl Runtime {
         tokio_executor::with_default(&mut self.inner().pool.sender(), || {
             let _reactor = driver::set_default(bg.reactor());
             let _timer = timer::set_default(bg.timer());
-            trace::dispatcher::with_default(trace, || {
-                entered.block_on(future)
-            })
+            trace::dispatcher::with_default(trace, || entered.block_on(future))
         })
     }
 
