@@ -131,7 +131,7 @@ impl Runtime {
     /// // tokio::net::TcpListener
     ///
     /// let listener =
-    ///     std::net::TcpListener::bind("127.0.0.1:80").unwrap();
+    ///     std::net::TcpListener::bind("127.0.0.1:8080").unwrap();
     /// let listener =
     ///     tokio::net::TcpListener::from_std(listener, &reactor_handle);
     ///
