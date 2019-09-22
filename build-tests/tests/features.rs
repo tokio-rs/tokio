@@ -37,12 +37,16 @@ fn tokio_with_net() {
     // net is present
     use build_tests::tokio::net;
 }
+
 #[test]
 fn compile_fail() {
     let t = trybuild::TestCases::new();
 
     #[cfg(feature = "executor-without-current-thread")]
     t.compile_fail("tests/fail/executor_without_current_thread.rs");
+
+    #[cfg(feature = "macros-invalid-input")]
+    t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "net-no-features")]
     {

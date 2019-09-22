@@ -124,8 +124,9 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
+    let _ = syn::parse_macro_input!(args as syn::parse::Nothing);
 
     let ret = &input.sig.output;
     let name = &input.sig.ident;
@@ -143,7 +144,7 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     if input.sig.asyncness.is_none() {
         let msg = "the async keyword is missing from the function declaration";
-        return syn::Error::new_spanned(&input, msg)
+        return syn::Error::new_spanned(&input.sig.fn_token, msg)
             .to_compile_error()
             .into();
     } else if !input.sig.inputs.is_empty() {

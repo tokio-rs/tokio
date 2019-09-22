@@ -85,6 +85,7 @@ jobs:
         - tokio-executor
         - tokio-net
         - executor-without-current-thread
+        - macros-invalid-input
         - net-no-features
         - net-with-tcp
         - net-with-udp
