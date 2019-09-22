@@ -26,7 +26,7 @@ proc-macro = true
 
 [dependencies]
 quote = "1"
-syn = { version = "1", features = ["full"] }
+syn = { version = "1.0.3", features = ["full"] }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.5", path = "../tokio", default-features = false, features = ["rt-full"] }
