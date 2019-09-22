@@ -29,25 +29,25 @@ impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
 
 impl<RW: AsyncRead + AsyncWrite> AsyncWrite for BufStream<RW> {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.project().0.poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.project().0.poll_flush(cx)
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.project().0.poll_shutdown(cx)
     }
 }
 
 impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
@@ -62,10 +62,10 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
 
 impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.project_into().0.poll_fill_buf(cx)
+        self.project().0.poll_fill_buf(cx)
     }
 
-    fn consume(mut self: Pin<&mut Self>, amt: usize) {
+    fn consume(self: Pin<&mut Self>, amt: usize) {
         self.project().0.consume(amt)
     }
 }
