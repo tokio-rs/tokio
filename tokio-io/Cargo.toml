@@ -20,14 +20,13 @@ Core I/O primitives for asynchronous I/O in Rust.
 categories = ["asynchronous"]
 
 [features]
-util = ["memchr", "pin-utils", "pin-project"]
+util = ["memchr", "pin-project"]
 
 [dependencies]
 bytes = "0.4.7"
 log = "0.4"
 futures-core-preview = "=0.3.0-alpha.18"
 memchr = { version = "2.2", optional = true }
-pin-utils = { version = "=0.1.0-alpha.4", optional = true }
 pin-project = { version = "=0.4.0-beta.1", optional = true }
 
 [dev-dependencies]
