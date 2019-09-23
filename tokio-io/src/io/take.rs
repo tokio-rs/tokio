@@ -5,10 +5,10 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-/// Reader for the [`take`](super::AsyncReadExt::take) method.
+/// Stream for the [`take`](super::AsyncReadExt::take) method.
 #[pin_project]
 #[derive(Debug)]
-#[must_use = "readers do nothing unless you `.await` or poll them"]
+#[must_use = "streams do nothing unless you `.await` or poll them"]
 pub struct Take<R> {
     #[pin]
     inner: R,

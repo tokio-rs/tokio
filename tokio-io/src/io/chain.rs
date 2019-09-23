@@ -6,9 +6,9 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Reader for the [`chain`](super::AsyncReadExt::chain) method.
+/// Stream for the [`chain`](super::AsyncReadExt::chain) method.
 #[pin_project]
-#[must_use = "readers do nothing unless polled"]
+#[must_use = "streams do nothing unless polled"]
 pub struct Chain<T, U> {
     #[pin]
     first: T,
