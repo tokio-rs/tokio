@@ -82,8 +82,13 @@ where
     }
 }
 
-#[test]
-fn assert_unpin() {
-    use std::marker::PhantomPinned;
-    super::is_unpin::<Copy<'_, PhantomPinned, PhantomPinned>>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<Copy<'_, PhantomPinned, PhantomPinned>>();
+    }
 }

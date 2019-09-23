@@ -35,6 +35,3 @@ pub use self::buf_writer::BufWriter;
 // used by `BufReader` and `BufWriter`
 // https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1
 const DEFAULT_BUF_SIZE: usize = 8 * 1024;
-
-#[cfg(test)]
-fn is_unpin<T: Unpin>() {}

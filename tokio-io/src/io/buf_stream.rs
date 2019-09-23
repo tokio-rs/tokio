@@ -70,7 +70,12 @@ impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
     }
 }
 
-#[test]
-fn assert_unpin() {
-    super::is_unpin::<BufStream<()>>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        crate::is_unpin::<BufStream<()>>();
+    }
 }

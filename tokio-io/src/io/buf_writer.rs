@@ -185,7 +185,12 @@ impl<W: fmt::Debug> fmt::Debug for BufWriter<W> {
     }
 }
 
-#[test]
-fn assert_unpin() {
-    super::is_unpin::<BufWriter<()>>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        crate::is_unpin::<BufWriter<()>>();
+    }
 }
