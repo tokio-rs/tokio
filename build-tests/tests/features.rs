@@ -21,7 +21,7 @@ fn net_with_udp() {
 
 #[test]
 #[cfg(feature = "net-with-uds")]
-fn net_with_udp() {
+fn net_with_uds() {
     use build_tests::tokio_net::uds;
 }
 
