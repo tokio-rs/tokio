@@ -72,7 +72,10 @@
 
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
-        #[cfg(any(feature = "rt-full"))]
+        #[cfg(any(
+            feature = "rt-full",
+            feature = "rt-current-thread",
+        ))]
         $i
     )*)
 }
@@ -103,8 +106,10 @@ if_runtime! {
     pub use crate::executor::spawn;
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
+    #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::main;
+    #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::test;
 }

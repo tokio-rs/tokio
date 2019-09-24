@@ -37,15 +37,21 @@ default = [
 codec = ["io", "tokio-codec", "bytes"]
 fs = ["tokio-fs"]
 io = ["tokio-io"]
+macros = ["tokio-macros"]
 net = ["tcp", "udp", "uds"]
+rt-current-thread = [
+  "timer",
+  "tokio-net",
+  "tokio-executor/current-thread",
+]
 rt-full = [
+  "macros",
   "num_cpus",
   "net",
   "sync",
   "timer",
   "tokio-executor/current-thread",
   "tokio-executor/threadpool",
-  "tokio-macros",
   "tracing-core",
 ]
 signal = ["tokio-net/signal"]
