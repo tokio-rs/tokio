@@ -3,9 +3,6 @@ use build_tests::tokio;
 #[tokio::main]
 fn main_is_not_async() {}
 
-#[tokio::main]
-async fn main_fn_has_args(_x: u8) {}
-
 #[tokio::main(foo)]
 async fn main_attr_has_unknown_args() {}
 

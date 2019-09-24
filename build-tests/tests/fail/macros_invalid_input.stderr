@@ -4,44 +4,38 @@ error: the async keyword is missing from the function declaration
 4 | fn main_is_not_async() {}
   | ^^
 
-error: the main function cannot accept arguments
- --> $DIR/macros_invalid_input.rs:7:27
-  |
-7 | async fn main_fn_has_args(_x: u8) {}
-  |                           ^^^^^^
-
 error: Unknown attribute foo is specified
- --> $DIR/macros_invalid_input.rs:9:15
+ --> $DIR/macros_invalid_input.rs:6:15
   |
-9 | #[tokio::main(foo)]
+6 | #[tokio::main(foo)]
   |               ^^^
 
 error: Must have specified ident
-  --> $DIR/macros_invalid_input.rs:12:15
-   |
-12 | #[tokio::main(multi_thread::bar)]
-   |               ^^^^^^^^^^^^^^^^^
+ --> $DIR/macros_invalid_input.rs:9:15
+  |
+9 | #[tokio::main(multi_thread::bar)]
+  |               ^^^^^^^^^^^^^^^^^
 
 error: the async keyword is missing from the function declaration
-  --> $DIR/macros_invalid_input.rs:16:1
+  --> $DIR/macros_invalid_input.rs:13:1
    |
-16 | fn test_is_not_async() {}
+13 | fn test_is_not_async() {}
    | ^^
 
 error: the test function cannot accept arguments
-  --> $DIR/macros_invalid_input.rs:19:27
+  --> $DIR/macros_invalid_input.rs:16:27
    |
-19 | async fn test_fn_has_args(_x: u8) {}
+16 | async fn test_fn_has_args(_x: u8) {}
    |                           ^^^^^^
 
 error: unexpected token
-  --> $DIR/macros_invalid_input.rs:21:15
+  --> $DIR/macros_invalid_input.rs:18:15
    |
-21 | #[tokio::test(foo)]
+18 | #[tokio::test(foo)]
    |               ^^^
 
 error: second test attribute is supplied
-  --> $DIR/macros_invalid_input.rs:25:1
+  --> $DIR/macros_invalid_input.rs:22:1
    |
-25 | #[test]
+22 | #[test]
    | ^^^^^^^

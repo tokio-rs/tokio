@@ -25,6 +25,10 @@ use quote::quote;
 /// - `single_thread` - Uses `current_thread`.
 /// - `multi_thread` - Uses multi-threaded runtime. Used by default.
 ///
+/// ## Function arguments:
+///
+/// Arguments are allowed for any functions aside from `main` which is special
+///
 /// ## Usage
 ///
 /// ### Select runtime
@@ -57,6 +61,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let ret = &input.sig.output;
     let name = &input.sig.ident;
+    let inputs = &input.sig.inputs;
     let body = &input.block;
     let attrs = &input.attrs;
 
@@ -65,7 +70,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         return syn::Error::new_spanned(input.sig.fn_token, msg)
             .to_compile_error()
             .into();
-    } else if !input.sig.inputs.is_empty() {
+    } else if name == "main" && !inputs.is_empty() {
         let msg = "the main function cannot accept arguments";
         return syn::Error::new_spanned(&input.sig.inputs, msg)
             .to_compile_error()
@@ -95,16 +100,14 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let result = match runtime {
         RuntimeType::Multi => quote! {
             #(#attrs)*
-            fn #name() #ret {
-                let mut rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async { #body })
+            fn #name(#inputs) #ret {
+                tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
         RuntimeType::Single => quote! {
             #(#attrs)*
-            fn #name() #ret {
-                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-                rt.block_on(async { #body })
+            fn #name(#inputs) #ret {
+                tokio::runtime::current_thread::Runtime::new().unwrap().block_on(async { #body })
             }
         },
         RuntimeType::Auto => quote! {
