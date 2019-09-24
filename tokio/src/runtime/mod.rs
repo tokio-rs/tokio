@@ -135,10 +135,24 @@
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
 pub mod current_thread;
+#[cfg(feature = "rt-full")]
 mod threadpool;
 
+#[cfg(feature = "rt-full")]
 pub use self::threadpool::{
     Builder,
     Runtime,
     TaskExecutor,
 };
+
+// Internal export, don't use.
+// This exists to support "auto" runtime selection when using the
+// #[tokio::main] attribute.
+#[doc(hidden)]
+pub mod __main {
+    #[cfg(feature = "rt-full")]
+    pub use super::Runtime;
+
+    #[cfg(not(feature = "rt-full"))]
+    pub use super::current_thread::Runtime;
+}

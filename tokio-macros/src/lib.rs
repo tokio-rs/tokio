@@ -49,6 +49,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     enum RuntimeType {
         Single,
         Multi,
+        Auto,
     }
 
     let input = syn::parse_macro_input!(item as syn::ItemFn);
@@ -71,7 +72,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
 
-    let mut runtime = RuntimeType::Multi;
+    let mut runtime = RuntimeType::Auto;
 
     for arg in args {
         if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg {
@@ -103,6 +104,13 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#attrs)*
             fn #name() #ret {
                 let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+                rt.block_on(async { #body })
+            }
+        },
+        RuntimeType::Auto => quote! {
+            #(#attrs)*
+            fn #name() #ret {
+                let mut rt = tokio::runtime::__main::Runtime::new().unwrap();
                 rt.block_on(async { #body })
             }
         },
