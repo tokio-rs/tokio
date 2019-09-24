@@ -38,3 +38,7 @@ pub use self::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufS
 
 // Re-export `Buf` and `BufMut` since they are part of the API
 pub use bytes::{Buf, BufMut};
+
+#[cfg(feature = "util")]
+#[cfg(test)]
+fn is_unpin<T: Unpin>() {}

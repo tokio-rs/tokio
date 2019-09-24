@@ -1,7 +1,7 @@
 use super::DEFAULT_BUF_SIZE;
 use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
 use futures_core::ready;
-use pin_utils::{unsafe_pinned, unsafe_unpinned};
+use pin_project::{pin_project, project};
 use std::fmt;
 use std::io::{self, Write};
 use std::pin::Pin;
@@ -28,16 +28,15 @@ use std::task::{Context, Poll};
 /// [`flush`]: super::AsyncWriteExt::flush
 ///
 // TODO: Examples
+#[pin_project]
 pub struct BufWriter<W> {
+    #[pin]
     inner: W,
     buf: Vec<u8>,
     written: usize,
 }
 
 impl<W: AsyncWrite> BufWriter<W> {
-    unsafe_pinned!(inner: W);
-    unsafe_unpinned!(buf: Vec<u8>);
-
     /// Creates a new `BufWriter` with a default buffer capacity. The default is currently 8 KB,
     /// but may change in the future.
     pub fn new(inner: W) -> Self {
@@ -53,13 +52,14 @@ impl<W: AsyncWrite> BufWriter<W> {
         }
     }
 
+    #[project]
     fn flush_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let Self {
-            inner,
+        #[project]
+        let BufWriter {
+            mut inner,
             buf,
             written,
-        } = unsafe { self.get_unchecked_mut() };
-        let mut inner = unsafe { Pin::new_unchecked(inner) };
+        } = self.project();
 
         let len = buf.len();
         let mut ret = Ok(());
@@ -102,7 +102,7 @@ impl<W: AsyncWrite> BufWriter<W> {
     ///
     /// It is inadvisable to directly write to the underlying writer.
     pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut W> {
-        self.inner()
+        self.project().inner
     }
 
     /// Consumes this `BufWriter`, returning the underlying writer.
@@ -127,21 +127,23 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
         if self.buf.len() + buf.len() > self.buf.capacity() {
             ready!(self.as_mut().flush_buf(cx))?;
         }
-        if buf.len() >= self.buf.capacity() {
-            self.inner().poll_write(cx, buf)
+
+        let me = self.project();
+        if buf.len() >= me.buf.capacity() {
+            me.inner.poll_write(cx, buf)
         } else {
-            Poll::Ready(self.buf().write(buf))
+            Poll::Ready(me.buf.write(buf))
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         ready!(self.as_mut().flush_buf(cx))?;
-        self.inner().poll_flush(cx)
+        self.get_pin_mut().poll_flush(cx)
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         ready!(self.as_mut().flush_buf(cx))?;
-        self.inner().poll_shutdown(cx)
+        self.get_pin_mut().poll_shutdown(cx)
     }
 }
 
@@ -170,7 +172,7 @@ impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
     }
 }
 
-impl<W: AsyncWrite + fmt::Debug> fmt::Debug for BufWriter<W> {
+impl<W: fmt::Debug> fmt::Debug for BufWriter<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BufWriter")
             .field("writer", &self.inner)
@@ -180,5 +182,15 @@ impl<W: AsyncWrite + fmt::Debug> fmt::Debug for BufWriter<W> {
             )
             .field("written", &self.written)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        crate::is_unpin::<BufWriter<()>>();
     }
 }

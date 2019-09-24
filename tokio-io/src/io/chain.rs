@@ -1,24 +1,20 @@
 use crate::{AsyncBufRead, AsyncRead};
 use futures_core::ready;
-use pin_utils::{unsafe_pinned, unsafe_unpinned};
+use pin_project::{pin_project, project};
 use std::fmt;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 /// Stream for the [`chain`](super::AsyncReadExt::chain) method.
+#[pin_project]
 #[must_use = "streams do nothing unless polled"]
 pub struct Chain<T, U> {
+    #[pin]
     first: T,
+    #[pin]
     second: U,
     done_first: bool,
-}
-
-impl<T, U> Unpin for Chain<T, U>
-where
-    T: Unpin,
-    U: Unpin,
-{
 }
 
 pub(super) fn chain<T, U>(first: T, second: U) -> Chain<T, U>
@@ -38,10 +34,6 @@ where
     T: AsyncRead,
     U: AsyncRead,
 {
-    unsafe_pinned!(first: T);
-    unsafe_pinned!(second: U);
-    unsafe_unpinned!(done_first: bool);
-
     /// Gets references to the underlying readers in this `Chain`.
     pub fn get_ref(&self) -> (&T, &U) {
         (&self.first, &self.second)
@@ -62,10 +54,8 @@ where
     /// underlying readers as doing so may corrupt the internal state of this
     /// `Chain`.
     pub fn get_pin_mut(self: Pin<&mut Self>) -> (Pin<&mut T>, Pin<&mut U>) {
-        unsafe {
-            let Self { first, second, .. } = self.get_unchecked_mut();
-            (Pin::new_unchecked(first), Pin::new_unchecked(second))
-        }
+        let me = self.project();
+        (me.first, me.second)
     }
 
     /// Consumes the `Chain`, returning the wrapped readers.
@@ -93,17 +83,19 @@ where
     U: AsyncRead,
 {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        if !self.done_first {
-            match ready!(self.as_mut().first().poll_read(cx, buf)?) {
-                0 if !buf.is_empty() => *self.as_mut().done_first() = true,
+        let me = self.project();
+
+        if !*me.done_first {
+            match ready!(me.first.poll_read(cx, buf)?) {
+                0 if !buf.is_empty() => *me.done_first = true,
                 n => return Poll::Ready(Ok(n)),
             }
         }
-        self.second().poll_read(cx, buf)
+        me.second.poll_read(cx, buf)
     }
 }
 
@@ -112,14 +104,14 @@ where
     T: AsyncBufRead,
     U: AsyncBufRead,
 {
+    #[project]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        let Self {
+        #[project]
+        let Chain {
             first,
             second,
             done_first,
-        } = unsafe { self.get_unchecked_mut() };
-        let first = unsafe { Pin::new_unchecked(first) };
-        let second = unsafe { Pin::new_unchecked(second) };
+        } = self.project();
 
         if !*done_first {
             match ready!(first.poll_fill_buf(cx)?) {
@@ -133,10 +125,21 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        if !self.done_first {
-            self.first().consume(amt)
+        let me = self.project();
+        if !*me.done_first {
+            me.first.consume(amt)
         } else {
-            self.second().consume(amt)
+            me.second.consume(amt)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        crate::is_unpin::<Chain<(), ()>>();
     }
 }

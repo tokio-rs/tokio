@@ -21,9 +21,6 @@ where
     Write { writer, buf }
 }
 
-// forward Unpin
-impl<W: Unpin + ?Sized> Unpin for Write<'_, W> {}
-
 impl<W> Future for Write<'_, W>
 where
     W: AsyncWrite + Unpin + ?Sized,
@@ -33,5 +30,16 @@ where
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let me = &mut *self;
         Pin::new(&mut *me.writer).poll_write(cx, me.buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<Write<'_, PhantomPinned>>();
     }
 }

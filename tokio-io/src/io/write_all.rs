@@ -20,8 +20,6 @@ where
     WriteAll { writer, buf }
 }
 
-impl<W: ?Sized + Unpin> Unpin for WriteAll<'_, W> {}
-
 impl<W> Future for WriteAll<'_, W>
 where
     W: AsyncWrite + Unpin + ?Sized,
@@ -42,5 +40,16 @@ where
         }
 
         Poll::Ready(Ok(()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<WriteAll<'_, PhantomPinned>>();
     }
 }

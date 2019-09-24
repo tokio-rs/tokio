@@ -1,7 +1,7 @@
 use super::DEFAULT_BUF_SIZE;
 use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
 use futures_core::ready;
-use pin_utils::{unsafe_pinned, unsafe_unpinned};
+use pin_project::{pin_project, project};
 use std::io::{self, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -23,7 +23,9 @@ use std::{cmp, fmt};
 /// discarded. Creating multiple instances of a `BufReader` on the same
 /// stream can cause data loss.
 // TODO: Examples
+#[pin_project]
 pub struct BufReader<R> {
+    #[pin]
     inner: R,
     buf: Box<[u8]>,
     pos: usize,
@@ -31,10 +33,6 @@ pub struct BufReader<R> {
 }
 
 impl<R: AsyncRead> BufReader<R> {
-    unsafe_pinned!(inner: R);
-    unsafe_unpinned!(pos: usize);
-    unsafe_unpinned!(cap: usize);
-
     /// Creates a new `BufReader` with a default buffer capacity. The default is currently 8 KB,
     /// but may change in the future.
     pub fn new(inner: R) -> Self {
@@ -74,7 +72,7 @@ impl<R: AsyncRead> BufReader<R> {
     ///
     /// It is inadvisable to directly read from the underlying reader.
     pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut R> {
-        self.inner()
+        self.project().inner
     }
 
     /// Consumes this `BufWriter`, returning the underlying reader.
@@ -93,9 +91,10 @@ impl<R: AsyncRead> BufReader<R> {
 
     /// Invalidates all data in the internal buffer.
     #[inline]
-    fn discard_buffer(mut self: Pin<&mut Self>) {
-        *self.as_mut().pos() = 0;
-        *self.cap() = 0;
+    fn discard_buffer(self: Pin<&mut Self>) {
+        let me = self.project();
+        *me.pos = 0;
+        *me.cap = 0;
     }
 }
 
@@ -109,7 +108,7 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
         if self.pos == self.cap && buf.len() >= self.buf.len() {
-            let res = ready!(self.as_mut().inner().poll_read(cx, buf));
+            let res = ready!(self.as_mut().get_pin_mut().poll_read(cx, buf));
             self.discard_buffer();
             return Poll::Ready(res);
         }
@@ -126,14 +125,15 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
 }
 
 impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
+    #[project]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        let Self {
+        #[project]
+        let BufReader {
             inner,
             buf,
             cap,
             pos,
-        } = unsafe { self.get_unchecked_mut() };
-        let mut inner = unsafe { Pin::new_unchecked(inner) };
+        } = self.project();
 
         // If we've reached the end of our internal buffer then we need to fetch
         // some more data from the underlying reader.
@@ -141,14 +141,15 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
         // to tell the compiler that the pos..cap slice is always valid.
         if *pos >= *cap {
             debug_assert!(*pos == *cap);
-            *cap = ready!(inner.as_mut().poll_read(cx, buf))?;
+            *cap = ready!(inner.poll_read(cx, buf))?;
             *pos = 0;
         }
         Poll::Ready(Ok(&buf[*pos..*cap]))
     }
 
-    fn consume(mut self: Pin<&mut Self>, amt: usize) {
-        *self.as_mut().pos() = cmp::min(self.pos + amt, self.cap);
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        let me = self.project();
+        *me.pos = cmp::min(*me.pos + amt, *me.cap);
     }
 }
 
@@ -170,7 +171,7 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
     }
 }
 
-impl<R: AsyncRead + fmt::Debug> fmt::Debug for BufReader<R> {
+impl<R: fmt::Debug> fmt::Debug for BufReader<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BufReader")
             .field("reader", &self.inner)
@@ -179,5 +180,15 @@ impl<R: AsyncRead + fmt::Debug> fmt::Debug for BufReader<R> {
                 &format_args!("{}/{}", self.cap - self.pos, self.buf.len()),
             )
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        crate::is_unpin::<BufReader<()>>();
     }
 }

@@ -16,7 +16,7 @@ use std::{
 /// one in the other so that both directions are buffered. See their documentation for details.
 #[pin_project]
 #[derive(Debug)]
-pub struct BufStream<RW: AsyncRead + AsyncWrite>(#[pin] BufReader<BufWriter<RW>>);
+pub struct BufStream<RW>(#[pin] BufReader<BufWriter<RW>>);
 
 impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
     /// Wrap a type in both [`BufWriter`] and [`BufReader`].
@@ -67,5 +67,15 @@ impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
         self.project().0.consume(amt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        crate::is_unpin::<BufStream<()>>();
     }
 }

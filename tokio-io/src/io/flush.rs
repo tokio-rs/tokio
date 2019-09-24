@@ -20,8 +20,6 @@ where
     Flush { a }
 }
 
-impl<A> Unpin for Flush<'_, A> where A: Unpin + ?Sized {}
-
 impl<A> Future for Flush<'_, A>
 where
     A: AsyncWrite + Unpin + ?Sized,
@@ -31,5 +29,16 @@ where
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = &mut *self;
         Pin::new(&mut *me.a).poll_flush(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<Flush<'_, PhantomPinned>>();
     }
 }
