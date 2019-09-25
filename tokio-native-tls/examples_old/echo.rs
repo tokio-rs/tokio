@@ -7,7 +7,7 @@ use tokio;
 use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
-use tokio_tls;
+use tokio_native_tls;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Bind the server's socket
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let der = include_bytes!("identity.p12");
     let cert = Identity::from_pkcs12(der, "mypass")?;
     let tls_acceptor =
-        tokio_tls::TlsAcceptor::from(native_tls::TlsAcceptor::builder(cert).build()?);
+        tokio_native_tls::TlsAcceptor::from(native_tls::TlsAcceptor::builder(cert).build()?);
 
     // Iterate incoming connections
     let server = tcp

@@ -8,7 +8,7 @@ use std::io;
 use std::net::ToSocketAddrs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio_tls;
+use tokio_native_tls;
 
 macro_rules! t {
     ($e:expr) => {
@@ -62,7 +62,7 @@ async fn fetch_google() {
     // of our request, then flushing, then finally read off the response.
     let builder = TlsConnector::builder();
     let connector = t!(builder.build());
-    let connector = tokio_tls::TlsConnector::from(connector);
+    let connector = tokio_native_tls::TlsConnector::from(connector);
     let mut socket = t!(connector.connect("google.com", socket).await);
     t!(socket.write_all(b"GET / HTTP/1.0\r\n\r\n").await);
     let mut data = Vec::new();
@@ -91,7 +91,7 @@ async fn wrong_hostname_error() {
     let socket = t!(TcpStream::connect(&addr).await);
     let builder = TlsConnector::builder();
     let connector = t!(builder.build());
-    let connector = tokio_tls::TlsConnector::from(connector);
+    let connector = tokio_native_tls::TlsConnector::from(connector);
     let res = connector
         .connect("rust-lang.org", socket)
         .await

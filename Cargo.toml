@@ -7,10 +7,10 @@ members = [
   "tokio-fs",
   "tokio-io",
   "tokio-macros",
+  "tokio-native-tls",
   "tokio-net",
   "tokio-sync",
   "tokio-test",
   "tokio-timer",
-  "tokio-tls",
   "build-tests",
 ]

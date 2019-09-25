@@ -6,7 +6,7 @@ use native_tls::TlsConnector;
 use std::io::{self, Error};
 use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
-use tokio_tls;
+use tokio_native_tls;
 
 macro_rules! t {
     ($e:expr) => {
@@ -90,7 +90,7 @@ async fn get_host(host: &'static str) -> Error {
     let socket = t!(TcpStream::connect(&addr).await);
     let builder = TlsConnector::builder();
     let cx = t!(builder.build());
-    let cx = tokio_tls::TlsConnector::from(cx);
+    let cx = tokio_native_tls::TlsConnector::from(cx);
     let res = cx
         .connect(host, socket)
         .await

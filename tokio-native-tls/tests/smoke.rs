@@ -12,7 +12,7 @@ use std::process::Command;
 use std::ptr;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, Error, ErrorKind};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_tls;
+use tokio_native_tls;
 
 macro_rules! t {
     ($e:expr) => {
@@ -228,7 +228,7 @@ cfg_if! {
         use std::env;
         use std::sync::Once;
 
-        fn contexts() -> (tokio_tls::TlsAcceptor, tokio_tls::TlsConnector) {
+        fn contexts() -> (tokio_native_tls::TlsAcceptor, tokio_native_tls::TlsConnector) {
             let keys = openssl_keys();
 
             let pkcs12 = t!(Identity::from_pkcs12(&keys.pkcs12_der, "foobar"));
@@ -246,7 +246,7 @@ cfg_if! {
         use std::fs::File;
         use std::sync::Once;
 
-        fn contexts() -> (tokio_tls::TlsAcceptor, tokio_tls::TlsConnector) {
+        fn contexts() -> (tokio_native_tls::TlsAcceptor, tokio_native_tls::TlsConnector) {
             let keys = openssl_keys();
 
             let pkcs12 = t!(Identity::from_pkcs12(&keys.pkcs12_der, "foobar"));
@@ -279,9 +279,9 @@ cfg_if! {
         use winapi::um::timezoneapi::*;
         use winapi::um::wincrypt::*;
 
-        const FRIENDLY_NAME: &'static str = "tokio-tls localhost testing cert";
+        const FRIENDLY_NAME: &'static str = "tokio-native-tls localhost testing cert";
 
-        fn contexts() -> (tokio_tls::TlsAcceptor, tokio_tls::TlsConnector) {
+        fn contexts() -> (tokio_native_tls::TlsAcceptor, tokio_native_tls::TlsConnector) {
             let cert = localhost_cert();
             let mut store = t!(Memory::new()).into_store();
             t!(store.add_cert(&cert, CertAdd::Always));
@@ -324,10 +324,10 @@ cfg_if! {
                     if !cert.is_time_valid().unwrap() {
                         io::stdout().write_all(br#"
 
-The tokio-tls test suite is about to delete an old copy of one of its
+The tokio-native-tls test suite is about to delete an old copy of one of its
 certificates from your root trust store. This certificate was only valid for one
 day and it is no longer needed. The host should be "localhost" and the
-description should mention "tokio-tls".
+description should mention "tokio-native-tls".
 
         "#).unwrap();
                         cert.delete().unwrap();
@@ -365,7 +365,7 @@ description should mention "tokio-tls".
                 let mut provider = 0;
                 let mut hkey = 0;
 
-                let mut buffer = "tokio-tls test suite".encode_utf16()
+                let mut buffer = "tokio-native-tls test suite".encode_utf16()
                                                          .chain(Some(0))
                                                          .collect::<Vec<_>>();
                 let res = CryptAcquireContextW(&mut provider,
@@ -395,8 +395,8 @@ description should mention "tokio-tls".
                 }
 
                 // start creating the certificate
-                let name = "CN=localhost,O=tokio-tls,OU=tokio-tls,\
-                            G=tokio_tls".encode_utf16()
+                let name = "CN=localhost,O=tokio-native-tls,OU=tokio-native-tls,\
+                            G=tokio_native_tls".encode_utf16()
                                           .chain(Some(0))
                                           .collect::<Vec<_>>();
                 let mut cname_buffer: [WCHAR; UNLEN as usize + 1] = mem::zeroed();
@@ -482,10 +482,10 @@ description should mention "tokio-tls".
                 // install the certificate to the machine's local store
                 io::stdout().write_all(br#"
 
-The tokio-tls test suite is about to add a certificate to your set of root
+The tokio-native-tls test suite is about to add a certificate to your set of root
 and trusted certificates. This certificate should be for the domain "localhost"
-with the description related to "tokio-tls". This certificate is only valid
-for one day and will be automatically deleted if you re-run the tokio-tls
+with the description related to "tokio-native-tls". This certificate is only valid
+for one day and will be automatically deleted if you re-run the tokio-native-tls
 test suite later.
 
         "#).unwrap();
