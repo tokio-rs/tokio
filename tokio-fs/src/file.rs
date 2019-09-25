@@ -266,14 +266,14 @@ impl File {
         asyncify(move || std.sync_all()).await
     }
 
-    /// This function is similar to `poll_sync_all`, except that it may not
+    /// This function is similar to `sync_all`, except that it may not
     /// synchronize file metadata to the filesystem.
     ///
     /// This is intended for use cases that must synchronize content, but don't
     /// need the metadata on disk. The goal of this method is to reduce disk
     /// operations.
     ///
-    /// Note that some platforms may simply implement this in terms of `poll_sync_all`.
+    /// Note that some platforms may simply implement this in terms of `sync_all`.
     ///
     /// # Examples
     ///
