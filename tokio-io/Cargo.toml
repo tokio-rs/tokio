@@ -27,7 +27,7 @@ bytes = "0.4.7"
 log = "0.4"
 futures-core-preview = "=0.3.0-alpha.18"
 memchr = { version = "2.2", optional = true }
-pin-project = { version = "=0.4.0-beta.1", optional = true }
+pin-project = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.5", path = "../tokio" }
