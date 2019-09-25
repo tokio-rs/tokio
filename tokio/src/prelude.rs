@@ -11,17 +11,23 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
+#[doc(no_inline)]
 pub use crate::future::FutureExt as _;
+#[doc(no_inline)]
 pub use futures_util::future::FutureExt as _;
 pub use std::future::Future;
 
-pub use crate::stream::{Stream, StreamExt as _};
+pub use crate::stream::Stream;
+#[doc(no_inline)]
+pub use crate::stream::StreamExt as _;
 pub use futures_sink::Sink;
+#[doc(no_inline)]
 pub use futures_util::sink::SinkExt as _;
+#[doc(no_inline)]
 pub use futures_util::stream::StreamExt as _;
 
 #[cfg(feature = "io")]
-pub use tokio_io::{
-    AsyncBufRead, AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite,
-    AsyncWriteExt as _,
-};
+pub use tokio_io::{AsyncBufRead, AsyncRead, AsyncWrite};
+#[cfg(feature = "io")]
+#[doc(no_inline)]
+pub use tokio_io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
