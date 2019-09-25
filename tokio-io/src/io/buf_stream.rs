@@ -25,6 +25,34 @@ impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
     pub fn new(stream: RW) -> BufStream<RW> {
         BufStream(BufReader::new(BufWriter::new(stream)))
     }
+
+    /// Gets a reference to the underlying I/O object.
+    ///
+    /// It is inadvisable to directly read from the underlying I/O object.
+    pub fn get_ref(&self) -> &RW {
+        self.0.get_ref().get_ref()
+    }
+
+    /// Gets a mutable reference to the underlying I/O object.
+    ///
+    /// It is inadvisable to directly read from the underlying I/O object.
+    pub fn get_mut(&mut self) -> &mut RW {
+        self.0.get_mut().get_mut()
+    }
+
+    /// Gets a pinned mutable reference to the underlying I/O object.
+    ///
+    /// It is inadvisable to directly read from the underlying I/O object.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut RW> {
+        self.project().0.get_pin_mut().get_pin_mut()
+    }
+
+    /// Consumes this `BufStream`, returning the underlying I/O object.
+    ///
+    /// Note that any leftover data in the internal buffer is lost.
+    pub fn into_inner(self) -> RW {
+        self.0.into_inner().into_inner()
+    }
 }
 
 impl<RW: AsyncRead + AsyncWrite> AsyncWrite for BufStream<RW> {
