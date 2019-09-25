@@ -120,6 +120,11 @@ impl<T, U> Framed<T, U> {
         &mut self.inner.get_mut().get_mut().1
     }
 
+    /// Returns a reference to the read buffer.
+    pub fn read_buffer(&self) -> &BytesMut {
+        self.inner.buffer()
+    }
+
     /// Consumes the `Frame`, returning its underlying I/O stream.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
