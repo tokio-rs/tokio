@@ -1,8 +1,16 @@
-use crate::loom::{
+#[cfg(test)]
+use loom::{
     sync::atomic::{AtomicPtr, AtomicUsize},
     sync::CausalCell,
     thread,
 };
+#[cfg(not(test))]
+use {
+    crate::loom::CausalCell,
+    std::sync::atomic::{AtomicPtr, AtomicUsize},
+    std::thread,
+};
+
 use std::mem::MaybeUninit;
 use std::ops;
 use std::ptr::{self, NonNull};

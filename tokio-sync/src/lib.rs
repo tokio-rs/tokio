@@ -30,6 +30,7 @@ macro_rules! if_fuzz {
 }
 
 mod barrier;
+#[cfg(not(test))]
 mod loom;
 pub mod mpsc;
 mod mutex;

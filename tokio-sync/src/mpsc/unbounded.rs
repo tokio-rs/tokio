@@ -1,6 +1,9 @@
-use super::chan;
-use crate::loom::sync::atomic::AtomicUsize;
+#[cfg(test)]
+use loom::sync::atomic::AtomicUsize;
+#[cfg(not(test))]
+use std::sync::atomic::AtomicUsize;
 
+use super::chan;
 use std::fmt;
 use std::task::{Context, Poll};
 

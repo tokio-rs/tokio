@@ -1,4 +1,7 @@
-use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell};
+#[cfg(test)]
+use loom::{sync::atomic::AtomicUsize, sync::CausalCell};
+#[cfg(not(test))]
+use {crate::loom::CausalCell, std::sync::atomic::AtomicUsize};
 
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};

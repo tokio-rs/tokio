@@ -1,6 +1,12 @@
 //! A channel for sending a single message between asynchronous tasks.
 
-use crate::loom::sync::{atomic::AtomicUsize, Arc, CausalCell};
+#[cfg(test)]
+use loom::sync::{atomic::AtomicUsize, Arc, CausalCell};
+#[cfg(not(test))]
+use {
+    crate::loom::CausalCell,
+    std::sync::{atomic::AtomicUsize, Arc},
+};
 
 use futures_core::ready;
 use std::fmt;

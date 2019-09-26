@@ -17,6 +17,10 @@ mod list;
 #[allow(warnings)]
 mod block;
 
+#[path = "../src/task/mod.rs"]
+#[allow(warnings)]
+mod task;
+
 const BLOCK_CAP: usize = 2;
 
 use loom::thread;

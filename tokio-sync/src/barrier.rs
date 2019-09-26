@@ -1,5 +1,9 @@
-use crate::watch;
+#[cfg(test)]
+use loom::sync::Mutex;
+#[cfg(not(test))]
 use std::sync::Mutex;
+
+use crate::watch;
 
 /// A barrier enables multiple threads to synchronize the beginning of some computation.
 ///

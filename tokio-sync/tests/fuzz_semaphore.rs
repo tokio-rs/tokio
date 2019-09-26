@@ -3,9 +3,14 @@
 #[macro_use]
 extern crate loom;
 
+// make a loacal module so we get #[cfg(test)]
 #[path = "../src/semaphore.rs"]
 #[allow(warnings)]
 mod semaphore;
+
+#[path = "../src/task/mod.rs"]
+#[allow(warnings)]
+mod task;
 
 use crate::semaphore::*;
 

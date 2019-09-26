@@ -53,16 +53,21 @@
 //! [`Receiver::poll`]: struct.Receiver.html#method.poll
 //! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
 
-use crate::task::AtomicWaker;
+#[cfg(test)]
+use loom::sync::{atomic::AtomicUsize, Mutex};
+#[cfg(not(test))]
+use std::sync::{atomic::AtomicUsize, Mutex};
 
+use crate::task::AtomicWaker;
 use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;
 use futures_util::future::poll_fn;
 use std::ops;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
+
+// We'd like to use loom for these on #[cfg(test)], but that won't work
+use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
 
 #[cfg(feature = "async-traits")]
 use futures_core::ready;

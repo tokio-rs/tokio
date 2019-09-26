@@ -17,6 +17,10 @@ mod mpsc;
 #[allow(warnings)]
 mod semaphore;
 
+#[path = "../src/task/mod.rs"]
+#[allow(warnings)]
+mod task;
+
 use futures_util::future::poll_fn;
 use loom::future::block_on;
 use loom::thread;

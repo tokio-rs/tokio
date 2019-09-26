@@ -1,9 +1,16 @@
-use super::list;
-use crate::loom::{
-    future::AtomicWaker,
+#[cfg(test)]
+use loom::{
     sync::atomic::AtomicUsize,
     sync::{Arc, CausalCell},
 };
+#[cfg(not(test))]
+use {
+    crate::loom::CausalCell,
+    std::sync::{atomic::AtomicUsize, Arc},
+};
+
+use super::list;
+use crate::task::AtomicWaker;
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
