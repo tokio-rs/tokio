@@ -1,4 +1,5 @@
-use crate::loom::{sync::atomic::AtomicUsize, sync::CausalCell};
+use crate::loom::sync::atomic::{self, AtomicUsize};
+use crate::loom::sync::CausalCell;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
@@ -171,6 +172,7 @@ impl AtomicWaker {
         debug!(" + register_task");
         match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
             WAITING => {
+                debug!(" + WAITING");
                 unsafe {
                     // Locked acquired, update the waker cell
                     self.waker.with_mut(|t| *t = Some(waker.into_waker()));
@@ -211,10 +213,14 @@ impl AtomicWaker {
                 }
             }
             WAKING => {
+                debug!(" + WAKING");
                 // Currently in the process of waking the task, i.e.,
                 // `wake` is currently being called on the old waker.
                 // So, we call wake on the new waker.
                 waker.wake();
+
+                // This is equivalent to a spin lock, so use a spin hint.
+                atomic::spin_loop_hint();
             }
             state => {
                 // In this case, a concurrent thread is holding the
