@@ -83,22 +83,26 @@ impl Barrier {
         // deadlock even if another future is concurrently holding the lock.
         // It is _desireable_ to do so as synchronous Mutexes are, at least in theory, faster than
         // the asynchronous counter-parts, so we should use them where possible [citation needed].
-        let mut state = self.state.lock().unwrap();
-        let generation = state.generation;
-        state.arrived += 1;
-        if state.arrived == self.n {
-            // we are the leader for this generation
-            // wake everyone, increment the generation, and return
-            state
-                .waker
-                .broadcast(state.generation)
-                .expect("there is at least one receiver");
-            state.arrived = 0;
-            state.generation += 1;
-            return BarrierWaitResult(true);
-        }
+        // NOTE: the extra scope here is so that the compiler doesn't think `state` is held across
+        // a yield point, and thus marks the returned future as !Send.
+        let generation = {
+            let mut state = self.state.lock().unwrap();
+            let generation = state.generation;
+            state.arrived += 1;
+            if state.arrived == self.n {
+                // we are the leader for this generation
+                // wake everyone, increment the generation, and return
+                state
+                    .waker
+                    .broadcast(state.generation)
+                    .expect("there is at least one receiver");
+                state.arrived = 0;
+                state.generation += 1;
+                return BarrierWaitResult(true);
+            }
 
-        drop(state);
+            generation
+        };
 
         // we're going to have to wait for the last of the generation to arrive
         let mut wait = self.wait.clone();
