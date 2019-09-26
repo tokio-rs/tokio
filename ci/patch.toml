@@ -11,5 +11,3 @@ tokio-net = { path = "tokio-net" }
 tokio-sync = { path = "tokio-sync" }
 tokio-timer = { path = "tokio-timer" }
 tokio-tls = { path = "tokio-tls" }
-
-loom = { git = "https://github.com/taiki-e/loom", branch = "futures" }
