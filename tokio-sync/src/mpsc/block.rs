@@ -1,14 +1,7 @@
-#[cfg(test)]
-use loom::{
+use crate::loom::{
     sync::atomic::{AtomicPtr, AtomicUsize},
     sync::CausalCell,
     thread,
-};
-#[cfg(not(test))]
-use {
-    crate::loom::CausalCell,
-    std::sync::atomic::{AtomicPtr, AtomicUsize},
-    std::thread,
 };
 
 use std::mem::MaybeUninit;

@@ -1,7 +1,4 @@
-#[cfg(test)]
-use loom::sync::Mutex;
-#[cfg(not(test))]
-use std::sync::Mutex;
+use crate::loom::sync::Mutex;
 
 use crate::watch;
 

@@ -53,12 +53,11 @@
 //! [`Receiver::poll`]: struct.Receiver.html#method.poll
 //! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
 
-#[cfg(test)]
-use loom::sync::{atomic::AtomicUsize, Mutex};
-#[cfg(not(test))]
-use std::sync::{atomic::AtomicUsize, Mutex};
+use crate::loom::{
+    future::AtomicWaker,
+    sync::{atomic::AtomicUsize, Mutex},
+};
 
-use crate::task::AtomicWaker;
 use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};
 use fnv::FnvHashMap;

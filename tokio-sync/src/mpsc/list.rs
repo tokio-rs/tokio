@@ -1,14 +1,8 @@
 //! A concurrent, lock-free, FIFO list.
 
-#[cfg(test)]
-use loom::{
+use crate::loom::{
     sync::atomic::{AtomicPtr, AtomicUsize},
     thread,
-};
-#[cfg(not(test))]
-use {
-    std::sync::atomic::{AtomicPtr, AtomicUsize},
-    std::thread,
 };
 
 use super::block::{self, Block};

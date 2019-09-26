@@ -22,6 +22,7 @@ struct Chan {
 }
 
 #[test]
+#[ignore]
 fn basic_notification() {
     const NUM_NOTIFY: usize = 2;
 

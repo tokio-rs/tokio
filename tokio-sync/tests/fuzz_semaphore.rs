@@ -1,16 +1,16 @@
 #![warn(rust_2018_idioms)]
 
+// in this, and all the other fuzz_ tests, we pull a little trick to use loom.
+// do not test the crate through tokio_sync::, but instead pull in the thing to test as a submodule
+// of this test file, and then `use loom` so that `crate::loom` now referes to the `loom` crate
+// rather than `src/loom.rs`.
+
 #[macro_use]
 extern crate loom;
 
-// make a loacal module so we get #[cfg(test)]
 #[path = "../src/semaphore.rs"]
 #[allow(warnings)]
 mod semaphore;
-
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
 
 use crate::semaphore::*;
 
