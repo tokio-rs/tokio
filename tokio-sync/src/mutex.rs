@@ -68,12 +68,6 @@ unsafe impl<T> Send for Mutex<T> where T: Send {}
 unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 
-#[test]
-fn bounds() {
-    fn check<T: Send>() {}
-    check::<MutexGuard<'_, u32>>();
-}
-
 impl<T> Mutex<T> {
     /// Creates a new lock in an unlocked state ready for use.
     pub fn new(t: T) -> Self {

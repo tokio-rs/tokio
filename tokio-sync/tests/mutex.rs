@@ -1,9 +1,15 @@
 #![warn(rust_2018_idioms)]
 
 use std::sync::Arc;
-use tokio_sync::Mutex;
+use tokio_sync::{Mutex, MutexGuard};
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
+
+#[test]
+fn bounds() {
+    fn check<T: Send>() {}
+    check::<MutexGuard<'_, u32>>();
+}
 
 #[test]
 fn straight_execution() {
