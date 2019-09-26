@@ -4,6 +4,13 @@ use tokio_sync::Barrier;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
+struct IsSend<T: Send>(T);
+#[test]
+fn barrier_future_is_send() {
+    let b = Barrier::new(0);
+    IsSend(b.wait());
+}
+
 #[test]
 fn zero_does_not_block() {
     let b = Barrier::new(0);
