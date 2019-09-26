@@ -17,3 +17,7 @@ path = "src/barrier.rs"
 [[bin]]
 name = "watch"
 path = "src/watch.rs"
+
+[[bin]]
+name = "atomic_waker"
+path = "src/atomic_waker.rs"
