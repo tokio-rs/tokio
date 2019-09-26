@@ -1,5 +1,5 @@
-use crate::loom::sync::CausalCell;
 use crate::loom::sync::atomic::{self, AtomicUsize};
+use crate::loom::sync::CausalCell;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
