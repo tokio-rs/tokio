@@ -11,16 +11,8 @@ mod watch;
 #[allow(warnings)]
 mod semaphore;
 
-//use futures_core::ready;
-//use futures_util::future::poll_fn;
 use loom::future::block_on;
 use loom::thread;
-//use std::future::Future;
-//use std::pin::Pin;
-//use std::sync::atomic::AtomicUsize;
-//use std::sync::atomic::Ordering::SeqCst;
-//use std::task::Poll::Ready;
-//use std::task::{Context, Poll};
 
 #[test]
 fn basic_usage() {

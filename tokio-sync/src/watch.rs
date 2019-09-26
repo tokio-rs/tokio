@@ -65,7 +65,7 @@ use futures_util::future::poll_fn;
 use std::ops;
 use std::sync::atomic::Ordering::SeqCst;
 
-// We'd like to use loom for these on #[cfg(test)], but that won't work
+// We'd like to use loom for these too, but loom doesn't have them yet
 use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
 
 #[cfg(feature = "async-traits")]
