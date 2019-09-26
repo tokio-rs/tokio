@@ -31,9 +31,9 @@ use std::task::{Context, Poll};
 #[pin_project]
 pub struct BufWriter<W> {
     #[pin]
-    inner: W,
-    buf: Vec<u8>,
-    written: usize,
+    pub(super) inner: W,
+    pub(super) buf: Vec<u8>,
+    pub(super) written: usize,
 }
 
 impl<W: AsyncWrite> BufWriter<W> {

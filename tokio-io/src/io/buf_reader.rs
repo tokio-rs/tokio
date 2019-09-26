@@ -26,10 +26,10 @@ use std::{cmp, fmt};
 #[pin_project]
 pub struct BufReader<R> {
     #[pin]
-    inner: R,
-    buf: Box<[u8]>,
-    pos: usize,
-    cap: usize,
+    pub(super) inner: R,
+    pub(super) buf: Box<[u8]>,
+    pub(super) pos: usize,
+    pub(super) cap: usize,
 }
 
 impl<R: AsyncRead> BufReader<R> {
