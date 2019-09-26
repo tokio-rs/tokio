@@ -26,11 +26,11 @@ tokio-io = { version = "=0.2.0-alpha.5", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.5", path = "../tokio-sync" }
 tokio-timer = { version = "=0.3.0-alpha.5", path = "../tokio-timer" }
 
-futures-core-preview = "=0.3.0-alpha.18"
+futures-core-preview = "=0.3.0-alpha.19"
 pin-convert = "0.1.0"
 
 [dev-dependencies]
-futures-util-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.19"
 
 [package.metadata.docs.rs]
 all-features = true
