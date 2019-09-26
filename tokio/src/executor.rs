@@ -19,7 +19,7 @@
 //! # `Executor` trait.
 //!
 //! This module provides the [`Executor`] trait (re-exported from
-//! [`tokio-executor`]), which describes the API that all executors must
+//! [`tokio-executor`], which describes the API that all executors must
 //! implement.
 //!
 //! A free [`spawn`] function is provided that allows spawning futures onto the
@@ -32,10 +32,10 @@
 //! thread pool instead of itself, allowing futures to spawn new tasks onto the
 //! thread pool when those tasks are `Send`.
 //!
-//! [`Future::poll`]: https://docs.rs/futures/0.1/futures/future/trait.Future.html#tymethod.poll
-//! [notified]: https://docs.rs/futures/0.1/futures/executor/trait.Notify.html#tymethod.notify
+//! [`Future::poll`]: std::future::Future::poll
+//! [notified]: std::task::Waker
 //! [`runtime`]: ../runtime/index.html
-//! [`tokio-executor`]: https://docs.rs/tokio-executor/0.1
+//! [`tokio-executor`]: https://docs.rs/tokio-executor
 //! [`Executor`]: trait.Executor.html
 //! [`spawn`]: fn.spawn.html
 

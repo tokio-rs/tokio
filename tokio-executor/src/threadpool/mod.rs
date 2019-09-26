@@ -72,7 +72,7 @@
 //! makes it available to other workers that encounter a [`blocking`] call.
 //!
 //! [`blocking`]: fn.blocking.html
-//! [`runtime`]: https://docs.rs/tokio/0.1/tokio/runtime/
+//! [`runtime`]: https://docs.rs/tokio/*/tokio/runtime/
 
 // ## Crate layout
 //

@@ -53,7 +53,6 @@
 //!
 //! [rt]: struct.Runtime.html
 //! [concurrent-rt]: ../struct.Runtime.html
-//! [chan]: https://docs.rs/futures/0.1/futures/sync/mpsc/fn.channel.html
 //! [reactor]: ../../reactor/struct.Reactor.html
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
 //! [timer]: ../../timer/index.html

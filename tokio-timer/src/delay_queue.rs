@@ -119,7 +119,7 @@ use std::time::{Duration, Instant};
 /// [`insert`]: #method.insert
 /// [`insert_at`]: #method.insert_at
 /// [`Key`]: struct.Key.html
-/// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+/// [`Stream`]: https://docs.rs/futures-core-preview/*/futures_core/stream/trait.Stream.html
 /// [`poll`]: #method.poll
 /// [`Stream::poll`]: #method.poll
 /// [`Timer`]: ../struct.Timer.html
