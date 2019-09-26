@@ -52,9 +52,12 @@ fn progress() {
         tx.broadcast("two").unwrap();
 
         let jh1 = thread::spawn(move || {
+            //eprintln!("broadcast three");
             tx.broadcast("three").unwrap();
             thread::yield_now();
+            //eprintln!("broadcast four");
             tx.broadcast("four").unwrap();
+            //eprintln!("broadcaster return");
             tx
         });
 
@@ -62,15 +65,14 @@ fn progress() {
         let jh2 = thread::spawn(move || {
             let mut got = 2;
             loop {
-                match *block_on(rx1.recv_ref()).unwrap() {
+                let recv = *block_on(rx1.recv_ref()).unwrap();
+                //eprintln!("received {} with got == {}", recv, got);
+                match recv {
                     "two" if got == 2 => {}
                     "three" if got == 2 || got == 3 => {
                         got = 3;
                     }
-                    "four" if got == 3 => {
-                        got = 4;
-                    }
-                    "four" if got == 4 => {
+                    "four" if got == 2 || got == 3 => {
                         break;
                     }
                     r => {
@@ -80,9 +82,19 @@ fn progress() {
             }
         });
 
-        assert_ne!(*block_on(rx.recv_ref()).unwrap(), "one");
+        thread::yield_now();
+        //eprintln!("main try recv");
+        // we know we'll wake up since we've never read
+        let recvd = *block_on(rx.recv_ref()).unwrap();
+        //eprintln!("main joining");
         let _tx = jh1.join().unwrap();
-        assert_eq!(*block_on(rx.recv_ref()).unwrap(), "four");
+        //eprintln!("main joined");
+        // we know we'll wake up as long as we didn't already receive four
+        if recvd != "four" {
+            assert_eq!(*block_on(rx.recv_ref()).unwrap(), "four");
+        }
+        //eprintln!("main joining again");
         jh2.join().unwrap();
+        //eprintln!("main joined again");
     });
 }
