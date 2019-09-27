@@ -9,8 +9,8 @@ use std::io;
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
-    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     sender.connect(receiver.local_addr()?).await?;
     receiver.connect(sender.local_addr()?).await?;
@@ -27,8 +27,8 @@ async fn send_recv() -> std::io::Result<()> {
 
 #[tokio::test]
 async fn send_to_recv_from() -> std::io::Result<()> {
-    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let message = b"hello!";
     let receiver_addr = receiver.local_addr()?;
@@ -45,7 +45,7 @@ async fn send_to_recv_from() -> std::io::Result<()> {
 #[tokio::test]
 async fn split() -> std::io::Result<()> {
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
-    let (mut r, mut s) = socket.split();
+    let (r, s) = socket.split();
 
     let msg = b"hello";
     let addr = s.as_ref().local_addr()?;

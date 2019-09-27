@@ -109,7 +109,7 @@ impl UdpSocket {
     /// will resolve to an error if the socket is not connected.
     ///
     /// [`connect`]: #method.connect
-    pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+    pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_send_priv(cx, buf)).await
     }
 
@@ -151,7 +151,7 @@ impl UdpSocket {
     /// will fail if the socket is not connected.
     ///
     /// [`connect`]: #method.connect
-    pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_recv_priv(cx, buf)).await
     }
 
@@ -176,7 +176,7 @@ impl UdpSocket {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    pub async fn send_to<A: ToSocketAddrs>(&mut self, buf: &[u8], target: A) -> io::Result<usize> {
+    pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
         let mut addrs = target.to_socket_addrs().await?;
 
         match addrs.next() {
@@ -211,7 +211,7 @@ impl UdpSocket {
     /// The function must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
-    pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         poll_fn(|cx| self.poll_recv_from_priv(cx, buf)).await
     }
 
