@@ -27,7 +27,7 @@ struct Server {
 impl Server {
     async fn run(self) -> Result<(), io::Error> {
         let Server {
-            mut socket,
+            socket,
             mut buf,
             mut to_send,
         } = self;
