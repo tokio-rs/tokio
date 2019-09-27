@@ -2,27 +2,26 @@ trigger: ["master", "std-future"]
 pr: ["master", "std-future"]
 
 variables:
-  nightly: nightly-2019-08-21
   RUSTFLAGS: -Dwarnings
 
 jobs:
 # Check formatting
 - template: ci/azure-rustfmt.yml
   parameters:
-    rust: $(nightly)
+    rust: beta
     name: rustfmt
 
 # Apply clippy lints to all crates
 - template: ci/azure-clippy.yml
   parameters:
-    rust: $(nightly)
+    rust: beta
     name: clippy
 
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
     name: test_tokio
-    rust: $(nightly)
+    rust: beta
     displayName: Test tokio
     cross: true
     crates:
@@ -44,7 +43,7 @@ jobs:
     name: test_sub_cross
     displayName: Test sub crates (cross) -
     cross: true
-    rust: $(nightly)
+    rust: beta
     crates:
       tokio-fs: []
       tokio-net:
@@ -59,7 +58,7 @@ jobs:
   parameters:
     name: test_linux
     displayName: Test sub crates -
-    rust: $(nightly)
+    rust: beta
     crates:
       tokio-codec: []
       tokio-executor:
@@ -79,7 +78,7 @@ jobs:
   parameters:
     name: test_features
     displayName: Test feature flags
-    rust: $(nightly)
+    rust: beta
     crates:
       build-tests:
         - tokio-executor
@@ -97,7 +96,7 @@ jobs:
 - template: ci/azure-cross-compile.yml
   parameters:
     name: cross
-    rust: $(nightly)
+    rust: beta
 
 # # This represents the minimum Rust version supported by
 # # Tokio. Updating this should be done in a dedicated PR and
@@ -114,11 +113,11 @@ jobs:
 # - template: ci/azure-tsan.yml
 #   parameters:
 #     name: tsan
-#     rust: $(nightly)
+#     rust: beta
 
 - template: ci/azure-deploy-docs.yml
   parameters:
-    rust: $(nightly)
+    rust: beta
     dependsOn:
       - rustfmt
       - clippy
