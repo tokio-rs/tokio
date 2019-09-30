@@ -35,3 +35,10 @@ race:WorkerEntry::set_next_sleeper
 # This ignores a false positive caused by `thread::park()`/`thread::unpark()`.
 # See: https://github.com/rust-lang/rust/pull/54806#issuecomment-436193353
 race:pthread_cond_destroy
+
+# Recent rand dependency updates and seeding changes have introduced
+# lazy_static's and other racy code. See:
+# https://github.com/tokio-rs/tokio/pull/1358#issuecomment-516172383
+race:RandomState*::build_hasher
+race:lazy_static::
+race:c2_chacha::guts

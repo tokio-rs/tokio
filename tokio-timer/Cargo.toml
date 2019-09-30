@@ -28,6 +28,6 @@ crossbeam-utils = "0.6.0"
 slab = "0.4.1"
 
 [dev-dependencies]
-rand = "0.6"
+rand = "0.7"
 tokio-mock-task = "0.1.0"
 tokio = "0.1.7"

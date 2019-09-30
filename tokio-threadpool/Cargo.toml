@@ -8,8 +8,8 @@ name = "tokio-threadpool"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.1.15"
-documentation = "https://docs.rs/tokio-threadpool/0.1.14/tokio_threadpool"
+version = "0.1.16"
+documentation = "https://docs.rs/tokio-threadpool/0.1.16/tokio_threadpool"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
 license = "MIT"
@@ -27,12 +27,13 @@ crossbeam-deque = "0.7.0"
 crossbeam-queue = "0.1.0"
 crossbeam-utils = "0.6.4"
 num_cpus = "1.2"
-rand = "0.6"
 slab = "0.4.1"
 log = "0.4"
+lazy_static = "1"
 
 [dev-dependencies]
-env_logger = "0.5"
+rand = "0.7"
+env_logger = { version = "0.6", default-features = false }
 
 # For comparison benchmarks
 futures-cpupool = "0.1.7"

@@ -1,3 +1,9 @@
+# 0.1.10 (September 25, 2019)
+
+### Changed
+- Upgrade to parking_lot 0.9.0 (#1298 backport)
+- The minimum supported rust version (MSRV) is now 1.31.0. (#1358)
+
 # 0.1.9 (March 1, 2019)
 
 ### Added
