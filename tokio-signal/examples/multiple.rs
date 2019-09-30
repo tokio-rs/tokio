@@ -39,7 +39,6 @@ mod platform {
         }
         Ok(())
     }
-
 }
 
 #[cfg(not(unix))]
