@@ -24,9 +24,9 @@ async-traits = ["futures-sink-preview"]
 
 [dependencies]
 fnv = "1.0.6"
-futures-core-preview = { version = "=0.3.0-alpha.18" }
-futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
-futures-util-preview = { version = "=0.3.0-alpha.18" }
+futures-core-preview = { version = "=0.3.0-alpha.19" }
+futures-sink-preview = { version = "=0.3.0-alpha.19", optional = true }
+futures-util-preview = { version = "=0.3.0-alpha.19" }
 
 [dev-dependencies]
 tokio = { version = "0.2.0-alpha.5", path = "../tokio" }

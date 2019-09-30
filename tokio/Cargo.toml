@@ -64,9 +64,9 @@ uds = ["io", "tokio-net/uds"]
 process = ["io", "tokio-net/process"]
 
 [dependencies]
-futures-core-preview = "=0.3.0-alpha.18"
-futures-sink-preview = "=0.3.0-alpha.18"
-futures-util-preview = { version = "=0.3.0-alpha.18", features = ["sink"] }
+futures-core-preview = "=0.3.0-alpha.19"
+futures-sink-preview = "=0.3.0-alpha.19"
+futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink"] }
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
@@ -88,8 +88,8 @@ tokio-executor = { version = "=0.2.0-alpha.5", optional = true, path = "../tokio
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.5", path = "../tokio-test" }
 
-futures-preview = "=0.3.0-alpha.18"
-futures-util-preview = "=0.3.0-alpha.18"
+futures-preview = "=0.3.0-alpha.19"
+futures-util-preview = "=0.3.0-alpha.19"
 pin-utils = "=0.1.0-alpha.4"
 env_logger = { version = "0.6", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }

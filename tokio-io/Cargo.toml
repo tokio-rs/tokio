@@ -25,7 +25,7 @@ util = ["memchr", "pin-project"]
 [dependencies]
 bytes = "0.4.7"
 log = "0.4"
-futures-core-preview = "=0.3.0-alpha.18"
+futures-core-preview = "=0.3.0-alpha.19"
 memchr = { version = "2.2", optional = true }
 pin-project = { version = "0.4", optional = true }
 
@@ -33,7 +33,7 @@ pin-project = { version = "0.4", optional = true }
 tokio = { version = "=0.2.0-alpha.5", path = "../tokio" }
 tokio-test = { version = "=0.2.0-alpha.5", path = "../tokio-test" }
 
-futures-util-preview = "=0.3.0-alpha.18"
+futures-util-preview = "=0.3.0-alpha.19"
 
 [package.metadata.docs.rs]
 all-features = true
