@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.2.0-alpha.5")]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.2.0-alpha.6")]
 #![warn(
     missing_debug_implementations,
     missing_docs,

@@ -7,14 +7,14 @@ name = "tokio-net"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.5"
+version = "0.2.0-alpha.6"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-net/0.2.0-alpha.5/tokio_net"
+documentation = "https://docs.rs/tokio-net/0.2.0-alpha.6/tokio_net"
 description = """
 Event loop that drives Tokio I/O resources.
 """
@@ -62,10 +62,10 @@ uds = [
 log = ["tracing/log"]
 
 [dependencies]
-tokio-codec = { version = "=0.2.0-alpha.5", path = "../tokio-codec" }
-tokio-executor = { version = "=0.2.0-alpha.5", features = ["blocking"], path = "../tokio-executor" }
-tokio-io = { version = "=0.2.0-alpha.5", path = "../tokio-io" }
-tokio-sync = { version = "=0.2.0-alpha.5", path = "../tokio-sync" }
+tokio-codec = { version = "=0.2.0-alpha.6", path = "../tokio-codec" }
+tokio-executor = { version = "=0.2.0-alpha.6", features = ["blocking"], path = "../tokio-executor" }
+tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
+tokio-sync = { version = "=0.2.0-alpha.6", path = "../tokio-sync" }
 
 tracing = { version = "0.1.5", optional = true }
 
@@ -103,8 +103,8 @@ optional = true
 tracing = { version = "0.1.5", features = ["log"] }
 
 [dev-dependencies]
-tokio = { version = "=0.2.0-alpha.5", path = "../tokio" }
-tokio-test = { version = "=0.2.0-alpha.5", path = "../tokio-test" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 num_cpus = "1.8.0"
 tokio-io-pool = "0.1.4"
 
