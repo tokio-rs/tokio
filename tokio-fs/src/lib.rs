@@ -1,4 +1,4 @@
-#![deny(missing_docs, missing_debug_implementations, warnings)]
+#![deny(missing_docs, missing_debug_implementations)]
 #![doc(html_root_url = "https://docs.rs/tokio-fs/0.1.6")]
 
 //! Asynchronous file and standard stream adaptation.

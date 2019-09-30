@@ -24,8 +24,6 @@
 //! connected clients they'll all join the same room and see everyone else's
 //! messages.
 
-#![deny(warnings)]
-
 extern crate futures;
 extern crate tokio;
 

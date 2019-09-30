@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 extern crate futures;
 extern crate loom;
 

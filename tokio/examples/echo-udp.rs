@@ -10,8 +10,6 @@
 //!
 //! Each line you type in to the `nc` terminal should be echo'd back to you!
 
-#![deny(warnings)]
-
 #[macro_use]
 extern crate futures;
 extern crate tokio;

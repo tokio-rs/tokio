@@ -1,5 +1,4 @@
 #![feature(test)]
-#![deny(warnings)]
 
 extern crate test;
 #[macro_use]

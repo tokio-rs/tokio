@@ -11,8 +11,6 @@
 //!
 //!     cargo run --example hello_world
 
-#![deny(warnings)]
-
 extern crate tokio;
 
 use tokio::io;

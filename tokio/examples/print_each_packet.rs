@@ -52,8 +52,6 @@
 //! ```
 //!
 
-#![deny(warnings)]
-
 extern crate tokio;
 extern crate tokio_codec;
 

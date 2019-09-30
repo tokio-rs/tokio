@@ -6,8 +6,6 @@
 //! new message with a new destination. Overall, we then use this to construct a
 //! "ping pong" pair where two sockets are sending messages back and forth.
 
-#![deny(warnings)]
-
 extern crate env_logger;
 extern crate tokio;
 extern crate tokio_codec;

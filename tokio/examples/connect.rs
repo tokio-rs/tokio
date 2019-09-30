@@ -14,8 +14,6 @@
 //! this repository! Many of them recommend running this as a simple "hook up
 //! stdin/stdout to a server" to get up and running.
 
-#![deny(warnings)]
-
 extern crate bytes;
 extern crate futures;
 extern crate tokio;

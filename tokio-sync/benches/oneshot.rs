@@ -1,5 +1,4 @@
 #![feature(test)]
-#![cfg_attr(test, deny(warnings))]
 
 extern crate futures;
 extern crate test;
