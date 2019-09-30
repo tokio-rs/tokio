@@ -631,7 +631,7 @@ impl HandlePriv {
     }
 
     unsafe fn from_usize(val: usize) -> HandlePriv {
-        let inner = mem::transmute::<usize, Weak<Inner>>(val);;
+        let inner = mem::transmute::<usize, Weak<Inner>>(val);
         HandlePriv { inner }
     }
 
