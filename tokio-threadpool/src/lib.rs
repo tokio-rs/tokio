@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.15")]
+#![doc(html_root_url = "https://docs.rs/tokio-threadpool/0.1.16")]
 #![deny(missing_docs, missing_debug_implementations)]
 
 //! A work-stealing based thread pool for executing futures.
@@ -84,8 +84,9 @@ extern crate crossbeam_queue;
 extern crate crossbeam_utils;
 #[macro_use]
 extern crate futures;
+#[macro_use]
+extern crate lazy_static;
 extern crate num_cpus;
-extern crate rand;
 extern crate slab;
 
 #[macro_use]
