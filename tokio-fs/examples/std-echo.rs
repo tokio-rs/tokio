@@ -19,8 +19,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             while let Some(line) = input.next().await {
                 let line = line?;
-                output.send(format!("OUT: {}", line)).await?;
-                error.send(format!("ERR: {}", line)).await?;
+                // https://github.com/rust-lang/rust/pull/64856
+                let s = format!("OUT: {}", line);
+                output.send(s).await?;
+                let s = format!("ERR: {}", line);
+                error.send(s).await?;
             }
             Ok(())
         }
