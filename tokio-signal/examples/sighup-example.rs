@@ -38,7 +38,6 @@ mod platform {
         ::tokio::runtime::current_thread::block_on_all(future)?;
         Ok(())
     }
-
 }
 
 #[cfg(not(unix))]
