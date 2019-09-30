@@ -127,5 +127,4 @@ mod tests {
         let mut fut = future::ok::<(), ()>(());
         assert_ready_eq!(fut.poll(), ());
     }
-
 }
