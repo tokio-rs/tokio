@@ -1,6 +1,11 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.2.0-alpha.6 (September 30, 2019)
+
+- Move to `futures-*-preview 0.3.0-alpha.19`
+- Move to `pin-project 0.4`
+
 # 0.2.0-alpha.5 (September 19, 2019)
 
 ### Changed
