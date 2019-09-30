@@ -55,6 +55,40 @@ impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
     }
 }
 
+impl<RW> From<BufReader<BufWriter<RW>>> for BufStream<RW> {
+    fn from(b: BufReader<BufWriter<RW>>) -> Self {
+        BufStream(b)
+    }
+}
+
+impl<RW> From<BufWriter<BufReader<RW>>> for BufStream<RW> {
+    fn from(b: BufWriter<BufReader<RW>>) -> Self {
+        // we need to "invert" the reader and writer
+        let BufWriter {
+            inner:
+                BufReader {
+                    inner,
+                    buf: rbuf,
+                    pos,
+                    cap,
+                },
+            buf: wbuf,
+            written,
+        } = b;
+
+        BufStream(BufReader {
+            inner: BufWriter {
+                inner,
+                buf: wbuf,
+                written,
+            },
+            buf: rbuf,
+            pos,
+            cap,
+        })
+    }
+}
+
 impl<RW: AsyncRead + AsyncWrite> AsyncWrite for BufStream<RW> {
     fn poll_write(
         self: Pin<&mut Self>,
