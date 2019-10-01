@@ -90,7 +90,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `single_thread` or `multi_thread`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -192,7 +192,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `single_thread` or `multi_thread`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
