@@ -62,7 +62,7 @@ where
                 true
             }
         } else {
-            shared.num_idle -= 1;
+            shared.dec_idle();
             POOL.condvar.notify_one();
             false
         }
@@ -106,7 +106,7 @@ fn spawn_thread() {
                 }
 
                 // IDLE
-                shared.num_idle += 1;
+                shared.inc_idle();
 
                 loop {
                     let lock_result = POOL.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
@@ -118,10 +118,17 @@ fn spawn_thread() {
                         run_task(task);
                         continue 'outer;
                     } else if timeout_result.timed_out() {
-                        shared.num_idle = shared.num_idle.saturating_sub(1);
                         shared.num_th -= 1;
+                        shared.dec_idle();
                         break 'outer;
                     }
+
+                    // Threads may do work in the top of the 'outer
+                    // loop without consuming notifications. This may
+                    // result in too many threads woken up. Make sure
+                    // we signal our idle state here, otherwise too
+                    // many threads may be spawned.
+                    shared.inc_idle()
                 }
             }
         })
@@ -144,5 +151,17 @@ impl Pool {
             }),
             condvar: Condvar::new(),
         }
+    }
+}
+
+impl Shared {
+    fn inc_idle(&mut self) {
+        // Spurious wakeups may cause this function to be called too
+        // many times, keep num_idle within a sane range.
+        self.num_idle = std::cmp::min(self.num_idle.saturating_add(1), self.num_th)
+    }
+
+    fn dec_idle(&mut self) {
+        self.num_idle = std::cmp::min(self.num_idle.saturating_sub(1), self.num_th)
     }
 }
