@@ -28,7 +28,7 @@ error: the test function cannot accept arguments
 16 | async fn test_fn_has_args(_x: u8) {}
    |                           ^^^^^^
 
-error: unexpected token
+error: Unknown attribute foo is specified
   --> $DIR/macros_invalid_input.rs:18:15
    |
 18 | #[tokio::test(foo)]
