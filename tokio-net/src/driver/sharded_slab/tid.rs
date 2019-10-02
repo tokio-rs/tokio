@@ -16,7 +16,6 @@ use std::{
 use lazy_static::lazy_static;
 
 /// Uniquely identifies a thread.
-// #[repr(transparent)]
 #[derive(Hash)]
 pub(crate) struct Tid<C> {
     id: usize,
