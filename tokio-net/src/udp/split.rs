@@ -15,70 +15,29 @@
 use super::UdpSocket;
 
 use futures_util::future::poll_fn;
-use std::error::Error;
-use std::fmt;
 use std::io;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use crate::ToSocketAddrs;
 
 /// The send half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
-pub struct UdpSocketSendHalf(Arc<UdpSocket>);
+pub struct UdpSocketSendHalf<'a>(&'a UdpSocket);
 
 /// The recv half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
 #[derive(Debug)]
-pub struct UdpSocketRecvHalf(Arc<UdpSocket>);
+pub struct UdpSocketRecvHalf<'a>(&'a UdpSocket);
 
-pub(crate) fn split(socket: UdpSocket) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
-    let shared = Arc::new(socket);
-    let send = shared.clone();
-    let recv = shared;
-    (UdpSocketRecvHalf(recv), UdpSocketSendHalf(send))
+pub(crate) fn split(socket: &mut UdpSocket) -> (UdpSocketRecvHalf<'_>, UdpSocketSendHalf<'_>) {
+    (UdpSocketRecvHalf(&*socket), UdpSocketSendHalf(&*socket))
 }
 
-/// Error indicating two halves were not from the same socket, and thus could
-/// not be `reunite`d.
-#[derive(Debug)]
-pub struct ReuniteError(pub UdpSocketSendHalf, pub UdpSocketRecvHalf);
-
-impl fmt::Display for ReuniteError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "tried to reunite halves that are not from the same socket"
-        )
-    }
-}
-
-impl Error for ReuniteError {}
-
-fn reunite(s: UdpSocketSendHalf, r: UdpSocketRecvHalf) -> Result<UdpSocket, ReuniteError> {
-    if Arc::ptr_eq(&s.0, &r.0) {
-        drop(r);
-        // Only two instances of the `Arc` are ever created, one for the
-        // receiver and one for the sender, and those `Arc`s are never exposed
-        // externally. And so when we drop one here, the other one must be the
-        // only remaining one.
-        Ok(Arc::try_unwrap(s.0).expect("udp: try_unwrap failed in reunite"))
-    } else {
-        Err(ReuniteError(s, r))
-    }
-}
-
-impl UdpSocketRecvHalf {
-    /// Attempts to put the two "halves" of a `UdpSocket` back together and
-    /// recover the original socket. Succeeds only if the two "halves"
-    /// originated from the same call to `UdpSocket::split`.
-    pub fn reunite(self, other: UdpSocketSendHalf) -> Result<UdpSocket, ReuniteError> {
-        reunite(other, self)
-    }
-
+impl<'a> UdpSocketRecvHalf<'a> {
     /// Returns a future that receives a single datagram on the socket. On success,
     /// the future resolves to the number of bytes read and the origin.
     ///
@@ -106,21 +65,22 @@ impl UdpSocketRecvHalf {
     }
 }
 
-impl UdpSocketSendHalf {
-    /// Attempts to put the two "halves" of a `UdpSocket` back together and
-    /// recover the original socket. Succeeds only if the two "halves"
-    /// originated from the same call to `UdpSocket::split`.
-    pub fn reunite(self, other: UdpSocketRecvHalf) -> Result<UdpSocket, ReuniteError> {
-        reunite(self, other)
-    }
-
+impl<'a> UdpSocketSendHalf<'a> {
     /// Returns a future that sends data on the socket to the given address.
     /// On success, the future will resolve to the number of bytes written.
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    pub async fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, target)).await
+    pub async fn send_to<A: ToSocketAddrs>(&mut self, buf: &[u8], target: A) -> io::Result<usize> {
+        let mut addrs = target.to_socket_addrs().await?;
+
+        match addrs.next() {
+            Some(target) => poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, &target)).await,
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "no addresses to send data to",
+            )),
+        }
     }
 
     /// Returns a future that sends data on the socket to the remote address to which it is connected.
@@ -135,14 +95,14 @@ impl UdpSocketSendHalf {
     }
 }
 
-impl AsRef<UdpSocket> for UdpSocketSendHalf {
+impl AsRef<UdpSocket> for UdpSocketSendHalf<'_> {
     fn as_ref(&self) -> &UdpSocket {
-        &self.0
+        self.0
     }
 }
 
-impl AsRef<UdpSocket> for UdpSocketRecvHalf {
+impl AsRef<UdpSocket> for UdpSocketRecvHalf<'_> {
     fn as_ref(&self) -> &UdpSocket {
-        &self.0
+        self.0
     }
 }
