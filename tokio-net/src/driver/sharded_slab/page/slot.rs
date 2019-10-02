@@ -68,7 +68,7 @@ impl<T> Slot<T> {
     }
 
     #[inline(always)]
-    pub(super) fn value<'a>(&'a self) -> Option<&'a T> {
+    pub(super) fn value(&self) -> Option<&T> {
         self.item.with(|item| unsafe { (&*item).as_ref() })
     }
 

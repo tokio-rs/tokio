@@ -67,14 +67,12 @@ impl Tid {
             .unwrap_or_else(|_| Self::poisoned())
     }
 
-    pub(crate) fn is_current(&self) -> bool {
+    pub(crate) fn is_current(self) -> bool {
         REGISTRATION
-            .try_with(|r| self == &r.current())
+            .try_with(|r| self == r.current())
             .unwrap_or(false)
     }
-}
 
-impl Tid {
     #[inline(always)]
     pub(crate) fn new(id: usize) -> Self {
         Self {
@@ -92,7 +90,7 @@ impl Tid {
     }
 
     /// Returns true if the local thread ID was accessed while unwinding.
-    pub(crate) fn is_poisoned(&self) -> bool {
+    pub(crate) fn is_poisoned(self) -> bool {
         self.id == std::usize::MAX
     }
 }

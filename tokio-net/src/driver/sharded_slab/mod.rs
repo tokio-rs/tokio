@@ -120,7 +120,7 @@ impl<T> Slab<T> {
     }
 
     /// Returns an iterator over all the items in the slab.
-    pub(crate) fn unique_iter<'a>(&'a mut self) -> iter::UniqueIter<'a, T> {
+    pub(crate) fn unique_iter(&mut self) -> iter::UniqueIter<'_, T> {
         let mut shards = self.shards.iter_mut();
         let shard = shards.next().expect("must be at least 1 shard");
         let mut pages = shard.with(|shard| unsafe { (*shard).iter() });
