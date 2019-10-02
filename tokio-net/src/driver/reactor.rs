@@ -1,11 +1,10 @@
 use super::platform;
-use super::sharded_rwlock::RwLock;
+use super::sharded_slab;
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
 
 use mio::event::Evented;
-use slab::Slab;
 use std::cell::RefCell;
 use std::io;
 use std::marker::PhantomData;
@@ -76,7 +75,7 @@ pub(super) struct Inner {
     next_aba_guard: AtomicUsize,
 
     /// Dispatch slabs for I/O and futures events
-    pub(super) io_dispatch: RwLock<Slab<ScheduledIo>>,
+    pub(super) io_dispatch: IoDispatch,
 
     /// Used to wake up the reactor from a call to `turn`
     wakeup: mio::SetReadiness,
@@ -100,9 +99,14 @@ thread_local! {
     static CURRENT_REACTOR: RefCell<Option<HandlePriv>> = RefCell::new(None)
 }
 
-const TOKEN_SHIFT: usize = 22;
+pub(super) type IoDispatch = sharded_slab::Slab<ScheduledIo, SlabCfg>;
+pub(super) struct SlabCfg;
+impl sharded_slab::Config for SlabCfg {
+    const MAX_PAGES: usize = 16;
+    const RESERVED_BITS: usize = 5;
+}
+const TOKEN_SHIFT: usize = IoDispatch::USED_BITS;
 
-// Kind of arbitrary, but this reserves some token space for later usage.
 const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_SOURCES);
 
@@ -161,6 +165,7 @@ impl Reactor {
     pub fn new() -> io::Result<Reactor> {
         let io = mio::Poll::new()?;
         let wakeup_pair = mio::Registration::new2();
+        let io_dispatch = sharded_slab::Slab::new_with_config();
 
         io.register(
             &wakeup_pair.0,
@@ -175,7 +180,7 @@ impl Reactor {
             inner: Arc::new(Inner {
                 io,
                 next_aba_guard: AtomicUsize::new(0),
-                io_dispatch: RwLock::new(Slab::with_capacity(1)),
+                io_dispatch,
                 wakeup: wakeup_pair.1,
             }),
         })
@@ -231,7 +236,8 @@ impl Reactor {
     /// Idle is defined as all tasks that have been spawned have completed,
     /// either successfully or with an error.
     pub fn is_idle(&self) -> bool {
-        self.inner.io_dispatch.read().is_empty()
+        // self.inner.io_dispatch.is_empty()
+        unimplemented!("eliza: add is_emtpy 2 slab");
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
@@ -281,27 +287,24 @@ impl Reactor {
 
         // Create a scope to ensure that notifying the tasks stays out of the
         // lock's critical section.
-        {
-            let io_dispatch = self.inner.io_dispatch.read();
 
-            let io = match io_dispatch.get(token) {
-                Some(io) => io,
-                None => return,
-            };
+        let io = match self.inner.io_dispatch.get(token) {
+            Some(io) => io,
+            None => return,
+        };
 
-            if aba_guard != io.aba_guard {
-                return;
-            }
+        if aba_guard != io.aba_guard {
+            return;
+        }
 
-            io.readiness.fetch_or(ready.as_usize(), Relaxed);
+        io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
-            if ready.is_writable() || platform::is_hup(ready) {
-                wr = io.writer.take_waker();
-            }
+        if ready.is_writable() || platform::is_hup(ready) {
+            wr = io.writer.take_waker();
+        }
 
-            if !(ready & (!mio::Ready::writable())).is_empty() {
-                rd = io.reader.take_waker();
-            }
+        if !(ready & (!mio::Ready::writable())).is_empty() {
+            rd = io.reader.take_waker();
         }
 
         if let Some(w) = rd {
@@ -437,24 +440,19 @@ impl Inner {
         // Get an ABA guard value
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
 
-        let key = {
-            // Block to contain the write lock
-            let mut io_dispatch = self.io_dispatch.write();
-
-            if io_dispatch.len() == MAX_SOURCES {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "reactor at max \
-                     registered I/O resources",
-                ));
-            }
-
-            io_dispatch.insert(ScheduledIo {
-                aba_guard,
-                readiness: AtomicUsize::new(0),
-                reader: AtomicWaker::new(),
-                writer: AtomicWaker::new(),
-            })
+        let key = if let Some(key) = self.io_dispatch.insert(ScheduledIo {
+            aba_guard,
+            readiness: AtomicUsize::new(0),
+            reader: AtomicWaker::new(),
+            writer: AtomicWaker::new(),
+        }) {
+            key
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "reactor at max \
+                 registered I/O resources",
+            ));
         };
 
         let token = aba_guard | key;
@@ -477,14 +475,13 @@ impl Inner {
 
     pub(super) fn drop_source(&self, token: usize) {
         debug!(message = "dropping I/O source", token);
-        self.io_dispatch.write().remove(token);
+        self.io_dispatch.remove(token);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
     pub(super) fn register(&self, token: usize, dir: Direction, w: Waker) {
         debug!(message = "scheduling", direction = ?dir, token);
-        let io_dispatch = self.io_dispatch.read();
-        let sched = io_dispatch.get(token).unwrap();
+        let sched = self.io_dispatch.get(token).unwrap();
 
         let (waker, ready) = match dir {
             Direction::Read => (&sched.reader, !mio::Ready::writable()),
@@ -504,8 +501,7 @@ impl Drop for Inner {
         // When a reactor is dropped it needs to wake up all blocked tasks as
         // they'll never receive a notification, and all connected I/O objects
         // will start returning errors pretty quickly.
-        let io = self.io_dispatch.read();
-        for (_, io) in io.iter() {
+        for io in self.io_dispatch.unique_iter() {
             io.writer.wake();
             io.reader.wake();
         }

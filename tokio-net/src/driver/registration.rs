@@ -507,8 +507,7 @@ impl Inner {
         let mask = direction.mask();
         let mask_no_hup = (mask - platform::hup()).as_usize();
 
-        let io_dispatch = inner.io_dispatch.read();
-        let sched = &io_dispatch[self.token];
+        let sched = inner.io_dispatch.get(self.token).unwrap();
 
         // This consumes the current readiness state **except** for HUP. HUP is
         // excluded because a) it is a final state and never transitions out of
