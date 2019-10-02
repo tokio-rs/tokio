@@ -111,23 +111,12 @@ impl<T> Slab<T> {
             .with(|shard| unsafe { (*shard).get(key) })
     }
 
-    /// Returns `true` if the slab contains a value for the given key.
-    pub(crate) fn contains(&self, key: usize) -> bool {
-        self.get(key).is_some()
-    }
-
     /// Returns the number of items currently stored in the slab.
     pub(crate) fn len(&self) -> usize {
         self.shards
             .iter()
             .map(|shard| shard.with(|shard| unsafe { (*shard).len() }))
             .sum()
-    }
-
-    /// Returns the current number of items which may be stored in the slab
-    /// without allocating.
-    pub(crate) fn capacity(&self) -> usize {
-        self.total_capacity() - self.len()
     }
 
     /// Returns an iterator over all the items in the slab.
@@ -141,13 +130,6 @@ impl<T> Slab<T> {
             slots,
             pages,
         }
-    }
-
-    fn total_capacity(&self) -> usize {
-        self.shards
-            .iter()
-            .map(|shard| shard.with(|shard| unsafe { (*shard).total_capacity() }))
-            .sum()
     }
 }
 
@@ -232,10 +214,6 @@ impl<T> Shard<T> {
 
     fn len(&self) -> usize {
         self.len.load(Ordering::Relaxed)
-    }
-
-    fn total_capacity(&self) -> usize {
-        self.iter().map(Page::total_capacity).sum()
     }
 
     fn iter<'a>(&'a self) -> std::slice::Iter<'a, Page<T>> {
