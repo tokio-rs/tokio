@@ -42,6 +42,16 @@
 #[macro_use]
 mod tracing;
 
+#[cfg(test)]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
+
+#[cfg(not(test))]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
+}
+
 mod addr;
 pub use addr::ToSocketAddrs;
 
@@ -63,3 +73,5 @@ pub mod udp;
 #[cfg(feature = "uds")]
 #[cfg(unix)]
 pub mod uds;
+
+pub(crate) mod sync;
