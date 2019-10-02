@@ -27,6 +27,7 @@ pub(crate) struct Slab<T> {
 }
 
 struct Shard<T> {
+    #[cfg(debug_assertions)]
     tid: usize,
     sz: usize,
     len: AtomicUsize,
@@ -136,9 +137,10 @@ impl<T> Slab<T> {
 }
 
 impl<T> Shard<T> {
-    fn new(tid: usize) -> Self {
+    fn new(_tid: usize) -> Self {
         Self {
-            tid,
+            #[cfg(debug_assertions)]
+            tid: _tid,
             sz: page::INITIAL_SIZE,
             len: AtomicUsize::new(0),
             pages: vec![Page::new(page::INITIAL_SIZE, 0)],
@@ -146,6 +148,7 @@ impl<T> Shard<T> {
     }
 
     fn insert(&mut self, value: T) -> Option<usize> {
+        #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::current().as_usize(), self.tid);
 
         let mut value = Some(value);
@@ -180,6 +183,7 @@ impl<T> Shard<T> {
 
     #[inline]
     fn get(&self, idx: usize) -> Option<&T> {
+        #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
         let addr = Addr::from_packed(idx);
         self.pages.get(addr.index())?.get(addr, idx)
@@ -187,8 +191,11 @@ impl<T> Shard<T> {
 
     /// Remove an item on the shard's local thread.
     fn remove_local(&mut self, idx: usize) -> Option<T> {
-        debug_assert_eq!(Tid::current().as_usize(), self.tid);
-        debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+        #[cfg(debug_assertions)]
+        {
+            debug_assert_eq!(Tid::current().as_usize(), self.tid);
+            debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+        }
         let addr = Addr::from_packed(idx);
 
         self.pages
@@ -202,8 +209,11 @@ impl<T> Shard<T> {
 
     /// Remove an item, while on a different thread from the shard's local thread.
     fn remove_remote(&self, idx: usize) -> Option<T> {
-        debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
-        debug_assert!(Tid::current().as_usize() != self.tid);
+        #[cfg(debug_assertions)]
+        {
+            debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+            debug_assert!(Tid::current().as_usize() != self.tid);
+        }
         let addr = Addr::from_packed(idx);
         self.pages
             .get(addr.index())?
