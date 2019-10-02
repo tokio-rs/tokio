@@ -1,9 +1,11 @@
 use super::Slab;
-use crate::sync::{Arc, Condvar, Mutex};
-use loom::thread;
+use loom::{
+    sync::{Arc, Condvar, Mutex},
+    thread,
+};
 
 mod idx {
-    use super::{
+    use super::super::{
         cfg,
         page::{self, slot},
         Pack, Tid,
