@@ -54,11 +54,7 @@ impl<C: cfg::Config> Generation<C> {
 
     #[inline(always)]
     fn advance(&mut self) -> Self {
-        #[cfg(test)]
-        print!("-> advance gen {:?}", self.value);
         self.value = (self.value + 1) % Self::BITS;
-        #[cfg(test)]
-        println!(" to {:?}", self.value);
         debug_assert!(self.value <= Self::BITS);
         *self
     }
@@ -75,9 +71,6 @@ impl<T, C: cfg::Config> Slot<T, C> {
 
     #[inline(always)]
     pub(super) fn get(&self, gen: Generation<C>) -> Option<&T> {
-        #[cfg(test)]
-        println!("-> get {:?}; current={:?}", gen, self.gen);
-
         // Is the index's generation the same as the current generation? If not,
         // the item that index referred to was removed, so return `None`.
         if gen != self.gen {
@@ -106,10 +99,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
         });
 
         // Advance the slot's generation by one, returning the new generation.
-        let gen = self.gen.advance();
-        #[cfg(test)]
-        println!("-> {:?}", gen);
-        gen
+        self.gen.advance()
     }
 
     pub(super) fn next(&self) -> usize {
@@ -117,9 +107,6 @@ impl<T, C: cfg::Config> Slot<T, C> {
     }
 
     pub(super) fn remove(&self, gen: Generation<C>, next: usize) -> Option<T> {
-        #[cfg(test)]
-        println!("-> remove={:?}; current={:?}", gen, self.gen);
-
         // Is the index's generation the same as the current generation? If not,
         // the item that index referred to was already removed.
         if gen != self.gen {

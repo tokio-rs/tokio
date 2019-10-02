@@ -81,53 +81,35 @@ impl<T, C: cfg::Config> Page<T, C> {
     #[inline]
     pub(crate) fn insert(&mut self, t: &mut Option<T>) -> Option<usize> {
         let head = self.local_head;
-        #[cfg(test)]
-        println!("-> local head {:?}", head);
-
         // are there any items on the local free list? (fast path)
         let head = if head < self.slab.len() {
             head
         } else {
             // if the local free list is empty, pop all the items on the remote
             // free list onto the local free list.
-            let head = self.remote_head.swap(Self::NULL, Ordering::Acquire);
-            #[cfg(test)]
-            println!("-> remote head {:?}", head);
-            head
+            self.remote_head.swap(Self::NULL, Ordering::Acquire)
         };
 
         // if the head is still null, both the local and remote free lists are
         // empty --- we can't fit any more items on this page.
         if head == Self::NULL {
-            #[cfg(test)]
-            println!("-> NULL! {:?}", head);
             return None;
         }
 
         let slot = &mut self.slab[head];
         let gen = slot.insert(t);
         self.local_head = slot.next();
-        let index = head + self.prev_sz;
-        #[cfg(test)]
-        println!("insert at offset: {}", index);
-        Some(gen.pack(index))
+        Some(gen.pack(head + self.prev_sz))
     }
 
     #[inline]
     pub(crate) fn get(&self, addr: Addr<C>, idx: usize) -> Option<&T> {
-        let poff = addr.offset() - self.prev_sz;
-        #[cfg(test)]
-        println!("-> offset {:?}", poff);
-
-        self.slab.get(poff)?.get(C::unpack_gen(idx))
+        let offset = addr.offset() - self.prev_sz;
+        self.slab.get(offset)?.get(C::unpack_gen(idx))
     }
 
     pub(crate) fn remove_local(&mut self, addr: Addr<C>, gen: slot::Generation<C>) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
-
-        #[cfg(test)]
-        println!("-> offset {:?}", offset);
-
         let val = self.slab.get(offset)?.remove(gen, self.local_head);
         self.local_head = offset;
         val
@@ -135,13 +117,7 @@ impl<T, C: cfg::Config> Page<T, C> {
 
     pub(crate) fn remove_remote(&self, addr: Addr<C>, gen: slot::Generation<C>) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
-
-        #[cfg(test)]
-        println!("-> offset {:?}", offset);
-
         let next = self.push_remote(offset);
-        #[cfg(test)]
-        println!("-> next={:?}", next);
 
         self.slab.get(offset)?.remove(gen, next)
     }

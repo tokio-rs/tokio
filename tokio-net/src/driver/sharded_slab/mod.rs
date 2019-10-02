@@ -194,8 +194,6 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// ```
     pub(crate) fn insert(&self, value: T) -> Option<usize> {
         let tid = Tid::<C>::current();
-        #[cfg(test)]
-        println!("insert {:?}", tid);
         self.shards[tid.as_usize()]
             .with_mut(|shard| unsafe {
                 // we are guaranteed to only mutate the shard while on its thread.
@@ -211,8 +209,6 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// instead.
     pub(crate) fn remove(&self, idx: usize) -> Option<T> {
         let tid = C::unpack_tid(idx);
-        #[cfg(test)]
-        println!("rm {:?}", tid);
         if tid.is_current() {
             self.shards[tid.as_usize()].with_mut(|shard| unsafe {
                 // only called if this is the current shard
@@ -239,8 +235,6 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// ```
     pub(crate) fn get(&self, key: usize) -> Option<&T> {
         let tid = C::unpack_tid(key);
-        #[cfg(test)]
-        println!("get {:?}", tid);
         self.shards
             .get(tid.as_usize())?
             .with(|shard| unsafe { (*shard).get(key) })
@@ -324,8 +318,6 @@ impl<T, C: cfg::Config> Shard<T, C> {
         // If not, can we allocate a new page?
         let pidx = self.pages.len();
         if pidx >= C::MAX_PAGES {
-            #[cfg(test)]
-            println!("max pages (len={}, max={})", self.pages.len(), C::MAX_PAGES);
             // out of pages!
             return None;
         }
@@ -347,10 +339,7 @@ impl<T, C: cfg::Config> Shard<T, C> {
     fn get(&self, idx: usize) -> Option<&T> {
         debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
         let addr = C::unpack_addr(idx);
-        let i = addr.index();
-        #[cfg(test)]
-        println!("-> {:?}; idx {:?}", addr, i);
-        self.pages.get(i)?.get(addr, idx)
+        self.pages.get(addr.index())?.get(addr, idx)
     }
 
     /// Remove an item on the shard's local thread.
@@ -359,8 +348,6 @@ impl<T, C: cfg::Config> Shard<T, C> {
         debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
         let addr = C::unpack_addr(idx);
 
-        #[cfg(test)]
-        println!("-> remove_local {:?}", addr);
         self.pages
             .get_mut(addr.index())?
             .remove_local(addr, C::unpack_gen(idx))
@@ -375,9 +362,6 @@ impl<T, C: cfg::Config> Shard<T, C> {
         debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
         debug_assert!(Tid::<C>::current().as_usize() != self.tid);
         let addr = C::unpack_addr(idx);
-
-        #[cfg(test)]
-        println!("-> remove_remote {:?}", addr);
         self.pages
             .get(addr.index())?
             .remove_remote(addr, C::unpack_gen(idx))
