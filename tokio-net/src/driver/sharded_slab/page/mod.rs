@@ -1,7 +1,7 @@
-use super::{Pack, Tid};
+use super::Pack;
 use crate::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};
 
-pub(crate) mod slot;
+pub(super) mod slot;
 use self::slot::Slot;
 use std::fmt;
 
@@ -119,10 +119,6 @@ impl<T> Page<T> {
         let next = self.push_remote(offset);
 
         self.slab.get(offset)?.remove(gen, next)
-    }
-
-    pub(super) fn total_capacity(&self) -> usize {
-        self.slab.len()
     }
 
     pub(super) fn iter<'a>(&'a self) -> Iter<'a, T> {
