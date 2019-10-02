@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-sync/0.2.0-alpha.4")]
+#![doc(html_root_url = "https://docs.rs/tokio-sync/0.2.0-alpha.6")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -6,7 +6,10 @@
     unreachable_pub
 )]
 #![deny(intra_doc_link_resolution_failure)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
 //! Asynchronous synchronization primitives.
 //!
@@ -26,13 +29,15 @@ macro_rules! if_fuzz {
     }}
 }
 
-mod lock;
+mod barrier;
 mod loom;
 pub mod mpsc;
+mod mutex;
 pub mod oneshot;
 pub mod semaphore;
 mod task;
 pub mod watch;
 
-pub use lock::{Lock, LockGuard};
+pub use barrier::{Barrier, BarrierWaitResult};
+pub use mutex::{Mutex, MutexGuard};
 pub use task::AtomicWaker;

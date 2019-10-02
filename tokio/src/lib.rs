@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.2.0-alpha.4")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.2.0-alpha.6")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -6,7 +6,10 @@
     unreachable_pub
 )]
 #![deny(intra_doc_link_resolution_failure)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -69,7 +72,10 @@
 
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
-        #[cfg(any(feature = "rt-full"))]
+        #[cfg(any(
+            feature = "rt-full",
+            feature = "rt-current-thread",
+        ))]
         $i
     )*)
 }
@@ -100,8 +106,10 @@ if_runtime! {
     pub use crate::executor::spawn;
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
+    #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::main;
+    #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::test;
 }

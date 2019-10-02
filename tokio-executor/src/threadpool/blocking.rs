@@ -104,7 +104,7 @@ pub struct BlockingError {
 ///         // from the context of a `Future` implementation. Since we don't
 ///         // have a complicated requirement, we can use `poll_fn` in this
 ///         // case.
-///         poll_fn(move |_| {
+///         let _ = poll_fn(move |_| {
 ///             blocking(|| {
 ///                 let msg = rx.recv().unwrap();
 ///                 println!("message = {}", msg);

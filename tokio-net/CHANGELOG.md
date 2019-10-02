@@ -1,3 +1,17 @@
+# 0.2.0-alpha.6 (September 30, 2019)
+
+- Move to `futures-*-preview 0.3.0-alpha.19`
+- Move to `pin-project 0.4`
+
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Added
+- platform specific `Command` methods (#1516).
+- Implement `From<std::process::Command>` for `Command` (#1513).
+
+### Fixed
+- doc generation (#1575).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio release.

@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-timer/0.3.0-alpha.4")]
+#![doc(html_root_url = "https://docs.rs/tokio-timer/0.3.0-alpha.6")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -6,7 +6,10 @@
     unreachable_pub
 )]
 #![deny(intra_doc_link_resolution_failure)]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
 //! Utilities for tracking time.
 //!
@@ -67,9 +70,9 @@ pub fn delay(deadline: Instant) -> Delay {
 
 /// Create a Future that completes in `duration` from now.
 ///
-/// Equivalent to `delay(Instant::now() + duration)`. Analogous to `std::thread::sleep`.
+/// Equivalent to `delay(tokio_timer::clock::now() + duration)`. Analogous to `std::thread::sleep`.
 pub fn delay_for(duration: Duration) -> Delay {
-    delay(Instant::now() + duration)
+    delay(clock::now() + duration)
 }
 
 // ===== Internal utils =====

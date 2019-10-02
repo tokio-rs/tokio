@@ -21,8 +21,14 @@ fn net_with_udp() {
 
 #[test]
 #[cfg(feature = "net-with-uds")]
-fn net_with_udp() {
+fn net_with_uds() {
     use build_tests::tokio_net::uds;
+}
+
+#[test]
+#[cfg(feature = "net-with-process")]
+fn net_with_process() {
+    use build_tests::tokio_net::process;
 }
 
 #[test]
@@ -31,12 +37,16 @@ fn tokio_with_net() {
     // net is present
     use build_tests::tokio::net;
 }
+
 #[test]
 fn compile_fail() {
     let t = trybuild::TestCases::new();
 
     #[cfg(feature = "executor-without-current-thread")]
     t.compile_fail("tests/fail/executor_without_current_thread.rs");
+
+    #[cfg(feature = "macros-invalid-input")]
+    t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "net-no-features")]
     {

@@ -134,7 +134,6 @@ macro_rules! assert_ready_err {
 ///
 /// ```
 /// use std::future::Future;
-/// use std::task::Poll;
 /// use futures_util::{future, pin_mut};
 /// use tokio_test::{assert_pending, task};
 ///

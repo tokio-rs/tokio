@@ -28,9 +28,6 @@ pub struct Read<'a, R: ?Sized> {
     buf: &'a mut [u8],
 }
 
-// forward Unpin
-impl<R: Unpin + ?Sized> Unpin for Read<'_, R> {}
-
 impl<R> Future for Read<'_, R>
 where
     R: AsyncRead + Unpin + ?Sized,
@@ -40,5 +37,16 @@ where
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let me = &mut *self;
         Pin::new(&mut *me.reader).poll_read(cx, me.buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<Read<'_, PhantomPinned>>();
     }
 }

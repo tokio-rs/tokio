@@ -9,14 +9,12 @@ use std::task::{Context, Poll};
 /// Future for the [`read_until`](crate::io::AsyncBufReadExt::read_until) method.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadUntil<'a, R: ?Sized + Unpin> {
+pub struct ReadUntil<'a, R: ?Sized> {
     reader: &'a mut R,
     byte: u8,
     buf: &'a mut Vec<u8>,
     read: usize,
 }
-
-impl<R: ?Sized + Unpin> Unpin for ReadUntil<'_, R> {}
 
 pub(crate) fn read_until<'a, R>(
     reader: &'a mut R,
@@ -71,5 +69,16 @@ impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadUntil<'_, R> {
             read,
         } = &mut *self;
         read_until_internal(Pin::new(reader), cx, *byte, buf, read)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<ReadUntil<'_, PhantomPinned>>();
     }
 }

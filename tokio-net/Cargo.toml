@@ -7,14 +7,14 @@ name = "tokio-net"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.4"
+version = "0.2.0-alpha.6"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-net/0.2.0-alpha.4/tokio_net"
+documentation = "https://docs.rs/tokio-net/0.2.0-alpha.6/tokio_net"
 description = """
 Event loop that drives Tokio I/O resources.
 """
@@ -23,6 +23,7 @@ categories = ["asynchronous", "network-programming"]
 [features]
 async-traits = []
 process = [
+    "tokio-io/util",
     "crossbeam-queue",
     "libc",
     "mio-named-pipes",
@@ -61,17 +62,17 @@ uds = [
 log = ["tracing/log"]
 
 [dependencies]
-tokio-codec = { version = "=0.2.0-alpha.4", path = "../tokio-codec" }
-tokio-executor = { version = "=0.2.0-alpha.4", features = ["blocking"], path = "../tokio-executor" }
-tokio-io = { version = "=0.2.0-alpha.4", path = "../tokio-io" }
-tokio-sync = { version = "=0.2.0-alpha.4", path = "../tokio-sync" }
+tokio-codec = { version = "=0.2.0-alpha.6", path = "../tokio-codec" }
+tokio-executor = { version = "=0.2.0-alpha.6", features = ["blocking"], path = "../tokio-executor" }
+tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
+tokio-sync = { version = "=0.2.0-alpha.6", path = "../tokio-sync" }
 
 tracing = { version = "0.1.5", optional = true }
 
 # driver implementation
 crossbeam-utils = "0.6.0"
-futures-core-preview = "=0.3.0-alpha.18"
-futures-util-preview = "=0.3.0-alpha.18"
+futures-core-preview = "=0.3.0-alpha.19"
+futures-util-preview = "=0.3.0-alpha.19"
 lazy_static = "1.0.2"
 mio = "0.6.14"
 num_cpus = "1.8.0"
@@ -80,7 +81,7 @@ slab = "0.4.0"
 
 # TCP / UDP
 bytes = { version = "0.4", optional = true }
-futures-sink-preview = { version = "=0.3.0-alpha.18", optional = true }
+futures-sink-preview = { version = "=0.3.0-alpha.19", optional = true }
 iovec = { version = "0.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
@@ -102,14 +103,14 @@ optional = true
 tracing = { version = "0.1.5", features = ["log"] }
 
 [dev-dependencies]
-tokio = { version = "0.2.0-alpha.4", path = "../tokio" }
-tokio-test = { version = "0.2.0-alpha.4", path = "../tokio-test" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 num_cpus = "1.8.0"
 tokio-io-pool = "0.1.4"
 
 # UDS tests
 tempfile = "3"
-futures-preview = { version = "=0.3.0-alpha.18", features = ["nightly", "async-await"] }
+futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -35,7 +35,7 @@ use std::any::Any;
 ///
 /// fn main() {
 ///     // build Runtime
-///     let mut runtime = Builder::new()
+///     let runtime = Builder::new()
 ///         .blocking_threads(4)
 ///         .clock(Clock::system())
 ///         .core_threads(4)
@@ -99,7 +99,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let mut rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new()
     ///     .panic_handler(|err| std::panic::resume_unwind(err))
     ///     .build()
     ///     .unwrap();
@@ -127,7 +127,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let mut rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new()
     ///     .core_threads(4)
     ///     .build()
     ///     .unwrap();
@@ -157,7 +157,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let mut rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new()
     ///     .blocking_threads(200)
     ///     .build();
     /// # }
@@ -186,7 +186,7 @@ impl Builder {
     /// use std::time::Duration;
     ///
     /// # pub fn main() {
-    /// let mut rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new()
     ///     .keep_alive(Some(Duration::from_secs(30)))
     ///     .build();
     /// # }
@@ -210,7 +210,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let mut rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new()
     ///     .name_prefix("my-pool-")
     ///     .build();
     /// # }
@@ -234,7 +234,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let mut rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new()
     ///     .stack_size(32 * 1024)
     ///     .build();
     /// # }

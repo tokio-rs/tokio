@@ -11,14 +11,12 @@ use std::task::{Context, Poll};
 /// Future for the [`read_line`](crate::io::AsyncBufReadExt::read_line) method.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadLine<'a, R: ?Sized + Unpin> {
+pub struct ReadLine<'a, R: ?Sized> {
     reader: &'a mut R,
     buf: &'a mut String,
     bytes: Vec<u8>,
     read: usize,
 }
-
-impl<R: ?Sized + Unpin> Unpin for ReadLine<'_, R> {}
 
 pub(crate) fn read_line<'a, R>(reader: &'a mut R, buf: &'a mut String) -> ReadLine<'a, R>
 where
@@ -67,5 +65,16 @@ impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadLine<'_, R> {
             read,
         } = &mut *self;
         read_line_internal(Pin::new(reader), cx, buf, bytes, read)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<ReadLine<'_, PhantomPinned>>();
     }
 }

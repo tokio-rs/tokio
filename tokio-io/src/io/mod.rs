@@ -2,6 +2,7 @@ mod async_buf_read_ext;
 mod async_read_ext;
 mod async_write_ext;
 mod buf_reader;
+mod buf_stream;
 mod buf_writer;
 mod chain;
 mod copy;
@@ -26,6 +27,8 @@ pub use self::async_read_ext::AsyncReadExt;
 pub use self::async_write_ext::AsyncWriteExt;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::buf_reader::BufReader;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::buf_stream::BufStream;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::buf_writer::BufWriter;
 

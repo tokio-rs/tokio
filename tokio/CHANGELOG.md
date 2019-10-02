@@ -1,6 +1,20 @@
 This changelog only applies to the `tokio` crate proper. Each sub crate
 maintains its own changelog tracking changes made in each respective sub crate.
 
+# 0.2.0-alpha.6 (September 30, 2019)
+
+- Move to `futures-*-preview 0.3.0-alpha.19`
+- Move to `pin-project 0.4`
+
+# 0.2.0-alpha.5 (September 19, 2019)
+
+### Changed
+- rename `sleep` to `delay_for` (#1518).
+- rename `Lock` to `Mutex` and make it more like `std::sync::Mutex` (#1573).
+
+### Added
+- add generic `split` for `AsyncRead + AsyncWrite` (#1521).
+
 # 0.2.0-alpha.4 (August 29, 2019)
 
 - Track tokio-net release.

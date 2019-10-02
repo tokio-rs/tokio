@@ -40,7 +40,7 @@ impl Interval {
 
     /// Creates new `Interval` that yields with interval of `duration`.
     ///
-    /// The function is shortcut for `Interval::new(Instant::now() + duration, duration)`.
+    /// The function is shortcut for `Interval::new(tokio_timer::clock::now() + duration, duration)`.
     ///
     /// The `duration` argument must be a non-zero duration.
     ///

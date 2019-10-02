@@ -47,3 +47,13 @@ fn clock_and_timer_single_threaded() {
         assert!(Instant::now() < when);
     });
 }
+
+#[test]
+fn mocked_clock_delay_for() {
+    tokio_test::clock::mock(|handle| {
+        let mut f = tokio_test::task::spawn(delay_for(Duration::from_millis(1)));
+        tokio_test::assert_pending!(f.poll());
+        handle.advance(Duration::from_millis(1));
+        tokio_test::assert_ready!(f.poll());
+    });
+}
