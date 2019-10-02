@@ -1,46 +1,28 @@
-use super::Slab;
+use super::{
+    page::{self, slot},
+    Pack, Slab, Tid,
+};
 use loom::{
     sync::{Arc, Condvar, Mutex},
     thread,
 };
+use proptest::prelude::*;
 
-mod idx {
-    use super::super::{
-        cfg,
-        page::{self, slot},
-        Pack, Tid,
-    };
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn tid_roundtrips(tid in 0usize..Tid::<cfg::DefaultConfig>::BITS) {
-            let tid = Tid::<cfg::DefaultConfig>::from_usize(tid);
-            let packed = tid.pack(0);
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
-
-        #[test]
-        fn idx_roundtrips(
-            tid in 0usize..Tid::<cfg::DefaultConfig>::BITS,
-            gen in 0usize..slot::Generation::<cfg::DefaultConfig>::BITS,
-            addr in 0usize..page::Addr::<cfg::DefaultConfig>::BITS,
-        ) {
-            let tid = Tid::<cfg::DefaultConfig>::from_usize(tid);
-            let gen = slot::Generation::<cfg::DefaultConfig>::from_usize(gen);
-            let addr = page::Addr::<cfg::DefaultConfig>::from_usize(addr);
-            let packed = tid.pack(gen.pack(addr.pack(0)));
-            assert_eq!(addr, page::Addr::from_packed(packed));
-            assert_eq!(gen, slot::Generation::from_packed(packed));
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
+proptest! {
+    #[test]
+    fn idx_roundtrips(
+        tid in 0usize..Tid::BITS,
+        gen in 0usize..slot::Generation::BITS,
+        addr in 0usize..page::Addr::BITS,
+    ) {
+        let tid = Tid::from_usize(tid);
+        let gen = slot::Generation::from_usize(gen);
+        let addr = page::Addr::from_usize(addr);
+        let packed = tid.pack(gen.pack(addr.pack(0)));
+        assert_eq!(addr, page::Addr::from_packed(packed));
+        assert_eq!(gen, slot::Generation::from_packed(packed));
+        assert_eq!(tid, Tid::from_packed(packed));
     }
-}
-
-struct TinyConfig;
-
-impl super::Config for TinyConfig {
-    const INITIAL_PAGE_SIZE: usize = 4;
 }
 
 #[test]
@@ -166,6 +148,11 @@ fn concurrent_insert_remove() {
     })
 }
 
+// We can no longer easily implement this test easily, since we can't override the
+// slab's page size, and thus we would have to put 32 elements into the slab,
+// which would make this test run for an extremely long amount of time under
+// `loom`. The sharded slab crate has versions of this test that work.
+/*
 #[test]
 fn remove_remote_and_reuse() {
     loom::model(|| {
@@ -203,6 +190,7 @@ fn remove_remote_and_reuse() {
         assert_eq!(slab.get(idx4), Some(&4), "slab: {:#?}", slab);
     });
 }
+*/
 
 #[test]
 fn unique_iter() {
@@ -230,39 +218,5 @@ fn unique_iter() {
         assert!(items.contains(&2), "items: {:?}", items);
         assert!(items.contains(&3), "items: {:?}", items);
         assert!(items.contains(&4), "items: {:?}", items);
-    });
-}
-
-// #[test]
-// fn big() {
-//     let mut model = loom::model::Builder::new();
-//     model.max_branches = 4096;
-//     model.check(|| {
-//         let slab = Slab::new();
-//         for i in 0..4096 {
-//             let k = slab.insert(i).expect("insert");
-//             assert_eq!(slab.get(k).expect("get"), &i);
-//         }
-//     })
-// }
-
-#[test]
-fn custom_page_sz() {
-    struct TinyConfig;
-
-    impl super::Config for TinyConfig {
-        const INITIAL_PAGE_SIZE: usize = 4;
-    }
-
-    let mut model = loom::model::Builder::new();
-    model.max_branches = 20000;
-    model.check(|| {
-        let slab = Slab::new_with_config::<TinyConfig>();
-
-        for i in 0..1024 {
-            println!("{}", i);
-            let k = slab.insert(i).expect("insert");
-            assert_eq!(slab.get(k).expect("get"), &i, "slab: {:#?}", slab);
-        }
     });
 }

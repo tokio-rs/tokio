@@ -5,13 +5,13 @@ use super::{
 use crate::sync::CausalCell;
 use std::slice;
 
-pub(crate) struct UniqueIter<'a, T, C: super::cfg::Config> {
-    pub(super) shards: slice::IterMut<'a, CausalCell<Shard<T, C>>>,
-    pub(super) pages: slice::Iter<'a, Page<T, C>>,
-    pub(super) slots: page::Iter<'a, T, C>,
+pub(crate) struct UniqueIter<'a, T> {
+    pub(super) shards: slice::IterMut<'a, CausalCell<Shard<T>>>,
+    pub(super) pages: slice::Iter<'a, Page<T>>,
+    pub(super) slots: page::Iter<'a, T>,
 }
 
-impl<'a, T, C: super::cfg::Config> Iterator for UniqueIter<'a, T, C> {
+impl<'a, T> Iterator for UniqueIter<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         loop {

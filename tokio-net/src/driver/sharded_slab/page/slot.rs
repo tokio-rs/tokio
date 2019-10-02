@@ -1,17 +1,14 @@
-use super::{
-    cfg::{self, CfgPrivate},
-    Pack, Tid,
-};
+use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
 use crate::sync::{
     atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
-use std::{fmt, marker::PhantomData};
+use std::fmt;
 
-pub(crate) struct Slot<T, C> {
+pub(crate) struct Slot<T> {
     /// ABA guard generation counter incremented every time a value is inserted
     /// into the slot.
-    gen: Generation<C>,
+    gen: Generation,
     /// The offset of the next item on the free list.
     next: AtomicUsize,
     /// The data stored in the slot.
@@ -19,58 +16,48 @@ pub(crate) struct Slot<T, C> {
 }
 
 #[repr(transparent)]
-pub(crate) struct Generation<C = cfg::DefaultConfig> {
-    value: usize,
-    _cfg: PhantomData<fn(C)>,
-}
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub(crate) struct Generation(usize);
 
-impl<C: cfg::Config> Pack<C> for Generation<C> {
+impl Pack for Generation {
     /// Use all the remaining bits in the word for the generation counter, minus
-    /// any bits reserved by the user.
-    const LEN: usize = (cfg::WIDTH - C::RESERVED_BITS) - Self::SHIFT;
-    const BITS: usize = cfg::make_mask(Self::LEN);
+    /// the reserved bits.
+    const LEN: usize = (WIDTH - RESERVED_BITS) - Self::SHIFT;
 
-    type Prev = Tid<C>;
+    type Prev = Tid;
 
     #[inline(always)]
     fn from_usize(u: usize) -> Self {
         debug_assert!(u <= Self::BITS);
-        Self::new(u)
+        Self(u)
     }
 
     #[inline(always)]
     fn as_usize(&self) -> usize {
-        self.value
+        self.0
     }
 }
 
-impl<C: cfg::Config> Generation<C> {
-    fn new(value: usize) -> Self {
-        Self {
-            value,
-            _cfg: PhantomData,
-        }
-    }
-
+impl Generation {
     #[inline(always)]
     fn advance(&mut self) -> Self {
-        self.value = (self.value + 1) % Self::BITS;
-        debug_assert!(self.value <= Self::BITS);
+        self.0 = (self.0 + 1) % Self::BITS;
+        debug_assert!(self.0 <= Self::BITS);
         *self
     }
 }
 
-impl<T, C: cfg::Config> Slot<T, C> {
+impl<T> Slot<T> {
     pub(super) fn new(next: usize) -> Self {
         Self {
-            gen: Generation::new(0),
+            gen: Generation(0),
             item: CausalCell::new(None),
             next: AtomicUsize::new(next),
         }
     }
 
     #[inline(always)]
-    pub(super) fn get(&self, gen: Generation<C>) -> Option<&T> {
+    pub(super) fn get(&self, gen: Generation) -> Option<&T> {
         // Is the index's generation the same as the current generation? If not,
         // the item that index referred to was removed, so return `None`.
         if gen != self.gen {
@@ -86,7 +73,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
     }
 
     #[inline(always)]
-    pub(super) fn insert(&mut self, value: &mut Option<T>) -> Generation<C> {
+    pub(super) fn insert(&mut self, value: &mut Option<T>) -> Generation {
         debug_assert!(
             self.item.with(|item| unsafe { (*item).is_none() }),
             "inserted into full slot"
@@ -106,7 +93,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
         self.next.load(Ordering::Acquire)
     }
 
-    pub(super) fn remove(&self, gen: Generation<C>, next: usize) -> Option<T> {
+    pub(super) fn remove(&self, gen: Generation, next: usize) -> Option<T> {
         // Is the index's generation the same as the current generation? If not,
         // the item that index referred to was already removed.
         if gen != self.gen {
@@ -121,45 +108,14 @@ impl<T, C: cfg::Config> Slot<T, C> {
     }
 }
 
-impl<C, T> fmt::Debug for Slot<C, T> {
+impl<T> fmt::Debug for Slot<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slot")
             .field("gen", &self.gen)
-            .field("next", &self.next.load(Ordering::Relaxed))
+            .field(
+                "next",
+                &format_args!("{:#0x}", self.next.load(Ordering::Relaxed)),
+            )
             .finish()
     }
 }
-
-impl<C> fmt::Debug for Generation<C> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Generation").field(&self.value).finish()
-    }
-}
-
-impl<C: cfg::Config> PartialEq for Generation<C> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
-    }
-}
-
-impl<C: cfg::Config> Eq for Generation<C> {}
-
-impl<C: cfg::Config> PartialOrd for Generation<C> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
-    }
-}
-
-impl<C: cfg::Config> Ord for Generation<C> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value.cmp(&other.value)
-    }
-}
-
-impl<C: cfg::Config> Clone for Generation<C> {
-    fn clone(&self) -> Self {
-        Self::new(self.value)
-    }
-}
-
-impl<C: cfg::Config> Copy for Generation<C> {}

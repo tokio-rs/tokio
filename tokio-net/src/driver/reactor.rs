@@ -1,5 +1,5 @@
 use super::platform;
-use super::sharded_slab;
+use super::sharded_slab::Slab;
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
@@ -75,7 +75,7 @@ pub(super) struct Inner {
     next_aba_guard: AtomicUsize,
 
     /// Dispatch slabs for I/O and futures events
-    pub(super) io_dispatch: IoDispatch,
+    pub(super) io_dispatch: Slab<ScheduledIo>,
 
     /// Used to wake up the reactor from a call to `turn`
     wakeup: mio::SetReadiness,
@@ -99,13 +99,7 @@ thread_local! {
     static CURRENT_REACTOR: RefCell<Option<HandlePriv>> = RefCell::new(None)
 }
 
-pub(super) type IoDispatch = sharded_slab::Slab<ScheduledIo, SlabCfg>;
-pub(super) struct SlabCfg;
-impl sharded_slab::Config for SlabCfg {
-    const MAX_PAGES: usize = 16;
-    const RESERVED_BITS: usize = 5;
-}
-const TOKEN_SHIFT: usize = IoDispatch::USED_BITS;
+const TOKEN_SHIFT: usize = Slab::<ScheduledIo>::MAX_BIT;
 
 const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_SOURCES);
@@ -165,7 +159,6 @@ impl Reactor {
     pub fn new() -> io::Result<Reactor> {
         let io = mio::Poll::new()?;
         let wakeup_pair = mio::Registration::new2();
-        let io_dispatch = sharded_slab::Slab::new_with_config();
 
         io.register(
             &wakeup_pair.0,
@@ -180,7 +173,7 @@ impl Reactor {
             inner: Arc::new(Inner {
                 io,
                 next_aba_guard: AtomicUsize::new(0),
-                io_dispatch,
+                io_dispatch: Slab::new(),
                 wakeup: wakeup_pair.1,
             }),
         })
