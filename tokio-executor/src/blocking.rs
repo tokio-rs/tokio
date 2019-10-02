@@ -20,6 +20,7 @@ struct Shared {
     queue: VecDeque<Box<dyn FnOnce() + Send>>,
     num_th: u32,
     num_idle: u32,
+    num_notify: u32,
 }
 
 lazy_static! {
@@ -62,7 +63,8 @@ where
                 true
             }
         } else {
-            shared.dec_idle();
+            shared.num_idle -= 1;
+            shared.num_notify += 1;
             POOL.condvar.notify_one();
             false
         }
@@ -96,39 +98,36 @@ fn spawn_thread() {
     thread::Builder::new()
         .name("tokio-blocking-driver".to_string())
         .spawn(|| {
+            let mut shared = POOL.shared.lock().unwrap();
             'outer: loop {
-                let mut shared = POOL.shared.lock().unwrap();
-
-                if let Some(task) = shared.queue.pop_front() {
+                // BUSY
+                while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
                     run_task(task);
-                    continue;
+                    shared = POOL.shared.lock().unwrap();
                 }
 
                 // IDLE
-                shared.inc_idle();
+                shared.num_idle += 1;
 
                 loop {
                     let lock_result = POOL.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
                     shared = lock_result.0;
                     let timeout_result = lock_result.1;
 
-                    if let Some(task) = shared.queue.pop_front() {
-                        drop(shared);
-                        run_task(task);
+                    if shared.num_notify != 0 {
+                        shared.num_notify -= 1;
                         continue 'outer;
-                    } else if timeout_result.timed_out() {
-                        shared.num_th -= 1;
-                        shared.dec_idle();
-                        break 'outer;
                     }
 
-                    // Threads may do work in the top of the 'outer
-                    // loop without consuming notifications. This may
-                    // result in too many threads woken up. Make sure
-                    // we signal our idle state here, otherwise too
-                    // many threads may be spawned.
-                    shared.inc_idle()
+                    if timeout_result.timed_out() {
+                        shared.num_th -= 1;
+                        shared.num_idle = shared
+                            .num_idle
+                            .checked_sub(1)
+                            .expect("num_idle underflowed on thread exit");
+                        break 'outer;
+                    }
                 }
             }
         })
@@ -148,20 +147,9 @@ impl Pool {
                 queue: VecDeque::new(),
                 num_th: 0,
                 num_idle: 0,
+                num_notify: 0,
             }),
             condvar: Condvar::new(),
         }
-    }
-}
-
-impl Shared {
-    fn inc_idle(&mut self) {
-        // Spurious wakeups may cause this function to be called too
-        // many times, keep num_idle within a sane range.
-        self.num_idle = std::cmp::min(self.num_idle.saturating_add(1), self.num_th)
-    }
-
-    fn dec_idle(&mut self) {
-        self.num_idle = std::cmp::min(self.num_idle.saturating_sub(1), self.num_th)
     }
 }
