@@ -16,8 +16,10 @@ const MAX_THREADS: usize = 4096;
 #[cfg(target_pointer_width = "32")]
 const MAX_THREADS: usize = 2048;
 
-const MAX_PAGES: usize = 16;
+const MAX_PAGES: usize = WIDTH / 4;
 const RESERVED_BITS: usize = 5;
+
+const WIDTH: usize = std::mem::size_of::<usize>() * 8;
 
 /// A sharded, lock-free slab.
 pub(crate) struct Slab<T> {
@@ -271,8 +273,6 @@ trait Pack: Sized {
         Self::from_usize(value)
     }
 }
-
-const WIDTH: usize = std::mem::size_of::<usize>() * 8;
 
 const fn make_mask(bits: usize) -> usize {
     let shift = 1 << (bits - 1);
