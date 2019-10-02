@@ -103,6 +103,7 @@ tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 num_cpus = "1.8.0"
 tokio-io-pool = "0.1.4"
+loom = "0.2.8"
 
 # UDS tests
 tempfile = "3"
