@@ -29,7 +29,7 @@ impl Addr {
         // determine the number of twos places by counting the number of leading
         // zeros (unused twos places) in the number's binary representation, and
         // subtracting that count from the total number of bits in a word.
-        super::WIDTH - (self.addr + INITIAL_SIZE >> ADDR_INDEX_SHIFT).leading_zeros() as usize
+        super::WIDTH - ((self.addr + INITIAL_SIZE) >> ADDR_INDEX_SHIFT).leading_zeros() as usize
     }
 
     pub(super) fn offset(&self) -> usize {
