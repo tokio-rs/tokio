@@ -71,9 +71,6 @@ pub(super) struct Inner {
     /// The underlying system event queue.
     io: mio::Poll,
 
-    /// ABA guard counter
-    next_aba_guard: AtomicUsize,
-
     /// Dispatch slabs for I/O and futures events
     pub(super) io_dispatch: Slab<ScheduledIo>,
 
@@ -82,7 +79,6 @@ pub(super) struct Inner {
 }
 
 pub(super) struct ScheduledIo {
-    aba_guard: usize,
     pub(super) readiness: AtomicUsize,
     pub(super) reader: AtomicWaker,
     pub(super) writer: AtomicWaker,
@@ -172,7 +168,6 @@ impl Reactor {
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
                 io,
-                next_aba_guard: AtomicUsize::new(0),
                 io_dispatch: Slab::new(),
                 wakeup: wakeup_pair.1,
             }),
@@ -272,7 +267,6 @@ impl Reactor {
     }
 
     fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
-        let aba_guard = token.0 & !MAX_SOURCES;
         let token = token.0 & MAX_SOURCES;
 
         let mut rd = None;
@@ -285,10 +279,6 @@ impl Reactor {
             Some(io) => io,
             None => return,
         };
-
-        if aba_guard != io.aba_guard {
-            return;
-        }
 
         io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
@@ -430,11 +420,7 @@ impl Inner {
     ///
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
-        // Get an ABA guard value
-        let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
-
         let key = if let Some(key) = self.io_dispatch.insert(ScheduledIo {
-            aba_guard,
             readiness: AtomicUsize::new(0),
             reader: AtomicWaker::new(),
             writer: AtomicWaker::new(),
@@ -448,7 +434,7 @@ impl Inner {
             ));
         };
 
-        let token = aba_guard | key;
+        let token = key;
         debug!(message = "adding I/O source", token);
 
         self.io.register(
