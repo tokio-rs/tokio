@@ -200,8 +200,7 @@ impl Reactor {
     /// Idle is defined as all tasks that have been spawned have completed,
     /// either successfully or with an error.
     pub fn is_idle(&self) -> bool {
-        // self.inner.io_dispatch.is_empty()
-        unimplemented!("eliza: add is_emtpy 2 slab");
+        self.inner.io_dispatch.len() == 0
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
@@ -247,9 +246,6 @@ impl Reactor {
 
         let mut rd = None;
         let mut wr = None;
-
-        // Create a scope to ensure that notifying the tasks stays out of the
-        // lock's critical section.
 
         let io = match self.inner.io_dispatch.get(token) {
             Some(io) => io,
@@ -362,21 +358,20 @@ impl Inner {
     ///
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
-        let key = if let Some(key) = self.io_dispatch.insert(ScheduledIo {
-            readiness: AtomicUsize::new(0),
-            reader: AtomicWaker::new(),
-            writer: AtomicWaker::new(),
-        }) {
-            key
-        } else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "reactor at max \
-                 registered I/O resources",
-            ));
-        };
+        let token = self
+            .io_dispatch
+            .insert(ScheduledIo {
+                readiness: AtomicUsize::new(0),
+                reader: AtomicWaker::new(),
+                writer: AtomicWaker::new(),
+            })
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    "reactor at max registered I/O resources",
+                )
+            })?;
 
-        let token = key;
         debug!(message = "adding I/O source", token);
 
         self.io.register(
@@ -386,7 +381,7 @@ impl Inner {
             mio::PollOpt::edge(),
         )?;
 
-        Ok(key)
+        Ok(token)
     }
 
     /// Deregisters an I/O resource from the reactor.
@@ -402,7 +397,10 @@ impl Inner {
     /// Registers interest in the I/O resource associated with `token`.
     pub(super) fn register(&self, token: usize, dir: Direction, w: Waker) {
         debug!(message = "scheduling", direction = ?dir, token);
-        let sched = self.io_dispatch.get(token).unwrap();
+        let sched = self
+            .io_dispatch
+            .get(token)
+            .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
 
         let (waker, ready) = match dir {
             Direction::Read => (&sched.reader, !mio::Ready::writable()),

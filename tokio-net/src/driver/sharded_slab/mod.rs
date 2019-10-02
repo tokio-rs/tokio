@@ -1,94 +1,4 @@
 //! A lock-free concurrent slab.
-//!
-//! Slabs provide pre-allocated storage for many instances of a single data
-//! type. When a large number of values of a single type are required,
-//! this can be more efficient than allocating each item individually. Since the
-//! allocated items are the same size, memory fragmentation is reduced, and
-//! creating and removing new items can be very cheap.
-//!
-//! This crate implements a lock-free concurrent slab, indexed by `usize`s.
-//!
-//! # Examples
-//!
-//! Inserting an item into the slab, returning an index:
-//! ```rust
-//! # use sharded_slab::Slab;
-//! let slab = Slab::new();
-//!
-//! let key = slab.insert("hello world");
-//! assert_eq!(slab.get(key), Some("hello world"));
-//! ```
-//!
-//! # Configuration
-//!
-//! For performance reasons, several values used by the slab are calculated as
-//! constants. In order to allow users to tune the slab's parameters, we provide
-//! a [`Config`] trait which defines these parameters as associated `consts`.
-//! The `Slab` type is generic over a `` parameter.
-//!
-//! [`Config`]: trait.Config.html
-//!
-//! # Comparison with Similar Crates
-//!
-//! - [`slab`]: Carl Lerche's `slab` crate provides a slab implementation with a
-//!   similar API, implemented by storing all data in a single vector.
-//!
-//!   Unlike `sharded_slab`, inserting and removing elements from the slab
-//!   requires  mutable access. This means that if the slab is accessed
-//!   concurrently by multiple threads, it is necessary for it to be protected
-//!   by a `Mutex` or `RwLock`. Items may not be inserted or removed (or
-//!   accessed, if a `Mutex` is used) concurrently, even when they are
-//!   unrelated. In many cases, the lock can become a significant bottleneck. On
-//!   the other hand, this crate allows separate indices in the slab to be
-//!   accessed, inserted, and removed concurrently without requiring a global
-//!   lock. Therefore, when the slab is shared across multiple threads, this
-//!   crate offers significantly better performance than `slab`.
-//!
-//!   However, the lock free slab introduces some additional constant-factor
-//!   overhead. This means that in use-cases where a slab is _not_ shared by
-//!   multiple threads and locking is not required, this crate will likely offer
-//!   slightly worse performance.
-//!
-//!   In summary: `sharded-slab` offers significantly improved performance in
-//!   concurrent use-cases, while `slab` should be preferred in single-threaded
-//!   use-cases.
-//!
-//! [`slab`]: https://crates.io/crates/loom
-//!
-// //! # Design
-// TODO(eliza) write this section
-//!
-//! # Safety and Correctness
-//!
-//! Most implementations of lock-free data structures in Rust require some
-//! amount of unsafe code, and this crate is not an exception. In order to catch
-//! potential bugs in this unsafe code, we make use of [`loom`], a
-//! permutation-testing tool for concurrent Rust programs. All `unsafe` blocks
-//! this crate occur in accesses to `loom` `CausalCell`s. This means that when
-//! those accesses occur in this crate's tests, `loom` will assert that they are
-//! valid under the C11 memory model across multiple permutations of concurrent
-//! executions of those tests.
-//!
-//! In order to guard against the [ABA problem][aba], this crate makes use of
-//! _generational indices_. Each slot in the slab tracks a generation counter
-//! which is incremented every time a value is inserted into that slot, and the
-//! indices returned by [`Slab::insert`] include the generation of the slot when
-//! the value was inserted, packed into the high-order bits of the index. This
-//! ensures that if a value is inserted, removed,  and a new value is inserted
-//! into the same slot in the slab, the key returned by the first call to
-//! `insert` will not map to the new value.
-//!
-//! Since a fixed number of bits are set aside to use for storing the generation
-//! counter, the counter will wrap  around after being incremented a number of
-//! times. To avoid situations where a returned index lives long enough to see the
-//! generation counter wrap around to the same value, it is good to be fairly
-//! generous when configuring the allocation of index bits.
-//!
-//! [`loom`]: https://crates.io/crates/loom
-//! [aba]: https://en.wikipedia.org/wiki/ABA_problem
-//! [`Slab::insert`]: struct.Slab.html#method.insert
-//!
-
 mod page;
 mod tid;
 pub(crate) use tid::Tid;
@@ -109,9 +19,7 @@ const MAX_THREADS: usize = 2048;
 const MAX_PAGES: usize = 16;
 const RESERVED_BITS: usize = 5;
 
-/// A sharded slab.
-///
-/// See the [crate-level documentation](index.html) for details on using this type.
+/// A sharded, lock-free slab.
 pub(crate) struct Slab<T> {
     shards: Box<[CausalCell<Shard<T>>]>,
 }
@@ -165,15 +73,6 @@ impl<T> Slab<T> {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use sharded_slab::Slab;
-    /// let slab = Slab::new();
-    ///
-    /// let key = slab.insert("hello world");
-    /// assert_eq!(slab.get(key), Some("hello world"));
-    /// ```
     pub(crate) fn insert(&self, value: T) -> Option<usize> {
         let tid = Tid::current();
         self.shards[tid.as_usize()]
@@ -205,16 +104,6 @@ impl<T> Slab<T> {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let slab = sharded_slab::Slab::new();
-    /// let key = slab.insert("hello world").unwrap();
-    ///
-    /// assert_eq!(slab.get(key), Some(&"hello world"));
-    /// assert_eq!(slab.get(12345), None);
-    /// ```
     pub(crate) fn get(&self, key: usize) -> Option<&T> {
         let tid = Tid::from_packed(key);
         self.shards
@@ -223,18 +112,6 @@ impl<T> Slab<T> {
     }
 
     /// Returns `true` if the slab contains a value for the given key.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let slab = sharded_slab::Slab::new();
-    ///
-    /// let key = slab.insert("hello world").unwrap();
-    /// assert!(slab.contains(key));
-    ///
-    /// slab.remove(key).unwrap();
-    /// assert!(!slab.contains(key));
-    /// ```
     pub(crate) fn contains(&self, key: usize) -> bool {
         self.get(key).is_some()
     }
@@ -379,8 +256,10 @@ unsafe impl<T: Sync> Sync for Slab<T> {}
 
 impl<T: fmt::Debug> fmt::Debug for Shard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Shard")
-            .field("tid", &self.tid)
+        let mut d = f.debug_struct("Shard");
+        #[cfg(debug_assertions)]
+        d.field("tid", &self.tid);
+        d.field("sz", &self.sz)
             .field("len", &self.len())
             .field("pages", &self.pages)
             .finish()
