@@ -18,6 +18,12 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 
+enum RuntimeType {
+    Single,
+    Multi,
+    Auto,
+}
+
 /// Marks async function to be executed by selected runtime.
 ///
 /// ## Options:
@@ -50,12 +56,6 @@ use quote::quote;
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    enum RuntimeType {
-        Single,
-        Multi,
-        Auto,
-    }
-
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
@@ -90,7 +90,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 "multi_thread" => runtime = RuntimeType::Multi,
                 "single_thread" => runtime = RuntimeType::Single,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `single_thread` or `multi_thread`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -124,9 +124,23 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by runtime, suitable to test enviornment
 ///
-/// Uses `current_thread` runtime.
+/// ## Options:
 ///
-/// # Examples
+/// - `single_thread` - Uses `current_thread`. Used by default.
+/// - `multi_thread` - Uses multi-threaded runtime.
+///
+/// ## Usage
+///
+/// ### Select runtime
+///
+/// ```no_run
+/// #[tokio::test(multi_thread)]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// ### Using default
 ///
 /// ```no_run
 /// #[tokio::test]
@@ -137,7 +151,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
-    let _ = syn::parse_macro_input!(args as syn::parse::Nothing);
+    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
     let ret = &input.sig.output;
     let name = &input.sig.ident;
@@ -165,13 +179,41 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
 
-    let result = quote! {
-        #[test]
-        #(#attrs)*
-        fn #name() #ret {
-            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-            rt.block_on(async { #body })
+    let mut runtime = RuntimeType::Auto;
+
+    for arg in args {
+        if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg {
+            let ident = path.get_ident();
+            if ident.is_none() {
+                let msg = "Must have specified ident";
+                return syn::Error::new_spanned(path, msg).to_compile_error().into();
+            }
+            match ident.unwrap().to_string().to_lowercase().as_str() {
+                "multi_thread" => runtime = RuntimeType::Multi,
+                "single_thread" => runtime = RuntimeType::Single,
+                name => {
+                    let msg = format!("Unknown attribute {} is specified; expected `single_thread` or `multi_thread`", name);
+                    return syn::Error::new_spanned(path, msg).to_compile_error().into();
+                }
+            }
         }
+    }
+
+    let result = match runtime {
+        RuntimeType::Multi => quote! {
+            #[test]
+            #(#attrs)*
+            fn #name() #ret {
+                tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
+            }
+        },
+        RuntimeType::Single | RuntimeType::Auto => quote! {
+            #[test]
+            #(#attrs)*
+            fn #name() #ret {
+                tokio::runtime::current_thread::Runtime::new().unwrap().block_on(async { #body })
+            }
+        },
     };
 
     result.into()
