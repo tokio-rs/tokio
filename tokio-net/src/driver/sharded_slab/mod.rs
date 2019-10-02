@@ -24,7 +24,7 @@
 //! For performance reasons, several values used by the slab are calculated as
 //! constants. In order to allow users to tune the slab's parameters, we provide
 //! a [`Config`] trait which defines these parameters as associated `consts`.
-//! The `Slab` type is generic over a `C: Config` parameter.
+//! The `Slab` type is generic over a `` parameter.
 //!
 //! [`Config`]: trait.Config.html
 //!
@@ -92,27 +92,31 @@
 mod page;
 mod tid;
 pub(crate) use tid::Tid;
-pub(crate) mod cfg;
 mod iter;
-use cfg::CfgPrivate;
-pub(crate) use cfg::{Config, DefaultConfig};
 
 use crate::sync::{
     atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
-use page::Page;
-use std::{fmt, marker::PhantomData};
+use page::{slot, Addr, Page};
+use std::fmt;
+
+#[cfg(target_pointer_width = "64")]
+const MAX_THREADS: usize = 4096;
+#[cfg(target_pointer_width = "32")]
+const MAX_THREADS: usize = 2048;
+
+const MAX_PAGES: usize = 16;
+const RESERVED_BITS: usize = 5;
 
 /// A sharded slab.
 ///
 /// See the [crate-level documentation](index.html) for details on using this type.
-pub(crate) struct Slab<T, C: cfg::Config = DefaultConfig> {
-    shards: Box<[CausalCell<Shard<T, C>>]>,
-    _cfg: PhantomData<C>,
+pub(crate) struct Slab<T> {
+    shards: Box<[CausalCell<Shard<T>>]>,
 }
 
-struct Shard<T, C: cfg::Config> {
+struct Shard<T> {
     tid: usize,
     sz: usize,
     len: AtomicUsize,
@@ -135,47 +139,25 @@ struct Shard<T, C: cfg::Config> {
     //                      │XXXXXXXX│
     //                      └────────┘
     //                         ...
-    pages: Vec<Page<T, C>>,
+    pages: Vec<Page<T>>,
 }
 
 impl<T> Slab<T> {
-    /// Returns a new slab with the default configuration parameters.
-    pub(crate) fn new() -> Self {
-        Self::new_with_config()
-    }
+    pub(crate) const MAX_BIT: usize = slot::Generation::LEN + slot::Generation::SHIFT;
 
-    /// Returns a new slab with the provided configuration parameters.
-    pub(crate) fn new_with_config<C: cfg::Config>() -> Slab<T, C> {
-        C::validate();
-        let mut shards = Vec::with_capacity(C::MAX_SHARDS);
+    /// Returns a new slab.
+    pub(crate) fn new() -> Self {
+        let mut shards = Vec::with_capacity(MAX_THREADS);
         let mut idx = 0;
-        shards.resize_with(C::MAX_SHARDS, || {
+        shards.resize_with(MAX_THREADS, || {
             let shard = Shard::new(idx);
             idx += 1;
             CausalCell::new(shard)
         });
         Slab {
             shards: shards.into_boxed_slice(),
-            _cfg: PhantomData,
         }
     }
-}
-
-impl<T, C: cfg::Config> Slab<T, C> {
-    /// The number of bits in each index which are used by the slab.
-    ///
-    /// If other data is packed into the `usize` indices returned by
-    /// [`Slab::insert`], user code is free to use any bits higher than the
-    /// `USED_BITS`-th bit freely.
-    ///
-    /// This is determined by the [`Config`] type that configures the slab's
-    /// parameters. By default, all bits are used; this can be changed by
-    /// overriding the [`Config::RESERVED_BITS`][res] constant.
-    ///
-    /// [`Config`]: trait.Config.html
-    /// [res]: trait.Config.html#associatedconstant.RESERVED_BITS
-    /// [`Slab::insert`]: struct.Slab.html#method.insert
-    pub(crate) const USED_BITS: usize = C::USED_BITS;
 
     /// Inserts a value into the slab, returning a key that can be used to
     /// access it.
@@ -193,7 +175,7 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// assert_eq!(slab.get(key), Some("hello world"));
     /// ```
     pub(crate) fn insert(&self, value: T) -> Option<usize> {
-        let tid = Tid::<C>::current();
+        let tid = Tid::current();
         self.shards[tid.as_usize()]
             .with_mut(|shard| unsafe {
                 // we are guaranteed to only mutate the shard while on its thread.
@@ -208,7 +190,7 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// If the slab does not contain a value for that key, `None` is returned
     /// instead.
     pub(crate) fn remove(&self, idx: usize) -> Option<T> {
-        let tid = C::unpack_tid(idx);
+        let tid = Tid::from_packed(idx);
         if tid.is_current() {
             self.shards[tid.as_usize()].with_mut(|shard| unsafe {
                 // only called if this is the current shard
@@ -234,7 +216,7 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// assert_eq!(slab.get(12345), None);
     /// ```
     pub(crate) fn get(&self, key: usize) -> Option<&T> {
-        let tid = C::unpack_tid(key);
+        let tid = Tid::from_packed(key);
         self.shards
             .get(tid.as_usize())?
             .with(|shard| unsafe { (*shard).get(key) })
@@ -272,7 +254,7 @@ impl<T, C: cfg::Config> Slab<T, C> {
     }
 
     /// Returns an iterator over all the items in the slab.
-    pub(crate) fn unique_iter<'a>(&'a mut self) -> iter::UniqueIter<'a, T, C> {
+    pub(crate) fn unique_iter<'a>(&'a mut self) -> iter::UniqueIter<'a, T> {
         let mut shards = self.shards.iter_mut();
         let shard = shards.next().expect("must be at least 1 shard");
         let mut pages = shard.with(|shard| unsafe { (*shard).iter() });
@@ -292,18 +274,18 @@ impl<T, C: cfg::Config> Slab<T, C> {
     }
 }
 
-impl<T, C: cfg::Config> Shard<T, C> {
+impl<T> Shard<T> {
     fn new(tid: usize) -> Self {
         Self {
             tid,
-            sz: C::INITIAL_SZ,
+            sz: page::INITIAL_SIZE,
             len: AtomicUsize::new(0),
-            pages: vec![Page::new(C::INITIAL_SZ, 0)],
+            pages: vec![Page::new(page::INITIAL_SIZE, 0)],
         }
     }
 
     fn insert(&mut self, value: T) -> Option<usize> {
-        debug_assert_eq!(Tid::<C>::current().as_usize(), self.tid);
+        debug_assert_eq!(Tid::current().as_usize(), self.tid);
 
         let mut value = Some(value);
 
@@ -317,13 +299,13 @@ impl<T, C: cfg::Config> Shard<T, C> {
 
         // If not, can we allocate a new page?
         let pidx = self.pages.len();
-        if pidx >= C::MAX_PAGES {
+        if pidx >= MAX_PAGES {
             // out of pages!
             return None;
         }
 
         // Add new page
-        let sz = C::page_size(pidx);
+        let sz = page::INITIAL_SIZE * 2usize.pow(pidx as u32);
         let mut page = Page::new(sz, self.sz);
         // Increment the total size of the shard, for the next time a new page
         // allocated.
@@ -337,20 +319,20 @@ impl<T, C: cfg::Config> Shard<T, C> {
 
     #[inline]
     fn get(&self, idx: usize) -> Option<&T> {
-        debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
-        let addr = C::unpack_addr(idx);
+        debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+        let addr = Addr::from_packed(idx);
         self.pages.get(addr.index())?.get(addr, idx)
     }
 
     /// Remove an item on the shard's local thread.
     fn remove_local(&mut self, idx: usize) -> Option<T> {
-        debug_assert_eq!(Tid::<C>::current().as_usize(), self.tid);
-        debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
-        let addr = C::unpack_addr(idx);
+        debug_assert_eq!(Tid::current().as_usize(), self.tid);
+        debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+        let addr = Addr::from_packed(idx);
 
         self.pages
             .get_mut(addr.index())?
-            .remove_local(addr, C::unpack_gen(idx))
+            .remove_local(addr, slot::Generation::from_packed(idx))
             .map(|item| {
                 self.len.fetch_sub(1, Ordering::Relaxed);
                 item
@@ -359,12 +341,12 @@ impl<T, C: cfg::Config> Shard<T, C> {
 
     /// Remove an item, while on a different thread from the shard's local thread.
     fn remove_remote(&self, idx: usize) -> Option<T> {
-        debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
-        debug_assert!(Tid::<C>::current().as_usize() != self.tid);
-        let addr = C::unpack_addr(idx);
+        debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+        debug_assert!(Tid::current().as_usize() != self.tid);
+        let addr = Addr::from_packed(idx);
         self.pages
             .get(addr.index())?
-            .remove_remote(addr, C::unpack_gen(idx))
+            .remove_remote(addr, slot::Generation::from_packed(idx))
             .map(|item| {
                 self.len.fetch_sub(1, Ordering::Relaxed);
                 item
@@ -379,24 +361,23 @@ impl<T, C: cfg::Config> Shard<T, C> {
         self.iter().map(Page::total_capacity).sum()
     }
 
-    fn iter<'a>(&'a self) -> std::slice::Iter<'a, Page<T, C>> {
+    fn iter<'a>(&'a self) -> std::slice::Iter<'a, Page<T>> {
         self.pages.iter()
     }
 }
 
-impl<T: fmt::Debug, C: cfg::Config> fmt::Debug for Slab<T, C> {
+impl<T: fmt::Debug> fmt::Debug for Slab<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slab")
-            // .field("shards", &self.shards)
-            .field("Config", &C::debug())
+            .field("shards", &self.shards)
             .finish()
     }
 }
 
-unsafe impl<T: Send, C: cfg::Config> Send for Slab<T, C> {}
-unsafe impl<T: Sync, C: cfg::Config> Sync for Slab<T, C> {}
+unsafe impl<T: Send> Send for Slab<T> {}
+unsafe impl<T: Sync> Sync for Slab<T> {}
 
-impl<T: fmt::Debug, C: cfg::Config> fmt::Debug for Shard<T, C> {
+impl<T: fmt::Debug> fmt::Debug for Shard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Shard")
             .field("tid", &self.tid)
@@ -406,14 +387,14 @@ impl<T: fmt::Debug, C: cfg::Config> fmt::Debug for Shard<T, C> {
     }
 }
 
-pub(crate) trait Pack<C: cfg::Config>: Sized {
+trait Pack: Sized {
     const LEN: usize;
 
-    const BITS: usize;
+    const BITS: usize = make_mask(Self::LEN);
     const SHIFT: usize = Self::Prev::SHIFT + Self::Prev::LEN;
     const MASK: usize = Self::BITS << Self::SHIFT;
 
-    type Prev: Pack<C>;
+    type Prev: Pack;
 
     fn as_usize(&self) -> usize;
     fn from_usize(val: usize) -> Self;
@@ -434,7 +415,14 @@ pub(crate) trait Pack<C: cfg::Config>: Sized {
     }
 }
 
-impl<C: cfg::Config> Pack<C> for () {
+const WIDTH: usize = std::mem::size_of::<usize>() * 8;
+
+const fn make_mask(bits: usize) -> usize {
+    let shift = 1 << (bits - 1);
+    shift | (shift - 1)
+}
+
+impl Pack for () {
     const BITS: usize = 0;
     const LEN: usize = 0;
     const SHIFT: usize = 0;
