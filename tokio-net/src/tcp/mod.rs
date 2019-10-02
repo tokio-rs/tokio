@@ -23,5 +23,7 @@ mod listener;
 pub mod split;
 mod stream;
 
+#[cfg(feature = "async-traits")]
+pub use self::incoming::Incoming;
 pub use self::listener::TcpListener;
 pub use self::stream::TcpStream;

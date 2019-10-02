@@ -40,7 +40,7 @@ pub mod tcp {
     //! [`TcpListener`]: struct.TcpListener.html
     //! [incoming_method]: struct.TcpListener.html#method.incoming
     //! [`Incoming`]: struct.Incoming.html
-    pub use tokio_net::tcp::{split, TcpListener, TcpStream};
+    pub use tokio_net::tcp::{split, Incoming, TcpListener, TcpStream};
 }
 #[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
