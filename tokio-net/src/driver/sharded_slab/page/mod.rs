@@ -20,7 +20,7 @@ const ADDR_INDEX_SHIFT: usize = INITIAL_SIZE.trailing_zeros() as usize + 1;
 impl Addr {
     const NULL: usize = Self::BITS + 1;
 
-    pub(super) fn index(&self) -> usize {
+    pub(super) fn index(self) -> usize {
         // Since every page is twice as large as the previous page, and all page sizes
         // are powers of two, we can determine the page index that contains a given
         // address by shifting the address down by the smallest page size and
@@ -32,7 +32,7 @@ impl Addr {
         super::WIDTH - ((self.addr + INITIAL_SIZE) >> ADDR_INDEX_SHIFT).leading_zeros() as usize
     }
 
-    pub(super) fn offset(&self) -> usize {
+    pub(super) fn offset(self) -> usize {
         self.addr
     }
 }
@@ -121,7 +121,7 @@ impl<T> Page<T> {
         self.slab.get(offset)?.remove(gen, next)
     }
 
-    pub(super) fn iter<'a>(&'a self) -> Iter<'a, T> {
+    pub(super) fn iter(&self) -> Iter<'_, T> {
         self.slab.iter().filter_map(Slot::value)
     }
 
