@@ -48,12 +48,12 @@ where
         let mut shared = POOL.shared.lock().unwrap();
 
         shared.queue.push_back(Box::new(move || {
-            // The receiver may have dropped
+            // The receiver may have been dropped.
             let _ = tx.send(f());
         }));
 
         if shared.num_idle == 0 {
-            // No threads are able to process the task
+            // No threads are able to process the task.
 
             if shared.num_th == MAX_THREADS {
                 // At max number of threads
@@ -63,6 +63,11 @@ where
                 true
             }
         } else {
+            // Notify an idle worker thread. The notification counter
+            // is used to count the needed amount of notifications
+            // exactly. Thread libraries may generate spurious
+            // wakeups, this counter is used to keep us in a
+            // consistent state.
             shared.num_idle -= 1;
             shared.num_notify += 1;
             POOL.condvar.notify_one();
@@ -116,18 +121,28 @@ fn spawn_thread() {
                     let timeout_result = lock_result.1;
 
                     if shared.num_notify != 0 {
+                        // We have received a legitimate wakeup,
+                        // acknowledge it by decrementing the counter
+                        // and transition to the BUSY state.
                         shared.num_notify -= 1;
                         break;
                     }
 
                     if timeout_result.timed_out() {
+                        // Thread exit
                         shared.num_th -= 1;
+
+                        // num_idle should now be tracked exactly, panic
+                        // with a descriptive message if it is not the
+                        // case.
                         shared.num_idle = shared
                             .num_idle
                             .checked_sub(1)
                             .expect("num_idle underflowed on thread exit");
                         return;
                     }
+
+                    // Spurious wakeup detected, go back to sleep.
                 }
             }
         })
