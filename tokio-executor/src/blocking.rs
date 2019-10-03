@@ -99,7 +99,7 @@ fn spawn_thread() {
         .name("tokio-blocking-driver".to_string())
         .spawn(|| {
             let mut shared = POOL.shared.lock().unwrap();
-            'outer: loop {
+            loop {
                 // BUSY
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
@@ -117,7 +117,7 @@ fn spawn_thread() {
 
                     if shared.num_notify != 0 {
                         shared.num_notify -= 1;
-                        continue 'outer;
+                        break;
                     }
 
                     if timeout_result.timed_out() {
@@ -126,7 +126,7 @@ fn spawn_thread() {
                             .num_idle
                             .checked_sub(1)
                             .expect("num_idle underflowed on thread exit");
-                        break 'outer;
+                        return;
                     }
                 }
             }
