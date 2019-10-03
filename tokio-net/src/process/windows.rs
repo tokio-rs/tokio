@@ -96,7 +96,7 @@ impl Child {
                 _ => return Err(io::Error::last_os_error()),
             }
             let mut status = 0;
-            let rc = GetExitCodeProcess(child.as_raw_handle(), &mut status);
+            let rc = GetExitCodeProcess(self.child.as_raw_handle(), &mut status);
             if rc == FALSE {
                 Err(io::Error::last_os_error())
             } else {
@@ -124,11 +124,11 @@ impl Future for Child {
                     Poll::Ready(Err(_)) => panic!("should not be canceled"),
                     Poll::Pending => return Poll::Pending,
                 }
-                let status = self.try_wait(&inner.child)?.expect("not ready yet");
+                let status = inner.try_wait()?.expect("not ready yet");
                 return Poll::Ready(Ok(status.into()));
             }
 
-            if let Some(e) = self.try_wait(&inner.child)? {
+            if let Some(e) = inner.try_wait()? {
                 return Poll::Ready(Ok(e.into()));
             }
             let (tx, rx) = oneshot::channel();
