@@ -725,6 +725,10 @@ impl Child {
         self.child.inner.id()
     }
 
+    pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        self.child.inner.try_wait()
+    }
+
     /// Forces the child to exit.
     ///
     /// This is equivalent to sending a SIGKILL on unix platforms.
