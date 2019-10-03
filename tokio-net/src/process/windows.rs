@@ -175,7 +175,6 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let _ = complete.take().unwrap().send(());
 }
 
-
 pub(crate) type ChildStdin = PollEvented<NamedPipe>;
 pub(crate) type ChildStdout = PollEvented<NamedPipe>;
 pub(crate) type ChildStderr = PollEvented<NamedPipe>;
