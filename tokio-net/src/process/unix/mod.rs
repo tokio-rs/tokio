@@ -115,6 +115,10 @@ impl Child {
     pub(crate) fn id(&self) -> u32 {
         self.inner.id()
     }
+
+    pub(crate) fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        self.inner.try_wait()
+    }
 }
 
 impl Kill for Child {
