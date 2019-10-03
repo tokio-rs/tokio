@@ -725,6 +725,11 @@ impl Child {
         self.child.inner.id()
     }
 
+    /// Attempts to collect the exit status of the child if it has already exited.
+    /// It will not block if the process hasn't exited yet.
+    ///
+    /// Has the same semantics as the [`process::Child::try_wait`](crate::process::Child::try_wait)
+    /// method in the standard library.
     pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
         self.child.inner.try_wait()
     }
