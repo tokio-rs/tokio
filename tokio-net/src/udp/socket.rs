@@ -1,4 +1,4 @@
-use super::split::{split, split_owned, RecvHalf, SendHalf, RecvHalfOwned, SendHalfOwned};
+use super::split::{split, split_owned, RecvHalf, RecvHalfOwned, SendHalf, SendHalfOwned};
 use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;

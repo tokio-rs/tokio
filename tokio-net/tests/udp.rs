@@ -4,7 +4,12 @@ use tokio_codec::{Decoder, Encoder};
 use tokio_net::udp::{UdpFramed, UdpSocket};
 
 use bytes::{BufMut, BytesMut};
-use futures_util::{future::{FutureExt, join}, sink::SinkExt, stream::StreamExt, try_future::try_join};
+use futures_util::{
+    future::{join, FutureExt},
+    sink::SinkExt,
+    stream::StreamExt,
+    try_future::try_join,
+};
 use std::io;
 
 #[tokio::test]
@@ -49,13 +54,17 @@ async fn split() -> std::io::Result<()> {
 
     let msg = b"hello";
     let addr = s.as_ref().local_addr()?;
-    join(async move {
-        s.send_to(msg, &addr).await.unwrap();
-    }, async move {
-        let mut recv_buf = [0u8; 32];
-        let (len, _) = r.recv_from(&mut recv_buf[..]).await.unwrap();
-        assert_eq!(&recv_buf[..len], msg);
-    }).await;
+    join(
+        async move {
+            s.send_to(msg, &addr).await.unwrap();
+        },
+        async move {
+            let mut recv_buf = [0u8; 32];
+            let (len, _) = r.recv_from(&mut recv_buf[..]).await.unwrap();
+            assert_eq!(&recv_buf[..len], msg);
+        },
+    )
+    .await;
     Ok(())
 }
 

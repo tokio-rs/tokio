@@ -14,13 +14,13 @@
 
 use super::UdpSocket;
 
+use crate::ToSocketAddrs;
 use futures_util::future::poll_fn;
 use std::error::Error;
 use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use crate::ToSocketAddrs;
 
 /// The send half after [`split`](super::UdpSocket::split).
 ///
@@ -109,7 +109,6 @@ impl AsRef<UdpSocket> for RecvHalf<'_> {
         self.0
     }
 }
-
 
 /// The send half after [`split`](super::UdpSocket::split).
 ///
