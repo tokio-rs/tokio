@@ -1,4 +1,4 @@
-use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
+use super::split::{split, split_owned, RecvHalf, SendHalf, RecvHalfOwned, SendHalfOwned};
 use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
@@ -71,8 +71,18 @@ impl UdpSocket {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(&mut self) -> (UdpSocketRecvHalf<'_>, UdpSocketSendHalf<'_>) {
+    pub fn split(&mut self) -> (RecvHalf<'_>, SendHalf<'_>) {
         split(self)
+    }
+
+    /// Split the `UdpSocket` into a receive half and a send half. The two parts
+    /// can be used to receive and send datagrams concurrently, even from two
+    /// different tasks.
+    ///
+    /// See the module level documenation of [`split`](super::split) for more
+    /// details.
+    pub fn split_owned(self) -> (RecvHalfOwned, SendHalfOwned) {
+        split_owned(self)
     }
 
     /// Returns the local address that this socket is bound to.
