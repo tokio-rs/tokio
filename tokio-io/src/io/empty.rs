@@ -1,4 +1,4 @@
-use crate::AsyncWrite;
+use crate::AsyncRead;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
