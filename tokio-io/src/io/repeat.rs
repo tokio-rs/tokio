@@ -59,7 +59,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        use std::marker::PhantomPinned;
         crate::is_unpin::<Repeat>();
     }
 }
