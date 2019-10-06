@@ -28,7 +28,7 @@ pub struct Sink {
 /// # Examples
 ///
 /// ```rust
-/// # use tokio_io::{self as io, AsyncRead};
+/// # use tokio_io::{self as io, AsyncWriteExt};
 /// # async fn dox() {
 /// let buffer = vec![1, 2, 3, 5, 8];
 /// let num_bytes = io::sink().write(&buffer).await.unwrap();

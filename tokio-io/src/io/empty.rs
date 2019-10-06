@@ -27,7 +27,7 @@ pub struct Empty {
 /// A slightly sad example of not reading anything into a buffer:
 ///
 /// ```rust
-/// # use tokio_io::{self as io, AsyncRead};
+/// # use tokio_io::{self as io, AsyncReadExt};
 /// # async fn dox() {
 /// let mut buffer = String::new();
 /// io::empty().read_to_string(&mut buffer).await.unwrap();

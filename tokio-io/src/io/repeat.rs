@@ -28,7 +28,7 @@ pub struct Repeat {
 /// # Examples
 ///
 /// ```
-/// # use tokio_io::{self as io, AsyncRead};
+/// # use tokio_io::{self as io, AsyncReadExt};
 /// # async fn dox() {
 /// let mut buffer = [0; 3];
 /// io::repeat(0b101).read_exact(&mut buffer).await.unwrap();
