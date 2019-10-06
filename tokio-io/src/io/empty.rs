@@ -9,9 +9,10 @@ use std::task::{Context, Poll};
 /// This struct is generally created by calling [`empty`]. Please see
 /// the documentation of [`empty()`][`empty`] for more details.
 ///
-/// This is an asynchronous version of `std::io::empty`.
+/// This is an asynchronous version of [`std::io::empty`][std].
 ///
 /// [`empty`]: fn.empty.html
+/// [std]: https://doc.rust-lang.org/std/io/struct.Empty.html
 pub struct Empty {
     _p: (),
 }
@@ -20,7 +21,7 @@ pub struct Empty {
 ///
 /// All reads from the returned reader will return `Poll::Ready(Ok(0))`.
 ///
-/// This is an asynchronous version of `std::io::empty`.
+/// This is an asynchronous version of [`std::io::empty`][std].
 ///
 /// # Examples
 ///
@@ -34,6 +35,8 @@ pub struct Empty {
 /// assert!(buffer.is_empty());
 /// # }
 /// ```
+///
+/// [std]: https://doc.rust-lang.org/std/io/fn.empty.html
 pub fn empty() -> Empty {
     Empty { _p: () }
 }

@@ -10,9 +10,10 @@ use std::task::{Context, Poll};
 /// This struct is generally created by calling [`repeat`][repeat]. Please
 /// see the documentation of `repeat()` for more details.
 ///
-/// This is an asynchronous version of `std::io::Repeat`.
+/// This is an asynchronous version of [`std::io::Repeat`][std].
 ///
 /// [repeat]: fn.repeat.html
+/// [std]: https://doc.rust-lang.org/std/io/struct.Repeat.html
 #[derive(Debug)]
 pub struct Repeat {
     byte: u8,
@@ -23,7 +24,7 @@ pub struct Repeat {
 /// All reads from this reader will succeed by filling the specified buffer with
 /// the given byte.
 ///
-/// This is an asynchronous version of [`std::io::repeat`].
+/// This is an asynchronous version of [`std::io::repeat`][std].
 ///
 /// # Examples
 ///
@@ -35,6 +36,8 @@ pub struct Repeat {
 /// assert_eq!(buffer, [0b101, 0b101, 0b101]);
 /// # }
 /// ```
+///
+/// [std]: https://doc.rust-lang.org/std/io/fn.repeat.html
 pub fn repeat(byte: u8) -> Repeat {
     Repeat { byte }
 }

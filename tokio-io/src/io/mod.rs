@@ -35,6 +35,8 @@ pub use self::buf_stream::BufStream;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::buf_writer::BufWriter;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::copy::{copy, Copy};
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::empty::{empty, Empty};
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::repeat::{repeat, Repeat};
