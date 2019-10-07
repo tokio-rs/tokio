@@ -1,5 +1,5 @@
-trigger: ["master", "std-future"]
-pr: ["master", "std-future"]
+trigger: ["master"]
+pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
