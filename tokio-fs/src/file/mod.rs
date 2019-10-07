@@ -20,6 +20,8 @@ use std::task::Context;
 use std::task::Poll;
 use std::task::Poll::*;
 
+mod os;
+
 /// A reference to an open file on the filesystem.
 ///
 /// This is a specialized version of [`std::fs::File`][std] for usage from the

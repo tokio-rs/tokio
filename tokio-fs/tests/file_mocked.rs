@@ -10,7 +10,7 @@ mod sys {
 use sys::pool::{self, asyncify};
 
 #[allow(warnings)]
-#[path = "../src/file.rs"]
+#[path = "../src/file/mod.rs"]
 mod file;
 use file::File;
 

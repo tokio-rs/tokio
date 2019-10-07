@@ -4,9 +4,12 @@ use std::fs::{Metadata, Permissions};
 use std::io;
 use std::io::prelude::*;
 use std::io::SeekFrom;
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
+#[cfg(windows)]
+use std::os::windows::io::RawHandle;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-
 pub struct File {
     shared: Arc<Mutex<Shared>>,
 }
@@ -195,6 +198,16 @@ impl File {
 
     pub fn try_clone(&self) -> io::Result<Self> {
         unimplemented!();
+    }
+
+    #[cfg(unix)]
+    pub fn as_raw_fd(&self) -> RawFd {
+        unimplemented!()
+    }
+
+    #[cfg(windows)]
+    pub fn as_raw_handle(&self) -> RawHandle {
+        unimplemented!()
     }
 }
 

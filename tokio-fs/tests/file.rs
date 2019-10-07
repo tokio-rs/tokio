@@ -44,6 +44,26 @@ async fn basic_write() {
     assert_eq!(file, HELLO);
 }
 
+#[tokio::test]
+#[cfg(unix)]
+async fn unix_fd() {
+    use std::os::unix::io::AsRawFd;
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+    assert!(file.as_raw_fd() as u64 > 0);
+}
+
+#[tokio::test]
+#[cfg(windows)]
+async fn windows_handle() {
+    use std::os::windows::io::AsRawHandle;
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+    assert!(file.as_raw_handle() as u64 > 0);
+}
+
 fn tempfile() -> NamedTempFile {
     NamedTempFile::new().unwrap()
 }
