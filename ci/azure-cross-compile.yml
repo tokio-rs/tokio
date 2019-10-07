@@ -18,6 +18,9 @@ jobs:
       arm:
         vmImage: ubuntu-16.04
         target: arm-unknown-linux-gnueabi
+      arm:
+        vmImage: ubuntu-16.04
+        target: armv5te-unknown-linux-gnueabi
   pool:
     vmImage: $(vmImage)
   steps:
