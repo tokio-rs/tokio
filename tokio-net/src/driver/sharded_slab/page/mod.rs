@@ -171,14 +171,14 @@ impl<T, C: cfg::Config> Shared<T, C> {
 
     #[inline]
     pub(crate) fn get(&self, addr: Addr<C>, idx: usize) -> Option<&T> {
-        let poff = addr.offset() - self.prev_sz;
+        let page_offset = addr.offset() - self.prev_sz;
         #[cfg(test)]
-        println!("-> offset {:?}", poff);
+        println!("-> offset {:?}", page_offset);
 
         self.slab.with(|slab| {
             unsafe { &*slab }
                 .as_ref()?
-                .get(poff)?
+                .get(page_offset)?
                 .get(C::unpack_gen(idx))
         })
     }

@@ -172,8 +172,8 @@ impl<T, C: cfg::Config> Shard<T, C> {
             #[cfg(test)]
             println!("-> page {}; {:?}; {:?}", page_idx, local, page);
 
-            if let Some(poff) = page.insert(local, &mut value) {
-                return Some(poff);
+            if let Some(page_offset) = page.insert(local, &mut value) {
+                return Some(page_offset);
             }
         }
 
