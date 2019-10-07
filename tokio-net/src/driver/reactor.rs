@@ -74,6 +74,9 @@ pub(super) struct Inner {
     /// Dispatch slabs for I/O and futures events
     pub(super) io_dispatch: Slab<ScheduledIo>,
 
+    /// The number of sources in `io_dispatch`.
+    n_sources: AtomicUsize,
+
     /// Used to wake up the reactor from a call to `turn`
     wakeup: mio::SetReadiness,
 }
@@ -169,6 +172,7 @@ impl Reactor {
             inner: Arc::new(Inner {
                 io,
                 io_dispatch: Slab::new(),
+                n_sources: AtomicUsize::new(0),
                 wakeup: wakeup_pair.1,
             }),
         })
@@ -224,7 +228,7 @@ impl Reactor {
     /// Idle is defined as all tasks that have been spawned have completed,
     /// either successfully or with an error.
     pub fn is_idle(&self) -> bool {
-        self.inner.io_dispatch.len() == 0
+        self.inner.n_sources.load(SeqCst) == 0
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
@@ -430,7 +434,8 @@ impl Inner {
                 )
             })?;
 
-        debug!(message = "adding I/O source", token);
+        let n_sources = self.n_sources.fetch_add(1, SeqCst);
+        debug!(message = "adding I/O source", token, n_sources);
 
         self.io.register(
             source,
@@ -450,6 +455,7 @@ impl Inner {
     pub(super) fn drop_source(&self, token: usize) {
         debug!(message = "dropping I/O source", token);
         self.io_dispatch.remove(token);
+        self.n_sources.fetch_sub(1, SeqCst);
     }
 
     /// Registers interest in the I/O resource associated with `token`.

@@ -1,4 +1,4 @@
-use super::{page, Pack};
+use super::{cfg, page, Pack};
 use std::{
     cell::{Cell, UnsafeCell},
     collections::VecDeque,
@@ -13,10 +13,11 @@ use std::{
 use lazy_static::lazy_static;
 
 /// Uniquely identifies a thread.
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct Tid {
+// #[repr(transparent)]
+#[derive(Hash)]
+pub(crate) struct Tid<C = cfg::DefaultConfig> {
     id: usize,
-    _not_send: PhantomData<UnsafeCell<()>>,
+    _not_send: PhantomData<(UnsafeCell<()>, fn(C))>,
 }
 
 #[derive(Debug)]
@@ -39,10 +40,11 @@ thread_local! {
 
 // === impl Tid ===
 
-impl Pack for Tid {
-    const LEN: usize = super::MAX_THREADS.trailing_zeros() as usize + 1;
+impl<C: cfg::Config> Pack<C> for Tid<C> {
+    const LEN: usize = C::MAX_SHARDS.trailing_zeros() as usize + 1;
+    const BITS: usize = cfg::make_mask(Self::LEN);
 
-    type Prev = page::Addr;
+    type Prev = page::Addr<C>;
 
     #[inline(always)]
     fn as_usize(&self) -> usize {
@@ -59,7 +61,7 @@ impl Pack for Tid {
     }
 }
 
-impl Tid {
+impl<C: cfg::Config> Tid<C> {
     #[inline]
     pub(crate) fn current() -> Self {
         REGISTRATION
@@ -67,12 +69,14 @@ impl Tid {
             .unwrap_or_else(|_| Self::poisoned())
     }
 
-    pub(crate) fn is_current(self) -> bool {
+    pub(crate) fn is_current(&self) -> bool {
         REGISTRATION
-            .try_with(|r| self == r.current())
+            .try_with(|r| self == &r.current::<C>())
             .unwrap_or(false)
     }
+}
 
+impl<C> Tid<C> {
     #[inline(always)]
     pub(crate) fn new(id: usize) -> Self {
         Self {
@@ -90,12 +94,12 @@ impl Tid {
     }
 
     /// Returns true if the local thread ID was accessed while unwinding.
-    pub(crate) fn is_poisoned(self) -> bool {
+    pub(crate) fn is_poisoned(&self) -> bool {
         self.id == std::usize::MAX
     }
 }
 
-impl fmt::Debug for Tid {
+impl<C> fmt::Debug for Tid<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_poisoned() {
             f.debug_tuple("Tid")
@@ -109,6 +113,25 @@ impl fmt::Debug for Tid {
     }
 }
 
+impl<C> PartialEq for Tid<C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<C> Eq for Tid<C> {}
+
+impl<C: cfg::Config> Clone for Tid<C> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            _not_send: PhantomData,
+        }
+    }
+}
+
+impl<C: cfg::Config> Copy for Tid<C> {}
+
 // === impl Registration ===
 
 impl Registration {
@@ -117,7 +140,7 @@ impl Registration {
     }
 
     #[inline(always)]
-    fn current(&self) -> Tid {
+    fn current<C: cfg::Config>(&self) -> Tid<C> {
         if let Some(tid) = self.0.get().map(Tid::new) {
             tid
         } else {
@@ -126,7 +149,7 @@ impl Registration {
     }
 
     #[cold]
-    fn register(&self) -> Tid {
+    fn register<C: cfg::Config>(&self) -> Tid<C> {
         let id = REGISTRY
             .free
             .lock()
@@ -139,7 +162,7 @@ impl Registration {
                 }
             })
             .unwrap_or_else(|| REGISTRY.next.fetch_add(1, Ordering::AcqRel));
-        debug_assert!(id <= Tid::BITS, "thread ID overflow!");
+        debug_assert!(id <= Tid::<C>::BITS, "thread ID overflow!");
         self.0.set(Some(id));
         Tid::new(id)
     }
@@ -151,21 +174,6 @@ impl Drop for Registration {
             if let Ok(mut free) = REGISTRY.free.lock() {
                 free.push_back(id);
             }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn tid_roundtrips(tid in 0usize..Tid::BITS) {
-            let tid = Tid::from_usize(tid);
-            let packed = tid.pack(0);
-            assert_eq!(tid, Tid::from_packed(packed));
         }
     }
 }

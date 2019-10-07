@@ -1,26 +1,25 @@
-use super::Pack;
-use crate::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};
+use super::{cfg, Pack};
+use crate::sync::{
+    atomic::{spin_loop_hint, AtomicUsize, Ordering},
+    CausalCell,
+};
 
-pub(super) mod slot;
+pub(crate) mod slot;
 use self::slot::Slot;
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
 /// A page address encodes the location of a slot within a shard (the page
 /// number and offset within that page) as a single linear value.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub(super) struct Addr {
+pub(crate) struct Addr<C: cfg::Config = cfg::DefaultConfig> {
     addr: usize,
+    _cfg: PhantomData<fn(C)>,
 }
 
-pub(super) const INITIAL_SIZE: usize = 32;
-
-const ADDR_INDEX_SHIFT: usize = INITIAL_SIZE.trailing_zeros() as usize + 1;
-
-impl Addr {
+impl<C: cfg::Config> Addr<C> {
     const NULL: usize = Self::BITS + 1;
 
-    pub(super) fn index(self) -> usize {
+    pub(crate) fn index(&self) -> usize {
         // Since every page is twice as large as the previous page, and all page sizes
         // are powers of two, we can determine the page index that contains a given
         // address by shifting the address down by the smallest page size and
@@ -29,16 +28,17 @@ impl Addr {
         // determine the number of twos places by counting the number of leading
         // zeros (unused twos places) in the number's binary representation, and
         // subtracting that count from the total number of bits in a word.
-        super::WIDTH - ((self.addr + INITIAL_SIZE) >> ADDR_INDEX_SHIFT).leading_zeros() as usize
+        cfg::WIDTH - (self.addr + C::INITIAL_SZ >> C::ADDR_INDEX_SHIFT).leading_zeros() as usize
     }
 
-    pub(super) fn offset(self) -> usize {
+    pub(crate) fn offset(&self) -> usize {
         self.addr
     }
 }
 
-impl Pack for Addr {
-    const LEN: usize = super::MAX_PAGES + ADDR_INDEX_SHIFT;
+impl<C: cfg::Config> Pack<C> for Addr<C> {
+    const LEN: usize = C::MAX_PAGES + C::ADDR_INDEX_SHIFT;
+    const BITS: usize = cfg::make_mask(Self::LEN);
 
     type Prev = ();
 
@@ -48,113 +48,225 @@ impl Pack for Addr {
 
     fn from_usize(addr: usize) -> Self {
         debug_assert!(addr <= Self::BITS);
-        Self { addr }
+        Self {
+            addr,
+            _cfg: PhantomData,
+        }
     }
 }
 
-pub(super) type Iter<'a, T> =
-    std::iter::FilterMap<std::slice::Iter<'a, Slot<T>>, fn(&'a Slot<T>) -> Option<&'a T>>;
+pub(crate) type Iter<'a, T, C> =
+    std::iter::FilterMap<std::slice::Iter<'a, Slot<T, C>>, fn(&'a Slot<T, C>) -> Option<&'a T>>;
 
-pub(super) struct Page<T> {
-    prev_sz: usize,
-    remote_head: AtomicUsize,
-    local_head: usize,
-    slab: Box<[Slot<T>]>,
+pub(crate) struct Local {
+    head: CausalCell<usize>,
 }
 
-impl<T> Page<T> {
-    pub(super) fn new(size: usize, prev_sz: usize) -> Self {
-        let mut slab = Vec::with_capacity(size);
-        slab.extend((1..size).map(Slot::new));
-        slab.push(Slot::new(Addr::NULL));
+pub(crate) struct Shared<T, C> {
+    remote_head: AtomicUsize,
+    size: usize,
+    prev_sz: usize,
+    slab: CausalCell<Option<Box<[Slot<T, C>]>>>,
+}
+
+impl Local {
+    pub(crate) fn new() -> Self {
         Self {
-            prev_sz,
-            remote_head: AtomicUsize::new(Addr::NULL),
-            local_head: 0,
-            slab: slab.into_boxed_slice(),
+            head: CausalCell::new(0),
         }
     }
 
+    #[inline(always)]
+    fn head(&self) -> usize {
+        self.head.with(|head| unsafe { *head })
+    }
+
+    #[inline(always)]
+    fn set_head(&self, new_head: usize) {
+        self.head.with_mut(|head| unsafe {
+            *head = new_head;
+        })
+    }
+}
+
+impl<T, C: cfg::Config> Shared<T, C> {
+    const NULL: usize = Addr::<C>::NULL;
+
+    pub(crate) fn new(size: usize, prev_sz: usize) -> Self {
+        Self {
+            prev_sz,
+            size,
+            remote_head: AtomicUsize::new(Self::NULL),
+            slab: CausalCell::new(None),
+        }
+    }
+
+    #[cold]
+    fn fill(&self) {
+        #[cfg(test)]
+        println!("-> alloc new page ({})", self.size);
+
+        debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
+
+        let mut slab = Vec::with_capacity(self.size);
+        slab.extend((1..self.size).map(Slot::new));
+        slab.push(Slot::new(Self::NULL));
+        self.slab.with_mut(|s| {
+            // this mut access is safe — it only occurs to initially
+            // allocate the page, which only happens on this thread; if the
+            // page has not yet been allocated, other threads will not try
+            // to access it yet.
+            unsafe {
+                *s = Some(slab.into_boxed_slice());
+            }
+        });
+    }
+
     #[inline]
-    pub(super) fn insert(&mut self, t: &mut Option<T>) -> Option<usize> {
-        let head = self.local_head;
+    pub(crate) fn insert(&self, local: &Local, t: &mut Option<T>) -> Option<usize> {
+        let head = local.head();
+        #[cfg(test)]
+        println!("-> local head {:?}", head);
+
         // are there any items on the local free list? (fast path)
-        let head = if head < self.slab.len() {
+        let head = if head < self.size {
             head
         } else {
             // if the local free list is empty, pop all the items on the remote
             // free list onto the local free list.
-            self.remote_head.swap(Addr::NULL, Ordering::Acquire)
+            let head = self.remote_head.swap(Self::NULL, Ordering::Acquire);
+            #[cfg(test)]
+            println!("-> remote head {:?}", head);
+            head
         };
 
         // if the head is still null, both the local and remote free lists are
         // empty --- we can't fit any more items on this page.
-        if head == Addr::NULL {
+        if head == Self::NULL {
+            #[cfg(test)]
+            println!("-> NULL! {:?}", head);
             return None;
         }
 
-        let slot = &mut self.slab[head];
-        let gen = slot.insert(t);
-        self.local_head = slot.next();
-        Some(gen.pack(head + self.prev_sz))
+        // do we need to allocate storage for this page?
+        if self.slab.with(|s| unsafe { (*s).is_none() }) {
+            self.fill();
+        }
+
+        let gen = self.slab.with(|slab| {
+            let slab = unsafe { &*(slab) }
+                .as_ref()
+                .expect("page must have been allocated to insert!");
+            let slot = &slab[head];
+            let gen = slot.insert(t);
+            local.set_head(slot.next());
+            gen
+        });
+
+        let index = head + self.prev_sz;
+        #[cfg(test)]
+        println!("insert at offset: {}", index);
+        Some(gen.pack(index))
     }
 
     #[inline]
-    pub(super) fn get(&self, addr: Addr, idx: usize) -> Option<&T> {
+    pub(crate) fn get(&self, addr: Addr<C>, idx: usize) -> Option<&T> {
+        let poff = addr.offset() - self.prev_sz;
+        #[cfg(test)]
+        println!("-> offset {:?}", poff);
+
+        self.slab.with(|slab| {
+            unsafe { &*slab }
+                .as_ref()?
+                .get(poff)?
+                .get(C::unpack_gen(idx))
+        })
+    }
+
+    pub(crate) fn remove_local(
+        &self,
+        local: &Local,
+        addr: Addr<C>,
+        gen: slot::Generation<C>,
+    ) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
-        self.slab
-            .get(offset)?
-            .get(slot::Generation::from_packed(idx))
+
+        #[cfg(test)]
+        println!("-> offset {:?}", offset);
+
+        self.slab.with(|slab| {
+            let slab = unsafe { &*slab }.as_ref()?;
+            let slot = slab.get(offset)?;
+            let val = slot.remove_value(gen)?;
+            slot.set_next(local.head());
+            local.set_head(offset);
+            Some(val)
+        })
     }
 
-    pub(super) fn remove_local(&mut self, addr: Addr, gen: slot::Generation) -> Option<T> {
+    pub(crate) fn remove_remote(&self, addr: Addr<C>, gen: slot::Generation<C>) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
-        let val = self.slab.get(offset)?.remove(gen, self.local_head);
-        self.local_head = offset;
-        val
-    }
 
-    pub(super) fn remove_remote(&self, addr: Addr, gen: slot::Generation) -> Option<T> {
-        let offset = addr.offset() - self.prev_sz;
-        let next = self.push_remote(offset);
+        #[cfg(test)]
+        println!("-> offset {:?}", offset);
 
-        self.slab.get(offset)?.remove(gen, next)
-    }
+        self.slab.with(|slab| {
+            let slab = unsafe { &*slab }.as_ref()?;
+            let slot = slab.get(offset)?;
+            let val = slot.remove_value(gen)?;
 
-    pub(super) fn iter(&self) -> Iter<'_, T> {
-        self.slab.iter().filter_map(Slot::value)
-    }
+            while {
+                let next = self.remote_head.load(Ordering::Relaxed);
 
-    #[inline(always)]
-    fn push_remote(&self, offset: usize) -> usize {
-        loop {
-            let next = self.remote_head.load(Ordering::Relaxed);
-            let actual = self
-                .remote_head
-                .compare_and_swap(next, offset, Ordering::Release);
-            if actual == next {
-                return next;
+                #[cfg(test)]
+                println!("-> next={:?}", next);
+
+                slot.set_next(next);
+
+                let actual = self
+                    .remote_head
+                    .compare_and_swap(next, offset, Ordering::Release);
+                actual != next
+            } {
+                spin_loop_hint();
             }
-            spin_loop_hint();
-        }
+
+            Some(val)
+        })
+    }
+
+    pub(crate) fn iter<'a>(&'a self) -> Option<Iter<'a, T, C>> {
+        let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
+        slab.map(|slab| slab.iter().filter_map(Slot::value as fn(_) -> _))
     }
 }
 
-impl<T> fmt::Debug for Page<T> {
+impl fmt::Debug for Local {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Page")
+        self.head.with(|head| {
+            let head = unsafe { *head };
+            f.debug_struct("Local")
+                .field("head", &format_args!("{:#0x}", head))
+                .finish()
+        })
+    }
+}
+
+impl<C, T> fmt::Debug for Shared<C, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Shared")
             .field(
                 "remote_head",
                 &format_args!("{:#0x}", &self.remote_head.load(Ordering::Relaxed)),
             )
-            .field("local_head", &format_args!("{:#0x}", &self.local_head))
             .field("prev_sz", &self.prev_sz)
-            .field("slab", &self.slab)
+            .field("size", &self.size)
+            // .field("slab", &self.slab)
             .finish()
     }
 }
 
-impl fmt::Debug for Addr {
+impl<C: cfg::Config> fmt::Debug for Addr<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Addr")
             .field("addr", &format_args!("{:#0x}", &self.addr))
@@ -164,6 +276,34 @@ impl fmt::Debug for Addr {
     }
 }
 
+impl<C: cfg::Config> PartialEq for Addr<C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.addr == other.addr
+    }
+}
+
+impl<C: cfg::Config> Eq for Addr<C> {}
+
+impl<C: cfg::Config> PartialOrd for Addr<C> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.addr.partial_cmp(&other.addr)
+    }
+}
+
+impl<C: cfg::Config> Ord for Addr<C> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.addr.cmp(&other.addr)
+    }
+}
+
+impl<C: cfg::Config> Clone for Addr<C> {
+    fn clone(&self) -> Self {
+        Self::from_usize(self.addr)
+    }
+}
+
+impl<C: cfg::Config> Copy for Addr<C> {}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -171,25 +311,25 @@ mod test {
 
     proptest! {
         #[test]
-        fn addr_roundtrips(pidx in 0usize..Addr::BITS) {
-            let addr = Addr::from_usize(pidx);
+        fn addr_roundtrips(pidx in 0usize..Addr::<cfg::DefaultConfig>::BITS) {
+            let addr = Addr::<cfg::DefaultConfig>::from_usize(pidx);
             let packed = addr.pack(0);
             assert_eq!(addr, Addr::from_packed(packed));
         }
         #[test]
-        fn gen_roundtrips(gen in 0usize..slot::Generation::BITS) {
-            let gen = slot::Generation::from_usize(gen);
+        fn gen_roundtrips(gen in 0usize..slot::Generation::<cfg::DefaultConfig>::BITS) {
+            let gen = slot::Generation::<cfg::DefaultConfig>::from_usize(gen);
             let packed = gen.pack(0);
             assert_eq!(gen, slot::Generation::from_packed(packed));
         }
 
         #[test]
         fn page_roundtrips(
-            gen in 0usize..slot::Generation::BITS,
-            addr in 0usize..Addr::BITS,
+            gen in 0usize..slot::Generation::<cfg::DefaultConfig>::BITS,
+            addr in 0usize..Addr::<cfg::DefaultConfig>::BITS,
         ) {
-            let gen = slot::Generation::from_usize(gen);
-            let addr = Addr::from_usize(addr);
+            let gen = slot::Generation::<cfg::DefaultConfig>::from_usize(gen);
+            let addr = Addr::<cfg::DefaultConfig>::from_usize(addr);
             let packed = gen.pack(addr.pack(0));
             assert_eq!(addr, Addr::from_packed(packed));
             assert_eq!(gen, slot::Generation::from_packed(packed));
