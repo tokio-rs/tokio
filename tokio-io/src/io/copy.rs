@@ -70,9 +70,8 @@ where
                 }
             }
 
-            // If we've written al the data and we've seen EOF, flush out the
+            // If we've written all the data and we've seen EOF, flush out the
             // data and finish the transfer.
-            // done with the entire transfer.
             if self.pos == self.cap && self.read_done {
                 let me = &mut *self;
                 ready!(Pin::new(&mut *me.writer).poll_flush(cx))?;
