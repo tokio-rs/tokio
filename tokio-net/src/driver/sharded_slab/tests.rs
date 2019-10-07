@@ -1,33 +1,62 @@
-use super::{
-    page::{self, slot},
-    Pack, Slab, Tid,
-};
-use loom::{
-    sync::{Arc, Condvar, Mutex},
-    thread,
-};
-use proptest::prelude::*;
+use crate::Slab;
+use loom::sync::{Arc, Condvar, Mutex};
+use loom::thread;
 
-proptest! {
-    #[test]
-    fn idx_roundtrips(
-        tid in 0usize..Tid::BITS,
-        gen in 0usize..slot::Generation::BITS,
-        addr in 0usize..page::Addr::BITS,
-    ) {
-        let tid = Tid::from_usize(tid);
-        let gen = slot::Generation::from_usize(gen);
-        let addr = page::Addr::from_usize(addr);
-        let packed = tid.pack(gen.pack(addr.pack(0)));
-        assert_eq!(addr, page::Addr::from_packed(packed));
-        assert_eq!(gen, slot::Generation::from_packed(packed));
-        assert_eq!(tid, Tid::from_packed(packed));
+mod idx {
+    use crate::{
+        cfg,
+        page::{self, slot},
+        Pack, Tid,
+    };
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn tid_roundtrips(tid in 0usize..Tid::<cfg::DefaultConfig>::BITS) {
+            let tid = Tid::<cfg::DefaultConfig>::from_usize(tid);
+            let packed = tid.pack(0);
+            assert_eq!(tid, Tid::from_packed(packed));
+        }
+
+        #[test]
+        fn idx_roundtrips(
+            tid in 0usize..Tid::<cfg::DefaultConfig>::BITS,
+            gen in 0usize..slot::Generation::<cfg::DefaultConfig>::BITS,
+            addr in 0usize..page::Addr::<cfg::DefaultConfig>::BITS,
+        ) {
+            let tid = Tid::<cfg::DefaultConfig>::from_usize(tid);
+            let gen = slot::Generation::<cfg::DefaultConfig>::from_usize(gen);
+            let addr = page::Addr::<cfg::DefaultConfig>::from_usize(addr);
+            let packed = tid.pack(gen.pack(addr.pack(0)));
+            assert_eq!(addr, page::Addr::from_packed(packed));
+            assert_eq!(gen, slot::Generation::from_packed(packed));
+            assert_eq!(tid, Tid::from_packed(packed));
+        }
     }
+}
+
+struct TinyConfig;
+
+impl crate::Config for TinyConfig {
+    const INITIAL_PAGE_SIZE: usize = 4;
+}
+
+fn run_model(name: &'static str, f: impl Fn() + Sync + Send + 'static) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let iters = AtomicUsize::new(0);
+    loom::model(move || {
+        println!(
+            "\n------------ running test {}; iteration {} ------------\n",
+            name,
+            iters.fetch_add(1, Ordering::SeqCst)
+        );
+        f()
+    });
 }
 
 #[test]
 fn local_remove() {
-    loom::model(|| {
+    run_model("local_remove", || {
         let slab = Arc::new(Slab::new());
 
         let s = slab.clone();
@@ -72,7 +101,7 @@ fn local_remove() {
 
 #[test]
 fn remove_remote() {
-    loom::model(|| {
+    run_model("remove_remote", || {
         let slab = Arc::new(Slab::new());
 
         let idx1 = slab.insert(1).expect("insert");
@@ -107,7 +136,7 @@ fn remove_remote() {
 
 #[test]
 fn concurrent_insert_remove() {
-    loom::model(|| {
+    run_model("concurrent_insert_remove", || {
         let slab = Arc::new(Slab::new());
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
@@ -148,14 +177,9 @@ fn concurrent_insert_remove() {
     })
 }
 
-// We can no longer easily implement this test easily, since we can't override the
-// slab's page size, and thus we would have to put 32 elements into the slab,
-// which would make this test run for an extremely long amount of time under
-// `loom`. The sharded slab crate has versions of this test that work.
-/*
 #[test]
 fn remove_remote_and_reuse() {
-    loom::model(|| {
+    run_model("remove_remote_and_reuse", || {
         let slab = Arc::new(Slab::new_with_config::<TinyConfig>());
 
         let idx1 = slab.insert(1).expect("insert");
@@ -173,28 +197,19 @@ fn remove_remote_and_reuse() {
             assert_eq!(s.remove(idx1), Some(1), "slab: {:#?}", s);
         });
 
-        let s = slab.clone();
-        let t2 = thread::spawn(move || {
-            assert_eq!(s.remove(idx2), Some(2), "slab: {:#?}", s);
-        });
-
-        t1.join().expect("thread 1 should not panic");
-        t2.join().expect("thread 2 should not panic");
-
         let idx1 = slab.insert(5).expect("insert");
-        let idx2 = slab.insert(6).expect("insert");
+        t1.join().expect("thread 1 should not panic");
 
         assert_eq!(slab.get(idx1), Some(&5), "slab: {:#?}", slab);
-        assert_eq!(slab.get(idx2), Some(&6), "slab: {:#?}", slab);
+        assert_eq!(slab.get(idx2), Some(&2), "slab: {:#?}", slab);
         assert_eq!(slab.get(idx3), Some(&3), "slab: {:#?}", slab);
         assert_eq!(slab.get(idx4), Some(&4), "slab: {:#?}", slab);
     });
 }
-*/
 
 #[test]
 fn unique_iter() {
-    loom::model(|| {
+    run_model("unique_iter", || {
         let mut slab = std::sync::Arc::new(Slab::new());
 
         let s = slab.clone();
@@ -218,5 +233,20 @@ fn unique_iter() {
         assert!(items.contains(&2), "items: {:?}", items);
         assert!(items.contains(&3), "items: {:?}", items);
         assert!(items.contains(&4), "items: {:?}", items);
+    });
+}
+
+#[test]
+fn custom_page_sz() {
+    let mut model = loom::model::Builder::new();
+    model.max_branches = 100000;
+    model.check(|| {
+        let slab = Slab::new_with_config::<TinyConfig>();
+
+        for i in 0..1024 {
+            println!("{}", i);
+            let k = slab.insert(i).expect("insert");
+            assert_eq!(slab.get(k).expect("get"), &i, "slab: {:#?}", slab);
+        }
     });
 }

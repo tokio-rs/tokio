@@ -1,74 +1,71 @@
 //! A lock-free concurrent slab.
+mod cfg;
 mod page;
 mod tid;
 pub(crate) use tid::Tid;
 mod iter;
 
-use crate::sync::{
-    atomic::{AtomicUsize, Ordering},
-    CausalCell,
-};
-use page::{slot, Addr, Page};
+use page::slot;
 use std::fmt;
 
-#[cfg(target_pointer_width = "64")]
-const MAX_THREADS: usize = 4096;
-#[cfg(target_pointer_width = "32")]
-const MAX_THREADS: usize = 2048;
-
-const MAX_PAGES: usize = WIDTH / 4;
-const RESERVED_BITS: usize = 5;
-
-const WIDTH: usize = std::mem::size_of::<usize>() * 8;
-
-/// A sharded, lock-free slab.
-pub(crate) struct Slab<T> {
-    shards: Box<[CausalCell<Shard<T>>]>,
+/// A sharded slab.
+///
+/// See the [crate-level documentation](index.html) for details on using this type.
+pub(crate) struct Slab<T, C: cfg::Config = cfg::DefaultConfig> {
+    shards: Box<[Shard<T, C>]>,
 }
 
-struct Shard<T> {
+// ┌─────────────┐      ┌────────┐
+// │ page 1      │      │        │
+// ├─────────────┤ ┌───▶│  next──┼─┐
+// │ page 2      │ │    ├────────┤ │
+// │             │ │    │XXXXXXXX│ │
+// │ local_free──┼─┘    ├────────┤ │
+// │ global_free─┼─┐    │        │◀┘
+// ├─────────────┤ └───▶│  next──┼─┐
+// │   page 3    │      ├────────┤ │
+// └─────────────┘      │XXXXXXXX│ │
+//       ...            ├────────┤ │
+// ┌─────────────┐      │XXXXXXXX│ │
+// │ page n      │      ├────────┤ │
+// └─────────────┘      │        │◀┘
+//                      │  next──┼───▶
+//                      ├────────┤
+//                      │XXXXXXXX│
+//                      └────────┘
+//                         ...
+struct Shard<T, C: cfg::Config> {
     #[cfg(debug_assertions)]
     tid: usize,
-    sz: usize,
-    len: AtomicUsize,
-    // ┌─────────────┐      ┌────────┐
-    // │ page 1      │      │        │
-    // ├─────────────┤ ┌───▶│  next──┼─┐
-    // │ page 2      │ │    ├────────┤ │
-    // │             │ │    │XXXXXXXX│ │
-    // │ local_free──┼─┘    ├────────┤ │
-    // │ global_free─┼─┐    │        │◀┘
-    // ├─────────────┤ └───▶│  next──┼─┐
-    // │   page 3    │      ├────────┤ │
-    // └─────────────┘      │XXXXXXXX│ │
-    //       ...            ├────────┤ │
-    // ┌─────────────┐      │XXXXXXXX│ │
-    // │ page n      │      ├────────┤ │
-    // └─────────────┘      │        │◀┘
-    //                      │  next──┼───▶
-    //                      ├────────┤
-    //                      │XXXXXXXX│
-    //                      └────────┘
-    //                         ...
-    pages: Vec<Page<T>>,
+    /// The local free list for each page.
+    ///
+    /// These are only ever accessed from this shard's thread, so they are
+    /// stored separately from the shared state for the page that can be
+    /// accessed concurrently, to minimize false sharing.
+    local: Box<[page::Local]>,
+    /// The shared state for each page in this shard.
+    ///
+    /// This consists of the page's metadata (size, previous size), remote free
+    /// list, and a pointer to the actual array backing that page.
+    shared: Box<[page::Shared<T, C>]>,
 }
 
 impl<T> Slab<T> {
-    pub(crate) const MAX_BIT: usize = slot::Generation::LEN + slot::Generation::SHIFT;
-
-    /// Returns a new slab.
+    /// Returns a new slab with the default configuration parameters.
     pub(crate) fn new() -> Self {
-        let mut shards = Vec::with_capacity(MAX_THREADS);
-        let mut idx = 0;
-        shards.resize_with(MAX_THREADS, || {
-            let shard = Shard::new(idx);
-            idx += 1;
-            CausalCell::new(shard)
-        });
-        Slab {
-            shards: shards.into_boxed_slice(),
-        }
+        Self::new_with_config()
     }
+
+    /// Returns a new slab with the provided configuration parameters.
+    pub(crate) fn new_with_config<C: cfg::Config>() -> Slab<T, C> {
+        C::validate();
+        let shards = (0..C::MAX_SHARDS).map(Shard::new).collect();
+        Slab { shards }
+    }
+}
+
+impl<T, C: cfg::Config> Slab<T, C> {
+    pub(crate) const MAX_BIT: usize = slot::Generation::<C>::LEN + slot::Generation::<C>::SHIFT;
 
     /// Inserts a value into the slab, returning a key that can be used to
     /// access it.
@@ -76,13 +73,21 @@ impl<T> Slab<T> {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use sharded_slab::Slab;
+    /// let slab = Slab::new();
+    ///
+    /// let key = slab.insert("hello world").unwrap();
+    /// assert_eq!(slab.get(key), Some(&"hello world"));
+    /// ```
     pub(crate) fn insert(&self, value: T) -> Option<usize> {
-        let tid = Tid::current();
+        let tid = Tid::<C>::current();
+        #[cfg(test)]
+        println!("insert {:?}", tid);
         self.shards[tid.as_usize()]
-            .with_mut(|shard| unsafe {
-                // we are guaranteed to only mutate the shard while on its thread.
-                (*shard).insert(value)
-            })
+            .insert(value)
             .map(|idx| tid.pack(idx))
     }
 
@@ -92,14 +97,14 @@ impl<T> Slab<T> {
     /// If the slab does not contain a value for that key, `None` is returned
     /// instead.
     pub(crate) fn remove(&self, idx: usize) -> Option<T> {
-        let tid = Tid::from_packed(idx);
+        let tid = C::unpack_tid(idx);
+        #[cfg(test)]
+        println!("rm {:?}", tid);
+        let shard = &self.shards[tid.as_usize()];
         if tid.is_current() {
-            self.shards[tid.as_usize()].with_mut(|shard| unsafe {
-                // only called if this is the current shard
-                (*shard).remove_local(idx)
-            })
+            shard.remove_local(idx)
         } else {
-            self.shards[tid.as_usize()].with(|shard| unsafe { (*shard).remove_remote(idx) })
+            shard.remove_remote(idx)
         }
     }
 
@@ -107,27 +112,29 @@ impl<T> Slab<T> {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let slab = sharded_slab::Slab::new();
+    /// let key = slab.insert("hello world").unwrap();
+    ///
+    /// assert_eq!(slab.get(key), Some(&"hello world"));
+    /// assert_eq!(slab.get(12345), None);
+    /// ```
     pub(crate) fn get(&self, key: usize) -> Option<&T> {
-        let tid = Tid::from_packed(key);
-        self.shards
-            .get(tid.as_usize())?
-            .with(|shard| unsafe { (*shard).get(key) })
-    }
-
-    /// Returns the number of items currently stored in the slab.
-    pub(crate) fn len(&self) -> usize {
-        self.shards
-            .iter()
-            .map(|shard| shard.with(|shard| unsafe { (*shard).len() }))
-            .sum()
+        let tid = C::unpack_tid(key);
+        #[cfg(test)]
+        println!("get {:?}", tid);
+        self.shards.get(tid.as_usize())?.get(key)
     }
 
     /// Returns an iterator over all the items in the slab.
-    pub(crate) fn unique_iter(&mut self) -> iter::UniqueIter<'_, T> {
+    pub(crate) fn unique_iter<'a>(&'a mut self) -> iter::UniqueIter<'a, T, C> {
         let mut shards = self.shards.iter_mut();
         let shard = shards.next().expect("must be at least 1 shard");
-        let mut pages = shard.with(|shard| unsafe { (*shard).iter() });
-        let slots = pages.next().expect("must be at least 1 page").iter();
+        let mut pages = shard.iter();
+        let slots = pages.next().and_then(page::Shared::iter);
         iter::UniqueIter {
             shards,
             slots,
@@ -136,134 +143,139 @@ impl<T> Slab<T> {
     }
 }
 
-impl<T> Shard<T> {
-    fn new(_tid: usize) -> Self {
+impl<T, C: cfg::Config> Shard<T, C> {
+    fn new(_idx: usize) -> Self {
+        let mut total_sz = 0;
+        let shared = (0..C::MAX_PAGES)
+            .map(|page_num| {
+                let sz = C::page_size(page_num);
+                let prev_sz = total_sz;
+                total_sz += sz;
+                page::Shared::new(sz, prev_sz)
+            })
+            .collect();
+        let local = (0..C::MAX_PAGES).map(|_| page::Local::new()).collect();
         Self {
             #[cfg(debug_assertions)]
-            tid: _tid,
-            sz: page::INITIAL_SIZE,
-            len: AtomicUsize::new(0),
-            pages: vec![Page::new(page::INITIAL_SIZE, 0)],
+            tid: _idx,
+            local,
+            shared,
         }
     }
 
-    fn insert(&mut self, value: T) -> Option<usize> {
-        #[cfg(debug_assertions)]
-        debug_assert_eq!(Tid::current().as_usize(), self.tid);
-
+    fn insert(&self, value: T) -> Option<usize> {
         let mut value = Some(value);
 
         // Can we fit the value into an existing page?
-        for page in self.pages.iter_mut() {
-            if let Some(poff) = page.insert(&mut value) {
-                self.len.fetch_add(1, Ordering::Relaxed);
+        for (page_idx, page) in self.shared.iter().enumerate() {
+            let local = self.local(page_idx);
+            #[cfg(test)]
+            println!("-> page {}; {:?}; {:?}", page_idx, local, page);
+
+            if let Some(poff) = page.insert(local, &mut value) {
                 return Some(poff);
             }
         }
 
-        // If not, can we allocate a new page?
-        let pidx = self.pages.len();
-        if pidx >= MAX_PAGES {
-            // out of pages!
-            return None;
-        }
-
-        // Add new page
-        let sz = page::INITIAL_SIZE * 2usize.pow(pidx as u32);
-        let mut page = Page::new(sz, self.sz);
-        // Increment the total size of the shard, for the next time a new page
-        // allocated.
-        self.sz += sz;
-        let poff = page.insert(&mut value).expect("new page should be empty");
-        self.len.fetch_add(1, Ordering::Relaxed);
-        self.pages.push(page);
-
-        Some(poff)
+        None
     }
 
-    #[inline]
+    #[inline(always)]
     fn get(&self, idx: usize) -> Option<&T> {
         #[cfg(debug_assertions)]
-        debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
-        let addr = Addr::from_packed(idx);
-        self.pages.get(addr.index())?.get(addr, idx)
+        debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
+        let addr = C::unpack_addr(idx);
+        let i = addr.index();
+        #[cfg(test)]
+        println!("-> {:?}; idx {:?}", addr, i);
+        if i > self.shared.len() {
+            return None;
+        }
+        self.shared[i].get(addr, idx)
     }
 
     /// Remove an item on the shard's local thread.
-    fn remove_local(&mut self, idx: usize) -> Option<T> {
+    fn remove_local(&self, idx: usize) -> Option<T> {
         #[cfg(debug_assertions)]
         {
-            debug_assert_eq!(Tid::current().as_usize(), self.tid);
-            debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
+            debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
         }
-        let addr = Addr::from_packed(idx);
+        let addr = C::unpack_addr(idx);
+        let page = addr.index();
 
-        self.pages
-            .get_mut(addr.index())?
-            .remove_local(addr, slot::Generation::from_packed(idx))
-            .map(|item| {
-                self.len.fetch_sub(1, Ordering::Relaxed);
-                item
-            })
+        #[cfg(test)]
+        println!("-> remove_local {:?}; page {:?}", addr, page);
+
+        self.shared
+            .get(page)?
+            .remove_local(self.local(page), addr, C::unpack_gen(idx))
     }
 
     /// Remove an item, while on a different thread from the shard's local thread.
     fn remove_remote(&self, idx: usize) -> Option<T> {
         #[cfg(debug_assertions)]
         {
-            debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
-            debug_assert!(Tid::current().as_usize() != self.tid);
+            debug_assert_eq!(Tid::<C>::from_packed(idx).as_usize(), self.tid);
+            debug_assert!(Tid::<C>::current().as_usize() != self.tid);
         }
-        let addr = Addr::from_packed(idx);
-        self.pages
-            .get(addr.index())?
-            .remove_remote(addr, slot::Generation::from_packed(idx))
-            .map(|item| {
-                self.len.fetch_sub(1, Ordering::Relaxed);
-                item
-            })
+        let addr = C::unpack_addr(idx);
+        let page = addr.index();
+
+        #[cfg(test)]
+        println!("-> remove_remote {:?}; page {:?}", addr, page);
+
+        self.shared
+            .get(page)?
+            .remove_remote(addr, C::unpack_gen(idx))
     }
 
-    fn len(&self) -> usize {
-        self.len.load(Ordering::Relaxed)
+    #[inline(always)]
+    fn local(&self, i: usize) -> &page::Local {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(
+            Tid::<C>::current().as_usize(),
+            self.tid,
+            "tried to access local data from another thread!"
+        );
+
+        &self.local[i]
     }
 
-    fn iter<'a>(&'a self) -> std::slice::Iter<'a, Page<T>> {
-        self.pages.iter()
+    fn iter<'a>(&'a self) -> std::slice::Iter<'a, page::Shared<T, C>> {
+        self.shared.iter()
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Slab<T> {
+impl<T: fmt::Debug, C: cfg::Config> fmt::Debug for Slab<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slab")
             .field("shards", &self.shards)
+            .field("Config", &C::debug())
             .finish()
     }
 }
 
-unsafe impl<T: Send> Send for Slab<T> {}
-unsafe impl<T: Sync> Sync for Slab<T> {}
+unsafe impl<T: Send, C: cfg::Config> Send for Slab<T, C> {}
+unsafe impl<T: Sync, C: cfg::Config> Sync for Slab<T, C> {}
 
-impl<T: fmt::Debug> fmt::Debug for Shard<T> {
+impl<T: fmt::Debug, C: cfg::Config> fmt::Debug for Shard<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Shard");
+
         #[cfg(debug_assertions)]
         d.field("tid", &self.tid);
-        d.field("sz", &self.sz)
-            .field("len", &self.len())
-            .field("pages", &self.pages)
-            .finish()
+        d.field("shared", &self.shared).finish()
     }
 }
 
-trait Pack: Sized {
+pub(crate) trait Pack<C: cfg::Config>: Sized {
     const LEN: usize;
 
-    const BITS: usize = make_mask(Self::LEN);
+    const BITS: usize;
     const SHIFT: usize = Self::Prev::SHIFT + Self::Prev::LEN;
     const MASK: usize = Self::BITS << Self::SHIFT;
 
-    type Prev: Pack;
+    type Prev: Pack<C>;
 
     fn as_usize(&self) -> usize;
     fn from_usize(val: usize) -> Self;
@@ -284,12 +296,7 @@ trait Pack: Sized {
     }
 }
 
-const fn make_mask(bits: usize) -> usize {
-    let shift = 1 << (bits - 1);
-    shift | (shift - 1)
-}
-
-impl Pack for () {
+impl<C: cfg::Config> Pack<C> for () {
     const BITS: usize = 0;
     const LEN: usize = 0;
     const SHIFT: usize = 0;
