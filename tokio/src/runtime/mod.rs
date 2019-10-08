@@ -141,8 +141,9 @@ mod threadpool;
 #[cfg(feature = "rt-full")]
 pub use self::threadpool::{
     Builder,
+    JoinHandle,
     Runtime,
-    TaskExecutor,
+    Spawner,
 };
 
 // Internal export, don't use.

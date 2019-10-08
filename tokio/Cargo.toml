@@ -53,7 +53,7 @@ rt-full = [
   "sync",
   "timer",
   "tokio-executor/current-thread",
-  "tokio-executor/threadpool",
+  "tokio-executor/thread-pool",
   "tracing-core",
 ]
 signal = ["tokio-net/signal"]
