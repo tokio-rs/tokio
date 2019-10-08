@@ -18,6 +18,7 @@ mod read_until;
 mod repeat;
 mod shutdown;
 mod sink;
+mod split;
 mod take;
 mod write;
 mod write_all;

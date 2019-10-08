@@ -1,6 +1,7 @@
 use crate::io::lines::{lines, Lines};
 use crate::io::read_line::{read_line, ReadLine};
 use crate::io::read_until::{read_until, ReadUntil};
+use crate::io::split::{split, Split};
 use crate::AsyncBufRead;
 
 /// An extension trait which adds utility methods to `AsyncBufRead` types.
@@ -53,6 +54,30 @@ pub trait AsyncBufReadExt: AsyncBufRead {
         Self: Unpin,
     {
         read_line(self, buf)
+    }
+
+    /// Returns a stream of the contents of this reader split on the byte
+    /// `byte`.
+    ///
+    /// This method is the async equivalent to
+    /// [`BufRead::split`](std::io::BufRead::split).
+    ///
+    /// The stream returned from this function will yield instances of
+    /// [`io::Result`]`<`[`Vec<u8>`]`>`. Each vector returned will *not* have
+    /// the delimiter byte at the end.
+    ///
+    /// [`io::Result`]: std::io::Result
+    /// [`Vec<u8>`]: std::vec::Vec
+    ///
+    /// # Errors
+    ///
+    /// Each item of the stream has the same error semantics as
+    /// [`AsyncBufReadExt::read_until`](AsyncBufReadExt::read_until).
+    fn split(self, byte: u8) -> Split<Self>
+    where
+        Self: Sized,
+    {
+        split(self, byte)
     }
 
     /// Returns a stream over the lines of this reader.
