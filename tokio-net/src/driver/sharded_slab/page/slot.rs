@@ -94,8 +94,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
             *item = value.take();
         });
 
-        // Advance the slot's generation by one, returning the new generation.
-        let gen = self.gen.fetch_add(1, Ordering::Release) + 1 % Generation::<C>::BITS;
+        let gen = self.gen.load(Ordering::Acquire);
 
         #[cfg(test)]
         println!("-> {:?}", gen);
@@ -111,12 +110,21 @@ impl<T, C: cfg::Config> Slot<T, C> {
     #[inline]
     pub(super) fn remove_value(&self, gen: Generation<C>) -> Option<T> {
         let current = self.gen.load(Ordering::Acquire);
+
         #[cfg(test)]
         println!("-> remove={:?}; current={:?}", gen, current);
+        let next_gen = (current + 1) % Generation::<C>::BITS;
 
-        // Is the index's generation the same as the current generation? If not,
-        // the item that index referred to was already removed.
-        if gen.value != current {
+        #[cfg(test)]
+        println!("-> new gen {:?}", next_gen);
+
+        if self
+            .gen
+            .compare_and_swap(current, next_gen, Ordering::Release)
+            != current
+        {
+            #[cfg(test)]
+            println!("-> already removed!");
             return None;
         }
 
