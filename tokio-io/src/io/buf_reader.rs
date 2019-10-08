@@ -1,8 +1,8 @@
 use super::DEFAULT_BUF_SIZE;
-use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
+use crate::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite};
 use futures_core::ready;
 use pin_project::{pin_project, project};
-use std::io::{self, Read};
+use std::io::{self, Read, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, fmt};
@@ -168,6 +168,67 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.get_pin_mut().poll_shutdown(cx)
+    }
+}
+
+impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
+    /// Seek to an offset, in bytes, in the underlying reader.
+    ///
+    /// The position used for seeking with `SeekFrom::Current(_)` is the
+    /// position the underlying reader would be at if the `BufReader` had no
+    /// internal buffer.
+    ///
+    /// Seeking always discards the internal buffer, even if the seek position
+    /// would otherwise fall within it. This guarantees that calling
+    /// `.into_inner()` immediately after a seek yields the underlying reader
+    /// at the same position.
+    ///
+    /// To seek without discarding the internal buffer, use
+    /// [`BufReader::poll_seek_relative`](BufReader::poll_seek_relative).
+    ///
+    /// See [`AsyncSeek`](futures_io::AsyncSeek) for more details.
+    ///
+    /// Note: In the edge case where you're seeking with `SeekFrom::Current(n)`
+    /// where `n` minus the internal buffer length overflows an `i64`, two
+    /// seeks will be performed instead of one. If the second seek returns
+    /// `Err`, the underlying reader will be left at the same position it would
+    /// have if you called `seek` with `SeekFrom::Current(0)`.
+    fn poll_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pos: SeekFrom,
+    ) -> Poll<io::Result<u64>> {
+        let result: u64;
+        if let SeekFrom::Current(n) = pos {
+            let remainder = (self.cap - self.pos) as i64;
+            // it should be safe to assume that remainder fits within an i64 as the alternative
+            // means we managed to allocate 8 exbibytes and that's absurd.
+            // But it's not out of the realm of possibility for some weird underlying reader to
+            // support seeking by i64::min_value() so we need to handle underflow when subtracting
+            // remainder.
+            if let Some(offset) = n.checked_sub(remainder) {
+                result = ready!(self
+                    .as_mut()
+                    .get_pin_mut()
+                    .poll_seek(cx, SeekFrom::Current(offset)))?;
+            } else {
+                // seek backwards by our remainder, and then by the offset
+                ready!(self
+                    .as_mut()
+                    .get_pin_mut()
+                    .poll_seek(cx, SeekFrom::Current(-remainder)))?;
+                self.as_mut().discard_buffer();
+                result = ready!(self
+                    .as_mut()
+                    .get_pin_mut()
+                    .poll_seek(cx, SeekFrom::Current(n)))?;
+            }
+        } else {
+            // Seeking with Start/End doesn't care about our buffer length.
+            result = ready!(self.as_mut().get_pin_mut().poll_seek(cx, pos))?;
+        }
+        self.discard_buffer();
+        Poll::Ready(Ok(result))
     }
 }
 

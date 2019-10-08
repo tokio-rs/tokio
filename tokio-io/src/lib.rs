@@ -21,6 +21,7 @@
 
 mod async_buf_read;
 mod async_read;
+mod async_seek;
 mod async_write;
 
 #[cfg(feature = "util")]
@@ -31,12 +32,13 @@ pub mod split;
 
 pub use self::async_buf_read::AsyncBufRead;
 pub use self::async_read::AsyncRead;
+pub use self::async_seek::AsyncSeek;
 pub use self::async_write::AsyncWrite;
 
 #[cfg(feature = "util")]
 pub use self::io::{
-    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
-    BufWriter, Copy, Empty, Repeat, Sink,
+    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+    BufReader, BufStream, BufWriter, Copy, Empty, Repeat, Sink,
 };
 
 // Re-export `Buf` and `BufMut` since they are part of the API

@@ -1,7 +1,7 @@
 use crate::io::{BufReader, BufWriter};
-use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
+use crate::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite};
 use pin_project::pin_project;
-use std::io::{self};
+use std::io::{self, SeekFrom};
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -129,6 +129,16 @@ impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
         self.project().0.consume(amt)
+    }
+}
+
+impl<RW: AsyncRead + AsyncWrite + AsyncSeek> AsyncSeek for BufStream<RW> {
+    fn poll_seek(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pos: SeekFrom,
+    ) -> Poll<io::Result<u64>> {
+        self.project().0.poll_seek(cx, pos)
     }
 }
 

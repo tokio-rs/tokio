@@ -1,5 +1,6 @@
 mod async_buf_read_ext;
 mod async_read_ext;
+mod async_seek_ext;
 mod async_write_ext;
 mod buf_reader;
 mod buf_stream;
@@ -16,6 +17,7 @@ mod read_to_end;
 mod read_to_string;
 mod read_until;
 mod repeat;
+mod seek;
 mod shutdown;
 mod sink;
 mod take;
@@ -26,6 +28,8 @@ mod write_all;
 pub use self::async_buf_read_ext::AsyncBufReadExt;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::async_read_ext::AsyncReadExt;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::async_seek_ext::AsyncSeekExt;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::async_write_ext::AsyncWriteExt;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411

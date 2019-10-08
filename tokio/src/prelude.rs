@@ -27,7 +27,9 @@ pub use futures_util::sink::SinkExt as _;
 pub use futures_util::stream::StreamExt as _;
 
 #[cfg(feature = "io")]
-pub use tokio_io::{AsyncBufRead, AsyncRead, AsyncWrite};
+pub use tokio_io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite};
 #[cfg(feature = "io")]
 #[doc(no_inline)]
-pub use tokio_io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
+pub use tokio_io::{
+    AsyncBufReadExt as _, AsyncReadExt as _, AsyncSeekExt as _, AsyncWriteExt as _,
+};

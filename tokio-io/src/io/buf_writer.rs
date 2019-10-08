@@ -1,9 +1,9 @@
 use super::DEFAULT_BUF_SIZE;
-use crate::{AsyncBufRead, AsyncRead, AsyncWrite};
+use crate::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite};
 use futures_core::ready;
 use pin_project::{pin_project, project};
 use std::fmt;
-use std::io::{self, Write};
+use std::io::{self, SeekFrom, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -169,6 +169,20 @@ impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
         self.get_pin_mut().consume(amt)
+    }
+}
+
+impl<W: AsyncWrite + AsyncSeek> AsyncSeek for BufWriter<W> {
+    /// Seek to the offset, in bytes, in the underlying writer.
+    ///
+    /// Seeking always writes out the internal buffer before seeking.
+    fn poll_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pos: SeekFrom,
+    ) -> Poll<io::Result<u64>> {
+        ready!(self.as_mut().flush_buf(cx))?;
+        self.get_pin_mut().poll_seek(cx, pos)
     }
 }
 
