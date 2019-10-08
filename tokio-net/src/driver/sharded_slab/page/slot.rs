@@ -10,7 +10,7 @@ pub(crate) struct Slot<T, C> {
     /// into the slot.
     gen: AtomicUsize,
     /// The offset of the next item on the free list.
-    next: AtomicUsize,
+    next: CausalCell<usize>,
     /// The data stored in the slot.
     item: CausalCell<Option<T>>,
     _cfg: PhantomData<fn(C)>,
@@ -56,7 +56,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
         Self {
             gen: AtomicUsize::new(0),
             item: CausalCell::new(None),
-            next: AtomicUsize::new(next),
+            next: CausalCell::new(next),
             _cfg: PhantomData,
         }
     }
@@ -104,7 +104,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
 
     #[inline(always)]
     pub(super) fn next(&self) -> usize {
-        self.next.load(Ordering::Acquire)
+        self.next.with(|next| unsafe { *next })
     }
 
     #[inline]
@@ -135,15 +135,17 @@ impl<T, C: cfg::Config> Slot<T, C> {
 
     #[inline(always)]
     pub(super) fn set_next(&self, next: usize) {
-        self.next.store(next, Ordering::Release);
+        self.next.with_mut(|n| unsafe {
+            (*n) = next;
+        })
     }
 }
 
-impl<C, T> fmt::Debug for Slot<C, T> {
+impl<T, C: cfg::Config> fmt::Debug for Slot<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slot")
             .field("gen", &self.gen.load(Ordering::Relaxed))
-            .field("next", &self.next.load(Ordering::Relaxed))
+            .field("next", &self.next())
             .finish()
     }
 }
