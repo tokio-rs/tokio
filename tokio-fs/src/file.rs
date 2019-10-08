@@ -6,7 +6,7 @@ use self::State::*;
 use crate::blocking::Buf;
 use crate::{asyncify, sys};
 
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::{AsyncRead, AsyncSeek, AsyncWrite};
 
 use futures_core::ready;
 use std::fmt;
@@ -181,63 +181,6 @@ impl File {
             std: Arc::new(std),
             state: State::Idle(Some(Buf::with_capacity(0))),
             last_write_err: None,
-        }
-    }
-
-    /// Seek to an offset, in bytes, in a stream.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::fs::File;
-    /// use tokio::prelude::*;
-    ///
-    /// use std::io::SeekFrom;
-    ///
-    /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
-    /// file.seek(SeekFrom::Start(6)).await?;
-    ///
-    /// let mut contents = vec![0u8; 10];
-    /// file.read_exact(&mut contents).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
-        self.complete_inflight().await;
-
-        let mut buf = match self.state {
-            Idle(ref mut buf_cell) => buf_cell.take().unwrap(),
-            _ => unreachable!(),
-        };
-
-        // Factor in any unread data from the buf
-        if !buf.is_empty() {
-            let n = buf.discard_read();
-
-            if let SeekFrom::Current(ref mut offset) = pos {
-                *offset += n;
-            }
-        }
-
-        let std = self.std.clone();
-
-        // Start the operation
-        self.state = Busy(sys::run(move || {
-            let res = (&*std).seek(pos);
-            (Operation::Seek(res), buf)
-        }));
-
-        let (op, buf) = match self.state {
-            Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await,
-        };
-
-        self.state = Idle(Some(buf));
-
-        match op {
-            Operation::Seek(res) => res,
-            _ => unreachable!(),
         }
     }
 
@@ -592,6 +535,56 @@ impl AsyncWrite for File {
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncSeek for File {
+    fn poll_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        mut pos: SeekFrom,
+    ) -> Poll<io::Result<u64>> {
+        if let Some(e) = self.last_write_err.take() {
+            return Ready(Err(e.into()));
+        }
+
+        loop {
+            match self.state {
+                Idle(ref mut buf_cell) => {
+                    let mut buf = buf_cell.take().unwrap();
+
+                    // Factor in any unread data from the buf
+                    if !buf.is_empty() {
+                        let n = buf.discard_read();
+
+                        if let SeekFrom::Current(ref mut offset) = pos {
+                            *offset += n;
+                        }
+                    }
+
+                    let std = self.std.clone();
+
+                    // Start the operation
+                    self.state = Busy(sys::run(move || {
+                        let res = (&*std).seek(pos);
+                        (Operation::Seek(res), buf)
+                    }));
+                }
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx));
+                    self.state = Idle(Some(buf));
+
+                    match op {
+                        Operation::Read(_) => {}
+                        Operation::Write(Err(e)) => {
+                            self.last_write_err = Some(e.kind());
+                        }
+                        Operation::Write(_) => {}
+                        Operation::Seek(res) => return Ready(res),
+                    }
+                }
+            }
+        }
     }
 }
 
