@@ -9,8 +9,6 @@ use page::slot;
 use std::fmt;
 
 /// A sharded slab.
-///
-/// See the [crate-level documentation](index.html) for details on using this type.
 pub(crate) struct Slab<T, C: cfg::Config = cfg::DefaultConfig> {
     shards: Box<[Shard<T, C>]>,
 }
@@ -73,15 +71,6 @@ impl<T, C: cfg::Config> Slab<T, C> {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use sharded_slab::Slab;
-    /// let slab = Slab::new();
-    ///
-    /// let key = slab.insert("hello world").unwrap();
-    /// assert_eq!(slab.get(key), Some(&"hello world"));
-    /// ```
     pub(crate) fn insert(&self, value: T) -> Option<usize> {
         let tid = Tid::<C>::current();
         #[cfg(test)]
@@ -112,16 +101,6 @@ impl<T, C: cfg::Config> Slab<T, C> {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let slab = sharded_slab::Slab::new();
-    /// let key = slab.insert("hello world").unwrap();
-    ///
-    /// assert_eq!(slab.get(key), Some(&"hello world"));
-    /// assert_eq!(slab.get(12345), None);
-    /// ```
     pub(crate) fn get(&self, key: usize) -> Option<&T> {
         let tid = C::unpack_tid(key);
         #[cfg(test)]
