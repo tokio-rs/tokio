@@ -113,6 +113,13 @@ impl<T, C: cfg::Config> Slot<T, C> {
 
         #[cfg(test)]
         println!("-> remove={:?}; current={:?}", gen, current);
+
+        // Is the index's generation the same as the current generation? If not,
+        // the item that index referred to was already removed.
+        if gen.value != current {
+            return None;
+        }
+
         let next_gen = (current + 1) % Generation::<C>::BITS;
 
         #[cfg(test)]
