@@ -3,6 +3,7 @@
 members = [
   "tokio",
   "tokio-codec",
+  "tokio-compat",
   "tokio-executor",
   "tokio-fs",
   "tokio-io",
