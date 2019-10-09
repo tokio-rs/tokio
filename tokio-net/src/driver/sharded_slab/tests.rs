@@ -139,6 +139,7 @@ fn concurrent_insert_remove() {
                 }
                 let key = next.take().unwrap();
                 assert_eq!(slab2.remove(key), Some(i));
+                assert!(slab2.get(key).is_none());
                 cvar.notify_one();
             }
         });
@@ -182,15 +183,17 @@ fn remove_remote_and_reuse() {
         let s = slab.clone();
         let t1 = thread::spawn(move || {
             assert_eq!(s.remove(idx1), Some(1), "slab: {:#?}", s);
+            assert_eq!(s.get(idx1), None);
         });
 
-        let idx1 = slab.insert(5).expect("insert");
+        let idx5 = slab.insert(5).expect("insert");
         t1.join().expect("thread 1 should not panic");
 
-        assert_eq!(slab.get(idx1), Some(&5), "slab: {:#?}", slab);
+        assert_eq!(slab.get(idx5), Some(&5), "slab: {:#?}", slab);
         assert_eq!(slab.get(idx2), Some(&2), "slab: {:#?}", slab);
         assert_eq!(slab.get(idx3), Some(&3), "slab: {:#?}", slab);
         assert_eq!(slab.get(idx4), Some(&4), "slab: {:#?}", slab);
+        assert_eq!(slab.get(idx1), None, "slab: {:#?}", slab);
     });
 }
 
