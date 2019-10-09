@@ -28,7 +28,7 @@ impl<C: cfg::Config> Addr<C> {
         // determine the number of twos places by counting the number of leading
         // zeros (unused twos places) in the number's binary representation, and
         // subtracting that count from the total number of bits in a word.
-        cfg::WIDTH - (self.addr + C::INITIAL_SZ >> C::ADDR_INDEX_SHIFT).leading_zeros() as usize
+        cfg::WIDTH - ((self.addr + C::INITIAL_SZ) >> C::ADDR_INDEX_SHIFT).leading_zeros() as usize
     }
 
     pub(crate) fn offset(&self) -> usize {
@@ -134,10 +134,7 @@ impl<T, C: cfg::Config> Shared<T, C> {
         } else {
             // if the local free list is empty, pop all the items on the remote
             // free list onto the local free list.
-            let head = self.remote_head.swap(Self::NULL, Ordering::Acquire);
-            #[cfg(test)]
-            println!("-> remote head {:?}", head);
-            head
+            self.remote_head.swap(Self::NULL, Ordering::Acquire)
         };
 
         // if the head is still null, both the local and remote free lists are
