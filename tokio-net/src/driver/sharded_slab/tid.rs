@@ -13,8 +13,7 @@ use std::{
 use lazy_static::lazy_static;
 
 /// Uniquely identifies a thread.
-// #[repr(transparent)]
-#[derive(Hash)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub(crate) struct Tid {
     id: usize,
     _not_send: PhantomData<UnsafeCell<()>>,
@@ -68,14 +67,12 @@ impl Tid {
             .unwrap_or_else(|_| Self::poisoned())
     }
 
-    pub(crate) fn is_current(&self) -> bool {
+    pub(crate) fn is_current(self) -> bool {
         REGISTRATION
-            .try_with(|r| self == &r.current())
+            .try_with(|r| self == r.current())
             .unwrap_or(false)
     }
-}
 
-impl Tid {
     #[inline(always)]
     pub(crate) fn new(id: usize) -> Self {
         Self {
@@ -93,7 +90,7 @@ impl Tid {
     }
 
     /// Returns true if the local thread ID was accessed while unwinding.
-    pub(crate) fn is_poisoned(&self) -> bool {
+    pub(crate) fn is_poisoned(self) -> bool {
         self.id == std::usize::MAX
     }
 }
@@ -111,25 +108,6 @@ impl fmt::Debug for Tid {
         }
     }
 }
-
-impl PartialEq for Tid {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for Tid {}
-
-impl Clone for Tid {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            _not_send: PhantomData,
-        }
-    }
-}
-
-impl Copy for Tid {}
 
 // === impl Registration ===
 
