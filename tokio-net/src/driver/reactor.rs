@@ -1,5 +1,9 @@
 use super::platform;
 use super::sharded_slab::Slab;
+use crate::sync::atomic::{
+    AtomicUsize,
+    Ordering::{Relaxed, SeqCst},
+};
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
@@ -10,8 +14,6 @@ use std::io;
 use std::marker::PhantomData;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
@@ -512,5 +514,113 @@ impl Direction {
             }
             Direction::Write => mio::Ready::writable() | platform::hup(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use loom::thread;
+
+    // No-op `Evented` impl just so we can have something to pass to `add_source`.
+    struct NotEvented;
+
+    impl Evented for NotEvented {
+        fn register(
+            &self,
+            _: &mio::Poll,
+            _: mio::Token,
+            _: mio::Ready,
+            _: mio::PollOpt,
+        ) -> io::Result<()> {
+            Ok(())
+        }
+
+        fn reregister(
+            &self,
+            _: &mio::Poll,
+            _: mio::Token,
+            _: mio::Ready,
+            _: mio::PollOpt,
+        ) -> io::Result<()> {
+            Ok(())
+        }
+
+        fn deregister(&self, _: &mio::Poll) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn tokens_unique_when_dropped() {
+        loom::model(|| {
+            println!("\n--- iteration ---\n");
+            let reactor = Reactor::new().unwrap();
+            let inner = reactor.inner;
+            let inner2 = inner.clone();
+
+            let token_1 = inner.add_source(&NotEvented).unwrap();
+            println!("token 1: {:#x}", token_1);
+            let thread = thread::spawn(move || {
+                inner2.drop_source(token_1);
+                println!("dropped: {:#x}", token_1);
+            });
+
+            let token_2 = inner.add_source(&NotEvented).unwrap();
+            println!("token 2: {:#x}", token_2);
+            thread.join().unwrap();
+
+            assert!(token_1 != token_2);
+        })
+    }
+
+    #[test]
+    fn tokens_unique_when_dropped_on_full_page() {
+        loom::model(|| {
+            println!("\n--- iteration ---\n");
+            let reactor = Reactor::new().unwrap();
+            let inner = reactor.inner;
+            let inner2 = inner.clone();
+            // add sources to fill up the first page so that the dropped index
+            // may be reused.
+            for i in 0..31 {
+                inner.add_source(&NotEvented).unwrap();
+            }
+
+            let token_1 = inner.add_source(&NotEvented).unwrap();
+            println!("token 1: {:#x}", token_1);
+            let thread = thread::spawn(move || {
+                inner2.drop_source(token_1);
+                println!("dropped: {:#x}", token_1);
+            });
+
+            let token_2 = inner.add_source(&NotEvented).unwrap();
+            println!("token 2: {:#x}", token_2);
+            thread.join().unwrap();
+
+            assert!(token_1 != token_2);
+        })
+    }
+
+    #[test]
+    fn tokens_unique_concurrent_add() {
+        loom::model(|| {
+            println!("\n--- iteration ---\n");
+            let reactor = Reactor::new().unwrap();
+            let inner = reactor.inner;
+            let inner2 = inner.clone();
+
+            let thread = thread::spawn(move || {
+                let token_2 = inner2.add_source(&NotEvented).unwrap();
+                println!("token 2: {:#x}", token_2);
+                token_2
+            });
+
+            let token_1 = inner.add_source(&NotEvented).unwrap();
+            println!("token 1: {:#x}", token_1);
+            let token_2 = thread.join().unwrap();
+
+            assert!(token_1 != token_2);
+        })
     }
 }
