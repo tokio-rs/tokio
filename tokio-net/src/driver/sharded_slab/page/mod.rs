@@ -204,23 +204,24 @@ impl<T> Shared<T> {
             let slot = slab.get(offset)?;
             let val = slot.remove_value()?;
 
-            while {
-                let next = self.remote_head.load(Ordering::Relaxed);
-
+            let mut next = self.remote_head.load(Ordering::Relaxed);
+            loop {
                 #[cfg(test)]
                 println!("-> next={:?}", next);
 
                 slot.set_next(next);
 
-                let actual = self
-                    .remote_head
-                    .compare_and_swap(next, offset, Ordering::Release);
-                actual != next
-            } {
-                spin_loop_hint();
+                let res = self.remote_head.compare_exchange(
+                    next,
+                    offset,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                );
+                match res {
+                    Ok(_) => return Some(val),
+                    Err(actual) => next = actual,
+                }
             }
-
-            Some(val)
         })
     }
 
