@@ -583,7 +583,7 @@ mod tests {
             let inner2 = inner.clone();
             // add sources to fill up the first page so that the dropped index
             // may be reused.
-            for i in 0..31 {
+            for _ in 0..31 {
                 inner.add_source(&NotEvented).unwrap();
             }
 
