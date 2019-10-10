@@ -1,4 +1,4 @@
-use super::{cfg, Pack};
+use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
 use crate::sync::{
     atomic::{spin_loop_hint, AtomicUsize, Ordering},
     CausalCell,
@@ -6,18 +6,19 @@ use crate::sync::{
 
 pub(crate) mod slot;
 use self::slot::Slot;
-use std::{fmt, marker::PhantomData};
+use std::fmt;
 
 /// A page address encodes the location of a slot within a shard (the page
 /// number and offset within that page) as a single linear value.
 #[repr(transparent)]
-pub(crate) struct Addr<C: cfg::Config = cfg::DefaultConfig> {
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+pub(crate) struct Addr {
     addr: usize,
-    _cfg: PhantomData<fn(C)>,
 }
 
-impl<C: cfg::Config> Addr<C> {
+impl Addr {
     const NULL: usize = Self::BITS + 1;
+    const INDEX_SHIFT: usize = INITIAL_PAGE_SIZE.trailing_zeros() as usize + 1;
 
     pub(crate) fn index(&self) -> usize {
         // Since every page is twice as large as the previous page, and all page sizes
@@ -28,7 +29,7 @@ impl<C: cfg::Config> Addr<C> {
         // determine the number of twos places by counting the number of leading
         // zeros (unused twos places) in the number's binary representation, and
         // subtracting that count from the total number of bits in a word.
-        cfg::WIDTH - ((self.addr + C::INITIAL_SZ) >> C::ADDR_INDEX_SHIFT).leading_zeros() as usize
+        WIDTH - ((self.addr + INITIAL_PAGE_SIZE) >> Self::INDEX_SHIFT).leading_zeros() as usize
     }
 
     pub(crate) fn offset(&self) -> usize {
@@ -36,9 +37,12 @@ impl<C: cfg::Config> Addr<C> {
     }
 }
 
-impl<C: cfg::Config> Pack<C> for Addr<C> {
-    const LEN: usize = C::MAX_PAGES + C::ADDR_INDEX_SHIFT;
-    const BITS: usize = cfg::make_mask(Self::LEN);
+pub(super) fn size(n: usize) -> usize {
+    INITIAL_PAGE_SIZE * 2usize.pow(n as _)
+}
+
+impl Pack for Addr {
+    const LEN: usize = super::MAX_PAGES + Self::INDEX_SHIFT;
 
     type Prev = ();
 
@@ -48,25 +52,22 @@ impl<C: cfg::Config> Pack<C> for Addr<C> {
 
     fn from_usize(addr: usize) -> Self {
         debug_assert!(addr <= Self::BITS);
-        Self {
-            addr,
-            _cfg: PhantomData,
-        }
+        Self { addr }
     }
 }
 
-pub(crate) type Iter<'a, T, C> =
-    std::iter::FilterMap<std::slice::Iter<'a, Slot<T, C>>, fn(&'a Slot<T, C>) -> Option<&'a T>>;
+pub(crate) type Iter<'a, T> =
+    std::iter::FilterMap<std::slice::Iter<'a, Slot<T>>, fn(&'a Slot<T>) -> Option<&'a T>>;
 
 pub(crate) struct Local {
     head: CausalCell<usize>,
 }
 
-pub(crate) struct Shared<T, C> {
+pub(crate) struct Shared<T> {
     remote_head: AtomicUsize,
     size: usize,
     prev_sz: usize,
-    slab: CausalCell<Option<Box<[Slot<T, C>]>>>,
+    slab: CausalCell<Option<Box<[Slot<T>]>>>,
 }
 
 impl Local {
@@ -89,8 +90,8 @@ impl Local {
     }
 }
 
-impl<T, C: cfg::Config> Shared<T, C> {
-    const NULL: usize = Addr::<C>::NULL;
+impl<T> Shared<T> {
+    const NULL: usize = Addr::NULL;
 
     pub(crate) fn new(size: usize, prev_sz: usize) -> Self {
         Self {
@@ -167,7 +168,7 @@ impl<T, C: cfg::Config> Shared<T, C> {
     }
 
     #[inline]
-    pub(crate) fn get(&self, addr: Addr<C>, idx: usize) -> Option<&T> {
+    pub(crate) fn get(&self, addr: Addr, idx: usize) -> Option<&T> {
         let page_offset = addr.offset() - self.prev_sz;
         #[cfg(test)]
         println!("-> offset {:?}", page_offset);
@@ -176,15 +177,15 @@ impl<T, C: cfg::Config> Shared<T, C> {
             unsafe { &*slab }
                 .as_ref()?
                 .get(page_offset)?
-                .get(C::unpack_gen(idx))
+                .get(slot::Generation::from_packed(idx))
         })
     }
 
     pub(crate) fn remove_local(
         &self,
         local: &Local,
-        addr: Addr<C>,
-        gen: slot::Generation<C>,
+        addr: Addr,
+        gen: slot::Generation,
     ) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
 
@@ -201,7 +202,7 @@ impl<T, C: cfg::Config> Shared<T, C> {
         })
     }
 
-    pub(crate) fn remove_remote(&self, addr: Addr<C>, gen: slot::Generation<C>) -> Option<T> {
+    pub(crate) fn remove_remote(&self, addr: Addr, gen: slot::Generation) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
@@ -232,7 +233,7 @@ impl<T, C: cfg::Config> Shared<T, C> {
         })
     }
 
-    pub(crate) fn iter<'a>(&'a self) -> Option<Iter<'a, T, C>> {
+    pub(crate) fn iter<'a>(&'a self) -> Option<Iter<'a, T>> {
         let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
         slab.map(|slab| slab.iter().filter_map(Slot::value as fn(_) -> _))
     }
@@ -249,7 +250,7 @@ impl fmt::Debug for Local {
     }
 }
 
-impl<C, T> fmt::Debug for Shared<C, T> {
+impl<T> fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Shared")
             .field(
@@ -263,7 +264,7 @@ impl<C, T> fmt::Debug for Shared<C, T> {
     }
 }
 
-impl<C: cfg::Config> fmt::Debug for Addr<C> {
+impl fmt::Debug for Addr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Addr")
             .field("addr", &format_args!("{:#0x}", &self.addr))
@@ -273,34 +274,6 @@ impl<C: cfg::Config> fmt::Debug for Addr<C> {
     }
 }
 
-impl<C: cfg::Config> PartialEq for Addr<C> {
-    fn eq(&self, other: &Self) -> bool {
-        self.addr == other.addr
-    }
-}
-
-impl<C: cfg::Config> Eq for Addr<C> {}
-
-impl<C: cfg::Config> PartialOrd for Addr<C> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.addr.partial_cmp(&other.addr)
-    }
-}
-
-impl<C: cfg::Config> Ord for Addr<C> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.addr.cmp(&other.addr)
-    }
-}
-
-impl<C: cfg::Config> Clone for Addr<C> {
-    fn clone(&self) -> Self {
-        Self::from_usize(self.addr)
-    }
-}
-
-impl<C: cfg::Config> Copy for Addr<C> {}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -308,25 +281,25 @@ mod test {
 
     proptest! {
         #[test]
-        fn addr_roundtrips(pidx in 0usize..Addr::<cfg::DefaultConfig>::BITS) {
-            let addr = Addr::<cfg::DefaultConfig>::from_usize(pidx);
+        fn addr_roundtrips(pidx in 0usize..Addr::BITS) {
+            let addr = Addr::from_usize(pidx);
             let packed = addr.pack(0);
             assert_eq!(addr, Addr::from_packed(packed));
         }
         #[test]
-        fn gen_roundtrips(gen in 0usize..slot::Generation::<cfg::DefaultConfig>::BITS) {
-            let gen = slot::Generation::<cfg::DefaultConfig>::from_usize(gen);
+        fn gen_roundtrips(gen in 0usize..slot::Generation::BITS) {
+            let gen = slot::Generation::from_usize(gen);
             let packed = gen.pack(0);
             assert_eq!(gen, slot::Generation::from_packed(packed));
         }
 
         #[test]
         fn page_roundtrips(
-            gen in 0usize..slot::Generation::<cfg::DefaultConfig>::BITS,
-            addr in 0usize..Addr::<cfg::DefaultConfig>::BITS,
+            gen in 0usize..slot::Generation::BITS,
+            addr in 0usize..Addr::BITS,
         ) {
-            let gen = slot::Generation::<cfg::DefaultConfig>::from_usize(gen);
-            let addr = Addr::<cfg::DefaultConfig>::from_usize(addr);
+            let gen = slot::Generation::from_usize(gen);
+            let addr = Addr::from_usize(addr);
             let packed = gen.pack(addr.pack(0));
             assert_eq!(addr, Addr::from_packed(packed));
             assert_eq!(gen, slot::Generation::from_packed(packed));

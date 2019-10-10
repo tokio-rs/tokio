@@ -1,13 +1,13 @@
-use super::{cfg, page, Shard};
+use super::{page, Shard};
 use std::slice;
 
-pub(crate) struct UniqueIter<'a, T, C: cfg::Config> {
-    pub(super) shards: slice::IterMut<'a, Shard<T, C>>,
-    pub(super) pages: slice::Iter<'a, page::Shared<T, C>>,
-    pub(super) slots: Option<page::Iter<'a, T, C>>,
+pub(crate) struct UniqueIter<'a, T> {
+    pub(super) shards: slice::IterMut<'a, Shard<T>>,
+    pub(super) pages: slice::Iter<'a, page::Shared<T>>,
+    pub(super) slots: Option<page::Iter<'a, T>>,
 }
 
-impl<'a, T, C: cfg::Config> Iterator for UniqueIter<'a, T, C> {
+impl<'a, T> Iterator for UniqueIter<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
