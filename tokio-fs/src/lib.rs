@@ -82,6 +82,8 @@ pub use crate::write::write;
 
 use std::io;
 
+pub use file::os::*;
+
 async fn asyncify<F, T>(f: F) -> io::Result<T>
 where
     F: FnOnce() -> io::Result<T> + Send + 'static,

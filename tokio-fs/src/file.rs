@@ -608,3 +608,19 @@ impl fmt::Debug for File {
             .finish()
     }
 }
+
+#[cfg(unix)]
+pub(crate) mod os {
+    use super::File;
+    use std::os::unix::io::{AsRawFd, RawFd};
+
+    impl AsRawFd for File {
+        fn as_raw_fd(&self) -> RawFd {
+            let std = self.std.clone();
+            (&*std).as_raw_fd()
+        }
+    }
+}
+
+#[cfg(not(unix))]
+pub(crate) mod os {}

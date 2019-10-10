@@ -48,6 +48,22 @@ fn tempfile() -> NamedTempFile {
     NamedTempFile::new().unwrap()
 }
 
+#[cfg(unix)]
+mod unix_text {
+    use super::*;
+    use std::os::unix::io::AsRawFd;
+
+    #[test]
+    fn unix_can_access_file_fd() {
+        let tempfile = tempfile();
+        let file = std::fs::File::create(tempfile.path()).unwrap();
+        let file_fd = file.as_raw_fd();
+        let async_file = File::from_std(file);
+        let async_file_fd = async_file.as_raw_fd();
+        assert_eq!(file_fd, async_file_fd)
+    }
+}
+
 /*
 mod pool;
 

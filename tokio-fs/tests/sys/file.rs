@@ -263,3 +263,15 @@ impl fmt::Debug for File {
         fmt.debug_struct("mock::File").finish()
     }
 }
+
+#[cfg(unix)]
+pub(crate) mod os {
+    use super::File;
+    use std::os::unix::io::{AsRawFd, RawFd};
+
+    impl AsRawFd for File {
+        fn as_raw_fd(&self) -> RawFd {
+            -1 as RawFd
+        }
+    }
+}
