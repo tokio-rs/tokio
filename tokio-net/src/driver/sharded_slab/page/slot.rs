@@ -1,11 +1,11 @@
-use super::super::{cfg, Pack, Tid};
+use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
 use crate::sync::{
     atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
-use std::{fmt, marker::PhantomData};
+use std::fmt;
 
-pub(crate) struct Slot<T, C> {
+pub(crate) struct Slot<T> {
     /// ABA guard generation counter incremented every time a value is inserted
     /// into the slot.
     gen: AtomicUsize,
@@ -13,22 +13,20 @@ pub(crate) struct Slot<T, C> {
     next: CausalCell<usize>,
     /// The data stored in the slot.
     item: CausalCell<Option<T>>,
-    _cfg: PhantomData<fn(C)>,
 }
 
 #[repr(transparent)]
-pub(crate) struct Generation<C = cfg::DefaultConfig> {
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+pub(crate) struct Generation {
     value: usize,
-    _cfg: PhantomData<fn(C)>,
 }
 
-impl<C: cfg::Config> Pack<C> for Generation<C> {
+impl Pack for Generation {
     /// Use all the remaining bits in the word for the generation counter, minus
     /// any bits reserved by the user.
-    const LEN: usize = (cfg::WIDTH - C::RESERVED_BITS) - Self::SHIFT;
-    const BITS: usize = cfg::make_mask(Self::LEN);
+    const LEN: usize = (WIDTH - RESERVED_BITS) - Self::SHIFT;
 
-    type Prev = Tid<C>;
+    type Prev = Tid;
 
     #[inline(always)]
     fn from_usize(u: usize) -> Self {
@@ -42,27 +40,23 @@ impl<C: cfg::Config> Pack<C> for Generation<C> {
     }
 }
 
-impl<C: cfg::Config> Generation<C> {
+impl Generation {
     fn new(value: usize) -> Self {
-        Self {
-            value,
-            _cfg: PhantomData,
-        }
+        Self { value }
     }
 }
 
-impl<T, C: cfg::Config> Slot<T, C> {
+impl<T> Slot<T> {
     pub(super) fn new(next: usize) -> Self {
         Self {
             gen: AtomicUsize::new(0),
             item: CausalCell::new(None),
             next: CausalCell::new(next),
-            _cfg: PhantomData,
         }
     }
 
     #[inline(always)]
-    pub(super) fn get(&self, gen: Generation<C>) -> Option<&T> {
+    pub(super) fn get(&self, gen: Generation) -> Option<&T> {
         let current = self.gen.load(Ordering::Acquire);
         #[cfg(test)]
         println!("-> get {:?}; current={:?}", gen, current);
@@ -82,7 +76,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
     }
 
     #[inline]
-    pub(super) fn insert(&self, value: &mut Option<T>) -> Generation<C> {
+    pub(super) fn insert(&self, value: &mut Option<T>) -> Generation {
         debug_assert!(
             self.item.with(|item| unsafe { (*item).is_none() }),
             "inserted into full slot"
@@ -108,7 +102,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
     }
 
     #[inline]
-    pub(super) fn remove_value(&self, gen: Generation<C>) -> Option<T> {
+    pub(super) fn remove_value(&self, gen: Generation) -> Option<T> {
         let current = self.gen.load(Ordering::Acquire);
 
         #[cfg(test)]
@@ -120,7 +114,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
             return None;
         }
 
-        let next_gen = (current + 1) % Generation::<C>::BITS;
+        let next_gen = (current + 1) % Generation::BITS;
 
         #[cfg(test)]
         println!("-> new gen {:?}", next_gen);
@@ -148,7 +142,7 @@ impl<T, C: cfg::Config> Slot<T, C> {
     }
 }
 
-impl<T, C: cfg::Config> fmt::Debug for Slot<T, C> {
+impl<T> fmt::Debug for Slot<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slot")
             .field("gen", &self.gen.load(Ordering::Relaxed))
@@ -156,37 +150,3 @@ impl<T, C: cfg::Config> fmt::Debug for Slot<T, C> {
             .finish()
     }
 }
-
-impl<C> fmt::Debug for Generation<C> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Generation").field(&self.value).finish()
-    }
-}
-
-impl<C: cfg::Config> PartialEq for Generation<C> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
-    }
-}
-
-impl<C: cfg::Config> Eq for Generation<C> {}
-
-impl<C: cfg::Config> PartialOrd for Generation<C> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
-    }
-}
-
-impl<C: cfg::Config> Ord for Generation<C> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value.cmp(&other.value)
-    }
-}
-
-impl<C: cfg::Config> Clone for Generation<C> {
-    fn clone(&self) -> Self {
-        Self::new(self.value)
-    }
-}
-
-impl<C: cfg::Config> Copy for Generation<C> {}
