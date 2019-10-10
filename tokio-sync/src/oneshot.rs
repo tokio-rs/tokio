@@ -198,6 +198,8 @@ impl<T> Sender<T> {
                 state = State::unset_tx_task(&inner.state);
 
                 if state.is_closed() {
+                    // Set the flag again so that the waker is released in drop
+                    State::set_tx_task(&inner.state);
                     return Ok(Async::Ready(()));
                 } else {
                     unsafe { inner.drop_tx_task() };
@@ -363,6 +365,9 @@ impl<T> Inner<T> {
                     // Unset the task
                     state = State::unset_rx_task(&self.state);
                     if state.is_complete() {
+                        // Set the flag again so that the waker is released in drop
+                        State::set_rx_task(&self.state);
+
                         return match unsafe { self.consume_value() } {
                             Some(value) => Ok(Ready(value)),
                             None => Err(RecvError(())),
