@@ -16,7 +16,6 @@ const MAX_THREADS: usize = 4096;
 const MAX_THREADS: usize = 2048;
 const INITIAL_PAGE_SIZE: usize = 32;
 const MAX_PAGES: usize = WIDTH / 4;
-const RESERVED_BITS: usize = 5;
 
 #[cfg(test)]
 mod tests;
