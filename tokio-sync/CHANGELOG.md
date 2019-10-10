@@ -1,3 +1,8 @@
+# 0.1.7 (October 10, 2019)
+
+### Fixed
+- memory leak when polling oneshot handle from more than one task (#1649).
+
 # 0.1.6 (June 4, 2019)
 
 ### Added
