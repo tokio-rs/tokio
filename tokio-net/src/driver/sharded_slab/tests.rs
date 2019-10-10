@@ -3,10 +3,7 @@ use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
 
 mod idx {
-    use super::super::{
-        page::{self, slot},
-        Pack, Tid,
-    };
+    use super::super::{page, Pack, Tid};
     use proptest::prelude::*;
 
     proptest! {
@@ -20,15 +17,12 @@ mod idx {
         #[test]
         fn idx_roundtrips(
             tid in 0usize..Tid::BITS,
-            gen in 0usize..slot::Generation::BITS,
             addr in 0usize..page::Addr::BITS,
         ) {
             let tid = Tid::from_usize(tid);
-            let gen = slot::Generation::from_usize(gen);
             let addr = page::Addr::from_usize(addr);
-            let packed = tid.pack(gen.pack(addr.pack(0)));
+            let packed = tid.pack(addr.pack(0));
             assert_eq!(addr, page::Addr::from_packed(packed));
-            assert_eq!(gen, slot::Generation::from_packed(packed));
             assert_eq!(tid, Tid::from_packed(packed));
         }
     }
@@ -53,7 +47,6 @@ mod tiny_slab {
     #[cfg(target_pointer_width = "32")]
     const MAX_THREADS: usize = 2048;
     const MAX_PAGES: usize = WIDTH / 4;
-    const RESERVED_BITS: usize = 5;
 
     #[path = "page/mod.rs"]
     #[allow(dead_code)]

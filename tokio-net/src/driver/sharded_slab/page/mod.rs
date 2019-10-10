@@ -151,42 +151,32 @@ impl<T> Shared<T> {
             self.fill();
         }
 
-        let gen = self.slab.with(|slab| {
+        self.slab.with(|slab| {
             let slab = unsafe { &*(slab) }
                 .as_ref()
                 .expect("page must have been allocated to insert!");
             let slot = &slab[head];
-            let gen = slot.insert(t);
+            slot.insert(t.take().expect("inserted twice!"));
             local.set_head(slot.next());
-            gen
         });
 
         let index = head + self.prev_sz;
         #[cfg(test)]
         println!("insert at offset: {}", index);
-        Some(gen.pack(index))
+        Some(index)
     }
 
     #[inline]
-    pub(crate) fn get(&self, addr: Addr, idx: usize) -> Option<&T> {
+    pub(crate) fn get(&self, addr: Addr) -> Option<&T> {
         let page_offset = addr.offset() - self.prev_sz;
         #[cfg(test)]
         println!("-> offset {:?}", page_offset);
 
-        self.slab.with(|slab| {
-            unsafe { &*slab }
-                .as_ref()?
-                .get(page_offset)?
-                .get(slot::Generation::from_packed(idx))
-        })
+        self.slab
+            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset)?.value())
     }
 
-    pub(crate) fn remove_local(
-        &self,
-        local: &Local,
-        addr: Addr,
-        gen: slot::Generation,
-    ) -> Option<T> {
+    pub(crate) fn remove_local(&self, local: &Local, addr: Addr) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
@@ -195,14 +185,14 @@ impl<T> Shared<T> {
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref()?;
             let slot = slab.get(offset)?;
-            let val = slot.remove_value(gen)?;
+            let val = slot.remove_value()?;
             slot.set_next(local.head());
             local.set_head(offset);
             Some(val)
         })
     }
 
-    pub(crate) fn remove_remote(&self, addr: Addr, gen: slot::Generation) -> Option<T> {
+    pub(crate) fn remove_remote(&self, addr: Addr) -> Option<T> {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
@@ -211,7 +201,7 @@ impl<T> Shared<T> {
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref()?;
             let slot = slab.get(offset)?;
-            let val = slot.remove_value(gen)?;
+            let val = slot.remove_value()?;
 
             while {
                 let next = self.remote_head.load(Ordering::Relaxed);
@@ -285,24 +275,6 @@ mod test {
             let addr = Addr::from_usize(pidx);
             let packed = addr.pack(0);
             assert_eq!(addr, Addr::from_packed(packed));
-        }
-        #[test]
-        fn gen_roundtrips(gen in 0usize..slot::Generation::BITS) {
-            let gen = slot::Generation::from_usize(gen);
-            let packed = gen.pack(0);
-            assert_eq!(gen, slot::Generation::from_packed(packed));
-        }
-
-        #[test]
-        fn page_roundtrips(
-            gen in 0usize..slot::Generation::BITS,
-            addr in 0usize..Addr::BITS,
-        ) {
-            let gen = slot::Generation::from_usize(gen);
-            let addr = Addr::from_usize(addr);
-            let packed = gen.pack(addr.pack(0));
-            assert_eq!(addr, Addr::from_packed(packed));
-            assert_eq!(gen, slot::Generation::from_packed(packed));
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::{page::slot, Pack, *};
+use super::*;
 use std::fmt;
 
 /// A sharded slab.
@@ -42,15 +42,13 @@ pub(super) struct Shard<T> {
 }
 
 impl<T> Slab<T> {
-    pub(crate) const MAX_BIT: usize = slot::Generation::SHIFT + slot::Generation::LEN;
+    pub(crate) const MAX_BIT: usize = Tid::SHIFT + Tid::LEN;
 
     /// Returns a new slab with the default configuration parameters.
     pub(crate) fn new() -> Self {
         let shards = (0..MAX_THREADS).map(Shard::new).collect();
         Self { shards }
     }
-
-    // pub(crate) const MAX_BIT: usize = slot::Generation::LEN + slot::Generation::SHIFT;
 
     /// Inserts a value into the slab, returning a key that can be used to
     /// access it.
@@ -158,7 +156,7 @@ impl<T> Shard<T> {
         if i > self.shared.len() {
             return None;
         }
-        self.shared[i].get(addr, idx)
+        self.shared[i].get(addr)
     }
 
     /// Remove an item on the shard's local thread.
@@ -173,11 +171,7 @@ impl<T> Shard<T> {
         #[cfg(test)]
         println!("-> remove_local {:?}; page {:?}", addr, page);
 
-        self.shared.get(page)?.remove_local(
-            self.local(page),
-            addr,
-            slot::Generation::from_packed(idx),
-        )
+        self.shared.get(page)?.remove_local(self.local(page), addr)
     }
 
     /// Remove an item, while on a different thread from the shard's local thread.
@@ -193,9 +187,7 @@ impl<T> Shard<T> {
         #[cfg(test)]
         println!("-> remove_remote {:?}; page {:?}", addr, page);
 
-        self.shared
-            .get(page)?
-            .remove_remote(addr, slot::Generation::from_packed(idx))
+        self.shared.get(page)?.remove_remote(addr)
     }
 
     #[inline(always)]
