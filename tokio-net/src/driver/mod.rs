@@ -130,7 +130,6 @@
 pub(crate) mod platform;
 mod reactor;
 mod registration;
-mod sharded_slab;
 
 pub use self::reactor::{set_default, DefaultGuard, Handle, Reactor};
 pub use self::registration::Registration;

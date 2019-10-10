@@ -1,14 +1,14 @@
-use super::{page, Shard};
+use super::{page, ScheduledIo, Shard};
 use std::slice;
 
-pub(crate) struct UniqueIter<'a, T> {
-    pub(super) shards: slice::IterMut<'a, Shard<T>>,
-    pub(super) pages: slice::Iter<'a, page::Shared<T>>,
-    pub(super) slots: Option<page::Iter<'a, T>>,
+pub(in crate::driver::reactor) struct UniqueIter<'a> {
+    pub(super) shards: slice::IterMut<'a, Shard>,
+    pub(super) pages: slice::Iter<'a, page::Shared>,
+    pub(super) slots: Option<page::Iter<'a>>,
 }
 
-impl<'a, T> Iterator for UniqueIter<'a, T> {
-    type Item = &'a T;
+impl<'a> Iterator for UniqueIter<'a> {
+    type Item = &'a ScheduledIo;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(item) = self.slots.as_mut().and_then(|slots| slots.next()) {

@@ -1,9 +1,12 @@
 use super::platform;
-use super::sharded_slab::Slab;
 use crate::sync::atomic::{
     AtomicUsize,
-    Ordering::{Relaxed, SeqCst},
+    Ordering::{Relaxed, Release, SeqCst},
 };
+
+mod sharded_slab;
+pub(crate) use sharded_slab::MAX_SOURCES;
+use sharded_slab::{Slab, TOKEN_SHIFT};
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
@@ -77,7 +80,7 @@ pub(super) struct Inner {
     io: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
-    pub(super) io_dispatch: Slab<ScheduledIo>,
+    pub(super) io_dispatch: Slab,
 
     /// The number of sources in `io_dispatch`.
     n_sources: AtomicUsize,
@@ -86,8 +89,9 @@ pub(super) struct Inner {
     wakeup: mio::SetReadiness,
 }
 
+#[derive(Debug)]
 pub(super) struct ScheduledIo {
-    aba_guard: usize,
+    aba_guard: AtomicUsize,
     pub(super) readiness: AtomicUsize,
     pub(super) reader: AtomicWaker,
     pub(super) writer: AtomicWaker,
@@ -104,9 +108,6 @@ thread_local! {
     static CURRENT_REACTOR: RefCell<Option<HandlePriv>> = RefCell::new(None)
 }
 
-const TOKEN_SHIFT: usize = Slab::<ScheduledIo>::MAX_BIT;
-
-const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_SOURCES);
 
 fn _assert_kinds() {
@@ -277,20 +278,13 @@ impl Reactor {
     }
 
     fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
-        let aba_guard = token.0 & !MAX_SOURCES;
-        let token = token.0 & MAX_SOURCES;
-
         let mut rd = None;
         let mut wr = None;
 
-        let io = match self.inner.io_dispatch.get(token) {
+        let io = match self.inner.io_dispatch.get(token.0) {
             Some(io) => io,
             None => return,
         };
-
-        if aba_guard != io.aba_guard {
-            return;
-        }
 
         io.readiness.fetch_or(ready.as_usize(), Relaxed);
 
@@ -433,20 +427,12 @@ impl Inner {
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
-        let index = self
-            .io_dispatch
-            .insert(ScheduledIo {
-                aba_guard,
-                readiness: AtomicUsize::new(0),
-                reader: AtomicWaker::new(),
-                writer: AtomicWaker::new(),
-            })
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    "reactor at max registered I/O resources",
-                )
-            })?;
+        let index = self.io_dispatch.insert(aba_guard).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "reactor at max registered I/O resources",
+            )
+        })?;
         let token = aba_guard | index;
         let _n_sources = self.n_sources.fetch_add(1, SeqCst);
         debug!(message = "adding I/O source", token, sources = _n_sources);
@@ -513,6 +499,30 @@ impl Direction {
                 mio::Ready::all() - mio::Ready::writable()
             }
             Direction::Write => mio::Ready::writable() | platform::hup(),
+        }
+    }
+}
+
+impl ScheduledIo {
+    fn insert(&self, aba_guard: usize) {
+        self.aba_guard.store(aba_guard, Release);
+    }
+
+    fn reset(&self) {
+        self.readiness.store(0, Release);
+        self.aba_guard.store(0, Release);
+        drop(self.reader.take_waker());
+        drop(self.writer.take_waker());
+    }
+}
+
+impl Default for ScheduledIo {
+    fn default() -> Self {
+        Self {
+            aba_guard: AtomicUsize::new(0),
+            readiness: AtomicUsize::new(0),
+            reader: AtomicWaker::new(),
+            writer: AtomicWaker::new(),
         }
     }
 }

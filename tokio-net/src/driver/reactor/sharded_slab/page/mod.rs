@@ -1,6 +1,6 @@
-use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
+use super::{Pack, ScheduledIo, INITIAL_PAGE_SIZE, WIDTH};
 use crate::sync::{
-    atomic::{spin_loop_hint, AtomicUsize, Ordering},
+    atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
 
@@ -56,18 +56,18 @@ impl Pack for Addr {
     }
 }
 
-pub(crate) type Iter<'a, T> =
-    std::iter::FilterMap<std::slice::Iter<'a, Slot<T>>, fn(&'a Slot<T>) -> Option<&'a T>>;
+pub(in crate::driver) type Iter<'a> =
+    std::iter::FilterMap<std::slice::Iter<'a, Slot>, fn(&'a Slot) -> Option<&'a ScheduledIo>>;
 
 pub(crate) struct Local {
     head: CausalCell<usize>,
 }
 
-pub(crate) struct Shared<T> {
+pub(crate) struct Shared {
     remote_head: AtomicUsize,
     size: usize,
     prev_sz: usize,
-    slab: CausalCell<Option<Box<[Slot<T>]>>>,
+    slab: CausalCell<Option<Box<[Slot]>>>,
 }
 
 impl Local {
@@ -90,7 +90,7 @@ impl Local {
     }
 }
 
-impl<T> Shared<T> {
+impl Shared {
     const NULL: usize = Addr::NULL;
 
     pub(crate) fn new(size: usize, prev_sz: usize) -> Self {
@@ -124,7 +124,7 @@ impl<T> Shared<T> {
     }
 
     #[inline]
-    pub(crate) fn insert(&self, local: &Local, t: &mut Option<T>) -> Option<usize> {
+    pub(crate) fn insert(&self, local: &Local, aba_guard: usize) -> Option<usize> {
         let head = local.head();
         #[cfg(test)]
         println!("-> local head {:?}", head);
@@ -157,7 +157,7 @@ impl<T> Shared<T> {
                 .as_ref()
                 .expect("page must have been allocated to insert!");
             let slot = &slab[head];
-            slot.insert(t.take().expect("inserted twice!"));
+            slot.insert(aba_guard);
             local.set_head(slot.next());
         });
 
@@ -168,7 +168,7 @@ impl<T> Shared<T> {
     }
 
     #[inline]
-    pub(crate) fn get(&self, addr: Addr) -> Option<&T> {
+    pub(in crate::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
         #[cfg(test)]
         println!("-> offset {:?}", page_offset);
@@ -177,32 +177,42 @@ impl<T> Shared<T> {
             .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset)?.value())
     }
 
-    pub(crate) fn remove_local(&self, local: &Local, addr: Addr) -> Option<T> {
+    pub(crate) fn remove_local(&self, local: &Local, addr: Addr) {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
         println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
-            let slab = unsafe { &*slab }.as_ref()?;
-            let slot = slab.get(offset)?;
-            let val = slot.remove_value()?;
-            slot.set_next(local.head());
-            local.set_head(offset);
-            Some(val)
+            let slot =
+                if let Some(slot) = unsafe { &*slab }.as_ref().and_then(|slab| slab.get(offset)) {
+                    slot
+                } else {
+                    return;
+                };
+            if slot.reset() {
+                slot.set_next(local.head());
+                local.set_head(offset);
+            }
         })
     }
 
-    pub(crate) fn remove_remote(&self, addr: Addr) -> Option<T> {
+    pub(crate) fn remove_remote(&self, addr: Addr) {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
         println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
-            let slab = unsafe { &*slab }.as_ref()?;
-            let slot = slab.get(offset)?;
-            let val = slot.remove_value()?;
+            let slot =
+                if let Some(slot) = unsafe { &*slab }.as_ref().and_then(|slab| slab.get(offset)) {
+                    slot
+                } else {
+                    return;
+                };
+            if !slot.reset() {
+                return;
+            }
 
             let mut next = self.remote_head.load(Ordering::Relaxed);
             loop {
@@ -218,14 +228,14 @@ impl<T> Shared<T> {
                     Ordering::Acquire,
                 );
                 match res {
-                    Ok(_) => return Some(val),
+                    Ok(_) => return,
                     Err(actual) => next = actual,
                 }
             }
         })
     }
 
-    pub(crate) fn iter(&self) -> Option<Iter<'_, T>> {
+    pub(in crate::driver) fn iter(&self) -> Option<Iter<'_>> {
         let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
         slab.map(|slab| slab.iter().filter_map(Slot::value as fn(_) -> _))
     }
@@ -242,7 +252,7 @@ impl fmt::Debug for Local {
     }
 }
 
-impl<T> fmt::Debug for Shared<T> {
+impl fmt::Debug for Shared {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Shared")
             .field(

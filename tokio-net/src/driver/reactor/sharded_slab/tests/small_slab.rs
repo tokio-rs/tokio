@@ -1,3 +1,4 @@
+use super::super::ScheduledIo;
 use loom::sync::Arc;
 use loom::thread;
 
@@ -47,25 +48,25 @@ fn remove_remote_and_reuse() {
         let idx1 = slab.insert(1).expect("insert");
         let idx2 = slab.insert(2).expect("insert");
 
-        assert_eq!(slab.get(idx1), Some(&1), "slab: {:#?}", slab);
-        assert_eq!(slab.get(idx2), Some(&2), "slab: {:#?}", slab);
+        assert_eq!(slab.get_guard(idx1), Some(1), "slab: {:#?}", slab);
+        assert_eq!(slab.get_guard(idx2), Some(2), "slab: {:#?}", slab);
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
-            assert_eq!(s.remove(idx1), Some(1), "slab: {:#?}", s);
-            let value = s.get(idx1);
+            s.remove(idx1);
+            let value = s.get_guard(idx1);
 
             // We may or may not see the new value yet, depending on when
             // this occurs, but we must either  see the new value or `None`;
             // the old value has been removed!
-            assert!(value == None || value == Some(&3));
+            assert!(value == None || value == Some(3));
         });
 
         let idx3 = slab.insert(3).expect("insert");
         t1.join().expect("thread 1 should not panic");
 
-        assert_eq!(slab.get(idx3), Some(&3), "slab: {:#?}", slab);
-        assert_eq!(slab.get(idx2), Some(&2), "slab: {:#?}", slab);
+        assert_eq!(slab.get_guard(idx3), Some(3), "slab: {:#?}", slab);
+        assert_eq!(slab.get_guard(idx2), Some(2), "slab: {:#?}", slab);
     });
 }
 
@@ -79,7 +80,12 @@ fn custom_page_sz() {
         for i in 0..1024 {
             println!("{}", i);
             let k = slab.insert(i).expect("insert");
-            assert_eq!(slab.get(k).expect("get"), &i, "slab: {:#?}", slab);
+            assert_eq!(
+                slab.get_guard(k).expect("get_guard"),
+                i,
+                "slab: {:#?}",
+                slab
+            );
         }
     });
 }
