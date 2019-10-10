@@ -20,7 +20,7 @@ impl Addr {
     const NULL: usize = Self::BITS + 1;
     const INDEX_SHIFT: usize = INITIAL_PAGE_SIZE.trailing_zeros() as usize + 1;
 
-    pub(crate) fn index(&self) -> usize {
+    pub(crate) fn index(self) -> usize {
         // Since every page is twice as large as the previous page, and all page sizes
         // are powers of two, we can determine the page index that contains a given
         // address by shifting the address down by the smallest page size and
@@ -32,7 +32,7 @@ impl Addr {
         WIDTH - ((self.addr + INITIAL_PAGE_SIZE) >> Self::INDEX_SHIFT).leading_zeros() as usize
     }
 
-    pub(crate) fn offset(&self) -> usize {
+    pub(crate) fn offset(self) -> usize {
         self.addr
     }
 }
@@ -147,7 +147,8 @@ impl<T> Shared<T> {
         }
 
         // do we need to allocate storage for this page?
-        if self.slab.with(|s| unsafe { (*s).is_none() }) {
+        let page_exists = self.slab.with(|s| unsafe { (*s).is_none() });
+        if page_exists {
             self.fill();
         }
 
@@ -223,7 +224,7 @@ impl<T> Shared<T> {
         })
     }
 
-    pub(crate) fn iter<'a>(&'a self) -> Option<Iter<'a, T>> {
+    pub(crate) fn iter(&self) -> Option<Iter<'_, T>> {
         let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
         slab.map(|slab| slab.iter().filter_map(Slot::value as fn(_) -> _))
     }
