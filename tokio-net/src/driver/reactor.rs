@@ -448,8 +448,8 @@ impl Inner {
                 )
             })?;
         let token = aba_guard | index;
-        let n_sources = self.n_sources.fetch_add(1, SeqCst);
-        debug!(message = "adding I/O source", token, n_sources);
+        let _n_sources = self.n_sources.fetch_add(1, SeqCst);
+        debug!(message = "adding I/O source", token, sources = _n_sources);
 
         self.io.register(
             source,
