@@ -19,11 +19,23 @@ pub(crate) struct Tid {
     _not_send: PhantomData<UnsafeCell<()>>,
 }
 
+/// Registers that a thread is currently using a thread ID.
+///
+/// This is stored in a thread local on each thread that has been assigned an
+/// ID. When the thread terminates, the thread local is dropped, indicating that
+/// that thread's ID number may be reused. This is to avoid exhausting the
+/// available bits for thread IDs in scenarios where threads are spawned and
+/// terminated very frequently.
 #[derive(Debug)]
 struct Registration(Cell<Option<usize>>);
 
+/// Tracks any thread IDs that can be reused, and a monotonic counter for
+/// generating new thread IDs.
 struct Registry {
+    /// The next thread ID number; used when there are no free IDs.
     next: AtomicUsize,
+    /// A queue of thread IDs whose threads have terminated. These will be
+    /// reused if possible.
     free: Mutex<VecDeque<usize>>,
 }
 
