@@ -1,9 +1,11 @@
 use super::*;
 use std::fmt;
 
+use crate::sync::atomic::Ordering;
+
 /// A sharded slab.
-pub(crate) struct Slab<T> {
-    shards: Box<[Shard<T>]>,
+pub(crate) struct Slab {
+    shards: Box<[Shard]>,
 }
 
 // ┌─────────────┐      ┌────────┐
@@ -25,7 +27,7 @@ pub(crate) struct Slab<T> {
 //                      │XXXXXXXX│
 //                      └────────┘
 //                         ...
-pub(super) struct Shard<T> {
+pub(super) struct Shard {
     #[cfg(debug_assertions)]
     tid: usize,
     /// The local free list for each page.
@@ -38,12 +40,13 @@ pub(super) struct Shard<T> {
     ///
     /// This consists of the page's metadata (size, previous size), remote free
     /// list, and a pointer to the actual array backing that page.
-    shared: Box<[page::Shared<T>]>,
+    shared: Box<[page::Shared]>,
 }
 
-impl<T> Slab<T> {
-    pub(crate) const MAX_BIT: usize = Tid::SHIFT + Tid::LEN;
+pub(crate) const TOKEN_SHIFT: usize = Tid::SHIFT + Tid::LEN;
+pub(crate) const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 
+impl Slab {
     /// Returns a new slab with the default configuration parameters.
     pub(crate) fn new() -> Self {
         let shards = (0..MAX_THREADS).map(Shard::new).collect();
@@ -56,21 +59,17 @@ impl<T> Slab<T> {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    pub(crate) fn insert(&self, value: T) -> Option<usize> {
+    pub(crate) fn insert(&self, aba_guard: usize) -> Option<usize> {
         let tid = Tid::current();
         #[cfg(test)]
         println!("insert {:?}", tid);
         self.shards[tid.as_usize()]
-            .insert(value)
+            .insert(aba_guard)
             .map(|idx| tid.pack(idx))
     }
 
-    /// Removes the value associated with the given key from the slab, returning
-    /// it.
-    ///
-    /// If the slab does not contain a value for that key, `None` is returned
-    /// instead.
-    pub(crate) fn remove(&self, idx: usize) -> Option<T> {
+    /// Removes the value associated with the given key from the slab.
+    pub(crate) fn remove(&self, idx: usize) {
         let tid = Tid::from_packed(idx);
         #[cfg(test)]
         println!("rm {:?}", tid);
@@ -86,15 +85,30 @@ impl<T> Slab<T> {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(crate) fn get(&self, key: usize) -> Option<&T> {
+    pub(in crate::driver) fn get(&self, token: usize) -> Option<&ScheduledIo> {
+        let idx = token & MAX_SOURCES;
+        let s = self.get2(idx)?;
+        let guard = token & !MAX_SOURCES;
+        if s.aba_guard.load(Ordering::Acquire) != guard {
+            return None;
+        }
+        Some(s)
+    }
+
+    fn get2(&self, key: usize) -> Option<&ScheduledIo> {
         let tid = Tid::from_packed(key);
         #[cfg(test)]
         println!("get {:?}", tid);
         self.shards.get(tid.as_usize())?.get(key)
     }
 
+    #[cfg(test)]
+    pub(super) fn get_guard(&self, idx: usize) -> Option<usize> {
+        self.get2(idx).map(|s| s.aba_guard.load(Ordering::Acquire))
+    }
+
     /// Returns an iterator over all the items in the slab.
-    pub(crate) fn unique_iter(&mut self) -> iter::UniqueIter<'_, T> {
+    pub(in crate::driver::reactor) fn unique_iter(&mut self) -> iter::UniqueIter<'_> {
         let mut shards = self.shards.iter_mut();
         let shard = shards.next().expect("must be at least 1 shard");
         let mut pages = shard.iter();
@@ -107,7 +121,7 @@ impl<T> Slab<T> {
     }
 }
 
-impl<T> Shard<T> {
+impl Shard {
     fn new(_idx: usize) -> Self {
         let mut total_sz = 0;
         let shared = (0..MAX_PAGES)
@@ -127,16 +141,14 @@ impl<T> Shard<T> {
         }
     }
 
-    fn insert(&self, value: T) -> Option<usize> {
-        let mut value = Some(value);
-
+    fn insert(&self, aba_guard: usize) -> Option<usize> {
         // Can we fit the value into an existing page?
         for (page_idx, page) in self.shared.iter().enumerate() {
             let local = self.local(page_idx);
             #[cfg(test)]
             println!("-> page {}; {:?}; {:?}", page_idx, local, page);
 
-            if let Some(page_offset) = page.insert(local, &mut value) {
+            if let Some(page_offset) = page.insert(local, aba_guard) {
                 return Some(page_offset);
             }
         }
@@ -145,7 +157,7 @@ impl<T> Shard<T> {
     }
 
     #[inline(always)]
-    fn get(&self, idx: usize) -> Option<&T> {
+    fn get(&self, idx: usize) -> Option<&ScheduledIo> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
 
@@ -160,34 +172,38 @@ impl<T> Shard<T> {
     }
 
     /// Remove an item on the shard's local thread.
-    fn remove_local(&self, idx: usize) -> Option<T> {
+    fn remove_local(&self, idx: usize) {
         #[cfg(debug_assertions)]
         {
             debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
         }
         let addr = page::Addr::from_packed(idx);
-        let page = addr.index();
+        let page_idx = addr.index();
 
         #[cfg(test)]
-        println!("-> remove_local {:?}; page {:?}", addr, page);
+        println!("-> remove_local {:?}; page {:?}", addr, page_idx);
 
-        self.shared.get(page)?.remove_local(self.local(page), addr)
+        if let Some(page) = self.shared.get(page_idx) {
+            page.remove_local(self.local(page_idx), addr);
+        }
     }
 
     /// Remove an item, while on a different thread from the shard's local thread.
-    fn remove_remote(&self, idx: usize) -> Option<T> {
+    fn remove_remote(&self, idx: usize) {
         #[cfg(debug_assertions)]
         {
             debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
             debug_assert!(Tid::current().as_usize() != self.tid);
         }
         let addr = page::Addr::from_packed(idx);
-        let page = addr.index();
+        let page_idx = addr.index();
 
         #[cfg(test)]
-        println!("-> remove_remote {:?}; page {:?}", addr, page);
+        println!("-> remove_remote {:?}; page {:?}", addr, page_idx);
 
-        self.shared.get(page)?.remove_remote(addr)
+        if let Some(page) = self.shared.get(page_idx) {
+            page.remove_remote(addr);
+        }
     }
 
     #[inline(always)]
@@ -202,12 +218,12 @@ impl<T> Shard<T> {
         &self.local[i]
     }
 
-    pub(super) fn iter<'a>(&'a self) -> std::slice::Iter<'a, page::Shared<T>> {
+    pub(super) fn iter<'a>(&'a self) -> std::slice::Iter<'a, page::Shared> {
         self.shared.iter()
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Slab<T> {
+impl fmt::Debug for Slab {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slab")
             .field("shards", &self.shards)
@@ -215,10 +231,10 @@ impl<T: fmt::Debug> fmt::Debug for Slab<T> {
     }
 }
 
-unsafe impl<T: Send> Send for Slab<T> {}
-unsafe impl<T: Sync> Sync for Slab<T> {}
+unsafe impl Send for Slab {}
+unsafe impl Sync for Slab {}
 
-impl<T: fmt::Debug> fmt::Debug for Shard<T> {
+impl fmt::Debug for Shard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Shard");
 
