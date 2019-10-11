@@ -1,5 +1,5 @@
 pub(crate) mod future {
-    pub(crate) use crate::task::AtomicWaker;
+    pub(crate) use super::super::task::AtomicWaker;
 }
 
 pub(crate) mod sync {

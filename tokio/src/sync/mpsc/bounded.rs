@@ -1,9 +1,9 @@
+use super::super::semaphore;
 use super::chan;
 
 use std::fmt;
 use std::task::{Context, Poll};
 
-#[cfg(feature = "async-traits")]
 use std::pin::Pin;
 
 /// Send values to the associated `Receiver`.
@@ -104,7 +104,7 @@ pub struct RecvError(());
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
-    let semaphore = (crate::semaphore::Semaphore::new(buffer), buffer);
+    let semaphore = (semaphore::Semaphore::new(buffer), buffer);
     let (tx, rx) = chan::channel(semaphore);
 
     let tx = Sender::new(tx);
@@ -115,7 +115,7 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Channel semaphore is a tuple of the semaphore implementation and a `usize`
 /// representing the channel bound.
-type Semaphore = (crate::semaphore::Semaphore, usize);
+type Semaphore = (semaphore::Semaphore, usize);
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
@@ -181,7 +181,6 @@ impl<T> Receiver<T> {
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_core::Stream for Receiver<T> {
     type Item = T;
 
@@ -244,7 +243,6 @@ impl<T> Sender<T> {
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_sink::Sink<T> for Sender<T> {
     type Error = SendError;
 

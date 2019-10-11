@@ -1,9 +1,12 @@
-use super::list;
-use crate::loom::{
-    future::AtomicWaker,
-    sync::atomic::AtomicUsize,
-    sync::{Arc, CausalCell},
+use super::super::{
+    loom::{
+        future::AtomicWaker,
+        sync::atomic::AtomicUsize,
+        sync::{Arc, CausalCell},
+    },
+    semaphore::{self, Permit, TryAcquireError},
 };
+use super::list;
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
@@ -335,8 +338,6 @@ impl<T, S> Drop for Chan<T, S> {
     }
 }
 
-use crate::semaphore::TryAcquireError;
-
 impl From<TryAcquireError> for TrySendError {
     fn from(src: TryAcquireError) -> TrySendError {
         if src.is_closed() {
@@ -351,9 +352,7 @@ impl From<TryAcquireError> for TrySendError {
 
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
-use crate::semaphore::Permit;
-
-impl Semaphore for (crate::semaphore::Semaphore, usize) {
+impl Semaphore for (semaphore::Semaphore, usize) {
     type Permit = Permit;
 
     fn new_permit() -> Permit {

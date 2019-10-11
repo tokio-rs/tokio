@@ -1,6 +1,7 @@
+#![cfg(loom)]
 #![warn(rust_2018_idioms)]
 
-#[path = "../src/oneshot.rs"]
+#[path = "../src/sync/oneshot.rs"]
 #[allow(warnings)]
 mod oneshot;
 

@@ -1,3 +1,4 @@
+#![cfg(loom)]
 #![warn(rust_2018_idioms)]
 
 #[macro_use]
@@ -9,13 +10,18 @@ macro_rules! if_fuzz {
     }
 }
 
-#[path = "../src/mpsc/mod.rs"]
-#[allow(warnings)]
-mod mpsc;
+// #[path = "../src/sync/mpsc/mod.rs"]
+// #[allow(warnings)]
+// mod mpsc;
 
-#[path = "../src/semaphore.rs"]
-#[allow(warnings)]
-mod semaphore;
+// #[path = "../src/sync/semaphore.rs"]
+// #[allow(warnings)]
+// mod semaphore;
+
+#[path = "../src/sync/mod.rs"]
+mod sync;
+
+use sync::mpsc;
 
 use futures_util::future::poll_fn;
 use loom::future::block_on;

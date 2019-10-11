@@ -1,10 +1,10 @@
 //! A concurrent, lock-free, FIFO list.
 
-use super::block::{self, Block};
-use crate::loom::{
+use super::super::loom::{
     sync::atomic::{AtomicPtr, AtomicUsize},
     thread,
 };
+use super::block::{self, Block};
 use std::fmt;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};

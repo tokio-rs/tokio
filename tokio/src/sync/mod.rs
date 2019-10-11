@@ -11,9 +11,20 @@
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
 
-//! Asynchronous synchronization primitives.
+//! Future-aware synchronization
 //!
-//! This crate provides primitives for synchronizing asynchronous tasks.
+//! This module is enabled with the **`sync`** feature flag.
+//!
+//! Tasks sometimes need to communicate with each other. This module contains
+//! two basic abstractions for doing so:
+//!
+//! - [oneshot](oneshot/index.html), a way of sending a single value
+//!   from one task to another.
+//! - [mpsc](mpsc/index.html), a multi-producer, single-consumer channel for
+//!   sending values between tasks.
+//! - [`Mutex`](struct.Mutex.html), an asynchronous `Mutex`-like type.
+//! - [watch](watch/index.html), a single-producer, multi-consumer channel that
+//!   only stores the **most recently** sent value.
 
 macro_rules! debug {
     ($($t:tt)*) => {

@@ -53,7 +53,7 @@
 //! [`Receiver::poll`]: struct.Receiver.html#method.poll
 //! [`Receiver::poll_ref`]: struct.Receiver.html#method.poll_ref
 
-use crate::task::AtomicWaker;
+use super::task::AtomicWaker;
 
 use core::task::Poll::{Pending, Ready};
 use core::task::{Context, Poll};

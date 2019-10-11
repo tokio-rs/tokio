@@ -1,9 +1,10 @@
+#![cfg(loom)]
 #![warn(rust_2018_idioms)]
 
 #[macro_use]
 extern crate loom;
 
-#[path = "../src/semaphore.rs"]
+#[path = "../src/sync/semaphore.rs"]
 #[allow(warnings)]
 mod semaphore;
 

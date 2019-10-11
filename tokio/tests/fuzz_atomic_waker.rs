@@ -1,10 +1,11 @@
+#![cfg(loom)]
 #![warn(rust_2018_idioms)]
 
 #[macro_use]
 extern crate loom;
 
 #[allow(dead_code)]
-#[path = "../src/task/atomic_waker.rs"]
+#[path = "../src/sync/task/atomic_waker.rs"]
 mod atomic_waker;
 use crate::atomic_waker::AtomicWaker;
 

@@ -1,3 +1,4 @@
+#![cfg(loom)]
 #![warn(rust_2018_idioms)]
 
 #[macro_use]
@@ -9,13 +10,16 @@ macro_rules! if_fuzz {
     }
 }
 
-#[path = "../src/mpsc/list.rs"]
-#[allow(warnings)]
-mod list;
+// #[path = "../src/sync/mpsc/list.rs"]
+// #[allow(warnings)]
+// mod list;
 
-#[path = "../src/mpsc/block.rs"]
-#[allow(warnings)]
-mod block;
+// #[path = "../src/sync/mpsc/block.rs"]
+// #[allow(warnings)]
+// mod block;
+
+#[path = "../src/sync/mod.rs"]
+mod sync;
 
 const BLOCK_CAP: usize = 2;
 
@@ -24,13 +28,13 @@ use std::sync::Arc;
 
 #[test]
 fn smoke() {
-    use crate::block::Read::*;
+    use crate::sync::mpsc::block::Read::*;
 
     const NUM_TX: usize = 2;
     const NUM_MSG: usize = 2;
 
     loom::model(|| {
-        let (tx, mut rx) = list::channel();
+        let (tx, mut rx) = crate::sync::mpsc::list::channel();
         let tx = Arc::new(tx);
 
         for th in 0..NUM_TX {

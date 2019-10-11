@@ -29,7 +29,7 @@
 //! [`Mutex`]: struct.Mutex.html
 //! [`MutexGuard`]: struct.MutexGuard.html
 
-use crate::semaphore;
+use super::semaphore;
 
 use futures_util::future::poll_fn;
 use std::cell::UnsafeCell;

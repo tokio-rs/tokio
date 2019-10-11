@@ -1,4 +1,4 @@
-use crate::watch;
+use super::watch;
 use std::sync::Mutex;
 
 /// A barrier enables multiple threads to synchronize the beginning of some computation.
@@ -49,7 +49,7 @@ impl Barrier {
     /// A barrier will block `n`-1 threads which call [`Barrier::wait`] and then wake up all
     /// threads at once when the `n`th thread calls `wait`.
     pub fn new(mut n: usize) -> Barrier {
-        let (waker, wait) = crate::watch::channel(0);
+        let (waker, wait) = watch::channel(0);
 
         if n == 0 {
             // if n is 0, it's not clear what behavior the user wants.
