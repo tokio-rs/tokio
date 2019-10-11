@@ -57,20 +57,6 @@ pub mod udp {
 #[cfg(feature = "udp")]
 pub use self::udp::{UdpFramed, UdpSocket};
 
-#[cfg(feature = "signal")]
-pub mod signal {
-    //! Asynchronous signal handling for `tokio`. ctrl-C notifications are
-    //! supported on both unix and windows systems. For finer grained signal
-    //! handling support on unix systems, see `tokio_net::signal::unix::Signal`.
-    pub use tokio_net::signal::ctrl_c;
-}
-
-#[cfg(feature = "process")]
-pub mod process {
-    //! An implementation of asynchronous process management for Tokio.
-    pub use tokio_net::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
-}
-
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {
     //! Unix domain socket bindings for `tokio` (only available on unix systems).

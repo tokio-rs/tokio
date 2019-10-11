@@ -29,8 +29,10 @@ jobs:
         - codec
         - fs
         - io
-        - rt-full
         - net
+        - process
+        - rt-full
+        - signal
         - sync
         - tcp
         - timer
