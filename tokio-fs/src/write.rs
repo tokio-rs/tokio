@@ -19,7 +19,7 @@ use std::{io, path::Path};
 /// ```
 pub async fn write<P, C: AsRef<[u8]> + Unpin>(path: P, contents: C) -> io::Result<()>
 where
-    P: AsRef<Path> + Send + Unpin + 'static,
+    P: AsRef<Path>,
 {
     let path = path.as_ref().to_owned();
     let contents = contents.as_ref().to_owned();
