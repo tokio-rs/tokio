@@ -115,7 +115,7 @@ mod udp {
     use futures::{future, Sink, SinkExt, Stream, StreamExt};
     use std::{error::Error, io, net::SocketAddr};
     use tokio::net::udp::{
-        split::{UdpSocketRecvHalf, UdpSocketSendHalf},
+        split::{RecvHalf, SendHalf},
         UdpSocket,
     };
 
@@ -143,7 +143,7 @@ mod udp {
 
     async fn send(
         mut stdin: impl Stream<Item = Result<Vec<u8>, io::Error>> + Unpin,
-        writer: &mut UdpSocketSendHalf,
+        writer: &mut SendHalf<'_>,
     ) -> Result<(), io::Error> {
         while let Some(item) = stdin.next().await {
             let buf = item?;
@@ -155,7 +155,7 @@ mod udp {
 
     async fn recv(
         mut stdout: impl Sink<Vec<u8>, Error = io::Error> + Unpin,
-        reader: &mut UdpSocketRecvHalf,
+        reader: &mut RecvHalf<'_>,
     ) -> Result<(), io::Error> {
         loop {
             let mut buf = vec![0; 1024];
