@@ -66,8 +66,7 @@ impl UdpSocket {
     }
 
     /// Split the `UdpSocket` into a receive half and a send half. The two parts
-    /// can be used to receive and send datagrams concurrently, even from two
-    /// different tasks.
+    /// can be used to receive and send datagrams concurrently.
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.

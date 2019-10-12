@@ -110,14 +110,14 @@ impl AsRef<UdpSocket> for RecvHalf<'_> {
     }
 }
 
-/// The send half after [`split`](super::UdpSocket::split).
+/// The send half after [`split_owned`](super::UdpSocket::split_owned).
 ///
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
 pub struct SendHalfOwned(Arc<UdpSocket>);
 
-/// The recv half after [`split`](super::UdpSocket::split).
+/// The recv half after [`split_owned`](super::UdpSocket::split_owned).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
@@ -163,7 +163,7 @@ fn reunite(s: SendHalfOwned, r: RecvHalfOwned) -> Result<UdpSocket, ReuniteError
 impl RecvHalfOwned {
     /// Attempts to put the two "halves" of a `UdpSocket` back together and
     /// recover the original socket. Succeeds only if the two "halves"
-    /// originated from the same call to `UdpSocket::split`.
+    /// originated from the same call to `UdpSocket::split_owned`.
     pub fn reunite(self, other: SendHalfOwned) -> Result<UdpSocket, ReuniteError> {
         reunite(other, self)
     }
@@ -198,7 +198,7 @@ impl RecvHalfOwned {
 impl SendHalfOwned {
     /// Attempts to put the two "halves" of a `UdpSocket` back together and
     /// recover the original socket. Succeeds only if the two "halves"
-    /// originated from the same call to `UdpSocket::split`.
+    /// originated from the same call to `UdpSocket::split_owned`.
     pub fn reunite(self, other: RecvHalfOwned) -> Result<UdpSocket, ReuniteError> {
         reunite(self, other)
     }
