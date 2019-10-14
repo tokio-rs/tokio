@@ -10,6 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::future::Future;
 use std::io;
+use std::time::Duration;
 
 /// Single-threaded runtime provides a way to start reactor
 /// and executor on the current thread.
@@ -81,6 +82,23 @@ impl fmt::Display for RunError {
 }
 
 impl Error for RunError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.inner.source()
+    }
+}
+
+#[derive(Debug)]
+pub struct TurnError {
+    inner: current_thread::TurnError,
+}
+
+impl fmt::Display for TurnError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "{}", self.inner)
+    }
+}
+
+impl Error for TurnError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.inner.source()
     }
@@ -179,6 +197,25 @@ impl Runtime {
     pub fn run(&mut self) -> Result<(), RunError> {
         self.enter(|executor| executor.run())
             .map_err(|e| RunError { inner: e })
+    }
+
+    /// Run the executor until all futures are blocking.
+    pub fn churn(&mut self) -> Result<(), TurnError> {
+        self.enter(|executor| {
+            loop {
+                let turn = executor.turn(Some(Duration::new(0, 0)));
+                match turn {
+                    Ok(turn) => {
+                        if !turn.has_polled() {
+                            break Ok(());
+                        }
+                    }
+                    Err(err) => {
+                        break Err(TurnError { inner: err });
+                    }
+                }
+            }
+        })
     }
 
     fn enter<F, R>(&mut self, f: F) -> R
