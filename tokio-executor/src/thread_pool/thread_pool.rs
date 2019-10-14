@@ -1,5 +1,5 @@
-use crate::Executor;
 use crate::thread_pool::{shutdown, Builder, JoinHandle, Spawner};
+use crate::Executor;
 
 use std::fmt;
 use std::future::Future;

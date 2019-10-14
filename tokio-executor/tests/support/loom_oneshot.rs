@@ -8,7 +8,9 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
         value: Mutex::new(None),
     });
 
-    let tx = Sender { inner: inner.clone() };
+    let tx = Sender {
+        inner: inner.clone(),
+    };
     let rx = Receiver { inner };
 
     (tx, rx)

@@ -2,8 +2,8 @@ use crate::loom::sync::Arc;
 use crate::loom::sys::num_cpus;
 use crate::loom::thread;
 use crate::park::Park;
-use crate::thread_pool::{shutdown, worker, Spawner, ThreadPool};
 use crate::thread_pool::park::DefaultPark;
+use crate::thread_pool::{shutdown, worker, Spawner, ThreadPool};
 
 use std::{fmt, usize};
 
@@ -33,7 +33,6 @@ impl Builder {
             around_worker: None,
         }
     }
-
 
     /// Set the number of threads running async tasks.
     ///
@@ -155,17 +154,14 @@ impl Builder {
     {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
-        let (pool, workers) = worker::create_set(self.pool_size, |i| {
-            BoxedPark::new(build_park(i))
-        });
+        let (pool, workers) = worker::create_set(self.pool_size, |i| BoxedPark::new(build_park(i)));
 
         // Spawn threads for each worker
         for (idx, mut worker) in workers.into_iter().enumerate() {
             let around_worker = self.around_worker.clone();
             let shutdown_tx = shutdown_tx.clone();
 
-            let mut th = thread::Builder::new()
-                .name(format!("{}{}", self.name_prefix, idx));
+            let mut th = thread::Builder::new().name(format!("{}{}", self.name_prefix, idx));
 
             if let Some(stack) = self.stack_size {
                 th = th.stack_size(stack);

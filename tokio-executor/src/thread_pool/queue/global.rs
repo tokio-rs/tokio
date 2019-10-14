@@ -3,8 +3,8 @@ use crate::loom::sync::atomic::Ordering::{Acquire, Release};
 use crate::loom::sync::Mutex;
 use crate::task::{Header, Task};
 
-use std::usize;
 use std::ptr::{self, NonNull};
+use std::usize;
 
 pub(super) struct Queue<T: 'static> {
     /// Pointers to the head and tail of the queue
@@ -60,7 +60,6 @@ impl<T: 'static> Queue<T> {
         self.len.store(len | CLOSED, Release);
 
         ret
-
     }
 
     fn len(&self) -> usize {

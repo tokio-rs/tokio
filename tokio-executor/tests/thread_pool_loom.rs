@@ -39,7 +39,7 @@ mod task;
 #[allow(warnings)]
 mod util;
 
-use tokio_executor::{Executor, TypedExecutor, SpawnError};
+use tokio_executor::{Executor, SpawnError, TypedExecutor};
 
 mod loom {
     pub(crate) use loom::*;
@@ -56,9 +56,9 @@ mod loom {
         }
     }
 }
-use crate::loom::sync::{Arc, Mutex};
-use crate::loom::sync::atomic::{AtomicUsize, AtomicBool};
 use crate::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
+use crate::loom::sync::{Arc, Mutex};
 
 use std::future::Future;
 

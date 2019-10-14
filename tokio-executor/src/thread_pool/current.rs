@@ -1,6 +1,6 @@
 use crate::loom::sync::Arc;
 use crate::park::Unpark;
-use crate::thread_pool::{Owned, worker};
+use crate::thread_pool::{worker, Owned};
 
 use std::cell::Cell;
 use std::ptr;

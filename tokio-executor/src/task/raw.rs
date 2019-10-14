@@ -32,7 +32,8 @@ where
     Harness::from_ptr(
         NonNull::new_unchecked(header),
         NonNull::new_unchecked(trailer),
-        future_or_output)
+        future_or_output,
+    )
 }
 
 /// Deallocate task struct referenced by `ptr`.
@@ -98,10 +99,7 @@ impl<S> RawTask<S> {
             );
 
             // Write future
-            ptr::write(
-                ptr.add(offset_future) as *mut Track<T>,
-                Track::new(task),
-            );
+            ptr::write(ptr.add(offset_future) as *mut Track<T>, Track::new(task));
 
             // Write trailer
             ptr::write(

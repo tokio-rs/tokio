@@ -52,7 +52,6 @@ impl Spawner {
 
 impl fmt::Debug for Spawner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Spawner")
-            .finish()
+        fmt.debug_struct("Spawner").finish()
     }
 }

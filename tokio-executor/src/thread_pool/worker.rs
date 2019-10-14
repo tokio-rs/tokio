@@ -21,7 +21,10 @@ struct Entry<P: 'static> {
     index: usize,
 }
 
-pub(crate) fn create_set<F, P>(pool_size: usize, mk_park: F) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
+pub(crate) fn create_set<F, P>(
+    pool_size: usize,
+    mk_park: F,
+) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
 where
     P: Park,
     F: FnMut(usize) -> P,
@@ -33,9 +36,7 @@ where
 
     // Establish the circular link between the individual worker state
     // structure and the container.
-    Arc::get_mut(&mut pool)
-        .unwrap()
-        .set_container_ptr();
+    Arc::get_mut(&mut pool).unwrap().set_container_ptr();
 
     // This will contain each worker.
     let workers = parks
@@ -315,7 +316,9 @@ where
         // notifications in hopes that the curent worker will grab those tasks.
         self.owned().defer_notification.set(true);
 
-        park.park_timeout(Duration::from_millis(0)).ok().expect("park failed");
+        park.park_timeout(Duration::from_millis(0))
+            .ok()
+            .expect("park failed");
 
         self.owned().defer_notification.set(false);
 

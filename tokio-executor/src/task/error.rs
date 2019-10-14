@@ -16,12 +16,16 @@ enum Repr {
 impl Error {
     /// Create a new `cancelled` error
     pub fn cancelled() -> Error {
-        Error { repr: Repr::Cancelled }
+        Error {
+            repr: Repr::Cancelled,
+        }
     }
 
     /// Create a new `panic` error
     pub fn panic(err: Box<dyn Any + Send + 'static>) -> Error {
-        Error { repr: Repr::Panic(err) }
+        Error {
+            repr: Repr::Panic(err),
+        }
     }
 }
 
@@ -34,5 +38,4 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {
-}
+impl std::error::Error for Error {}

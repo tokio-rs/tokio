@@ -2,12 +2,12 @@
 //!
 //! - Attempt to spin.
 
-use crate::{Executor, SpawnError};
 use crate::loom::rand::seed;
 use crate::park::Unpark;
 use crate::task::{self, Task};
 use crate::thread_pool::{current, queue, BoxFuture, Idle, JoinHandle, Owned, Shared};
 use crate::util::{CachePadded, FastRand};
+use crate::{Executor, SpawnError};
 
 use std::cell::UnsafeCell;
 use std::future::Future;

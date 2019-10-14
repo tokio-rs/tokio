@@ -1,6 +1,6 @@
-use crate::park::{Park, Unpark};
-use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::sync::atomic::{AtomicUsize, Ordering};
+use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::park::{Park, Unpark};
 
 use std::marker::PhantomData;
 use std::mem;

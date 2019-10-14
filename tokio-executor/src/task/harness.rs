@@ -1,7 +1,7 @@
 use crate::loom::alloc::Track;
 use crate::loom::cell::CausalCheck;
-use crate::task::{raw, Error, Header, Schedule, Snapshot, Task, Trailer};
 use crate::task::waker::waker_ref;
+use crate::task::{raw, Error, Header, Schedule, Snapshot, Task, Trailer};
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -164,11 +164,7 @@ where
                 }
             }
             Err(err) => {
-                self.complete(
-                    executor,
-                    join_interest,
-                    Track::new(Err(Error::panic(err))),
-                );
+                self.complete(executor, join_interest, Track::new(Err(Error::panic(err))));
                 false
             }
         }

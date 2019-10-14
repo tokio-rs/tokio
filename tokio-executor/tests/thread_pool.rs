@@ -345,17 +345,15 @@ fn eagerly_drops_futures() {
     let (park_tx, park_rx) = mpsc::sync_channel(0);
     let (unpark_tx, unpark_rx) = mpsc::sync_channel(0);
 
-    let pool = Builder::new()
-        .num_threads(4)
-        .build_with_park(move |_| {
-            let (tx, rx) = mpsc::channel();
-            MyPark {
-                tx: Mutex::new(tx),
-                rx,
-                park_tx: park_tx.clone(),
-                unpark_tx: unpark_tx.clone(),
-            }
-        });
+    let pool = Builder::new().num_threads(4).build_with_park(move |_| {
+        let (tx, rx) = mpsc::channel();
+        MyPark {
+            tx: Mutex::new(tx),
+            rx,
+            park_tx: park_tx.clone(),
+            unpark_tx: unpark_tx.clone(),
+        }
+    });
 
     struct MyTask {
         task_tx: Option<mpsc::Sender<Waker>>,
@@ -408,16 +406,14 @@ fn park_called_at_interval() {
         park_light: Arc<AtomicBool>,
     }
 
-    struct MyUnpark {
-    }
+    struct MyUnpark {}
 
     impl Park for MyPark {
         type Unpark = MyUnpark;
         type Error = ();
 
         fn unpark(&self) -> Self::Unpark {
-            MyUnpark {
-            }
+            MyUnpark {}
         }
 
         fn park(&mut self) -> Result<(), Self::Error> {
@@ -439,8 +435,7 @@ fn park_called_at_interval() {
     }
 
     impl Unpark for MyUnpark {
-        fn unpark(&self) {
-        }
+        fn unpark(&self) {}
     }
 
     let park_light_1 = Arc::new(AtomicBool::new(false));
@@ -449,14 +444,12 @@ fn park_called_at_interval() {
     let (done_tx, done_rx) = mpsc::channel();
 
     // Use 1 thread to ensure the worker stays busy.
-    let pool = Builder::new()
-        .num_threads(1)
-        .build_with_park(move |idx| {
-            assert_eq!(idx, 0);
-            MyPark {
-                park_light: park_light_2.clone(),
-            }
-        });
+    let pool = Builder::new().num_threads(1).build_with_park(move |idx| {
+        assert_eq!(idx, 0);
+        MyPark {
+            park_light: park_light_2.clone(),
+        }
+    });
 
     let mut cnt = 0;
 
@@ -481,7 +474,5 @@ fn park_called_at_interval() {
 }
 
 fn new_pool() -> ThreadPool {
-    Builder::new()
-        .num_threads(4)
-        .build()
+    Builder::new().num_threads(4).build()
 }

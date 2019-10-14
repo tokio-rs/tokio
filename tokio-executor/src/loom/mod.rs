@@ -53,13 +53,13 @@ pub(crate) mod rand {
 }
 
 pub(crate) mod sync {
-    pub(crate) use std::sync::{Arc, Mutex, Condvar};
+    pub(crate) use std::sync::{Arc, Condvar, Mutex};
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::atomic_u32::AtomicU32;
         pub(crate) use crate::loom::atomic_usize::AtomicUsize;
 
-        pub(crate) use std::sync::atomic::{AtomicPtr, Ordering, fence, spin_loop_hint};
+        pub(crate) use std::sync::atomic::{fence, spin_loop_hint, AtomicPtr, Ordering};
     }
 }
 

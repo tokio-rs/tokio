@@ -34,9 +34,9 @@ impl<T: 'static> TransferStack<T> {
             loop {
                 *task.as_ref().queue_next.get() = (next | curr as usize) as *const _;
 
-                let res = self
-                    .head
-                    .compare_exchange(curr, task.as_ptr() as *mut _, Release, Relaxed);
+                let res =
+                    self.head
+                        .compare_exchange(curr, task.as_ptr() as *mut _, Release, Relaxed);
 
                 match res {
                     Ok(_) => return,

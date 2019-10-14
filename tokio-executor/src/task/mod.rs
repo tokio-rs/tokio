@@ -20,15 +20,14 @@ pub(crate) use self::stack::TransferStack;
 mod state;
 mod waker;
 
-
 use self::harness::Harness;
 use self::meta::{Trailer, Vtable};
 use self::raw::RawTask;
 use self::state::{Snapshot, State};
 
 use std::future::Future;
-use std::{fmt, mem};
 use std::ptr::NonNull;
+use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count
 pub(crate) struct Task<S: 'static> {

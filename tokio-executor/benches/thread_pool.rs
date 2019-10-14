@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use tokio_executor::thread_pool::{Builder, ThreadPool, Spawner};
+use tokio_executor::thread_pool::{Builder, Spawner, ThreadPool};
 use tokio_sync::oneshot;
 
 use std::future::Future;
@@ -34,9 +34,7 @@ const NUM_THREADS: usize = 6;
 fn spawn_many(b: &mut test::Bencher) {
     const NUM_SPAWN: usize = 10_000;
 
-    let threadpool = Builder::new()
-        .num_threads(NUM_THREADS)
-        .build();
+    let threadpool = Builder::new().num_threads(NUM_THREADS).build();
 
     let (tx, rx) = mpsc::sync_channel(1000);
     let rem = Arc::new(AtomicUsize::new(0));
@@ -64,9 +62,7 @@ fn yield_many(b: &mut test::Bencher) {
     const NUM_YIELD: usize = 1_000;
     const TASKS_PER_CPU: usize = 50;
 
-    let threadpool = Builder::new()
-        .num_threads(NUM_THREADS)
-        .build();
+    let threadpool = Builder::new().num_threads(NUM_THREADS).build();
 
     let tasks = TASKS_PER_CPU * num_cpus::get_physical();
     let (tx, rx) = mpsc::sync_channel(tasks);
@@ -92,9 +88,7 @@ fn yield_many(b: &mut test::Bencher) {
 fn ping_pong(b: &mut test::Bencher) {
     const NUM_PINGS: usize = 1_000;
 
-    let threadpool = Builder::new()
-        .num_threads(NUM_THREADS)
-        .build();
+    let threadpool = Builder::new().num_threads(NUM_THREADS).build();
 
     let (done_tx, done_rx) = mpsc::sync_channel(1000);
     let rem = Arc::new(AtomicUsize::new(0));
@@ -140,9 +134,7 @@ fn ping_pong(b: &mut test::Bencher) {
 fn chained_spawn(b: &mut test::Bencher) {
     const ITER: usize = 1_000;
 
-    let threadpool = Builder::new()
-        .num_threads(NUM_THREADS)
-        .build();
+    let threadpool = Builder::new().num_threads(NUM_THREADS).build();
 
     fn iter(spawner: Spawner, done_tx: mpsc::SyncSender<()>, n: usize) {
         if n == 0 {
