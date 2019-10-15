@@ -6,13 +6,22 @@ use super::compat;
 use background::Background;
 
 use futures_01::future::Future as Future01;
-use futures_03_util::{compat::Future01CompatExt, future::FutureExt};
+use futures_util::{compat::Future01CompatExt, future::FutureExt};
 use std::{future::Future, io};
 use tokio_executor::enter;
 use tokio_executor::threadpool::{Sender, ThreadPool};
 use tokio_net::driver;
 use tokio_timer::timer;
 
+/// A thread pool runtime that can run tasks that use both `tokio` 0.1 and
+/// `tokio` 0.2 APIs.
+///
+/// This functions similarly to the [`tokio::runtime::Runtime`] struct in the
+/// `tokio` crate. However, unlike that runtime, the `tokio-compat` runtime is
+/// capable of running both `std::future::Future` tasks that use `tokio` 0.2
+/// runtime services. and `futures` 0.1 tasks that use `tokio` 0.1 runtime
+/// services.
+#[derive(Debug)]
 pub struct Runtime {
     inner: Option<Inner>,
 }
@@ -92,9 +101,59 @@ pub fn run<F>(future: F)
 where
     F: Future01<Item = (), Error = ()> + Send + 'static,
 {
+    run_03(future.compat().map(|_| ()))
+}
+
+/// Start the Tokio runtime using the supplied `std::future` future to bootstrap execution.
+///
+/// This function is used to bootstrap the execution of a Tokio application. It
+/// does the following:
+///
+/// * Start the Tokio runtime using a default configuration.
+/// * Spawn the given future onto the thread pool.
+/// * Block the current thread until the runtime shuts down.
+///
+/// Note that the function will not return immediately once `future` has
+/// completed. Instead it waits for the entire runtime to become idle.
+///
+/// See the [module level][mod] documentation for more details.
+///
+/// # Examples
+///
+/// ```rust
+/// use futures_01::{Future as Future01, Stream as Stream01};
+/// use tokio_01::net::TcpListener;
+///
+/// # fn process<T>(_: T) -> Box<Future01<Item = (), Error = ()> + Send> {
+/// # unimplemented!();
+/// # }
+/// # fn dox() {
+/// # let addr = "127.0.0.1:8080".parse().unwrap();
+/// let listener = TcpListener::bind(&addr).unwrap();
+///
+/// let server = listener.incoming()
+///     .map_err(|e| println!("error = {:?}", e))
+///     .for_each(|socket| {
+///         tokio_01::spawn(process(socket))
+///     });
+///
+/// tokio_compat::run(server);
+/// # }
+/// # pub fn main() {}
+/// ```
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+///
+/// [mod]: ../index.html
+pub fn run_03<F>(future: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
     // Check enter before creating a new Runtime...
     let runtime = Runtime::new().expect("failed to start new Runtime");
-    runtime.spawn(future.compat().map(|_| ()));
+    runtime.spawn_03(future);
     runtime.shutdown_on_idle();
 }
 
@@ -128,7 +187,7 @@ impl Runtime {
         Builder::new().build()
     }
 
-    /// Spawn a future onto the Tokio runtime.
+    /// Spawn a `futures` 0.1 future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
@@ -148,9 +207,10 @@ impl Runtime {
     ///    let rt = Runtime::new().unwrap();
     ///
     ///    // Spawn a future onto the runtime
-    ///    rt.spawn(async {
+    ///    rt.spawn(futures_01::future::lazy(|| {
     ///        println!("now running on a worker thread");
-    ///    });
+    ///        Ok(())
+    ///    }));
     ///
     ///    rt.shutdown_on_idle();
     /// }
@@ -162,13 +222,53 @@ impl Runtime {
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&self, future: F) -> &Self
     where
+        F: Future01<Item = (), Error = ()> + Send + 'static,
+    {
+        self.inner().pool.spawn(future.compat().map(|_| ()));
+        self
+    }
+
+    /// Spawn a `std::future` future onto the Tokio runtime.
+    ///
+    /// This spawns the given future onto the runtime's executor, usually a
+    /// thread pool. The thread pool is then responsible for polling the future
+    /// until it completes.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_compat::runtime::Runtime;
+    ///
+    /// fn main() {
+    ///    // Create the runtime
+    ///    let rt = Runtime::new().unwrap();
+    ///
+    ///    // Spawn a future onto the runtime
+    ///    rt.spawn_03(async {
+    ///        println!("now running on a worker thread");
+    ///    });
+    ///
+    ///    rt.shutdown_on_idle();
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Failure occurs if the executor
+    /// is currently at capacity and is unable to spawn a new future.
+    pub fn spawn_03<F>(&self, future: F) -> &Self
+    where
         F: Future<Output = ()> + Send + 'static,
     {
         self.inner().pool.spawn(future);
         self
     }
 
-    /// Run a future to completion on the Tokio runtime.
+    /// Run a `futures` 0.1 future to completion on the Tokio runtime.
     ///
     /// This runs the given future on the runtime, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which
@@ -180,7 +280,26 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on<F>(&self, future: F) -> F::Output
+    pub fn block_on<F>(&self, future: F) -> Result<F::Item, F::Error>
+    where
+        F: Future01,
+    {
+        self.block_on_03(future.compat())
+    }
+
+    /// Run a `std::future` future to completion on the Tokio runtime.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers which
+    /// the future spawns internally will be executed on the runtime.
+    ///
+    /// This method should not be called from an asynchronous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
+    pub fn block_on_03<F>(&self, future: F) -> F::Output
     where
         F: Future,
     {

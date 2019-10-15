@@ -5,7 +5,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use futures_01::future::Future as Future01;
-use futures_03_util::compat::Future01CompatExt;
+use futures_util::compat::Future01CompatExt;
 
 #[test]
 fn can_run_01_futures() {

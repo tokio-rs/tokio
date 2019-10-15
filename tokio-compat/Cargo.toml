@@ -1,8 +1,27 @@
 [package]
 name = "tokio-compat"
-version = "0.1.0"
-authors = ["Eliza Weisman <eliza@buoyant.io>"]
+# When releasing to crates.io:
+# - Remove path dependencies
+# - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+#   - README.md
+# - Update CHANGELOG.md.
+# - Create "v0.1.x" git tag.
+version = "0.1.0-alpha.1"
 edition = "2018"
+authors = ["Tokio Contributors <team@tokio.rs>"]
+license = "MIT"
+readme = "README.md"
+documentation = "https://docs.rs/tokio-compat/0.1.0-alpha.1/tokio-compat/"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+description = """
+Compatibility between `tokio` 0.2 and legacy versions.
+"""
+categories = ["asynchronous", "network-programming"]
+keywords = ["io", "async", "non-blocking", "futures"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
@@ -13,7 +32,7 @@ runtime = ["old-timer", "old-reactor", "old-executor", "tokio-executor", "tokio-
 pin-project = "0.4"
 futures-01 = { package = "futures", version = "0.1" }
 futures-03-core = { package = "futures-core-preview", version = "0.3.0-alpha.19" }
-futures-03-util = { package = "futures-util-preview", version = "0.3.0-alpha.19", features = ["compat"] }
+futures-util = { package = "futures-util-preview", version = "0.3.0-alpha.19", features = ["compat"] }
 
 old-timer = { package = "tokio-timer", version = "0.2", optional = true}
 old-reactor = { package = "tokio-reactor", version = "0.1", optional = true }
