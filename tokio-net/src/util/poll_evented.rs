@@ -121,8 +121,6 @@ struct Inner {
 
 macro_rules! poll_ready {
     ($me:expr, $mask:expr, $cache:ident, $take:ident, $poll:expr) => {{
-        $me.register()?;
-
         // Load cached & encoded readiness.
         let mut cached = $me.inner.$cache.load(Relaxed);
         let mask = $mask | platform::hup();
@@ -169,27 +167,36 @@ where
 {
     /// Creates a new `PollEvented` associated with the default reactor.
     pub fn new(io: E) -> PollEvented<E> {
-        PollEvented {
+        let pe = Self {
             io: Some(io),
             inner: Inner {
                 registration: Registration::new(),
                 read_readiness: AtomicUsize::new(0),
                 write_readiness: AtomicUsize::new(0),
             },
-        }
+        };
+        pe.register().expect("failed to register register with default reactor");
+        pe
     }
 
     /// Creates a new `PollEvented` associated with the specified reactor.
     pub fn new_with_handle(io: E, handle: &Handle) -> io::Result<Self> {
-        let ret = PollEvented::new(io);
+        let pe = Self {
+            io: Some(io),
+            inner: Inner {
+                registration: Registration::new(),
+                read_readiness: AtomicUsize::new(0),
+                write_readiness: AtomicUsize::new(0),
+            },
+        };
 
         if let Some(handle) = handle.as_priv() {
-            ret.inner
+            pe.inner
                 .registration
-                .register_with_priv(ret.io.as_ref().unwrap(), handle)?;
+                .register_with_priv(pe.io.as_ref().unwrap(), handle)?;
         }
 
-        Ok(ret)
+        Ok(pe)
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness

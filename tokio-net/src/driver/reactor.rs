@@ -378,7 +378,7 @@ impl Unpark for Handle {
 impl Default for Handle {
     /// Returns a "default" handle, i.e., a handle that lazily binds to a reactor.
     fn default() -> Handle {
-        Handle { inner: None }
+        Handle { inner: Some(HandlePriv::try_current().unwrap()) }
     }
 }
 

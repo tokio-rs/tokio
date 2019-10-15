@@ -45,13 +45,6 @@ pub struct Registration {
     ///
     /// Setting this requires acquiring the lock from state.
     inner: UnsafeCell<Option<Inner>>,
-
-    /// Tracks the state of the registration.
-    ///
-    /// The least significant 2 bits are used to track the lifecycle of the
-    /// registration. The rest of the `state` variable is a pointer to tasks
-    /// that must be notified once the lock is released.
-    state: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -61,24 +54,24 @@ struct Inner {
 }
 
 /// Tasks waiting on readiness notifications.
-#[derive(Debug)]
-struct Node {
-    direction: Direction,
-    waker: Waker,
-    next: *mut Node,
-}
+// #[derive(Debug)]
+// struct Node {
+//     direction: Direction,
+//     waker: Waker,
+//     next: *mut Node,
+// }
 
 /// Initial state. The handle is not set and the registration is idle.
-const INIT: usize = 0;
+// const INIT: usize = 0;
 
 /// A thread locked the state and will associate a handle.
-const LOCKED: usize = 1;
+// const LOCKED: usize = 1;
 
 /// A handle has been associated with the registration.
-const READY: usize = 2;
+// const READY: usize = 2;
 
 /// Masks the lifecycle state
-const LIFECYCLE_MASK: usize = 0b11;
+// const LIFECYCLE_MASK: usize = 0b11;
 
 /// A fake token used to identify error situations
 const ERROR: usize = usize::MAX;
@@ -93,7 +86,6 @@ impl Registration {
     pub fn new() -> Registration {
         Registration {
             inner: UnsafeCell::new(None),
-            state: AtomicUsize::new(INIT),
         }
     }
 
@@ -182,70 +174,80 @@ impl Registration {
         T: Evented,
         F: Fn() -> io::Result<HandlePriv>,
     {
-        let mut state = self.state.load(SeqCst);
+        // let mut state = self.state.load(SeqCst);
 
-        loop {
-            match state {
-                INIT => {
-                    // Registration is currently not associated with a handle.
-                    // Get a handle then attempt to lock the state.
-                    let handle = f()?;
+        // loop {
+        //     match state {
+        //         INIT => {
+        //             // Registration is currently not associated with a handle.
+        //             // Get a handle then attempt to lock the state.
+        //             let handle = f()?;
 
-                    let actual = self.state.compare_and_swap(INIT, LOCKED, SeqCst);
+        //             let actual = self.state.compare_and_swap(INIT, LOCKED, SeqCst);
 
-                    if actual != state {
-                        state = actual;
-                        continue;
-                    }
+        //             if actual != state {
+        //                 state = actual;
+        //                 continue;
+        //             }
 
-                    // Create the actual registration
-                    let (inner, res) = Inner::new(io, handle);
+        //             // Create the actual registration
+        //             let (inner, res) = Inner::new(io, handle);
 
-                    unsafe {
-                        *self.inner.get() = Some(inner);
-                    }
+        //             unsafe {
+        //                 *self.inner.get() = Some(inner);
+        //             }
 
-                    // Transition out of the locked state. This acquires the
-                    // current value, potentially having a list of tasks that
-                    // are pending readiness notifications.
-                    let actual = self.state.swap(READY, SeqCst);
+        //             // Transition out of the locked state. This acquires the
+        //             // current value, potentially having a list of tasks that
+        //             // are pending readiness notifications.
+        //             let actual = self.state.swap(READY, SeqCst);
 
-                    // Consume the stack of nodes
+        //             // Consume the stack of nodes
 
-                    let mut read = false;
-                    let mut write = false;
-                    let mut ptr = (actual & !LIFECYCLE_MASK) as *mut Node;
+        //             let mut read = false;
+        //             let mut write = false;
+        //             let mut ptr = (actual & !LIFECYCLE_MASK) as *mut Node;
 
-                    let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
+        //             let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
 
-                    while !ptr.is_null() {
-                        let node = unsafe { Box::from_raw(ptr) };
-                        let node = *node;
-                        let Node {
-                            direction,
-                            waker,
-                            next,
-                        } = node;
+        //             while !ptr.is_null() {
+        //                 let node = unsafe { Box::from_raw(ptr) };
+        //                 let node = *node;
+        //                 let Node {
+        //                     direction,
+        //                     waker,
+        //                     next,
+        //                 } = node;
 
-                        let flag = match direction {
-                            Direction::Read => &mut read,
-                            Direction::Write => &mut write,
-                        };
+        //                 let flag = match direction {
+        //                     Direction::Read => &mut read,
+        //                     Direction::Write => &mut write,
+        //                 };
 
-                        if !*flag {
-                            *flag = true;
+        //                 if !*flag {
+        //                     *flag = true;
 
-                            inner.register(direction, waker);
-                        }
+        //                     inner.register(direction, waker);
+        //                 }
 
-                        ptr = next;
-                    }
+        //                 ptr = next;
+        //             }
 
-                    return res.map(|_| true);
-                }
-                _ => return Ok(false),
-            }
+        //             return res.map(|_| true);
+        //         }
+        //         _ => return Ok(false),
+        //     }
+        // }
+
+        let handle = f()?;
+
+        let (inner, res) = Inner::new(io, handle);
+
+        unsafe {
+            *self.inner.get() = Some(inner)
         }
+
+        res.map(|_| true)
     }
 
     /// Poll for events on the I/O resource's read readiness stream.
@@ -355,65 +357,76 @@ impl Registration {
         direction: Direction,
         cx: Option<&mut Context<'_>>,
     ) -> io::Result<Option<mio::Ready>> {
-        let mut state = self.state.load(SeqCst);
+        // let mut state = self.state.load(SeqCst);
 
-        // Cache the node pointer
-        let mut node = None;
+        // // Cache the node pointer
+        // let mut node = None;
 
-        loop {
-            match state {
-                INIT => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        "must call register before poll_read_ready",
-                    ));
-                }
-                READY => {
-                    let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
-                    return inner.poll_ready(direction, cx);
-                }
-                LOCKED => {
-                    let cx = if let Some(ref cx) = cx {
-                        cx
-                    } else {
-                        // Skip the notification tracking junk.
-                        return Ok(None);
-                    };
+        // loop {
+        //     match state {
+        //         INIT => {
+        //             return Err(io::Error::new(
+        //                 io::ErrorKind::Other,
+        //                 "must call register before poll_read_ready",
+        //             ));
+        //         }
+        //         READY => {
+        //             let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
+        //             return inner.poll_ready(direction, cx);
+        //         }
+        //         LOCKED => {
+        //             let cx = if let Some(ref cx) = cx {
+        //                 cx
+        //             } else {
+        //                 // Skip the notification tracking junk.
+        //                 return Ok(None);
+        //             };
 
-                    let next_ptr = (state & !LIFECYCLE_MASK) as *mut Node;
+        //             let next_ptr = (state & !LIFECYCLE_MASK) as *mut Node;
 
-                    // Get the node
-                    let mut n = node.take().unwrap_or_else(|| {
-                        Box::new(Node {
-                            direction,
-                            waker: cx.waker().clone(),
-                            next: ptr::null_mut(),
-                        })
-                    });
+        //             // Get the node
+        //             let mut n = node.take().unwrap_or_else(|| {
+        //                 Box::new(Node {
+        //                     direction,
+        //                     waker: cx.waker().clone(),
+        //                     next: ptr::null_mut(),
+        //                 })
+        //             });
 
-                    n.next = next_ptr;
+        //             n.next = next_ptr;
 
-                    let node_ptr = Box::into_raw(n);
-                    let next = node_ptr as usize | (state & LIFECYCLE_MASK);
+        //             let node_ptr = Box::into_raw(n);
+        //             let next = node_ptr as usize | (state & LIFECYCLE_MASK);
 
-                    let actual = self.state.compare_and_swap(state, next, SeqCst);
+        //             let actual = self.state.compare_and_swap(state, next, SeqCst);
 
-                    if actual != state {
-                        // Back out of the node boxing
-                        let n = unsafe { Box::from_raw(node_ptr) };
+        //             if actual != state {
+        //                 // Back out of the node boxing
+        //                 let n = unsafe { Box::from_raw(node_ptr) };
 
-                        // Save this for next loop
-                        node = Some(n);
+        //                 // Save this for next loop
+        //                 node = Some(n);
 
-                        state = actual;
-                        continue;
-                    }
+        //                 state = actual;
+        //                 continue;
+        //             }
 
-                    return Ok(None);
-                }
-                _ => unreachable!(),
-            }
-        }
+        //             return Ok(None);
+        //         }
+        //         _ => unreachable!(),
+        //     }
+        // }
+
+        // TODO: make this `if let`?
+        let inner = unsafe { (*self.inner.get()).as_ref().unwrap() };
+        let cxx = if let Some(ref cx) = cx {
+            cx
+        } else {
+            return Ok(None)
+        };
+
+        inner.register(direction, cxx.waker().clone());
+        inner.poll_ready(direction, cx)
     }
 }
 
@@ -439,6 +452,7 @@ impl Inner {
             Some(inner) => match inner.add_source(io) {
                 Ok(token) => token,
                 Err(e) => {
+                    println!("failed to add source: {}", e);
                     res = Err(e);
                     ERROR
                 }
@@ -456,6 +470,7 @@ impl Inner {
 
     fn register(&self, direction: Direction, waker: Waker) {
         if self.token == ERROR {
+            println!("found ERROR in registration::Inner");
             waker.wake();
             return;
         }
@@ -473,9 +488,10 @@ impl Inner {
 
     fn deregister<E: Evented>(&self, io: &E) -> io::Result<()> {
         if self.token == ERROR {
+            println!("failed to deregister; found ERROR");
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                "failed to associate with reactor",
+                "deregister: failed to associate with reactor",
             ));
         }
 
@@ -493,9 +509,10 @@ impl Inner {
         cx: Option<&mut Context<'_>>,
     ) -> io::Result<Option<mio::Ready>> {
         if self.token == ERROR {
+            println!("failed to poll ready");
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                "failed to associate with reactor",
+                "poll_ready: failed to associate with reactor",
             ));
         }
 

@@ -219,7 +219,7 @@ impl TcpListener {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use tokio::net::TcpListener;
     ///
     /// use std::io;

@@ -16,29 +16,28 @@ use tokio_net::process::Command;
 mod support;
 use support::*;
 
-fn run_test() {
+async fn run_test() {
     let finished = Arc::new(AtomicBool::new(false));
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut futures = FuturesOrdered::new();
-        for i in 0..2 {
-            futures.push(
-                Command::new("echo")
-                    .arg(format!("I am spawned process #{}", i))
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn()
-                    .unwrap()
-                    .boxed(),
-            )
-        }
-
         let mut rt = current_thread::Runtime::new().expect("failed to get runtime");
-        rt.block_on(with_timeout(futures.collect::<Vec<_>>()));
+        let mut futures = FuturesOrdered::new();
+        run_with_timeout(&mut rt, async {
+            for i in 0..2 {
+                futures.push(
+                    Command::new("echo")
+                        .arg(format!("I am spawned process #{}", i))
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()
+                        .unwrap()
+                        .boxed(),
+                )
+            }
+        });
         drop(rt);
-
         finished_clone.store(true, Ordering::SeqCst);
     });
 
@@ -49,11 +48,11 @@ fn run_test() {
     );
 }
 
-#[test]
-fn issue_42() {
+#[tokio::test]
+async fn issue_42() {
     let max = 10;
     for i in 0..max {
         println!("running {}/{}", i, max);
-        run_test()
+        run_test().await
     }
 }
