@@ -343,7 +343,7 @@ where
     /// # Panics
     ///
     /// This function panics if `handle` is some but fails to reference a
-    /// current reactor.
+    /// reactor.
     fn register(&mut self, handle: Option<&Handle>) -> io::Result<()> {
         match handle {
             Some(handle) => {

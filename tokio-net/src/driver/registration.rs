@@ -127,14 +127,20 @@ impl Registration {
         Ok(())
     }
 
+    /// Register an I/O resource with a reactor.
+    ///
+    /// Once the association is established, it remains established until the
+    /// registration instance is dropped.
     fn register2<T, F>(&mut self, io: &T, f: F) -> io::Result<()>
     where
         T: Evented,
         F: Fn() -> io::Result<HandlePriv>,
     {
-        let handle = f()?;
-        let inner = Inner::add_source(io, handle)?;
-        self.inner = Some(inner);
+        if self.inner.is_none() {
+            let handle = f()?;
+            let inner = Inner::add_source(io, handle)?;
+            self.inner = Some(inner);
+        }
         Ok(())
     }
 
@@ -249,10 +255,10 @@ impl Registration {
         direction: Direction,
         cx: Option<&mut Context<'_>>,
     ) -> io::Result<Option<mio::Ready>> {
-        let inner = self
-            .inner
-            .as_ref()
-            .expect("source has not been registered with an event loop");
+        let inner = self.inner.as_ref().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "I/O resource has not been registered to a reactor",
+        ))?;
         if let Some(ref cx) = cx {
             inner.register(direction, cx.waker().clone());
         }
