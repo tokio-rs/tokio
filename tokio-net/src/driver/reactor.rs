@@ -376,10 +376,15 @@ impl Unpark for Handle {
 }
 
 impl Default for Handle {
-    /// Returns a "default" handle, i.e., a handle that lazily binds to a reactor.
+    /// Returns a "default" handle, i.e., a handle that eagerly binds to a reactor.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if there is no current reactor.
     fn default() -> Handle {
+        let handle = HandlePriv::try_current().expect("no current reactor");
         Handle {
-            inner: Some(HandlePriv::try_current().unwrap()),
+            inner: Some(handle),
         }
     }
 }
