@@ -339,22 +339,23 @@ where
     }
 
     /// Ensure that the I/O resource is registered with the reactor.
-    fn register(&self, handle: Option<&Handle>) -> io::Result<()> {
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `handle` is some but fails to reference a
+    /// current reactor.
+    fn register(&self, handle: Option<&Handle>) -> io::Result<bool> {
         match handle {
             Some(handle) => {
-                if let Some(handle) = handle.as_priv() {
-                    self.inner
-                        .registration
-                        .register_with_priv(self.io.as_ref().unwrap(), handle)?;
-                }
-            }
-            None => {
+                let handle = handle
+                    .as_priv()
+                    .expect("failed to find reference to reactor");
                 self.inner
                     .registration
-                    .register(self.io.as_ref().unwrap())?;
+                    .register_with_priv(self.io.as_ref().unwrap(), handle)
             }
+            None => self.inner.registration.register(self.io.as_ref().unwrap()),
         }
-        Ok(())
     }
 }
 
