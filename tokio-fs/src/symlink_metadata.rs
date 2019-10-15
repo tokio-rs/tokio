@@ -11,7 +11,7 @@ use std::path::Path;
 /// [std]: https://doc.rust-lang.org/std/fs/fn.symlink_metadata.html
 pub async fn symlink_metadata<P>(path: P) -> io::Result<Metadata>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path>,
 {
     let path = path.as_ref().to_owned();
     asyncify(|| std::fs::symlink_metadata(path)).await
