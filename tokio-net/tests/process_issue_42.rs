@@ -4,7 +4,6 @@
 
 use futures_util::future::FutureExt;
 use futures_util::stream::FuturesOrdered;
-use futures_util::stream::StreamExt;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

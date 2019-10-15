@@ -326,10 +326,10 @@ where
     }
 
     fn new2(io: E, handle: Option<&Handle>) -> io::Result<Self> {
-        let pe = Self {
+        let mut pe = Self {
             io: Some(io),
             inner: Inner {
-                registration: Registration::new(),
+                registration: Registration::default(),
                 read_readiness: AtomicUsize::new(0),
                 write_readiness: AtomicUsize::new(0),
             },
@@ -344,7 +344,7 @@ where
     ///
     /// This function panics if `handle` is some but fails to reference a
     /// current reactor.
-    fn register(&self, handle: Option<&Handle>) -> io::Result<bool> {
+    fn register(&mut self, handle: Option<&Handle>) -> io::Result<()> {
         match handle {
             Some(handle) => {
                 let handle = handle
