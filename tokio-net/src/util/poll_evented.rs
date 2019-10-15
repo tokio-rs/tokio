@@ -166,37 +166,13 @@ where
     E: Evented,
 {
     /// Creates a new `PollEvented` associated with the default reactor.
-    pub fn new(io: E) -> PollEvented<E> {
-        let pe = Self {
-            io: Some(io),
-            inner: Inner {
-                registration: Registration::new(),
-                read_readiness: AtomicUsize::new(0),
-                write_readiness: AtomicUsize::new(0),
-            },
-        };
-        pe.register().expect("failed to register register with default reactor");
-        pe
+    pub fn new(io: E) -> Self {
+        Self::new2(io, None).unwrap()
     }
 
     /// Creates a new `PollEvented` associated with the specified reactor.
     pub fn new_with_handle(io: E, handle: &Handle) -> io::Result<Self> {
-        let pe = Self {
-            io: Some(io),
-            inner: Inner {
-                registration: Registration::new(),
-                read_readiness: AtomicUsize::new(0),
-                write_readiness: AtomicUsize::new(0),
-            },
-        };
-
-        if let Some(handle) = handle.as_priv() {
-            pe.inner
-                .registration
-                .register_with_priv(pe.io.as_ref().unwrap(), handle)?;
-        }
-
-        Ok(pe)
+        Self::new2(io, Some(handle))
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -349,11 +325,35 @@ where
         Ok(())
     }
 
+    fn new2(io: E, handle: Option<&Handle>) -> io::Result<Self> {
+        let pe = Self {
+            io: Some(io),
+            inner: Inner {
+                registration: Registration::new(),
+                read_readiness: AtomicUsize::new(0),
+                write_readiness: AtomicUsize::new(0),
+            },
+        };
+        pe.register(handle)?;
+        Ok(pe)
+    }
+
     /// Ensure that the I/O resource is registered with the reactor.
-    fn register(&self) -> io::Result<()> {
-        self.inner
-            .registration
-            .register(self.io.as_ref().unwrap())?;
+    fn register(&self, handle: Option<&Handle>) -> io::Result<()> {
+        match handle {
+            Some(handle) => {
+                if let Some(handle) = handle.as_priv() {
+                    self.inner
+                        .registration
+                        .register_with_priv(self.io.as_ref().unwrap(), handle)?;
+                }
+            }
+            None => {
+                self.inner
+                    .registration
+                    .register(self.io.as_ref().unwrap())?;
+            }
+        }
         Ok(())
     }
 }

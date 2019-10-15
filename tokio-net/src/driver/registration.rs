@@ -243,9 +243,7 @@ impl Registration {
 
         let (inner, res) = Inner::new(io, handle);
 
-        unsafe {
-            *self.inner.get() = Some(inner)
-        }
+        unsafe { *self.inner.get() = Some(inner) }
 
         res.map(|_| true)
     }
@@ -422,7 +420,7 @@ impl Registration {
         let cxx = if let Some(ref cx) = cx {
             cx
         } else {
-            return Ok(None)
+            return Ok(None);
         };
 
         inner.register(direction, cxx.waker().clone());
