@@ -32,7 +32,7 @@ sink = ["futures-util/sink"]
 [dependencies]
 futures-01 = { package = "futures", version = "0.1" }
 futures-03-core = { package = "futures-core-preview", version = "0.3.0-alpha.19" }
-futures-util = { package = "futures-util-preview", version = "0.3.0-alpha.19", default-features = "false", features = ["compat"] }
+futures-util = { package = "futures-util-preview", version = "0.3.0-alpha.19", default-features = false, features = ["compat"] }
 
 # runtime-only
 old-timer = { package = "tokio-timer", version = "0.2", optional = true}
