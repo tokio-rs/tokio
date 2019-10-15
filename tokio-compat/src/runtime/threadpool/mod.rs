@@ -16,11 +16,13 @@ use tokio_timer::timer;
 /// A thread pool runtime that can run tasks that use both `tokio` 0.1 and
 /// `tokio` 0.2 APIs.
 ///
-/// This functions similarly to the [`tokio::runtime::Runtime`] struct in the
+/// This functions similarly to the [`tokio::runtime::Runtime`][rt] struct in the
 /// `tokio` crate. However, unlike that runtime, the `tokio-compat` runtime is
 /// capable of running both `std::future::Future` tasks that use `tokio` 0.2
 /// runtime services. and `futures` 0.1 tasks that use `tokio` 0.1 runtime
 /// services.
+///
+/// [rt]: https://docs.rs/tokio/0.2.0-alpha.6/tokio/runtime/struct.Runtime.html
 #[derive(Debug)]
 pub struct Runtime {
     inner: Option<Inner>,

@@ -1,10 +1,10 @@
 //! Runtimes compatible with both `tokio` 0.1 and `tokio` 0.2 futures.
 //!
-//! This module is similar to the [`tokio::runtime`] module. However, the
-//! runtimes in this crate are capable of executing both `futures` 0.1 futures
-//! that use the `tokio` 0.1 runtime services (i.e. `timer`, `reactor`, and
-//! `executor`), **and** `std::future` futures that use the `tokio` 0.2 runtime
-//! services.
+//! This module is similar to the [`tokio::runtime`] module, with one
+//! key difference: the runtimes in this crate are capable of executing
+//! both `futures` 0.1 futures that use the `tokio` 0.1 runtime services
+//! (i.e. `timer`, `reactor`, and `executor`), **and** `std::future`
+//! futures that use the `tokio` 0.2 runtime services.
 //!
 //! The `futures` crate's [`compat` module][futures-compat] provides
 //! interoperability between `futures` 0.1 and `std::future` _future types_
@@ -19,6 +19,18 @@
 //! `tokio-compat`'s `runtime` module contains modified versions of the `tokio`
 //! 0.2 runtimes that are capable of providing `tokio` 0.1 and `tokio`
 //! 0.2-compatible runtime services.
+//!
+//! Creating a [`Runtime`] does the following:
+//!
+//! * Spawn a background thread running a [`Reactor`] instance.
+//! * Start a [`ThreadPool`] for executing futures.
+//! * Run an instance of [`Timer`] **per** thread pool worker thread.
+//! * Run a **single** `tokio` 0.1 [`Reactor`][reactor-01] and
+//!   [`Timer`][timer-01] on a background thread, for legacy tasks.
+//!
+//! Legacy `futures` 0.1 tasks will be executed by the `tokio` 0.2 thread pool
+//! workers, alongside `std::future` tasks. However, they will use the timer and
+//! reactor provided by the compatibility background thread.
 //!
 //! ## Examples
 //!
@@ -70,7 +82,14 @@
 //! });
 //! ```
 //!
+//! [`tokio::runtime`]: https://docs.rs/tokio/0.2.0-alpha.6/tokio/runtime/index.html
 //! [futures-compat]: https://rust-lang-nursery.github.io/futures-api-docs/0.3.0-alpha.19/futures/compat/index.html
+//! [`Timer`]: https://docs.rs/tokio/0.2.0-alpha.6/tokio/timer/index.html
+//! [`Runtime`]: struct.Runtime.html
+//! [`Reactor`]:https://docs.rs/tokio/0.2.0-alpha.6/tokio/reactor/struct.Reactor.html
+//! [timer-01]: https://docs.rs/tokio/0.1.22/tokio/timer/index.html
+//! [reactor-01]: https://docs.rs/tokio/0.1.22/tokio/timer/reactor/struct.Reactor.html
+//! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 mod compat;
 mod threadpool;
 
