@@ -2,6 +2,10 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::time::{Duration, Instant};
+
+use futures_01::future::Future as Future01;
+use futures_03_util::compat::Future01CompatExt;
 
 #[test]
 fn can_run_01_futures() {
@@ -39,4 +43,32 @@ fn can_spawn_03_futures() {
         Ok(())
     }));
     assert!(ran.load(Ordering::SeqCst));
+}
+
+#[test]
+fn tokio_01_timers_work() {
+    let future1_ran = Arc::new(AtomicBool::new(false));
+    let ran = future1_ran.clone();
+    let future1 = futures_01::future::lazy(|| {
+        let when = Instant::now() + Duration::from_millis(15);
+        tokio_01::timer::Delay::new(when)
+    })
+    .map(move |_| ran.store(true, Ordering::SeqCst))
+    .map_err(|_| panic!("timer should work"));
+
+    let future2_ran = Arc::new(AtomicBool::new(false));
+    let ran = future2_ran.clone();
+    let future2 = async move {
+        let when = Instant::now() + Duration::from_millis(10);
+        tokio_01::timer::Delay::new(when).compat().await.unwrap();
+        ran.store(true, Ordering::SeqCst);
+    };
+
+    super::run(futures_01::future::lazy(move || {
+        tokio_02::spawn(future2);
+        tokio_01::spawn(future1);
+        Ok(())
+    }));
+    assert!(future1_ran.load(Ordering::SeqCst));
+    assert!(future2_ran.load(Ordering::SeqCst));
 }
