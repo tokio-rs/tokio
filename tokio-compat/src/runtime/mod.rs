@@ -63,7 +63,7 @@
 //! ```rust
 //! # use std::time::{Duration, Instant};
 //! use futures_01::future::lazy;
-//! use futures_util::compat::*;
+//! use tokio_compat::prelude::*;
 //!
 //! tokio_compat::run_03(async {
 //!     // Wait for a `tokio` 0.1 `Delay`...
@@ -88,7 +88,7 @@
 //! [`Runtime`]: struct.Runtime.html
 //! [`Reactor`]:https://docs.rs/tokio/0.2.0-alpha.6/tokio/reactor/struct.Reactor.html
 //! [timer-01]: https://docs.rs/tokio/0.1.22/tokio/timer/index.html
-//! [reactor-01]: https://docs.rs/tokio/0.1.22/tokio/timer/reactor/struct.Reactor.html
+//! [reactor-01]: https://docs.rs/tokio/0.1.22/tokio/reactor/struct.Reactor.html
 //! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 mod compat;
 mod threadpool;
