@@ -6,11 +6,26 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-futures-01 = ["futures_01"]
-futures-io = ["tokio-io", "futures-io"]
+default = ["runtime"]
+runtime = ["old-timer", "old-reactor", "old-executor", "tokio-executor", "tokio-net", "tokio-timer", "tokio-sync", "num_cpus", "tracing-core"]
 
 [dependencies]
 pin-project = "0.4"
-futures_01 = { package = "futures", version = "0.1", optional = "true" }
-futures_03 = { package = "futures", version = "0.1", optional = "true" }
-tokio_io = {version = "0.2.0-alpha.6", optional = true }
+futures-01 = { package = "futures", version = "0.1" }
+futures-03-core = { package = "futures-core-preview", version = "0.3.0-alpha.19" }
+futures-03-util = { package = "futures-util-preview", version = "0.3.0-alpha.19", features = ["compat"] }
+
+old-timer = { package = "tokio-timer", version = "0.2", optional = true}
+old-reactor = { package = "tokio-reactor", version = "0.1", optional = true }
+old-executor = { package = "tokio-executor", version = "0.1", optional = true }
+
+tokio-executor = { version = "0.2.0-alpha.6", optional = true, features = ["current-thread", "threadpool"]  }
+tokio-net = { version = "0.2.0-alpha.6", optional = true  }
+tokio-timer = { version = "0.3.0-alpha.6", optional = true  }
+tokio-sync = { version = "0.2.0-alpha.6", optional = true  }
+num_cpus =  { version = "1.10.1", optional = true }
+tracing-core = { version = "0.1", optional = true }
+
+[dev-dependencies]
+tokio-01 = { package = "tokio", version = "0.1" }
+tokio-02 = { package = "tokio", version = "0.2.0-alpha.6" }
