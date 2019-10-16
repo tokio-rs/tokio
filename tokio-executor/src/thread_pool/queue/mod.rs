@@ -8,14 +8,11 @@ mod worker;
 pub(crate) use self::inject::Inject;
 pub(crate) use self::worker::Worker;
 
-// Made accessible to this and sub modules.
-use super::LOCAL_QUEUE_CAPACITY;
-
 use crate::loom::sync::Arc;
 
 pub(crate) fn build<T: 'static>(workers: usize) -> Vec<Worker<T>> {
     let local: Vec<_> = (0..workers)
-        .map(|_| local::Queue::with_capacity(LOCAL_QUEUE_CAPACITY))
+        .map(|_| local::Queue::new())
         .collect();
 
     let cluster = Arc::new(Cluster {

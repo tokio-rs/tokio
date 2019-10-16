@@ -2,6 +2,7 @@ use crate::loom::cell::{CausalCell, CausalCheck};
 use crate::loom::sync::atomic::Ordering::{Acquire, Release};
 use crate::loom::sync::atomic::{self, AtomicU32};
 use crate::task::Task;
+use crate::thread_pool::LOCAL_QUEUE_CAPACITY;
 use crate::thread_pool::queue::global;
 
 use std::fmt;
@@ -15,26 +16,25 @@ pub(super) struct Queue<T: 'static> {
     /// Only updated by producer thread but read by many threads.
     tail: AtomicU32,
 
-    mask: usize,
-
     /// Elements
     buffer: Box<[CausalCell<MaybeUninit<Task<T>>>]>,
 }
 
+const MASK: usize = LOCAL_QUEUE_CAPACITY - 1;
+
 impl<T: 'static> Queue<T> {
-    pub(super) fn with_capacity(capacity: usize) -> Queue<T> {
-        assert!(capacity >= 2 && capacity.is_power_of_two());
+    pub(super) fn new() -> Queue<T> {
+        debug_assert!(LOCAL_QUEUE_CAPACITY >= 2 && LOCAL_QUEUE_CAPACITY.is_power_of_two());
 
-        let mut buffer = Vec::with_capacity(capacity);
+        let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
 
-        for _ in 0..capacity {
+        for _ in 0..LOCAL_QUEUE_CAPACITY {
             buffer.push(CausalCell::new(MaybeUninit::uninit()));
         }
 
         Queue {
             head: AtomicU32::new(0),
             tail: AtomicU32::new(0),
-            mask: capacity - 1,
             buffer: buffer.into(),
         }
     }
@@ -51,9 +51,9 @@ impl<T> Queue<T> {
             // safety: this is the **only** thread that updates this cell.
             let tail = self.tail.unsync_load();
 
-            if tail.wrapping_sub(head) < self.buffer.len() as u32 {
+            if tail.wrapping_sub(head) < LOCAL_QUEUE_CAPACITY as u32 {
                 // Map the position to a slot index.
-                let idx = tail as usize & self.mask;
+                let idx = tail as usize & MASK;
 
                 self.buffer[idx].with_mut(|ptr| {
                     // Write the task to the slot
@@ -61,7 +61,7 @@ impl<T> Queue<T> {
                 });
 
                 // Make the task available
-                self.tail.store(tail + 1, Release);
+                self.tail.store(tail.wrapping_add(1), Release);
 
                 return;
             }
@@ -92,8 +92,6 @@ impl<T> Queue<T> {
         tail: u32,
         global: &global::Queue<T>,
     ) -> Result<(), Task<T>> {
-        use super::LOCAL_QUEUE_CAPACITY;
-
         const BATCH_LEN: usize = LOCAL_QUEUE_CAPACITY / 2 + 1;
 
         let n = tail.wrapping_sub(head) / 2;
@@ -121,8 +119,8 @@ impl<T> Queue<T> {
         for i in 0..n {
             let j = i + 1;
 
-            let i_idx = (i + head) as usize & self.mask;
-            let j_idx = (j + head) as usize & self.mask;
+            let i_idx = (i + head) as usize & MASK;
+            let j_idx = (j + head) as usize & MASK;
 
             // Get the next pointer
             let next = if j == n {
@@ -144,7 +142,7 @@ impl<T> Queue<T> {
             });
         }
 
-        let head = self.buffer[head as usize & self.mask].with(|ptr| ptr::read((*ptr).as_ptr()));
+        let head = self.buffer[head as usize & MASK].with(|ptr| ptr::read((*ptr).as_ptr()));
 
         // Push the tasks onto the global queue
         global.push_batch(head, task, BATCH_LEN);
@@ -168,7 +166,7 @@ impl<T> Queue<T> {
             }
 
             // Map the head position to a slot index.
-            let idx = head as usize & self.mask;
+            let idx = head as usize & MASK;
 
             let task = self.buffer[idx].with(|ptr| {
                 // Tentatively read the task at the head position. Note that we
@@ -199,8 +197,6 @@ impl<T> Queue<T> {
 
     /// Steal half the tasks from self and place them into `dst`.
     pub(super) unsafe fn steal(&self, dst: &Queue<T>) -> Option<Task<T>> {
-        debug_assert_eq!(self.mask, dst.mask);
-
         let dst_tail = dst.tail.unsync_load();
 
         // Steal the tasks into `dst`'s buffer. This does not yet expose the
@@ -216,7 +212,7 @@ impl<T> Queue<T> {
         n -= 1;
 
         let ret_pos = dst_tail.wrapping_add(n);
-        let ret_idx = ret_pos as usize & self.mask;
+        let ret_idx = ret_pos as usize & MASK;
 
         let ret = dst.buffer[ret_idx].with(|ptr| ptr::read((*ptr).as_ptr()));
 
@@ -229,7 +225,7 @@ impl<T> Queue<T> {
         let dst_head = dst.head.load(Acquire);
 
         assert!(
-            dst_tail.wrapping_sub(dst_head) + n <= dst.buffer.len() as u32,
+            dst_tail.wrapping_sub(dst_head) + n <= LOCAL_QUEUE_CAPACITY as u32,
             "overflow"
         );
 
@@ -252,7 +248,7 @@ impl<T> Queue<T> {
                 return 0;
             }
 
-            if n > self.buffer.len() as u32 / 2 {
+            if n > LOCAL_QUEUE_CAPACITY as u32 / 2 {
                 atomic::spin_loop_hint();
                 // inconsistent, try again
                 continue;
@@ -268,8 +264,8 @@ impl<T> Queue<T> {
                 let dst_pos = dst_tail.wrapping_add(i);
 
                 // Map to slots
-                let src_idx = src_pos as usize & self.mask;
-                let dst_idx = dst_pos as usize & self.mask;
+                let src_idx = src_pos as usize & MASK;
+                let dst_idx = dst_pos as usize & MASK;
 
                 // Read the task
                 let (task, ch) =
@@ -301,7 +297,6 @@ impl<T> fmt::Debug for Queue<T> {
         fmt.debug_struct("local::Queue")
             .field("head", &self.head)
             .field("tail", &self.tail)
-            .field("mask", &self.mask)
             .field("buffer", &"[...]")
             .finish()
     }
