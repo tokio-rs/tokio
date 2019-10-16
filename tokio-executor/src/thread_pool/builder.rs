@@ -187,6 +187,9 @@ impl Builder {
                     worker.run();
                 }
 
+                // Worker must be dropped before the `shutdown_tx`
+                drop(worker);
+
                 // Dropping the handle must happen __after__ the callback
                 drop(shutdown_tx);
             });
