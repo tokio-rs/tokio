@@ -59,9 +59,8 @@ impl Registration {
     ///
     /// # Return
     ///
-    /// If the registration happened successfully, `Ok` is returned.
-    ///
-    /// If an error is encountered during registration, `Err` is returned.
+    /// - `Ok` if the registration happened successfully
+    /// - `Err` if an error was encountered during registration
     pub fn register<T>(&mut self, io: &T) -> io::Result<()>
     where
         T: Evented,

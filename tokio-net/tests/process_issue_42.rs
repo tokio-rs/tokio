@@ -15,7 +15,7 @@ use tokio_net::process::Command;
 mod support;
 use support::*;
 
-async fn run_test() {
+fn run_test() {
     let finished = Arc::new(AtomicBool::new(false));
     let finished_clone = finished.clone();
 
@@ -47,11 +47,11 @@ async fn run_test() {
     );
 }
 
-#[tokio::test]
-async fn issue_42() {
+#[test]
+fn issue_42() {
     let max = 10;
     for i in 0..max {
         println!("running {}/{}", i, max);
-        run_test().await
+        run_test()
     }
 }

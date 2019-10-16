@@ -350,9 +350,8 @@ impl Handle {
     ///
     /// # Returns
     ///
-    /// If there is handle set for the worker thread, returns `Ok<Handle>`.
-    ///
-    /// If there is no handle set for the worker thread, returns `Err`.
+    /// - `Ok<Handle>` if there is reactor set for the current thread
+    /// - `Err` if there is no reactor set for the current thread
     pub fn current() -> io::Result<Handle> {
         let inner = HandlePriv::try_current()?;
         Ok(Handle { inner: Some(inner) })

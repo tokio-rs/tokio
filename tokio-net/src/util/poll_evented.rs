@@ -342,7 +342,7 @@ where
     ///
     /// # Panics
     ///
-    /// This function panics if `handle` is some but fails to reference a
+    /// This function panics if `handle` is `Some` but fails to reference a
     /// reactor.
     fn register(&mut self, handle: Option<&Handle>) -> io::Result<()> {
         match handle {
