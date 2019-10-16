@@ -1,9 +1,9 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::{Acquire, Release};
 use crate::loom::sync::Mutex;
 use crate::task::{Header, Task};
 
 use std::ptr::{self, NonNull};
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::usize;
 
 pub(super) struct Queue<T: 'static> {

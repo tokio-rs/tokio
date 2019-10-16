@@ -1,8 +1,8 @@
 use crate::loom::sync::atomic::AtomicPtr;
-use crate::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::task::{Header, Task};
 
 use std::ptr::{self, NonNull};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 /// Concurrent stack of tasks, used to pass ownership of a task from one worker
 /// to another.

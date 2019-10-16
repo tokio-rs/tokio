@@ -22,6 +22,7 @@ impl AtomicUsize {
     ///
     /// All mutations must have happened before the unsynchronized load.
     /// Additionally, there must be no concurrent mutations.
+    #[cfg(feature = "thread-pool")]
     pub(crate) unsafe fn unsync_load(&self) -> usize {
         *(*self.inner.get()).get_mut()
     }

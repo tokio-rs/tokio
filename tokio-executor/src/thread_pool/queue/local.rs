@@ -1,5 +1,4 @@
 use crate::loom::cell::{CausalCell, CausalCheck};
-use crate::loom::sync::atomic::Ordering::{Acquire, Release};
 use crate::loom::sync::atomic::{self, AtomicU32};
 use crate::task::Task;
 use crate::thread_pool::queue::global;
@@ -8,6 +7,7 @@ use crate::thread_pool::LOCAL_QUEUE_CAPACITY;
 use std::fmt;
 use std::mem::MaybeUninit;
 use std::ptr;
+use std::sync::atomic::Ordering::{Acquire, Release};
 
 pub(super) struct Queue<T: 'static> {
     /// Concurrently updated by many threads.

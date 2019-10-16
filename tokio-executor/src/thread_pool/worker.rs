@@ -119,7 +119,7 @@ where
     /// Returns `true` if the worker needs to park
     fn tick(&self, park: &mut impl Park<Unpark = P>) -> bool {
         // Process all pending tasks in the local queue.
-        if !dbg!(self.process_local_queue(park)) {
+        if !self.process_local_queue(park) {
             return false;
         }
 
@@ -127,9 +127,9 @@ where
         // in order to attempt to steal work from other workers.
         //
         // On `false`, the worker has entered the parked state
-        if dbg!(self.transition_to_searching()) {
+        if self.transition_to_searching() {
             // If `true` then work was found
-            if dbg!(self.search_for_work()) {
+            if self.search_for_work() {
                 return false;
             }
         }
@@ -273,7 +273,7 @@ where
     }
 
     fn run_task(&self, task: Task<Shared<P>>) {
-        if dbg!(self.is_searching()) {
+        if self.is_searching() {
             self.transition_from_searching();
         }
 
@@ -284,13 +284,13 @@ where
     }
 
     fn final_work_sweep(&self) {
-        if dbg!(!self.owned().work_queue.is_empty()) {
+        if !self.owned().work_queue.is_empty() {
             self.set().notify_work();
         }
     }
 
     fn park(&self, park: &mut impl Park<Unpark = P>) {
-        if dbg!(self.transition_to_parked()) {
+        if self.transition_to_parked() {
             // We are the final searching worker, check if any work arrived
             // before parking
             self.final_work_sweep();
@@ -305,7 +305,7 @@ where
             // We might have been woken to cleanup dropped task
             self.maintenance();
 
-            if dbg!(self.transition_from_parked()) {
+            if self.transition_from_parked() {
                 return;
             }
         }

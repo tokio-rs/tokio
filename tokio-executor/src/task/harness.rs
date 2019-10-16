@@ -326,7 +326,6 @@ where
     // ===== waker behavior =====
 
     pub(super) fn wake_by_val(self) {
-        dbg!("wake_by_val");
         self.wake_by_ref();
         self.drop_waker();
     }
@@ -336,8 +335,7 @@ where
     }
 
     pub(super) fn wake_by_ref(&self) {
-        dbg!("wake_by_ref");
-        if dbg!(self.header().state.transition_to_notified()) {
+        if self.header().state.transition_to_notified() {
             unsafe {
                 let executor = match self.header().executor.with(|ptr| *ptr) {
                     Some(executor) => executor,
@@ -350,7 +348,7 @@ where
     }
 
     pub(super) fn drop_waker(self) {
-        if dbg!(self.header().state.ref_dec()) {
+        if self.header().state.ref_dec() {
             unsafe {
                 self.dealloc();
             }
@@ -595,6 +593,5 @@ where
 }
 
 unsafe fn drop_future<T: Future>(ptr: *mut Track<T>) {
-    dbg!("drop_future");
     ptr.drop_in_place();
 }

@@ -61,14 +61,6 @@
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://doc.rust-lang.org/std/future/trait.Future.html#tymethod.poll
 
-macro_rules! dbg {
-    ($($t:tt)*) => {
-        $($t)*
-        // Uncomment this line to get a _lot_ of debug output
-        // std::dbg!($($t)*)
-    }
-}
-
 #[cfg(all(test, loom))]
 macro_rules! thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
@@ -92,6 +84,7 @@ pub mod park;
 #[cfg(feature = "thread-pool")]
 mod task;
 mod typed;
+#[cfg(feature = "thread-pool")]
 mod util;
 
 #[cfg(feature = "blocking")]

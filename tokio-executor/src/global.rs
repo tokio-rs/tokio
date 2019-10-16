@@ -1,3 +1,4 @@
+#[cfg(feature = "thread-pool")]
 use crate::thread_pool::ThreadPool;
 use crate::{Executor, SpawnError};
 
@@ -44,6 +45,7 @@ impl DefaultExecutor {
                 let executor = unsafe { &mut *executor_ptr };
                 Some(f(executor))
             }
+            #[cfg(feature = "thread-pool")]
             State::ThreadPool(threadpool_ptr) => {
                 let mut thread_pool = unsafe { &*threadpool_ptr };
                 Some(f(&mut thread_pool))
@@ -59,6 +61,7 @@ enum State {
     Empty,
 
     // default executor is a thread pool instance.
+    #[cfg(feature = "thread-pool")]
     ThreadPool(*const ThreadPool),
 
     // default executor is set to a custom executor.
@@ -141,6 +144,7 @@ where
             let executor = unsafe { &mut *executor_ptr };
             executor.spawn(Box::pin(future)).unwrap();
         }
+        #[cfg(feature = "thread-pool")]
         State::ThreadPool(threadpool_ptr) => {
             let thread_pool = unsafe { &*threadpool_ptr };
             thread_pool.spawn_background(future);
@@ -149,6 +153,7 @@ where
     })
 }
 
+#[cfg(feature = "thread-pool")]
 pub(crate) fn with_threadpool<F, R>(thread_pool: &ThreadPool, f: F) -> R
 where
     F: FnOnce() -> R,

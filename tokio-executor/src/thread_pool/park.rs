@@ -1,10 +1,10 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::SeqCst;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::park::{Park, Unpark};
 
 use std::error::Error;
 use std::fmt;
+use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
 /// Parks the thread.

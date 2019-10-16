@@ -1,7 +1,10 @@
+#[cfg(feature = "thread-pool")]
 mod atomic_u32;
 mod atomic_usize;
+#[cfg(feature = "thread-pool")]
 mod causal_cell;
 
+#[cfg(feature = "thread-pool")]
 pub(crate) mod alloc {
     pub(crate) use std::alloc::{alloc, dealloc};
 
@@ -25,10 +28,12 @@ pub(crate) mod alloc {
     }
 }
 
+#[cfg(feature = "thread-pool")]
 pub(crate) mod cell {
     pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
 }
 
+#[cfg(feature = "thread-pool")]
 pub(crate) mod rand {
     use std::collections::hash_map::RandomState;
     use std::hash::{BuildHasher, Hash, Hasher};
@@ -54,17 +59,21 @@ pub(crate) mod sync {
     pub(crate) use std::sync::{Arc, Condvar, Mutex};
 
     pub(crate) mod atomic {
+        #[cfg(feature = "thread-pool")]
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
-        pub(crate) use std::sync::atomic::{fence, spin_loop_hint, AtomicPtr, Ordering};
+        #[cfg(feature = "thread-pool")]
+        pub(crate) use std::sync::atomic::{fence, spin_loop_hint, AtomicPtr};
     }
 }
 
+#[cfg(feature = "thread-pool")]
 pub(crate) mod sys {
     pub(crate) fn num_cpus() -> usize {
         usize::max(1, num_cpus::get_physical())
     }
 }
 
+#[cfg(feature = "thread-pool")]
 pub(crate) use std::thread;

@@ -1,10 +1,10 @@
 //! Coordinates idling workers
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::{self, AcqRel, Relaxed, SeqCst};
 use crate::loom::sync::Mutex;
 
 use std::fmt;
+use std::sync::atomic::Ordering::{self, AcqRel, Relaxed, SeqCst};
 
 pub(super) struct Idle {
     /// Tracks both the number of searching workers and the number of unparked
@@ -50,7 +50,7 @@ impl Idle {
         // provide sufficient guarantees, so this load is done with `SeqCst` and
         // will pair with the `fetch_sub(1)` when transitioning out of
         // searching.
-        if dbg!(!self.notify_should_wakeup()) {
+        if !self.notify_should_wakeup() {
             return None;
         }
 
@@ -58,7 +58,7 @@ impl Idle {
         let mut sleepers = self.sleepers.lock().unwrap();
 
         // Check again, now that the lock is acquired
-        if dbg!(!self.notify_should_wakeup()) {
+        if !self.notify_should_wakeup() {
             return None;
         }
 
@@ -144,7 +144,7 @@ impl Idle {
     }
 
     fn notify_should_wakeup(&self) -> bool {
-        let state = dbg!(State::load(&self.state, SeqCst));
+        let state = State::load(&self.state, SeqCst);
         state.num_searching() == 0 && state.num_unparked() < self.num_workers
     }
 }

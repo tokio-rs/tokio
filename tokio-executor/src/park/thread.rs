@@ -1,10 +1,11 @@
-use crate::loom::sync::atomic::{AtomicUsize, Ordering};
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::park::{Park, Unpark};
 
 use std::marker::PhantomData;
 use std::mem;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
 

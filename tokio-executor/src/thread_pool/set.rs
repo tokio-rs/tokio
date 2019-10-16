@@ -71,7 +71,7 @@ where
     }
 
     pub(super) fn notify_work(&self) {
-        if let Some(index) = dbg!(self.idle.worker_to_notify()) {
+        if let Some(index) = self.idle.worker_to_notify() {
             self.shared[index].unpark();
         }
     }
@@ -94,20 +94,17 @@ where
     pub(crate) fn schedule(&self, task: Task<Shared<P>>) {
         current::get(|current_worker| match current_worker.as_member(self) {
             Some(worker) => {
-                if dbg!(worker.submit_local(task)) {
+                if worker.submit_local(task) {
                     self.notify_work();
                 }
             }
             None => {
-                dbg!("Set::schedule - inject_task");
                 self.inject_task(task);
             }
         })
     }
 
     pub(crate) fn set_container_ptr(&mut self) {
-        dbg!(("set_container_ptr", self as *const _ as usize));
-
         let ptr = self as *const _;
         for shared in &mut self.shared[..] {
             shared.set_container_ptr(ptr);
