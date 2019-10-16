@@ -127,24 +127,30 @@ impl TcpStream {
     ///
     /// This function will convert a TCP stream created by the standard library
     /// to a TCP stream ready to be used with the provided event loop handle.
-    /// Use `Handle::default()` to lazily bind to an event loop, just like `connect` does.
+    ///
+    /// The `handle` argument is the event loop that this listener will be
+    /// bound to.
+    /// Use [`Handle::current()`] to eagerly bind to an event loop.
+    ///
+    /// [`Handle::current()`]: ../reactor/struct.Handle.html
     ///
     /// # Examples
     ///
     /// ```no_run
+    /// use std::error::Error;
     /// use tokio::net::TcpStream;
     /// use tokio_net::driver::Handle;
     ///
-    /// # fn dox() -> std::io::Result<()> {
-    /// let std_stream = std::net::TcpStream::connect("127.0.0.1:34254")?;
-    /// let stream = TcpStream::from_std(std_stream, &Handle::default())?;
-    /// # Ok(())
-    /// # }
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let std_stream = std::net::TcpStream::connect("127.0.0.1:34254")?;
+    ///     let stream = TcpStream::from_std(std_stream, &Handle::current()?)?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn from_std(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_stream(stream)?;
         let io = PollEvented::new_with_handle(io, handle)?;
-
         Ok(TcpStream { io })
     }
 
@@ -743,10 +749,9 @@ impl TryFrom<net::TcpStream> for TcpStream {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`TcpStream::from_std(stream, &Handle::default())`](TcpStream::from_std).
+    /// [`TcpStream::from_std(stream, &Handle::current())`](TcpStream::from_std).
     fn try_from(stream: net::TcpStream) -> Result<Self, Self::Error> {
-        let handle = Handle::try_current()?;
-        Self::from_std(stream, &handle)
+        Self::from_std(stream, &Handle::current()?)
     }
 }
 

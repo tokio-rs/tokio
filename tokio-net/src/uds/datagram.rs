@@ -216,10 +216,9 @@ impl TryFrom<net::UnixDatagram> for UnixDatagram {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UnixDatagram::from_std(stream, &Handle::default())`](UnixDatagram::from_std).
+    /// [`UnixDatagram::from_std(stream, &Handle::current())`](UnixDatagram::from_std).
     fn try_from(stream: net::UnixDatagram) -> Result<Self, Self::Error> {
-        let handle = Handle::try_current()?;
-        Self::from_std(stream, &handle)
+        Self::from_std(stream, &Handle::current()?)
     }
 }
 

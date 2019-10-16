@@ -117,10 +117,9 @@ impl TryFrom<net::UnixListener> for UnixListener {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UnixListener::from_std(stream, &Handle::default())`](UnixListener::from_std).
+    /// [`UnixListener::from_std(stream, &Handle::current())`](UnixListener::from_std).
     fn try_from(stream: net::UnixListener) -> io::Result<Self> {
-        let handle = Handle::try_current()?;
-        Self::from_std(stream, &handle)
+        Self::from_std(stream, &Handle::current()?)
     }
 }
 

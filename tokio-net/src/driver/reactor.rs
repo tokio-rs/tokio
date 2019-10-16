@@ -39,9 +39,6 @@ pub struct Reactor {
 /// A `Handle` is used for associating I/O objects with an event loop
 /// explicitly. Typically though you won't end up using a `Handle` that often
 /// and will instead use the default reactor for the execution context.
-///
-/// By default, most components bind lazily to reactors.
-/// To get this behavior when manually passing a `Handle`, use `default()`.
 #[derive(Clone)]
 pub struct Handle {
     inner: Option<HandlePriv>,
@@ -349,20 +346,14 @@ impl fmt::Debug for Reactor {
 // ===== impl Handle =====
 
 impl Handle {
-    #[doc(hidden)]
-    #[deprecated(note = "semantics were sometimes surprising, use Handle::default()")]
-    pub fn current() -> Handle {
-        // TODO: Should this panic on error?
-        HandlePriv::try_current()
-            .map(|handle| Handle {
-                inner: Some(handle),
-            })
-            .unwrap_or(Handle {
-                inner: Some(HandlePriv { inner: Weak::new() }),
-            })
-    }
-
-    pub(crate) fn try_current() -> io::Result<Handle> {
+    /// Get a handle to the current reactor.
+    ///
+    /// # Returns
+    ///
+    /// If there is handle set for the worker thread, returns `Ok<Handle>`.
+    ///
+    /// If there is no handle set for the worker thread, returns `Err`.
+    pub fn current() -> io::Result<Handle> {
         let inner = HandlePriv::try_current()?;
         Ok(Handle { inner: Some(inner) })
     }
