@@ -39,12 +39,8 @@ impl fmt::Display for Error {
 impl fmt::Debug for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.repr {
-            Repr::Cancelled => {
-                write!(fmt, "task::Error::Cancelled")
-            }
-            Repr::Panic(_) => {
-                write!(fmt, "task::Error::Panic(...)")
-            }
+            Repr::Cancelled => write!(fmt, "task::Error::Cancelled"),
+            Repr::Panic(_) => write!(fmt, "task::Error::Panic(...)"),
         }
     }
 }

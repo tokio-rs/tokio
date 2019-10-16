@@ -11,9 +11,7 @@ pub(crate) use self::worker::Worker;
 use crate::loom::sync::Arc;
 
 pub(crate) fn build<T: 'static>(workers: usize) -> Vec<Worker<T>> {
-    let local: Vec<_> = (0..workers)
-        .map(|_| local::Queue::new())
-        .collect();
+    let local: Vec<_> = (0..workers).map(|_| local::Queue::new()).collect();
 
     let cluster = Arc::new(Cluster {
         local: local.into_boxed_slice(),
