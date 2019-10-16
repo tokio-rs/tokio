@@ -36,10 +36,12 @@ mod small_slab;
 fn local_remove() {
     loom::model(|| {
         let slab = Arc::new(Slab::new());
+        let next_guard = Arc::new(AtomicUsize::new(0));
 
         let s = slab.clone();
+        let guard = next_guard.clone();
         let t1 = thread::spawn(move || {
-            let idx = s.insert(1).expect("insert");
+            let idx = s.insert().expect("insert");
             assert_eq!(s.get_guard(idx), Some(1));
             s.remove(idx);
             assert_eq!(s.get_guard(idx), None);
@@ -124,7 +126,7 @@ fn concurrent_insert_remove() {
         let remover = thread::spawn(move || {
             let (lock, cvar) = &*pair2;
             for i in 0..2 {
-                println!("--- remover i={} ---", i);
+                test_println!("--- remover i={} ---", i);
                 let mut next = lock.lock().unwrap();
                 while next.is_none() {
                     next = cvar.wait(next).unwrap();
@@ -138,7 +140,7 @@ fn concurrent_insert_remove() {
 
         let (lock, cvar) = &*pair;
         for i in 0..2 {
-            println!("--- inserter i={} ---", i);
+            test_println!("--- inserter i={} ---", i);
             let key = slab.insert(i).expect("insert");
 
             let mut next = lock.lock().unwrap();

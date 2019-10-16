@@ -105,7 +105,7 @@ impl Shared {
     #[cold]
     fn fill(&self) {
         #[cfg(test)]
-        println!("-> alloc new page ({})", self.size);
+        test_println!("-> alloc new page ({})", self.size);
 
         debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
 
@@ -127,7 +127,7 @@ impl Shared {
     pub(crate) fn insert(&self, local: &Local, aba_guard: usize) -> Option<usize> {
         let head = local.head();
         #[cfg(test)]
-        println!("-> local head {:?}", head);
+        test_println!("-> local head {:?}", head);
 
         // are there any items on the local free list? (fast path)
         let head = if head < self.size {
@@ -142,7 +142,7 @@ impl Shared {
         // empty --- we can't fit any more items on this page.
         if head == Self::NULL {
             #[cfg(test)]
-            println!("-> NULL! {:?}", head);
+            test_println!("-> NULL! {:?}", head);
             return None;
         }
 
@@ -163,7 +163,7 @@ impl Shared {
 
         let index = head + self.prev_sz;
         #[cfg(test)]
-        println!("insert at offset: {}", index);
+        test_println!("insert at offset: {}", index);
         Some(index)
     }
 
@@ -171,17 +171,21 @@ impl Shared {
     pub(in crate::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
         #[cfg(test)]
-        println!("-> offset {:?}", page_offset);
+        test_println!("-> offset {:?}", page_offset);
 
-        self.slab
-            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset)?.value())
+        let value = self
+            .slab
+            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset)?.value());
+        #[cfg(test)]
+        test_println!("-> offset {:?}; value={:?}", page_offset, value);
+        value
     }
 
     pub(crate) fn remove_local(&self, local: &Local, addr: Addr) {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
-        println!("-> offset {:?}", offset);
+        test_println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
             let slot =
@@ -201,7 +205,7 @@ impl Shared {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
-        println!("-> offset {:?}", offset);
+        test_println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
             let slot =
@@ -217,7 +221,7 @@ impl Shared {
             let mut next = self.remote_head.load(Ordering::Relaxed);
             loop {
                 #[cfg(test)]
-                println!("-> next={:?}", next);
+                test_println!("-> next={:?}", next);
 
                 slot.set_next(next);
 

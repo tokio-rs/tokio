@@ -95,7 +95,7 @@ fn concurrent_insert_remove() {
         let remover = thread::spawn(move || {
             let (lock, cvar) = &*pair2;
             for i in 0..2 {
-                println!("--- remover i={} ---", i);
+                test_println!("--- remover i={} ---", i);
                 let mut next = lock.lock().unwrap();
                 while next.is_none() {
                     next = cvar.wait(next).unwrap();
@@ -109,7 +109,7 @@ fn concurrent_insert_remove() {
 
         let (lock, cvar) = &*pair;
         for i in 0..2 {
-            println!("--- inserter i={} ---", i);
+            test_println!("--- inserter i={} ---", i);
             let key = slab.insert(i).expect("insert");
 
             let mut next = lock.lock().unwrap();

@@ -42,7 +42,7 @@ fn remove_remote_and_reuse() {
     let mut model = loom::model::Builder::new();
     model.max_branches = 100000;
     model.check(|| {
-        println!("\n --- iteration ---\n");
+        test_println!("\n --- iteration ---\n");
         let slab = Arc::new(Slab::new());
 
         let idx1 = slab.insert(1).expect("insert");
@@ -78,7 +78,7 @@ fn custom_page_sz() {
         let slab = Slab::new();
 
         for i in 0..1024 {
-            println!("{}", i);
+            test_println!("{}", i);
             let k = slab.insert(i).expect("insert");
             assert_eq!(
                 slab.get_guard(k).expect("get_guard"),

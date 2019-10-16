@@ -452,7 +452,7 @@ impl ScheduledIo {
 
     fn reset(&self) {
         self.readiness.store(0, Release);
-        self.aba_guard.store(0, Release);
+        self.aba_guard.store(1, Release);
         drop(self.reader.take_waker());
         drop(self.writer.take_waker());
     }
@@ -461,7 +461,7 @@ impl ScheduledIo {
 impl Default for ScheduledIo {
     fn default() -> Self {
         Self {
-            aba_guard: AtomicUsize::new(0),
+            aba_guard: AtomicUsize::new(1),
             readiness: AtomicUsize::new(0),
             reader: AtomicWaker::new(),
             writer: AtomicWaker::new(),

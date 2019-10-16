@@ -76,7 +76,7 @@ impl Slab {
     pub(crate) fn insert(&self, aba_guard: usize) -> Option<usize> {
         let tid = Tid::current();
         #[cfg(test)]
-        println!("insert {:?}", tid);
+        test_println!("insert {:?}", tid);
         self.shards[tid.as_usize()]
             .insert(aba_guard)
             .map(|idx| tid.pack(idx))
@@ -86,7 +86,7 @@ impl Slab {
     pub(crate) fn remove(&self, idx: usize) {
         let tid = Tid::from_packed(idx);
         #[cfg(test)]
-        println!("rm {:?}", tid);
+        test_println!("rm {:?}", tid);
         let shard = &self.shards[tid.as_usize()];
         if tid.is_current() {
             shard.remove_local(idx)
@@ -112,7 +112,7 @@ impl Slab {
     fn get2(&self, key: usize) -> Option<&ScheduledIo> {
         let tid = Tid::from_packed(key);
         #[cfg(test)]
-        println!("get {:?}", tid);
+        test_println!("get {:?}", tid);
         self.shards.get(tid.as_usize())?.get(key)
     }
 
@@ -154,7 +154,7 @@ impl SingleShard {
         // we must lock the slab to insert an item.
         let local = self.local.lock().unwrap();
         #[cfg(test)]
-        println!("insert");
+        test_println!("insert");
         self.shard.insert(aba_guard)
     }
 
@@ -163,7 +163,7 @@ impl SingleShard {
         // try to lock the slab so that we can use `remove_local`.
         let lock = self.local.try_lock();
         let local = lock.is_ok();
-        println!("rm {:#x}; local={}", idx, local);
+        test_println!("rm {:#x}; local={}", idx, local);
 
         if local {
             self.shard.remove_local(idx)
@@ -188,7 +188,7 @@ impl SingleShard {
 
     fn get2(&self, key: usize) -> Option<&ScheduledIo> {
         #[cfg(test)]
-        println!("get {:#x}", key);
+        test_println!("get {:#x}", key);
         self.shard.get(key)
     }
 
@@ -231,7 +231,7 @@ impl Shard {
         for (page_idx, page) in self.shared.iter().enumerate() {
             let local = self.local(page_idx);
             #[cfg(test)]
-            println!("-> page {}; {:?}; {:?}", page_idx, local, page);
+            test_println!("-> page {}; {:?}; {:?}", page_idx, local, page);
 
             if let Some(page_offset) = page.insert(local, aba_guard) {
                 return Some(page_offset);
@@ -248,7 +248,7 @@ impl Shard {
         let addr = page::Addr::from_packed(idx);
         let i = addr.index();
         #[cfg(test)]
-        println!("-> {:?}; idx {:?}", addr, i);
+        test_println!("-> {:?}; idx {:?}", addr, i);
         if i > self.shared.len() {
             return None;
         }
@@ -262,7 +262,7 @@ impl Shard {
         let page_idx = addr.index();
 
         #[cfg(test)]
-        println!("-> remove_local {:?}; page {:?}", addr, page_idx);
+        test_println!("-> remove_local {:?}; page {:?}", addr, page_idx);
 
         if let Some(page) = self.shared.get(page_idx) {
             page.remove_local(self.local(page_idx), addr);
@@ -277,7 +277,7 @@ impl Shard {
         let page_idx = addr.index();
 
         #[cfg(test)]
-        println!("-> remove_remote {:?}; page {:?}", addr, page_idx);
+        test_println!("-> remove_remote {:?}; page {:?}", addr, page_idx);
 
         if let Some(page) = self.shared.get(page_idx) {
             page.remove_remote(addr);

@@ -1,4 +1,17 @@
 //! A lock-free concurrent slab.
+
+#[cfg(test)]
+macro_rules! test_println {
+    ($($arg:tt)*) => {
+        println!("{:?} {}", crate::driver::reactor::sharded_slab::Tid::current(), format_args!($($arg)*))
+    }
+}
+
+#[cfg(not(test))]
+macro_rules! test_println {
+    ($($arg:tt)*) => {};
+}
+
 mod iter;
 mod pack;
 mod page;

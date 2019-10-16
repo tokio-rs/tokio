@@ -25,6 +25,8 @@ impl Slot {
     #[inline(always)]
     pub(super) fn value(&self) -> Option<&ScheduledIo> {
         if self.empty.load(Ordering::Acquire) {
+            #[cfg(test)]
+            test_println!("--> slot empty!");
             return None;
         }
         Some(&self.item)
