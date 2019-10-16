@@ -48,7 +48,7 @@ impl Idle {
         // For this to happen, this load must happen before the thread
         // transitioning `num_searching` to zero. Acquire / Relese does not
         // provide sufficient guarantees, so this load is done with `SeqCst` and
-        // will apir with the `fetch_sub(1)` when transitioning out of
+        // will pair with the `fetch_sub(1)` when transitioning out of
         // searching.
         if dbg!(!self.notify_should_wakeup()) {
             return None;
