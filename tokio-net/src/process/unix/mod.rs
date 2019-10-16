@@ -221,5 +221,5 @@ where
             return Err(io::Error::last_os_error());
         }
     }
-    Ok(Some(PollEvented::new(Fd { inner: io })))
+    Ok(Some(PollEvented::new(Fd { inner: io })?))
 }

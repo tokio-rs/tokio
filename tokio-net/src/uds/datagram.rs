@@ -25,7 +25,7 @@ impl UnixDatagram {
         P: AsRef<Path>,
     {
         let socket = mio_uds::UnixDatagram::bind(path)?;
-        Ok(UnixDatagram::new(socket))
+        UnixDatagram::new(socket)
     }
 
     /// Creates an unnamed pair of connected sockets.
@@ -35,8 +35,8 @@ impl UnixDatagram {
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
         let (a, b) = mio_uds::UnixDatagram::pair()?;
-        let a = UnixDatagram::new(a);
-        let b = UnixDatagram::new(b);
+        let a = UnixDatagram::new(a)?;
+        let b = UnixDatagram::new(b)?;
 
         Ok((a, b))
     }
@@ -52,15 +52,15 @@ impl UnixDatagram {
         Ok(UnixDatagram { io })
     }
 
-    fn new(socket: mio_uds::UnixDatagram) -> UnixDatagram {
-        let io = PollEvented::new(socket);
-        UnixDatagram { io }
+    fn new(socket: mio_uds::UnixDatagram) -> io::Result<UnixDatagram> {
+        let io = PollEvented::new(socket)?;
+        Ok(UnixDatagram { io })
     }
 
     /// Creates a new `UnixDatagram` which is not bound to any address.
     pub fn unbound() -> io::Result<UnixDatagram> {
         let socket = mio_uds::UnixDatagram::unbound()?;
-        Ok(UnixDatagram::new(socket))
+        UnixDatagram::new(socket)
     }
 
     /// Connects the socket to the specified address.
@@ -218,7 +218,8 @@ impl TryFrom<net::UnixDatagram> for UnixDatagram {
     /// This is equivalent to
     /// [`UnixDatagram::from_std(stream, &Handle::default())`](UnixDatagram::from_std).
     fn try_from(stream: net::UnixDatagram) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        let handle = Handle::try_current()?;
+        Self::from_std(stream, &handle)
     }
 }
 

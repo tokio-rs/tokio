@@ -96,7 +96,7 @@ impl TcpListener {
 
     fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
         let listener = mio::net::TcpListener::bind(&addr)?;
-        Ok(TcpListener::new(listener))
+        TcpListener::new(listener)
     }
 
     /// Accept a new incoming connection from this listener.
@@ -137,7 +137,7 @@ impl TcpListener {
         let (io, addr) = ready!(self.poll_accept_std(cx))?;
 
         let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io);
+        let io = TcpStream::new(io)?;
 
         Poll::Ready(Ok((io, addr)))
     }
@@ -207,9 +207,9 @@ impl TcpListener {
         Ok(TcpListener { io })
     }
 
-    fn new(listener: mio::net::TcpListener) -> TcpListener {
-        let io = PollEvented::new(listener);
-        TcpListener { io }
+    fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
+        let io = PollEvented::new(listener)?;
+        Ok(TcpListener { io })
     }
 
     /// Returns the local address that this listener is bound to.
@@ -331,7 +331,8 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// This is equivalent to
     /// [`TcpListener::from_std(stream, &Handle::default())`](TcpListener::from_std).
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        let handle = Handle::try_current()?;
+        Self::from_std(stream, &handle)
     }
 }
 

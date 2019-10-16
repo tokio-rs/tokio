@@ -39,7 +39,7 @@ impl UnixStream {
         P: AsRef<Path>,
     {
         let stream = mio_uds::UnixStream::connect(path)?;
-        let stream = UnixStream::new(stream);
+        let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
         Ok(stream)
@@ -64,15 +64,15 @@ impl UnixStream {
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
         let (a, b) = mio_uds::UnixStream::pair()?;
-        let a = UnixStream::new(a);
-        let b = UnixStream::new(b);
+        let a = UnixStream::new(a)?;
+        let b = UnixStream::new(b)?;
 
         Ok((a, b))
     }
 
-    pub(crate) fn new(stream: mio_uds::UnixStream) -> UnixStream {
-        let io = PollEvented::new(stream);
-        UnixStream { io }
+    pub(crate) fn new(stream: mio_uds::UnixStream) -> io::Result<UnixStream> {
+        let io = PollEvented::new(stream)?;
+        Ok(UnixStream { io })
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -136,7 +136,8 @@ impl TryFrom<net::UnixStream> for UnixStream {
     /// This is equivalent to
     /// [`UnixStream::from_std(stream, &Handle::default())`](UnixStream::from_std).
     fn try_from(stream: net::UnixStream) -> io::Result<Self> {
-        Self::from_std(stream, &Handle::default())
+        let handle = Handle::try_current()?;
+        Self::from_std(stream, &handle)
     }
 }
 

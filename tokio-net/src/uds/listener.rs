@@ -26,7 +26,7 @@ impl UnixListener {
         P: AsRef<Path>,
     {
         let listener = mio_uds::UnixListener::bind(path)?;
-        let io = PollEvented::new(listener);
+        let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }
 
@@ -63,7 +63,7 @@ impl UnixListener {
         let (io, addr) = ready!(self.poll_accept_std(cx))?;
 
         let io = mio_uds::UnixStream::from_stream(io)?;
-        Ok((UnixStream::new(io), addr)).into()
+        Ok((UnixStream::new(io)?, addr)).into()
     }
 
     fn poll_accept_std(
@@ -119,7 +119,8 @@ impl TryFrom<net::UnixListener> for UnixListener {
     /// This is equivalent to
     /// [`UnixListener::from_std(stream, &Handle::default())`](UnixListener::from_std).
     fn try_from(stream: net::UnixListener) -> io::Result<Self> {
-        Self::from_std(stream, &Handle::default())
+        let handle = Handle::try_current()?;
+        Self::from_std(stream, &handle)
     }
 }
 

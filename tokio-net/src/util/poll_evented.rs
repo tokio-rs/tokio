@@ -166,8 +166,8 @@ where
     E: Evented,
 {
     /// Creates a new `PollEvented` associated with the default reactor.
-    pub fn new(io: E) -> Self {
-        Self::new2(io, None).unwrap()
+    pub fn new(io: E) -> io::Result<Self> {
+        Self::new2(io, None)
     }
 
     /// Creates a new `PollEvented` associated with the specified reactor.

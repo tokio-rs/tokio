@@ -101,7 +101,7 @@ impl TcpStream {
     /// Establish a connection to the specified `addr`.
     async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
         let sys = mio::net::TcpStream::connect(&addr)?;
-        let stream = TcpStream::new(sys);
+        let stream = TcpStream::new(sys)?;
 
         // Once we've connected, wait for the stream to be writable as
         // that's when the actual connection has been initiated. Once we're
@@ -118,9 +118,9 @@ impl TcpStream {
         Ok(stream)
     }
 
-    pub(crate) fn new(connected: mio::net::TcpStream) -> TcpStream {
-        let io = PollEvented::new(connected);
-        TcpStream { io }
+    pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
+        let io = PollEvented::new(connected)?;
+        Ok(TcpStream { io })
     }
 
     /// Create a new `TcpStream` from a `std::net::TcpStream`.
@@ -745,7 +745,8 @@ impl TryFrom<net::TcpStream> for TcpStream {
     /// This is equivalent to
     /// [`TcpStream::from_std(stream, &Handle::default())`](TcpStream::from_std).
     fn try_from(stream: net::TcpStream) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        let handle = Handle::try_current()?;
+        Self::from_std(stream, &handle)
     }
 }
 

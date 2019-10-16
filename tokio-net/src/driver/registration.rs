@@ -59,10 +59,7 @@ impl Registration {
     ///
     /// # Return
     ///
-    /// If the registration happened successfully, `Ok(true)` is returned.
-    ///
-    /// If an I/O resource has previously been successfully registered,
-    /// `Ok(false)` is returned.
+    /// If the registration happened successfully, `Ok` is returned.
     ///
     /// If an error is encountered during registration, `Err` is returned.
     pub fn register<T>(&mut self, io: &T) -> io::Result<()>
@@ -78,10 +75,7 @@ impl Registration {
     /// the first call will establish the registration. Subsequent calls will be
     /// no-ops.
     ///
-    /// If the registration happened successfully, `Ok(true)` is returned.
-    ///
-    /// If an I/O resource has previously been successfully registered,
-    /// `Ok(false)` is returned.
+    /// If the registration happened successfully, `Ok` is returned.
     ///
     /// If an error is encountered during registration, `Err` is returned.
     pub fn register_with<T>(&mut self, io: &T, handle: &Handle) -> io::Result<()>

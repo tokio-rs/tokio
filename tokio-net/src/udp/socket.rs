@@ -40,12 +40,13 @@ impl UdpSocket {
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
-        mio::net::UdpSocket::bind(&addr).map(UdpSocket::new)
+        let sys = mio::net::UdpSocket::bind(&addr)?;
+        UdpSocket::new(sys)
     }
 
-    fn new(socket: mio::net::UdpSocket) -> UdpSocket {
-        let io = PollEvented::new(socket);
-        UdpSocket { io }
+    fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
+        let io = PollEvented::new(socket)?;
+        Ok(UdpSocket { io })
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.
@@ -388,7 +389,8 @@ impl TryFrom<net::UdpSocket> for UdpSocket {
     /// This is equivalent to
     /// [`UdpSocket::from_std(stream, &Handle::default())`](UdpSocket::from_std).
     fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        let handle = Handle::try_current()?;
+        Self::from_std(stream, &handle)
     }
 }
 

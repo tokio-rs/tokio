@@ -362,6 +362,11 @@ impl Handle {
             })
     }
 
+    pub(crate) fn try_current() -> io::Result<Handle> {
+        let inner = HandlePriv::try_current()?;
+        Ok(Handle { inner: Some(inner) })
+    }
+
     pub(crate) fn as_priv(&self) -> Option<&HandlePriv> {
         self.inner.as_ref()
     }
@@ -371,20 +376,6 @@ impl Unpark for Handle {
     fn unpark(&self) {
         if let Some(ref h) = self.inner {
             h.wakeup();
-        }
-    }
-}
-
-impl Default for Handle {
-    /// Returns a "default" handle, i.e., a handle that eagerly binds to a reactor.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if there is no current reactor.
-    fn default() -> Handle {
-        let handle = HandlePriv::try_current().expect("no current reactor");
-        Handle {
-            inner: Some(handle),
         }
     }
 }
