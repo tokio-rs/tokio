@@ -104,7 +104,7 @@ num_cpus = "1.8.0"
 tokio-io-pool = "0.1.4"
 
 # sharded slab tests
-loom = "0.2"
+loom = { git = "https://github.com/hawkw/loom.git", branch = "eliza/try-lock" }
 proptest = "0.9.4"
 
 # UDS tests

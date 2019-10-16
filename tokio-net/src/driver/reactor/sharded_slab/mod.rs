@@ -8,7 +8,7 @@ mod tid;
 use super::ScheduledIo;
 use pack::{Pack, WIDTH};
 use slab::Shard;
-pub(crate) use slab::{Slab, MAX_SOURCES, TOKEN_SHIFT};
+pub(crate) use slab::{SingleShard, Slab, MAX_SOURCES, TOKEN_SHIFT};
 use tid::Tid;
 
 #[cfg(target_pointer_width = "64")]

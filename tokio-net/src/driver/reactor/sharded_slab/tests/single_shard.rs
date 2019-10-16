@@ -1,41 +1,12 @@
-use super::Slab;
+use super::super::SingleShard;
 use crate::sync::atomic::Ordering;
 use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
 
-mod idx {
-    use super::super::{page, Pack, Tid};
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn tid_roundtrips(tid in 0usize..Tid::BITS) {
-            let tid = Tid::from_usize(tid);
-            let packed = tid.pack(0);
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
-
-        #[test]
-        fn idx_roundtrips(
-            tid in 0usize..Tid::BITS,
-            addr in 0usize..page::Addr::BITS,
-        ) {
-            let tid = Tid::from_usize(tid);
-            let addr = page::Addr::from_usize(addr);
-            let packed = tid.pack(addr.pack(0));
-            assert_eq!(addr, page::Addr::from_packed(packed));
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
-    }
-}
-
-mod single_shard;
-mod small_slab;
-
 #[test]
 fn local_remove() {
     loom::model(|| {
-        let slab = Arc::new(Slab::new());
+        let slab = Arc::new(SingleShard::new());
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
@@ -79,7 +50,7 @@ fn local_remove() {
 #[test]
 fn remove_remote() {
     loom::model(|| {
-        let slab = Arc::new(Slab::new());
+        let slab = Arc::new(SingleShard::new());
 
         let idx1 = slab.insert(1).expect("insert");
         assert_eq!(slab.get_guard(idx1), Some(1));
@@ -116,7 +87,7 @@ fn remove_remote() {
 #[test]
 fn concurrent_insert_remove() {
     loom::model(|| {
-        let slab = Arc::new(Slab::new());
+        let slab = Arc::new(SingleShard::new());
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
         let slab2 = slab.clone();
@@ -160,7 +131,7 @@ fn concurrent_insert_remove() {
 #[test]
 fn unique_iter() {
     loom::model(|| {
-        let mut slab = std::sync::Arc::new(Slab::new());
+        let mut slab = std::sync::Arc::new(SingleShard::new());
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {

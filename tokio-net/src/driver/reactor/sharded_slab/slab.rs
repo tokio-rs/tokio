@@ -1,11 +1,18 @@
 use super::*;
 use std::fmt;
 
-use crate::sync::atomic::Ordering;
+use crate::sync::{atomic::Ordering, Mutex};
 
 /// A sharded slab.
 pub(crate) struct Slab {
     shards: Box<[Shard]>,
+}
+
+/// A slab implemented with a single shard.
+#[derive(Debug)]
+pub(crate) struct SingleShard {
+    shard: Shard,
+    local: Mutex<()>,
 }
 
 // ┌─────────────┐      ┌────────┐
@@ -27,7 +34,7 @@ pub(crate) struct Slab {
 //                      │XXXXXXXX│
 //                      └────────┘
 //                         ...
-pub(super) struct Shard {
+pub(crate) struct Shard {
     #[cfg(debug_assertions)]
     tid: usize,
     /// The local free list for each page.
@@ -49,6 +56,13 @@ pub(crate) const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 impl Slab {
     /// Returns a new slab with the default configuration parameters.
     pub(crate) fn new() -> Self {
+        Self::with_max_threads(MAX_THREADS)
+    }
+
+    pub(crate) fn with_max_threads(max_threads: usize) -> Self {
+        // Round the max number of threads to the next power of two and clamp to
+        // the maximum representable number.
+        let max = max_threads.next_power_of_two().min(MAX_THREADS);
         let shards = (0..MAX_THREADS).map(Shard::new).collect();
         Self { shards }
     }
@@ -121,6 +135,77 @@ impl Slab {
     }
 }
 
+impl SingleShard {
+    /// Returns a new slab with the default configuration parameters.
+    pub(crate) fn new() -> Self {
+        Self {
+            shard: Shard::new(0),
+            local: Mutex::new(()),
+        }
+    }
+
+    /// Inserts a value into the slab, returning a key that can be used to
+    /// access it.
+    ///
+    /// If this function returns `None`, then the shard for the current thread
+    /// is full and no items can be added until some are removed, or the maximum
+    /// number of shards has been reached.
+    pub(crate) fn insert(&self, aba_guard: usize) -> Option<usize> {
+        // we must lock the slab to insert an item.
+        let local = self.local.lock().unwrap();
+        #[cfg(test)]
+        println!("insert");
+        self.shard.insert(aba_guard)
+    }
+
+    /// Removes the value associated with the given key from the slab.
+    pub(crate) fn remove(&self, idx: usize) {
+        // try to lock the slab so that we can use `remove_local`.
+        let lock = self.local.try_lock();
+        let local = lock.is_ok();
+        println!("rm {:#x}; local={}", idx, local);
+
+        if local {
+            self.shard.remove_local(idx)
+        } else {
+            self.shard.remove_remote(idx)
+        }
+    }
+
+    /// Return a reference to the value associated with the given key.
+    ///
+    /// If the slab does not contain a value for the given key, `None` is
+    /// returned instead.
+    pub(in crate::driver) fn get(&self, token: usize) -> Option<&ScheduledIo> {
+        let idx = token & MAX_SOURCES;
+        let s = self.get2(idx)?;
+        let guard = token & !MAX_SOURCES;
+        if s.aba_guard.load(Ordering::Acquire) != guard {
+            return None;
+        }
+        Some(s)
+    }
+
+    fn get2(&self, key: usize) -> Option<&ScheduledIo> {
+        #[cfg(test)]
+        println!("get {:#x}", key);
+        self.shard.get(key)
+    }
+
+    #[cfg(test)]
+    pub(super) fn get_guard(&self, idx: usize) -> Option<usize> {
+        self.get2(idx).map(|s| s.aba_guard.load(Ordering::Acquire))
+    }
+
+    /// Returns an iterator over all the items in the slab.
+    pub(in crate::driver::reactor) fn unique_iter(&self) -> iter::ShardIter<'_> {
+        let lock = self.local.lock().unwrap();
+        let mut pages = self.shard.iter();
+        let slots = pages.next().and_then(page::Shared::iter);
+        iter::ShardIter { lock, slots, pages }
+    }
+}
+
 impl Shard {
     fn new(_idx: usize) -> Self {
         let mut total_sz = 0;
@@ -187,7 +272,7 @@ impl Shard {
     /// Remove an item, while on a different thread from the shard's local thread.
     fn remove_remote(&self, idx: usize) {
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
-        debug_assert!(Tid::current().as_usize() != self.tid);
+        // debug_assert!(Tid::current().as_usize() != self.tid);
         let addr = page::Addr::from_packed(idx);
         let page_idx = addr.index();
 
@@ -201,11 +286,11 @@ impl Shard {
 
     #[inline(always)]
     fn local(&self, i: usize) -> &page::Local {
-        debug_assert_eq!(
-            Tid::current().as_usize(),
-            self.tid,
-            "tried to access local data from another thread!"
-        );
+        // debug_assert_eq!(
+        //     Tid::current().as_usize(),
+        //     self.tid,
+        //     "tried to access local data from another thread!"
+        // );
 
         &self.local[i]
     }
@@ -225,6 +310,9 @@ impl fmt::Debug for Slab {
 
 unsafe impl Send for Slab {}
 unsafe impl Sync for Slab {}
+
+unsafe impl Send for SingleShard {}
+unsafe impl Sync for SingleShard {}
 
 impl fmt::Debug for Shard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
