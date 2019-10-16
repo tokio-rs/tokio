@@ -69,32 +69,6 @@ impl Registration {
         self.register2(io, HandlePriv::try_current)
     }
 
-    /// Register the I/O resource with the specified reactor.
-    ///
-    /// This function is safe to call concurrently and repeatedly. However, only
-    /// the first call will establish the registration. Subsequent calls will be
-    /// no-ops.
-    ///
-    /// If the registration happened successfully, `Ok` is returned.
-    ///
-    /// If an error is encountered during registration, `Err` is returned.
-    pub fn register_with<T>(&mut self, io: &T, handle: &Handle) -> io::Result<()>
-    where
-        T: Evented,
-    {
-        self.register2(io, || match handle.as_priv() {
-            Some(handle) => Ok(handle.clone()),
-            None => HandlePriv::try_current(),
-        })
-    }
-
-    pub(crate) fn register_with_priv<T>(&mut self, io: &T, handle: &HandlePriv) -> io::Result<()>
-    where
-        T: Evented,
-    {
-        self.register2(io, || Ok(handle.clone()))
-    }
-
     /// Deregister the I/O resource from the reactor it is associated with.
     ///
     /// This function must be called before the I/O resource associated with the
@@ -119,6 +93,32 @@ impl Registration {
             inner.deregister(io)?
         }
         Ok(())
+    }
+
+    /// Register the I/O resource with the specified reactor.
+    ///
+    /// This function is safe to call concurrently and repeatedly. However, only
+    /// the first call will establish the registration. Subsequent calls will be
+    /// no-ops.
+    ///
+    /// If the registration happened successfully, `Ok` is returned.
+    ///
+    /// If an error is encountered during registration, `Err` is returned.
+    pub fn register_with<T>(&mut self, io: &T, handle: &Handle) -> io::Result<()>
+    where
+        T: Evented,
+    {
+        self.register2(io, || match handle.as_priv() {
+            Some(handle) => Ok(handle.clone()),
+            None => HandlePriv::try_current(),
+        })
+    }
+
+    pub(crate) fn register_with_priv<T>(&mut self, io: &T, handle: &HandlePriv) -> io::Result<()>
+    where
+        T: Evented,
+    {
+        self.register2(io, || Ok(handle.clone()))
     }
 
     /// Register an I/O resource with a reactor.
