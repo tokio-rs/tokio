@@ -1,4 +1,4 @@
-use crate::{Header, Schedule, Task};
+use crate::task::{Schedule, Task};
 
 use loom::sync::Notify;
 use std::collections::VecDeque;
@@ -10,18 +10,18 @@ pub(crate) struct LoomSchedule {
 }
 
 impl LoomSchedule {
-    pub fn new() -> LoomSchedule {
+    pub(crate) fn new() -> LoomSchedule {
         LoomSchedule {
             notify: Notify::new(),
             pending: Mutex::new(VecDeque::new()),
         }
     }
 
-    pub fn push_task(&self, task: Task<Self>) {
+    pub(crate) fn push_task(&self, task: Task<Self>) {
         self.schedule(task);
     }
 
-    pub fn recv(&self) -> Option<Task<Self>> {
+    pub(crate) fn recv(&self) -> Option<Task<Self>> {
         loop {
             if let Some(task) = self.pending.lock().unwrap().pop_front() {
                 return task;

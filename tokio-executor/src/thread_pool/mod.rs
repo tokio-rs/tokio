@@ -32,6 +32,10 @@ pub use self::thread_pool::ThreadPool;
 
 mod worker;
 
+/// Unit tests
+#[cfg(test)]
+mod tests;
+
 // Re-export `task::Error`
 pub use crate::task::Error;
 
@@ -43,4 +47,11 @@ pub(crate) use self::worker::create_set as create_pool;
 pub(crate) type BoxFuture =
     std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>;
 
+#[cfg(not(loom))]
 const LOCAL_QUEUE_CAPACITY: usize = 256;
+
+// Shrink the size of the local queue when using loom. This shouldn't impact
+// logic, but allows loom to test more edge cases in a reasonable a mount of
+// time.
+#[cfg(loom)]
+const LOCAL_QUEUE_CAPACITY: usize = 2;

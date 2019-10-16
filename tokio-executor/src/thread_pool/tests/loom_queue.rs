@@ -1,31 +1,11 @@
-#![cfg(loom)]
+use crate::task::{self, Task};
+use crate::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
+use crate::thread_pool::queue;
 
-#[path = ""]
-mod thread_pool {
-    const LOCAL_QUEUE_CAPACITY: usize = 2;
-
-    #[path = "../src/thread_pool/queue/mod.rs"]
-    #[allow(warnings)]
-    pub(crate) mod queue;
-}
-use thread_pool::queue;
-
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
-use task::{Header, Schedule, Task};
-
-use loom;
 use loom::thread;
 
 use std::cell::Cell;
 use std::rc::Rc;
-
-#[allow(warnings)]
-mod support {
-    pub mod mock_schedule;
-}
-use support::mock_schedule::{Noop, NOOP_SCHEDULE};
 
 #[test]
 fn multi_worker() {

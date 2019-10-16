@@ -1,22 +1,8 @@
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
-use task::{Header, Schedule, Task};
+use crate::task::{self, Header};
 
-#[path = "../src/loom/mod.rs"]
-#[allow(warnings)]
-mod loom;
-
-#[allow(warnings)]
-mod support {
-    pub mod backoff;
-    mod macros;
-    pub mod mock_schedule;
-    pub mod track_drop;
-}
-use support::backoff::*;
-use support::mock_schedule::{mock, Mock};
-use support::track_drop::track_drop;
+use crate::tests::backoff::*;
+use crate::tests::mock_schedule::{mock, Mock};
+use crate::tests::track_drop::track_drop;
 
 use tokio::sync::oneshot;
 use tokio_test::task::spawn;

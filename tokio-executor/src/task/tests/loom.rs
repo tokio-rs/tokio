@@ -1,34 +1,13 @@
-#![cfg(loom)]
+use crate::task;
+use crate::tests::loom_schedule::LoomSchedule;
 
-macro_rules! dbg {
-    ($($t:tt)*) => {
-        $($t)*
-        // Uncomment this line to get a _lot_ of debug output
-        // std::dbg!($($t)*)
-    }
-}
+use tokio_test::{assert_err, assert_ok};
 
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
-use task::{Header, Schedule, Task};
-
-use loom;
 use loom::future::block_on;
 use loom::sync::atomic::AtomicBool;
 use loom::sync::atomic::Ordering::{Acquire, Release};
 use loom::thread;
-
-use tokio_test::{assert_err, assert_ok};
-
 use std::future::Future;
-
-#[allow(warnings)]
-mod support {
-    pub mod loom_schedule;
-    mod macros;
-}
-use support::loom_schedule::LoomSchedule;
 
 #[test]
 fn create_drop_join_handle() {

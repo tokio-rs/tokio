@@ -1,74 +1,14 @@
-#![cfg(loom)]
-
-macro_rules! thread_local {
-    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
-}
-
-macro_rules! dbg {
-    ($($t:tt)*) => {
-        $($t)*
-        // Uncomment this line to get a _lot_ of debug output
-        // std::dbg!($($t)*)
-    }
-}
-
-#[path = "../src/enter.rs"]
-#[allow(warnings)]
-mod enter;
-use enter::enter;
-
-#[path = "../src/global.rs"]
-#[allow(warnings)]
-mod global;
-use global::{spawn, with_default};
-
-#[path = "../src/park/mod.rs"]
-#[allow(warnings)]
-mod park;
-
-#[path = "../src/thread_pool/mod.rs"]
-#[allow(warnings)]
-mod thread_pool;
-use thread_pool::ThreadPool;
-
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
-
-#[path = "../src/util/mod.rs"]
-#[allow(warnings)]
-mod util;
-
-use tokio_executor::{Executor, SpawnError, TypedExecutor};
-
-mod loom {
-    pub(crate) use loom::*;
-
-    pub(crate) mod rand {
-        pub(crate) fn seed() -> u64 {
-            1
-        }
-    }
-
-    pub(crate) mod sys {
-        pub(crate) fn num_cpus() -> usize {
-            2
-        }
-    }
-}
+use crate::spawn;
 use crate::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
+use crate::tests::loom_oneshot as oneshot;
+use crate::thread_pool::ThreadPool;
 
 use std::future::Future;
 
-mod support {
-    pub mod loom_oneshot;
-}
-use support::loom_oneshot as oneshot;
-
 #[test]
-fn multi_spawn() {
+fn pool_multi_spawn() {
     loom::model(|| {
         let pool = ThreadPool::new();
 
@@ -102,7 +42,7 @@ fn multi_spawn() {
 }
 
 #[test]
-fn multi_notify() {
+fn pool_multi_notify() {
     loom::model(|| {
         let pool = ThreadPool::new();
 

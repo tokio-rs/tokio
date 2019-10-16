@@ -1,29 +1,6 @@
-macro_rules! dbg {
-    ($($t:tt)*) => {
-        $($t)*
-        // Uncomment this line to get a _lot_ of debug output
-        // std::dbg!($($t)*)
-    }
-}
-
-#[path = "../src/loom/mod.rs"]
-#[allow(warnings)]
-mod loom;
-
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
-use task::{Header, Schedule, Task};
-
-#[path = ""]
-mod thread_pool {
-    pub(crate) const LOCAL_QUEUE_CAPACITY: usize = 256;
-
-    #[path = "../src/thread_pool/queue/mod.rs"]
-    #[allow(warnings)]
-    pub(crate) mod queue;
-}
-use thread_pool::{queue, LOCAL_QUEUE_CAPACITY};
+use crate::task::{self, Task};
+use crate::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
+use crate::thread_pool::{queue, LOCAL_QUEUE_CAPACITY};
 
 macro_rules! assert_pop {
     ($q:expr, $expect:expr) => {
@@ -70,12 +47,6 @@ macro_rules! assert_empty {
         }
     }};
 }
-
-#[allow(warnings)]
-mod support {
-    pub mod mock_schedule;
-}
-use support::mock_schedule::{Noop, NOOP_SCHEDULE};
 
 #[test]
 fn single_worker_push_pop() {

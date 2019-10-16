@@ -1,4 +1,6 @@
-use crate::{Header, Schedule, Task};
+#![allow(warnings)]
+
+use crate::task::{Header, Schedule, Task};
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -39,31 +41,31 @@ pub(crate) fn mock() -> Mock {
 }
 
 impl Mock {
-    pub fn bind(self, task: &Task<Mock>) -> Self {
+    pub(crate) fn bind(self, task: &Task<Mock>) -> Self {
         self.push(Call::Bind(task.header() as *const _));
         self
     }
 
-    pub fn release(self) -> Self {
+    pub(crate) fn release(self) -> Self {
         self.push(Call::Release);
         self
     }
 
-    pub fn release_local(self) -> Self {
+    pub(crate) fn release_local(self) -> Self {
         self.push(Call::ReleaseLocal);
         self
     }
 
-    pub fn schedule(self) -> Self {
+    pub(crate) fn schedule(self) -> Self {
         self.push(Call::Schedule);
         self
     }
 
-    pub fn next_pending_run(&self) -> Option<Task<Self>> {
+    pub(crate) fn next_pending_run(&self) -> Option<Task<Self>> {
         self.inner.lock().unwrap().pending_run.pop_front()
     }
 
-    pub fn next_pending_drop(&self) -> Option<Task<Self>> {
+    pub(crate) fn next_pending_drop(&self) -> Option<Task<Self>> {
         self.inner.lock().unwrap().pending_drop.pop_front()
     }
 

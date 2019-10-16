@@ -20,6 +20,10 @@ pub(crate) use self::stack::TransferStack;
 mod state;
 mod waker;
 
+/// Unit tests
+#[cfg(test)]
+mod tests;
+
 use self::harness::Harness;
 use self::meta::{Trailer, Vtable};
 use self::raw::RawTask;

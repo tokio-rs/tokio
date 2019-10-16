@@ -69,6 +69,16 @@ macro_rules! dbg {
     }
 }
 
+#[cfg(all(test, loom))]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
+
+// At the top due to macros
+#[cfg(test)]
+#[macro_use]
+mod tests;
+
 #[cfg(any(feature = "current-thread", feature = "threadpool"))]
 #[macro_use]
 mod tracing;

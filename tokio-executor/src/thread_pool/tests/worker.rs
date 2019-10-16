@@ -1,34 +1,5 @@
-#![cfg(not(miri))]
-
-pub(crate) use tokio_executor::{enter, park, Executor, SpawnError, TypedExecutor};
-
-#[path = "../src/global.rs"]
-#[allow(warnings)]
-mod global;
-use global::with_default;
-
-#[path = "../src/loom/mod.rs"]
-#[allow(warnings)]
-mod loom;
-
-#[path = "../src/task/mod.rs"]
-#[allow(warnings)]
-mod task;
-
-#[path = "../src/thread_pool/mod.rs"]
-#[allow(warnings)]
-mod thread_pool;
-
-#[path = "../src/util/mod.rs"]
-#[allow(warnings)]
-mod util;
-
-#[allow(warnings)]
-mod support {
-    pub mod mock_park;
-    pub mod track_drop;
-}
-use support::track_drop::track_drop;
+use crate::tests::track_drop::track_drop;
+use crate::thread_pool;
 
 use tokio_test::assert_ok;
 
@@ -38,7 +9,7 @@ macro_rules! pool {
         (pool, w.remove(0), w.remove(0), mock_park)
     }};
     (! $n:expr) => {{
-        let mut mock_park = crate::support::mock_park::MockPark::new();
+        let mut mock_park = crate::tests::mock_park::MockPark::new();
         let (pool, workers) = thread_pool::create_pool($n, |index| mock_park.mk_park(index));
         (pool, workers, mock_park)
     }};

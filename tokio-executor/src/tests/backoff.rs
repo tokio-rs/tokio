@@ -2,14 +2,14 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub struct Backoff(usize, bool);
+pub(crate) struct Backoff(usize, bool);
 
-pub fn backoff(n: usize) -> impl Future<Output = ()> {
+pub(crate) fn backoff(n: usize) -> impl Future<Output = ()> {
     Backoff(n, false)
 }
 
 /// Back off, but clone the waker each time
-pub fn backoff_clone(n: usize) -> impl Future<Output = ()> {
+pub(crate) fn backoff_clone(n: usize) -> impl Future<Output = ()> {
     Backoff(n, true)
 }
 

@@ -6,12 +6,12 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 #[derive(Debug)]
-pub struct TrackDrop<T>(T, Arc<AtomicBool>);
+pub(crate) struct TrackDrop<T>(T, Arc<AtomicBool>);
 
 #[derive(Debug)]
-pub struct DidDrop(Arc<AtomicBool>, Arc<AtomicBool>);
+pub(crate) struct DidDrop(Arc<AtomicBool>, Arc<AtomicBool>);
 
-pub fn track_drop<T: Future>(future: T) -> (impl Future<Output = TrackDrop<T::Output>>, DidDrop) {
+pub(crate) fn track_drop<T: Future>(future: T) -> (impl Future<Output = TrackDrop<T::Output>>, DidDrop) {
     let did_drop_future = Arc::new(AtomicBool::new(false));
     let did_drop_output = Arc::new(AtomicBool::new(false));
     let did_drop = DidDrop(did_drop_future.clone(), did_drop_output.clone());
@@ -24,7 +24,7 @@ pub fn track_drop<T: Future>(future: T) -> (impl Future<Output = TrackDrop<T::Ou
 }
 
 impl<T> TrackDrop<T> {
-    pub fn get_ref(&self) -> &T {
+    pub(crate) fn get_ref(&self) -> &T {
         &self.0
     }
 }
@@ -45,11 +45,11 @@ impl<T> Drop for TrackDrop<T> {
 }
 
 impl DidDrop {
-    pub fn did_drop_future(&self) -> bool {
+    pub(crate) fn did_drop_future(&self) -> bool {
         self.0.load(SeqCst)
     }
 
-    pub fn did_drop_output(&self) -> bool {
+    pub(crate) fn did_drop_output(&self) -> bool {
         self.1.load(SeqCst)
     }
 }
