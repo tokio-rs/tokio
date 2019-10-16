@@ -249,10 +249,12 @@ impl Registration {
         direction: Direction,
         cx: Option<&mut Context<'_>>,
     ) -> io::Result<Option<mio::Ready>> {
-        let inner = self.inner.as_ref().ok_or(io::Error::new(
-            io::ErrorKind::Other,
-            "I/O resource has not been registered to a reactor",
-        ))?;
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "I/O resource has not been registered to a reactor",
+            )
+        })?;
         if let Some(ref cx) = cx {
             inner.register(direction, cx.waker().clone());
         }
