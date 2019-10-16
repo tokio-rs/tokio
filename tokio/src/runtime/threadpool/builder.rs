@@ -25,8 +25,6 @@ use std::sync::{Arc, Mutex};
 /// # Examples
 ///
 /// ```
-/// use std::time::Duration;
-///
 /// use tokio::runtime::Builder;
 /// use tokio_timer::clock::Clock;
 ///

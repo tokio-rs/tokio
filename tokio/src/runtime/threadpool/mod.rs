@@ -76,9 +76,6 @@ impl Runtime {
     ///     .unwrap();
     ///
     /// // Use the runtime...
-    ///
-    /// // Shutdown the runtime
-    /// rt.shutdown_now();
     /// ```
     ///
     /// [mod]: index.html
@@ -109,8 +106,6 @@ impl Runtime {
     ///    rt.spawn(async {
     ///        println!("now running on a worker thread");
     ///    });
-    ///
-    ///    rt.shutdown_on_idle();
     /// }
     /// ```
     ///

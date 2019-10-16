@@ -38,10 +38,10 @@ impl Spawner {
     /// # fn dox() {
     /// // Create the runtime
     /// let rt = Runtime::new().unwrap();
-    /// let executor = rt.executor();
+    /// let spawner = rt.spawner();
     ///
     /// // Spawn a future onto the runtime
-    /// executor.spawn(async {
+    /// spawner.spawn(async {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
