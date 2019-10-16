@@ -11,7 +11,9 @@ pub(crate) struct TrackDrop<T>(T, Arc<AtomicBool>);
 #[derive(Debug)]
 pub(crate) struct DidDrop(Arc<AtomicBool>, Arc<AtomicBool>);
 
-pub(crate) fn track_drop<T: Future>(future: T) -> (impl Future<Output = TrackDrop<T::Output>>, DidDrop) {
+pub(crate) fn track_drop<T: Future>(
+    future: T,
+) -> (impl Future<Output = TrackDrop<T::Output>>, DidDrop) {
     let did_drop_future = Arc::new(AtomicBool::new(false));
     let did_drop_output = Arc::new(AtomicBool::new(false));
     let did_drop = DidDrop(did_drop_future.clone(), did_drop_output.clone());

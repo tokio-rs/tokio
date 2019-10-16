@@ -20,4 +20,4 @@ pub(crate) mod std {
     }
 }
 
-pub(crate) use self::std::{alloc, cell, sync, rand, sys, thread};
+pub(crate) use self::std::{alloc, cell, rand, sync, sys, thread};

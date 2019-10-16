@@ -1,7 +1,7 @@
-use crate::spawn;
 use crate::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
+use crate::spawn;
 use crate::tests::loom_oneshot as oneshot;
 use crate::thread_pool::ThreadPool;
 
