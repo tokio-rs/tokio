@@ -130,13 +130,13 @@ impl TcpStream {
     ///
     /// The `handle` argument is the event loop that this listener will be
     /// bound to.
-    /// Use [`Handle::current()`] to eagerly bind to an event loop.
+    /// Use [`Handle::current()`] to bind to the current event loop.
     ///
     /// [`Handle::current()`]: ../reactor/struct.Handle.html
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use std::error::Error;
     /// use tokio::net::TcpStream;
     /// use tokio_net::driver::Handle;

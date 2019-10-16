@@ -61,7 +61,7 @@ impl UdpSocket {
     ///
     /// The `handle` argument is the event loop that this listener will be
     /// bound to.
-    /// Use [`Handle::current()`] to eagerly bind to an event loop.
+    /// Use [`Handle::current()`] to bind to the current event loop.
     ///
     /// [`Handle::current()`]: ../reactor/struct.Handle.html
     pub fn from_std(socket: net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {

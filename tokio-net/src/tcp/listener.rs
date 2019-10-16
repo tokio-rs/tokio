@@ -175,7 +175,7 @@ impl TcpListener {
     ///
     /// The `handle` argument is the event loop that this listener will be
     /// bound to.
-    /// Use [`Handle::current()`] to eagerly bind to an event loop.
+    /// Use [`Handle::current()`] to bind to the current event loop.
     ///
     /// The platform specific behavior of this function looks like:
     ///
@@ -221,7 +221,7 @@ impl TcpListener {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use tokio::net::TcpListener;
     ///
     /// use std::io;
