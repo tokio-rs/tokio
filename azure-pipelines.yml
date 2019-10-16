@@ -65,7 +65,7 @@ jobs:
       tokio-codec: []
       tokio-executor:
         - current-thread
-        - threadpool
+        - thread-pool
       tokio-io:
         - util
       tokio-sync:

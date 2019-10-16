@@ -102,7 +102,7 @@ impl<S: 'static> Task<S> {
 
 impl<S: Schedule> Task<S> {
     /// Returns `self` when the task needs to be immediately re-scheduled
-    pub(crate) fn run(self, executor: *const S) -> Option<Self> {
+    pub(crate) fn run(self, executor: NonNull<S>) -> Option<Self> {
         if unsafe { self.raw.poll(executor) } {
             Some(self)
         } else {

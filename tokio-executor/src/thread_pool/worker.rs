@@ -277,7 +277,7 @@ where
             self.transition_from_searching();
         }
 
-        if let Some(task) = task.run(self.shared() as *const _) {
+        if let Some(task) = task.run(self.shared().into()) {
             self.owned().submit_local_yield(task);
             self.set().notify_work();
         }

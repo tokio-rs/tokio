@@ -3,6 +3,7 @@ use crate::task::{Snapshot, State};
 
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
+use std::ptr::NonNull;
 use std::task::Waker;
 
 pub(crate) struct Header<S: 'static> {
@@ -10,7 +11,7 @@ pub(crate) struct Header<S: 'static> {
     pub(super) state: State,
 
     /// Pointer to the executor owned by the task
-    pub(super) executor: CausalCell<*const S>,
+    pub(super) executor: CausalCell<Option<NonNull<S>>>,
 
     /// Pointer to next task, used for misc task linked lists.
     pub(crate) queue_next: UnsafeCell<*const Header<S>>,
@@ -36,7 +37,7 @@ pub(super) struct Trailer {
 
 pub(super) struct Vtable<S: 'static> {
     /// Poll the future
-    pub(super) poll: unsafe fn(*mut (), *const S) -> bool,
+    pub(super) poll: unsafe fn(*mut (), NonNull<S>) -> bool,
 
     /// The task handle has been dropped and the join waker needs to be dropped
     /// or the task struct needs to be deallocated
@@ -63,7 +64,7 @@ pub(super) struct Vtable<S: 'static> {
 }
 
 impl<S> Header<S> {
-    pub(super) fn executor(&self) -> *const S {
+    pub(super) fn executor(&self) -> Option<NonNull<S>> {
         unsafe { self.executor.with(|ptr| *ptr) }
     }
 }

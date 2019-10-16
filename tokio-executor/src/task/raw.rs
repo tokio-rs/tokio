@@ -81,7 +81,7 @@ impl<S> RawTask<S> {
                 ptr as *mut Header<S>,
                 Header {
                     state,
-                    executor: CausalCell::new(ptr::null()),
+                    executor: CausalCell::new(None),
                     queue_next: UnsafeCell::new(ptr::null()),
                     owned_next: UnsafeCell::new(ptr::null()),
                     owned_prev: UnsafeCell::new(ptr::null()),
@@ -134,7 +134,7 @@ impl<S> RawTask<S> {
     /// Safety: mutual exclusion is required to call this function.
     ///
     /// Returns `true` if the task needs to be scheduled again.
-    pub(super) unsafe fn poll(&self, executor: *const S) -> bool {
+    pub(super) unsafe fn poll(&self, executor: NonNull<S>) -> bool {
         // Get the vtable without holding a ref to the meta struct. This is done
         // because a mutable reference to the task is passed into the poll fn.
         let vtable = self.header().vtable;
@@ -183,7 +183,7 @@ impl<S: 'static> Clone for RawTask<S> {
 
 impl<S: 'static> Copy for RawTask<S> {}
 
-unsafe fn poll<T: Future, S: Schedule>(ptr: *mut (), executor: *const S) -> bool {
+unsafe fn poll<T: Future, S: Schedule>(ptr: *mut (), executor: NonNull<S>) -> bool {
     let harness = harness::<T, S>(ptr);
     harness.poll(executor)
 }

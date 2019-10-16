@@ -89,6 +89,7 @@ mod executor;
 mod global;
 mod loom;
 pub mod park;
+#[cfg(feature = "thread-pool")]
 mod task;
 mod typed;
 mod util;

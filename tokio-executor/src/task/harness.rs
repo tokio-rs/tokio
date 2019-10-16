@@ -57,7 +57,7 @@ where
     /// Panics raised while polling the future are handled.
     ///
     /// Returns `true` if the task needs to be scheduled again
-    pub(super) fn poll(self, executor: *const S) -> bool {
+    pub(super) fn poll(self, executor: NonNull<S>) -> bool {
         use std::panic;
 
         // Transition the task to the running state.
@@ -76,14 +76,14 @@ where
         // is safe because a) this is the only time the value is set. b) at this
         // point, there are no outstanding wakers which might access the
         // field concurrently.
-        if self.header().executor().is_null() {
+        if self.header().executor().is_none() {
             unsafe {
                 // We don't want the destructor to run because we don't really
                 // own the task here.
                 let task = ManuallyDrop::new(Task::from_raw(self.header));
                 // Call the scheduler's bind callback
-                (*executor).bind(&task);
-                self.header().executor.with_mut(|ptr| *ptr = executor);
+                executor.as_ref().bind(&task);
+                self.header().executor.with_mut(|ptr| *ptr = Some(executor));
             }
         }
 
@@ -339,10 +339,12 @@ where
         dbg!("wake_by_ref");
         if dbg!(self.header().state.transition_to_notified()) {
             unsafe {
-                let executor = self.header().executor.with(|ptr| *ptr);
-                debug_assert!(!executor.is_null());
+                let executor = match self.header().executor.with(|ptr| *ptr) {
+                    Some(executor) => executor,
+                    None => panic!("executor should be set"),
+                };
 
-                S::schedule(&*executor, Task::from_raw(self.header));
+                S::schedule(executor.as_ref(), Task::from_raw(self.header));
             }
         }
     }
@@ -416,11 +418,11 @@ where
         unsafe {
             let task = Task::from_raw(self.header);
 
-            if bound_executor.is_null() {
+            if let Some(executor) = bound_executor {
+                executor.as_ref().release(task);
+            } else {
                 // Just drop the task. This will release / deallocate memory.
                 drop(task);
-            } else {
-                (*bound_executor).release(task);
             }
         }
     }
@@ -429,7 +431,7 @@ where
 
     fn complete(
         mut self,
-        executor: *const S,
+        executor: NonNull<S>,
         join_interest: bool,
         out: Track<super::Result<T::Output>>,
     ) {
@@ -444,11 +446,11 @@ where
 
         // Handle releasing the task. First, check if the current
         // executor is the one that is bound to the task:
-        if executor == bound_executor {
+        if Some(executor) == bound_executor {
             unsafe {
                 // perform a local release
                 let task = ManuallyDrop::new(Task::from_raw(self.header));
-                (*bound_executor).release_local(&task);
+                executor.as_ref().release_local(&task);
 
                 if self.transition_to_released(join_interest).is_final_ref() {
                     self.dealloc();
@@ -468,7 +470,13 @@ where
 
             unsafe {
                 let task = Task::from_raw(self.header);
-                (*bound_executor).release(task);
+
+                let executor = match bound_executor {
+                    Some(executor) => executor,
+                    None => panic!("executor should be set"),
+                };
+
+                executor.as_ref().release(task);
             }
         }
     }
