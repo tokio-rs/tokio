@@ -78,7 +78,7 @@ impl Default for ThreadPool {
     }
 }
 
-impl Executor for &'_ ThreadPool {
+impl Executor for &ThreadPool {
     fn spawn(
         &mut self,
         future: std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
