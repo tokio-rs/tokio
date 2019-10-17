@@ -184,7 +184,7 @@ where
         if might_drop_join_waker_on_release && !res.is_join_interested() {
             debug_assert!(res.has_join_waker());
 
-            // Its our responsibility to drop the waker
+            // It's our responsibility to drop the waker
             check.check();
             let _ = join_waker.assume_init();
         }
