@@ -85,8 +85,7 @@ impl fmt::Display for ParkError {
     }
 }
 
-impl Error for ParkError {
-}
+impl Error for ParkError {}
 
 impl Inner {
     fn park(&self, timeout: Option<Duration>) {
