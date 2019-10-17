@@ -3,6 +3,7 @@
 //! - Attempt to spin.
 
 use crate::loom::rand::seed;
+use crate::loom::sync::Mutex;
 use crate::park::Unpark;
 use crate::task::{self, Task};
 use crate::thread_pool::{current, queue, BoxFuture, Idle, JoinHandle, Owned, Shared};
@@ -27,10 +28,20 @@ where
 
     /// Coordinates idle workers
     idle: Idle,
+
+    /// Used during shutdown;
+    shutdown_lock: Mutex<()>,
 }
 
 unsafe impl<P: Unpark> Send for Set<P> {}
 unsafe impl<P: Unpark> Sync for Set<P> {}
+
+impl<P: 'static> Drop for Set<P> {
+    fn drop(&mut self) {
+        // Wait until all wakers are done notifying
+        let _ = self.shutdown_lock.lock().unwrap();
+    }
+}
 
 impl<P> Set<P>
 where
@@ -62,11 +73,17 @@ where
             owned: owned.into_boxed_slice(),
             inject,
             idle: Idle::new(num_workers),
+            shutdown_lock: Mutex::new(()),
         }
     }
 
     fn inject_task(&self, task: Task<Shared<P>>) {
+        // A temporary fix for use-after-free bug when tasks are notifed from
+        // outside of the scheduler while the scheduler is being shutdown.
+        let lock = self.shutdown_lock.lock().unwrap();
+
         if let Err(task) = self.inject.push(task) {
+
             task.shutdown();
 
             // There may be a worker, in the process of being shutdown, that is
@@ -79,6 +96,8 @@ where
         } else {
             self.notify_work();
         }
+
+        drop(lock);
     }
 
     pub(super) fn notify_work(&self) {

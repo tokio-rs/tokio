@@ -14,7 +14,7 @@ pub(crate) struct DefaultPark {
 }
 
 /// Unparks threads that were parked by `DefaultPark`.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct DefaultUnpark {
     inner: Arc<Inner>,
 }
