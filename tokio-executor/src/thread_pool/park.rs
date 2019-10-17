@@ -81,7 +81,7 @@ impl Unpark for DefaultUnpark {
 
 impl fmt::Display for ParkError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.description().fmt(fmt)
+        write!(fmt, "unknown park error")
     }
 }
 
