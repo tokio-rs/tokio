@@ -17,7 +17,7 @@ pub(super) struct Background {
 
 pub(super) struct Compat {
     pub(super) compat_reactor: reactor_01::Handle,
-    pub(super) compat_timer: timer_01::Handle,
+    pub(super) compat_timer: timer_02::Handle,
     pub(super) compat_bg: Background,
 }
 
@@ -28,7 +28,7 @@ impl Compat {
         let reactor = reactor_01::Reactor::new()?;
         let reactor_handle = reactor.handle();
 
-        let timer = timer_01::Timer::new_with_now(reactor, clock);
+        let timer = timer_02::Timer::new_with_now(reactor, clock);
         let timer_handle = timer.handle();
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
@@ -96,7 +96,7 @@ where
     }
 }
 
-impl timer_02::clock::Now for Now<tokio_timer::clock::Clock> {
+impl clock_02::Now for Now<tokio_timer::clock::Clock> {
     fn now(&self) -> Instant {
         self.0.now()
     }
