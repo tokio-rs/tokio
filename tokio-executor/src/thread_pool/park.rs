@@ -169,7 +169,7 @@ impl Inner {
             EMPTY => return,    // no one was waiting
             NOTIFIED => return, // already unparked
             PARKED => {}        // gotta go wake someone up
-            _ => panic!("inconsistent state in unpark"),
+            n => panic!("inconsistent state in unpark: {}", n),
         }
 
         // There is a period between when the parked thread sets `state` to `PARKED` (or last
