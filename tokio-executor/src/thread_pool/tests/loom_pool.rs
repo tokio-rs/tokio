@@ -77,7 +77,25 @@ fn pool_multi_notify() {
     });
 }
 
+#[test]
+fn pool_shutdown() {
+    loom::model(|| {
+        let pool = ThreadPool::new();
+
+        pool.spawn(async move {
+            gated2(true).await;
+        });
+
+        drop(pool);
+    });
+}
+
 fn gated() -> impl Future<Output = &'static str> {
+    gated2(false)
+}
+
+fn gated2(thread: bool) -> impl Future<Output = &'static str> {
+    use crate::loom::thread;
     use futures_util::future::poll_fn;
     use std::sync::Arc;
     use std::task::Poll;
@@ -90,10 +108,17 @@ fn gated() -> impl Future<Output = &'static str> {
             let gate = gate.clone();
             let waker = cx.waker().clone();
 
-            spawn(async move {
-                gate.store(true, Release);
-                waker.wake_by_ref();
-            });
+            if thread {
+                thread::spawn(move || {
+                    gate.store(true, Release);
+                    waker.wake_by_ref();
+                });
+            } else {
+                spawn(async move {
+                    gate.store(true, Release);
+                    waker.wake_by_ref();
+                });
+            }
 
             fired = true;
 

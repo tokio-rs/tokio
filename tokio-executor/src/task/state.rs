@@ -229,7 +229,7 @@ impl State {
         let prev = Snapshot(self.val.fetch_or(DELTA, Release));
 
         debug_assert!(!prev.is_released());
-        debug_assert!(prev.is_complete() || prev.is_canceled());
+        debug_assert!(prev.is_complete() || prev.is_canceled(), "state = {:?}", prev);
 
         let next = Snapshot(prev.0 | DELTA);
 

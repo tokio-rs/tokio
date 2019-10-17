@@ -15,12 +15,13 @@ fn create_drop_join_handle() {
         let (task, join_handle) = task::joinable(async { "hello" });
 
         let schedule = LoomSchedule::new();
+        let schedule = From::from(&schedule);
 
         let th = thread::spawn(move || {
             drop(join_handle);
         });
 
-        assert_none!(task.run(&schedule));
+        assert_none!(task.run(schedule));
 
         th.join().unwrap();
     });
@@ -36,6 +37,7 @@ fn poll_drop_handle_then_drop() {
         let (task, mut join_handle) = task::joinable(async { "hello" });
 
         let schedule = LoomSchedule::new();
+        let schedule = From::from(&schedule);
 
         let th = thread::spawn(move || {
             block_on(poll_fn(|cx| {
@@ -44,7 +46,7 @@ fn poll_drop_handle_then_drop() {
             }));
         });
 
-        assert_none!(task.run(&schedule));
+        assert_none!(task.run(schedule));
 
         th.join().unwrap();
     });
@@ -56,13 +58,14 @@ fn join_output() {
         let (task, join_handle) = task::joinable(async { "hello world" });
 
         let schedule = LoomSchedule::new();
+        let schedule = From::from(&schedule);
 
         let th = thread::spawn(move || {
             let out = assert_ok!(block_on(join_handle));
             assert_eq!("hello world", out);
         });
 
-        assert_none!(task.run(&schedule));
+        assert_none!(task.run(schedule));
         th.join().unwrap();
     });
 }
@@ -107,19 +110,17 @@ fn release_remote() {
         let (task, join_handle) = task::joinable(gated(1, false, true));
 
         let s1 = LoomSchedule::new();
-        let s1 = &s1;
         let s2 = LoomSchedule::new();
-        let s2 = &s2;
 
         // Join handle
         let th = join_one_task(join_handle);
 
-        let task = match task.run(s1) {
+        let task = match task.run(From::from(&s1)) {
             Some(task) => task,
             None => s1.recv().expect("released!"),
         };
 
-        assert_none!(task.run(s2));
+        assert_none!(task.run(From::from(&s2)));
         assert_none!(s1.recv());
 
         assert_ok!(th.join().unwrap());
@@ -144,7 +145,6 @@ fn shutdown_from_list_after_poll() {
         let (task, join_handle) = task::joinable(gated(1, false, false));
 
         let s1 = LoomSchedule::new();
-        let s1 = &s1;
 
         let mut list = task::OwnedList::new();
         list.insert(&task);
@@ -152,7 +152,7 @@ fn shutdown_from_list_after_poll() {
         // Join handle
         let th = join_two_tasks(join_handle);
 
-        match task.run(s1) {
+        match task.run(From::from(&s1)) {
             Some(task) => {
                 // always drain the list before calling shutdown on tasks
                 list.shutdown();
@@ -180,12 +180,11 @@ fn shutdown_from_queue_after_poll() {
         let (task, join_handle) = task::joinable(gated(1, false, false));
 
         let s1 = LoomSchedule::new();
-        let s1 = &s1;
 
         // Join handle
         let th = join_two_tasks(join_handle);
 
-        let task = match task.run(s1) {
+        let task = match task.run(From::from(&s1)) {
             Some(task) => task,
             None => assert_some!(s1.recv()),
         };
@@ -240,7 +239,7 @@ fn work(schedule: &LoomSchedule) {
         let mut task = Some(task);
 
         while let Some(t) = task.take() {
-            task = t.run(schedule);
+            task = t.run(From::from(schedule));
         }
     }
 }
