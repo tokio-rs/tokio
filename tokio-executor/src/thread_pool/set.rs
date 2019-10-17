@@ -83,7 +83,6 @@ where
         let lock = self.shutdown_lock.lock().unwrap();
 
         if let Err(task) = self.inject.push(task) {
-
             task.shutdown();
 
             // There may be a worker, in the process of being shutdown, that is
