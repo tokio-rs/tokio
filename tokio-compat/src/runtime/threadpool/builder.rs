@@ -102,7 +102,7 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new()
-    ///     .panic_handler(|err| std::panic::resume_unwind(err))
+    ///     .panic_handler(std::panic::resume_unwind)
     ///     .build()
     ///     .unwrap();
     /// # }
@@ -371,7 +371,7 @@ impl Builder {
                 let sender_lock = compat_sender2.read().unwrap();
                 let mut compat_sender = sender_lock
                     .clone()
-                    .expect("compat executor be set before the pool is run!");
+                    .expect("compat executor needs to be set before the pool is run!");
 
                 // Set the default tokio 0.1 reactor to the background compat reactor.
                 reactor_01::with_default(&compat_reactor, &mut enter, |enter| {
