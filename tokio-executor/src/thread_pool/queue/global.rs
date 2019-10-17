@@ -97,6 +97,7 @@ impl<T: 'static> Queue<T> {
             //
             // We increment by 2 to avoid touching the shutdown flag
             if (len >> 1) == MAX_LEN {
+                eprintln!("[ERROR] overflowed task counter. This is a bug and should be reported.");
                 std::process::abort();
             }
 

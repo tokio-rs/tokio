@@ -300,7 +300,7 @@ where
         loop {
             park.park().ok().expect("park failed");
 
-            // We might have been woken to cleanup dropped task
+            // We might have been woken to clean up a dropped task
             self.maintenance();
 
             if self.transition_from_parked() {

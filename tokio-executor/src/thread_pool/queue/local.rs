@@ -222,10 +222,7 @@ impl<T> Queue<T> {
         // Synchronize with stealers
         let dst_head = dst.head.load(Acquire);
 
-        assert!(
-            dst_tail.wrapping_sub(dst_head) + n <= LOCAL_QUEUE_CAPACITY as u32,
-            "overflow"
-        );
+        assert!(dst_tail.wrapping_sub(dst_head) + n <= LOCAL_QUEUE_CAPACITY as u32);
 
         // Make the stolen items available to consumers
         dst.tail.store(dst_tail.wrapping_add(n), Release);
