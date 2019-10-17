@@ -33,9 +33,9 @@ rt-current-thread = [
     "tokio-executor/current-thread",
     "tokio-net",
     "tokio-timer",
+    "tokio-sync",
 ]
 rt-full = [
-    "tokio-sync",
     "tracing-core",
     "num_cpus",
     "tokio-executor/threadpool",
