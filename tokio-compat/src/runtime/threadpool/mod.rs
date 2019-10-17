@@ -443,5 +443,13 @@ where
     }
 }
 
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            drop(inner);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;
