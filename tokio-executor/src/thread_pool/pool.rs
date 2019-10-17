@@ -59,8 +59,7 @@ impl ThreadPool {
         F: Future,
     {
         crate::global::with_threadpool(self, || {
-            let mut enter = crate::enter()
-                .expect("attempting to block while on a Tokio executor");
+            let mut enter = crate::enter().expect("attempting to block while on a Tokio executor");
             enter.block_on(future)
         })
     }

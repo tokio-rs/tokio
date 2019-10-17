@@ -134,7 +134,11 @@ impl Inner {
                     // Block the current thread on the conditional variable.
                     _m = self.cvar.wait(_m).unwrap();
 
-                    if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+                    if self
+                        .state
+                        .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                        .is_ok()
+                    {
                         return; // got a notification
                     }
 

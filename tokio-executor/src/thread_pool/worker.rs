@@ -72,8 +72,7 @@ where
 
         // Track the current worker
         current::set(&entry.pool, entry.index, || {
-            let _enter = crate::enter()
-                .expect("executor already running on thread");
+            let _enter = crate::enter().expect("executor already running on thread");
 
             crate::with_default(&mut executor, || {
                 entry.run(park);
