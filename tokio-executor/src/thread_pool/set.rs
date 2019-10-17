@@ -161,7 +161,7 @@ impl Set<Box<dyn Unpark>> {
     }
 }
 
-impl<'a, P> Executor for &'a Set<P>
+impl<P> Executor for &Set<P>
 where
     P: Unpark,
 {
