@@ -23,7 +23,7 @@ use std::io;
 /// # Examples
 ///
 /// ```
-/// use tokio::runtime::current_thread::Builder;
+/// use tokio_compat::runtime::current_thread::Builder;
 /// use tokio_timer::clock::Clock;
 ///
 /// # pub fn main() {

@@ -5,15 +5,21 @@
 //! on the current  thread instead of using a thread pool. This means that it is
 //! able to spawn futures that do not implement `Send`.
 //!
-//! Same as the default [`Runtime`][concurrent-rt], the
-//! [`current_thread::Runtime`][rt] includes:
+//! Same as the default [`current_thread::Runtime`][default-rt] in the main
+//! `tokio` crate, the [`tokio_compat::current_thread::Runtime`][rt] includes:
 //!
 //! * A [reactor] to drive I/O resources.
 //! * An [executor] to execute tasks that use these I/O resources.
 //! * A [timer] for scheduling work to run after a set period of time.
 //!
+//! Unlike the default `current_thread::Runtime`, however, the `tokio_compat`
+//! version must spawn an additional background thread to run the `tokio` 0.1
+//! [`Reactor`][reactor-01] and [`Timer`][timer-01]. This is necessary to
+//! support legacy tasks, as the main thread is already running a `tokio` 0.2
+//! `Reactor` and `Timer`.
+//!
 //! Note that [`current_thread::Runtime`][rt] does not implement `Send` itself
-//! and cannot be safely moved to other threads.
+//! and cannot be safely moved to other threads
 //!
 //! # Spawning from other threads
 //!
@@ -24,16 +30,22 @@
 //! For example:
 //!
 //! ```
-//! use tokio::runtime::current_thread::Runtime;
+//! use tokio_compat::runtime::current_thread::Runtime;
 //! use std::thread;
 //!
 //! let runtime = Runtime::new().unwrap();
 //! let handle = runtime.handle();
 //!
 //! thread::spawn(move || {
-//!     let _ = handle.spawn(async {
-//!         println!("hello world");
-//!     });
+//!     // Spawn a `futures` 0.1 task on the other thread's runtime.
+//!     let _ = handle.spawn(futures_01::future::lazy(|| {
+//!         println!("hello from futures 0.1!");
+//!     }));
+//!
+//!     // Spawn a `std::future` task on the other thread's runtime.
+//!     let _ = handle.spawn_std(async {
+//!         println!("hello from std::future!");
+//!     }));
 //! }).join().unwrap();
 //! ```
 //!
@@ -43,7 +55,7 @@
 //! returning its result.
 //!
 //! ```
-//! use tokio::runtime::current_thread::Runtime;
+//! use tokio_compat::runtime::current_thread::Runtime;
 //!
 //! let runtime = Runtime::new().unwrap();
 //!
@@ -53,10 +65,14 @@
 //!
 //! [rt]: struct.Runtime.html
 //! [concurrent-rt]: ../struct.Runtime.html
+//! [default-rt]:
+//!     https://docs.rs/tokio/0.2.0-alpha.6/tokio/runtime/current_thread/struct.Runtime.html
 //! [chan]: https://docs.rs/futures/0.1/futures/sync/mpsc/fn.channel.html
 //! [reactor]: ../../reactor/struct.Reactor.html
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
 //! [timer]: ../../timer/index.html
+//! [timer-01]: https://docs.rs/tokio/0.1.22/tokio/timer/index.html
+//! [reactor-01]: https://docs.rs/tokio/0.1.22/tokio/reactor/struct.Reactor.html
 use super::compat;
 
 mod builder;

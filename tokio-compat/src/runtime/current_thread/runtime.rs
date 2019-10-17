@@ -66,7 +66,7 @@ impl Handle {
     ///
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
-    pub fn spawn_std<F>(&self, future: F) -> Result<(), executor_01::SpawnError>
+    pub fn spawn_std<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
     where
         F: Future01<Output = ()> + Send + 'static,
     {
@@ -91,9 +91,19 @@ where
     T: Future<Output = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), tokio_executor::executor::SpawnError> {
+        Handle::spawn_std(self, future)
+    }
+}
+
+impl<T> executor_01::TypedExecutor<T> for Handle
+where
+    T: Future01<Item = (), Error = ()> + Send + 'static,
+{
+    fn spawn(&mut self, future: T) -> Result<(), executor_01::SpawnError> {
         Handle::spawn(self, future)
     }
 }
+
 
 /// Error returned by the `run` function.
 #[derive(Debug)]
