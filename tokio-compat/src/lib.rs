@@ -1,6 +1,6 @@
 //! Compatibility between `tokio` 0.2 and legacy versions.
-#[cfg(feature = "runtime")]
+#[cfg(any(feature = "rt-current-thread", feature = "rt-full"))]
 pub mod runtime;
-#[cfg(feature = "runtime")]
+#[cfg(feature = "rt-full")]
 pub use self::runtime::{run, run_std};
 pub mod prelude;

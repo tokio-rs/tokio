@@ -24,18 +24,22 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 
 [features]
-default = ["runtime", "sink"]
+default = ["rt-full", "sink"]
 # enables the compat runtimes.
-runtime = [
+rt-current-thread = [
     "tokio-timer-02",
     "tokio-reactor-01",
     "tokio-executor-01",
-    "tokio-executor",
+    "tokio-executor/current-thread",
     "tokio-net",
     "tokio-timer",
+]
+rt-full = [
     "tokio-sync",
     "tracing-core",
-    "num_cpus"
+    "num_cpus",
+    "tokio-executor/threadpool",
+    "rt-current-thread",
 ]
 sink = ["futures-util/sink"]
 
@@ -48,8 +52,8 @@ futures-util = { package = "futures-util-preview", version = "0.3.0-alpha.19", d
 tokio-timer-02 = { package = "tokio-timer", version = "0.2", optional = true}
 tokio-reactor-01 = { package = "tokio-reactor", version = "0.1", optional = true }
 tokio-executor-01 = { package = "tokio-executor", version = "0.1", optional = true }
-tokio-executor = { version = "0.2.0-alpha.6", optional = true, features = ["current-thread", "threadpool"]  }
-tokio-net = { version = "0.2.0-alpha.6", optional = true  }
+tokio-executor = { version = "0.2.0-alpha.6", optional = true, default-features = false }
+tokio-net = { version = "0.2.0-alpha.6", optional = true }
 tokio-timer = { version = "0.3.0-alpha.6", optional = true  }
 tokio-sync = { version = "0.2.0-alpha.6", optional = true  }
 num_cpus =  { version = "1.10.1", optional = true }
