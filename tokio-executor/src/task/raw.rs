@@ -86,8 +86,8 @@ impl<S> RawTask<S> {
                     state,
                     executor: CausalCell::new(None),
                     queue_next: UnsafeCell::new(ptr::null()),
-                    owned_next: UnsafeCell::new(ptr::null()),
-                    owned_prev: UnsafeCell::new(ptr::null()),
+                    owned_next: UnsafeCell::new(None),
+                    owned_prev: UnsafeCell::new(None),
                     vtable: &Vtable {
                         poll: poll::<T, S>,
                         drop_task: drop_task::<T, S>,

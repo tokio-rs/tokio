@@ -17,10 +17,10 @@ pub(crate) struct Header<S: 'static> {
     pub(crate) queue_next: UnsafeCell<*const Header<S>>,
 
     /// Pointer to the next task in the ownership list.
-    pub(crate) owned_next: UnsafeCell<*const Header<S>>,
+    pub(crate) owned_next: UnsafeCell<Option<NonNull<Header<S>>>>,
 
     /// Pointer to the previous task in the ownership list.
-    pub(crate) owned_prev: UnsafeCell<*const Header<S>>,
+    pub(crate) owned_prev: UnsafeCell<Option<NonNull<Header<S>>>>,
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable<S>,

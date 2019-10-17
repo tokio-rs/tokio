@@ -184,7 +184,7 @@ where
         if might_drop_join_waker_on_release && !res.is_join_interested() {
             debug_assert!(res.has_join_waker());
 
-            // It's our responsibility to drop the waker
+            // Its our responsibility to drop the waker
             check.check();
             let _ = join_waker.assume_init();
         }
@@ -278,11 +278,11 @@ where
             // Acquire the lock
             let state = self.header().state.unset_waker();
 
-            if !state.is_active() {
-                return state;
+            if state.is_active() {
+                return self.store_join_waker(waker);
             }
 
-            self.store_join_waker(waker)
+            state
         }
     }
 
@@ -314,7 +314,7 @@ where
             if !(res.is_complete() | res.is_canceled()) || res.is_released() {
                 // We are responsible for freeing the waker handle
                 check.check();
-                let _ = waker.assume_init();
+                drop(waker.assume_init());
             }
 
             if res.is_final_ref() {
@@ -509,7 +509,7 @@ where
                 // Its our responsibility to drop the waker
                 check.check();
                 unsafe {
-                    let _ = join_waker.assume_init();
+                    drop(join_waker.assume_init());
                 }
             }
 
@@ -557,8 +557,10 @@ where
 
     fn set_might_drop_join_waker_on_release(&self) {
         unsafe {
-            // The next field must be null at this point
-            debug_assert!((*self.header().queue_next.get()).is_null());
+            debug_assert!(
+                (*self.header().queue_next.get()).is_null(),
+                "the task's queue_next field must be null when releasing"
+            );
 
             *self.header().queue_next.get() = 1 as *const _;
         }

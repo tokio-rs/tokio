@@ -175,7 +175,7 @@ impl Builder {
                 impl Drop for AbortOnPanic {
                     fn drop(&mut self) {
                         if thread::panicking() {
-                            eprintln!("[ERROR] unhandled panic in Tokio scheduler");
+                            eprintln!("[ERROR] unhandled panic in Tokio scheduler. This is a bug and should be reported.");
                             std::process::abort();
                         }
                     }
