@@ -66,8 +66,19 @@ where
     }
 
     fn inject_task(&self, task: Task<Shared<P>>) {
-        self.inject.push(task);
-        self.notify_work();
+        if let Err(task) = self.inject.push(task) {
+            task.shutdown();
+
+            // There may be a worker, in the process of being shutdown, that is
+            // waiting for this task to be released, so we notify all workers
+            // just in case.
+            //
+            // Over aggressive, but the runtime is in the process of shutting
+            // down, so efficiency is not critical.
+            self.notify_all();
+        } else {
+            self.notify_work();
+        }
     }
 
     pub(super) fn notify_work(&self) {

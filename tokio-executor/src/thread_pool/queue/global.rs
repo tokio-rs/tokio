@@ -1,6 +1,6 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
-use crate::task::{Header, Schedule, Task};
+use crate::task::{Header, Task};
 
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{Acquire, Release};
@@ -66,6 +66,46 @@ impl<T: 'static> Queue<T> {
         self.len.load(Acquire) >> 1
     }
 
+    pub(super) fn push(&self, task: Task<T>) -> Result<(), Task<T>> {
+        unsafe {
+            // Acquire queue lock
+            let mut p = self.pointers.lock().unwrap();
+
+            // Check if the queue is closed. This must happen in the lock.
+            let len = self.len.unsync_load();
+            if len & CLOSED == CLOSED {
+                return Err(task);
+            }
+
+            let task = task.into_raw();
+
+            // The next pointer should already be null
+            debug_assert!(get_next(task).is_null());
+
+            if let Some(tail) = NonNull::new(p.tail as *mut _) {
+                set_next(tail, task.as_ptr());
+            } else {
+                p.head = task.as_ptr();
+            }
+
+            p.tail = task.as_ptr();
+
+            // Increment the count.
+            //
+            // All updates to the len atomic are guarded by the mutex. As such,
+            // a non-atomic load followed by a store is safe.
+            //
+            // We increment by 2 to avoid touching the shutdown flag
+            if (len >> 1) == MAX_LEN {
+                eprintln!("[ERROR] overflowed task counter. This is a bug and should be reported.");
+                std::process::abort();
+            }
+
+            self.len.store(len + 2, Release);
+            Ok(())
+        }
+    }
+
     pub(super) fn push_batch(&self, batch_head: Task<T>, batch_tail: Task<T>, num: usize) {
         unsafe {
             let batch_head = batch_head.into_raw().as_ptr();
@@ -129,48 +169,6 @@ impl<T: 'static> Queue<T> {
             self.len.store(self.len.unsync_load() - 2, Release);
 
             Some(Task::from_raw(task))
-        }
-    }
-}
-
-impl<T: Schedule> Queue<T> {
-    pub(super) fn push(&self, task: Task<T>) {
-        unsafe {
-            // Acquire queue lock
-            let mut p = self.pointers.lock().unwrap();
-
-            // Check if the queue is closed. This must happen in the lock.
-            let len = self.len.unsync_load();
-            if len & CLOSED == CLOSED {
-                task.shutdown();
-                return;
-            }
-
-            let task = task.into_raw();
-
-            // The next pointer should already be null
-            debug_assert!(get_next(task).is_null());
-
-            if let Some(tail) = NonNull::new(p.tail as *mut _) {
-                set_next(tail, task.as_ptr());
-            } else {
-                p.head = task.as_ptr();
-            }
-
-            p.tail = task.as_ptr();
-
-            // Increment the count.
-            //
-            // All updates to the len atomic are guarded by the mutex. As such,
-            // a non-atomic load followed by a store is safe.
-            //
-            // We increment by 2 to avoid touching the shutdown flag
-            if (len >> 1) == MAX_LEN {
-                eprintln!("[ERROR] overflowed task counter. This is a bug and should be reported.");
-                std::process::abort();
-            }
-
-            self.len.store(len + 2, Release);
         }
     }
 }
