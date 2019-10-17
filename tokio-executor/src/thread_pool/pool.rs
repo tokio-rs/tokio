@@ -60,7 +60,6 @@ impl ThreadPool {
     {
         crate::global::with_threadpool(self, || {
             let mut enter = crate::enter()
-                .ok()
                 .expect("attempting to block while on a Tokio executor");
             enter.block_on(future)
         })
@@ -71,6 +70,12 @@ impl ThreadPool {
         if self.spawner.workers().close() {
             self.shutdown_rx.wait();
         }
+    }
+}
+
+impl Default for ThreadPool {
+    fn default() -> ThreadPool {
+        ThreadPool::new()
     }
 }
 

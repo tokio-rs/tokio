@@ -16,19 +16,20 @@ use self::owned::Owned;
 
 mod park;
 
+mod pool;
+pub use self::pool::ThreadPool;
+
+mod queue;
+
 mod spawner;
 pub use self::spawner::Spawner;
 
-mod queue;
 mod set;
 
 mod shared;
 use self::shared::Shared;
 
 mod shutdown;
-
-mod thread_pool;
-pub use self::thread_pool::ThreadPool;
 
 mod worker;
 

@@ -26,6 +26,8 @@ where
     let (_, future_offset, trailer_offset) = layout_task::<T, S>();
 
     let header = ptr as *mut Header<S>;
+
+    #[allow(clippy::cast_ptr_alignment)]
     let trailer = (ptr as *mut u8).add(trailer_offset) as *mut Trailer;
     let future_or_output = (header as *mut u8).add(future_offset) as *mut ();
 
@@ -73,6 +75,7 @@ impl<S> RawTask<S> {
     {
         let (layout, offset_future, offset_trailer) = layout_task::<T, S>();
 
+        #[allow(clippy::cast_ptr_alignment)]
         unsafe {
             // Allocate memory for the task
             let ptr = alloc::alloc(layout);
@@ -127,14 +130,14 @@ impl<S> RawTask<S> {
     }
 
     /// Returns a raw pointer to the task's meta structure.
-    pub(super) fn header_ptr(&self) -> NonNull<Header<S>> {
+    pub(super) fn header_ptr(self) -> NonNull<Header<S>> {
         self.ptr
     }
 
     /// Safety: mutual exclusion is required to call this function.
     ///
     /// Returns `true` if the task needs to be scheduled again.
-    pub(super) unsafe fn poll(&self, executor: NonNull<S>) -> bool {
+    pub(super) unsafe fn poll(self, executor: NonNull<S>) -> bool {
         // Get the vtable without holding a ref to the meta struct. This is done
         // because a mutable reference to the task is passed into the poll fn.
         let vtable = self.header().vtable;
@@ -142,24 +145,24 @@ impl<S> RawTask<S> {
         (vtable.poll)(self.ptr.as_ptr() as *mut (), executor)
     }
 
-    pub(super) fn drop_task(&self) {
+    pub(super) fn drop_task(self) {
         let vtable = self.header().vtable;
         unsafe {
             (vtable.drop_task)(self.ptr.as_ptr() as *mut ());
         }
     }
 
-    pub(super) unsafe fn read_output(&self, dst: *mut (), state: Snapshot) {
+    pub(super) unsafe fn read_output(self, dst: *mut (), state: Snapshot) {
         let vtable = self.header().vtable;
         (vtable.read_output)(self.ptr.as_ptr() as *mut (), dst, state);
     }
 
-    pub(super) fn store_join_waker(&self, waker: &Waker) -> Snapshot {
+    pub(super) fn store_join_waker(self, waker: &Waker) -> Snapshot {
         let vtable = self.header().vtable;
         unsafe { (vtable.store_join_waker)(self.ptr.as_ptr() as *mut (), waker) }
     }
 
-    pub(super) fn swap_join_waker(&self, waker: &Waker, prev: Snapshot) -> Snapshot {
+    pub(super) fn swap_join_waker(self, waker: &Waker, prev: Snapshot) -> Snapshot {
         let vtable = self.header().vtable;
         unsafe { (vtable.swap_join_waker)(self.ptr.as_ptr() as *mut (), waker, prev) }
     }

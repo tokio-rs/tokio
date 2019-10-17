@@ -200,15 +200,12 @@ where
 
         let _reset = Reset(cell, was);
 
-        match state {
-            State::Ready(executor) => {
-                let executor = unsafe { &mut *executor };
+        if let State::Ready(executor) = state {
+            let executor = unsafe { &mut *executor };
 
-                if executor.status().is_err() {
-                    panic!("executor not active; is this because `with_default` is called with `DefaultExecutor`?");
-                }
+            if executor.status().is_err() {
+                panic!("executor not active; is this because `with_default` is called with `DefaultExecutor`?");
             }
-            _ => {}
         }
 
         cell.set(state);

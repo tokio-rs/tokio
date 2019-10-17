@@ -191,12 +191,12 @@ impl State {
     }
 
     /// Number of workers currently searching
-    fn num_searching(&self) -> usize {
+    fn num_searching(self) -> usize {
         self.0 & SEARCH_MASK
     }
 
     /// Number of workers currently unparked
-    fn num_unparked(&self) -> usize {
+    fn num_unparked(self) -> usize {
         (self.0 & UNPARK_MASK) >> UNPARK_SHIFT
     }
 }

@@ -129,9 +129,7 @@ impl<T> Queue<T> {
             } else {
                 self.buffer[j_idx].with(|ptr| {
                     let value = (*ptr).as_ptr();
-                    let node = (*value).header() as *const _;
-
-                    node
+                    (*value).header() as *const _
                 })
             };
 

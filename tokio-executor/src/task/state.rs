@@ -13,27 +13,27 @@ pub(super) struct State {
 pub(super) struct Snapshot(usize);
 
 /// The task is currently being run.
-const RUNNING: usize = 0b000001;
+const RUNNING: usize = 0b00_0001;
 
 /// The task has been notified by a waker.
-const NOTIFIED: usize = 0b000010;
+const NOTIFIED: usize = 0b00_0010;
 
 /// The task is complete.
 ///
 /// Once this bit is set, it is never unset
-const COMPLETE: usize = 0b000100;
+const COMPLETE: usize = 0b00_0100;
 
 /// The primary task handle has been dropped.
-const RELEASED: usize = 0b001000;
+const RELEASED: usize = 0b00_1000;
 
 /// The join handle is still around
-const JOIN_INTEREST: usize = 0b010000;
+const JOIN_INTEREST: usize = 0b01_0000;
 
 /// A join handle waker has been set
-const JOIN_WAKER: usize = 0b100000;
+const JOIN_WAKER: usize = 0b10_0000;
 
 /// The task has been forcibly canceled.
-const CANCELLED: usize = 0b1000000;
+const CANCELLED: usize = 0b100_0000;
 
 /// All bits
 const LIFECYCLE_MASK: usize =

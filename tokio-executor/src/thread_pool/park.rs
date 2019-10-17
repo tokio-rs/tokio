@@ -134,10 +134,11 @@ impl Inner {
                     // Block the current thread on the conditional variable.
                     _m = self.cvar.wait(_m).unwrap();
 
-                    match self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst) {
-                        Ok(_) => return, // got a notification
-                        Err(_) => {}     // spurious wakeup, go back to sleep
+                    if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+                        return; // got a notification
                     }
+
+                    // spurious wakeup, go back to sleep
                 }
             }
             Some(timeout) => {
