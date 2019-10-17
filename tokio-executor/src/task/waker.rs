@@ -2,6 +2,7 @@ use crate::task::{raw, Header, Schedule};
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::ops;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 pub(super) struct WakerRef<'a, S: 'static> {
@@ -33,8 +34,10 @@ where
     }
 }
 
-impl<S> WakerRef<'_, S> {
-    pub(super) fn get_ref(&self) -> &Waker {
+impl<S> ops::Deref for WakerRef<'_, S> {
+    type Target = Waker;
+
+    fn deref(&self) -> &Waker {
         &self.waker
     }
 }

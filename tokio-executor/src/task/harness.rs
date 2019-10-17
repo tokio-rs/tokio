@@ -126,7 +126,7 @@ where
                     // The waker passed into the `poll` function does not require a ref
                     // count increment.
                     let waker_ref = waker_ref::<T, S>(self.header());
-                    let mut cx = Context::from_waker(waker_ref.get_ref());
+                    let mut cx = Context::from_waker(&*waker_ref);
 
                     future.poll(&mut cx)
                 };
