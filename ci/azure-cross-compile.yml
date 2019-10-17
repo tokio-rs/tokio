@@ -17,7 +17,7 @@ jobs:
         target: mips-unknown-linux-gnu
       arm:
         vmImage: ubuntu-16.04
-        target: arm-unknown-linux-gnueabi
+        target: arm-linux-androideabi
   pool:
     vmImage: $(vmImage)
   steps:

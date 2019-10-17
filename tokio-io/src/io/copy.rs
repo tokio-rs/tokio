@@ -5,6 +5,13 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+/// A future that asynchronously copies the entire contents of a reader into a
+/// writer.
+///
+/// This struct is generally created by calling [`copy`][copy]. Please
+/// see the documentation of `copy()` for more details.
+///
+/// [copy]: fn.copy.html
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Copy<'a, R: ?Sized, W: ?Sized> {
@@ -17,7 +24,40 @@ pub struct Copy<'a, R: ?Sized, W: ?Sized> {
     buf: Box<[u8]>,
 }
 
-pub(crate) fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
+/// Asynchronously copies the entire contents of a reader into a writer.
+///
+/// This function returns a future that will continuously read data from
+/// `reader` and then write it into `writer` in a streaming fashion until
+/// `reader` returns EOF.
+///
+/// On success, the total number of bytes that were copied from
+/// `reader` to `writer` is returned.
+///
+/// This is an asynchronous version of [`std::io::copy`][std].
+///
+/// # Errors
+///
+/// The returned future will finish with an error will return an error
+/// immediately if any call to `poll_read` or `poll_write` returns an error.
+///
+/// # Examples
+///
+/// ```
+/// use tokio_io as io;
+///
+/// # async fn dox() -> std::io::Result<()> {
+/// let mut reader: &[u8] = b"hello";
+/// let mut writer: Vec<u8> = vec![];
+///
+/// io::copy(&mut reader, &mut writer).await?;
+///
+/// assert_eq!(&b"hello"[..], &writer[..]);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [std]: https://doc.rust-lang.org/std/io/fn.copy.html
+pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
 where
     R: AsyncRead + Unpin + ?Sized,
     W: AsyncWrite + Unpin + ?Sized,
@@ -70,9 +110,8 @@ where
                 }
             }
 
-            // If we've written al the data and we've seen EOF, flush out the
+            // If we've written all the data and we've seen EOF, flush out the
             // data and finish the transfer.
-            // done with the entire transfer.
             if self.pos == self.cap && self.read_done {
                 let me = &mut *self;
                 ready!(Pin::new(&mut *me.writer).poll_flush(cx))?;

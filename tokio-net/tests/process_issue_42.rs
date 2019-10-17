@@ -42,7 +42,7 @@ fn run_test() {
         finished_clone.store(true, Ordering::SeqCst);
     });
 
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(Duration::from_millis(1000));
     assert!(
         finished.load(Ordering::SeqCst),
         "FINISHED flag not set, maybe we deadlocked?"

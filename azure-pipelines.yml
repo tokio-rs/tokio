@@ -1,5 +1,5 @@
-trigger: ["master", "std-future"]
-pr: ["master", "std-future"]
+trigger: ["master"]
+pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
@@ -29,8 +29,10 @@ jobs:
         - codec
         - fs
         - io
-        - rt-full
         - net
+        - process
+        - rt-full
+        - signal
         - sync
         - tcp
         - timer

@@ -40,7 +40,7 @@ pub mod tcp {
     //! [`TcpListener`]: struct.TcpListener.html
     //! [incoming_method]: struct.TcpListener.html#method.incoming
     //! [`Incoming`]: struct.Incoming.html
-    pub use tokio_net::tcp::{split, TcpListener, TcpStream};
+    pub use tokio_net::tcp::{split, Incoming, TcpListener, TcpStream};
 }
 #[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
@@ -56,20 +56,6 @@ pub mod udp {
 }
 #[cfg(feature = "udp")]
 pub use self::udp::{UdpFramed, UdpSocket};
-
-#[cfg(feature = "signal")]
-pub mod signal {
-    //! Asynchronous signal handling for `tokio`. ctrl-C notifications are
-    //! supported on both unix and windows systems. For finer grained signal
-    //! handling support on unix systems, see `tokio_net::signal::unix::Signal`.
-    pub use tokio_net::signal::ctrl_c;
-}
-
-#[cfg(feature = "process")]
-pub mod process {
-    //! An implementation of asynchronous process management for Tokio.
-    pub use tokio_net::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
-}
 
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {

@@ -29,7 +29,9 @@ default = [
   "fs",
   "io",
   "net",
+  "process",
   "rt-full",
+  "signal",
   "sync",
   "timer",
 ]
