@@ -82,6 +82,14 @@
 //! });
 //! ```
 //!
+//! Note that in order to allow drop-in compatibility for legacy codebases using
+//! `tokio` 0.1, the  [`run`], [`spawn`], and [`block_on`] methods provided by the
+//! compatibility runtimes take `futures` 0.1 futures. This allows the
+//! compatibility runtimes to replace the `tokio` 0.1 runtimes in those codebases
+//! without requiring changes to unrelated code. The compatibility runtimes
+//! _also_ provide `std::future`-compatible versions of these methods, named
+//! [`run_std`], [`spawn_std`], and [`block_on_std`].
+//!
 //! [`tokio::runtime`]: https://docs.rs/tokio/0.2.0-alpha.6/tokio/runtime/index.html
 //! [futures-compat]: https://rust-lang-nursery.github.io/futures-api-docs/0.3.0-alpha.19/futures/compat/index.html
 //! [`Timer`]: https://docs.rs/tokio/0.2.0-alpha.6/tokio/timer/index.html
@@ -90,6 +98,12 @@
 //! [timer-01]: https://docs.rs/tokio/0.1.22/tokio/timer/index.html
 //! [reactor-01]: https://docs.rs/tokio/0.1.22/tokio/reactor/struct.Reactor.html
 //! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
+//! [`run`]: struct.Runtime.html#method.run
+//! [`spawn`]: struct.Runtime.html#method.spawn
+//! [`block_on`]: struct.Runtime.html#method.block_on
+//! [`run_std`]: struct.Runtime.html#method.run_std
+//! [`spawn_std`]: struct.Runtime.html#method.spawn_std
+//! [`block_on_std`]: struct.Runtime.html#method.spawn_std
 mod compat;
 pub mod current_thread;
 #[cfg(feature = "rt-full")]
