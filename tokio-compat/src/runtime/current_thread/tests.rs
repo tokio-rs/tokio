@@ -1,9 +1,9 @@
+use super::Runtime;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use std::time::{Duration, Instant};
-use super::Runtime;
 
 use futures_01::future::Future as Future01;
 use futures_util::compat::Future01CompatExt;
@@ -17,7 +17,8 @@ fn can_run_01_futures() {
     rt.block_on(futures_01::future::lazy(move || {
         future_ran.store(true, Ordering::SeqCst);
         Ok::<(), ()>(())
-    })).unwrap();
+    }))
+    .unwrap();
     assert!(ran.load(Ordering::SeqCst));
 }
 

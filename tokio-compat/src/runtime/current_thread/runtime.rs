@@ -1,13 +1,16 @@
-use super::{compat::{Compat, self}, Builder};
+use super::{
+    compat::{self, Compat},
+    Builder,
+};
 
 use tokio_executor::current_thread::Handle as ExecutorHandle;
 use tokio_executor::current_thread::{self, CurrentThread};
-use tokio_timer_02 as timer_02;
-use tokio_reactor_01 as reactor_01;
 use tokio_executor_01 as executor_01;
 use tokio_net::driver::{self, Reactor};
+use tokio_reactor_01 as reactor_01;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
+use tokio_timer_02 as timer_02;
 
 use futures_01::future::Future as Future01;
 use futures_util::{compat::Future01CompatExt, future::FutureExt};
@@ -103,7 +106,6 @@ where
         Handle::spawn(self, future)
     }
 }
-
 
 /// Error returned by the `run` function.
 #[derive(Debug)]
@@ -294,13 +296,13 @@ impl Runtime {
             ref timer_handle,
             ref clock,
             ref mut executor,
-            compat: Compat {
-                ref compat_timer,
-                ref compat_reactor,
-                ..
-            }
+            compat:
+                Compat {
+                    ref compat_timer,
+                    ref compat_reactor,
+                    ..
+                },
         } = *self;
-
 
         let mut enter = executor_01::enter().unwrap();
         // Set the default tokio 0.1 reactor to the background compat reactor.
@@ -313,7 +315,9 @@ impl Runtime {
                 timer_02::with_default(&compat_timer, enter, |enter| {
                     let _timer = timer::set_default(&timer_handle);
                     // Set default executor for tokio 0.1 futures.
-                    let mut compat_exec = CompatExec { inner: current_thread::TaskExecutor::current(), };
+                    let mut compat_exec = CompatExec {
+                        inner: current_thread::TaskExecutor::current(),
+                    };
                     executor_01::with_default(&mut compat_exec, enter, |_enter| {
                         // The TaskExecutor is a fake executor that looks into the
                         // current single-threaded executor when used. This is a trick,
@@ -335,7 +339,8 @@ impl executor_01::Executor for CompatExec {
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), executor_01::SpawnError> {
         let future = future.compat().map(|_| ());
-        tokio_executor::Executor::spawn(&mut self.inner, Box::pin(future)).map_err(compat::spawn_err)
+        tokio_executor::Executor::spawn(&mut self.inner, Box::pin(future))
+            .map_err(compat::spawn_err)
     }
 
     fn status(&self) -> Result<(), executor_01::SpawnError> {
