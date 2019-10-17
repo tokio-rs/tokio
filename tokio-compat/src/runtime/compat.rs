@@ -15,6 +15,7 @@ pub(super) struct Background {
     thread: Option<thread::JoinHandle<()>>,
 }
 
+#[derive(Debug)]
 pub(super) struct Compat {
     pub(super) compat_reactor: reactor_01::Handle,
     pub(super) compat_timer: timer_02::Handle,

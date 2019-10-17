@@ -56,7 +56,7 @@ impl Handle {
     {
         self.0
             .spawn(future.compat().map(|_| ()))
-            .map_err(compat::spawn_error)
+            .map_err(compat::spawn_err)
     }
 
     /// Spawn a `std::future` future onto the `CurrentThread` runtime instance
@@ -68,7 +68,7 @@ impl Handle {
     /// instance of the `Handle` does not exist anymore.
     pub fn spawn_std<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
     where
-        F: Future01<Output = ()> + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
     {
         self.0.spawn(future)
     }
@@ -82,7 +82,7 @@ impl Handle {
     /// This allows a caller to avoid creating the task if the call to `spawn`
     /// has a high likelihood of failing.
     pub fn status(&self) -> Result<(), executor_01::SpawnError> {
-        self.0.status().map_err(compat::spawn_error)
+        self.0.status().map_err(compat::spawn_err)
     }
 }
 
@@ -90,7 +90,7 @@ impl<T> tokio_executor::TypedExecutor<T> for Handle
 where
     T: Future<Output = ()> + Send + 'static,
 {
-    fn spawn(&mut self, future: T) -> Result<(), tokio_executor::executor::SpawnError> {
+    fn spawn(&mut self, future: T) -> Result<(), tokio_executor::SpawnError> {
         Handle::spawn_std(self, future)
     }
 }
@@ -166,16 +166,17 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
-    /// use tokio::runtime::current_thread::Runtime;
+    /// use tokio_compat::runtime::current_thread::Runtime;
     ///
     /// # fn dox() {
     /// // Create the runtime
     /// let mut rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
-    /// rt.spawn(async {
+    /// rt.spawn(futures_01::future::lazy(|| {
     ///     println!("now running on a worker thread");
-    /// });
+    ///     Ok(())
+    /// }));
     /// # }
     /// ```
     ///
@@ -200,14 +201,14 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
-    /// use tokio::runtime::current_thread::Runtime;
+    /// use tokio_compat::runtime::current_thread::Runtime;
     ///
     /// # fn dox() {
     /// // Create the runtime
     /// let mut rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
-    /// rt.spawn(async {
+    /// rt.spawn_std(async {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
@@ -221,9 +222,10 @@ impl Runtime {
     where
         F: Future<Output = ()> + 'static,
     {
-        self.executor.spawn(future.compat().map(|_| ()));
+        self.executor.spawn(future);
         self
     }
+
     /// Runs the provided `futures` 0.1 future, blocking the current thread
     /// until the future completes.
     ///
@@ -240,7 +242,7 @@ impl Runtime {
     ///
     /// The caller is responsible for ensuring that other spawned futures
     /// complete execution by calling `block_on` or `run`.
-    pub fn block_on<F>(&mut self, f: F) -> Result<F::Item, F::Output>
+    pub fn block_on<F>(&mut self, f: F) -> Result<F::Item, F::Error>
     where
         F: Future01,
     {
@@ -293,8 +295,9 @@ impl Runtime {
             ref clock,
             ref mut executor,
             compat: Compat {
-                ref timer_handle: compat_timer,
-                ref reactor_handle: compat_reactor,
+                ref compat_timer,
+                ref compat_reactor,
+                ..
             }
         } = *self;
 
@@ -331,8 +334,8 @@ impl executor_01::Executor for CompatExec {
         &mut self,
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), executor_01::SpawnError> {
-        self.inner
-            .spawn(future.compat().map(|_| ())).map_err(compat::spawn_err)
+        let future = future.compat().map(|_| ());
+        tokio_executor::Executor::spawn(&mut self.inner, Box::pin(future)).map_err(compat::spawn_err)
     }
 
     fn status(&self) -> Result<(), executor_01::SpawnError> {

@@ -13,10 +13,10 @@ fn can_run_01_futures() {
     let future_ran = Arc::new(AtomicBool::new(false));
     let ran = future_ran.clone();
 
-    let mut rt = Runtime::new();
-    runtime.block_on(futures_01::future::lazy(move || {
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on(futures_01::future::lazy(move || {
         future_ran.store(true, Ordering::SeqCst);
-        Ok(())
+        Ok::<(), ()>(())
     })).unwrap();
     assert!(ran.load(Ordering::SeqCst));
 }
@@ -25,7 +25,7 @@ fn can_run_01_futures() {
 fn can_spawn_01_futures() {
     let future_ran = Arc::new(AtomicBool::new(false));
     let ran = future_ran.clone();
-    let mut rt = Runtime::new();
+    let mut rt = Runtime::new().unwrap();
     rt.spawn(futures_01::future::lazy(move || {
         tokio_01::spawn(futures_01::future::lazy(move || {
             future_ran.store(true, Ordering::SeqCst);
@@ -41,7 +41,7 @@ fn can_spawn_01_futures() {
 fn can_spawn_std_futures() {
     let future_ran = Arc::new(AtomicBool::new(false));
     let ran = future_ran.clone();
-    let mut rt = Runtime::new();
+    let mut rt = Runtime::new().unwrap();
     rt.spawn(futures_01::future::lazy(move || {
         tokio_02::spawn(async move {
             future_ran.store(true, Ordering::SeqCst);
@@ -71,7 +71,7 @@ fn tokio_01_timers_work() {
         ran.store(true, Ordering::SeqCst);
     };
 
-    let mut rt = Runtime::new();
+    let mut rt = Runtime::new().unwrap();
     rt.spawn(futures_01::future::lazy(move || {
         tokio_02::spawn(future2);
         tokio_01::spawn(future1);

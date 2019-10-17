@@ -40,12 +40,13 @@
 //!     // Spawn a `futures` 0.1 task on the other thread's runtime.
 //!     let _ = handle.spawn(futures_01::future::lazy(|| {
 //!         println!("hello from futures 0.1!");
+//!         Ok(())
 //!     }));
 //!
 //!     // Spawn a `std::future` task on the other thread's runtime.
 //!     let _ = handle.spawn_std(async {
 //!         println!("hello from std::future!");
-//!     }));
+//!     });
 //! }).join().unwrap();
 //! ```
 //!

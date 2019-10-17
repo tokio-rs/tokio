@@ -91,6 +91,9 @@
 //! [reactor-01]: https://docs.rs/tokio/0.1.22/tokio/reactor/struct.Reactor.html
 //! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 mod compat;
+#[cfg(feature = "rt-full")]
 mod threadpool;
+pub mod current_thread;
 
+#[cfg(feature = "rt-full")]
 pub use threadpool::{run, run_std, Builder, Runtime};
