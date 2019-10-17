@@ -10,6 +10,7 @@ use futures_util::{compat::Future01CompatExt, future::FutureExt};
 use std::{future::Future, io};
 use tokio_executor::enter;
 use tokio_executor::threadpool::{Sender, ThreadPool};
+use tokio_executor_01 as executor_01;
 use tokio_net::driver;
 use tokio_timer::timer;
 
@@ -306,12 +307,12 @@ impl Runtime {
         F: Future,
     {
         let mut entered = enter().expect("nested block_on");
-        let mut old_entered = old_executor::enter().expect("nested block_on");
+        let mut old_entered = executor_01::enter().expect("nested block_on");
         let bg = &self.inner().background;
         let trace = &self.inner().trace;
 
         tokio_executor::with_default(&mut self.inner().pool.sender(), || {
-            old_executor::with_default(
+            executor_01::with_default(
                 &mut CompatSender(self.inner().pool.sender()),
                 &mut old_entered,
                 |_old_entered| {
@@ -363,40 +364,40 @@ impl Runtime {
     }
 }
 
-fn translate_spawn_err(new: tokio_executor::SpawnError) -> old_executor::SpawnError {
+fn translate_spawn_err(new: tokio_executor::SpawnError) -> executor_01::SpawnError {
     match new {
-        _ if new.is_shutdown() => old_executor::SpawnError::shutdown(),
-        _ if new.is_at_capacity() => old_executor::SpawnError::at_capacity(),
+        _ if new.is_shutdown() => executor_01::SpawnError::shutdown(),
+        _ if new.is_at_capacity() => executor_01::SpawnError::at_capacity(),
         e => unreachable!("weird spawn error {:?}", e),
     }
 }
 
-impl old_executor::Executor for CompatSender<&'_ Sender> {
+impl executor_01::Executor for CompatSender<&'_ Sender> {
     fn spawn(
         &mut self,
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
-    ) -> Result<(), old_executor::SpawnError> {
+    ) -> Result<(), executor_01::SpawnError> {
         self.0
             .spawn(future.compat().map(|_| ()))
             .map_err(translate_spawn_err)
     }
 
-    fn status(&self) -> Result<(), old_executor::SpawnError> {
+    fn status(&self) -> Result<(), executor_01::SpawnError> {
         tokio_executor::Executor::status(&self.0).map_err(translate_spawn_err)
     }
 }
 
-impl old_executor::Executor for CompatSender<Sender> {
+impl executor_01::Executor for CompatSender<Sender> {
     fn spawn(
         &mut self,
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
-    ) -> Result<(), old_executor::SpawnError> {
+    ) -> Result<(), executor_01::SpawnError> {
         self.0
             .spawn(future.compat().map(|_| ()))
             .map_err(translate_spawn_err)
     }
 
-    fn status(&self) -> Result<(), old_executor::SpawnError> {
+    fn status(&self) -> Result<(), executor_01::SpawnError> {
         tokio_executor::Executor::status(&self.0).map_err(translate_spawn_err)
     }
 }

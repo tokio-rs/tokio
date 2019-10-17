@@ -1,6 +1,6 @@
-use old_executor::park as old_park;
-use old_reactor;
-use old_timer;
+use tokio_executor_01::park as park_01;
+use tokio_reactor_01 as reactor_01;
+use tokio_timer_02::{clock as clock_02, timer as timer_02};
 
 use std::{
     io, thread,
@@ -16,19 +16,19 @@ pub(super) struct Background {
 }
 
 pub(super) struct Compat {
-    pub(super) compat_reactor: old_reactor::Handle,
-    pub(super) compat_timer: old_timer::timer::Handle,
+    pub(super) compat_reactor: reactor_01::Handle,
+    pub(super) compat_timer: timer_01::Handle,
     pub(super) compat_bg: Background,
 }
 
 impl Compat {
     pub(super) fn spawn(clock: &tokio_timer::clock::Clock) -> io::Result<Self> {
-        let clock = old_timer::clock::Clock::new_with_now(Now(clock.clone()));
+        let clock = clock_02::Clock::new_with_now(Now(clock.clone()));
 
-        let reactor = old_reactor::Reactor::new()?;
+        let reactor = reactor_01::Reactor::new()?;
         let reactor_handle = reactor.handle();
 
-        let timer = old_timer::timer::Timer::new_with_now(reactor, clock);
+        let timer = timer_01::Timer::new_with_now(reactor, clock);
         let timer_handle = timer.handle();
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
@@ -66,7 +66,7 @@ struct CompatPark<P>(P);
 
 impl<P> park::Park for CompatPark<P>
 where
-    P: old_park::Park,
+    P: park_01::Park,
 {
     type Unpark = CompatPark<P::Unpark>;
     type Error = P::Error;
@@ -88,7 +88,7 @@ where
 
 impl<U> park::Unpark for CompatPark<U>
 where
-    U: old_park::Unpark,
+    U: park_01::Unpark,
 {
     #[inline]
     fn unpark(&self) {
@@ -96,7 +96,7 @@ where
     }
 }
 
-impl old_timer::clock::Now for Now<tokio_timer::clock::Clock> {
+impl timer_02::clock::Now for Now<tokio_timer::clock::Clock> {
     fn now(&self) -> Instant {
         self.0.now()
     }

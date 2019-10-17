@@ -1,9 +1,12 @@
 use super::{background, compat::Compat, Inner, Runtime};
 
 use tokio_executor::threadpool;
+use tokio_executor_01 as executor_01;
 use tokio_net::driver::{self, Reactor};
+use tokio_reactor_01 as reactor_01;
 use tokio_timer::clock::{self, Clock};
 use tokio_timer::timer::{self, Timer};
+use tokio_timer_02 as timer_02;
 
 use num_cpus;
 use std::any::Any;
@@ -362,7 +365,7 @@ impl Builder {
             .threadpool_builder
             .around_worker(move |w| {
                 let index = w.id().to_usize();
-                let mut enter = old_executor::enter().unwrap();
+                let mut enter = executor_01::enter().unwrap();
                 // We need the threadpool's sender to set up the default tokio
                 // 0.1 executor.
                 let sender_lock = compat_sender2.read().unwrap();
@@ -371,17 +374,17 @@ impl Builder {
                     .expect("compat executor be set before the pool is run!");
 
                 // Set the default tokio 0.1 reactor to the background compat reactor.
-                old_reactor::with_default(&compat_reactor, &mut enter, |enter| {
+                reactor_01::with_default(&compat_reactor, &mut enter, |enter| {
                     // Set the default tokio 0.2 reactor to this worker thread's
                     // reactor.
                     let _reactor = driver::set_default(&reactor_handles[index]);
                     clock::with_default(&clock, || {
                         // Set up a default timer for tokio 0.1 compat.
-                        old_timer::with_default(&compat_timer, enter, |enter| {
+                        timer_02::with_default(&compat_timer, enter, |enter| {
                             let _timer = timer::set_default(&timer_handles[index]);
                             tracing_core::dispatcher::with_default(&dispatch, || {
                                 // Set the default executor for tokio 0.1 compat.
-                                old_executor::with_default(&mut compat_sender, enter, |_enter| {
+                                executor_01::with_default(&mut compat_sender, enter, |_enter| {
                                     w.run();
                                 })
                             })
