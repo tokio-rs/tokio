@@ -1,3 +1,4 @@
+use super::super::{RESERVED_BITS, WIDTH};
 use super::ScheduledIo;
 use crate::sync::{
     atomic::{AtomicBool, Ordering},
@@ -13,6 +14,37 @@ pub(crate) struct Slot {
     item: ScheduledIo,
 }
 
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+pub(crate) struct Generation {
+    value: usize,
+}
+
+impl Pack for Generation {
+    /// Use all the remaining bits in the word for the generation counter, minus
+    /// any bits reserved by the user.
+    const LEN: usize = (WIDTH - RESERVED_BITS) - Self::SHIFT;
+
+    type Prev = Tid;
+
+    #[inline(always)]
+    fn from_usize(u: usize) -> Self {
+        debug_assert!(u <= Self::BITS);
+        Self::new(u)
+    }
+
+    #[inline(always)]
+    fn as_usize(&self) -> usize {
+        self.value
+    }
+}
+
+impl Generation {
+    fn new(value: usize) -> Self {
+        Self { value }
+    }
+}
+
 impl Slot {
     pub(super) fn new(next: usize) -> Self {
         Self {
@@ -23,22 +55,22 @@ impl Slot {
     }
 
     #[inline(always)]
-    pub(super) fn value(&self) -> Option<&ScheduledIo> {
-        if self.empty.load(Ordering::Acquire) {
-            #[cfg(test)]
-            test_println!("--> slot empty!");
+    pub(super) fn get(&self, gen: Generation) -> Option<&T> {
+        let current = self.gen.load(Ordering::Acquire);
+        test_println!("-> get {:?}; current={:?}", gen, current);
+
+        // Is the index's generation the same as the current generation? If not,
+        // the item that index referred to was removed, so return `None`.
+        if gen.value != current {
             return None;
         }
+
         Some(&self.item)
     }
 
     #[inline]
-    pub(super) fn insert(&self, aba_guard: usize) {
-        // Set the new value.
-        self.item.insert(aba_guard);
-
-        let was_empty = self.empty.compare_and_swap(true, false, Ordering::Release);
-        assert!(was_empty, "slot must have been empty!")
+    pub(super) fn insert(&self) -> Generation {
+        Generation::from_usize(self.gen.load(Ordering::Acquire))
     }
 
     #[inline(always)]
@@ -47,9 +79,13 @@ impl Slot {
     }
 
     #[inline]
-    pub(super) fn reset(&self) -> bool {
-        let is_empty = self.empty.compare_and_swap(false, true, Ordering::Release);
-        if is_empty {
+    pub(super) fn reset(&self, gen: Generation) -> bool {
+        let next = (gen.value + 1) % Generation::BITS;
+        let actual = self
+            .generation
+            .compare_and_swap(gen.value, next, Ordering::AcqRel);
+        test_println!("-> remove {:?}; next={:?}; actual={:?}", gen, next, actual);
+        if actual != gen {
             return false;
         };
 
