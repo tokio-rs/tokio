@@ -109,7 +109,7 @@ impl Builder {
     /// ```
     pub fn panic_handler<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(Box<dyn Any + Send>) + Send + Sync + 'static,
+        F: Fn(Box<dyn Any + Send>) -> ! + Send + Sync + 'static,
     {
         self.threadpool_builder.panic_handler(f);
         self

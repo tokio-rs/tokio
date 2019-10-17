@@ -78,7 +78,7 @@ impl TaskExecutor {
     /// let executor = rt.executor();
     ///
     /// // Spawn a future onto the runtime
-    /// executor.spawn(async {
+    /// executor.spawn_std(async {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
