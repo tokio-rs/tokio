@@ -17,8 +17,8 @@
 //! compatibility layer.
 //!
 //! `tokio-compat`'s `runtime` module contains modified versions of the `tokio`
-//! 0.2 runtimes that are capable of providing `tokio` 0.1 and `tokio`
-//! 0.2-compatible runtime services.
+//! 0.2 `Runtime` and `current_thread::Runtime` that are capable of providing
+//! `tokio` 0.1 and `tokio` 0.2-compatible runtime services.
 //!
 //! Creating a [`Runtime`] does the following:
 //!
