@@ -45,6 +45,7 @@ pub struct Builder {
     /// Thread pool specific builder
     thread_pool_builder: thread_pool::Builder,
 
+    /// The number of worker threads
     num_threads: usize,
 
     /// To run after each worker thread starts
