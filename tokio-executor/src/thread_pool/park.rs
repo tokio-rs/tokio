@@ -86,9 +86,6 @@ impl fmt::Display for ParkError {
 }
 
 impl Error for ParkError {
-    fn description(&self) -> &str {
-        "unknown park error"
-    }
 }
 
 impl Inner {
