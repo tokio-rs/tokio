@@ -16,7 +16,7 @@ struct Inner {
     // thread-local variables cannot track generics. However, the current worker
     // is only checked when `P` is already known, so the type can be figured out
     // on demand.
-    set: *const (),
+    workers: *const (),
     idx: usize,
 }
 
@@ -29,7 +29,7 @@ where
     P: Unpark,
 {
     CURRENT_WORKER.with(|cell| {
-        assert!(cell.get().set.is_null());
+        assert!(cell.get().workers.is_null());
 
         struct Guard<'a>(&'a Cell<Inner>);
 
@@ -40,7 +40,7 @@ where
         }
 
         cell.set(Inner {
-            set: pool.shared() as *const _ as *const (),
+            workers: pool.shared() as *const _ as *const (),
             idx: index,
         });
 
@@ -67,7 +67,7 @@ impl Current {
     {
         let inner = CURRENT_WORKER.with(|cell| cell.get());
 
-        if ptr::eq(inner.set as *const _, set.shared().as_ptr()) {
+        if ptr::eq(inner.workers as *const _, set.shared().as_ptr()) {
             Some(unsafe { &*set.owned()[inner.idx].get() })
         } else {
             None
@@ -78,7 +78,7 @@ impl Current {
 impl Inner {
     fn new() -> Inner {
         Inner {
-            set: ptr::null(),
+            workers: ptr::null(),
             idx: 0,
         }
     }
