@@ -190,7 +190,7 @@ impl State {
         let mut prev = self.load();
 
         loop {
-            if prev.is_complete() || prev.is_canceled() {
+            if !prev.is_active() {
                 return None;
             }
 
@@ -229,11 +229,7 @@ impl State {
         let prev = Snapshot(self.val.fetch_or(DELTA, Release));
 
         debug_assert!(!prev.is_released());
-        debug_assert!(
-            prev.is_complete() || prev.is_canceled(),
-            "state = {:?}",
-            prev
-        );
+        debug_assert!(prev.is_terminal(), "state = {:?}", prev);
 
         let next = Snapshot(prev.0 | DELTA);
 
@@ -443,8 +439,24 @@ impl Snapshot {
         self.0 & CANCELLED == CANCELLED
     }
 
+    /// Used during normal runtime.
     pub(super) fn is_active(self) -> bool {
         self.0 & (COMPLETE | CANCELLED) == 0
+    }
+
+    /// Used before dropping the task
+    pub(super) fn is_terminal(self) -> bool {
+        // When both the notified & running flags are set, the task was canceled
+        // after being notified, before it was run.
+        //
+        // There is a race where:
+        // - The task state transitions to notified
+        // - The global queue is shutdown
+        // - The waker attempts to push into the global queue and fails.
+        // - The waker holds the last reference to the task, thus drops it.
+        //
+        // In this scenario, the cancelled bit will never get set.
+        !self.is_active() || (self.is_notified() && self.is_running())
     }
 
     pub(super) fn is_join_interested(self) -> bool {
@@ -481,6 +493,7 @@ impl fmt::Debug for Snapshot {
             .field("is_notified", &self.is_notified())
             .field("is_released", &self.is_released())
             .field("is_complete", &self.is_complete())
+            .field("is_canceled", &self.is_canceled())
             .field("is_join_interested", &self.is_join_interested())
             .field("has_join_waker", &self.has_join_waker())
             .field("is_final_ref", &self.is_final_ref())

@@ -179,7 +179,7 @@ where
         // transition the task to released
         let res = self.header().state.release_task();
 
-        assert!(res.is_complete() || res.is_canceled());
+        assert!(res.is_terminal(), "state = {:?}", res);
 
         if might_drop_join_waker_on_release && !res.is_join_interested() {
             debug_assert!(res.has_join_waker());
