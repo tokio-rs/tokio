@@ -66,7 +66,19 @@ impl<T: 'static> Queue<T> {
         self.len.load(Acquire) >> 1
     }
 
-    pub(super) fn push(&self, task: Task<T>) -> Result<(), Task<T>> {
+    pub(super) fn wait_for_unlocked(&self) {
+        // Acquire and release the lock immediately. This synchronizes the
+        // caller **after** all external waiters are done w/ the scheduler
+        // struct.
+        drop(self.pointers.lock().unwrap());
+    }
+
+    /// Push a value into the queue and call the closure **while still holding
+    /// the push lock**
+    pub(super) fn push<F>(&self, task: Task<T>, f: F)
+    where
+        F: FnOnce(Result<(), Task<T>>),
+    {
         unsafe {
             // Acquire queue lock
             let mut p = self.pointers.lock().unwrap();
@@ -74,7 +86,8 @@ impl<T: 'static> Queue<T> {
             // Check if the queue is closed. This must happen in the lock.
             let len = self.len.unsync_load();
             if len & CLOSED == CLOSED {
-                return Err(task);
+                f(Err(task));
+                return;
             }
 
             let task = task.into_raw();
@@ -102,7 +115,7 @@ impl<T: 'static> Queue<T> {
             }
 
             self.len.store(len + 2, Release);
-            Ok(())
+            f(Ok(()));
         }
     }
 

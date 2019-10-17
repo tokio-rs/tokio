@@ -99,18 +99,18 @@ fn multi_worker_inject_pop() {
     let i = q1.injector();
 
     // Push a value
-    i.push(val(0));
+    i.push(val(0), is_ok);
     assert_pop!(q1, 0);
     assert_empty!(q2);
 
     // Push another value
-    i.push(val(1));
+    i.push(val(1), is_ok);
     assert_pop!(q2, 1);
     assert_empty!(q1);
 
-    i.push(val(2));
-    i.push(val(3));
-    i.push(val(4));
+    i.push(val(2), is_ok);
+    i.push(val(3), is_ok);
+    i.push(val(4), is_ok);
     assert_pop!(q2, 2);
     assert_pop!(q1, 3);
     assert_pop!(q1, 4);
@@ -155,8 +155,8 @@ fn polling_global_first() {
     let (q, _) = queues_2();
     let i = q.injector();
 
-    i.push(val(1000));
-    i.push(val(1001));
+    i.push(val(1000), is_ok);
+    i.push(val(1001), is_ok);
 
     for n in 0..5 {
         q.push(val(n));
@@ -274,4 +274,8 @@ fn num(task: Task<Noop>) -> u32 {
         map.remove(&num);
         num
     })
+}
+
+fn is_ok<T, E>(r: Result<T, E>) {
+    assert!(r.is_ok())
 }
