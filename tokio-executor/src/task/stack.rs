@@ -73,7 +73,7 @@ impl<T: 'static> TransferStack<T> {
                 use std::process;
 
                 if !self.0.is_null() {
-                    // we have bugz
+                    // we have bugs
                     process::abort();
                 }
             }
