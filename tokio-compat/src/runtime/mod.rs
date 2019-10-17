@@ -65,7 +65,7 @@
 //! use futures_01::future::lazy;
 //! use tokio_compat::prelude::*;
 //!
-//! tokio_compat::run_03(async {
+//! tokio_compat::run_std(async {
 //!     // Wait for a `tokio` 0.1 `Delay`...
 //!     let when = Instant::now() + Duration::from_millis(10);
 //!     tokio_01::timer::Delay::new(when)
@@ -93,4 +93,4 @@
 mod compat;
 mod threadpool;
 
-pub use threadpool::{run, run_03, Builder, Runtime};
+pub use threadpool::{run, run_std, Builder, Runtime};

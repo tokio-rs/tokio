@@ -33,7 +33,7 @@ fn can_spawn_01_futures() {
 }
 
 #[test]
-fn can_spawn_03_futures() {
+fn can_spawn_std_futures() {
     let future_ran = Arc::new(AtomicBool::new(false));
     let ran = future_ran.clone();
     super::run(futures_01::future::lazy(move || {

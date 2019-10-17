@@ -104,7 +104,7 @@ pub fn run<F>(future: F)
 where
     F: Future01<Item = (), Error = ()> + Send + 'static,
 {
-    run_03(future.compat().map(|_| ()))
+    run_std(future.compat().map(|_| ()))
 }
 
 /// Start the Tokio runtime using the supplied `std::future` future to bootstrap execution.
@@ -150,13 +150,13 @@ where
 /// This function panics if called from the context of an executor.
 ///
 /// [mod]: ../index.html
-pub fn run_03<F>(future: F)
+pub fn run_std<F>(future: F)
 where
     F: Future<Output = ()> + Send + 'static,
 {
     // Check enter before creating a new Runtime...
     let runtime = Runtime::new().expect("failed to start new Runtime");
-    runtime.spawn_03(future);
+    runtime.spawn_std(future);
     runtime.shutdown_on_idle();
 }
 
@@ -251,7 +251,7 @@ impl Runtime {
     ///    let rt = Runtime::new().unwrap();
     ///
     ///    // Spawn a future onto the runtime
-    ///    rt.spawn_03(async {
+    ///    rt.spawn_std(async {
     ///        println!("now running on a worker thread");
     ///    });
     ///
@@ -263,7 +263,7 @@ impl Runtime {
     ///
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
-    pub fn spawn_03<F>(&self, future: F) -> &Self
+    pub fn spawn_std<F>(&self, future: F) -> &Self
     where
         F: Future<Output = ()> + Send + 'static,
     {
@@ -287,7 +287,7 @@ impl Runtime {
     where
         F: Future01,
     {
-        self.block_on_03(future.compat())
+        self.block_on_std(future.compat())
     }
 
     /// Run a `std::future` future to completion on the Tokio runtime.
@@ -302,7 +302,7 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on_03<F>(&self, future: F) -> F::Output
+    pub fn block_on_std<F>(&self, future: F) -> F::Output
     where
         F: Future,
     {
