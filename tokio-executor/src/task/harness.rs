@@ -237,7 +237,7 @@ where
         if res.is_released() {
             // We are responsible for freeing the waker handle
             check.check();
-            let _ = waker.assume_init();
+            drop(waker.assume_init());
         }
 
         if res.is_final_ref() {
