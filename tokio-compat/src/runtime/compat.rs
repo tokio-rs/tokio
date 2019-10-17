@@ -1,4 +1,4 @@
-use tokio_executor_01::park as park_01;
+use tokio_executor_01::{self as executor_01, park as park_01};
 use tokio_reactor_01 as reactor_01;
 use tokio_timer_02::{clock as clock_02, timer as timer_02};
 
@@ -20,6 +20,12 @@ pub(super) struct Compat {
     pub(super) compat_timer: timer_02::Handle,
     pub(super) compat_bg: Background,
 }
+
+#[derive(Debug)]
+pub(super) struct Now<N>(N);
+
+#[derive(Debug)]
+struct CompatPark<P>(P);
 
 impl Compat {
     pub(super) fn spawn(clock: &tokio_timer::clock::Clock) -> io::Result<Self> {
@@ -58,11 +64,13 @@ impl Drop for Background {
     }
 }
 
-#[derive(Debug)]
-pub(super) struct Now<N>(N);
-
-#[derive(Debug)]
-struct CompatPark<P>(P);
+pub(super) fn spawn_err(new: tokio_executor::SpawnError) -> executor_01::SpawnError {
+    match new {
+        _ if new.is_shutdown() => executor_01::SpawnError::shutdown(),
+        _ if new.is_at_capacity() => executor_01::SpawnError::at_capacity(),
+        e => unreachable!("weird spawn error {:?}", e),
+    }
+}
 
 impl<P> park::Park for CompatPark<P>
 where

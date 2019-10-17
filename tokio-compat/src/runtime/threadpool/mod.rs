@@ -1,6 +1,8 @@
 mod background;
 mod builder;
+mod task_executor;
 pub use builder::Builder;
+pub use task_executor::TaskExecutor;
 
 use super::compat;
 use background::Background;
@@ -52,7 +54,7 @@ struct Inner {
     compat_bg: compat::Background,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct CompatSender<S>(S);
 
 // ===== impl Runtime =====
@@ -188,6 +190,28 @@ impl Runtime {
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         Builder::new().build()
+    }
+
+    /// Return a handle to the runtime's executor.
+    ///
+    /// The returned handle can be used to spawn both `futures` 0.1 and
+    /// `std::future` tasks that run on this runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_compat::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// let executor_handle = rt.executor();
+    ///
+    /// // use `executor_handle`
+    /// ```
+    pub fn executor(&self) -> TaskExecutor {
+        let inner = CompatSender(self.inner().pool.sender().clone());
+        TaskExecutor { inner }
     }
 
     /// Spawn a `futures` 0.1 future onto the Tokio runtime.
@@ -399,6 +423,23 @@ impl executor_01::Executor for CompatSender<Sender> {
 
     fn status(&self) -> Result<(), executor_01::SpawnError> {
         tokio_executor::Executor::status(&self.0).map_err(translate_spawn_err)
+    }
+}
+
+impl<T> executor_01::TypedExecutor<T> for CompatSender<Sender>
+where
+    T: Future01<Item = (), Error = ()> + Send + 'static,
+{
+    fn spawn(&mut self, future: T) -> Result<(), executor_01::SpawnError> {
+        let future = Box::pin(future.compat().map(|_| ()));
+        // Use the `tokio` 0.2 `TypedExecutor` impl so we don't have to box the
+        // future twice (once to spawn it using `Executor01::spawn` and a second
+        // time to pin the compat future).
+        self.0.spawn(future).map_err(compat::spawn_err)
+    }
+
+    fn status(&self) -> Result<(), executor_01::SpawnError> {
+        executor_01::Executor::status(self)
     }
 }
 
