@@ -41,7 +41,7 @@ pub struct Reactor {
 /// and will instead use the default reactor for the execution context.
 #[derive(Clone)]
 pub struct Handle {
-    inner: Option<HandlePriv>,
+    inner: HandlePriv,
 }
 
 /// Like `Handle`, but never `None`.
@@ -137,14 +137,7 @@ pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
              for execution context"
         );
 
-        let handle = match handle.as_priv() {
-            Some(handle) => handle,
-            None => {
-                panic!("`handle` does not reference a reactor");
-            }
-        };
-
-        *current = Some(handle.clone());
+        *current = Some(handle.as_priv().clone());
     });
 
     DefaultGuard {
@@ -186,9 +179,9 @@ impl Reactor {
     /// to bind them to this event loop.
     pub fn handle(&self) -> Handle {
         Handle {
-            inner: Some(HandlePriv {
+            inner: HandlePriv {
                 inner: Arc::downgrade(&self.inner),
-            }),
+            },
         }
     }
 
@@ -354,19 +347,17 @@ impl Handle {
     /// - `Err` if there is no reactor set for the current thread
     pub fn current() -> io::Result<Handle> {
         let inner = HandlePriv::try_current()?;
-        Ok(Handle { inner: Some(inner) })
+        Ok(Handle { inner })
     }
 
-    pub(crate) fn as_priv(&self) -> Option<&HandlePriv> {
+    pub(crate) fn as_priv(&self) -> &HandlePriv {
         self.inner.as_ref()
     }
 }
 
 impl Unpark for Handle {
     fn unpark(&self) {
-        if let Some(ref h) = self.inner {
-            h.wakeup();
-        }
+        self.inner.wakeup();
     }
 }
 
@@ -412,6 +403,12 @@ impl HandlePriv {
 impl fmt::Debug for HandlePriv {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "HandlePriv")
+    }
+}
+
+impl AsRef<HandlePriv> for HandlePriv {
+    fn as_ref(&self) -> &Self {
+        &self
     }
 }
 
