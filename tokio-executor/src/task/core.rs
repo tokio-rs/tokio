@@ -99,11 +99,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
 }
 
 impl<T: Future> Core<T> {
-    pub(super) fn new(future: T) -> Core<T> {
-        let stage = Stage::Running(Track::new(future));
-        Core { stage }
-    }
-
     pub(super) fn transition_to_consumed(&mut self) {
         self.stage = Stage::Consumed
     }

@@ -1,15 +1,11 @@
-use crate::loom::alloc::{self, Track};
-use crate::loom::cell::CausalCell;
+use crate::loom::alloc::Track;
 use crate::task::core::Cell;
 use crate::task::harness::Harness;
 use crate::task::state::{Snapshot, State};
 use crate::task::{Header, Schedule};
 
-use std::cell::UnsafeCell;
-use std::cmp;
 use std::future::Future;
-use std::mem::MaybeUninit;
-use std::ptr::{self, NonNull};
+use std::ptr::NonNull;
 use std::task::Waker;
 
 /// Raw task handle

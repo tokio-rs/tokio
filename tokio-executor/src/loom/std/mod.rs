@@ -6,8 +6,6 @@ mod causal_cell;
 
 #[cfg(feature = "thread-pool")]
 pub(crate) mod alloc {
-    pub(crate) use std::alloc::{alloc, dealloc};
-
     #[derive(Debug)]
     pub(crate) struct Track<T> {
         value: T,

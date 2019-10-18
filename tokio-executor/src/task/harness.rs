@@ -2,15 +2,12 @@ use crate::loom::alloc::Track;
 use crate::loom::cell::CausalCheck;
 use crate::task::core::{Cell, Core, Header, Trailer};
 use crate::task::state::Snapshot;
-use crate::task::waker::waker_ref;
-use crate::task::{raw, Error, Schedule, Task};
+use crate::task::{Error, Schedule, Task};
 
 use std::future::Future;
-use std::marker::PhantomData;
-use std::mem::{self, ManuallyDrop, MaybeUninit};
-use std::pin::Pin;
-use std::ptr::{self, NonNull};
-use std::task::{Context, Poll, Waker};
+use std::mem::{ManuallyDrop, MaybeUninit};
+use std::ptr::NonNull;
+use std::task::{Poll, Waker};
 
 /// Typed raw task handle
 pub(super) struct Harness<T: Future, S: 'static> {
@@ -108,8 +105,8 @@ where
                     }
                 }
 
-                let mut guard: Guard<T> = Guard {
-                    core: core,
+                let mut guard = Guard {
+                    core,
                     polled: false,
                 };
 
