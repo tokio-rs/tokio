@@ -1,9 +1,9 @@
 use crate::loom::alloc::Track;
 use crate::loom::cell::CausalCheck;
+use crate::task::core::{Cell, Core, Header, Trailer};
+use crate::task::state::Snapshot;
 use crate::task::waker::waker_ref;
 use crate::task::{raw, Error, Schedule, Task};
-use crate::task::core::{Header, Cell, Core, Trailer};
-use crate::task::state::Snapshot;
 
 use std::future::Future;
 use std::marker::PhantomData;

@@ -1,9 +1,9 @@
 use crate::loom::alloc::{self, Track};
 use crate::loom::cell::CausalCell;
-use crate::task::{Header, Schedule};
 use crate::task::core::Cell;
 use crate::task::harness::Harness;
 use crate::task::state::{Snapshot, State};
+use crate::task::{Header, Schedule};
 
 use std::cell::UnsafeCell;
 use std::cmp;
