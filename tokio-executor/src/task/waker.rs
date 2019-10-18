@@ -1,4 +1,5 @@
-use crate::task::{raw, Header, Schedule};
+use crate::task::{Header, Schedule};
+use crate::task::harness::Harness;
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -65,7 +66,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = raw::harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
     harness.drop_waker();
 }
 
@@ -79,7 +80,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = raw::harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
     harness.wake_by_val();
 }
 
@@ -89,7 +90,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = raw::harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
     harness.wake_by_local_ref();
 }
 
@@ -99,7 +100,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = raw::harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
     harness.wake_by_ref();
 }
 

@@ -1,21 +1,20 @@
 use crate::loom::alloc::Track;
 use crate::loom::cell::CausalCheck;
 use crate::task::waker::waker_ref;
-use crate::task::{raw, Error, Header, Schedule, Snapshot, Task, Trailer};
+use crate::task::{raw, Error, Schedule, Task};
+use crate::task::core::{Header, Cell, Core, Trailer};
+use crate::task::state::Snapshot;
 
 use std::future::Future;
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::{self, ManuallyDrop, MaybeUninit};
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::task::{Context, Poll, Waker};
 
 /// Typed raw task handle
-pub(super) struct Harness<T, S: 'static> {
-    header: NonNull<Header<S>>,
-    trailer: NonNull<Trailer>,
-    future_or_output: *mut (),
-    _p: PhantomData<(T)>,
+pub(super) struct Harness<T: Future, S: 'static> {
+    cell: NonNull<Cell<T, S>>,
 }
 
 impl<T, S> Harness<T, S>
@@ -23,25 +22,23 @@ where
     T: Future,
     S: 'static,
 {
-    pub(super) fn from_ptr(
-        header: NonNull<Header<S>>,
-        trailer: NonNull<Trailer>,
-        future_or_output: *mut (),
-    ) -> Harness<T, S> {
-        Harness {
-            header,
-            trailer,
-            future_or_output,
-            _p: PhantomData,
-        }
+    pub(super) unsafe fn from_raw(ptr: *mut ()) -> Harness<T, S> {
+        debug_assert!(!ptr.is_null());
+
+        let cell = NonNull::new_unchecked(ptr as *mut Cell<T, S>);
+        Harness { cell }
     }
 
     fn header(&self) -> &Header<S> {
-        unsafe { self.header.as_ref() }
+        unsafe { &self.cell.as_ref().header }
     }
 
     fn trailer(&self) -> &Trailer {
-        unsafe { self.trailer.as_ref() }
+        unsafe { &self.cell.as_ref().trailer }
+    }
+
+    fn core(&mut self) -> &mut Core<T> {
+        unsafe { &mut self.cell.as_mut().core }
     }
 }
 
@@ -57,7 +54,7 @@ where
     /// Panics raised while polling the future are handled.
     ///
     /// Returns `true` if the task needs to be scheduled again
-    pub(super) fn poll(self, executor: NonNull<S>) -> bool {
+    pub(super) fn poll(mut self, executor: NonNull<S>) -> bool {
         use std::panic;
 
         // Transition the task to the running state.
@@ -72,18 +69,23 @@ where
         let join_interest = res.is_join_interested();
         debug_assert!(join_interest || !res.has_join_waker());
 
+        // Get the cell components
+        let cell = unsafe { &mut self.cell.as_mut() };
+        let header = &cell.header;
+        let core = &mut cell.core;
+
         // If the task's executor pointer is not yet set, then set it here. This
         // is safe because a) this is the only time the value is set. b) at this
         // point, there are no outstanding wakers which might access the
         // field concurrently.
-        if self.header().executor().is_none() {
+        if header.executor().is_none() {
             unsafe {
                 // We don't want the destructor to run because we don't really
                 // own the task here.
-                let task = ManuallyDrop::new(Task::from_raw(self.header));
+                let task = ManuallyDrop::new(Task::from_raw(header.into()));
                 // Call the scheduler's bind callback
                 executor.as_ref().bind(&task);
-                self.header().executor.with_mut(|ptr| *ptr = Some(executor));
+                header.executor.with_mut(|ptr| *ptr = Some(executor));
             }
         }
 
@@ -91,58 +93,30 @@ where
         // future has been obtained. This also ensures the `*mut T` pointer
         // contains the future (as opposed to the output) and is initialized.
 
-        let res = self.header().future_causality.with_mut(|_| {
+        let res = header.future_causality.with_mut(|_| {
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                struct Guard<T: Future> {
-                    future_or_output: *mut (),
-                    _p: PhantomData<T>,
+                struct Guard<'a, T: Future> {
+                    core: &'a mut Core<T>,
+                    polled: bool,
                 }
 
-                impl<T: Future> Drop for Guard<T> {
+                impl<T: Future> Drop for Guard<'_, T> {
                     fn drop(&mut self) {
-                        let future = self.future_or_output;
-
-                        if !future.is_null() {
-                            self.future_or_output = ptr::null_mut();
-                            unsafe {
-                                drop_future(future as *mut Track<T>);
-                            }
+                        if !self.polled {
+                            self.core.transition_to_consumed();
                         }
                     }
                 }
 
                 let mut guard: Guard<T> = Guard {
-                    future_or_output: self.future_or_output,
-                    _p: PhantomData,
+                    core: core,
+                    polled: false,
                 };
 
-                let res = {
-                    let tracked = unsafe { &mut *(self.future_or_output as *mut Track<T>) };
+                let res = guard.core.poll(header);
 
-                    // The future is pinned within the task. The above state transition
-                    // has ensured the safety of this action.
-                    let future = unsafe { Pin::new_unchecked(tracked.get_mut()) };
-
-                    // The waker passed into the `poll` function does not require a ref
-                    // count increment.
-                    let waker_ref = waker_ref::<T, S>(self.header());
-                    let mut cx = Context::from_waker(&*waker_ref);
-
-                    future.poll(&mut cx)
-                };
-
-                // Remove `future_or_output` from the guard, this prevents the
-                // future from being dropped once the scope ends.
-                guard.future_or_output = ptr::null_mut();
-
-                if res.is_ready() {
-                    // The future is complete, we want to drop it. However, the drop
-                    // fn could panic, so we need to call it from within the
-                    // `catch_panic` block.
-                    unsafe {
-                        drop_future(self.future_or_output as *mut Track<T>);
-                    }
-                }
+                // prevent the guard from dropping the future
+                guard.polled = true;
 
                 res
             }))
@@ -150,7 +124,7 @@ where
 
         match res {
             Ok(Poll::Ready(out)) => {
-                self.complete(executor, join_interest, Track::new(Ok(out)));
+                self.complete(executor, join_interest, Ok(out));
                 false
             }
             Ok(Poll::Pending) => {
@@ -164,7 +138,7 @@ where
                 }
             }
             Err(err) => {
-                self.complete(executor, join_interest, Track::new(Err(Error::panic(err))));
+                self.complete(executor, join_interest, Err(Error::panic(err)));
                 false
             }
         }
@@ -203,11 +177,7 @@ where
             // "uninitialized" data at this point.
         });
 
-        // Drop task components. This is mostly to properly release loom's data
-        self.header.as_ptr().drop_in_place();
-        self.trailer.as_ptr().drop_in_place();
-
-        raw::dealloc::<T, _>(self.header);
+        drop(Box::from_raw(self.cell.as_ptr()));
     }
 
     // ===== join handle =====
@@ -217,12 +187,10 @@ where
         dst: *mut Track<super::Result<T::Output>>,
         state: Snapshot,
     ) {
-        let src = self.future_or_output as *const Track<super::Result<T::Output>>;
-
         if state.is_canceled() {
             dst.write(Track::new(Err(Error::cancelled())));
         } else {
-            src.copy_to_nonoverlapping(dst, 1);
+            self.core().read_output(dst);
         }
 
         // Before transitioning the state, the waker must be read. It is
@@ -302,9 +270,7 @@ where
                     debug_assert!(!(res.is_complete() && res.is_canceled()));
 
                     if res.is_complete() {
-                        let out_ptr =
-                            self.future_or_output as *const Track<super::Result<T::Output>>;
-                        let _ = out_ptr.read();
+                        self.core().transition_to_consumed();
                     }
 
                     self.header().state.complete_join_handle()
@@ -342,7 +308,7 @@ where
                     None => panic!("executor should be set"),
                 };
 
-                S::schedule(executor.as_ref(), Task::from_raw(self.header));
+                S::schedule(executor.as_ref(), self.to_task());
             }
         }
     }
@@ -372,24 +338,25 @@ where
         self.do_cancel(res);
     }
 
-    fn do_cancel(&self, res: Snapshot) {
+    fn do_cancel(mut self, res: Snapshot) {
         use std::panic;
 
         debug_assert!(!res.is_complete());
+
+        let cell = unsafe { &mut self.cell.as_mut() };
+        let header = &cell.header;
+        let core = &mut cell.core;
 
         // Since we transitioned the task state to `canceled`, it won't ever be
         // polled again. We are now responsible for all cleanup.
         //
         // We have to drop the future
         //
-        self.header().future_causality.with_mut(|_| {
+        header.future_causality.with_mut(|_| {
             // Guard against potential panics in the drop handler
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                let future = self.future_or_output;
-
-                unsafe {
-                    drop_future(future as *mut Track<T>);
-                }
+                // Drop the future
+                core.transition_to_consumed();
             }));
         });
 
@@ -414,7 +381,7 @@ where
         let bound_executor = unsafe { self.header().executor.with(|ptr| *ptr) };
 
         unsafe {
-            let task = Task::from_raw(self.header);
+            let task = self.to_task();
 
             if let Some(executor) = bound_executor {
                 executor.as_ref().release(task);
@@ -431,13 +398,11 @@ where
         mut self,
         executor: NonNull<S>,
         join_interest: bool,
-        out: Track<super::Result<T::Output>>,
+        output: super::Result<T::Output>,
     ) {
         if join_interest {
             // Store the output. The future has already been dropped
-            unsafe {
-                self.store_out(out);
-            }
+            self.core().store_output(output);
         }
 
         let bound_executor = unsafe { self.header().executor.with(|ptr| *ptr) };
@@ -447,7 +412,7 @@ where
         if Some(executor) == bound_executor {
             unsafe {
                 // perform a local release
-                let task = ManuallyDrop::new(Task::from_raw(self.header));
+                let task = ManuallyDrop::new(self.to_task());
                 executor.as_ref().release_local(&task);
 
                 if self.transition_to_released(join_interest).is_final_ref() {
@@ -467,7 +432,7 @@ where
             }
 
             unsafe {
-                let task = Task::from_raw(self.header);
+                let task = self.to_task();
 
                 let executor = match bound_executor {
                     Some(executor) => executor,
@@ -527,16 +492,12 @@ where
                 // The join handle dropped interest before we could release
                 // the output. We are now responsible for releasing the
                 // output.
-                unsafe {
-                    self.drop_out();
-                }
+                self.core().transition_to_consumed();
             } else if res.has_join_waker() {
                 if res.is_canceled() {
                     // The join handle will set the output to Cancelled without
                     // attempting to read the output. We must drop it here.
-                    unsafe {
-                        self.drop_out();
-                    }
+                    self.core().transition_to_consumed();
                 }
 
                 // Notify the join handle. The previous transition obtains the
@@ -581,19 +542,8 @@ where
         self.trailer().waker.with_deferred(|ptr| ptr.read())
     }
 
-    unsafe fn store_out(&mut self, out: Track<super::Result<T::Output>>) {
-        self.header().future_causality.with_mut(|_| {
-            (self.future_or_output as *mut Track<super::Result<T::Output>>).write(out);
-        });
+    unsafe fn to_task(&self) -> Task<S> {
+        let ptr = self.cell.as_ptr() as *mut Header<S>;
+        Task::from_raw(NonNull::new_unchecked(ptr))
     }
-
-    unsafe fn drop_out(&mut self) {
-        self.header().future_causality.with_mut(|_| {
-            (self.future_or_output as *mut Track<super::Result<T::Output>>).drop_in_place();
-        });
-    }
-}
-
-unsafe fn drop_future<T: Future>(ptr: *mut Track<T>) {
-    ptr.drop_in_place();
 }

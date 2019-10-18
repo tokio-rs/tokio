@@ -1,3 +1,6 @@
+mod core;
+pub(crate) use self::core::Header;
+
 mod error;
 pub use self::error::Error;
 
@@ -8,9 +11,6 @@ pub(crate) use self::join::JoinHandle;
 
 mod list;
 pub(crate) use self::list::OwnedList;
-
-mod meta;
-pub(crate) use self::meta::Header;
 
 mod raw;
 
@@ -24,10 +24,7 @@ mod waker;
 #[cfg(test)]
 mod tests;
 
-use self::harness::Harness;
-use self::meta::{Trailer, Vtable};
 use self::raw::RawTask;
-use self::state::{Snapshot, State};
 
 use std::future::Future;
 use std::ptr::NonNull;
@@ -94,7 +91,7 @@ impl<S: 'static> Task<S> {
     }
 
     pub(crate) fn into_raw(self) -> NonNull<Header<S>> {
-        let raw = self.raw.header_ptr();
+        let raw = self.raw.into_raw();
         mem::forget(self);
         raw
     }

@@ -1,8 +1,10 @@
 use crate::loom::alloc::{self, Track};
 use crate::loom::cell::CausalCell;
-use crate::task::{Harness, Header, Schedule, Snapshot, State, Trailer, Vtable};
+use crate::task::{Header, Schedule};
+use crate::task::core::Cell;
+use crate::task::harness::Harness;
+use crate::task::state::{Snapshot, State};
 
-use std::alloc::Layout;
 use std::cell::UnsafeCell;
 use std::cmp;
 use std::future::Future;
@@ -15,40 +17,45 @@ pub(super) struct RawTask<S: 'static> {
     ptr: NonNull<Header<S>>,
 }
 
-/// Wrap a raw pointer with a harness, providing task functionality.
-pub(super) unsafe fn harness<T, S>(ptr: *const ()) -> Harness<T, S>
-where
-    T: Future,
-    S: 'static,
-{
-    debug_assert!(!ptr.is_null());
+pub(super) struct Vtable<S: 'static> {
+    /// Poll the future
+    pub(super) poll: unsafe fn(*mut (), NonNull<S>) -> bool,
 
-    let (_, future_offset, trailer_offset) = layout_task::<T, S>();
+    /// The task handle has been dropped and the join waker needs to be dropped
+    /// or the task struct needs to be deallocated
+    pub(super) drop_task: unsafe fn(*mut ()),
 
-    let header = ptr as *mut Header<S>;
+    /// Read the task output
+    pub(super) read_output: unsafe fn(*mut (), *mut (), Snapshot),
 
-    #[allow(clippy::cast_ptr_alignment)]
-    let trailer = (ptr as *mut u8).add(trailer_offset) as *mut Trailer;
-    let future_or_output = (header as *mut u8).add(future_offset) as *mut ();
+    /// Store the join handle's waker
+    ///
+    /// Returns a snapshot of the state **after** the transition
+    pub(super) store_join_waker: unsafe fn(*mut (), &Waker) -> Snapshot,
 
-    Harness::from_ptr(
-        NonNull::new_unchecked(header),
-        NonNull::new_unchecked(trailer),
-        future_or_output,
-    )
+    /// Replace the join handle's waker
+    ///
+    /// Returns a snapshot of the state **after** the transition
+    pub(super) swap_join_waker: unsafe fn(*mut (), &Waker, Snapshot) -> Snapshot,
+
+    /// The join handle has been dropped
+    pub(super) drop_join_handle_slow: unsafe fn(*mut ()),
+
+    /// The task is being canceled
+    pub(super) cancel: unsafe fn(*mut (), bool),
 }
 
-/// Deallocate task struct referenced by `ptr`.
-///
-/// All drop operations must have already been performed on data contained by
-/// the struct.
-pub(super) unsafe fn dealloc<T, S>(ptr: NonNull<Header<S>>)
-where
-    T: Future,
-    S: 'static,
-{
-    let (layout, _, _) = layout_task::<T, S>();
-    alloc::dealloc(ptr.as_ptr() as *mut u8, layout);
+/// Get the vtable for the requested `T` and `S` generics.
+pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable<S> {
+    &Vtable {
+        poll: poll::<T, S>,
+        drop_task: drop_task::<T, S>,
+        read_output: read_output::<T, S>,
+        store_join_waker: store_join_waker::<T, S>,
+        swap_join_waker: swap_join_waker::<T, S>,
+        drop_join_handle_slow: drop_join_handle_slow::<T, S>,
+        cancel: cancel::<T, S>,
+    }
 }
 
 impl<S> RawTask<S> {
@@ -73,49 +80,10 @@ impl<S> RawTask<S> {
         T: Future + Send + 'static,
         S: Schedule,
     {
-        let (layout, offset_future, offset_trailer) = layout_task::<T, S>();
+        let ptr = Box::into_raw(Cell::<T, S>::new(task, state));
+        let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header<S>) };
 
-        #[allow(clippy::cast_ptr_alignment)]
-        unsafe {
-            // Allocate memory for the task
-            let ptr = alloc::alloc(layout);
-
-            ptr::write(
-                ptr as *mut Header<S>,
-                Header {
-                    state,
-                    executor: CausalCell::new(None),
-                    queue_next: UnsafeCell::new(ptr::null()),
-                    owned_next: UnsafeCell::new(None),
-                    owned_prev: UnsafeCell::new(None),
-                    vtable: &Vtable {
-                        poll: poll::<T, S>,
-                        drop_task: drop_task::<T, S>,
-                        read_output: read_output::<T, S>,
-                        store_join_waker: store_join_waker::<T, S>,
-                        swap_join_waker: swap_join_waker::<T, S>,
-                        drop_join_handle_slow: drop_join_handle_slow::<T, S>,
-                        cancel: cancel::<T, S>,
-                    },
-                    future_causality: CausalCell::new(()),
-                },
-            );
-
-            // Write future
-            ptr::write(ptr.add(offset_future) as *mut Track<T>, Track::new(task));
-
-            // Write trailer
-            ptr::write(
-                ptr.add(offset_trailer) as *mut Trailer,
-                Trailer {
-                    waker: CausalCell::new(MaybeUninit::new(None)),
-                },
-            );
-
-            let ptr = NonNull::new_unchecked(ptr as *mut Header<S>);
-
-            RawTask { ptr }
-        }
+        RawTask { ptr }
     }
 
     pub(super) unsafe fn from_raw(ptr: NonNull<Header<S>>) -> RawTask<S> {
@@ -130,7 +98,7 @@ impl<S> RawTask<S> {
     }
 
     /// Returns a raw pointer to the task's meta structure.
-    pub(super) fn header_ptr(self) -> NonNull<Header<S>> {
+    pub(super) fn into_raw(self) -> NonNull<Header<S>> {
         self.ptr
     }
 
@@ -187,22 +155,22 @@ impl<S: 'static> Clone for RawTask<S> {
 impl<S: 'static> Copy for RawTask<S> {}
 
 unsafe fn poll<T: Future, S: Schedule>(ptr: *mut (), executor: NonNull<S>) -> bool {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.poll(executor)
 }
 
 unsafe fn drop_task<T: Future, S: Schedule>(ptr: *mut ()) {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_task();
 }
 
 unsafe fn read_output<T: Future, S: Schedule>(ptr: *mut (), dst: *mut (), state: Snapshot) {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.read_output(dst as *mut Track<super::Result<T::Output>>, state);
 }
 
 unsafe fn store_join_waker<T: Future, S: Schedule>(ptr: *mut (), waker: &Waker) -> Snapshot {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.store_join_waker(waker)
 }
 
@@ -211,84 +179,16 @@ unsafe fn swap_join_waker<T: Future, S: Schedule>(
     waker: &Waker,
     prev: Snapshot,
 ) -> Snapshot {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.swap_join_waker(waker, prev)
 }
 
 unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: *mut ()) {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_join_handle_slow()
 }
 
 unsafe fn cancel<T: Future, S: Schedule>(ptr: *mut (), from_queue: bool) {
-    let harness = harness::<T, S>(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.cancel(from_queue)
-}
-
-/// Returns the layout of the combined meta and future as well as the offset to
-/// the union of the future / output.
-fn layout_task<T, S>() -> (Layout, usize, usize)
-where
-    T: Future,
-    S: 'static,
-{
-    // Compute the layout of the union of the task and the output.
-    let layout_union_task_ret = layout_union(
-        Layout::new::<Track<T>>(),
-        Layout::new::<Track<super::Result<T::Output>>>(),
-    );
-
-    let (layout, offset_future) = layout_extend(Layout::new::<Header<S>>(), layout_union_task_ret);
-
-    let (layout, offset_trailer) = layout_extend(layout, Layout::new::<Trailer>());
-
-    (layout, offset_future, offset_trailer)
-}
-
-fn layout_union(first: Layout, second: Layout) -> Layout {
-    let size = cmp::max(first.size(), second.size());
-    let align = cmp::max(first.align(), second.align());
-
-    Layout::from_size_align(size, align).unwrap()
-}
-
-/// Returns the layout of `first` followed by `second as well as the offset at
-/// which `second` can be found in the returned layout.
-fn layout_extend(first: Layout, next: Layout) -> (Layout, usize) {
-    let new_align = cmp::max(first.align(), next.align());
-    let pad = layout_padding_needed_for(first, next.align());
-
-    let offset = first.size().checked_add(pad).unwrap();
-
-    let new_size = offset.checked_add(next.size()).unwrap();
-
-    let layout = Layout::from_size_align(new_size, new_align).unwrap();
-    (layout, offset)
-}
-
-fn layout_padding_needed_for(layout: Layout, align: usize) -> usize {
-    let len = layout.size();
-
-    // Rounded up value is:
-    //   len_rounded_up = (len + align - 1) & !(align - 1);
-    // and then we return the padding difference: `len_rounded_up - len`.
-    //
-    // We use modular arithmetic throughout:
-    //
-    // 1. align is guaranteed to be > 0, so align - 1 is always
-    //    valid.
-    //
-    // 2. `len + align - 1` can overflow by at most `align - 1`,
-    //    so the &-mask wth `!(align - 1)` will ensure that in the
-    //    case of overflow, `len_rounded_up` will itself be 0.
-    //    Thus the returned padding, when added to `len`, yields 0,
-    //    which trivially satisfies the alignment `align`.
-    //
-    // (Of course, attempts to allocate blocks of memory whose
-    // size and padding overflow in the above manner should cause
-    // the allocator to yield an error anyway.)
-
-    let len_rounded_up = len.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1);
-
-    len_rounded_up.wrapping_sub(len)
 }
