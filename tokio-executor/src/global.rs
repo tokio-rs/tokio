@@ -1,4 +1,7 @@
-use super::{Executor, SpawnError};
+#[cfg(feature = "thread-pool")]
+use crate::thread_pool::ThreadPool;
+use crate::{Executor, SpawnError};
+
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
@@ -37,17 +40,18 @@ impl DefaultExecutor {
 
     #[inline]
     fn with_current<F: FnOnce(&mut dyn Executor) -> R, R>(f: F) -> Option<R> {
-        EXECUTOR.with(
-            |current_executor| match current_executor.replace(State::Active) {
-                State::Ready(executor_ptr) => {
-                    let executor = unsafe { &mut *executor_ptr };
-                    let result = f(executor);
-                    current_executor.set(State::Ready(executor_ptr));
-                    Some(result)
-                }
-                State::Empty | State::Active => None,
-            },
-        )
+        EXECUTOR.with(|current_executor| match current_executor.get() {
+            State::Ready(executor_ptr) => {
+                let executor = unsafe { &mut *executor_ptr };
+                Some(f(executor))
+            }
+            #[cfg(feature = "thread-pool")]
+            State::ThreadPool(threadpool_ptr) => {
+                let mut thread_pool = unsafe { &*threadpool_ptr };
+                Some(f(&mut thread_pool))
+            }
+            State::Empty => None,
+        })
     }
 }
 
@@ -55,10 +59,13 @@ impl DefaultExecutor {
 enum State {
     // default executor not defined
     Empty,
-    // default executor is defined and ready to be used
+
+    // default executor is a thread pool instance.
+    #[cfg(feature = "thread-pool")]
+    ThreadPool(*const ThreadPool),
+
+    // default executor is set to a custom executor.
     Ready(*mut dyn Executor),
-    // default executor is currently active (used to detect recursive calls)
-    Active,
 }
 
 thread_local! {
@@ -132,7 +139,26 @@ pub fn spawn<T>(future: T)
 where
     T: Future<Output = ()> + Send + 'static,
 {
-    DefaultExecutor::current().spawn(Box::pin(future)).unwrap()
+    EXECUTOR.with(|current_executor| match current_executor.get() {
+        State::Ready(executor_ptr) => {
+            let executor = unsafe { &mut *executor_ptr };
+            executor.spawn(Box::pin(future)).unwrap();
+        }
+        #[cfg(feature = "thread-pool")]
+        State::ThreadPool(threadpool_ptr) => {
+            let thread_pool = unsafe { &*threadpool_ptr };
+            thread_pool.spawn_background(future);
+        }
+        State::Empty => panic!("must be called from the context of Tokio runtime"),
+    })
+}
+
+#[cfg(feature = "thread-pool")]
+pub(crate) fn with_threadpool<F, R>(thread_pool: &ThreadPool, f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    with_state(State::ThreadPool(thread_pool as *const ThreadPool), f)
 }
 
 /// Set the default executor for the duration of the closure
@@ -144,8 +170,23 @@ where
     T: Executor,
     F: FnOnce() -> R,
 {
+    // While scary, this is safe. The function takes a
+    // `&mut Executor`, which guarantees that the reference lives for the
+    // duration of `with_default`.
+    //
+    // Because we are always clearing the TLS value at the end of the
+    // function, we can cast the reference to 'static which thread-local
+    // cells require.
+    let executor = unsafe { hide_lt(executor as &mut _ as *mut _) };
+    with_state(State::Ready(executor), f)
+}
+
+fn with_state<F, R>(state: State, f: F) -> R
+where
+    F: FnOnce() -> R,
+{
     EXECUTOR.with(|cell| {
-        let was = cell.get();
+        let was = cell.replace(State::Empty);
 
         // Ensure that the executor is removed from the thread-local context
         // when leaving the scope. This handles cases that involve panicking.
@@ -159,16 +200,15 @@ where
 
         let _reset = Reset(cell, was);
 
-        // While scary, this is safe. The function takes a
-        // `&mut Executor`, which guarantees that the reference lives for the
-        // duration of `with_default`.
-        //
-        // Because we are always clearing the TLS value at the end of the
-        // function, we can cast the reference to 'static which thread-local
-        // cells require.
-        let executor = unsafe { hide_lt(executor as &mut _ as *mut _) };
+        if let State::Ready(executor) = state {
+            let executor = unsafe { &mut *executor };
 
-        cell.set(State::Ready(executor));
+            if executor.status().is_err() {
+                panic!("executor not active; is this because `with_default` is called with `DefaultExecutor`?");
+            }
+        }
+
+        cell.set(state);
 
         f()
     })
@@ -183,7 +223,7 @@ unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'stat
 
 #[cfg(test)]
 mod tests {
-    use super::{with_default, DefaultExecutor, Executor};
+    use super::{with_default, DefaultExecutor};
 
     #[test]
     fn default_executor_is_send_and_sync() {
@@ -193,12 +233,11 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn nested_default_executor_status() {
         let _enter = super::super::enter().unwrap();
         let mut executor = DefaultExecutor::current();
 
-        let result = with_default(&mut executor, || DefaultExecutor::current().status());
-
-        assert!(result.err().unwrap().is_shutdown())
+        let _result = with_default(&mut executor, || ());
     }
 }

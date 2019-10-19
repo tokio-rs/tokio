@@ -1,15 +1,15 @@
-mod background;
 mod builder;
-mod task_executor;
-
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::builder::Builder;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::task_executor::TaskExecutor;
-use background::Background;
 
-use tokio_executor::enter;
-use tokio_executor::threadpool::ThreadPool;
+mod spawner;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::spawner::Spawner;
+
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use tokio_executor::thread_pool::JoinHandle;
+
+use tokio_executor::thread_pool::ThreadPool;
 use tokio_net::driver;
 use tokio_timer::timer;
 
@@ -41,18 +41,14 @@ struct Inner {
     /// Task execution pool.
     pool: ThreadPool,
 
+    /// Reactor handles
+    reactor_handles: Vec<tokio_net::driver::Handle>,
+
+    /// Timer handles
+    timer_handles: Vec<timer::Handle>,
+
     /// Tracing dispatcher
     trace: trace::Dispatch,
-
-    /// Maintains a reactor and timer that are always running on a background
-    /// thread. This is to support `runtime.block_on` w/o requiring the future
-    /// to be `Send`.
-    ///
-    /// A dedicated background thread is required as the threadpool threads
-    /// might not be running. However, this is a temporary work around.
-    ///
-    /// TODO: Delete this
-    background: Background,
 }
 
 // ===== impl Runtime =====
@@ -80,35 +76,11 @@ impl Runtime {
     ///     .unwrap();
     ///
     /// // Use the runtime...
-    ///
-    /// // Shutdown the runtime
-    /// rt.shutdown_now();
     /// ```
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         Builder::new().build()
-    }
-
-    /// Return a handle to the runtime's executor.
-    ///
-    /// The returned handle can be used to spawn tasks that run on this runtime.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    ///
-    /// let rt = Runtime::new()
-    ///     .unwrap();
-    ///
-    /// let executor_handle = rt.executor();
-    ///
-    /// // use `executor_handle`
-    /// ```
-    pub fn executor(&self) -> TaskExecutor {
-        let inner = self.inner().pool.sender().clone();
-        TaskExecutor { inner }
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -134,8 +106,6 @@ impl Runtime {
     ///    rt.spawn(async {
     ///        println!("now running on a worker thread");
     ///    });
-    ///
-    ///    rt.shutdown_on_idle();
     /// }
     /// ```
     ///
@@ -166,32 +136,19 @@ impl Runtime {
     where
         F: Future,
     {
-        let mut entered = enter().expect("nested block_on");
-
-        let bg = &self.inner().background;
         let trace = &self.inner().trace;
 
-        tokio_executor::with_default(&mut self.inner().pool.sender(), || {
-            let _reactor = driver::set_default(bg.reactor());
-            let _timer = timer::set_default(bg.timer());
-            trace::dispatcher::with_default(trace, || {
-                entered.block_on(future)
-            })
+        let _reactor = driver::set_default(&self.inner().reactor_handles[0]);
+        let _timer = timer::set_default(&self.inner().timer_handles[0]);
+
+        trace::dispatcher::with_default(trace, || {
+            self.inner().pool.block_on(future)
         })
     }
 
-    /// Signals the runtime to shutdown once it becomes idle.
+    /// Return a handle to the runtime's spawner.
     ///
-    /// Blocks the current thread until the shutdown operation has completed.
-    /// This function can be used to perform a graceful shutdown of the runtime.
-    ///
-    /// The runtime enters an idle state once **all** of the following occur.
-    ///
-    /// * The thread pool has no tasks to execute, i.e., all tasks that were
-    ///   spawned have completed.
-    /// * The reactor is not managing any I/O resources.
-    ///
-    /// See [module level][mod] documentation for more details.
+    /// The returned handle can be used to spawn tasks that run on this runtime.
     ///
     /// # Examples
     ///
@@ -201,18 +158,13 @@ impl Runtime {
     /// let rt = Runtime::new()
     ///     .unwrap();
     ///
-    /// // Use the runtime...
+    /// let spawner = rt.spawner();
     ///
-    /// // Shutdown the runtime
-    /// rt.shutdown_on_idle();
+    /// spawner.spawn(async { println!("hello"); });
     /// ```
-    ///
-    /// [mod]: index.html
-    pub fn shutdown_on_idle(mut self) {
-        let mut e = tokio_executor::enter().unwrap();
-
-        let inner = self.inner.take().unwrap();
-        e.block_on(inner.pool.shutdown_on_idle());
+    pub fn spawner(&self) -> Spawner {
+        let inner = self.inner().pool.spawner().clone();
+        Spawner::new(inner)
     }
 
     /// Signals the runtime to shutdown immediately.
@@ -248,11 +200,9 @@ impl Runtime {
     /// ```
     ///
     /// [mod]: index.html
+    #[allow(warnings)]
     pub fn shutdown_now(mut self) {
-        let mut e = tokio_executor::enter().unwrap();
-        let inner = self.inner.take().unwrap();
-
-        e.block_on(inner.pool.shutdown_now());
+        self.inner.unwrap().pool.shutdown_now();
     }
 
     fn inner(&self) -> &Inner {
