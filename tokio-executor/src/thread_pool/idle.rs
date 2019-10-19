@@ -110,14 +110,10 @@ impl Idle {
 
     /// A lightweight transition from searching -> running.
     ///
-    /// This operation does not require the full SeqCst transition because after
-    /// it is done, it guarantees that a worker will remain in the searching
-    /// state.
-    ///
     /// Returns `true` if this is the final searching worker. The caller
     /// **must** notify a new worker.
     pub(super) fn transition_worker_from_searching(&self) -> bool {
-        State::dec_num_searching(&self.state, AcqRel)
+        State::dec_num_searching(&self.state)
     }
 
     /// Unpark a specific worker. This happens if tasks are submitted from
@@ -171,8 +167,8 @@ impl State {
     }
 
     /// Returns `true` if this is the final searching worker
-    fn dec_num_searching(cell: &AtomicUsize, ordering: Ordering) -> bool {
-        let state = State(cell.fetch_sub(1, ordering));
+    fn dec_num_searching(cell: &AtomicUsize) -> bool {
+        let state = State(cell.fetch_sub(1, SeqCst));
         state.num_searching() == 1
     }
 
@@ -186,7 +182,7 @@ impl State {
             dec += 1;
         }
 
-        let prev = State(cell.fetch_sub(dec, AcqRel));
+        let prev = State(cell.fetch_sub(dec, SeqCst));
         is_searching && prev.num_searching() == 1
     }
 
