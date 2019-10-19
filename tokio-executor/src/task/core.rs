@@ -141,7 +141,7 @@ impl<T: Future> Core<T> {
 
         dst.write(match mem::replace(&mut self.stage, Stage::Consumed) {
             Stage::Finished(output) => output,
-            _ => panic!("unexpected state"),
+            _ => unreachable!("unexpected state"),
         });
     }
 }
