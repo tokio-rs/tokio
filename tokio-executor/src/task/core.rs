@@ -110,7 +110,7 @@ impl<T: Future> Core<T> {
         let res = {
             let future = match &mut self.stage {
                 Stage::Running(tracked) => tracked.get_mut(),
-                _ => panic!("unexpected stage"),
+                _ => unreachable!("unexpected stage"),
             };
 
             // The future is pinned within the task. The above state transition
