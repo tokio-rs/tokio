@@ -1,11 +1,11 @@
-//! A mocked clock for use with `tokio_timer` based futures.
+//! A mocked clock for use with `tokio::timer` based futures.
 //!
 //! # Example
 //!
 //! ```
 //! use tokio::clock;
+//! use tokio::timer::delay;
 //! use tokio_test::{assert_ready, assert_pending, task};
-//! use tokio_timer::delay;
 //!
 //! use std::time::Duration;
 //!
@@ -22,9 +22,9 @@
 //! });
 //! ```
 
+use tokio::timer::clock::{Clock, Now};
+use tokio::timer::Timer;
 use tokio_executor::park::{Park, Unpark};
-use tokio_timer::clock::{Clock, Now};
-use tokio_timer::Timer;
 
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -125,13 +125,13 @@ impl MockClock {
     where
         F: FnOnce(&mut Handle) -> R,
     {
-        ::tokio_timer::clock::with_default(&self.clock, || {
+        tokio::timer::clock::with_default(&self.clock, || {
             let park = self.time.mock_park();
             let timer = Timer::new(park);
             let handle = timer.handle();
             let time = self.time.clone();
 
-            let _timer = ::tokio_timer::set_default(&handle);
+            let _timer = tokio::timer::set_default(&handle);
             let mut handle = Handle::new(timer, time);
             f(&mut handle)
             // lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()

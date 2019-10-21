@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 #[cfg(feature = "timer")]
-use tokio_timer::{throttle::Throttle, Timeout};
+use crate::timer::{throttle::Throttle, Timeout};
 
 #[doc(inline)]
 pub use futures_core::Stream;

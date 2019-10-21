@@ -1,4 +1,4 @@
-use crate::driver::{platform, Handle, Registration};
+use crate::driver::{platform, Registration};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -121,8 +121,6 @@ struct Inner {
 
 macro_rules! poll_ready {
     ($me:expr, $mask:expr, $cache:ident, $take:ident, $poll:expr) => {{
-        $me.register()?;
-
         // Load cached & encoded readiness.
         let mut cached = $me.inner.$cache.load(Relaxed);
         let mask = $mask | platform::hup();
@@ -168,28 +166,16 @@ where
     E: Evented,
 {
     /// Creates a new `PollEvented` associated with the default reactor.
-    pub fn new(io: E) -> PollEvented<E> {
-        PollEvented {
+    pub fn new(io: E) -> io::Result<Self> {
+        let registration = Registration::new(&io)?;
+        Ok(Self {
             io: Some(io),
             inner: Inner {
-                registration: Registration::new(),
+                registration,
                 read_readiness: AtomicUsize::new(0),
                 write_readiness: AtomicUsize::new(0),
             },
-        }
-    }
-
-    /// Creates a new `PollEvented` associated with the specified reactor.
-    pub fn new_with_handle(io: E, handle: &Handle) -> io::Result<Self> {
-        let ret = PollEvented::new(io);
-
-        if let Some(handle) = handle.as_priv() {
-            ret.inner
-                .registration
-                .register_with_priv(ret.io.as_ref().unwrap(), handle)?;
-        }
-
-        Ok(ret)
+        })
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -339,14 +325,6 @@ where
             cx.waker().wake_by_ref();
         }
 
-        Ok(())
-    }
-
-    /// Ensure that the I/O resource is registered with the reactor.
-    fn register(&self) -> io::Result<()> {
-        self.inner
-            .registration
-            .register(self.io.as_ref().unwrap())?;
         Ok(())
     }
 }

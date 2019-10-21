@@ -1,10 +1,10 @@
 use crate::runtime::current_thread::Builder;
+use crate::timer::clock::{self, Clock};
+use crate::timer::timer::{self, Timer};
 
 use tokio_executor::current_thread::Handle as ExecutorHandle;
 use tokio_executor::current_thread::{self, CurrentThread};
 use tokio_net::driver::{self, Reactor};
-use tokio_timer::clock::{self, Clock};
-use tokio_timer::timer::{self, Timer};
 
 use std::error::Error;
 use std::fmt;

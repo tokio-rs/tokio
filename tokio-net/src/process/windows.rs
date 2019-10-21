@@ -188,5 +188,5 @@ where
         None => return None,
     };
     let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
-    Some(PollEvented::new(pipe))
+    PollEvented::new(pipe).ok()
 }
