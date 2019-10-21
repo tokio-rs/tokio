@@ -23,8 +23,6 @@ fn timer_with_threaded_runtime() {
         tx.send(()).unwrap();
     });
 
-    rt.shutdown_on_idle();
-
     rx.recv().unwrap();
 }
 

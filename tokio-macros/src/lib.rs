@@ -28,8 +28,8 @@ enum RuntimeType {
 ///
 /// ## Options:
 ///
-/// - `single_thread` - Uses `current_thread`.
-/// - `multi_thread` - Uses multi-threaded runtime. Used by default.
+/// - `current_thread` - Uses the `current_thread` runtime.
+/// - `threadpool` - Uses the multi-threaded `threadpool` runtime. Used by default.
 ///
 /// ## Function arguments:
 ///
@@ -40,7 +40,7 @@ enum RuntimeType {
 /// ### Select runtime
 ///
 /// ```rust
-/// #[tokio::main(single_thread)]
+/// #[tokio::main(current_thread)]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -87,10 +87,10 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 return syn::Error::new_spanned(path, msg).to_compile_error().into();
             }
             match ident.unwrap().to_string().to_lowercase().as_str() {
-                "multi_thread" => runtime = RuntimeType::Multi,
-                "single_thread" => runtime = RuntimeType::Single,
+                "threadpool" => runtime = RuntimeType::Multi,
+                "current_thread" => runtime = RuntimeType::Single,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified; expected `single_thread` or `multi_thread`", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `current_thread` or `threadpool`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -126,15 +126,15 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Options:
 ///
-/// - `single_thread` - Uses `current_thread`. Used by default.
-/// - `multi_thread` - Uses multi-threaded runtime.
+/// - `current_thread` - Uses the `current_thread` runtime. Used by default.
+/// - `threadpool` - Uses multi-threaded runtime.
 ///
 /// ## Usage
 ///
 /// ### Select runtime
 ///
 /// ```no_run
-/// #[tokio::test(multi_thread)]
+/// #[tokio::test(threadpool)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -189,10 +189,10 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
                 return syn::Error::new_spanned(path, msg).to_compile_error().into();
             }
             match ident.unwrap().to_string().to_lowercase().as_str() {
-                "multi_thread" => runtime = RuntimeType::Multi,
-                "single_thread" => runtime = RuntimeType::Single,
+                "threadpool" => runtime = RuntimeType::Multi,
+                "current_thread" => runtime = RuntimeType::Single,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified; expected `single_thread` or `multi_thread`", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `current_thread` or `threadpool`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }

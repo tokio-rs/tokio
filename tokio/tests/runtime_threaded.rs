@@ -47,14 +47,13 @@ fn spawn_shutdown() {
 
     rt.spawn(client_server(tx.clone()));
 
-    // Use executor trait
-    let f = Box::pin(client_server(tx));
-    tokio_executor::Executor::spawn(&mut rt.executor(), f).unwrap();
+    // Use spawner
+    rt.spawner().spawn(client_server(tx));
 
-    rt.shutdown_on_idle();
+    assert_ok!(rx.recv());
+    assert_ok!(rx.recv());
 
-    assert_ok!(rx.try_recv());
-    assert_ok!(rx.try_recv());
+    rt.shutdown_now();
     assert_err!(rx.try_recv());
 }
 
@@ -68,8 +67,6 @@ fn block_on_timer() {
     });
 
     assert_eq!(v, 42);
-
-    rt.shutdown_on_idle();
 }
 
 #[test]
@@ -111,30 +108,35 @@ fn block_waits() {
     });
 
     assert_ok!(b_rx.try_recv());
-
-    rt.shutdown_on_idle();
 }
 
 #[test]
 fn spawn_many() {
     const ITER: usize = 200;
 
-    let cnt = Arc::new(Mutex::new(0));
     let rt = Runtime::new().unwrap();
+
+    let cnt = Arc::new(Mutex::new(0));
+    let (tx, rx) = mpsc::channel();
+    let tx = Arc::new(Mutex::new(tx));
 
     let c = cnt.clone();
     rt.block_on(async move {
         for _ in 0..ITER {
             let c = c.clone();
+            let tx = tx.clone();
             tokio::spawn(async move {
                 let mut x = c.lock().unwrap();
                 *x = 1 + *x;
+
+                if *x == ITER {
+                    tx.lock().unwrap().send(()).unwrap();
+                }
             });
         }
     });
 
-    rt.shutdown_on_idle();
-
+    rx.recv().unwrap();
     assert_eq!(ITER, *cnt.lock().unwrap());
 }
 
@@ -146,30 +148,12 @@ fn nested_enter() {
     rt.block_on(async {
         assert_err!(tokio_executor::enter());
 
-        // Since this is testing panics in other threads, printing about panics
-        // is noisy and can give the impression that the test is ignoring panics.
-        //
-        // It *is* ignoring them, but on purpose.
-        let prev_hook = panic::take_hook();
-        panic::set_hook(Box::new(|info| {
-            let s = info.to_string();
-            if s.starts_with("panicked at 'nested ")
-                || s.starts_with("panicked at 'Multiple executors at once")
-            {
-                // expected, noop
-            } else {
-                println!("{}", s);
-            }
-        }));
-
         let res = panic::catch_unwind(move || {
             let rt = Runtime::new().unwrap();
             rt.block_on(async {});
         });
 
         assert_err!(res);
-
-        panic::set_hook(prev_hook);
     });
 }
 
@@ -198,7 +182,7 @@ fn after_start_and_before_stop_is_called() {
 
     rt.block_on(client_server(tx));
 
-    rt.shutdown_on_idle();
+    drop(rt);
 
     assert_ok!(rx.try_recv());
 

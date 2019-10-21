@@ -19,7 +19,7 @@ use std::task::Poll;
 /// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
 pub async fn read_dir<P>(path: P) -> io::Result<ReadDir>
 where
-    P: AsRef<Path> + Send + 'static,
+    P: AsRef<Path>,
 {
     let path = path.as_ref().to_owned();
     let std = asyncify(|| std::fs::read_dir(path)).await?;

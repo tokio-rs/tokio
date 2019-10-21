@@ -70,9 +70,6 @@
 //! }
 //! ```
 //!
-//! In this function, the `run` function blocks until the runtime becomes idle.
-//! See [`shutdown_on_idle`][idle] for more shutdown details.
-//!
 //! From within the context of the runtime, additional tasks are spawned using
 //! the [`tokio::spawn`] function. Futures spawned using this function will be
 //! executed on the same thread pool used by the [`Runtime`].
@@ -129,7 +126,6 @@
 //! [`Reactor`]: ../reactor/struct.Reactor.html
 //! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
-//! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
@@ -141,8 +137,9 @@ mod threadpool;
 #[cfg(feature = "rt-full")]
 pub use self::threadpool::{
     Builder,
+    JoinHandle,
     Runtime,
-    TaskExecutor,
+    Spawner,
 };
 
 // Internal export, don't use.

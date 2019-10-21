@@ -4,7 +4,7 @@ error: the async keyword is missing from the function declaration
 4 | fn main_is_not_async() {}
   | ^^
 
-error: Unknown attribute foo is specified; expected `single_thread` or `multi_thread`
+error: Unknown attribute foo is specified; expected `current_thread` or `threadpool`
  --> $DIR/macros_invalid_input.rs:6:15
   |
 6 | #[tokio::main(foo)]
@@ -13,8 +13,8 @@ error: Unknown attribute foo is specified; expected `single_thread` or `multi_th
 error: Must have specified ident
  --> $DIR/macros_invalid_input.rs:9:15
   |
-9 | #[tokio::main(multi_thread::bar)]
-  |               ^^^^^^^^^^^^^^^^^
+9 | #[tokio::main(threadpool::bar)]
+  |               ^^^^^^^^^^^^^^^
 
 error: the async keyword is missing from the function declaration
   --> $DIR/macros_invalid_input.rs:13:1
@@ -28,7 +28,7 @@ error: the test function cannot accept arguments
 16 | async fn test_fn_has_args(_x: u8) {}
    |                           ^^^^^^
 
-error: Unknown attribute foo is specified; expected `single_thread` or `multi_thread`
+error: Unknown attribute foo is specified; expected `current_thread` or `threadpool`
   --> $DIR/macros_invalid_input.rs:18:15
    |
 18 | #[tokio::test(foo)]

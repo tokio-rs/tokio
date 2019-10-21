@@ -60,6 +60,17 @@
 //! [`DefaultExecutor`]: struct.DefaultExecutor.html
 //! [`Park`]: park/index.html
 //! [`Future::poll`]: https://doc.rust-lang.org/std/future/trait.Future.html#tymethod.poll
+
+#[cfg(all(test, loom))]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
+
+// At the top due to macros
+#[cfg(test)]
+#[macro_use]
+mod tests;
+
 #[cfg(any(feature = "current-thread", feature = "threadpool"))]
 #[macro_use]
 mod tracing;
@@ -68,8 +79,13 @@ mod enter;
 mod error;
 mod executor;
 mod global;
+mod loom;
 pub mod park;
+#[cfg(feature = "thread-pool")]
+mod task;
 mod typed;
+#[cfg(feature = "thread-pool")]
+mod util;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;
@@ -77,8 +93,8 @@ pub mod blocking;
 #[cfg(feature = "current-thread")]
 pub mod current_thread;
 
-#[cfg(feature = "threadpool")]
-pub mod threadpool;
+#[cfg(feature = "thread-pool")]
+pub mod thread_pool;
 
 pub use crate::enter::{enter, exit, Enter, EnterError};
 pub use crate::error::SpawnError;

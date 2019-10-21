@@ -1,3 +1,5 @@
+#![allow(unused_macros)]
+
 //! This module provides a small facade that wraps the `tracing` APIs we use, so
 //! that when the `tracing` dependency is disabled, `tracing`'s macros expand to
 //! no-ops.

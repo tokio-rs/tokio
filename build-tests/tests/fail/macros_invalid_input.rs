@@ -6,7 +6,7 @@ fn main_is_not_async() {}
 #[tokio::main(foo)]
 async fn main_attr_has_unknown_args() {}
 
-#[tokio::main(multi_thread::bar)]
+#[tokio::main(threadpool::bar)]
 async fn main_attr_has_path_args() {}
 
 #[tokio::test]

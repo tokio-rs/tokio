@@ -65,7 +65,7 @@ jobs:
       tokio-codec: []
       tokio-executor:
         - current-thread
-        - threadpool
+        - thread-pool
       tokio-io:
         - util
       tokio-sync:
@@ -93,6 +93,13 @@ jobs:
         - net-with-uds
         - tokio-no-features
         - tokio-with-net
+
+# Run loom tests
+- template: ci/azure-loom.yml
+  parameters:
+    rust: beta
+    crates:
+      - tokio-executor
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
