@@ -82,6 +82,8 @@ pub use self::delay_queue::DelayQueue;
 
 pub mod throttle;
 
+// TODO: clean this up
+#[allow(clippy::module_inception)]
 pub mod timer;
 pub use timer::{set_default, Timer};
 
