@@ -29,6 +29,21 @@ mod idx {
     }
 }
 
+fn store_val(slab: &Arc<Slab>, readiness: usize) -> usize {
+    println!("store: {}", readiness);
+    let key = slab.alloc().expect("allocate slot");
+    if let Some(slot) = slab.get(key) {
+        slot.readiness.store(readiness, Ordering::Release);
+    } else {
+        panic!("slab did not contain a value for {:#x}", key);
+    }
+    key
+}
+
+fn get_val(slab: &Arc<Slab>, key: usize) -> Option<usize> {
+    slab.get(key).map(|s| s.readiness.load(Ordering::Acquire))
+}
+
 mod single_shard;
 mod small_slab;
 
@@ -36,42 +51,40 @@ mod small_slab;
 fn local_remove() {
     loom::model(|| {
         let slab = Arc::new(Slab::new());
-        let next_guard = Arc::new(AtomicUsize::new(0));
 
         let s = slab.clone();
-        let guard = next_guard.clone();
         let t1 = thread::spawn(move || {
-            let idx = s.alloc().expect("alloc");
-            assert_eq!(s.get_guard(idx), Some(1));
+            let idx = store_val(&s, 1);
+            assert_eq!(get_val(&s, idx), Some(1));
             s.remove(idx);
-            assert_eq!(s.get_guard(idx), None);
-            let idx = s.alloc(2).expect("alloc");
-            assert_eq!(s.get_guard(idx), Some(2));
+            assert_eq!(get_val(&s, idx), None);
+            let idx = store_val(&s, 2);
+            assert_eq!(get_val(&s, idx), Some(2));
             s.remove(idx);
-            assert_eq!(s.get_guard(idx), None);
+            assert_eq!(get_val(&s, idx), None);
         });
 
         let s = slab.clone();
         let t2 = thread::spawn(move || {
-            let idx = s.alloc(3).expect("alloc");
-            assert_eq!(s.get_guard(idx), Some(3));
+            let idx = store_val(&s, 3);
+            assert_eq!(get_val(&s, idx), Some(3));
             s.remove(idx);
-            assert_eq!(s.get_guard(idx), None);
-            let idx = s.alloc(4).expect("alloc");
+            assert_eq!(get_val(&s, idx), None);
+            let idx = store_val(&s, 4);
             s.remove(idx);
-            assert_eq!(s.get_guard(idx), None);
+            assert_eq!(get_val(&s, idx), None);
         });
 
         let s = slab;
-        let idx1 = s.alloc(5).expect("alloc");
-        assert_eq!(s.get_guard(idx1), Some(5));
-        let idx2 = s.alloc(6).expect("alloc");
-        assert_eq!(s.get_guard(idx2), Some(6));
+        let idx1 = store_val(&s, 5);
+        assert_eq!(get_val(&s, idx1), Some(5));
+        let idx2 = store_val(&s, 6);
+        assert_eq!(get_val(&s, idx2), Some(6));
         s.remove(idx1);
-        assert_eq!(s.get_guard(idx1), None);
-        assert_eq!(s.get_guard(idx2), Some(6));
+        assert_eq!(get_val(&s, idx1), None);
+        assert_eq!(get_val(&s, idx2), Some(6));
         s.remove(idx2);
-        assert_eq!(s.get_guard(idx2), None);
+        assert_eq!(get_val(&s, idx2), None);
 
         t1.join().expect("thread 1 should not panic");
         t2.join().expect("thread 2 should not panic");
@@ -83,35 +96,35 @@ fn remove_remote() {
     loom::model(|| {
         let slab = Arc::new(Slab::new());
 
-        let idx1 = slab.alloc(1).expect("alloc");
-        assert_eq!(slab.get_guard(idx1), Some(1));
+        let idx1 = store_val(&slab, 1);
+        assert_eq!(get_val(&slab, idx1), Some(1));
 
-        let idx2 = slab.alloc(2).expect("alloc");
-        assert_eq!(slab.get_guard(idx2), Some(2));
+        let idx2 = store_val(&slab, 2);
+        assert_eq!(get_val(&slab, idx2), Some(2));
 
-        let idx3 = slab.alloc(3).expect("alloc");
-        assert_eq!(slab.get_guard(idx3), Some(3));
+        let idx3 = store_val(&slab, 3);
+        assert_eq!(get_val(&slab, idx3), Some(3));
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
-            assert_eq!(s.get_guard(idx2), Some(2));
+            assert_eq!(get_val(&s, idx2), Some(2));
             s.remove(idx2);
-            assert_eq!(s.get_guard(idx2), None);
+            assert_eq!(get_val(&s, idx2), None);
         });
 
         let s = slab.clone();
         let t2 = thread::spawn(move || {
-            assert_eq!(s.get_guard(idx3), Some(3));
+            assert_eq!(get_val(&s, idx3), Some(3));
             s.remove(idx3);
-            assert_eq!(s.get_guard(idx3), None);
+            assert_eq!(get_val(&s, idx3), None);
         });
 
         t1.join().expect("thread 1 should not panic");
         t2.join().expect("thread 2 should not panic");
 
-        assert_eq!(slab.get_guard(idx1), Some(1));
-        assert_eq!(slab.get_guard(idx2), None);
-        assert_eq!(slab.get_guard(idx3), None);
+        assert_eq!(get_val(&slab, idx1), Some(1));
+        assert_eq!(get_val(&slab, idx2), None);
+        assert_eq!(get_val(&slab, idx3), None);
     });
 }
 
@@ -133,7 +146,7 @@ fn concurrent_alloc_remove() {
                 }
                 let key = next.take().unwrap();
                 slab2.remove(key);
-                assert!(slab2.get_guard(key).is_none());
+                assert_eq!(get_val(&slab2, key), None);
                 cvar.notify_one();
             }
         });
@@ -141,7 +154,7 @@ fn concurrent_alloc_remove() {
         let (lock, cvar) = &*pair;
         for i in 0..2 {
             test_println!("--- allocer i={} ---", i);
-            let key = slab.alloc(i).expect("alloc");
+            let key = store_val(&slab, i);
 
             let mut next = lock.lock().unwrap();
             *next = Some(key);
@@ -152,7 +165,7 @@ fn concurrent_alloc_remove() {
                 next = cvar.wait(next).unwrap();
             }
 
-            assert!(slab.get_guard(key).is_none());
+            assert_eq!(get_val(&slab, key), None);
         }
 
         remover.join().unwrap();
@@ -162,27 +175,27 @@ fn concurrent_alloc_remove() {
 #[test]
 fn unique_iter() {
     loom::model(|| {
-        let mut slab = std::sync::Arc::new(Slab::new());
+        let mut slab = Arc::new(Slab::new());
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
-            s.alloc(1).expect("alloc");
-            s.alloc(2).expect("alloc");
+            store_val(&s, 1);
+            store_val(&s, 2);
         });
 
         let s = slab.clone();
         let t2 = thread::spawn(move || {
-            s.alloc(3).expect("alloc");
-            s.alloc(4).expect("alloc");
+            store_val(&s, 3);
+            store_val(&s, 4);
         });
 
         t1.join().expect("thread 1 should not panic");
         t2.join().expect("thread 2 should not panic");
 
-        let slab = std::sync::Arc::get_mut(&mut slab).expect("other arcs should be dropped");
+        let slab = Arc::get_mut(&mut slab).expect("other arcs should be dropped");
         let items: Vec<_> = slab
             .unique_iter()
-            .map(|i| i.aba_guard.load(Ordering::Acquire))
+            .map(|i| i.readiness.load(Ordering::Acquire))
             .collect();
         assert!(items.contains(&1), "items: {:?}", items);
         assert!(items.contains(&2), "items: {:?}", items);

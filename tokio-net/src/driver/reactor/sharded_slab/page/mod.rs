@@ -1,4 +1,4 @@
-use super::{Pack, ScheduledIo, INITIAL_PAGE_SIZE, WIDTH};
+use super::{Pack, ScheduledIo, INITIAL_PAGE_SIZE, RESERVED_BITS, WIDTH};
 use crate::sync::{
     atomic::{AtomicUsize, Ordering},
     CausalCell,
