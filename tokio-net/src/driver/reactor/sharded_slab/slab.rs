@@ -9,8 +9,8 @@ pub(crate) struct Slab {
 }
 
 /// A slab implemented with a single shard.
-/// TODO(eliza): once worker threads are available, this type will be
-/// unnecessary and can be removed.
+// TODO(eliza): once worker threads are available, this type will be
+// unnecessary and can be removed.
 #[derive(Debug)]
 pub(crate) struct SingleShard {
     shard: Shard,
@@ -55,6 +55,7 @@ pub(super) struct Shard {
 pub(crate) const TOKEN_SHIFT: usize = Tid::SHIFT + Tid::LEN;
 pub(crate) const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 
+#[allow(dead_code)] // coming back soon!
 impl Slab {
     /// Returns a new slab with the default configuration parameters.
     pub(crate) fn new() -> Self {

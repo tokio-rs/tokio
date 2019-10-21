@@ -5,8 +5,8 @@ use crate::sync::atomic::{
 };
 
 mod sharded_slab;
+use sharded_slab::SingleShard;
 pub(crate) use sharded_slab::MAX_SOURCES;
-use sharded_slab::{Slab, TOKEN_SHIFT};
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
@@ -62,7 +62,9 @@ pub(super) struct Inner {
     io: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
-    pub(super) io_dispatch: Slab,
+    // TODO(eliza): once worker threads are available, replace this with a
+    // properly sharded slab.
+    pub(super) io_dispatch: SingleShard,
 
     /// The number of sources in `io_dispatch`.
     n_sources: AtomicUsize,
@@ -153,7 +155,7 @@ impl Reactor {
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
                 io,
-                io_dispatch: Slab::new(),
+                io_dispatch: SingleShard::new(),
                 n_sources: AtomicUsize::new(0),
                 wakeup: wakeup_pair.1,
             }),
